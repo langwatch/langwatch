@@ -4,13 +4,15 @@
  * for its span, and two viewers of the same window share one cache slot.
  */
 
+import { type Authorization, readScopeKeyOf } from "@langwatch/authorization";
+
 export interface DiscoverParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
 }
 
 export interface FacetValuesParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   facetKey: string;
   prefix?: string;
@@ -20,6 +22,11 @@ export interface FacetValuesParams {
 
 /** Bucket size for live-range time params so the cache key stabilises across rapid refetches. */
 const CACHE_TIME_BUCKET_MS = 60_000;
+
+/** The tenant set and windows a proof fences reads to; an aggregate and a member never share. */
+function scopeKeyOf(authorization: Authorization): string {
+  return readScopeKeyOf(authorization);
+}
 
 function bucketTime(ts: number): number {
   return Math.floor(ts / CACHE_TIME_BUCKET_MS) * CACHE_TIME_BUCKET_MS;
@@ -80,7 +87,7 @@ export function facetValuesCacheKey(params: FacetValuesParams): string {
   // "Live" time ranges roll forward by milliseconds each request — bucket to the
   // minute so identical user intent hits the same cache slot.
   return [
-    params.tenantId,
+    scopeKeyOf(params.authorization),
     params.facetKey,
     bucketTime(params.timeRange.from),
     bucketTime(params.timeRange.to),
@@ -90,13 +97,16 @@ export function facetValuesCacheKey(params: FacetValuesParams): string {
   ].join("|");
 }
 
-export function discoverCacheKey(
-  tenantId: string,
-  snapped: ReturnType<typeof snapToWindowPreset>,
-): string {
+export function discoverCacheKey({
+  authorization,
+  snapped,
+}: {
+  authorization: Authorization;
+  snapped: ReturnType<typeof snapToWindowPreset>;
+}): string {
   // Include the snapped `from` alongside `to` so two requests with different actual
   // spans that happen to land in the same preset label (e.g. 15-minute and 1-hour
   // windows both classify as "1h") don't collide on one cache slot — without `from`
   // the second viewer's facets would be served for a window they aren't looking at.
-  return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
+  return [scopeKeyOf(authorization), snapped.label, snapped.from, snapped.to].join("|");
 }

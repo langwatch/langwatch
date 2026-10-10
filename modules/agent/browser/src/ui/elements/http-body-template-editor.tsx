@@ -1,4 +1,7 @@
-import { Box, Code, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
+import { Box, Code, Text, VStack } from "@langwatch/design-system/primitives";
+
+import { httpBodyLanguage } from "../../model/http-body-language.ts";
+import { HttpBodyCodeEditor } from "./http-body-code-editor.tsx";
 
 /**
  * Standard variables available for HTTP agent body templates.
@@ -26,24 +29,23 @@ export type BodyTemplateEditorProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** The request headers; Content-Type picks the highlight language. */
+  headers?: { key: string; value: string }[];
 };
 
-export function BodyTemplateEditor({ value, onChange, disabled = false }: BodyTemplateEditorProps) {
+export function BodyTemplateEditor({
+  value,
+  onChange,
+  disabled = false,
+  headers,
+}: BodyTemplateEditorProps) {
   return (
     <VStack align="stretch" gap={3} width="full">
-      <Textarea
+      <HttpBodyCodeEditor
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={`{
-  "thread_id": "{{threadId}}",
-  "messages": {{messages}}
-}`}
-        fontFamily="mono"
-        fontSize="13px"
-        minHeight="180px"
+        onChange={onChange}
         disabled={disabled}
-        resize="vertical"
-        data-testid="body-template-editor"
+        language={httpBodyLanguage({ headers })}
       />
       <Box padding={3} bg="bg.subtle" borderRadius="md" borderWidth="1px" borderColor="border">
         <Text fontSize="xs" fontWeight="medium" color="fg.muted" marginBottom={2}>

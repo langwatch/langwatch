@@ -160,6 +160,7 @@ export function createPublicApiRig(
     monitorsByEvaluator?: Record<string, string[]>;
     graphIds?: string[];
     testFireResult?: TestFireResult;
+    allowInsecureLocalUrls?: boolean;
   } = {},
 ) {
   const rows = new Map((options.rows ?? []).map((row) => [row.id, row]));
@@ -250,7 +251,9 @@ export function createPublicApiRig(
   const service = AutomationPublicApiService.create({
     automation,
     rules: { getProjectIdentity: async () => ({ name: "Acme", slug: TEST_PROJECT.slug }) },
-    providers: AutomationProviderRegistryService.create(sealWith(MARKING_CRYPTO)),
+    providers: AutomationProviderRegistryService.create(sealWith(MARKING_CRYPTO), {
+      allowInsecureLocalUrls: options.allowInsecureLocalUrls ?? false,
+    }),
     slackConnections: AutomationSlackConnectionService.create({
       slack,
       projects: { getOrganizationId: async () => "organization_1" },

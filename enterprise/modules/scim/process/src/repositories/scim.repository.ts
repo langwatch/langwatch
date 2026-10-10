@@ -180,13 +180,15 @@ export abstract class ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    /** Held without access until a seat frees: written disabled, as seat reconciliation does. */
+    pending?: boolean;
   }) => Promise<void>;
-  abstract removeMembership: (input: { organizationId: string; userId: string }) => Promise<void>;
   /** This organization's SCIM-pushed groups this person belongs to. */
   abstract findDirectoryGroupIds(input: {
     organizationId: string;
     userId: string;
   }): Promise<string[]>;
+  /** A SCIM-pushed group by id; a group made in LangWatch is not found. */
   abstract findGroup(input: {
     organizationId: string;
     id: string;
@@ -308,7 +310,7 @@ export abstract class ScimRepository {
     organizationId: string;
     userId: string;
   }): Promise<string[]>;
-  /** Whom these connections' directories have claimed, one row per person. */
+  /** Whom these connections' directories claim and have not deactivated, one row per person. */
   abstract findDirectoryOwnership(input: {
     connectionIds: string[];
   }): Promise<ScimDirectoryOwnership[]>;

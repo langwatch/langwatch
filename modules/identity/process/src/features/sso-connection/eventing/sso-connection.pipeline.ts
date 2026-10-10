@@ -65,10 +65,7 @@ import {
   onTornDown,
 } from "./connection-teardown.process.ts";
 import { EngineFollowingSsoConnectionHeadStore } from "./sso-connection-head.store.ts";
-import {
-  type SsoConnectionEventAppends,
-  SsoConnectionLedgerStore,
-} from "./sso-connection-ledger.store.ts";
+import { SsoConnectionLedgerStore } from "./sso-connection-ledger.store.ts";
 import {
   type SsoConnectionEvent,
   type SsoConnectionFoldState,
@@ -437,8 +434,6 @@ export function composeSsoConnectionGraph(options: {
   >;
   /** The one "is there a way back in" answer, shared with the setup journey. */
   breakGlass: SsoBreakGlassBindingRepository;
-  /** The sso_connection pipeline's own store. */
-  eventStore: SsoConnectionEventAppends;
   /** The senders the process connected, which the ledger stages through. */
   commands: IdentityEventing;
   directoryMove: Pick<SsoConnectionDirectoryMoveService, "migrationFinalized">;
@@ -450,7 +445,7 @@ export function composeSsoConnectionGraph(options: {
   /** The platform-operator grant the operator-only acts are asked against. */
   authorization: SsoConnectionGuardsDeps["authorization"];
 }): SsoConnectionGraph {
-  const { repositories, eventStore, commands } = options;
+  const { repositories, commands } = options;
   const head = EngineFollowingSsoConnectionHeadStore.create({
     heads: repositories.ssoConnectionHeads,
     engineProvider: options.engineProvider,
@@ -465,7 +460,7 @@ export function composeSsoConnectionGraph(options: {
   });
   const connections = SsoConnectionService.create(
     guards,
-    SsoConnectionLedgerStore.forPipeline({ projectionStore: head, eventStore, commands }),
+    SsoConnectionLedgerStore.forPipeline({ projectionStore: head, commands }),
   );
   const mail = options.mail;
   const pipeline = () =>

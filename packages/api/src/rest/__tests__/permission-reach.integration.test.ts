@@ -7,6 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { defineRestRouter, type RestDoorCredential } from "../declaration.ts";
@@ -28,6 +29,7 @@ function family(credential: RestDoorCredential) {
     .post("/api/budgets", "createBudget")
     .withPermission("gatewayBudgets:create", { at: "organization" })
     .withOutput(z.object({ ok: z.boolean() }))
+    .withoutAudit("test route")
     .handle(({ app }) => app.read())
     .get("/api/budgets", "listBudgets")
     .withPermission("gatewayBudgets:view")
@@ -46,7 +48,7 @@ function keyDoor(withheld: readonly string[] = []) {
         throw new PermissionDeniedError({
           permission,
           scope: { type: "organization", id: ORGANIZATION.id },
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
       }
 
@@ -58,7 +60,11 @@ function keyDoor(withheld: readonly string[] = []) {
 }
 
 function mounted(door: RestIdentity, handled: string[] = []) {
-  const runtime = createRestRuntime({ identity: door, doors: { api_key: door } });
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: door,
+    doors: { api_key: door },
+  });
 
   return runtime.mount(family("api_key").router(), {
     app: () => ({
@@ -105,7 +111,10 @@ describe("a route that says how far the key door asks its permission", () => {
   /** @scenario "A route says how far the key door asks its permission" */
   it("refuses a mount that puts such a route behind another door, naming the route", () => {
     const { door } = keyDoor();
-    const runtime = createRestRuntime({ identity: door });
+    const runtime = createRestRuntime({
+      authorization: authorizationPort,
+      identity: door,
+    });
 
     expect(() =>
       runtime.mount(family("organization").router(), {

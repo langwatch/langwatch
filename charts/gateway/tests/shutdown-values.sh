@@ -211,7 +211,30 @@ test_cors_allowed_origins_reach_the_configmap() {
   fi
 }
 
+# The metrics listener is opt-in: off renders no key, on renders the switch, the port and the secret.
+test_the_metrics_listener_is_opt_in() {
+  local exporter port rendered
+  exporter=$(configmap_value_of "" "OTEL_METRICS_EXPORTER")
+  if [ -n "$exporter" ]; then
+    fail "metrics default" "OTEL_METRICS_EXPORTER is '$exporter', expected absent"
+  else
+    echo "ok   [metrics default] OTEL_METRICS_EXPORTER is absent"
+  fi
+
+  exporter=$(configmap_value_of "--set metrics.enabled=true" "OTEL_METRICS_EXPORTER")
+  port=$(configmap_value_of "--set metrics.enabled=true --set metrics.port=9470" "OTEL_EXPORTER_PROMETHEUS_PORT")
+  rendered=$(render "--set metrics.enabled=true")
+  if [ "$exporter" != "otlp,prometheus" ] || [ "$port" != "9470" ]; then
+    fail "metrics enabled" "OTEL_METRICS_EXPORTER='${exporter:-<absent>}', OTEL_EXPORTER_PROMETHEUS_PORT='${port:-<absent>}'"
+  elif ! grep -q 'name: METRICS_API_KEY' <<<"$rendered"; then
+    fail "metrics enabled" "METRICS_API_KEY is not injected from the Secret"
+  else
+    echo "ok   [metrics enabled] exporter=$exporter port=$port, METRICS_API_KEY injected"
+  fi
+}
+
 test_drain_timing_reaches_the_configmap
+test_the_metrics_listener_is_opt_in
 test_cors_allowed_origins_reach_the_configmap
 test_the_duration_string_keys_are_refused
 test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period

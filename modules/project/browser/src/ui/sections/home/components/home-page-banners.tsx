@@ -1,5 +1,5 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { getRawColorValue, useColorModeValue } from "@langwatch/design-system/color-mode";
 import { RawKbd } from "@langwatch/design-system/kbd";
 import { LangyMark } from "@langwatch/design-system/langy-mark";
 import {
@@ -45,8 +45,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
  * lighting it. The shader cannot read CSS variables, so these are resolved hex
  * exactly like every slide's.
  */
-const LANTERN_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];
-const LANTERN_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
+const LANTERN_COLORS = ["accent.solid", "orange.muted", "purple.solid"];
 
 /**
  * The Langy mark as the homebar announcement's identity — its own instance, deliberately
@@ -78,8 +77,7 @@ function LangyHomebarMark() {
 const LANGY_SLIDE: Slide = {
   id: "langy-ships-the-fix",
   storagePrefix: "langwatch:langy-home-banner-dismissed:v1:",
-  colorsLight: ["#f56b1a", "#ffb380", "#6e57d2", "#fff7ed"],
-  colorsDark: ["#a8480d", "#f56b1a", "#5b41c2", "#140b06"],
+  colors: ["accent.solid", "orange.muted", "purple.solid", "bg.subtle"],
   mesh: {
     distortion: 0.9,
     swirl: 0.7,
@@ -101,7 +99,7 @@ const LANGY_SLIDE: Slide = {
     </>
   ),
   ctaLabel: "Ask Langy to investigate",
-  legacyCtaColor: "orange.700",
+  legacyCtaColor: "accent.fg",
   posthogEvent: "langy_banner_click",
   navigate: ({ askLangy }) =>
     askLangy?.(
@@ -147,9 +145,8 @@ interface Slide {
   id: string;
   /** Per-project localStorage key prefix for the 7-day snooze. */
   storagePrefix: string;
-  /** Resolved hex colours (the WebGL shader can't read CSS variables). */
-  colorsLight: string[];
-  colorsDark: string[];
+  /** Semantic colours resolved before they reach the WebGL shader. */
+  colors: string[];
   /** Canvas shape + position, interpolated alongside the colours so the blob
    *  drifts, rotates and reshapes between slides, not just recolours. */
   mesh: {
@@ -185,8 +182,7 @@ const SLIDES: Slide[] = [
   {
     id: "automations",
     storagePrefix: "langwatch:automations-home-banner-dismissed:v1:",
-    colorsLight: ["#b45309", "#ea580c", "#e11d48", "#fff7ed"],
-    colorsDark: ["#7c2d12", "#9a3412", "#881337", "#1a0f0a"],
+    colors: ["orange.fg", "accent.solid", "red.solid", "orange.subtle"],
     mesh: {
       distortion: 0.92,
       swirl: 0.5,
@@ -206,15 +202,14 @@ const SLIDES: Slide[] = [
       </>
     ),
     ctaLabel: "Explore automations",
-    legacyCtaColor: "orange.700",
+    legacyCtaColor: "accent.fg",
     posthogEvent: "automations_banner_click",
     navigate: ({ go, projectSlug }) => go(`/${projectSlug}/automations`),
   },
   {
     id: "voice-agents",
     storagePrefix: "langwatch:voice-agents-home-banner-dismissed:v1:",
-    colorsLight: ["#0f766e", "#06b6d4", "#6366f1", "#ecfeff"],
-    colorsDark: ["#134e4a", "#0e7490", "#312e81", "#0a1424"],
+    colors: ["teal.solid", "cyan.solid", "purple.solid", "cyan.subtle"],
     mesh: {
       distortion: 0.85,
       swirl: 0.62,
@@ -233,7 +228,7 @@ const SLIDES: Slide[] = [
       </>
     ),
     ctaLabel: "Try voice agent testing",
-    legacyCtaColor: "teal.700",
+    legacyCtaColor: "teal.fg",
     posthogEvent: "voice_agents_banner_click",
     navigate: () =>
       window.open(
@@ -537,9 +532,11 @@ export function HomePageBanners({
   const slide = eligible[active];
 
   // Target palette + shape for the active slide, resolved for the theme.
-  const targetColors = useMemo(() => {
-    if (!slide) return [];
-    return isDark ? slide.colorsDark : slide.colorsLight;
+  const [targetColors, setTargetColors] = useState<string[]>([]);
+  const [themeLanternColors, setThemeLanternColors] = useState<string[]>([]);
+  useEffect(() => {
+    setTargetColors(slide?.colors.map(getRawColorValue) ?? []);
+    setThemeLanternColors(LANTERN_COLORS.map(getRawColorValue));
   }, [slide, isDark]);
   const targetMesh = slide?.mesh;
 
@@ -641,7 +638,6 @@ export function HomePageBanners({
   // The lantern is lit whether or not there is anything to announce, so when
   // every slide has been dismissed it falls back to Langy's own palette rather
   // than going dark. Same canvas, different bed.
-  const themeLanternColors = isDark ? LANTERN_COLORS_DARK : LANTERN_COLORS;
   const lanternColors = colors.length >= 3 ? colors : themeLanternColors;
   const multi = eligible.length > 1;
   const selectSlide = (nextIndex: number) => {
@@ -761,8 +757,8 @@ function LanternBanner({
         // depth.
         filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
         css={{
-          maskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-          WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+          maskImage: "radial-gradient(58% 62% at 50% 46%, currentColor 12%, transparent 72%)",
+          WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, currentColor 12%, transparent 72%)",
         }}
       >
         {lowPerf ? (
@@ -855,14 +851,7 @@ function LanternBanner({
                   {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
                 </Box>
                 {slide.badge ? (
-                  <chakra.span
-                    flexShrink={0}
-                    fontSize="11px"
-                    fontWeight="600"
-                    /* A step deeper than orange.fg on light: over the white
-                         bloom the default reads brownish; dark keeps it. */
-                    color={{ base: "orange.700", _dark: "orange.fg" }}
-                  >
+                  <chakra.span flexShrink={0} fontSize="11px" fontWeight="600" color="accent.fg">
                     {slide.badge}
                   </chakra.span>
                 ) : null}
@@ -939,7 +928,7 @@ function LanternBanner({
                              because the motion.div below takes a raw style
                              object that cannot carry Chakra conditionals. */
                         css={{
-                          "--ticker-accent": "var(--chakra-colors-orange-700)",
+                          "--ticker-accent": "var(--chakra-colors-accent-fg)",
                           _dark: {
                             "--ticker-accent": "var(--chakra-colors-orange-fg)",
                           },
@@ -995,8 +984,8 @@ function LegacyBanner({
       width="full"
       borderRadius="xl"
       overflow="hidden"
-      color="white"
-      boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.18)"
+      color="fg"
+      boxShadow="lg"
       minHeight={{ base: "160px", md: "172px" }}
       onMouseEnter={() => {
         hoveredRef.current = true;
@@ -1011,9 +1000,9 @@ function LegacyBanner({
         inset={0}
         pointerEvents="none"
         style={{
-          background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
-            colors[1] ?? colors[0] ?? "#333"
-          } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
+          background: `linear-gradient(120deg, ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}, ${
+            colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"
+          } 45%, ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"})`,
         }}
       />
       {!lowPerf ? (
@@ -1037,10 +1026,10 @@ function LegacyBanner({
         position="absolute"
         inset={0}
         pointerEvents="none"
-        backgroundImage="linear-gradient(120deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 55%, rgba(0,0,0,0) 100%)"
+        backgroundImage="linear-gradient(120deg, var(--chakra-colors-bg-scrim) 0%, color-mix(in srgb, var(--chakra-colors-bg-scrim) 20%, transparent) 55%, transparent 100%)"
       />
 
-      <Box display="grid" position="relative" zIndex={1} width="full">
+      <Box display="grid" position="relative" zIndex={1} width="full" bg="bg.panel">
         {eligible.map((s) => {
           const isActive = s.id === slide.id;
           return (
@@ -1073,10 +1062,10 @@ function LegacyBanner({
                   justifyContent="center"
                   boxSize="44px"
                   borderRadius="full"
-                  bg="white/20"
-                  boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
+                  bg="bg.panel/20"
+                  boxShadow="inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-border-strong) 35%, transparent)"
                 >
-                  {s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : s.iconNode}
+                  {s.Icon ? <Icon as={s.Icon} boxSize={5} color="fg" /> : s.iconNode}
                 </Box>
 
                 <VStack align="start" gap={1.5} flex={1} minWidth={0}>
@@ -1085,7 +1074,7 @@ function LegacyBanner({
                       as="h2"
                       size="md"
                       fontWeight="600"
-                      color="white/95"
+                      color="fg"
                       letterSpacing="-0.01em"
                       lineHeight={1.25}
                     >
@@ -1096,13 +1085,13 @@ function LegacyBanner({
                         paddingX={2}
                         paddingY="2px"
                         borderRadius="full"
-                        bg="white/30"
+                        bg="bg.panel/30"
                         flexShrink={0}
                       >
                         <Text
                           textStyle="2xs"
                           fontWeight="700"
-                          color="white"
+                          color="fg"
                           letterSpacing="0.08em"
                           textTransform="uppercase"
                           lineHeight={1.2}
@@ -1114,7 +1103,7 @@ function LegacyBanner({
                   </HStack>
                   <Text
                     textStyle="sm"
-                    color="white/80"
+                    color="fg.muted"
                     lineHeight={1.6}
                     maxWidth={{ base: "full", md: "560px" }}
                   >
@@ -1123,17 +1112,17 @@ function LegacyBanner({
                   <HStack gap={2} marginTop={1.5}>
                     <Button
                       size="sm"
-                      bg="white"
+                      bg="bg.panel"
                       color={s.legacyCtaColor}
                       fontWeight="600"
                       paddingX={4}
-                      boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+                      boxShadow="sm"
                       _hover={{
-                        bg: "white/90",
+                        bg: "bg.panel/90",
                         transform: "translateY(-1px)",
                       }}
                       _active={{
-                        bg: "white/80",
+                        bg: "bg.panel/80",
                         transform: "translateY(0)",
                       }}
                       transition="background-color 0.12s ease, transform 0.12s ease"
@@ -1159,7 +1148,7 @@ function LegacyBanner({
               cy="12"
               r="9"
               fill="none"
-              stroke="rgba(255,255,255,0.28)"
+              stroke="var(--chakra-colors-border-strong)"
               strokeWidth="2.5"
             />
             <g transform="rotate(-90 12 12)">
@@ -1168,7 +1157,7 @@ function LegacyBanner({
                 cy="12"
                 r="9"
                 fill="none"
-                stroke="white"
+                stroke="var(--chakra-colors-fg)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 style={{ pathLength: progress }}
@@ -1197,11 +1186,11 @@ function LegacyBanner({
               width={i === active ? "18px" : "7px"}
               height="7px"
               borderRadius="full"
-              bg={i === active ? "white" : "whiteAlpha.500"}
+              bg={i === active ? "bg.panel" : "fg/40"}
               transition="width 0.2s ease, background-color 0.2s ease"
               cursor="pointer"
               _hover={{
-                bg: i === active ? "white" : "whiteAlpha.700",
+                bg: i === active ? "bg.panel" : "fg/60",
               }}
             />
           ))}
@@ -1240,7 +1229,7 @@ function BriefingBanner({
         borderRadius="14px"
         borderWidth="1px"
         borderColor="border.muted"
-        background="bg.surface"
+        background="bg.card"
         overflow="hidden"
         onMouseEnter={() => {
           hoveredRef.current = true;
@@ -1262,10 +1251,10 @@ function BriefingBanner({
           opacity={0.45}
           style={{
             boxShadow: [
-              `inset 0 10px 18px -14px ${colors[0] ?? "#333"}`,
-              `inset 0 -10px 18px -14px ${colors[2] ?? colors[0] ?? "#333"}`,
-              `inset 10px 0 18px -14px ${colors[1] ?? colors[0] ?? "#333"}`,
-              `inset -10px 0 18px -14px ${colors[1] ?? colors[0] ?? "#333"}`,
+              `inset 0 10px 18px -14px ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
+              `inset 0 -10px 18px -14px ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
+              `inset 10px 0 18px -14px ${colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
+              `inset -10px 0 18px -14px ${colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
             ].join(", "),
           }}
         />
@@ -1284,9 +1273,9 @@ function BriefingBanner({
             position="absolute"
             inset={0}
             style={{
-              background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
-                colors[1] ?? colors[0] ?? "#333"
-              } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
+              background: `linear-gradient(120deg, ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}, ${
+                colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"
+              } 45%, ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"})`,
             }}
           />
           <AnimatedBannerOnly lowPerf={lowPerf}>
@@ -1327,16 +1316,16 @@ function BriefingBanner({
             boxSize="44px"
             borderRadius="11px"
             overflow="hidden"
-            boxShadow="inset 0 0 0 1px rgba(255,255,255,0.14)"
+            boxShadow="inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-border-strong) 14%, transparent)"
           >
             <Box
               position="absolute"
               inset={0}
               pointerEvents="none"
               style={{
-                background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
-                  colors[1] ?? colors[0] ?? "#333"
-                } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
+                background: `linear-gradient(120deg, ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}, ${
+                  colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"
+                } 45%, ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"})`,
               }}
             />
             {/* Per-slide glyph, crossfading on the morph's clock. */}
@@ -1353,7 +1342,7 @@ function BriefingBanner({
                     placeItems: "center",
                   }}
                 >
-                  {s.iconNode ?? (s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : null)}
+                  {s.iconNode ?? (s.Icon ? <Icon as={s.Icon} boxSize={5} color="fg" /> : null)}
                 </motion.div>
               ))}
             </Box>

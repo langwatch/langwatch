@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 /** Dataset tRPC inputs stated once in the contract. Upsert uses two parsers
  * (not intersected) so authorization sweep can read scope ids.
@@ -22,42 +23,72 @@ const DATASET_RECORD_IDS_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRIS
  * The half of a dataset write that is the same either way: the tenant key and
  * the rows, if any came with it.
  */
-export const datasetApiUpsertBaseInputSchema = z.object({
+const datasetApiUpsertBaseInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetRecords: z.array(datasetRecordInputSchema).optional(),
 });
+export interface DatasetApiUpsertBaseInputSchema extends Named<
+  typeof datasetApiUpsertBaseInputSchemaDefinition
+> {}
+export const datasetApiUpsertBaseInputSchema: DatasetApiUpsertBaseInputSchema =
+  datasetApiUpsertBaseInputSchemaDefinition;
 
 /**
  * The half that names the dataset: every caller names it outright (Alex,
  * 2026-10-07, round 9 D3; the experiment-name borrow is gone).
  */
-export const datasetApiUpsertTargetInputSchema = z.object({
+const datasetApiUpsertTargetInputSchemaDefinition = z.object({
   ...datasetRecordFormSchema.shape,
   datasetId: z.string().optional(),
 });
+export interface DatasetApiUpsertTargetInputSchema extends Named<
+  typeof datasetApiUpsertTargetInputSchemaDefinition
+> {}
+export const datasetApiUpsertTargetInputSchema: DatasetApiUpsertTargetInputSchema =
+  datasetApiUpsertTargetInputSchemaDefinition;
 
-export const datasetApiValidateNameInputSchema = z.object({
+const datasetApiValidateNameInputSchemaDefinition = z.object({
   projectId: z.string(),
   proposedName: z.string(),
   excludeDatasetId: z.string().optional(),
 });
+export interface DatasetApiValidateNameInputSchema extends Named<
+  typeof datasetApiValidateNameInputSchemaDefinition
+> {}
+export const datasetApiValidateNameInputSchema: DatasetApiValidateNameInputSchema =
+  datasetApiValidateNameInputSchemaDefinition;
 
 /** One project. The list read names it and nothing else. */
-export const datasetApiProjectInputSchema = z.object({ projectId: z.string() });
+const datasetApiProjectInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface DatasetApiProjectInputSchema extends Named<
+  typeof datasetApiProjectInputSchemaDefinition
+> {}
+export const datasetApiProjectInputSchema: DatasetApiProjectInputSchema =
+  datasetApiProjectInputSchemaDefinition;
 
 /** One dataset inside one project, by id or by slug. */
-export const datasetApiDatasetInputSchema = z.object({
+const datasetApiDatasetInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
 });
+export interface DatasetApiDatasetInputSchema extends Named<
+  typeof datasetApiDatasetInputSchemaDefinition
+> {}
+export const datasetApiDatasetInputSchema: DatasetApiDatasetInputSchema =
+  datasetApiDatasetInputSchemaDefinition;
 
-export const datasetApiDeleteInputSchema = z.object({
+const datasetApiDeleteInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   undo: z.boolean().optional(),
 });
+export interface DatasetApiDeleteInputSchema extends Named<
+  typeof datasetApiDeleteInputSchemaDefinition
+> {}
+export const datasetApiDeleteInputSchema: DatasetApiDeleteInputSchema =
+  datasetApiDeleteInputSchemaDefinition;
 
-export const datasetApiUpdateMappingInputSchema = z.object({
+const datasetApiUpdateMappingInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   mapping: z
@@ -72,54 +103,94 @@ export const datasetApiUpdateMappingInputSchema = z.object({
     })
     .optional(),
 });
+export interface DatasetApiUpdateMappingInputSchema extends Named<
+  typeof datasetApiUpdateMappingInputSchemaDefinition
+> {}
+export const datasetApiUpdateMappingInputSchema: DatasetApiUpdateMappingInputSchema =
+  datasetApiUpdateMappingInputSchemaDefinition;
 
-export const datasetApiFindNextNameInputSchema = z.object({
+const datasetApiFindNextNameInputSchemaDefinition = z.object({
   projectId: z.string(),
   proposedName: z.string(),
 });
+export interface DatasetApiFindNextNameInputSchema extends Named<
+  typeof datasetApiFindNextNameInputSchemaDefinition
+> {}
+export const datasetApiFindNextNameInputSchema: DatasetApiFindNextNameInputSchema =
+  datasetApiFindNextNameInputSchemaDefinition;
 
-export const datasetApiCopyInputSchema = z.object({
+const datasetApiCopyInputSchemaDefinition = z.object({
   datasetId: z.string(),
   sourceProjectId: z.string(),
   projectId: z.string(),
 });
+export interface DatasetApiCopyInputSchema extends Named<
+  typeof datasetApiCopyInputSchemaDefinition
+> {}
+export const datasetApiCopyInputSchema: DatasetApiCopyInputSchema =
+  datasetApiCopyInputSchemaDefinition;
 
 /** `datasetRecord.create`: new entries appended to a dataset. */
-export const datasetRecordApiCreateInputSchema = z.object({
+const datasetRecordApiCreateInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   ...newDatasetEntriesSchema.shape,
 });
+export interface DatasetRecordApiCreateInputSchema extends Named<
+  typeof datasetRecordApiCreateInputSchemaDefinition
+> {}
+export const datasetRecordApiCreateInputSchema: DatasetRecordApiCreateInputSchema =
+  datasetRecordApiCreateInputSchemaDefinition;
 
 /** `datasetRecord.update`: one entry replaced, or created, by id. */
-export const datasetRecordApiUpdateInputSchema = z.object({
+const datasetRecordApiUpdateInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   recordId: z.string(),
   updatedRecord: z.record(z.string(), z.any()),
 });
+export interface DatasetRecordApiUpdateInputSchema extends Named<
+  typeof datasetRecordApiUpdateInputSchemaDefinition
+> {}
+export const datasetRecordApiUpdateInputSchema: DatasetRecordApiUpdateInputSchema =
+  datasetRecordApiUpdateInputSchemaDefinition;
 
 /** One dataset inside one project: what the whole-dataset reads name. */
-export const datasetRecordApiLookupInputSchema = z.object({
+const datasetRecordApiLookupInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
 });
+export interface DatasetRecordApiLookupInputSchema extends Named<
+  typeof datasetRecordApiLookupInputSchemaDefinition
+> {}
+export const datasetRecordApiLookupInputSchema: DatasetRecordApiLookupInputSchema =
+  datasetRecordApiLookupInputSchemaDefinition;
 
 /** `datasetRecord.listPaginated`: the editor's classic page N of M. */
-export const datasetRecordApiPageInputSchema = z.object({
+const datasetRecordApiPageInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(200).default(50),
   search: z.string().optional(),
 });
+export interface DatasetRecordApiPageInputSchema extends Named<
+  typeof datasetRecordApiPageInputSchemaDefinition
+> {}
+export const datasetRecordApiPageInputSchema: DatasetRecordApiPageInputSchema =
+  datasetRecordApiPageInputSchemaDefinition;
 
 /** `datasetRecord.deleteMany`: entries removed by id. */
-export const datasetRecordApiDeleteManyInputSchema = z.object({
+const datasetRecordApiDeleteManyInputSchemaDefinition = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   recordIds: z.array(z.string()).max(DATASET_RECORD_IDS_MAX),
 });
+export interface DatasetRecordApiDeleteManyInputSchema extends Named<
+  typeof datasetRecordApiDeleteManyInputSchemaDefinition
+> {}
+export const datasetRecordApiDeleteManyInputSchema: DatasetRecordApiDeleteManyInputSchema =
+  datasetRecordApiDeleteManyInputSchemaDefinition;
 
 export type DatasetApiUpsertBaseInput = z.infer<typeof datasetApiUpsertBaseInputSchema>;
 export type DatasetApiUpsertTargetInput = z.infer<typeof datasetApiUpsertTargetInputSchema>;

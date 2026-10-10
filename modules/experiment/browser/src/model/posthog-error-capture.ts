@@ -1,6 +1,6 @@
 /**
  * Reports an exception as PostHog's `$exception` event, through the host's
- * analytics capability (CLAUDE.md rule 7: no module holds an analytics client).
+ * analytics host service (CLAUDE.md rule 7: no module holds an analytics client).
  */
 
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";

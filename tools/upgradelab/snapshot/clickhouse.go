@@ -228,6 +228,10 @@ func (clickhouse *ClickHouseHTTP) Export(ctx context.Context, table string, out 
 	}
 	defer response.Body.Close()
 	if encoding := response.Header.Get("Content-Encoding"); encoding != "zstd" {
+		// An empty table answers an empty, uncompressed body: kept as an empty file, which restore skips.
+		if n, _ := io.Copy(io.Discard, response.Body); encoding == "" && n == 0 {
+			return nil
+		}
 		return fmt.Errorf("export of %s came back %q-encoded, not zstd", table, encoding)
 	}
 	_, err = io.Copy(out, response.Body)

@@ -6,7 +6,13 @@ import { Tooltip } from "../overlays/tooltip.tsx";
 import { InfoWithoutSelecting } from "./info-without-selecting.tsx";
 
 const meta = {
-  title: "Primitives/Info without selecting",
+  title: "Feedback/Info without selecting",
+  parameters: {
+    usage: {
+      use: "An (i) inside a clickable row or card that must not trigger the row.",
+      avoid: "Beside a field label: use Field info tooltip.",
+    },
+  },
   component: InfoWithoutSelecting,
   tags: ["autodocs"],
   args: { children: null },

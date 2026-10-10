@@ -221,6 +221,11 @@ export class AuthzGrantWriterService {
       scopes: [binding],
     });
     this.assertNoPersonalScope(scopeRows);
+    await this.ceiling.assertHeldWithinCaller({
+      organizationId: input.organizationId,
+      caller: input.caller,
+      binding,
+    });
     await this.assertNotLastAdmin({
       organizationId: input.organizationId,
       bindingId: input.bindingId,
@@ -274,6 +279,13 @@ export class AuthzGrantWriterService {
         scopes: deletions,
       });
       this.assertNoPersonalScope(deleteScopeRows);
+      for (const binding of deletions) {
+        await this.ceiling.assertHeldWithinCaller({
+          organizationId: input.organizationId,
+          caller: input.caller,
+          binding,
+        });
+      }
       await this.options.ledger.revokeBindings({
         organizationId: input.organizationId,
         bindingIds: deletions.map((binding) => binding.id),

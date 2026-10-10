@@ -6,6 +6,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const positiveInteger = z.coerce.number().int().positive();
@@ -41,7 +42,12 @@ export const evaluationConfig = Config.define((c) => ({
 export type EvaluationServerConfig = ConfigOf<typeof evaluationConfig>;
 
 /** All a browser learns: whether this deployment can run an evaluator at all. */
-export const evaluationWebConfigSchema = z.strictObject({ langevals: z.boolean() });
+const evaluationWebConfigSchemaDefinition = z.strictObject({ langevals: z.boolean() });
+export interface EvaluationWebConfigSchema extends Named<
+  typeof evaluationWebConfigSchemaDefinition
+> {}
+export const evaluationWebConfigSchema: EvaluationWebConfigSchema =
+  evaluationWebConfigSchemaDefinition;
 
 export type EvaluationWebConfig = z.infer<typeof evaluationWebConfigSchema>;
 

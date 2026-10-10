@@ -11,7 +11,11 @@ import { renderWithAnnotationHost } from "../../../testing.tsx";
 import { AnnotationQueueEditor } from "../annotation-queue-editor.tsx";
 
 const mocks = vi.hoisted(() => {
-  const state: { queue: unknown; saved: unknown[] } = { queue: undefined, saved: [] };
+  const state: {
+    queue: unknown;
+    saved: unknown[];
+    scores: { id: string; name: string }[] | undefined;
+  } = { queue: void 0, saved: [], scores: [] };
   return state;
 });
 
@@ -32,10 +36,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
     annotationScore: {
       getAllActive: {
         useQuery: () => ({
-          data: [
-            { id: "score-1", name: "Accuracy" },
-            { id: "score-2", name: "Tone" },
-          ],
+          data: mocks.scores,
         }),
       },
     },
@@ -46,6 +47,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
             members: [
               { user: { id: "user-1", name: "Ana" } },
               { user: { id: "user-2", name: "Bo" } },
+              { user: { id: "user-3", name: null, email: "cy@example.com" } },
             ],
           },
         }),
@@ -72,6 +74,10 @@ function renderEditor(queueId?: string) {
 beforeEach(() => {
   mocks.queue = undefined;
   mocks.saved = [];
+  mocks.scores = [
+    { id: "score-1", name: "Accuracy" },
+    { id: "score-2", name: "Tone" },
+  ];
 });
 
 afterEach(() => cleanup());
@@ -143,5 +149,48 @@ describe("given a stored queue", () => {
         queueId: "queue-9",
       },
     ]);
+  });
+});
+
+describe("given a member whose account has no display name", () => {
+  /** @scenario A member with no display name is named by their email in the queue editor */
+  it("names them by email in the picker and on a stored queue's tag", async () => {
+    mocks.queue = {
+      name: "Stored",
+      description: null,
+      members: [{ user: { id: "user-3", name: null } }],
+      AnnotationQueueScores: [{ annotationScore: { id: "score-1", name: "Accuracy" } }],
+    };
+    const user = userEvent.setup();
+    renderEditor("queue-9");
+    const trigger = screen.getByRole("button", { name: /cy@example.com/ });
+    await user.click(trigger);
+    expect(
+      await screen.findByRole("button", { name: /cy@example.com/, pressed: true }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("given no available score types", () => {
+  it("disables the picker and links the inline hint to score settings", async () => {
+    mocks.scores = [];
+    const user = userEvent.setup();
+    renderEditor();
+    const picker = screen.getByRole("button", { name: "Add Score Type" });
+    expect(picker).toBeDisabled();
+    expect(picker).toHaveAccessibleDescription(/No score types yet/);
+    expect(screen.getByRole("link", { name: "Create an annotation score" })).toHaveAttribute(
+      "href",
+      "/settings/annotation-scores",
+    );
+    await user.click(picker);
+    expect(screen.queryByTestId("annotation-queue-editor-score-option")).toBeNull();
+  });
+
+  it("does not mistake a pending read for an empty collection", () => {
+    mocks.scores = void 0;
+    renderEditor();
+    expect(screen.getByRole("button", { name: "Add Score Type" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Create an annotation score" })).toBeNull();
   });
 });

@@ -31,7 +31,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/identity-client`.
+- Client packages (package.json): `@langwatch/feature-flag-client`, `@langwatch/identity-client`.
 - Lends: `SsoTestSignInToken`, `PasskeyCeremoniesToken`, `TwoStepCeremoniesToken`, `SignInMethodLinkingToken`.
 - Capabilities: `session`, `frontDoorTheme`, `host`.
 - Config slices: `auth`.

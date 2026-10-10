@@ -1,14 +1,17 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type {
-  RunSecretCiphertext,
-  ScenarioExecutionPrefetchInput,
-  ScenarioExecutionPrefetchResult,
-  ScenarioExecutionPreparation,
+import {
+  isAgentTestScenarioId,
+  type RunSecretCiphertext,
+  type ScenarioChildEnvironment,
+  type ScenarioExecutionPrefetchInput,
+  type ScenarioExecutionPrefetchResult,
+  type ScenarioExecutionPreparation,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -21,6 +24,7 @@ import { ScenarioRunKeyService } from "../../../services/scenario-run-key.servic
 import { ScenarioRunSecretsService } from "../../../services/scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
 import type { ScenarioService } from "../../../services/scenario.service.ts";
+import { AgentTestPrefetchService } from "./agent-test-prefetch.service.ts";
 import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
@@ -146,6 +150,9 @@ export class ScenarioExecutionPrefetcherService {
       "Prefetching scenario data",
     );
 
+    // An agent test has no scenario row: it reads the project and the agent, as on main.
+    if (isAgentTestScenarioId(context.scenarioId)) return this.prepareAgentTest(input);
+
     const runSecrets = this.decryptRunSecrets(context.secretParameters);
     if (!runSecrets.success) {
       return this.failedPreparation(runSecrets.error);
@@ -195,6 +202,53 @@ export class ScenarioExecutionPrefetcherService {
       }),
     };
   };
+
+  private prepareAgentTest({
+    context,
+    target,
+    startedByUserId,
+    startedByApiKeyId,
+  }: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation {
+    const { projectId } = context;
+    let announce: (environment: ScenarioChildEnvironment | null) => void = () => void 0;
+    const childEnvironment = new Promise<ScenarioChildEnvironment | null>((resolve) => {
+      announce = resolve;
+    });
+
+    const result = AgentTestPrefetchService.create({ workflows: this.options.workflows }).prefetch({
+      context,
+      target,
+      config: this.options.config,
+      reads: {
+        project: async () => {
+          const project = await this.lookups.fetchProject(projectId);
+          return project.success ? { success: true, data: { organizationId: null } } : project;
+        },
+        adapter: () =>
+          this.targets
+            .getTargetAdapter({ projectId, target, runSecretValues: {} })
+            .catch((error: unknown) => {
+              if (HandledError.isHandled(error) && error.code === "scenario_target_not_found") {
+                return null;
+              }
+              throw error;
+            }),
+        agentName: async () =>
+          (await this.options.agents.getNamesByIds({ ids: [target.referenceId], projectId }))[0]
+            ?.name ?? null,
+        runKey: (adapter) =>
+          this.runKeys.tokenFor({ projectId, adapter, startedByUserId, startedByApiKeyId }),
+      },
+      onChildEnvReady: announce,
+    });
+    // A run that fails before announcing starts no child.
+    void result.then(
+      () => announce(null),
+      () => announce(null),
+    );
+
+    return { childEnvironment, result };
+  }
 
   private decryptRunSecrets(ciphertext: RunSecretCiphertext | undefined): DecryptedRunSecrets {
     if (!ciphertext || Object.keys(ciphertext).length === 0) {

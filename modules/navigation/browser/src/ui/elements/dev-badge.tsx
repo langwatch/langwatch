@@ -13,10 +13,10 @@ export function DevBadge({ label }: { label?: string }) {
     <Text
       fontSize="11px"
       fontWeight="bold"
-      color="white"
-      backgroundColor="blackAlpha.600"
+      color="fg"
+      backgroundColor="bg.raised"
       border="1px solid"
-      borderColor="whiteAlpha.300"
+      borderColor="border.strong"
       borderRadius="full"
       height="32px"
       lineHeight="30px"

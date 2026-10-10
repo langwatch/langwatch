@@ -90,7 +90,7 @@ const renderSubscriptionPage = () => {
       <BillingHostProvider value={host}>{children}</BillingHostProvider>
     </DesignSystemProvider>
   );
-  return render(<SubscriptionPage />, { wrapper: Wrapper });
+  return { ...render(<SubscriptionPage />, { wrapper: Wrapper }), host };
 };
 
 // ---------------------------------------------------------------------------
@@ -345,6 +345,27 @@ describe("<SubscriptionPage/>", () => {
     });
 
     describe("when clicking Upgrade now", () => {
+      /** @scenario A checkout that answers no hosted page is reported to the customer */
+      it("tells the customer when the checkout answers no page", async () => {
+        mockCreateSubscription.mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({ url: null }),
+          isLoading: false,
+          isPending: false,
+        });
+
+        const { host } = renderSubscriptionPage();
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+        await waitFor(() => {
+          expect(host.failures).toHaveLength(1);
+        });
+        expect(host.departures).toEqual([]);
+      });
+
       it("calls createSubscription with resolved GROWTH_SEAT plan", async () => {
         const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
         mockCreateSubscription.mockReturnValue({

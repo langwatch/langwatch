@@ -1,5 +1,6 @@
 /** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
+import type { Hosting } from "@langwatch/browser-host/deployment";
 import {
   Activity,
   Anvil,
@@ -12,7 +13,6 @@ import {
   Building2,
   Coins,
   CreditCard,
-  DatabaseZap,
   EyeOff,
   Server,
   Fingerprint,
@@ -90,6 +90,7 @@ export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
   isSaaS: boolean;
   hasCloudOps: boolean;
+  hosting: Hosting;
   showEnterpriseNav: boolean;
   isLiteMember: boolean;
   hasOpsAccess: boolean;
@@ -290,7 +291,10 @@ export const OPS_ATTENTION_HREF = "/ops";
  * navigation, so a page missing here can't be reached from the menu.
  * `opsMenuReachability` pins it against the route table (ops-navigation-v2).
  */
-export function opsGroup(): SettingsMenuGroup {
+export function opsGroup({
+  hasCloudOps,
+  hosting,
+}: Pick<SettingsMenuGates, "hasCloudOps" | "hosting">): SettingsMenuGroup {
   return {
     id: "settings-ops",
     label: "Ops",
@@ -319,9 +323,11 @@ export function opsGroup(): SettingsMenuGroup {
       // already only a drawer opened from the projections section, so its
       // entry here pointed at a redirect.
       { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
-      { label: "Feature Flags", href: "/ops/feature-flags", icon: Flag },
+      // The cloud's gradual-rollout switch, also on a developer's machine; never self-hosted.
+      ...(hasCloudOps || hosting === "local"
+        ? [{ label: "Feature Flags", href: "/ops/feature-flags", icon: Flag }]
+        : []),
       { label: "Upgrades", href: "/ops/upgrades", icon: RefreshCw },
-      { label: "Migrations", href: "/ops/migrations", icon: DatabaseZap },
     ],
   };
 }
@@ -366,7 +372,7 @@ export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
     aiInfrastructureGroup(gates),
     dataControlsGroup(gates),
     projectGroup(gates),
-    ...(gates.hasOpsAccess ? [opsGroup()] : []),
+    ...(gates.hasOpsAccess ? [opsGroup(gates)] : []),
     ...(gates.isPlatformAdmin ? [instanceGroup()] : []),
     ...(gates.isPlatformAdmin && gates.hasCloudOps ? [cloudAdminGroup()] : []),
   ];

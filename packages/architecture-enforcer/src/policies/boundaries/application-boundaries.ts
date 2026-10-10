@@ -5,7 +5,11 @@ import ts from "typescript";
 import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceText } from "../../workspace/module-graph.ts";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import {
+  BACKEND_APPLICATION_ROOT,
+  composesApplication,
+  type WorkspaceSnapshot,
+} from "../../workspace/snapshot.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const API_RUNTIME = "@langwatch/platform-api";
@@ -179,7 +183,9 @@ function packageForPhysicalApplicationSpecifier(
   packages: readonly ClassifiedPackage[],
   specifier: string,
 ): ClassifiedPackage | undefined {
-  const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server|tasks)(?:\/|$)/);
+  const match = specifier.match(
+    /^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server|tasks|backend)(?:\/|$)/,
+  );
   if (!match) return void 0;
 
   return packages.find((pkg) => pkg.kind === "application" && pkg.applicationRole === match[1]);
@@ -220,19 +226,20 @@ type SourceImportRule = (input: {
 }) => ArchitectureViolation[];
 
 const applicationImportsApplication: SourceImportRule = ({ pkg, target, sourceImport }) => {
-  if (pkg.kind === "application" && target?.kind === "application") {
-    return [
-      {
-        policy: "application-boundary",
-        file: sourceImport.file,
-        line: sourceImport.line,
-        specifier: sourceImport.specifier,
-        message: `Application ${pkg.applicationRole} cannot import application ${target.applicationRole} source.`,
-        allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
-      },
-    ];
-  }
-  return [];
+  if (pkg.kind !== "application" || target?.kind !== "application") return [];
+
+  if (composesApplication({ importer: pkg, target })) return [];
+
+  return [
+    {
+      policy: "application-boundary",
+      file: sourceImport.file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message: `Application ${pkg.applicationRole} cannot import application ${target.applicationRole} source.`,
+      allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
+    },
+  ];
 };
 
 const mismatchedEnterpriseComposition: SourceImportRule = ({ pkg, target, sourceImport }) => {
@@ -441,14 +448,14 @@ function combinedRuntimeViolations({
 
     if (!imports.has(WORKER_RUNTIME)) continue;
 
-    if (packageRoot === "tools/dev-runtime") continue;
+    if (packageRoot === "tools/dev-runtime" || packageRoot === BACKEND_APPLICATION_ROOT) continue;
 
     violations.push({
       policy: "application-boundary",
       file: join(root, packageRoot, "src"),
       message: `${packageRoot} imports both API and worker runtime construction entry points.`,
       allowed:
-        "Only the private tools/dev-runtime contributor composition may combine both runtimes.",
+        "Only apps/backend (npx's one-process backend, Alex 2026-10-10) and the private tools/dev-runtime may combine both runtimes.",
     });
   }
 

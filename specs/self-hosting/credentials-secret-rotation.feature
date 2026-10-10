@@ -151,3 +151,43 @@ Feature: Rotating CREDENTIALS_SECRET
     When the operator runs it again
     Then it re-seals nothing
     And it counts the moved credentials as already current
+
+  @unit
+  Scenario: A serving process records a fingerprint of each credential key it accepts, never the key
+    Given a serving process configured with a credential key
+    When it records its serving roster row
+    Then the row holds a short fingerprint of that key
+    And the fingerprint does not contain the key
+    And the same key written in another letter case or with surrounding spaces gives the same fingerprint
+    And a different key gives a different fingerprint
+
+  @unit
+  Scenario: The re-seal task refuses while a running process does not accept both secrets
+    Given a CREDENTIALS_SECRET and a CREDENTIALS_SECRET_PREVIOUS
+    And a running process whose roster row states only the current secret
+    When the operator runs the credentials-reseal task
+    Then it refuses, naming that process
+    And it writes nothing
+
+  @unit
+  Scenario: The re-seal task refuses while a running process states no secrets
+    Given a CREDENTIALS_SECRET and a CREDENTIALS_SECRET_PREVIOUS
+    And a running process from a build that does not state the keys it accepts
+    When the operator runs the credentials-reseal task
+    Then it refuses, naming that process
+    And it writes nothing
+
+  @unit
+  Scenario: The re-seal task runs once every running process accepts both secrets
+    Given a CREDENTIALS_SECRET and a CREDENTIALS_SECRET_PREVIOUS
+    And every running process states both secrets
+    When the operator runs the credentials-reseal task
+    Then values sealed under the previous secret are re-sealed under the current one
+
+  @unit
+  Scenario: A dry run while a running process does not accept both secrets changes nothing
+    Given a CREDENTIALS_SECRET and a CREDENTIALS_SECRET_PREVIOUS
+    And a running process whose roster row states only the current secret
+    When the operator runs the credentials-reseal task with --dry-run
+    Then it reports which processes do not accept both secrets yet, without refusing
+    And it writes nothing

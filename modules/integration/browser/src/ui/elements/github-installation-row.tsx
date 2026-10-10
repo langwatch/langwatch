@@ -4,7 +4,8 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
-import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingItem } from "@langwatch/design-system/settings-card";
 import type { GithubInstallationSummary } from "@langwatch/github-contract";
 
 export type GithubInstallationRowProps = {
@@ -34,17 +35,11 @@ export function GithubInstallationRow({
   onDisconnect,
 }: GithubInstallationRowProps) {
   return (
-    <Box
-      data-testid="github-installation-row"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-    >
-      <HStack justify="space-between" gap={3}>
+    <SettingItem data-testid="github-installation-row">
+      <HStack justify="space-between" gap={3} flexWrap="wrap">
         <VStack align="stretch" gap={0}>
           <HStack gap={2}>
-            <Text fontSize="sm" fontWeight="600">
+            <Text fontSize="sm" fontWeight="medium">
               @{installation.accountLogin}
             </Text>
             {installation.suspended ? (
@@ -82,6 +77,6 @@ export function GithubInstallationRow({
           </Button>
         </HStack>
       </HStack>
-    </Box>
+    </SettingItem>
   );
 }

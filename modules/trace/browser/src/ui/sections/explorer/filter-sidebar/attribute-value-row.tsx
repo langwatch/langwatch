@@ -29,7 +29,8 @@ export const AttributeValueRow = memo(function AttributeValueRow({
   const isActive = isInclude || isExclude;
 
   const palette = paletteFromColor(hashColor(value));
-  const barBg = isExclude ? "red.solid" : `${palette}.solid`;
+  const barBg = isExclude ? "red.subtle" : `${palette}.subtle`;
+  const labelColor = isExclude ? "red.fg" : `${palette}.fg`;
 
   return (
     <CheckboxCard.Root
@@ -49,11 +50,11 @@ export const AttributeValueRow = memo(function AttributeValueRow({
       border="none"
       _hover={{
         "& [data-facet-label]": {
-          color: "white",
+          color: labelColor,
           fontWeight: isActive ? 700 : 600,
         },
         "& [data-facet-bar]": {
-          opacity: isActive ? 0.6 : 0.35,
+          opacity: 1,
         },
       }}
       _focusVisible={{
@@ -71,7 +72,7 @@ export const AttributeValueRow = memo(function AttributeValueRow({
         left={0}
         width="100%"
         bg={barBg}
-        opacity={isActive ? 0.45 : 0.2}
+        opacity={isActive ? 1 : 0.5}
         pointerEvents="none"
         transition="opacity 120ms ease, background 120ms ease"
       />
@@ -83,7 +84,7 @@ export const AttributeValueRow = memo(function AttributeValueRow({
           flex={1}
           minWidth={0}
           data-facet-label
-          color="white"
+          color={labelColor}
           textDecoration={isExclude ? "line-through" : undefined}
         >
           {label}

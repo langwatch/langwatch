@@ -1,7 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * The per-person notification choice, over the memory repository.
  * @see specs/langy/langy-notifications.feature
@@ -38,7 +37,7 @@ async function createPerson() {
   });
   const service = UserService.create({
     repository: users,
-    organizations: createApiFixture<OrganizationApi>({}),
+    personalProjects: { findPersonalProjectId: async () => null },
     auth: createApiFixture<AuthApi>({}),
     avatarStorage,
     credentialIssuer: "credential",

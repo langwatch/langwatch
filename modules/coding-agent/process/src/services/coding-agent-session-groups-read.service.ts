@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
   CodingAgentSessionLookupInput,
@@ -59,7 +60,7 @@ export class CodingAgentSessionGroupsReadService {
   }
 
   async readForViewer(
-    input: TraceSessionGroupsInput & { viewerUserId: string },
+    input: TraceSessionGroupsInput & { viewerUserId: string; authorization: Authorization },
   ): Promise<TracesSessionsPage> {
     const { viewerUserId, ...request } = input;
     const protections = await this.traces.resolveViewerProtections({

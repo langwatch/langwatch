@@ -5,9 +5,11 @@ import { routingDecisionSchema } from "@langwatch/identity-contract";
  * screens have always called.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { inviteLandingSchema } from "@langwatch/organization-contract";
 import {
   createdUserSchema,
   userApiChangePasswordInputSchema,
+  userApiUnlinkAccountInputSchema,
   userApiRegisterInputSchema,
   userApiSetPasswordInputSchema,
   userApiSuccessSchema,
@@ -24,7 +26,6 @@ import {
   addressConfirmationSchema,
   frontDoorAskedSchema,
   frontDoorOwnAddressSentSchema,
-  inviteLandingSchema,
   priorSessionSchema,
   signUpEnrollmentSchema,
   signUpVerificationRequestSchema,
@@ -101,6 +102,11 @@ export const authTrpc = defineTrpcContract("auth")
 
   .mutation("changePassword")
   .withInput(userApiChangePasswordInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /** Removing one of the caller's own sign-in methods, moved from `user.*` with its wire. */
+  .mutation("unlinkAccount")
+  .withInput(userApiUnlinkAccountInputSchema)
   .withOutput(userApiSuccessSchema)
 
   /**

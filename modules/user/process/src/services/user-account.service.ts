@@ -1,21 +1,13 @@
 import {
-  type EnsuredPersonalWorkspace,
-  type FindPersonalWorkspaceInput,
-  type OrganizationApi,
-  type PersonalWorkspace,
-  TeamNotFoundError,
-  type PersonalWorkspaceInput,
-} from "@langwatch/organization-contract";
-import {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
 } from "@langwatch/user-contract";
 
 export class UserAccountService {
-  private constructor(private readonly organizations: OrganizationApi) {}
+  private constructor() {}
 
-  static create(dependencies: { organizations: OrganizationApi }): UserAccountService {
-    return new UserAccountService(dependencies.organizations);
+  static create(): UserAccountService {
+    return new UserAccountService();
   }
 
   personalCallerFor(input: {
@@ -31,16 +23,5 @@ export class UserAccountService {
     }
 
     return input.project.ownerUserId;
-  }
-
-  ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {
-    return this.organizations.ensurePersonalWorkspace(input);
-  }
-
-  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.organizations.getPersonalWorkspace(input).catch((error: unknown) => {
-      if (TeamNotFoundError.is(error)) return null;
-      throw error;
-    });
   }
 }

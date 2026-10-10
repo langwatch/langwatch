@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** How many completed jobs the queue keeps in its rolling latency sample;
@@ -83,21 +84,28 @@ export function computePercentileFromHistogram(
   return LATENCY_HISTOGRAM_BOUNDS_MS[LATENCY_HISTOGRAM_BOUNDS_MS.length - 1]!;
 }
 
-export const latencyWindowPercentilesSchema = z.object({
+const latencyWindowPercentilesSchemaDefinition = z.object({
   p50Ms: z.number(),
   p99Ms: z.number(),
   /** Completions the window's percentiles are computed over. */
   count: z.number(),
 });
+export interface LatencyWindowPercentilesSchema extends Named<
+  typeof latencyWindowPercentilesSchemaDefinition
+> {}
+export const latencyWindowPercentilesSchema: LatencyWindowPercentilesSchema =
+  latencyWindowPercentilesSchemaDefinition;
 export type LatencyWindowPercentiles = z.infer<typeof latencyWindowPercentilesSchema>;
 
 /** Per-window percentiles; a window with no completions is null. */
-export const latencyWindowsSchema = z.object({
+const latencyWindowsSchemaDefinition = z.object({
   hour: latencyWindowPercentilesSchema.nullable(),
   day: latencyWindowPercentilesSchema.nullable(),
   week: latencyWindowPercentilesSchema.nullable(),
   allTime: latencyWindowPercentilesSchema.nullable(),
 });
+export interface LatencyWindowsSchema extends Named<typeof latencyWindowsSchemaDefinition> {}
+export const latencyWindowsSchema: LatencyWindowsSchema = latencyWindowsSchemaDefinition;
 export type LatencyWindows = z.infer<typeof latencyWindowsSchema>;
 
 export function computeWindowPercentiles(

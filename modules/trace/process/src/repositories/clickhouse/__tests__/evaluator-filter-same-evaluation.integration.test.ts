@@ -5,9 +5,11 @@
  * @see https://github.com/langwatch/tasks/issues/918
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { tenantScope } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { expandStatementForProject } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import {
   startMigratedTraceClickHouse,
@@ -108,13 +110,17 @@ let ch: ClickHouseClient;
 async function matching(filter: string, tenant = tenantId): Promise<string[]> {
   const compiled = traceQueryTranslation.translateFilter({
     queryText: filter,
-    tenantId: tenant,
     timeRange: WINDOW,
   });
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
+  const statement = expandStatementForProject({
+    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${compiled.sql}`,
+    queryParams: compiled.params,
+    projectId: tenant,
+  });
   const result = await ch.query({
-    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled.sql}`,
-    query_params: compiled.params,
+    query: statement.query,
+    query_params: statement.queryParams,
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TraceId: string }>();

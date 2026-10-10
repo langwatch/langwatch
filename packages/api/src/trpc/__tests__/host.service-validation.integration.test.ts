@@ -8,6 +8,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { SessionReader } from "../../hosting/session-reader.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
@@ -41,6 +42,7 @@ async function callThroughHost(): Promise<{
   const trpc = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
     authz: {
+      ...authorizeDefaults,
       getDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
       getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
       checkScopeLineage: async () => ({ kind: "consistent" }),

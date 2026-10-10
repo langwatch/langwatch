@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -14,7 +15,7 @@ export type ScenarioRunExportMode = z.infer<typeof scenarioRunExportModeSchema>;
 export const scenarioRunExportStatusFilterSchema = z.enum(["pass", "fail", "stalled"]);
 export type ScenarioRunExportStatusFilter = z.infer<typeof scenarioRunExportStatusFilterSchema>;
 
-export const scenarioRunExportRequestSchema = z.object({
+const scenarioRunExportRequestSchemaDefinition = z.object({
   projectId: z.string(),
   mode: scenarioRunExportModeSchema,
   /** Scopes to one scenario set; omitted when exporting from "All Runs". */
@@ -24,6 +25,11 @@ export const scenarioRunExportRequestSchema = z.object({
   startDate: z.number().optional(),
   endDate: z.number().optional(),
 });
+export interface ScenarioRunExportRequestSchema extends Named<
+  typeof scenarioRunExportRequestSchemaDefinition
+> {}
+export const scenarioRunExportRequestSchema: ScenarioRunExportRequestSchema =
+  scenarioRunExportRequestSchemaDefinition;
 export type ScenarioRunExportRequest = z.infer<typeof scenarioRunExportRequestSchema>;
 
 /** The export application opens one download for an authenticated person. */
@@ -47,8 +53,13 @@ export type ScenarioRunExportDownload = Readonly<{
  * export emits several rows per run, and a category filter drops some runs
  * entirely, so only runs-visited can compare against a total known up front.
  */
-export const scenarioRunExportProgressSchema = z.object({
+const scenarioRunExportProgressSchemaDefinition = z.object({
   exported: z.number(),
   total: z.number(),
 });
+export interface ScenarioRunExportProgressSchema extends Named<
+  typeof scenarioRunExportProgressSchemaDefinition
+> {}
+export const scenarioRunExportProgressSchema: ScenarioRunExportProgressSchema =
+  scenarioRunExportProgressSchemaDefinition;
 export type ScenarioRunExportProgress = z.infer<typeof scenarioRunExportProgressSchema>;

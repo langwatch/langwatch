@@ -4,6 +4,7 @@ import type {
   OrganizationInvite,
   OrganizationUser,
   OrganizationUserRole,
+  PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
 
 /** The columns a pending or payment-pending invite is written with. */
@@ -26,6 +27,11 @@ export type InviteWithRequester = OrganizationInvite & {
 
 export type InviteWithOrganization = OrganizationInvite & {
   organization: Organization | null;
+};
+
+/** One invitation as its link's landing reads it: the organization and who asked. */
+export type InviteWithOrganizationAndRequester = InviteWithOrganization & {
+  requestedByUser: { name: string | null } | null;
 };
 
 /**
@@ -107,6 +113,10 @@ export abstract class OrganizationInviteRepository {
   abstract getInviteByCodeWithOrganization(input: {
     inviteCode: string;
   }): Promise<InviteWithOrganization>;
+  /** Throws `InviteNotFoundError`. */
+  abstract getInviteLandingByCode(input: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester>;
   abstract findAdminEmails(input: { organizationId: string }): Promise<string[]>;
   /** The live projects' slugs in these teams. */
   abstract findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]>;
@@ -117,6 +127,10 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     email: string;
   }): Promise<OrganizationInvite>;
+  /** Every pending invite on one address, in any organization, newest first: an operator's read. */
+  abstract findPendingInvitesForAddress(input: {
+    address: string;
+  }): Promise<PendingInvitationsByEmail>;
   /**
    * The oldest pending, unexpired invite on ONE address, in any organization
    * (ADR-171 v6). One address per read: the tenancy guard admits a
@@ -125,6 +139,7 @@ export abstract class OrganizationInviteRepository {
   abstract findOldestPendingInviteForAddress(input: { address: string }): Promise<{
     inviteCode: string;
     organizationName: string;
+    inviterName: string | null;
     role: OrganizationUserRole;
   } | null>;
   /**

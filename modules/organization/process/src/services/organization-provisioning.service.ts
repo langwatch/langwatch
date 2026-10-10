@@ -15,6 +15,7 @@ import type {
   OrganizationMembershipRepository,
 } from "../repositories/organization-membership.repository.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
+import type { OrganizationMemberChangeNotice } from "./organization-member-admission.service.ts";
 import type { OrganizationTestArrivals } from "./organization-membership.service.ts";
 
 /** The KSUID resource an organization's first team is born under. */
@@ -35,6 +36,7 @@ export class OrganizationProvisioningService {
     repository: OrganizationMembershipRepository;
     creations: OrganizationCreationNotice;
     testArrivals: OrganizationTestArrivals;
+    memberNotices: Pick<OrganizationMemberChangeNotice, "memberRemoved">;
   }): OrganizationProvisioningService {
     return new OrganizationProvisioningService(dependencies);
   }
@@ -44,6 +46,7 @@ export class OrganizationProvisioningService {
       repository: OrganizationMembershipRepository;
       creations: OrganizationCreationNotice;
       testArrivals: OrganizationTestArrivals;
+      memberNotices: Pick<OrganizationMemberChangeNotice, "memberRemoved">;
     },
   ) {}
 
@@ -144,7 +147,7 @@ export class OrganizationProvisioningService {
       // The caller has to see what actually went wrong, so a compensation
       // that fails too is reported rather than raised over the top of it.
       try {
-        await this.repo.deleteProvisionedOrganization(result.organization.id);
+        await this.deleteProvisionedOrganization({ organizationId: result.organization.id });
       } catch (compensationError) {
         this.dependencies.creations.reportError(
           compensationError instanceof Error
@@ -211,7 +214,16 @@ export class OrganizationProvisioningService {
   }: {
     organizationId: string;
   }): Promise<void> {
+    const members = await this.repo.findMembersWithDepartments({ organizationId });
     await this.repo.deleteProvisionedOrganization(organizationId);
+    // M8487-REMOVAL-PATHS: every member the deletion took is a removal peers react to.
+    for (const { userId } of members) {
+      await this.dependencies.memberNotices.memberRemoved({
+        organizationId,
+        userId,
+        removedByUserId: null,
+      });
+    }
   }
 
   /** One organization's provisioning summary, or null when the id is unknown. */

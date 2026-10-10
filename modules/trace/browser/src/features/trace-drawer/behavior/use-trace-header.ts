@@ -18,6 +18,7 @@ export function useTraceHeaderCanonical() {
   const rowHeader = useTraceListRowHeader();
   const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
   const backfillOccurredAtMs = useTraceDrawer((s) => s.backfillOccurredAtMs);
+  const backfillTenantId = useTraceDrawer((s) => s.backfillTenantId);
   const query = api.traces.header.useQuery(
     { ...queryArgs, full: true },
     {
@@ -40,6 +41,16 @@ export function useTraceHeaderCanonical() {
   useEffect(() => {
     if (resolvedTimestamp !== undefined) backfillOccurredAtMs(resolvedTimestamp);
   }, [resolvedTimestamp, backfillOccurredAtMs]);
+
+  // A deep link into an aggregate names no member: the header's read picks one and the
+  // drawer's other reads follow it rather than each picking again (ADR-177 block F).
+  const resolvedTenantId =
+    query.data?.traceId === queryArgs.traceId ? query.data.projectId : undefined;
+  useEffect(() => {
+    if (resolvedTenantId && resolvedTenantId !== queryArgs.projectId) {
+      backfillTenantId(resolvedTenantId);
+    }
+  }, [resolvedTenantId, queryArgs.projectId, backfillTenantId]);
 
   return query;
 }

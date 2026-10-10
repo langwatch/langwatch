@@ -3,7 +3,8 @@ import {
   type DataPrivacySnapshot,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { Heading, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card, Table } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 
 import {
   CATEGORY_LABELS,
@@ -94,25 +95,35 @@ export function EffectiveSummary({
     { term: "Secrets redaction", value: secretsValue },
   ];
   return (
-    <VStack gap={3} align="stretch" width="full" paddingTop={2}>
-      <VStack gap={0} align="start">
-        <Heading as="h3" fontSize="lg">
-          Effective for {scopeLabel}
-        </Heading>
-        <Text fontSize="sm" color="fg.muted">
-          What is actually applied, after the rules above cascade down.
-        </Text>
-      </VStack>
-      <Table.Root variant="line" size="sm" width="full">
-        <Table.Body>
-          {effectiveRows.map(({ term, value }) => (
-            <Table.Row key={term}>
-              <Table.Cell color="fg.muted">{term}</Table.Cell>
-              <Table.Cell textAlign="end">{value}</Table.Cell>
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </VStack>
+    <SettingsSection
+      divided={false}
+      title={`Effective for ${scopeLabel}`}
+      hint="What is actually applied, after the rules above cascade down."
+    >
+      <Card.Root width="full">
+        <Card.Body paddingY={0}>
+          <Table.Root
+            variant="line"
+            size="sm"
+            width="full"
+            // The card draws the outer edge; the last row's rule would double it.
+            css={{ "& tr:last-of-type td": { borderBottomWidth: 0 } }}
+          >
+            <Table.Body>
+              {effectiveRows.map(({ term, value }) => (
+                <Table.Row key={term}>
+                  <Table.Cell color="fg.muted" paddingX={0}>
+                    {term}
+                  </Table.Cell>
+                  <Table.Cell textAlign="end" paddingX={0}>
+                    {value}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </Card.Body>
+      </Card.Root>
+    </SettingsSection>
   );
 }

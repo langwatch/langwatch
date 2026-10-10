@@ -33,6 +33,7 @@ const ENDPOINT_ROW = {
   maxBatchSize: 100,
   maxBatchDelayMs: 1000,
   maxInFlight: 4,
+  allowSelfSignedCertificate: false,
   enabledEvents: ["gateway.request.completed"],
   status: "ACTIVE",
   disabledReason: null,

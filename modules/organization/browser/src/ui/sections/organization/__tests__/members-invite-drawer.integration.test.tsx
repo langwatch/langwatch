@@ -108,15 +108,29 @@ describe("the organization members page", () => {
     });
 
     /** @scenario Typing an email inline opens the drawer carrying that email */
-    it("opens the drawer carrying what was typed into the inline box", async () => {
+    it("opens the drawer carrying the whole address typed into the inline box", async () => {
+      const { host } = renderMembers();
+      const box = screen.getByLabelText("Invite a teammate by email");
+
+      await userEvent.type(box, "new.hire@acme.test");
+      expect(host.overlays).toEqual([]);
+      await userEvent.type(box, "{Enter}");
+
+      expect(host.overlays).toEqual([
+        { name: "inviteMember", props: { initialEmail: "new.hire@acme.test" } },
+      ]);
+    });
+
+    /** @scenario Typing an email inline opens the drawer carrying that email */
+    it("carries the typed address when Invite people is chosen", async () => {
       const { host } = renderMembers();
 
-      await userEvent.type(screen.getByLabelText("Invite a teammate by email"), "n");
+      await userEvent.type(screen.getByLabelText("Invite a teammate by email"), "a@b.test");
+      await userEvent.click(screen.getByRole("button", { name: /invite people/i }));
 
-      expect(host.overlays[0]).toEqual({
-        name: "inviteMember",
-        props: { initialEmail: "n" },
-      });
+      expect(host.overlays).toEqual([
+        { name: "inviteMember", props: { initialEmail: "a@b.test" } },
+      ]);
     });
   });
 });

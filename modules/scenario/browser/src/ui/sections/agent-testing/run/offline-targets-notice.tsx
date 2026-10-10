@@ -3,7 +3,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert } from "@langwatch/design-system/primitives";
 
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { offlineTargetMessage, offlineTargetsOf } from "./offline-targets.ts";
@@ -21,21 +21,13 @@ export function OfflineTargetsNotice({
   if (offline.length === 0) return null;
 
   return (
-    <VStack
-      align="stretch"
-      gap={1}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      paddingX={3}
-      paddingY={2}
-      data-testid="run-dialog-offline-targets"
-    >
-      {offline.map((target) => (
-        <Text key={target.id} fontSize="12px">
-          {offlineTargetMessage(target)}
-        </Text>
-      ))}
-    </VStack>
+    <Alert.Root status="warning" size="sm" data-testid="run-dialog-offline-targets">
+      <Alert.Indicator />
+      <Alert.Content>
+        {offline.map((target) => (
+          <Alert.Description key={target.id}>{offlineTargetMessage(target)}</Alert.Description>
+        ))}
+      </Alert.Content>
+    </Alert.Root>
   );
 }

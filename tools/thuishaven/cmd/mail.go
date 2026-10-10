@@ -11,9 +11,11 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// The `haven mail` noun: read this worktree's own caught email — one client
+// The `haven sim mail` noun: read this worktree's own caught email — one client
 // over the sink's own HTTP API (services/mailsim), the same API a test would
 // call directly. `address` needs no request; every other subcommand dials
 // d.orch.MailBaseURL, which refuses immediately, naming the lane and the
@@ -24,7 +26,7 @@ import (
 // before the server's own deadline fires.
 const mailHTTPTimeout = 5 * time.Second
 
-// mailWaitDefaultTimeout is `haven mail wait`'s timeout when --timeout is not
+// mailWaitDefaultTimeout is `haven sim mail wait`'s timeout when --timeout is not
 // given, matching the sink's own default.
 const mailWaitDefaultTimeout = 30 * time.Second
 
@@ -114,10 +116,10 @@ func (c mailClient) do(ctx context.Context, r mailRequest) error {
 	}
 }
 
-// mailFilter narrows a list or a wait to a recipient and a subject; empty
-// fields match everything.
+// mailFilter narrows a list or a wait to a recipient and a subject (a wait
+// also to mail newer than an id); empty fields match everything.
 type mailFilter struct {
-	to, subject string
+	to, subject, after string
 }
 
 // addTo sets the filter's non-empty fields on q.
@@ -127,6 +129,9 @@ func (f mailFilter) addTo(q url.Values) url.Values {
 	}
 	if f.subject != "" {
 		q.Set("subject", f.subject)
+	}
+	if f.after != "" {
+		q.Set("after", f.after)
 	}
 	return q
 }
@@ -213,9 +218,9 @@ func (c mailClient) getHTML(ctx context.Context, id string) (string, error) {
 }
 
 // mailUsage is printed on a missing or unknown subcommand.
-const mailUsage = "usage: haven mail <address|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--timeout]|delete <id>|clear> [--json]"
+const mailUsage = "usage: haven sim mail <address|status|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--after <id>] [--timeout]|delete <id>|clear|fault <0|4xx|5xx|off>> [--json]"
 
-// runMail is `haven mail <address|list|get|links|wait|delete|clear>`.
+// runMail is `haven sim mail <address|status|list|get|links|wait|delete|clear>`.
 func runMail(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(mailUsage)
@@ -247,10 +252,13 @@ type mailSink struct {
 	asJSON  bool
 }
 
-// runMailSubcommand is every `haven mail` subcommand but `address`, given the
+// runMailSubcommand is every `haven sim mail` subcommand but `address`, given the
 // sink's base URL — split out so it can be unit-tested against a stub HTTP
 // server implementing the pinned contract, with no Orchestrator involved.
 func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error {
+	if inv.args[0] == "set" {
+		return simSetForcedError(sources.NewSimAPIAt(sink.baseURL), "mail", inv, sink.asJSON)
+	}
 	cmd := mailCommand{client: newMailClient(sink.baseURL), asJSON: sink.asJSON}
 	switch inv.args[0] {
 	case "list":
@@ -265,8 +273,10 @@ func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error
 		return cmd.delete(ctx, inv)
 	case "clear":
 		return cmd.clear(ctx)
+	case "inbox":
+		return cmd.inbox(ctx)
 	default:
-		return fmt.Errorf("unknown `haven mail` subcommand %q — %s", inv.args[0], mailUsage)
+		return fmt.Errorf("unknown `haven sim mail` subcommand %q — %s", inv.args[0], mailUsage)
 	}
 }
 
@@ -290,7 +300,7 @@ func (cmd mailCommand) list(ctx context.Context, inv invocation) error {
 
 func (cmd mailCommand) get(ctx context.Context, inv invocation) error {
 	if len(inv.args) < 2 {
-		return errors.New("usage: haven mail get <id> [--html]")
+		return errors.New("usage: haven sim mail get <id> [--html]")
 	}
 	id := inv.args[1]
 	if inv.has("--html") {
@@ -317,7 +327,8 @@ func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
 		}
 		timeout = dur
 	}
-	msg, matched, err := cmd.client.wait(ctx, mailFilter{to: inv.value("--to"), subject: inv.value("--subject")}, timeout)
+	filter := mailFilter{to: inv.value("--to"), subject: inv.value("--subject"), after: inv.value("--after")}
+	msg, matched, err := cmd.client.wait(ctx, filter, timeout)
 	if err != nil {
 		return err
 	}
@@ -330,7 +341,7 @@ func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
 // links prints the links found in one message, one per line.
 func (cmd mailCommand) links(ctx context.Context, inv invocation) error {
 	if len(inv.args) < 2 {
-		return errors.New("usage: haven mail links <id>")
+		return errors.New("usage: haven sim mail links <id>")
 	}
 	msg, err := cmd.client.get(ctx, inv.args[1])
 	if err != nil {
@@ -348,7 +359,7 @@ func (cmd mailCommand) links(ctx context.Context, inv invocation) error {
 // delete removes one message from the inbox.
 func (cmd mailCommand) delete(ctx context.Context, inv invocation) error {
 	if len(inv.args) < 2 {
-		return errors.New("usage: haven mail delete <id>")
+		return errors.New("usage: haven sim mail delete <id>")
 	}
 	id := inv.args[1]
 	notFound := fmt.Errorf("message %q is not in this stack's inbox", id)
@@ -359,6 +370,32 @@ func (cmd mailCommand) delete(ctx context.Context, inv invocation) error {
 		return printMailJSON(map[string]bool{"deleted": true})
 	}
 	fmt.Println("message deleted")
+	return nil
+}
+
+// mailInbox is the sink's own account of itself, as GET /api/inbox reports it.
+type mailInbox struct {
+	Stack      string `json:"stack"`
+	SMTPAddr   string `json:"smtpAddr"`
+	BaseURL    string `json:"baseUrl"`
+	Persistent bool   `json:"persistent"`
+	Address    string `json:"address"`
+}
+
+// inbox prints what the console's "This inbox" panel shows.
+func (cmd mailCommand) inbox(ctx context.Context) error {
+	var info mailInbox
+	if err := cmd.client.do(ctx, mailRequest{method: http.MethodGet, path: "/api/inbox", into: &info}); err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(info)
+	}
+	fmt.Printf("stack:      %s\n", info.Stack)
+	fmt.Printf("address:    %s\n", info.Address)
+	fmt.Printf("smtp:       %s\n", info.SMTPAddr)
+	fmt.Printf("console:    %s\n", info.BaseURL)
+	fmt.Printf("persistent: %t\n", info.Persistent)
 	return nil
 }
 

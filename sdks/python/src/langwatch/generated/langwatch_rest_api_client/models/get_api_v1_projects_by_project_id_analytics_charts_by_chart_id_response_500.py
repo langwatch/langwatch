@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ..models.get_api_v1_projects_by_project_id_analytics_charts_by_chart_id_response_500_meta import (
         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Meta,
     )
+    from ..models.get_api_v1_projects_by_project_id_analytics_charts_by_chart_id_response_500_trace import (
+        GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Trace,
+    )
 
 
 T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500")
@@ -31,6 +34,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
         meta (GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
+        trace (GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
         fault (GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Fault | Unset):
@@ -44,6 +48,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
     meta: GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
+    trace: GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
     fault: GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Fault | Unset = UNSET
@@ -66,6 +71,10 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
         trace_id = self.trace_id
 
         span_id = self.span_id
+
+        trace: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.trace, Unset):
+            trace = self.trace.to_dict()
 
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
@@ -97,6 +106,8 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
+        if trace is not UNSET:
+            field_dict["trace"] = trace
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
@@ -112,6 +123,9 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_v1_projects_by_project_id_analytics_charts_by_chart_id_response_500_meta import (
             GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Meta,
+        )
+        from ..models.get_api_v1_projects_by_project_id_analytics_charts_by_chart_id_response_500_trace import (
+            GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Trace,
         )
 
         d = dict(src_dict)
@@ -134,6 +148,13 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
 
         span_id = d.pop("span_id", UNSET)
 
+        _trace = d.pop("trace", UNSET)
+        trace: GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Trace | Unset
+        if isinstance(_trace, Unset):
+            trace = UNSET
+        else:
+            trace = GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500Trace.from_dict(_trace)
+
         tips = cast(list[str], d.pop("tips", UNSET))
 
         docs_url = d.pop("docs_url", UNSET)
@@ -155,6 +176,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse500:
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
+            trace=trace,
             tips=tips,
             docs_url=docs_url,
             fault=fault,

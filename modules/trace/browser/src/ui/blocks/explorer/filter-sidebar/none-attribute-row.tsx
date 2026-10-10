@@ -36,7 +36,7 @@ export const NoneAttributeRow: React.FC<{
         textStyle="xs"
         fontStyle="italic"
         fontWeight={active ? "600" : "400"}
-        color={active ? "white" : "fg.subtle"}
+        color={active ? "gray.contrast" : "fg.subtle"}
         data-facet-label
       >
         (none)

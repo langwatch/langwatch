@@ -70,6 +70,7 @@ async function gatewayAppStub() {
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
+      licensing: peer("licensing"),
     },
     repositories,
     config: {

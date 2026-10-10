@@ -4,32 +4,26 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Button } from "@langwatch/design-system/primitives";
 
 export function MissingProviderNotice() {
   return (
-    <VStack
-      align="start"
-      gap={2}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      padding={3}
-      data-testid="run-dialog-missing-provider"
-    >
-      <Text fontSize="sm" fontWeight="medium">
-        No model provider is set up
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        A run needs a model provider to simulate the user and judge the result.
-      </Text>
-      <Button
-        size="xs"
-        variant="outline"
-        onClick={() => window.open("/settings/model-providers", "_blank", "noopener,noreferrer")}
-      >
-        Open model provider settings
-      </Button>
-    </VStack>
+    <Alert.Root status="warning" size="sm" data-testid="run-dialog-missing-provider">
+      <Alert.Indicator />
+      <Alert.Content gap={2}>
+        <Alert.Title>No model provider is set up</Alert.Title>
+        <Alert.Description>
+          A run needs a model provider to simulate the user and judge the result.
+        </Alert.Description>
+        <Button
+          size="xs"
+          variant="outline"
+          alignSelf="start"
+          onClick={() => window.open("/settings/model-providers", "_blank", "noopener,noreferrer")}
+        >
+          Open model provider settings
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
   );
 }

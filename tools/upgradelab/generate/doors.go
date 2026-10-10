@@ -24,7 +24,6 @@ import (
 
 const (
 	composeFile   = "dev/scripts/upgrade-rehearsal/compose.yml"
-	productSeeds  = "dev/scripts/upgrade-rehearsal/seed/product.mjs"
 	healthTimeout = 10 * time.Minute
 	stderrTail    = 4096
 )
@@ -112,6 +111,7 @@ type ComposeDoors struct {
 	runDir  string
 	project string
 	seed    int64
+	seeder  *seed.Seeder
 }
 
 // NewComposeDoors refuses a used Out, loads the shape env and writes the env file and ports override.
@@ -192,17 +192,27 @@ func (doors *ComposeDoors) Run(ctx context.Context, plan Plan, step Step) error 
 	if step.Name == "capture" {
 		return doors.redact(doors.capture(ctx, plan))
 	}
+	if err := doors.runInvocations(ctx, plan, step); err != nil {
+		return doors.redact(err)
+	}
+	switch step.Name {
+	case "old-release-up":
+		return waitHealthy(ctx, doors.options.Ports.appURL()+"/api/health")
+	case "product-seeds":
+		return doors.redact(doors.seedProducts(ctx))
+	}
+	return nil
+}
+
+func (doors *ComposeDoors) runInvocations(ctx context.Context, plan Plan, step Step) error {
 	invocations, err := doors.Invocations(plan, step)
 	if err != nil {
 		return err
 	}
 	for _, invocation := range invocations {
 		if err := doors.options.Runner.Run(ctx, invocation); err != nil && !firedOnly(step, err) {
-			return doors.redact(err)
+			return err
 		}
-	}
-	if step.Name == "old-release-up" {
-		return waitHealthy(ctx, doors.options.Ports.appURL()+"/api/health")
 	}
 	return nil
 }
@@ -217,7 +227,7 @@ func (doors *ComposeDoors) Invocations(plan Plan, step Step) ([]Invocation, erro
 	case "tenancy-sql":
 		return []Invocation{doors.psql(plan.TenancyS)}, nil
 	case "product-seeds":
-		return doors.productSeeds(), nil
+		return []Invocation{doors.psql(AccountSQL(doors.seed))}, nil
 	case "traffic", "traffic-at-cut":
 		return []Invocation{doors.traffic(step)}, nil
 	case "pause-worker":
@@ -244,26 +254,22 @@ func (doors *ComposeDoors) psql(sql string) Invocation {
 	return invocation
 }
 
-// productSeeds ports seed-account.sh into one psql transaction, then runs product.mjs signed in as it.
-// shortcut: product.mjs stays node; port its kinds to Go when the bash rehearsal retires (ruling D3).
-func (doors *ComposeDoors) productSeeds() []Invocation {
-	email, password := seedAccount(doors.seed)
-	node := Invocation{Args: []string{"node", filepath.Join(doors.options.Root, productSeeds), "seed"}, Dir: doors.options.Root, Env: []string{
-		"APP_BASE=" + doors.options.Ports.appURL(), "SEED_EMAIL=" + email, "SEED_PASSWORD=" + password, "SEED_LABEL=" + doors.project,
-		"OUT=" + filepath.Join(doors.runDir, "product-seeds.json"),
-	}}
-	return []Invocation{doors.psql(accountSQL(doors.seed)), node}
+// seedProducts signs in as the account AccountSQL wrote and creates each product kind through the old app's doors.
+func (doors *ComposeDoors) seedProducts(ctx context.Context) error {
+	email, password := SeedAccount(doors.seed)
+	doors.seeder = seed.NewSeeder(seed.ProductInput{AppURL: doors.options.Ports.appURL(), Email: email, Password: password, Label: doors.project})
+	return doors.seeder.Seed(ctx)
 }
 
-// seedAccount is the seed's credential account; seed-derived so a restored copy can sign in again.
-func seedAccount(seedValue int64) (email, password string) {
+// SeedAccount is the seed's credential account; seed-derived so a restored copy can sign in again.
+func SeedAccount(seedValue int64) (email, password string) {
 	n := strconv.FormatInt(seedValue, 10)
 	return "seed+" + n + "@snapshot.test", "snapshot-test-seed-password-" + n
 }
 
-// accountSQL hashes in a scratch pgcrypto schema it drops in the same transaction, so the old schema keeps no extension.
-func accountSQL(seedValue int64) string {
-	email, password := seedAccount(seedValue)
+// AccountSQL hashes in a scratch pgcrypto schema it drops in the same transaction, so the old schema keeps no extension.
+func AccountSQL(seedValue int64) string {
+	email, password := SeedAccount(seedValue)
 	user := sqlString(fmt.Sprintf("snap_seed_user_%d", seedValue))
 	return "SET search_path TO mydb;\nBEGIN;\nCREATE SCHEMA upgradelab_crypto;\nCREATE EXTENSION pgcrypto SCHEMA upgradelab_crypto;\n" +
 		`INSERT INTO "User" (id, name, email, "emailVerified") VALUES (` + user + `, 'Snapshot seed', ` + sqlString(email) + ", true);\n" +
@@ -323,8 +329,25 @@ func (doors *ComposeDoors) capture(ctx context.Context, plan Plan) error {
 	if err != nil {
 		return err
 	}
-	_, err = snapshot.Capture(ctx, snapshot.CaptureInput{Dir: doors.options.Out, Stores: stores, Meta: doors.meta(plan), Scrubber: doors.scrubber(plan)})
-	return err
+	if _, err = snapshot.Capture(ctx, snapshot.CaptureInput{Dir: doors.options.Out, Stores: stores, Meta: doors.meta(plan), Scrubber: doors.scrubber(plan)}); err != nil {
+		return err
+	}
+	return doors.checkExpect(ctx)
+}
+
+// checkExpect asks the still-running old app, after capture, whether every seeded kind is there.
+func (doors *ComposeDoors) checkExpect(ctx context.Context) error {
+	if doors.seeder == nil {
+		return errors.New("expect: product-seeds never ran in this process, so there is nothing to check")
+	}
+	counts, err := doors.seeder.Count(ctx)
+	if err != nil {
+		return fmt.Errorf("expect: %w", err)
+	}
+	if err := seed.ExpectedKinds().Check(counts); err != nil {
+		return fmt.Errorf("expect: %w", err)
+	}
+	return nil
 }
 
 func (doors *ComposeDoors) stores() (snapshot.Stores, error) {
@@ -362,7 +385,7 @@ func (doors *ComposeDoors) meta(plan Plan) snapshot.Manifest {
 	request := plan.Request
 	return snapshot.Manifest{
 		ID:              fmt.Sprintf("%s-%s-%s-seed%d", request.Shape, strings.ReplaceAll(request.Release, "@", "-"), request.Volume, request.Seed),
-		Recipe:          snapshot.Recipe{Version: 1, Hash: plan.Digest()},
+		Recipe:          snapshot.Recipe{Version: seed.RecipeVersion, Hash: plan.Digest()},
 		Release:         request.Release,
 		Image:           doors.image,
 		Shape:           snapshot.Shape{Name: request.Shape, Env: doors.env.Values, SecretNames: doors.env.SecretNames},
@@ -390,7 +413,7 @@ func (doors *ComposeDoors) redact(err error) error {
 	}
 	secrets := map[string]string{}
 	maps.Copy(secrets, doors.env.Secrets)
-	_, secrets["SEED_PASSWORD"] = seedAccount(doors.seed)
+	_, secrets["SEED_PASSWORD"] = SeedAccount(doors.seed)
 	names := slices.SortedFunc(maps.Keys(secrets), func(a, b string) int { return len(secrets[b]) - len(secrets[a]) })
 	text := err.Error()
 	for _, name := range names {

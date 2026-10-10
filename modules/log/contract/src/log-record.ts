@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const logCorrelationSourceSchema = z.enum([
@@ -11,7 +12,7 @@ export type LogCorrelationSource = z.infer<typeof logCorrelationSourceSchema>;
 export const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
 export type LogProviderKind = z.infer<typeof logProviderKindSchema>;
 
-export const canonicalLogRecordSchema = z.object({
+const canonicalLogRecordSchemaDefinition = z.object({
   tenantId: z.string(),
   organizationId: z.string(),
   recordId: z.string().regex(/^[a-f0-9]{64}$/),
@@ -57,11 +58,16 @@ export const canonicalLogRecordSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
   acceptedAt: z.number().int().nonnegative(),
 });
+export interface CanonicalLogRecordSchema extends Named<
+  typeof canonicalLogRecordSchemaDefinition
+> {}
+export const canonicalLogRecordSchema: CanonicalLogRecordSchema =
+  canonicalLogRecordSchemaDefinition;
 
 export type CanonicalLogRecord = z.infer<typeof canonicalLogRecordSchema>;
 
 /** The portable trace-correlated read shape derived from canonical log storage. */
-export const canonicalTraceLogRecordSchema = z.object({
+const canonicalTraceLogRecordSchemaDefinition = z.object({
   traceId: z.string(),
   spanId: z.string(),
   timeUnixMs: z.number().int().nonnegative(),
@@ -71,6 +77,11 @@ export const canonicalTraceLogRecordSchema = z.object({
   scopeName: z.string(),
   scopeVersion: z.string().nullable(),
 });
+export interface CanonicalTraceLogRecordSchema extends Named<
+  typeof canonicalTraceLogRecordSchemaDefinition
+> {}
+export const canonicalTraceLogRecordSchema: CanonicalTraceLogRecordSchema =
+  canonicalTraceLogRecordSchemaDefinition;
 export type CanonicalTraceLogRecord = z.infer<typeof canonicalTraceLogRecordSchema>;
 
 export type LogPiiRedactionLevel = "STRICT" | "ESSENTIAL" | "DISABLED";

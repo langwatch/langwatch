@@ -96,10 +96,10 @@ func TestArgvBuilders(t *testing.T) {
 	if got := strings.Join(UpArgs(), " "); got != "up --agent --detach" {
 		t.Errorf("UpArgs = %q", got)
 	}
-	if got := strings.Join(StatusArgs(), " "); got != "status --agent --json" {
+	if got := strings.Join(StatusArgs(), " "); got != "status --agent --json stacks" {
 		t.Errorf("StatusArgs = %q", got)
 	}
-	if got := strings.Join(DestroyArgs("slug-1"), " "); got != "destroy slug-1 --agent --yes" {
+	if got := strings.Join(DestroyArgs("slug-1"), " "); got != "down --destroy --stack slug-1 --agent --yes" {
 		t.Errorf("DestroyArgs = %q", got)
 	}
 	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {

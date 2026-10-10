@@ -4,36 +4,59 @@
  * role the decision engine could not read is refused here.
  */
 import { authzPermissionSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** One organization, for the read that lists its custom roles. */
-export const roleApiOrganizationInputSchema = z.object({ organizationId: z.string() });
+const roleApiOrganizationInputSchemaDefinition = z.object({ organizationId: z.string() });
+export interface RoleApiOrganizationInputSchema extends Named<
+  typeof roleApiOrganizationInputSchemaDefinition
+> {}
+export const roleApiOrganizationInputSchema: RoleApiOrganizationInputSchema =
+  roleApiOrganizationInputSchemaDefinition;
 
 /** One custom role, named on its own without a tenant key. */
-export const roleApiRoleInputSchema = z.object({ roleId: z.string() });
+const roleApiRoleInputSchemaDefinition = z.object({ roleId: z.string() });
+export interface RoleApiRoleInputSchema extends Named<typeof roleApiRoleInputSchemaDefinition> {}
+export const roleApiRoleInputSchema: RoleApiRoleInputSchema = roleApiRoleInputSchemaDefinition;
 
 /** Attaching or detaching one custom role for one member of one team. */
-export const roleApiUserRoleAssignmentInputSchema = z.object({
+const roleApiUserRoleAssignmentInputSchemaDefinition = z.object({
   userId: z.string(),
   teamId: z.string(),
   customRoleId: z.string(),
 });
+export interface RoleApiUserRoleAssignmentInputSchema extends Named<
+  typeof roleApiUserRoleAssignmentInputSchemaDefinition
+> {}
+export const roleApiUserRoleAssignmentInputSchema: RoleApiUserRoleAssignmentInputSchema =
+  roleApiUserRoleAssignmentInputSchemaDefinition;
 
 /** Defining a custom role. */
-export const roleApiCreateInputSchema = z.object({
+const roleApiCreateInputSchemaDefinition = z.object({
   organizationId: z.string(),
   name: z.string().min(1).max(50),
   description: z.string().optional(),
   permissions: z.array(authzPermissionSchema),
 });
+export interface RoleApiCreateInputSchema extends Named<
+  typeof roleApiCreateInputSchemaDefinition
+> {}
+export const roleApiCreateInputSchema: RoleApiCreateInputSchema =
+  roleApiCreateInputSchemaDefinition;
 
 /** Editing a custom role. */
-export const roleApiUpdateInputSchema = z.object({
+const roleApiUpdateInputSchemaDefinition = z.object({
   roleId: z.string(),
   name: z.string().min(1).max(50).optional(),
   description: z.string().optional(),
   permissions: z.array(authzPermissionSchema).optional(),
 });
+export interface RoleApiUpdateInputSchema extends Named<
+  typeof roleApiUpdateInputSchemaDefinition
+> {}
+export const roleApiUpdateInputSchema: RoleApiUpdateInputSchema =
+  roleApiUpdateInputSchemaDefinition;
 
 export type RoleApiOrganizationInput = z.infer<typeof roleApiOrganizationInputSchema>;
 export type RoleApiRoleInput = z.infer<typeof roleApiRoleInputSchema>;

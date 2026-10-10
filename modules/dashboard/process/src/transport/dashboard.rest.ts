@@ -3,11 +3,7 @@
  * carries the address a reader opens the dashboard at, which the application
  * builds from the project's slug and the deployment's base URL.
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   dashboardDeletedResponseSchema,
   dashboardDetailResponseSchema,
@@ -21,11 +17,7 @@ import {
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 
-export const dashboardRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<DashboardApi>;
-}> = defineRestRouter(DashboardApi)
+export const dashboardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
 
@@ -59,6 +51,7 @@ export const dashboardRest: Readonly<{
   // Creating asks for `analytics:create`; `:manage` still implies it, so nobody
   // who could create a dashboard yesterday loses that.
   .post("/", "postApiDashboards")
+  .withAudit("dashboards.create")
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:create")
   .withOutput(dashboardResponseSchema)
@@ -73,6 +66,7 @@ export const dashboardRest: Readonly<{
   // Registered before /:id so "reorder" is not read as an id. Reordering
   // rewrites existing dashboards' positions — an `:update`.
   .put("/reorder", "putApiDashboardsReorder")
+  .withAudit("dashboards.reorderDashboards")
   .withInput(dashboardRestReorderSchema)
   .withPermission("analytics:update")
   .withOutput(dashboardReorderResponseSchema)
@@ -99,6 +93,7 @@ export const dashboardRest: Readonly<{
   })
 
   .patch("/:id", "patchApiDashboardsById")
+  .withAudit("dashboards.rename")
   .withParams(dashboardRestParamsSchema)
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:update")
@@ -116,6 +111,7 @@ export const dashboardRest: Readonly<{
 
   // Hard delete with cascade — deliberately stays at `:manage`.
   .delete("/:id", "deleteApiDashboardsById")
+  .withAudit("dashboards.delete")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(dashboardDeletedResponseSchema)

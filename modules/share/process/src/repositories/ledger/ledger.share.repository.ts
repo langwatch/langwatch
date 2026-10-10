@@ -124,7 +124,9 @@ export class LedgerShareRepository implements ShareRepository {
         `share link ${id} was recorded on the grants ledger but its compat row has not landed; the projection queue is stalled`,
       );
     }
-    return row;
+    // The read carries the project context a resolve needs; a mint answers the link alone.
+    const { project: _project, ...link } = row;
+    return link;
   }
 
   /**

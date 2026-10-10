@@ -23,12 +23,11 @@ export class IdentitySecretHealMigrationService implements SystemMigration {
     "places they can be written during the migration, so a password changed " +
     "at any moment keeps working. Sign-in behavior does not change.";
   readonly requiresOperatorConfirmation = false;
-  // Follows the backfill it repairs after: nothing to heal on an
-  // installation where no user has latched.
-  readonly runsAutomaticallyOnSelfHosted = false;
-  // Paced with the backfill it repairs after, for the same reason: a user
-  // outside the backfill's cohort has nothing to heal.
-  readonly enrolledAutomatically = false;
+  // Runs wherever the identifier backfill it repairs after runs: that backfill
+  // latches self-hosted users too, so their secrets can drift there as well.
+  readonly runsAutomaticallyOnSelfHosted = true;
+  // Enrols every user as that backfill does; only the drifted ones are visited.
+  readonly enrolledAutomatically = true;
   /** Only users whose legacy secrets could have drifted (Q64): a pass over the whole
    *  user table costs a claim and two state writes per user, twice before serving. */
   readonly candidateTenants: TenantSource;

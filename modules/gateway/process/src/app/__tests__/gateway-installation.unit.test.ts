@@ -12,6 +12,7 @@ import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { GATEWAY_DEBITS_PROCESS_NAME } from "../../eventing/gateway-debit.process.ts";
@@ -219,18 +220,20 @@ type InstalledGateway = Awaited<ReturnType<typeof installGateway>>["state"];
 function servedInternalDoor(state: InstalledGateway, app: GatewayModule) {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
   const runtime = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => undefined },
   });
-  runtime.mount(gatewayInternalRest.router(), () => app, { facts: state.facts });
+  runtime.mount(gatewayInternalRest.router(), () => app, {
+    middlewareBindings: state.middlewareBindings,
+  });
 
   return runtime.app;
 }
@@ -278,7 +281,7 @@ describe("gateway app installation", () => {
         if (!(app instanceof GatewayModule)) {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
-        const credential = state.facts?.find(isInternalCredential);
+        const credential = state.middlewareBindings?.find(isInternalCredential);
         if (!credential)
           throw new Error("Gateway installation did not bind its internal credential");
 

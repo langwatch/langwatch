@@ -53,8 +53,9 @@ describe("<SignInError/>", () => {
     /** @scenario "Recovery works the same when the org's required method is not yet known" */
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
-      expect(screen.getByText(/provider didn't confirm the address/i)).toBeTruthy();
-      expect(screen.getByText(/method you used before/i)).toBeTruthy();
+      expect(screen.getByText(/already has an account/i)).toBeTruthy();
+      expect(screen.getByText(/sign in the way you did before/i)).toBeTruthy();
+      expect(screen.getByText(/single sign-on/i)).toBeTruthy();
     });
   });
 
@@ -82,6 +83,21 @@ describe("<SignInError/>", () => {
         name: /sign out.*try again/i,
       });
       expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+    });
+  });
+
+  describe("when an unsolicited single sign-on response meets a browser signed in as someone else", () => {
+    /** @scenario "An unsolicited response for another person is refused while somebody is signed in" */
+    it("asks the person to sign out, then sign in again from their identity provider", () => {
+      renderError("signed_in_as_another_user");
+      expect(
+        screen.getByText(
+          "You are already signed in as someone else. Sign out, then sign in again from your identity provider.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe(
+        FEDERATED_LOGOUT_PATH,
+      );
     });
   });
 
@@ -162,6 +178,19 @@ describe("given a sign-in refused because an unconfirmed account holds the addre
   });
 });
 
+describe("given a sign-in refused because the directory turned the member off", () => {
+  /** @scenario "The deactivated refusal reaches the sign-in screen in plain words" */
+  it("crosses as itself and tells them to ask an administrator", () => {
+    expect(signInErrorMayCross("sso_member_deactivated")).toBe(true);
+
+    renderError("sso_member_deactivated");
+
+    expect(screen.getByText(/Your access has been turned off/i)).toBeTruthy();
+    expect(screen.getByText(/Ask an administrator of your organization/i)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
+
 describe("given a sign-in method refused until an administrator approves the link", () => {
   /** @scenario "A handled refusal crosses with its own code" */
   it("crosses as a stable code, so the screen stays put and offers a sign-out, not a bounce", () => {
@@ -184,6 +213,7 @@ describe("given one of the assertion refusals the boundary admits", () => {
     renderError("sso_setup_address_mismatch");
 
     expect(screen.getByText("That sign-in came from a different address")).toBeTruthy();
+    expect(screen.getByText(/only the person who registered it can test it/)).toBeTruthy();
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 

@@ -4,9 +4,9 @@ import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { MONO_FONT } from "../../model/front-door-theme.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
-import { rankMethodsForBrowser } from "../../model/method-ranking.ts";
+import { methodsWorthOffering, rankMethodsForBrowser } from "../../model/method-ranking.ts";
+import { readPasskeyOnThisDevice } from "../../model/passkey-on-this-device.ts";
 
 import "../elements/auth-front-door.css";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
@@ -22,6 +22,7 @@ import { PasskeySignInButton } from "./passkey-sign-in-button.tsx";
 export function SignInMethodPicker({
   methodSet,
   reasonCode,
+  showGuidance = true,
   lastUsedMethodId,
   onFederatedMethodChosen,
   renderLocalMethod,
@@ -33,6 +34,8 @@ export function SignInMethodPicker({
 }: {
   methodSet: readonly SignInMethod[];
   reasonCode: string;
+  /** False where the screen's heading already says why the picker is shown. */
+  showGuidance?: boolean;
   /** The method this browser last got in with, badged where it appears. */
   lastUsedMethodId?: string | null;
   onFederatedMethodChosen: (method: SignInMethod) => void;
@@ -48,10 +51,16 @@ export function SignInMethodPicker({
   /** The ceremony ended without a session. */
   onPasskeyDeclined?: () => void;
 }) {
-  const guidance = signInRoutingReasonCopy(reasonCode);
+  const guidance = showGuidance ? signInRoutingReasonCopy(reasonCode) : null;
   // The server's ranking with this browser's last-used method promoted: one
   // promotion, never a re-sort.
-  const ordered = rankMethodsForBrowser({ methodSet, lastUsedMethodId });
+  const [passkeyOnThisDevice] = useState(readPasskeyOnThisDevice);
+  const offered = methodsWorthOffering({ methodSet, reasonCode, passkeyOnThisDevice });
+  // A passkey-only installation still shows its one way in rather than "no way to sign in".
+  const ordered = rankMethodsForBrowser({
+    methodSet: offered.length > 0 ? offered : methodSet,
+    lastUsedMethodId,
+  });
   // A WebAuthn ceremony hands the screen to the browser and the operating
   // system: while one is in flight, a second click on another method would
   // open a competing prompt on top of it. Scoped to this picker rather than a
@@ -60,14 +69,10 @@ export function SignInMethodPicker({
   const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
 
   return (
-    <VStack width="full" align="stretch" gap={4} data-testid="method-picker">
+    <VStack width="full" align="stretch" gap={3} data-testid="method-picker">
       {guidance ? (
-        <Alert.Root
-          status="info"
-          variant="outline"
-          borderStartWidth="4px"
-          borderStartColor="colorPalette.solid"
-        >
+        <Alert.Root status="info" size="sm">
+          <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>{guidance.title}</Alert.Title>
             <Alert.Description>{guidance.describe}</Alert.Description>
@@ -110,7 +115,11 @@ export function hasAlternativeMethods({
 }: {
   methodSet: readonly SignInMethod[];
 }): boolean {
-  return methodSet.some((method) => method.kind === "federated" || method.kind === "passkey");
+  return methodsWorthOffering({
+    methodSet,
+    reasonCode: null,
+    passkeyOnThisDevice: readPasskeyOnThisDevice(),
+  }).some((method) => method.kind === "federated" || method.kind === "passkey");
 }
 
 /**
@@ -136,6 +145,7 @@ export function AlternativeMethods({
   // See `SignInMethodPicker`: the same local flag, so a second click here
   // cannot start a competing WebAuthn prompt while one is already running.
   const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
+  const [passkeyOnThisDevice] = useState(readPasskeyOnThisDevice);
 
   return (
     <VStack width="full" align="stretch" gap={3} data-testid="alternative-methods">
@@ -146,7 +156,7 @@ export function AlternativeMethods({
           hand-offs would be putting the longest routes in front of the
           shortest. It stays under the address field rather than over it: the
           address is what most people came to type. */}
-      {methodSet.some((method) => method.kind === "passkey") ? (
+      {passkeyOnThisDevice && methodSet.some((method) => method.kind === "passkey") ? (
         <PasskeySignInButton
           callbackUrl={callbackUrl}
           badge={lastUsedMethodId === "passkey" ? <LastUsedBadge /> : null}
@@ -227,19 +237,12 @@ export function LastUsedBadge() {
   );
 }
 
-/** A thin "or" between the address step and the methods beside it, said the
- *  way the site says its small technical words: mono, spaced, quiet. */
+/** A thin "or" between the address step and the methods beside it, in the card's own type. */
 export function MethodDivider() {
   return (
     <HStack width="full" gap="10px" paddingY="6px">
       <Divider />
-      <Text
-        fontFamily={MONO_FONT}
-        fontSize="10px"
-        textTransform="uppercase"
-        letterSpacing="0.16em"
-        color="fg.muted"
-      >
+      <Text fontSize="12px" color="fg.subtle">
         or
       </Text>
       <Divider />

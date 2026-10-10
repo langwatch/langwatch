@@ -93,7 +93,9 @@ export class AutomationSlackClaimReconcileService {
   }: SlackClaimReconcileInput): Promise<SlackClaimReconcileCounts> {
     const counts: SlackClaimReconcileCounts = { claimed: 0, skipped: 0, released: 0, kept: 0 };
     if (from?.phase !== "release") {
+      const held = await this.heldClaims({ signal });
       const claimed = await this.claimActiveSlackTriggers({
+        held,
         after: from?.after ?? undefined,
         dryRun,
         signal,
@@ -113,13 +115,30 @@ export class AutomationSlackClaimReconcileService {
     return { ...counts, ...released };
   }
 
+  /** Claims Slack holds, `connection|claimant` -> label: one already in place is not rewritten. */
+  private async heldClaims({ signal }: { signal?: AbortSignal }): Promise<Map<string, string>> {
+    const held = new Map<string, string>();
+    let cursor: string | undefined;
+    do {
+      signal?.throwIfAborted();
+      const page = await this.deps.slack.listSlackConnectionClaims({ after: cursor });
+      for (const claim of page.claims) {
+        held.set(`${claim.connectionId}|${claim.claimant.id}`, claim.claimant.label);
+      }
+      cursor = page.next ?? undefined;
+    } while (cursor !== undefined);
+    return held;
+  }
+
   /** Claims each active Slack automation's connection; an unusable one is skipped and counted. */
   private async claimActiveSlackTriggers({
+    held,
     after,
     dryRun,
     signal,
     onPage,
   }: {
+    held: ReadonlyMap<string, string>;
     after?: string;
     dryRun: boolean;
     signal?: AbortSignal;
@@ -135,7 +154,9 @@ export class AutomationSlackClaimReconcileService {
         limit: TRIGGER_PAGE_LIMIT,
       });
       for (const trigger of triggers) {
-        if (connectionIdsOf(trigger).length === 0) continue;
+        const [connectionId] = connectionIdsOf(trigger);
+        if (connectionId === undefined) continue;
+        if (held.get(`${connectionId}|${trigger.id}`) === trigger.name) continue;
         const outcome = dryRun ? "claimed" : await this.claim({ trigger });
         counts[outcome] += 1;
       }

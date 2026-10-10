@@ -6,6 +6,7 @@
  * and needs these values to do it. A form that only asked questions would
  * send them away to guess, and what they would guess is ours.
  */
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoConnectionType } from "@langwatch/identity-contract";
 
@@ -43,8 +44,8 @@ export function ServiceProviderSection({
         {!connected && (
           <>
             {" "}
-            The part shown as <code>{SERVICE_PROVIDER_PLACEHOLDER}</code> is filled in once you
-            register below, so come back for the finished {one ? "address" : "addresses"}.
+            The part shown as <InlineCode>{SERVICE_PROVIDER_PLACEHOLDER}</InlineCode> is filled in
+            once you register below, so come back for the finished {one ? "address" : "addresses"}.
           </>
         )}
       </Text>
@@ -56,8 +57,9 @@ export function ServiceProviderSection({
       {protocol === "oidc" && deploymentSignIn && (
         <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
           The sign-in page also offers {deploymentSignIn.name}, set up by this installation&apos;s
-          deployment. That sign-in returns to <code>{deploymentSignIn.redirectUrl}</code>. If it
-          uses the same application in your identity provider, register both addresses there.
+          deployment. That sign-in returns to{" "}
+          <InlineCode>{deploymentSignIn.redirectUrl}</InlineCode>. If it uses the same application
+          in your identity provider, register both addresses there.
         </Text>
       )}
     </SettingsCard>

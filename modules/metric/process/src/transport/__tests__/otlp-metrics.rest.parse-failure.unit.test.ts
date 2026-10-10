@@ -8,12 +8,13 @@ import type { MetricApi } from "@langwatch/metric-contract";
 import type * as Observability from "@langwatch/observability";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OtlpMetricReceiverService } from "../../services/otlp-metric-receiver.service.ts";
-import { otlpMetricsRest } from "../otlp-metrics.rest.ts";
+import { otlpMetricsDoor, otlpMetricsRest } from "../otlp-metrics.rest.ts";
 
 const receiverLog = vi.hoisted(() => ({
   loggerName: "langwatch:otel:v1:metrics",
@@ -79,9 +80,11 @@ function mount() {
     collection: createApiFixture(),
   });
   const app = createApiFixture<MetricApi>({
-    receiveOtlpMetrics: (request) => receiver.receive(request),
+    receiveOtlpMetrics: (input) => receiver.receive(input),
   });
   const hono = createRestRuntime({
+    doors: { otlp_ingest: otlpMetricsDoor.open(traces) },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the receiver resolves its own credential");
@@ -89,7 +92,7 @@ function mount() {
     },
   }).mount(otlpMetricsRest.router(), {
     app: () => app,
-    credential: "public",
+    credential: "otlp_ingest",
     onError: (error) => {
       throw error;
     },

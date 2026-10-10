@@ -103,6 +103,14 @@ export const goErrorCodes = {
    */
   config_invalid: { service: "config" },
   /**
+   * ErrConnectCredentialPending — means the license authenticated but its
+   * managed key is still being provisioned. It is not a refusal: a retry a few
+   * seconds later succeeds, so the gateway never remembers it.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_credential_pending: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrConnectInstanceRequired — means a license token arrived without the
    * X-LangWatch-Instance header. A license is bound to one install, so the
    * token alone identifies nothing.

@@ -23,7 +23,9 @@ export function CollapsedGrantRow({ grant }: { grant: CollapsedGrant }) {
   return (
     <HStack gap={2} fontSize="xs" flexWrap="wrap" justify="end">
       <Badge colorPalette={roleTone(grant.tier)} size="sm">
-        {grant.roleName}
+        <Text as="span" truncate maxWidth="200px" title={grant.roleName}>
+          {grant.roleName}
+        </Text>
       </Badge>
       <Text color="fg.muted">on</Text>
       {showChips ? (

@@ -51,17 +51,35 @@ func (o *Orchestrator) simulatorShell(name string) string {
 // goCombinedShell runs the data-plane services in ONE Go process — the local
 // topology (ADR-004, amendment 2026-09-07). `services` names which of them this
 // stack selected, so a worktree that turned one off gets a process hosting only
-// the other rather than a second lane it has to reason about.
-//
-// Watching is air: it rebuilds the one binary on a Go change, restarts only
-// when the build succeeded, and waits out the same quiet window the Node lane
-// debounces on (LANGWATCH_DEV_WATCH_DEBOUNCE_MS).
-func goCombinedShell(repoRoot string, services []string, shouldWatch bool) string {
-	target := "service"
-	if shouldWatch {
-		target = "service-watch"
+// the other rather than a second lane it has to reason about. Watching is
+// haven's own `go-watch`; not watching runs `make service` once.
+func (p *childPlan) goCombinedShell(lane string, services []string) string {
+	repoRoot, watchArgv := p.opts.RepoRoot, p.goWatchArgv()
+	if len(watchArgv) == 0 {
+		return fmt.Sprintf("make -C %q service svc=combined args=%q", repoRoot, strings.Join(services, " "))
 	}
-	return fmt.Sprintf("make -C %q %s svc=combined args=%q", repoRoot, target, strings.Join(services, " "))
+	var b strings.Builder
+	b.WriteString("cd " + shQuote(repoRoot) + " && ")
+	// ponytail: consoles build once per lane start, as `make service-watch` did; slice 5 retires it for Vite.
+	for _, svc := range services {
+		if strings.HasSuffix(svc, "sim") {
+			fmt.Fprintf(&b, "{ "+nxCacheEnv+"pnpm exec nx run @langwatch/%s-web:build --outputStyle=static || echo '%s-web did not build; its console names the fix'; } && ", svc, svc)
+		}
+	}
+	b.WriteString(`_snap=$(export -p) && . dev/scripts/lib/load-dev-env.sh && { ! test -f .env || load_dev_env .env; } && eval "$_snap" && `)
+	b.WriteString(`. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && export LOG_FORMAT=${LOG_FORMAT:-json} && exec`)
+	for _, arg := range append(append(append([]string{}, watchArgv...), filepath.Join(".bin", "combined", lane)), services...) {
+		b.WriteString(" " + shQuote(arg))
+	}
+	return b.String()
+}
+
+// goWatchArgv is the watch command for the go lanes, or nil when not watching.
+func (p *childPlan) goWatchArgv() []string {
+	if !p.opts.ShouldGoWatch {
+		return nil
+	}
+	return p.o.cfg.GoWatchArgv
 }
 
 // SimulatorsInGoFile is the dev-tagged file that links the simulators into the
@@ -131,20 +149,30 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		Stack: st, Opts: opts, RepoDir: repoDir, Base: p.base,
 		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
-	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
-	out := []Child{p.frontChild(mono, isOneProcess)}
+	isBuiltUI := !st.Layout.IsMonolith() && opts.Selection.IsBuiltUI()
+	out := []Child{p.frontChild(mono, isBuiltUI)}
+	if isBuiltUI && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
+		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui"), p.o.cfg.UIWatchArgv))
+	}
 	out = append(out, p.goLanes(mono)...)
 	if opts.Selection.Langevals {
 		out = append(out, p.langevalsChild())
+	}
+	if opts.Selection.DesignSystem && !st.Layout.IsMonolith() && p.port(domain.DesignSystemService) != 0 {
+		out = append(out, p.designSystemChild())
+	}
+	if opts.Selection.MailRoom && !st.Layout.IsMonolith() && p.port(domain.MailRoomService) != 0 {
+		out = append(out, p.mailRoomChild())
 	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, p.base, p.port("langyagent"), opts.langyDockerHost)
 		langy.LogPath = p.logPath("langyagent")
 		out = append(out, langy)
 	}
-	if st.Layout.IsMonolith() || isOneProcess {
+	if st.Layout.IsMonolith() || isBuiltUI {
 		return out
 	}
+	// --hmr: Vite runs as its own ui lane beside the backend (ADR-168, 2026-10-10).
 	return append(out, p.backendChild())
 }
 
@@ -176,14 +204,25 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// The simulators' provider settings (mail, storage, voice, analytics, LLM),
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
-	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.LLMService} {
+	p.base = append(p.base, simulatorsEnv(opts.Selection, st, repoDir)...)
+	if os.Getenv(domain.NoMailKnob) == "1" {
+		p.base = append(p.base, domain.NoMailEnv()...) // after mailsim's SMTP lines, so these win
+	}
+	return p
+}
+
+// simulatorsEnv is every selected simulator's provider settings. The lanes and the
+// seed both take it: the seed writes the LLM base URLs into the provider rows.
+func simulatorsEnv(sel domain.Selection, st domain.Stack, repoDir string) []string {
+	var env []string
+	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService, domain.LambdaService} {
 		for _, svc := range st.Services {
 			if svc.Name == name {
-				p.base = append(p.base, simulatorBaseEnv(opts.Selection, svc, repoDir)...)
+				env = append(env, simulatorBaseEnv(sel, svc, repoDir)...)
 			}
 		}
 	}
-	return p
+	return env
 }
 
 // simulatorBaseEnv points the product at a selected simulator — but never over
@@ -201,8 +240,14 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 		return domain.VoiceProviderEnv(resolvedDevEnv(repoDir), svc.Port)
 	case svc.Name == domain.AnalyticsService && sel.Analytics && svc.Port != 0:
 		return domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+	case svc.Name == domain.OutboundService && sel.Outbound && svc.Port != 0:
+		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+	case svc.Name == domain.PaymentService && sel.Payment && svc.Port != 0:
+		return domain.PaymentProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.LLMService && sel.LLM && svc.Port != 0:
 		return domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)
+	case svc.Name == domain.LambdaService && sel.Lambda && svc.Port != 0:
+		return domain.LambdaFleetEnv(resolvedDevEnv(repoDir), svc.Port)
 	}
 	return nil
 }
@@ -229,8 +274,17 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	env := append(domain.LaneDatabaseEnv(p.base, lane),
 		"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
 		p.o.compileCacheEnv(p.st.Slug))
+	if p.opts.Selection.IsStill() {
+		env = append(env, "LANGWATCH_DEV_WATCH=0")
+	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
+		if p.opts.Selection.Refresh == domain.RefreshHMR {
+			env = append(env, "LANGWATCH_UI_BUNDLED=1")
+		}
+		if p.opts.Selection.Refresh == domain.RefreshWatch {
+			env = append(env, "LANGWATCH_UI_WATCH=1") // the api's port marks pages, which then reload once idle
+		}
 		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {
 			env = append(env, "LANGWATCH_DEV_TOOLS_IDLE="+v)
 		}
@@ -239,13 +293,13 @@ func (p *childPlan) nodeEnv(lane string) []string {
 }
 
 // frontChild is the lane serving the browser application: the monolith's app
-// lane, the one-process app lane, or the ui lane.
-func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
+// lane, the built-UI app lane (still and --watch), or the --hmr Vite ui lane.
+func (p *childPlan) frontChild(mono monolithPlan, isBuiltUI bool) Child {
 	switch {
 	case p.st.Layout.IsMonolith():
 		return mono.appChild()
-	case isOneProcess:
-		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
+	case isBuiltUI:
+		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}
 	return Child{
 		Name: "ui", Dir: p.repoDir, Color: palette[1], LogPath: p.logPath("ui"),
@@ -279,14 +333,14 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 	} else if len(goServices) > 0 {
 		out = append(out, Child{
 			Name: GoLane, Dir: p.opts.RepoRoot, Color: palette[2], LogPath: p.logPath(GoLane),
-			Shell: goCombinedShell(p.opts.RepoRoot, goServices, p.opts.ShouldGoWatch),
+			Shell: p.goCombinedShell(GoLane, goServices),
 			Env:   goEnv,
 		})
 	}
 	if len(sims.services) > 0 {
 		out = append(out, Child{
 			Name: SimsLane, Dir: p.opts.RepoRoot, Color: palette[8], LogPath: p.logPath(SimsLane),
-			Shell: goCombinedShell(p.opts.RepoRoot, sims.services, p.opts.ShouldGoWatch),
+			Shell: p.goCombinedShell(SimsLane, sims.services),
 			Env:   append(append(append([]string{}, p.base...), domain.LaneEnv(SimsLane)), sims.env...),
 		})
 	}
@@ -294,7 +348,7 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 }
 
 // retireStaleSimsCapture removes the sims capture an earlier split run left
-// when this run plans a go lane and no sims lane (LANGWATCH_GO_ONE_PROCESS):
+// when this run plans a go lane and no sims lane (the default; LANGWATCH_DEV_ONE_PROCESS=0 splits):
 // `haven logs <sim>` reads sims.log first, so a dead one would hide go.log.
 func retireStaleSimsCapture(children []Child) {
 	if slices.ContainsFunc(children, func(c Child) bool { return c.Name == SimsLane }) {
@@ -344,8 +398,8 @@ func (sp *simulatorPlan) host(binary string, env func() []string, child func() C
 
 // planSimulators places every selected simulator. The linked simulators get a
 // lane of their own, so a simulator under load cannot starve the gateway: a
-// second `service combined` process. LANGWATCH_GO_ONE_PROCESS=1 folds them
-// into the go lane instead (a trial; Langy always keeps its own lane).
+// second `service combined` process. LANGWATCH_DEV_ONE_PROCESS (on by
+// default; it governs only the Go lanes) folds them into the go lane instead; Langy always keeps its own lane.
 func (p *childPlan) planSimulators() simulatorPlan {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	sp := simulatorPlan{
@@ -376,7 +430,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM, analytics and telemetry, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry and lambda, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -389,7 +443,10 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Voice, "voicesim", func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, repoRoot, base) }},
 		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
 		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
+		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
+		{sel.Payment, "paymentsim", func() []string { return paymentEnv(st, repoRoot) }, func() Child { return o.paymentChild(st, repoRoot, base) }},
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
+		{sel.Lambda, "lambdasim", func() []string { return lambdaEnv(st) }, func() Child { return o.lambdaChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {
 			sp.host(sim.binary, sim.env, sim.child)
@@ -411,24 +468,68 @@ func (p *childPlan) backendChild() Child {
 		// its own configuration and composes its own graph, and nothing reads
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
-		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane),
+		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane), SplitLog: true,
 		Shell: "pnpm --silent --filter " + BackendPackage + " dev",
 		Env:   p.nodeEnv(APILane),
 	}
 }
 
-// oneProcessChild is a modular checkout's ui and api lanes as one: the UI's
-// Vite server, the api and the worker in one Node process, the backend
-// reloaded in-process (ADR-168, B1). It still listens on the app port and the
-// API port, so `haven restart ui|api` bounces it and the rows stay truthful.
-// No readiness probe, as for the ui lane: the UI's boot-wait screen covers it.
-func oneProcessChild(repoDir string, env []string, logPath string) Child {
+// builtUIChild is the built and watch UI modes' app lane: the api and worker with
+// no Vite (`dev`), serving apps/ui/dist/client as production does;
+// app.<slug> routes to the API port (see provision). It builds once at start (Nx
+// restores an unchanged tree); after that only `haven ui-watch` or `haven reload ui` rebuild.
+func builtUIChild(repoDir string, env []string, logPath string) Child {
+	build := uiPruneStaleShell + "(" + UIBuildShell + ") && "
 	return Child{
-		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
-		Shell: "pnpm --silent --filter " + BackendPackage + " dev:one",
+		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath, SplitLog: true,
+		Shell: build + "pnpm --silent --filter " + BackendPackage + " dev",
 		Env:   env,
 	}
 }
+
+// uiWatchChild is a watching built-UI stack's ui lane: `haven ui-watch` runs a
+// one-shot `vite build` per settled burst of browser edits and logs each
+// rebuild's duration. No long-lived Vite, so no memory held between builds.
+func uiWatchChild(repoDir string, env []string, logPath string, watchArgv []string) Child {
+	args := make([]string, 0, len(watchArgv))
+	for _, arg := range watchArgv {
+		args = append(args, shQuote(arg))
+	}
+	return Child{Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath, Shell: "exec " + strings.Join(args, " "), Env: env}
+}
+
+// nxCacheEnv is the root scripts' Nx prefix: no .env loaded into tasks, no colour.
+// Every cached Nx build haven starts carries it, so one cache serves them all.
+const nxCacheEnv = "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false "
+
+// UIBuildShell builds apps/ui through Nx's cached `build:local` target (an
+// unchanged tree restores in seconds), moves it to a per-pid staging dir and
+// swaps it in with two renames, so the api never serves a half-written bundle.
+// A lock (pid file, stale when its owner is gone) serialises the shared output.
+const UIBuildShell = "set -e; " + uiStageVars + "s=$d/client.local; " + uiLockShell + "rm -rf $n; " +
+	nxCacheEnv + "pnpm --silent nx run " + UIPackage + ":build:local --outputStyle=static; mv $s $n; " + uiSwapShell
+
+// uiStageVars names the served bundle's dir, this shell's staging and old dirs, and the lock.
+const uiStageVars = "d=" + UIDirRel + "/dist; n=$d/client.next.$$; o=$d/client.old.$$; l=$d/client.lock; mkdir -p $d; "
+
+// uiLockShell takes the bundle lock, clearing one whose owner is gone; released on exit.
+const uiLockShell = "until (set -C; echo $$ > $l) 2>/dev/null; do p=$(cat $l 2>/dev/null) && [ -n \"$p\" ] && ! kill -0 $p 2>/dev/null && rm -f $l; sleep 1; done; " +
+	"trap 'rm -f $l' EXIT; trap 'exit 1' INT TERM; "
+
+// uiSwapShell records the staged build's own assets, marks the outgoing build's
+// as superseded now (mtime) and carries them forward, so an open page's lazy
+// chunks never 404; a carried chunk superseded over 24 h ago is dropped. Then
+// two renames put the staged bundle in place.
+const uiSwapShell = "ls $n/assets > $n/.build-assets 2>/dev/null || :; " +
+	"if [ -d $d/client/assets ]; then (cd $d/client/assets && xargs touch < ../.build-assets) 2>/dev/null || :; " +
+	"mkdir -p $n/assets; cp -Rnp $d/client/assets/. $n/assets/ || :; fi; " +
+	"(cd $n/assets && find . -type f -mmin +1440 | while read -r f; do grep -qxF \"${f#./}\" ../.build-assets || rm -f \"$f\"; done) || :; " +
+	"if [ -d $d/client ]; then mv $d/client $o; fi; mv $n $d/client; rm -rf $o"
+
+// uiPruneStaleShell runs at stack start: no page is open yet, so every asset
+// the served build does not list goes.
+const uiPruneStaleShell = "c=" + UIDirRel + "/dist/client; if [ -f $c/.build-assets ]; then " +
+	"(cd $c/assets && for f in *; do grep -qxF \"$f\" ../.build-assets || rm -f \"$f\"; done) || :; fi; "
 
 // The Node lanes a stack supervises, by workspace package name. planChildren
 // runs each with `pnpm --filter <pkg> dev` from the workspace root, so the lane
@@ -465,11 +566,11 @@ const (
 	// it has its own liveness, and a stack whose worker is down looks healthy
 	// from every other row.
 	WorkerLane = "worker"
-	// AppLane is the ui and api lanes run as one process (LANGWATCH_DEV_ONE_PROCESS=1).
+	// AppLane is the built-UI stack's one Node lane: api and worker serving apps/ui/dist/client (still and --watch).
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
 	// GoLane is the process hosting the Go data-plane services, and the
-	// simulators too when LANGWATCH_GO_ONE_PROCESS=1.
+	// simulators too unless LANGWATCH_DEV_ONE_PROCESS=0.
 	GoLane = "go"
 	// SimsLane is the second Go process, hosting the simulators a stack
 	// selected, so load on one cannot starve the gateway.

@@ -39,8 +39,8 @@ export function budgetBarLabel(value: VirtualKeyBudgetBarValue): string {
     return `${limit} ${adjective} budget, spend unavailable`;
   }
   const head = `${formatBudgetUsd(value.periodSpentUsd)} of ${limit} ${adjective} budget`;
-  // TOTAL is a lifetime allowance; there is no period to reset.
-  if (value.window === "TOTAL") return head;
+  // TOTAL never resets and MANUAL only on request; neither has a reset time to show.
+  if (value.window === "TOTAL" || value.window === "MANUAL") return head;
   const resets = formatTimeAgo(toEpochMs(value.resetsAt));
   return resets ? `${head}, resets ${resets}` : head;
 }

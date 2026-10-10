@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -15,7 +16,7 @@ import { latencyWindowsSchema } from "./ops-latency.ts";
 /** Unknown wire versions are absent during rolling deploys. */
 export const SNAPSHOT_VERSION = 1;
 
-export const liveSnapshotSchema = z.object({
+const liveSnapshotSchemaDefinition = z.object({
   version: z.literal(SNAPSHOT_VERSION),
   computedAt: z.number(),
   writerId: z.string(),
@@ -52,8 +53,10 @@ export const liveSnapshotSchema = z.object({
   pausedKeys: z.array(z.string()),
   throughputHistory: z.array(throughputPointSchema),
 });
+export interface LiveSnapshotSchema extends Named<typeof liveSnapshotSchemaDefinition> {}
+export const liveSnapshotSchema: LiveSnapshotSchema = liveSnapshotSchemaDefinition;
 
-export const detailSnapshotSchema = z.object({
+const detailSnapshotSchemaDefinition = z.object({
   version: z.literal(SNAPSHOT_VERSION),
   computedAt: z.number(),
   writerId: z.string(),
@@ -78,6 +81,8 @@ export const detailSnapshotSchema = z.object({
   // during a rolling handover; readers coalesce absence to null.
   latencyWindows: latencyWindowsSchema.nullable().optional(),
 });
+export interface DetailSnapshotSchema extends Named<typeof detailSnapshotSchemaDefinition> {}
+export const detailSnapshotSchema: DetailSnapshotSchema = detailSnapshotSchemaDefinition;
 
 export type LiveSnapshot = z.infer<typeof liveSnapshotSchema>;
 export type DetailSnapshot = z.infer<typeof detailSnapshotSchema>;

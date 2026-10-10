@@ -34,7 +34,6 @@ const organization = {
   stripeCustomerId: null,
   currency: "USD" as const,
   pricingModel: "SEAT_EVENT" as const,
-  licenseExpiresAt: null,
   useCustomS3: false,
   createdAt: "2026-04-01T10:00:00.000Z",
 };

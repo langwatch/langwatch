@@ -14,10 +14,7 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-// Deep import on purpose: `ErrorActions` is deliberately absent from the
-// `~/features/errors` barrel, which would put it in an import cycle with the
-// toaster. `components/ui/toaster.tsx` reaches for it the same way.
-import { ErrorActions } from "../../../behavior/errors.tsx";
+import { ErrorRetryRow } from "../../../behavior/errors.tsx";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
 import { CARD } from "../../../model/langy/asaplangy-tokens.ts";
@@ -156,7 +153,11 @@ export function AICreateModal({
         borderColor={assistant ? CARD.border : undefined}
         // A plain deep shadow — no purple "AI" glow. LangWatch's chrome is a
         // hairline and one warm accent, not a spectrum.
-        boxShadow={assistant ? "0 28px 90px -32px rgba(2, 6, 23, 0.62)" : undefined}
+        boxShadow={
+          assistant
+            ? "0 28px 90px -32px color-mix(in srgb, var(--chakra-colors-bg-scrim) 62%, transparent)"
+            : undefined
+        }
       >
         {assistant && <LangyMarkGradientDefs />}
         {showCloseButton && <Dialog.CloseTrigger />}
@@ -253,7 +254,7 @@ function CreateModalHeader({
             borderRadius="12px"
             borderWidth="1px"
             borderColor="border.muted"
-            bg="bg.surface"
+            bg="bg.card"
           >
             <LangyMark size={27} />
           </Box>
@@ -475,7 +476,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
           borderRadius="16px"
           borderWidth="1px"
           borderColor="border"
-          bg="bg.surface"
+          bg="bg.card"
           position="relative"
         >
           <LangyMark size={32} />
@@ -485,7 +486,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
             width="60px"
             height="60px"
             borderWidth="2px"
-            color="orange.400"
+            color="orange.fg"
           />
         </Box>
         <VStack gap={1}>
@@ -501,7 +502,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
 
   return (
     <VStack gap={4} py={8}>
-      <Spinner size="lg" color="blue.500" />
+      <Spinner size="lg" color="blue.fg" />
       <Text color="fg.muted">{text}</Text>
     </VStack>
   );
@@ -516,7 +517,7 @@ function ErrorState({ error }: ErrorStateProps) {
 
   return (
     <VStack gap={4} py={4}>
-      <Box p={3} borderRadius="full" bg="red.100" color="red.600">
+      <Box p={3} borderRadius="full" bg="red.subtle" color="red.fg">
         <Icon as={AlertCircle} boxSize={6} />
       </Box>
       <VStack gap={1}>
@@ -530,7 +531,7 @@ function ErrorState({ error }: ErrorStateProps) {
             customer (ADR-045) — it is the handle support can act on, where the
             raw failure text that used to sit here was neither readable nor
             ours to show. */}
-        <ErrorActions traceId={classified.traceId} />
+        <ErrorRetryRow traceId={classified.traceId} />
       </VStack>
     </VStack>
   );
@@ -634,8 +635,12 @@ function StartModeButton({
       cursor="pointer"
       transition="color 120ms ease, background 120ms ease, box-shadow 120ms ease"
       color={active ? activeColor : "fg.muted"}
-      bg={active ? "bg.surface" : "transparent"}
-      boxShadow={active ? "0 1px 2px rgba(2, 6, 23, 0.12)" : "none"}
+      bg={active ? "bg.card" : "transparent"}
+      boxShadow={
+        active
+          ? "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 12%, transparent)"
+          : "none"
+      }
       _hover={active ? undefined : { color: "fg" }}
     >
       {children}
@@ -646,7 +651,7 @@ function StartModeButton({
 /** The manual path body: a plain, un-accented "you're in control" panel. */
 function ManualStartState({ assistantName }: { assistantName: string }) {
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="xl" bg="bg.surface" padding={5}>
+    <Box borderWidth="1px" borderColor="border" borderRadius="xl" bg="bg.card" padding={5}>
       <HStack align="start" gap={3}>
         <Box
           display="grid"
@@ -714,7 +719,6 @@ function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps)
             href="/settings/model-providers"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "white" }}
           >
             Configure model provider
           </a>

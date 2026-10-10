@@ -1,5 +1,4 @@
-import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
-import { ChevronRight } from "lucide-react";
+import { SidebarSection as SidebarSectionView } from "@langwatch/design-system/app-shell";
 import type React from "react";
 
 import { useSidebarSectionState } from "../../behavior/use-sidebar-section-state.ts";
@@ -15,6 +14,7 @@ type SidebarSectionProps = {
   tourId?: string;
 };
 
+/** The design system's sidebar section, open or closed as this person last left it. */
 export const SidebarSection = ({
   id,
   label,
@@ -23,66 +23,18 @@ export const SidebarSection = ({
   defaultExpanded = true,
   tourId,
 }: SidebarSectionProps) => {
-  const { isExpanded, toggleSection } = useSidebarSectionState({
-    id,
-    defaultExpanded,
-  });
+  const { isExpanded, toggleSection } = useSidebarSectionState({ id, defaultExpanded });
 
   return (
-    <VStack width="full" gap={0.5} align="start" data-tour={tourId}>
-      <SidebarSectionToggle
-        isExpanded={isExpanded}
-        label={label}
-        showExpanded={showExpanded}
-        onToggle={toggleSection}
-      />
-
-      {isExpanded && (
-        <VStack width="full" gap={0.5} align="start">
-          {children}
-        </VStack>
-      )}
-    </VStack>
+    <SidebarSectionView
+      label={label}
+      heading={<SideMenuSectionLabel label={label} />}
+      isExpanded={isExpanded}
+      onToggle={toggleSection}
+      showExpanded={showExpanded}
+      tourId={tourId}
+    >
+      {children}
+    </SidebarSectionView>
   );
 };
-
-const SidebarSectionToggle = ({
-  isExpanded,
-  label,
-  showExpanded,
-  onToggle,
-}: {
-  isExpanded: boolean;
-  label: string;
-  showExpanded: boolean;
-  onToggle: () => void;
-}) => (
-  <Box asChild width="full" cursor="pointer">
-    <button
-      type="button"
-      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label}`}
-      aria-expanded={isExpanded}
-      onClick={onToggle}
-    >
-      <HStack
-        width="full"
-        minHeight="28px"
-        paddingX={showExpanded ? 2 : 3}
-        paddingTop={2.5}
-        paddingBottom={0.5}
-        gap={showExpanded ? 1 : 0}
-        justifyContent={showExpanded ? "flex-start" : "center"}
-        borderRadius="md"
-        color="gray.500"
-        _hover={{ color: "nav.fg" }}
-      >
-        {showExpanded && <SideMenuSectionLabel label={label} />}
-        {!isExpanded && (
-          <Box opacity={0.5} display="flex">
-            <ChevronRight size={13} aria-hidden="true" />
-          </Box>
-        )}
-      </HStack>
-    </button>
-  </Box>
-);

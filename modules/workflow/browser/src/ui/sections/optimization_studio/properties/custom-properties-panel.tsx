@@ -7,7 +7,7 @@ import { toEpochMs } from "@langwatch/time";
 import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version.tsx";
@@ -86,7 +86,7 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
         </HStack>
         <HStack>
           <Avatar.Root size="2xs">
-            <Avatar.Fallback name="jim" bg="orange.400" color="white" />
+            <Avatar.Fallback name="jim" bg="orange.solid" color="orange.contrast" />
           </Avatar.Root>
           <Text fontSize="12px" lineClamp={1}>
             {currentVersion?.author?.name}

@@ -18,7 +18,7 @@ type Proxy interface {
 	Running() bool
 	// Installed reports whether a real portless binary is resolvable (a global
 	// install, a project-local one, or PORTLESS_BIN) rather than the on-demand
-	// `npx` fallback — so `haven setup` can tell the user to install it once.
+	// `npx` fallback — so `haven self setup` can tell the user to install it once.
 	Installed() bool
 	// EnsureReady boots the proxy if it is not already running and trusts its CA
 	// on first run, so `haven up` self-bootstraps with no setup command at all.
@@ -58,7 +58,7 @@ type Store interface {
 	ReadSelection(worktreeDir string) (domain.Selection, bool)
 	WriteSelection(worktreeDir string, sel domain.Selection) error
 	// The machine-wide "never ask me about this prerequisite again" set that
-	// `haven install` records. Machine-wide, not worktree-local, because the
+	// `haven self install` records. Machine-wide, not worktree-local, because the
 	// prerequisites are properties of the machine: a developer who declined
 	// the ClickHouse client once should not be asked by the next checkout.
 	// An absent or unreadable file is an empty set, never an error — a
@@ -77,9 +77,10 @@ type Store interface {
 	TouchDBActivity(slug string) error
 	DBActivity() map[string]time.Time
 	RemoveDBActivity(slug string)
-	// ClaimDaemon atomically records this process as the singleton daemon, but
-	// only if no record exists yet (O_EXCL). It returns false without overwriting
-	// when one already does, so two daemons racing to start can never both win.
+	// ClaimDaemon takes the daemon flock without waiting and, when it wins,
+	// writes the record; the lock is held until ClearDaemon or process death,
+	// so the kernel frees it on a crash and no stale record can block (D9).
+	// False means another daemon holds it.
 	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
@@ -129,7 +130,7 @@ type Store interface {
 // AgentHookSettings writes another tool's configuration, which is why it is not on
 // Store: everything Store persists is haven's OWN state — stacks, slugs,
 // selections, the daemon record, heavy-run slots. This edits a file in the
-// developer's repo that belongs to an agent client, and only `haven setup` uses it.
+// developer's repo that belongs to an agent client, and only `haven self setup` uses it.
 type AgentHookSettings interface {
 	// EnsureHook registers command as a PreToolUse hook in repoRoot's
 	// local agent configuration — untracked and per worktree. It merges: an
@@ -181,6 +182,9 @@ type Child struct {
 	// size-capped with one rotated generation — whether the stack runs attached
 	// or detached. It is what `haven logs` reads (ADR-064: logs are a tap).
 	LogPath string
+	// SplitLog captures a Node host lane per application (ui, api, worker) beside
+	// LogPath instead of into it, so logs list what a developer thinks about.
+	SplitLog bool
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
@@ -217,10 +221,16 @@ type System interface {
 	FreePorts(n int) ([]int, error)
 	PortInUse(port int) bool
 	ProcessAlive(pid int) bool
+	// ProcessStart is pid's start time, "" when unknown; pid plus start is a
+	// process's identity, so a reused pid is never mistaken for ours (D6).
+	ProcessStart(pid int) string
 	Terminate(pid int)
 	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
 	// bounces one supervised child (its supervisor restarts it on exit).
 	TerminateGroup(pid int)
+	// Reload sends pid SIGUSR2, the Node host's "reload on demand" signal
+	// (tools/dev-runtime); the process keeps running.
+	Reload(pid int)
 	// KillGroup SIGKILLs pid's whole process group — `down -f`'s hard stop for
 	// a stack that must die now (or won't die gracefully).
 	KillGroup(pid int)
@@ -275,7 +285,7 @@ type ClickHouse interface {
 	HTTPPort() int
 	// Running reports whether the managed server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
@@ -300,7 +310,7 @@ type Postgres interface {
 	Port() int
 	// Running reports whether the server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
@@ -320,7 +330,7 @@ type Redis interface {
 	Port() int
 	// Running reports whether the server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// FlushDB empties one logical database (FLUSHDB, never FLUSHALL).
 	FlushDB(ctx context.Context, db int) error
@@ -342,7 +352,7 @@ type Observability interface {
 	Stop(ctx context.Context) error
 	// IsRunning reports whether the stack is answering right now, without starting it.
 	IsRunning(ctx context.Context) bool
-	// Health returns a one-line status for `haven doctor`.
+	// Health returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Endpoints reports the stack's ports without touching the runtime.
 	Endpoints() domain.ObservabilityEndpoints
@@ -352,6 +362,13 @@ type Observability interface {
 // fan-out). It reads live state through the callbacks it is constructed with.
 type Dashboard interface {
 	Serve(ctx context.Context, port int) error
+}
+
+// DaemonClient is how an up asks the running daemon to act (ruling D-S4c-1).
+type DaemonClient interface {
+	// StartKeeper asks the daemon on port to start slug's keeper and returns
+	// once the keeper holds the stack's record.
+	StartKeeper(ctx context.Context, port int, slug string) error
 }
 
 // Semaphore is a machine-wide counting semaphore so parallel, memory-hungry work
@@ -482,9 +499,10 @@ type ContainerJanitor interface {
 
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.
 type DaemonInfo struct {
-	PID  int    `json:"pid"`
-	Port int    `json:"port"`
-	URL  string `json:"url"`
+	PID   int    `json:"pid"`
+	Start string `json:"start,omitempty"`
+	Port  int    `json:"port"`
+	URL   string `json:"url"`
 }
 
 // HeavyRunSnapshot is one heavy run currently holding a slot: its own

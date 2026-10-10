@@ -43,6 +43,8 @@ export class LiveUpgradeFailedError extends Error {
 const LIVE_UPGRADE_SYNTHETIC: Readonly<Record<string, string>> = {
   BASE_HOST: "http://langwatch.test",
   NEXTAUTH_URL: "http://langwatch.test",
+  NEXTAUTH_SECRET: "synthetic-nextauth-secret-synthetic",
+  CREDENTIALS_SECRET: "0".repeat(64),
   API_KEY_PEPPER: "synthetic-api-key-pepper",
 };
 

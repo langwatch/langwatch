@@ -6,12 +6,12 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsDashboardTrpc } from "@langwatch/ops-contract";
 
-import { OPS_PROBE, opsOperatorFact } from "#transport/ops-operator.trpc";
+import { OPS_PROBE, opsOperatorContext } from "#transport/ops-operator.trpc";
 
 export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsDashboardTrpc> =
   defineTrpcRouter(OpsApi, opsDashboardTrpc)
     .procedure("getScope")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .noPermission(OPS_PROBE)
     .handle(async ({ app }, operator) => ({ scope: await app.operatorScope(operator) }))
 

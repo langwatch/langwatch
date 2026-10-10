@@ -5,7 +5,8 @@ import { HStack } from "../../primitives.ts";
 import { WorkflowCardDisplay, WorkflowIcon } from "./workflow-card.tsx";
 
 const meta = {
-  title: "Components/Workflow card",
+  title: "Data display/Workflow card",
+  parameters: { usage: { use: "A workflow's emoji or glyph tile in a gallery." } },
   component: WorkflowCardDisplay,
   tags: ["autodocs"],
   args: {

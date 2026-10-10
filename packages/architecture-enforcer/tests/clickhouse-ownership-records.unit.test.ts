@@ -289,6 +289,7 @@ describe("ClickHouse ownership records", () => {
         "stored_spans",
         "evaluation_runs",
         "gateway_spend",
+        "gateway_budget_ledger_events",
         "log_records",
         "instant_eval_runs",
       ]);

@@ -1,6 +1,8 @@
+import type { EventReadSeat } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
 
+import { EventingSsoConnectionHistoryRepository } from "../../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
 import { PrismaSsoConnectionAdminRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-admin.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-projection.repository.ts";
 import {
@@ -15,6 +17,7 @@ import { PrismaSsoRegistrantReadRepository } from "../../features/sso-connection
 import { newSsoAuthenticationActivityId } from "../../features/sso-connection/rules/sso-connection-id.rules.ts";
 import { PrismaSsoDomainOwnershipRepository } from "../../features/sso-domain/repositories/prisma/prisma.sso-domain-ownership.repository.ts";
 import { PrismaSsoDomainReproofTargetRepository } from "../../features/sso-domain/repositories/prisma/prisma.sso-domain-reproof.repository.ts";
+import { EventingIdentityHistoryRepository } from "../eventing/eventing.identity-history.repository.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { RedisIdentityRateLimitRepository } from "../redis/redis.identity-rate-limit.repository.ts";
 import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
@@ -47,15 +50,16 @@ import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.reposito
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
 import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verification.repository.ts";
 
-/** The live tier: every identity row over the one Prisma client. */
+/** The live tier: every identity row over the one Prisma client, the logs over the read seat. */
 export class PostgresIdentityRepositories {
-  static readonly requires = ["prisma", "encryption", "rateLimiter"] as const;
+  static readonly requires = ["prisma", "encryption", "rateLimiter", "eventReadSeat"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
       encryption: Encryption;
       rateLimiter: RateLimiter;
+      eventReadSeat: EventReadSeat;
     }>,
   ): IdentityRepositories {
     const database = members.prisma;
@@ -109,6 +113,12 @@ export class PostgresIdentityRepositories {
       ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
       identityLookup: PrismaIdentityLookupRepository.create(database),
       rateLimits: RedisIdentityRateLimitRepository.create(members.rateLimiter),
+      identityHistory: EventingIdentityHistoryRepository.create({
+        eventReadSeat: members.eventReadSeat,
+      }),
+      ssoConnectionHistory: EventingSsoConnectionHistoryRepository.create({
+        eventReadSeat: members.eventReadSeat,
+      }),
     };
   }
 }

@@ -23,7 +23,7 @@ export const FieldTypeSelect = ({
     return (
       <HStack gap={1} flexShrink={0} paddingX={1} data-testid={testId}>
         <VariableTypeIcon type={value} size={14} />
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="sm" color="fg.muted">
           {getTypeLabel(value)}
         </Text>
       </HStack>
@@ -32,7 +32,7 @@ export const FieldTypeSelect = ({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           colorPalette="gray"
           flexShrink={0}
@@ -42,7 +42,7 @@ export const FieldTypeSelect = ({
           data-testid={testId}
         >
           <VariableTypeIcon type={value} size={14} />
-          <Text fontSize="13px">{getTypeLabel(value)}</Text>
+          <Text textStyle="sm">{getTypeLabel(value)}</Text>
           <ChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Menu.Trigger>

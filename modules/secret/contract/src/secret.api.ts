@@ -35,8 +35,8 @@ export interface SecretApi {
   createReserved(input: CreateReservedSecretInput): Promise<{ value: string }>;
   /** Parks a secret for a single later read, and answers the id that reads it. */
   stashReveal(input: StashRevealInput): Promise<StashedReveal>;
-  /** Serves a stashed secret and forgets it. Every later read is refused. */
-  revealOnce(input: RevealOnceInput): Promise<RevealedSecret>;
+  /** Serves a stashed secret to its recipient and forgets it. Every later read is refused. */
+  revealOnce(input: RevealOnceInput, by: SecretCaller): Promise<RevealedSecret>;
 }
 
 export const SecretApi = moduleApi<SecretApi>()("secret");

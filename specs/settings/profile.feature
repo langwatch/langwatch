@@ -258,3 +258,13 @@ Feature: Profile - who I am here, and where I am signed in
       Given the read of my keys fails
       When I open my profile
       Then I am told what could not be read, in words, with a trace to quote
+
+  Rule: the page keeps the settings look
+
+    @integration
+    Scenario: The profile is a narrow column of divided bands with bordered rows
+      Given I hold a browser session and a key
+      When I open my profile
+      Then the page column is no wider than 820px
+      And each band has a hairline divider above it
+      And each row of a band has its own border

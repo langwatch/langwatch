@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -21,6 +22,7 @@ import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
 import { CacheRuleEditDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
@@ -29,10 +31,11 @@ type CacheRuleListRow = RouterOutputs["gatewayCacheRules"]["list"][number];
 
 function CacheRulesPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
-  const canCreate = hasPermission("gatewayCacheRules:create");
-  const canUpdate = hasPermission("gatewayCacheRules:update");
-  const canDelete = hasPermission("gatewayCacheRules:delete");
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
+  const canCreate = host.hasPermission("gatewayCacheRules:create");
+  const canUpdate = host.hasPermission("gatewayCacheRules:update");
+  const canDelete = host.hasPermission("gatewayCacheRules:delete");
 
   const listQuery = api.gatewayCacheRules.list.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -118,8 +121,8 @@ function CacheRulesPage() {
 
         <PageLayout.Container>
           <Text color="fg.muted" marginBottom={6}>
-            Decide when the gateway answers from its cache instead of calling the model; the
-            highest-priority matching rule wins.
+            Decide when the gateway answers from its cache instead of calling the model. Rules are
+            checked from the lowest priority number up, and the first one that matches wins.
           </Text>
           {isLoadingRules && <ListSkeleton />}
           {showRulesError && (
@@ -216,9 +219,14 @@ function CacheRulesTable({
   onArchive: (rule: CacheRuleListRow) => void;
 }) {
   return (
-    <Card.Root width="full" overflow="hidden">
+    <Card.Root variant="showcase" width="full" overflow="hidden">
       <Card.Body paddingY={0} paddingX={0}>
-        <Table.Root variant="line" size="md" width="full">
+        <ListTable
+          containerProps={{ overflowX: "auto", maxWidth: "full" }}
+          variant="line"
+          size="md"
+          width="full"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
@@ -253,11 +261,11 @@ function CacheRulesTable({
                 </Table.Cell>
                 <Table.Cell>
                   <Switch
+                    colorPalette="accent"
                     checked={r.enabled}
                     onCheckedChange={() => onToggle(r)}
                     disabled={!canUpdate}
                     size="sm"
-                    colorPalette="orange"
                   />
                 </Table.Cell>
                 <Table.Cell>
@@ -286,7 +294,7 @@ function CacheRulesTable({
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Card.Body>
     </Card.Root>
   );

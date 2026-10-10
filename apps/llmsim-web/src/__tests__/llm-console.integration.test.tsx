@@ -51,6 +51,7 @@ const json = ({ body, status = 200 }: { body: unknown; status?: number }) =>
 
 /** llmsim's console API as the page calls it; PUT /settings echoes what it was sent. */
 const fakeSim = ({ listed = calls }: { listed?: typeof calls } = {}) => {
+  let remaining = listed;
   const fetch = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input, "http://llm.test");
     if (url.pathname === "/_sim/api/info") {
@@ -63,7 +64,11 @@ const fakeSim = ({ listed = calls }: { listed?: typeof calls } = {}) => {
         },
       });
     }
-    if (url.pathname === "/_sim/api/calls") return json({ body: { calls: listed } });
+    if (url.pathname === "/_sim/api/calls" && init?.method === "DELETE") {
+      remaining = [];
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === "/_sim/api/calls") return json({ body: { calls: remaining } });
     if (url.pathname.startsWith("/_sim/api/calls/")) {
       return json({ body: details[url.pathname.split("/").pop() ?? ""] });
     }
@@ -79,6 +84,7 @@ const fakeSim = ({ listed = calls }: { listed?: typeof calls } = {}) => {
 describe("the llmsim console", () => {
   afterEach(() => {
     cleanup();
+    window.location.hash = "";
     vi.unstubAllGlobals();
   });
 
@@ -130,6 +136,51 @@ describe("the llmsim console", () => {
           method: "PUT",
           body: JSON.stringify({ forcedError: 429, seed: "" }),
         }),
+      ),
+    );
+  });
+
+  /** @scenario "The console clears and filters recent calls" */
+  it("filters calls by model and clears them all", async () => {
+    const fetch = fakeSim();
+    render(<LlmConsole />);
+    const list = await screen.findByRole("list", { name: "Recent calls" }, { timeout: 5000 });
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2));
+
+    fireEvent.change(screen.getByLabelText("Filter calls"), { target: { value: "langy" } });
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("list", { name: "Recent calls" })).getAllByRole("listitem"),
+      ).toHaveLength(1),
+    );
+
+    fireEvent.change(screen.getByLabelText("Filter calls"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear calls" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear all" }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith("/_sim/api/calls", { method: "DELETE" }),
+    );
+    expect(await screen.findByText("No calls yet")).toBeTruthy();
+  });
+
+  /** @scenario "The console sets any 4xx or 5xx forced error and explains per-call overrides" */
+  it("offers every common forced error and names the per-call overrides", async () => {
+    const fetch = fakeSim();
+    render(<LlmConsole />);
+
+    fireEvent.click(await screen.findByRole("tab", { name: /Settings/u }));
+    const settings = await screen.findByTestId("settings");
+    for (const header of ["X-Llmsim-Seed", "X-Llmsim-Mode", "X-Llmsim-Error", "Model langy-echo"]) {
+      expect(within(settings).getByText(header)).toBeTruthy();
+    }
+    fireEvent.change(screen.getByLabelText("Forced error"), { target: { value: "529" } });
+    fireEvent.click(screen.getByText("Save"));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/_sim/api/settings",
+        expect.objectContaining({ body: JSON.stringify({ forcedError: 529, seed: "" }) }),
       ),
     );
   });

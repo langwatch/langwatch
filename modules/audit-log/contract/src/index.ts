@@ -13,12 +13,18 @@ export {
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
+  type AuditLogEntrySchema,
+  type AuditLogHistoryEntrySchema,
+  type AuditLogTargetEntrySchema,
+  type FindAuditLogByTargetKindInputSchema,
 } from "./audit-log.ts";
 export {
   auditLogIntentSchema,
   recordAuditLogCommandSchema,
   type AuditLogIntent,
   type RecordAuditLogCommand,
+  type AuditLogIntentSchema,
+  type RecordAuditLogCommandSchema,
 } from "./audit-log.ts";
 export { AuditLogApi } from "./audit-log.ts";
 export {
@@ -28,5 +34,7 @@ export {
   type RecentItem,
   type RecentItemsInput,
   type RecentItemType,
+  type RecentItemSchema,
+  type RecentItemsInputSchema,
 } from "./recent-items.ts";
 export { homeTrpc } from "./recent-items.ts";

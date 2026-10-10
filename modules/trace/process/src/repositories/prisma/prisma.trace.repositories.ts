@@ -1,9 +1,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse/clickhouse.trace-clustering-sample.repository.ts";
+import { ClickHouseTraceIndexMaterialisationRepository } from "../clickhouse/clickhouse.trace-index-materialisation.repository.ts";
 import { MemberTraceClickHouseClientRepository } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceModelSpendRepository } from "../clickhouse/clickhouse.trace-model-spend.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
@@ -16,6 +18,7 @@ import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existenc
 import { ClickHouseTraceInstantEvalRunsRepository } from "../clickhouse/trace-instant-eval-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../clickhouse/trace-list.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
+import { ClickHouseTraceSpanRepository } from "../clickhouse/trace-span.repository.ts";
 import {
   TraceSummaryClickHouseRepository,
   TraceSummaryProjectionClickHouseRepository,
@@ -51,7 +54,10 @@ export class PostgresTraceRepositories {
     | "eventPayloads"
   > {
     const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
-    const storage = { resolveClient: traceClickHouse };
+    const clickhouse = MemberTraceClickHouseClientRepository.authorizedFor(members.clickhouse);
+    const storage = { resolveClient: traceClickHouse, clickhouse };
+    const annotations = PrismaTraceAnnotationsRepository.create(members.prisma);
+    const annotationScores = PrismaTraceAnnotationScoresRepository.create(members.prisma);
 
     return {
       editOverlay: PrismaTraceEditOverlayRepository.create(members.prisma),
@@ -60,8 +66,11 @@ export class PostgresTraceRepositories {
       }),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
-      analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create(storage),
-      spanStorage: SpanStorageClickHouseRepository.create(traceClickHouse),
+      analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({
+        resolveClient: traceClickHouse,
+      }),
+      spanStorage: SpanStorageClickHouseRepository.create(storage),
+      spanTree: ClickHouseTraceSpanRepository.create(storage),
       existence: ClickHouseTraceExistenceRepository.create({
         resolveClient: traceClickHouse,
       }),
@@ -74,17 +83,23 @@ export class PostgresTraceRepositories {
       instantEvalRuns: ClickHouseTraceInstantEvalRunsRepository.create({
         resolveClient: traceClickHouse,
       }),
-      evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create({
-        resolveClient: traceClickHouse,
+      evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create(storage),
+      annotations,
+      annotationScores,
+      legacyRead: TraceLegacyReadClickHouseRepository.create({
+        resolveClickHouseClient: traceClickHouse,
+        clickhouse,
+        annotations: { rows: annotations, scores: annotationScores },
       }),
-      annotations: PrismaTraceAnnotationsRepository.create(members.prisma),
-      annotationScores: PrismaTraceAnnotationScoresRepository.create(members.prisma),
-      list: TraceListClickHouseRepository.create(traceClickHouse),
-      sessionGroups: SessionGroupsClickHouseRepository.create(traceClickHouse),
+      list: TraceListClickHouseRepository.create({ clickhouse }),
+      sessionGroups: SessionGroupsClickHouseRepository.create({ clickhouse }),
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create({
         resolveClient: traceClickHouse,
       }),
       usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
+      indexMaterialisation: ClickHouseTraceIndexMaterialisationRepository.create(
+        members.clickhouse,
+      ),
       modelSpend: ClickHouseTraceModelSpendRepository.create(members.clickhouse),
       attributeSpend: ClickHouseTraceAttributeSpendRepository.create(members.clickhouse),
       attributedRollup: ClickHouseTraceAttributedRollupRepository.create(members.clickhouse),

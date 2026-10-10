@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export type LangyJsonValue =
@@ -34,5 +35,7 @@ export type LangyMessageRole = z.infer<typeof langyMessageRoleSchema>;
  * opaque to the pipeline, stored verbatim as JSON; the UI flattens text
  * parts on read. The pipeline never interprets part internals.
  */
-export const langyMessagePartSchema = z.record(z.string(), langyJsonValueSchema);
+const langyMessagePartSchemaDefinition = z.record(z.string(), langyJsonValueSchema);
+export interface LangyMessagePartSchema extends Named<typeof langyMessagePartSchemaDefinition> {}
+export const langyMessagePartSchema: LangyMessagePartSchema = langyMessagePartSchemaDefinition;
 export type LangyMessagePart = z.infer<typeof langyMessagePartSchema>;

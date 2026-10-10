@@ -14,6 +14,7 @@ import {
   type UiScopeSelection,
   type UiScopeTeam,
 } from "@langwatch/organization-contract";
+import { findLandingProjects, isAggregateProjectKind } from "@langwatch/project-contract";
 
 /**
  * Whether the caller holds a membership on this team — `organization.getAll`
@@ -59,14 +60,16 @@ export function userCanOpenTeam({
 export function selectAmbientTeam<
   T extends {
     isPersonal?: boolean | null;
-    projects: readonly unknown[];
+    projects: readonly { kind?: string | null }[];
     members?: readonly { userId?: string }[];
   },
 >({ teams, userId }: { teams: readonly T[]; userId?: string }): T | undefined {
+  // A team holding only an aggregate has nothing to land on (ADR-177 block F).
+  const landable = (team: T) => findLandingProjects(team.projects).length > 0;
   const byPreference = (candidates: readonly T[]) =>
-    candidates.find((team) => !team.isPersonal && team.projects.length > 0) ??
+    candidates.find((team) => !team.isPersonal && landable(team)) ??
     candidates.find((team) => !team.isPersonal) ??
-    candidates.find((team) => team.projects.length > 0) ??
+    candidates.find(landable) ??
     candidates[0];
 
   const own = userId ? teams.filter((team) => userBelongsToTeam(team, userId)) : teams;
@@ -182,7 +185,8 @@ function resolveProject({
     );
   }
   if (!team) return void 0;
-  return resolvedSlugMatch?.project ?? team.projects[0];
+  // Never an aggregate by default, unless the team holds nothing else.
+  return resolvedSlugMatch?.project ?? findLandingProjects(team.projects)[0] ?? team.projects[0];
 }
 
 function findTeamsBySlug(
@@ -251,7 +255,10 @@ function selectUsableSlugMatch({
     : void 0;
   const match = membershipMatch ?? matches[0];
   if (!match || isAddressedBySlug) return match;
-  if (isPersonalScopeRoute || match.team.isPersonal) return void 0;
+  // A remembered aggregate is never landed on: an admin opens one on purpose (ADR-177 block F).
+  if (isPersonalScopeRoute || match.team.isPersonal || isAggregateProjectKind(match.project.kind)) {
+    return void 0;
+  }
   const canOpen = userCanOpenTeam({
     team: match.team,
     userId,
@@ -322,6 +329,8 @@ export function resolveUiScope({
     (team) =>
       team.id === selection.teamId &&
       !team.isPersonal &&
+      // Holding only aggregates leaves nothing to land on, so it is forgotten.
+      (team.projects.length === 0 || findLandingProjects(team.projects).length > 0) &&
       userCanOpenTeam({
         team,
         userId,
@@ -388,7 +397,8 @@ export function uiScopeSelectionWrites({
   // "Where was I working" is a question about the organization's teams
   // and projects — a personal workspace isn't one; it resolves from its
   // own address every time, so nothing about it needs remembering.
-  if (!team?.isPersonal) {
+  // An aggregate is opened on purpose, never remembered (ADR-177 block F).
+  if (!team?.isPersonal && !isAggregateProjectKind(project?.kind)) {
     if (team && team.id !== selection.teamId) {
       writes.push({ key: "teamId", value: team.id });
     }

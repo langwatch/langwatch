@@ -60,8 +60,8 @@ export function InlineCommandPalette({ placeholder }: InlineCommandPaletteProps)
       borderRadius="16px"
       boxShadow={
         focused
-          ? "0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
-          : "0 1px 2px rgba(20, 20, 23, 0.04), 0 12px 30px -22px rgba(20, 20, 23, 0.5)"
+          ? "0 2px 8px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent), 0 24px 70px -20px color-mix(in srgb, var(--chakra-colors-bg-scrim) 35%, transparent)"
+          : "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent), 0 12px 30px -22px color-mix(in srgb, var(--chakra-colors-bg-scrim) 50%, transparent)"
       }
       transition="border-color 130ms ease, box-shadow 130ms ease"
       onKeyDown={(event) => {

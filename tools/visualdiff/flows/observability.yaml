@@ -264,7 +264,7 @@ flows:
           path: /{slug}/annotations
       - action: click
         with:
-          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+          selector: [data-testid="annotation-queue-create"]
       - action: fill
         with:
           label: /^Name Annotation Queue/
@@ -341,7 +341,7 @@ flows:
           path: /{slug}/annotations
       - action: click
         with:
-          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+          selector: [data-testid="annotation-queue-create"]
       - action: fill
         with:
           label: /^Name Annotation Queue/

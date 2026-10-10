@@ -39,7 +39,6 @@ export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
   "openai",
   "anthropic",
   "voyage",
-  "custom",
 ]);
 
 /**

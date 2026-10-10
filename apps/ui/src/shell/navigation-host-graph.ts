@@ -6,11 +6,11 @@
 
 import type { NavigationOrganization, NavigationTeam } from "@langwatch/navigation-contract";
 
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 
-/** Organization's team rules, handed in from its loaded scope capability. */
+/** Organization's team rules, handed in from its loaded scope host service. */
 export type NavigationTeamRules = Pick<
-  UiRootCapabilities["scope"],
+  UiRootHostServices["scope"],
   "selectAmbientTeam" | "userCanOpenTeam"
 >;
 
@@ -32,6 +32,7 @@ export type NavigationGraphRead = readonly {
       id: string;
       name: string;
       slug: string;
+      kind?: string;
       presenceEnabled?: boolean;
       lastCodingAgentSessionAt?: string | null;
       lastCodingAgentPullRequestAt?: string | null;
@@ -61,6 +62,7 @@ export function toNavigationOrganizations(read: NavigationGraphRead): Navigation
         id: project.id,
         name: project.name,
         slug: project.slug,
+        kind: project.kind,
         isPersonal: team.isPersonal,
         lastCodingAgentSessionAt: project.lastCodingAgentSessionAt,
         lastCodingAgentPullRequestAt: project.lastCodingAgentPullRequestAt,

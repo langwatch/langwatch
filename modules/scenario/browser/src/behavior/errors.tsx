@@ -3,6 +3,7 @@
  */
 
 import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { ErrorActions } from "@langwatch/error-views";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import type { ReactNode } from "react";
 
@@ -34,7 +35,7 @@ export function FormServerError({ form }: { form: MinimalForm }) {
 /**
  * The two ways out a failed panel offers.
  */
-export function ErrorActions({
+export function ErrorRetryRow({
   onRetry,
   traceId,
   children,
@@ -47,11 +48,7 @@ export function ErrorActions({
   if (!onRetry && !children && !traceId) return null;
   return (
     <HStack gap={2}>
-      {traceId && (
-        <Text fontSize="xs" color="fg.muted">
-          Reference {traceId}
-        </Text>
-      )}
+      {traceId && <ErrorActions traceId={traceId} />}
       {onRetry && (
         <Button size="sm" variant="outline" onClick={onRetry}>
           Try again

@@ -6,7 +6,11 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj-1" });
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
@@ -119,13 +123,16 @@ function matchRows({
  * read is a broken fixture, not a failed expectation. Throws to report setup
  * break as a setup break, keeping assertions in the it blocks. */
 async function readTraces(traceIds: string[]) {
-  const { TraceLegacyReadClickHouseRepository } =
-    await import("../trace-legacy-read.repository.ts");
-  const service = new TraceLegacyReadClickHouseRepository({
+  const service = mappedLegacyRead({
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,
   });
-  await service.findTracesWithSpans({ projectId: "proj-1", traceIds, protections });
+  await service.findTracesWithSpans({
+    authorization: OWN_READ,
+    projectId: "proj-1",
+    traceIds,
+    protections,
+  });
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),
   );

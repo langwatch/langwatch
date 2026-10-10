@@ -5,18 +5,15 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { FormProvider, useForm, useFormContext } from "react-hook-form";
+import { FormProvider, useForm, useFormContext, useWatch } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RuntimeParametersField } from "../runtime-parameters-field.tsx";
 
 function FormValueProbe() {
   const methods = useFormContext<PromptConfigFormValues>();
-  return (
-    <output data-testid="parameters-value">
-      {JSON.stringify(methods.watch("version.parameters"))}
-    </output>
-  );
+  const parameters = useWatch({ control: methods.control, name: "version.parameters" });
+  return <output data-testid="parameters-value">{JSON.stringify(parameters)}</output>;
 }
 
 function renderField(initialParameters: Record<string, unknown> = {}) {

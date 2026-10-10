@@ -7,6 +7,7 @@ import {
   type ProcessManagerApplier,
   type Projection,
   type RegisteredCommand,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
@@ -67,6 +68,8 @@ export function buildWebhookDeliveryPipeline(input: {
   governanceProcess?: ProcessManagerApplier<WebhookDeliveryEvent>;
   gatewayEvents?: WebhookGatewayEventDelivery;
   prune?: WebhookDeliveryPruneDeps;
+  /** Each tenant's retention, stamped on the delivery event rows. */
+  retention?: RetentionPolicyResolver | undefined;
 }): WebhookDeliveryDefinition {
   const pipeline = definePipeline({
     name: WEBHOOK_DELIVERY_PIPELINE_NAME,
@@ -78,6 +81,7 @@ export function buildWebhookDeliveryPipeline(input: {
     ])
     .withCommand("requestSpendDelivery", RequestSpendDeliveryCommand)
     .withCommand("requestGovernanceDelivery", RequestGovernanceDeliveryCommand);
+  if (input.retention) pipeline.withRetention(input.retention);
   if (!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents || !input.prune) {
     return pipeline.build();
   }

@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -9,6 +7,8 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
@@ -225,41 +225,39 @@ export function EnvironmentsTab({
   }
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflowX="auto">
-      <Table.Root size="sm" data-testid="environments-table">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Description</Table.ColumnHeader>
-            <Table.ColumnHeader>Created</Table.ColumnHeader>
-            <Table.ColumnHeader>Created by</Table.ColumnHeader>
+    <ListTable size="sm" data-testid="environments-table" containerProps={{ overflowX: "auto" }}>
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Name</Table.ColumnHeader>
+          <Table.ColumnHeader>Description</Table.ColumnHeader>
+          <Table.ColumnHeader>Created</Table.ColumnHeader>
+          <Table.ColumnHeader>Created by</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {rows.map((row) => (
+          <Table.Row key={row.id}>
+            <Table.Cell>
+              <HStack gap={2}>
+                <Text fontWeight="medium">{row.name}</Text>
+                {row.discoveredFrom && (
+                  <Badge size="xs" variant="surface" colorPalette="purple">
+                    Discovered from {row.discoveredFrom}
+                  </Badge>
+                )}
+                {row.isSample && (
+                  <Badge size="xs" variant="surface" colorPalette="orange">
+                    sample
+                  </Badge>
+                )}
+              </HStack>
+            </Table.Cell>
+            <Table.Cell color="fg.muted">{row.description}</Table.Cell>
+            <Table.Cell color="fg.muted">{formatCreated(row.createdIso)}</Table.Cell>
+            <Table.Cell color="fg.muted">{row.createdBy}</Table.Cell>
           </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {rows.map((row) => (
-            <Table.Row key={row.id}>
-              <Table.Cell>
-                <HStack gap={2}>
-                  <Text fontWeight="medium">{row.name}</Text>
-                  {row.discoveredFrom && (
-                    <Badge size="xs" variant="surface" colorPalette="purple">
-                      Discovered from {row.discoveredFrom}
-                    </Badge>
-                  )}
-                  {row.isSample && (
-                    <Badge size="xs" variant="surface" colorPalette="orange">
-                      sample
-                    </Badge>
-                  )}
-                </HStack>
-              </Table.Cell>
-              <Table.Cell color="fg.muted">{row.description}</Table.Cell>
-              <Table.Cell color="fg.muted">{formatCreated(row.createdIso)}</Table.Cell>
-              <Table.Cell color="fg.muted">{row.createdBy}</Table.Cell>
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Box>
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }

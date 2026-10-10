@@ -6,6 +6,8 @@ import type { Project } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
+
 const logger = vi.hoisted(() => ({
   info: vi.fn(),
   error: vi.fn(),
@@ -19,8 +21,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logger,
 }));
 
-import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import {
   type TraceProcessingPipelineInput,
   TraceProcessingRuntimeAdapter,
@@ -66,6 +68,7 @@ function compose() {
   const updateMetadata = vi.fn<Peers["projects"]["updateMetadata"]>(async () => undefined);
   const pipeline = TraceProcessingRuntimeAdapter.create({
     role: "worker",
+    authorizeFoldRead: ownProofAuthorizer,
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
     peers: createApiFixture<Peers>({
       dataRetention: createApiFixture<Peers["dataRetention"]>({

@@ -115,7 +115,7 @@ func freeRedisDBs(taken map[int]bool, size RedisDBSize) ([]int, error) {
 // visualdiff - the registry step below is simply skipped, and only the
 // DBSIZE probe guards the allocation.
 
-// havenStatusReport is the slice of `haven status --agent --json` this
+// havenStatusReport is the slice of `haven status --agent --json stacks` this
 // package reads: one redisDb per registered stack.
 type havenStatusReport struct {
 	Stacks []struct {
@@ -124,7 +124,7 @@ type havenStatusReport struct {
 }
 
 // HavenRegisteredRedisDBs lists the redisDb each of haven's registered
-// stacks holds, by shelling out to `haven status --agent --json`
+// stacks holds, by shelling out to `haven status --agent --json stacks`
 // (tools/thuishaven/app/report.go's Status, embedding domain.Stack's
 // "redisDb" field). When haven is not on PATH the registry step is skipped:
 // it returns (nil, nil), meaning there is nothing to exclude on its account,
@@ -133,13 +133,13 @@ func HavenRegisteredRedisDBs(ctx context.Context) (map[int]bool, error) {
 	if !havenOnPath() {
 		return nil, nil
 	}
-	out, err := exec.CommandContext(ctx, "haven", "status", "--agent", "--json").Output()
+	out, err := exec.CommandContext(ctx, "haven", "status", "--agent", "--json", "stacks").Output()
 	if err != nil {
-		return nil, fmt.Errorf("haven status --agent --json: %w", err)
+		return nil, fmt.Errorf("haven status --agent --json stacks: %w", err)
 	}
 	var report havenStatusReport
 	if err := json.Unmarshal(out, &report); err != nil {
-		return nil, fmt.Errorf("haven status --agent --json: %w", err)
+		return nil, fmt.Errorf("haven status --agent --json stacks: %w", err)
 	}
 	dbs := make(map[int]bool, len(report.Stacks))
 	for _, stack := range report.Stacks {

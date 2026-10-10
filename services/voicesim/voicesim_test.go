@@ -286,6 +286,26 @@ func TestConsoleAPIListsCallsNewestFirstWithTurns(t *testing.T) {
 	}
 }
 
+// @scenario "An agent clears the call log between runs"
+func TestClearingTheCallLogEmptiesItAndKeepsIDsCounting(t *testing.T) {
+	s, srv := newTestServer(t)
+	s.calls.open("agent_1")
+	s.calls.open("agent_2")
+	if resp := do(t, http.MethodDelete, srv.URL+"/_sim/api/calls", "", nil); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("DELETE /_sim/api/calls answered %d, want 204", resp.StatusCode)
+	}
+	var body struct {
+		Calls []Call `json:"calls"`
+	}
+	getJSON(t, srv.URL+"/_sim/api/calls", &body)
+	if len(body.Calls) != 0 {
+		t.Fatalf("calls after clear = %+v, want none", body.Calls)
+	}
+	if next := s.calls.open("agent_3"); next.ID != "conv_voicesim_0003" {
+		t.Fatalf("the next call is %s, want conv_voicesim_0003", next.ID)
+	}
+}
+
 // @scenario "The call log is bounded"
 func TestCallLogKeepsOnlyTheMostRecentCalls(t *testing.T) {
 	var log callLog

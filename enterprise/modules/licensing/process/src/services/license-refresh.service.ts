@@ -36,6 +36,9 @@ interface LicenseApplication {
   >;
 }
 
+/** C3B-RETRY-INLINE: a pending managed key is asked for again once, this long after. */
+const PENDING_RETRY_MS = 30_000;
+
 interface LicenseRefreshServiceDependencies {
   readonly install: ConnectInstallService;
   /** Where a sync's outcome is recorded; organization writes it to its own row. */
@@ -50,6 +53,8 @@ interface LicenseRefreshServiceDependencies {
   /** The release this install runs, as the report names it. */
   readonly version: () => string;
   readonly now: () => Instant;
+  /** How the pass waits before retrying a pending organization; tests skip the wait. */
+  readonly wait?: (ms: number) => Promise<void>;
   readonly logger?: { warn(fields: Record<string, unknown>, message: string): void };
 }
 
@@ -68,17 +73,40 @@ export class LicenseRefreshService {
   async syncAll(organizationIds: readonly string[]): Promise<void> {
     if (!this.deps.host) return;
 
+    const pending: string[] = [];
     for (const organizationId of organizationIds) {
       const entitled = await this.deps.install.findEntitledServices(organizationId);
       if (entitled.length === 0) continue;
-
-      try {
-        await this.syncOne(organizationId);
-        await this.record({ organizationId, error: null });
-      } catch (error) {
-        await this.recordFailure({ organizationId, error });
+      if (!(await this.syncAndRecord({ organizationId, retryPending: true }))) {
+        pending.push(organizationId);
       }
     }
+    if (pending.length === 0) return;
+
+    await (this.deps.wait ?? waitFor)(PENDING_RETRY_MS);
+    for (const organizationId of pending) {
+      await this.syncAndRecord({ organizationId, retryPending: false });
+    }
+  }
+
+  /** Records how one sync ended; false, recording nothing, when it is pending and may retry. */
+  private async syncAndRecord({
+    organizationId,
+    retryPending,
+  }: {
+    organizationId: string;
+    retryPending: boolean;
+  }): Promise<boolean> {
+    try {
+      await this.syncOne(organizationId);
+      await this.record({ organizationId, error: null });
+    } catch (error) {
+      const isPending =
+        HandledError.isHandled(error) && error.code === "connect_credential_pending";
+      if (retryPending && isPending) return false;
+      await this.recordFailure({ organizationId, error });
+    }
+    return true;
   }
 
   /**
@@ -214,4 +242,8 @@ export class LicenseRefreshService {
     this.deps.logger?.warn({ organizationId, code }, "license sync failed");
     await this.record({ organizationId, error: code }).catch(() => void 0);
   }
+}
+
+function waitFor(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

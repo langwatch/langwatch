@@ -317,7 +317,8 @@ function readFilledValue({
 }
 
 /** The media types a `data:` cell value is allowed to open as a link. */
-const OPENABLE_DATA_URL_RE = /^data:(?:image\/|audio\/|video\/|application\/pdf\b)/i;
+const OPENABLE_DATA_URL_RE =
+  /^data:(?:image\/(?:png|jpe?g|gif|webp|avif|bmp)|(?:audio|video)\/[\w.-]+|application\/pdf)[;,]/i;
 
 /**
  * Where the chip points: a reference or an address as it is, a data URL only

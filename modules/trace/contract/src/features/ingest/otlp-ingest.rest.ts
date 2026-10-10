@@ -1,14 +1,12 @@
+import type { Named } from "@langwatch/module";
 /**
  * The OTLP receiver's own errors and small pure helpers. Ports live in the
  * server transport file instead, keeping this contract free of the DOM-lib
  * `Request` dependency neither the browser SDK nor another module needs.
  */
-import type { OtlpSourcePolicy } from "@langwatch/otlp";
+import { otlpSourcePolicySchema } from "@langwatch/otlp/door";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { z } from "zod";
-
-/** The exporter base a `/v1/traces` suffix was appended to; the receiver checks it. */
-export const otlpTraceAliasParamsSchema = z.object({ otlpBase: z.string() });
 
 export type OtlpIngestCredentialInput = Readonly<{
   authorization: string | null;
@@ -16,25 +14,31 @@ export type OtlpIngestCredentialInput = Readonly<{
   xProjectId: string | null;
 }>;
 
-export type OtlpIngestProject = Readonly<{
-  id: string;
-  teamId: string;
-  organizationId: string;
-}>;
+const otlpIngestProjectSchema = z.object({
+  id: z.string(),
+  teamId: z.string(),
+  organizationId: z.string(),
+});
+export type OtlpIngestProject = Readonly<z.infer<typeof otlpIngestProjectSchema>>;
 
-type OtlpIngestIdentity = Readonly<{
-  apiKeyId: string | null;
-  organizationId: string;
-  ingestSourceType: string | null;
-  ingestionTemplateId: string | null;
-  sourcePolicy?: OtlpSourcePolicy;
-}>;
-
-/** A resolved receiver credential; a refusal is thrown, and the receiver renders it. */
-export type OtlpIngestCredential = Readonly<{
-  project: OtlpIngestProject;
-  identity: OtlpIngestIdentity;
-}>;
+/** A resolved receiver credential, handed by the OTLP ingest door as the route's session. */
+const otlpIngestCredentialSchemaDefinition = z.object({
+  project: otlpIngestProjectSchema,
+  identity: z.object({
+    apiKeyId: z.string().nullable(),
+    organizationId: z.string(),
+    ingestSourceType: z.string().nullable(),
+    ingestionTemplateId: z.string().nullable(),
+    sourcePolicy: otlpSourcePolicySchema.optional(),
+  }),
+});
+export interface OtlpIngestCredentialSchema extends Named<
+  typeof otlpIngestCredentialSchemaDefinition
+> {}
+export const otlpIngestCredentialSchema: OtlpIngestCredentialSchema =
+  otlpIngestCredentialSchemaDefinition;
+/** A refusal is thrown, and the receiver renders it. */
+export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 
 export type OtlpTraceCollectionResult = Readonly<{
   rejectedSpans?: number;
@@ -46,7 +50,15 @@ export type OtlpTraceCollectionResult = Readonly<{
 
 /** OTLP operations are part of Trace's one public process API. */
 /** One OTLP trace export, for the tenant it belongs to. */
-export type OtlpTracesInput = { tenantId: string; traceRequest: IExportTraceServiceRequest };
+export type OtlpTracesInput = {
+  tenantId: string;
+  traceRequest: IExportTraceServiceRequest;
+  /**
+   * In-process backfill only (seed plan Q1 (a)): admits spans up to this many days old, at most
+   * `SPAN_BACKFILL_MAX_PAST_DAYS`, instead of `SPAN_MAX_PAST_MS`. The OTLP door never sets it.
+   */
+  backfillMaxPastDays?: number;
+};
 
 export type TraceOtlpIngestApi = Readonly<{
   otlpCredential(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential>;

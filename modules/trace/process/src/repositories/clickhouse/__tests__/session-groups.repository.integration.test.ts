@@ -5,8 +5,13 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  aggregateProof,
+  ownProof,
+} from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { SessionGroupsQuery } from "../../session-groups.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -201,7 +206,7 @@ async function insertSessionLog({
 
 function query(overrides: Partial<SessionGroupsQuery> = {}): SessionGroupsQuery {
   return {
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange,
     sort: { column: "lastActivity", direction: "desc" },
     limit: 50,
@@ -212,7 +217,9 @@ function query(overrides: Partial<SessionGroupsQuery> = {}): SessionGroupsQuery 
 describe.skipIf(!clickHouseConfigured)("given two sessions with several traces each", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
-    repository = new SessionGroupsClickHouseRepository(async () => ch);
+    repository = SessionGroupsClickHouseRepository.create({
+      clickhouse: authorizedClickHouseFor(ch),
+    });
 
     await insertTraceSummaries([
       // Session alpha: three traces whose rollup the small-page read must
@@ -294,12 +301,12 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
   afterAll(async () => {
     if (ch) {
       await ch.exec({
-        query: `ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
+        query: `ALTER TABLE trace_summaries DELETE WHERE startsWith(TenantId, {tag:String})`,
+        query_params: { tag },
       });
       await ch.exec({
-        query: `ALTER TABLE log_records DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
+        query: `ALTER TABLE log_records DELETE WHERE startsWith(TenantId, {tag:String})`,
+        query_params: { tag },
       });
     }
   });
@@ -514,5 +521,110 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     expect(pagedSessions).toEqual(Array.from({ length: 5 }, (_, index) => `${pagedTag}-${index}`));
     const sortedActivities = [...activities].toSorted((a, b) => b - a);
     expect(activities).toEqual(sortedActivities);
+  });
+
+  describe("given two members of an aggregate", () => {
+    const aggregate = `${tag}-aggregate`;
+    const memberX = `${tag}-member-x`;
+    const memberY = `${tag}-member-y`;
+    const authorization = aggregateProof({
+      projectId: aggregate,
+      members: [
+        { projectId: memberX, from: 0 },
+        { projectId: memberY, from: 0 },
+      ],
+      now: baseMs,
+    });
+
+    it("keeps each session's own preview when both hold the same trace id", async () => {
+      const twinTraceId = `${tag}-twin-trace`;
+      const [sessionX, sessionY] = [`${tag}-twin-sess-x`, `${tag}-twin-sess-y`];
+      await insertTraceSummaries(
+        [
+          { tenant: memberX, sessionId: sessionX, offsetMs: 20_000 },
+          { tenant: memberY, sessionId: sessionY, offsetMs: 10_000 },
+        ].map(({ tenant, sessionId, offsetMs }) => ({
+          ...sessionTrace({
+            sessionId,
+            traceId: twinTraceId,
+            occurredAtMs: baseMs - offsetMs,
+            cost: 1,
+            promptTokens: 10,
+            completionTokens: 5,
+            computedInput: `twin prompt of ${tenant}`,
+          }),
+          TenantId: tenant,
+        })),
+      );
+
+      const page = await repository.listSessionGroups(query({ authorization }));
+
+      const x = page.rows.find((row) => row.conversationId === sessionX);
+      const y = page.rows.find((row) => row.conversationId === sessionY);
+      expect([x?.lastTraceId, y?.lastTraceId]).toEqual([twinTraceId, twinTraceId]);
+      expect(x?.input).toBe(`twin prompt of ${memberX}`);
+      expect(y?.input).toBe(`twin prompt of ${memberY}`);
+    });
+
+    it("lists one session per member sharing a conversation id and pages on the tenant tie", async () => {
+      const shared = `${tag}-shared-conversation`;
+      const [sharedX, sharedY] = [`${memberX}-shared`, `${memberY}-shared`];
+      const sharedProof = aggregateProof({
+        projectId: aggregate,
+        members: [
+          { projectId: sharedX, from: 0 },
+          { projectId: sharedY, from: 0 },
+        ],
+        now: baseMs,
+      });
+      await insertTraceSummaries(
+        [
+          { tenant: sharedX, cost: 1 },
+          { tenant: sharedY, cost: 2 },
+        ].map(({ tenant, cost }) => ({
+          ...sessionTrace({
+            sessionId: shared,
+            traceId: `${tenant}-shared-trace`,
+            occurredAtMs: baseMs + 5_000,
+            cost,
+            promptTokens: cost,
+            completionTokens: cost,
+          }),
+          TenantId: tenant,
+        })),
+      );
+
+      const page = await repository.listSessionGroups(query({ authorization: sharedProof }));
+      expect(
+        page.rows
+          .map((row) => ({ tenantId: row.tenantId, cost: row.totalCost }))
+          .toSorted((a, b) => a.cost - b.cost),
+      ).toEqual([
+        { tenantId: sharedX, cost: 1 },
+        { tenantId: sharedY, cost: 2 },
+      ]);
+      expect(page.totalHits).toBe(2);
+
+      // Same sort value, same conversation id: only the tenant tells the pages apart.
+      const first = await repository.listSessionGroups(
+        query({ authorization: sharedProof, limit: 1 }),
+      );
+      const firstRow = first.rows[0];
+      if (!firstRow) throw new Error("expected a first session");
+      const second = await repository.listSessionGroups(
+        query({
+          authorization: sharedProof,
+          limit: 1,
+          cursor: {
+            sortValue: firstRow.lastActivityMs,
+            conversationId: firstRow.conversationId,
+            tenantId: firstRow.tenantId,
+          },
+        }),
+      );
+      expect(new Set([firstRow.tenantId, second.rows[0]?.tenantId])).toEqual(
+        new Set([sharedX, sharedY]),
+      );
+    });
   });
 });

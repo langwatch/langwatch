@@ -244,6 +244,7 @@ const buildColumns = ({
           return (
             <BatchTargetCell
               targetOutput={targetOutput}
+              isEvaluator={targetCol.type === "evaluator"}
               suppressedEvaluatorIds={comparisonEvaluatorIds}
               showOutput={showOutputs}
               showEvaluations={showEvaluations}

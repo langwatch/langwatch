@@ -2,8 +2,7 @@ import { Box, HStack, Link, Spacer, Text, VStack } from "@langwatch/design-syste
 import { Switch } from "@langwatch/design-system/switch";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useMemo } from "react";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
@@ -92,107 +91,84 @@ export function IfElsePropertiesPanel({
     type: input.type,
   }));
 
-  const availableSources = useMemo(
-    () => buildAvailableSources({ nodeId: node.id, nodes, edges }),
-    [edges, nodes, node.id],
-  );
+  const availableSources = buildAvailableSources({ nodeId: node.id, nodes, edges });
 
-  const inputMappings = useMemo(
-    () =>
-      buildInputMappings({
-        nodeId: node.id,
-        edges,
-        inputs: node.data.inputs ?? [],
-      }),
-    [edges, node.id, node.data.inputs],
-  );
+  const inputMappings = buildInputMappings({
+    nodeId: node.id,
+    edges,
+    inputs: node.data.inputs ?? [],
+  });
 
-  const handleMappingChange = useCallback(
-    (identifier: string, mapping: WorkflowPanelFieldMapping | undefined) => {
-      const workflow = getWorkflow();
-      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
-      const result = applyMappingChange({
-        nodeId: node.id,
-        identifier,
-        mapping,
-        currentEdges: workflow.edges,
-        currentInputs,
-      });
-      setEdges(result.edges);
-      setNode({ id: node.id, data: { inputs: result.inputs } });
-      updateNodeInternals(node.id);
-    },
-    [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
-  );
+  const handleMappingChange = (
+    identifier: string,
+    mapping: WorkflowPanelFieldMapping | undefined,
+  ) => {
+    const workflow = getWorkflow();
+    const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+    const result = applyMappingChange({
+      nodeId: node.id,
+      identifier,
+      mapping,
+      currentEdges: workflow.edges,
+      currentInputs,
+    });
+    setEdges(result.edges);
+    setNode({ id: node.id, data: { inputs: result.inputs } });
+    updateNodeInternals(node.id);
+  };
 
-  const handleInputsChange = useCallback(
-    (newVariables: WorkflowVariable[]) => {
-      const existingInputs = node.data.inputs ?? [];
-      const newInputs: Field[] = newVariables.map((variable) => {
-        const existing = existingInputs.find((i) => i.identifier === variable.identifier);
-        return {
-          identifier: variable.identifier,
-          type: variable.type as Field["type"],
-          ...(existing?.value != null ? { value: existing.value } : {}),
-        };
-      });
-      setNode({ id: node.id, data: { inputs: newInputs } });
-      updateNodeInternals(node.id);
-    },
-    [node.id, node.data.inputs, setNode, updateNodeInternals],
-  );
+  const handleInputsChange = (newVariables: WorkflowVariable[]) => {
+    const existingInputs = node.data.inputs ?? [];
+    const newInputs: Field[] = newVariables.map((variable) => {
+      const existing = existingInputs.find((i) => i.identifier === variable.identifier);
+      return {
+        identifier: variable.identifier,
+        type: variable.type as Field["type"],
+        ...(existing?.value != null ? { value: existing.value } : {}),
+      };
+    });
+    setNode({ id: node.id, data: { inputs: newInputs } });
+    updateNodeInternals(node.id);
+  };
 
-  const param = useCallback(
-    (identifier: string) =>
-      (node.data.parameters?.find((p) => p.identifier === identifier)?.value as
-        | string
-        | undefined) ?? "",
-    [node.data.parameters],
-  );
+  const param = (identifier: string) =>
+    (node.data.parameters?.find((p) => p.identifier === identifier)?.value as string | undefined) ??
+    "";
 
   const condition = param("condition");
   const code = param("code");
   const isCode = param("condition_language") === "python";
 
-  const handleConditionChange = useCallback(
-    (value: string) => {
-      setNodeParameter(node.id, {
-        identifier: "condition",
-        type: "str",
-        value,
-      });
-    },
-    [setNodeParameter, node.id],
-  );
+  const handleConditionChange = (value: string) => {
+    setNodeParameter(node.id, {
+      identifier: "condition",
+      type: "str",
+      value,
+    });
+  };
 
-  const handleCodeChange = useCallback(
-    (value: string) => {
+  const handleCodeChange = (value: string) => {
+    setNodeParameter(node.id, {
+      identifier: "code",
+      type: "code",
+      value,
+    });
+  };
+
+  const handleLanguageToggle = (checked: boolean) => {
+    setNodeParameter(node.id, {
+      identifier: "condition_language",
+      type: "str",
+      value: checked ? "python" : "liquid",
+    });
+    if (checked && !code.trim()) {
       setNodeParameter(node.id, {
         identifier: "code",
         type: "code",
-        value,
+        value: pythonConditionTemplate(node.data.inputs ?? []),
       });
-    },
-    [setNodeParameter, node.id],
-  );
-
-  const handleLanguageToggle = useCallback(
-    (checked: boolean) => {
-      setNodeParameter(node.id, {
-        identifier: "condition_language",
-        type: "str",
-        value: checked ? "python" : "liquid",
-      });
-      if (checked && !code.trim()) {
-        setNodeParameter(node.id, {
-          identifier: "code",
-          type: "code",
-          value: pythonConditionTemplate(node.data.inputs ?? []),
-        });
-      }
-    },
-    [setNodeParameter, node.id, code, node.data.inputs],
-  );
+    }
+  };
 
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={4}>

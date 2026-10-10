@@ -1,4 +1,3 @@
-import { bindRestCredential } from "@langwatch/api/rest";
 import type { LicensingApi, LicensingServerConfig } from "@langwatch/enterprise-licensing-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -11,8 +10,7 @@ import { LicenseMintService } from "./services/license-mint.service.ts";
 import { OrganizationLicenseCopyService } from "./services/organization-license-copy.service.ts";
 import { OrganizationLicenseWriterService } from "./services/organization-license-writer.service.ts";
 import { GenerateLicenseTask } from "./tasks/generate-license.task.ts";
-import { connectHostRest } from "./transport/connect-host.rest.ts";
-import { connectHostedRest } from "./transport/connect-hosted.rest.ts";
+import { connectHostDoor, connectHostRest } from "./transport/connect-host.rest.ts";
 import { connectTrpcTransport } from "./transport/connect.trpc.ts";
 import { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 
@@ -23,22 +21,19 @@ export const licensingProcessModule: PublishedProcessModule<
 > = defineProcessModule("licensing")
   .withRepositories(licensingRepositories)
   .withApi(LicensingModule)
-  .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest)
-  // The Go data plane signs hosted calls with the gateway's own secret, so the
-  // family answers behind the gateway's door rather than a rebuilt one.
-  .withTransportFacts(({ dependencies }) => [
-    bindRestCredential("internal_secret", () => dependencies.gateway.internalDoor()),
-  ])
+  .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest)
   .withEventing(licenseSyncEventing)
   .withEventing(licensingCustomerEventing)
-  .withTasks(({ app, dependencies, repositories }) => [
+  // The connect host's bearer, verified before the body (W02-DOOR-SHAPE, 2026-10-10).
+  .withDoors({ licence_token: connectHostDoor })
+  .withTasks(({ app, repositories }) => [
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({
         licenses: app,
         organizations: repositories.connectOrganizations,
         storage: OrganizationLicenseWriterService.create({
           licenses: repositories.organizationLicenses,
-          organizations: dependencies.organizations,
+          facts: app.customerFactsService(),
         }),
         registry: repositories.issuedLicenses,
       }),

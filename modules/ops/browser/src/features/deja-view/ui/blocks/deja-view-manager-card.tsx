@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
@@ -53,13 +54,11 @@ function instanceStatus(instance: DejaViewProcessManagerInstance | null): {
   return { label: "Active", palette: "green" };
 }
 
-function Chips({ items, palette }: { items: readonly string[]; palette: string }) {
+function Chips({ items }: { items: readonly string[] }) {
   return (
     <Wrap gap={1}>
       {items.map((item) => (
-        <Badge key={item} colorPalette={palette} variant="subtle" size="sm">
-          {item}
-        </Badge>
+        <InlineCode key={item}>{item}</InlineCode>
       ))}
     </Wrap>
   );
@@ -125,11 +124,11 @@ export function ManagerCard({ manager }: { manager: DejaViewProcessManager }) {
         </HStack>
 
         <Field label="Triggers">
-          <Chips items={manager.eventTypes} palette="blue" />
+          <Chips items={manager.eventTypes} />
         </Field>
         {manager.intentTypes.length > 0 && (
           <Field label="Emits">
-            <Chips items={manager.intentTypes} palette="purple" />
+            <Chips items={manager.intentTypes} />
           </Field>
         )}
 

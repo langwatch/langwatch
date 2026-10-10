@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -18,7 +19,12 @@ import {
  * The `[occurredAtMs, traceId]` ClickHouse pagination cursor a full page
  * hands to the next one.
  */
-export const topicClusteringSearchAfterSchema = z.tuple([z.number(), z.string()]);
+const topicClusteringSearchAfterSchemaDefinition = z.tuple([z.number(), z.string()]);
+export interface TopicClusteringSearchAfterSchema extends Named<
+  typeof topicClusteringSearchAfterSchemaDefinition
+> {}
+export const topicClusteringSearchAfterSchema: TopicClusteringSearchAfterSchema =
+  topicClusteringSearchAfterSchemaDefinition;
 export type TopicClusteringSearchAfter = z.infer<typeof topicClusteringSearchAfterSchema>;
 
 /**
@@ -26,11 +32,16 @@ export type TopicClusteringSearchAfter = z.infer<typeof topicClusteringSearchAft
  * Daily scheduled runs do NOT emit this event: they are wake-driven inside
  * the process manager (ADR-051 §2).
  */
-export const topicClusteringRequestedEventDataSchema = z.object({
+const topicClusteringRequestedEventDataSchemaDefinition = z.object({
   trigger: z.enum([TOPIC_CLUSTERING_TRIGGER.MANUAL, TOPIC_CLUSTERING_TRIGGER.BOOTSTRAP]),
   /** User who asked, for manual triggers. */
   requestedByUserId: z.string().optional(),
 });
+export interface TopicClusteringRequestedEventDataSchema extends Named<
+  typeof topicClusteringRequestedEventDataSchemaDefinition
+> {}
+export const topicClusteringRequestedEventDataSchema: TopicClusteringRequestedEventDataSchema =
+  topicClusteringRequestedEventDataSchemaDefinition;
 export type TopicClusteringRequestedEventData = z.infer<
   typeof topicClusteringRequestedEventDataSchema
 >;
@@ -39,12 +50,17 @@ export type TopicClusteringRequestedEventData = z.infer<
  * TopicClusteringRunStarted — needed to rebuild in-progress state on replay.
  * Without it, only run completion is logged.
  */
-export const topicClusteringRunStartedEventDataSchema = z.object({
+const topicClusteringRunStartedEventDataSchemaDefinition = z.object({
   /** Logical run identity, shared by every page of one backlog walk. */
   runId: z.string(),
   /** 1-based page number within the run. */
   page: z.number(),
 });
+export interface TopicClusteringRunStartedEventDataSchema extends Named<
+  typeof topicClusteringRunStartedEventDataSchemaDefinition
+> {}
+export const topicClusteringRunStartedEventDataSchema: TopicClusteringRunStartedEventDataSchema =
+  topicClusteringRunStartedEventDataSchemaDefinition;
 export type TopicClusteringRunStartedEventData = z.infer<
   typeof topicClusteringRunStartedEventDataSchema
 >;
@@ -54,7 +70,7 @@ export type TopicClusteringRunStartedEventData = z.infer<
  * gate-skipped pages). `runId` identifies the logical run (shared by all
  * pages); `nextSearchAfter` present means more pages remain to walk.
  */
-export const topicClusteringRunCompletedEventDataSchema = z.object({
+const topicClusteringRunCompletedEventDataSchemaDefinition = z.object({
   /** Logical run identity, e.g. `20260717T093000` or `manual-1789000000000`. */
   runId: z.string(),
   /** 1-based page number within the run. */
@@ -72,6 +88,11 @@ export const topicClusteringRunCompletedEventDataSchema = z.object({
     .optional(),
   nextSearchAfter: topicClusteringSearchAfterSchema.optional(),
 });
+export interface TopicClusteringRunCompletedEventDataSchema extends Named<
+  typeof topicClusteringRunCompletedEventDataSchemaDefinition
+> {}
+export const topicClusteringRunCompletedEventDataSchema: TopicClusteringRunCompletedEventDataSchema =
+  topicClusteringRunCompletedEventDataSchemaDefinition;
 export type TopicClusteringRunCompletedEventData = z.infer<
   typeof topicClusteringRunCompletedEventDataSchema
 >;
@@ -81,7 +102,7 @@ export type TopicClusteringRunCompletedEventData = z.infer<
  * (ADR-051 §4: 3 attempts, then the intent retires dead and this event
  * records the durable, visible failure).
  */
-export const topicClusteringRunFailedEventDataSchema = z.object({
+const topicClusteringRunFailedEventDataSchemaDefinition = z.object({
   runId: z.string(),
   page: z.number(),
   error: z.string(),
@@ -90,6 +111,11 @@ export const topicClusteringRunFailedEventDataSchema = z.object({
   /** True when the customer can resolve it (credentials, quota, config). */
   isUserActionable: z.boolean().optional(),
 });
+export interface TopicClusteringRunFailedEventDataSchema extends Named<
+  typeof topicClusteringRunFailedEventDataSchemaDefinition
+> {}
+export const topicClusteringRunFailedEventDataSchema: TopicClusteringRunFailedEventDataSchema =
+  topicClusteringRunFailedEventDataSchemaDefinition;
 export type TopicClusteringRunFailedEventData = z.infer<
   typeof topicClusteringRunFailedEventDataSchema
 >;
@@ -99,7 +125,7 @@ export type TopicClusteringRunFailedEventData = z.infer<
  * assignTopic writes into ClickHouse TopicId/SubTopicId — they must pass
  * through unchanged, and `centroid`/`p95Distance` make it replay-rebuildable.
  */
-export const topicModelEntrySchema = z.object({
+const topicModelEntrySchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   /** Parent topic id for subtopics; null for top-level topics. */
@@ -115,13 +141,15 @@ export const topicModelEntrySchema = z.object({
    */
   firstRecordedAt: z.number().optional(),
 });
+export interface TopicModelEntrySchema extends Named<typeof topicModelEntrySchemaDefinition> {}
+export const topicModelEntrySchema: TopicModelEntrySchema = topicModelEntrySchemaDefinition;
 export type TopicModelEntry = z.infer<typeof topicModelEntrySchema>;
 
 /**
  * TopicsRecorded — the topic model changed. The Topic table is a projection
  * of these events; nothing else writes it.
  */
-export const topicClusteringTopicsRecordedEventDataSchema = z.object({
+const topicClusteringTopicsRecordedEventDataSchemaDefinition = z.object({
   mode: z.enum([TOPIC_MODEL_RECORD_MODE.REPLACE, TOPIC_MODEL_RECORD_MODE.MERGE]),
   source: z.enum([TOPIC_MODEL_RECORD_SOURCE.CLUSTERING, TOPIC_MODEL_RECORD_SOURCE.SEED]),
   /**
@@ -131,6 +159,11 @@ export const topicClusteringTopicsRecordedEventDataSchema = z.object({
   dedupeKey: z.string(),
   topics: z.array(topicModelEntrySchema),
 });
+export interface TopicClusteringTopicsRecordedEventDataSchema extends Named<
+  typeof topicClusteringTopicsRecordedEventDataSchemaDefinition
+> {}
+export const topicClusteringTopicsRecordedEventDataSchema: TopicClusteringTopicsRecordedEventDataSchema =
+  topicClusteringTopicsRecordedEventDataSchemaDefinition;
 export type TopicClusteringTopicsRecordedEventData = z.infer<
   typeof topicClusteringTopicsRecordedEventDataSchema
 >;

@@ -1,6 +1,7 @@
 import type { EntitlementRepositories } from "../entitlement.repositories.ts";
 import { MemoryBillableEventsMeterRepository } from "./memory.billable-events-meter.repository.ts";
 import { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
+import { MemoryMemberSeatRepository } from "./memory.member-seat.repository.ts";
 import { MemoryOrganizationSpendRepository } from "./memory.organization-spend.repository.ts";
 import { MemoryTenancyRepository } from "./memory.tenancy.repository.ts";
 import { MemoryTraceMeterRepository } from "./memory.trace-meter.repository.ts";
@@ -15,6 +16,7 @@ export class MemoryEntitlementRepositories {
 
     return {
       membership: MemoryUsageMembershipRepository.create({ memory: database }),
+      seats: MemoryMemberSeatRepository.create({ memory: database }),
       spend: MemoryOrganizationSpendRepository.create({ memory: database }),
       tenancy: MemoryTenancyRepository.create({ memory: database }),
       billableEvents,

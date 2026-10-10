@@ -1,9 +1,11 @@
+import { sealAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -19,6 +21,7 @@ import {
   createModelProviderTestDataPrivacy,
   createModelProviderTestManagedProviders,
   createModelProviderTestSecrets,
+  createModelProviderTestTraces,
 } from "./model-provider.fixture.ts";
 
 function testProject(id: string) {
@@ -98,10 +101,11 @@ function createFullModelProviderTestOrganizations(): OrganizationApi {
  */
 function createRealModelProviderApp(
   repositories: ModelProviderRepositories = MemoryModelProviderRepositories.create(),
+  traces: TraceApi = createModelProviderTestTraces(),
 ): Promise<ModelProviderModule> {
   return ModelProviderModule.create({
     repositories,
-    channels: MemoryModelProviderChannels.create(),
+    channels: MemoryModelProviderChannels.create({ bound: { traces } }),
     dependencies: {
       projects: createFullModelProviderTestProjects(),
       organizations: createFullModelProviderTestOrganizations(),
@@ -162,6 +166,53 @@ describe("ModelProviderModule.create", () => {
           customKeys: { OPENAI_API_KEY: "sk-test" },
         }),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe("given the trace module bound to the channel tier", () => {
+    describe("when the cost-rule preview is asked what a pattern matches", () => {
+      it("reads trace's models instead of refusing as service_unavailable", async () => {
+        const traces = createApiFixture<TraceApi>({
+          readModelUsageStats: async () => [{ model: "gpt-5", spanCount: 2, lastSeenMs: 1 }],
+          readRecentSpansByModels: async () => [],
+        });
+        const app = await createRealModelProviderApp(undefined, traces);
+        const authorization = sealAuthorization({
+          actor: { type: "user", id: "user-1" },
+          principal: { type: "user", id: "user-1" },
+          scope: { organizationId: "organization-1" },
+          grants: [{ projectId: "project-1", permissions: ["traces:view"], via: [], kind: "own" }],
+          expiresAt: Date.now() + 60_000,
+          purpose: { kind: "route", route: "test" },
+        });
+
+        await expect(
+          app.previewCostRuleMatchingSpans(
+            { projectId: "project-1", regex: "gpt-5" },
+            { authorization },
+          ),
+        ).resolves.toMatchObject({ matchedModels: [{ model: "gpt-5", spanCount: 2 }] });
+      });
+    });
+  });
+
+  describe("given a deployment that blocks local destinations", () => {
+    describe.each([
+      ["a metadata address", "http://169.254.169.254/latest"],
+      ["a loopback address", "http://127.0.0.1:8080/v1"],
+    ])("when a custom provider is saved with %s as its base URL", (_name, baseUrl) => {
+      it("refuses the save with model_provider_invalid", async () => {
+        const app = await createRealModelProviderApp();
+
+        await expect(
+          app.upsertUnattributed({
+            projectId: "project-1",
+            provider: "custom",
+            enabled: true,
+            customKeys: { CUSTOM_API_KEY: "sk-test", CUSTOM_BASE_URL: baseUrl },
+          }),
+        ).rejects.toMatchObject({ code: "model_provider_invalid" });
+      });
     });
   });
 

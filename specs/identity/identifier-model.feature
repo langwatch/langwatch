@@ -583,3 +583,10 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the full-screen waiting-for-team-access page is not shown
     And the page renders normally once the read answers and confirms team membership
     And the waiting page is shown once the read answers and confirms no team membership
+
+  @integration
+  Scenario: The team access dialog fits its content on desktop and mobile
+    Given a signed-in member has no team access
+    When the waiting dialog is shown in light or dark mode
+    Then it is centred and sized to its content
+    And its actions remain within a narrow viewport

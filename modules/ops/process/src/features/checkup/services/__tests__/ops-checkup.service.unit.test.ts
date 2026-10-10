@@ -25,7 +25,6 @@ import { OpsCheckupService } from "../ops-checkup.service.ts";
 
 const CONFIG: OpsServerConfig = {
   apiKey: undefined,
-  metricsApiKey: undefined,
   clickhouseOpsUrl: undefined,
   usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
   collectClickHouseBackupMetrics: true,

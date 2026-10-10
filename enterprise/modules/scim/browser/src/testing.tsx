@@ -1,6 +1,7 @@
 // Test harness for mounting the SCIM screen: a fake host that records requests
 // and answers the base URL. Internal only, not exported.
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
@@ -45,8 +46,8 @@ export class FakeScimHost extends ScimHostApi {
     return !this.options.withheld?.includes(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.options.flags?.includes(flag) ?? false;
+  isFeatureEnabled({ name }: ReleaseFlagToken): boolean {
+    return this.options.flags?.includes(name) ?? false;
   }
 
   succeeded(notice: ScimSuccessNotice): void {

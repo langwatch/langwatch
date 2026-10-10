@@ -7,6 +7,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import {
   createTrpcRuntime,
   defineTrpcRouter,
@@ -46,6 +47,7 @@ function members(grants: Grants): TrpcRuntimeMembers<LookupContext> {
     identity: { caller: (ctx) => ({ actor: ctx.actor as never }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

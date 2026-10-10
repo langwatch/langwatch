@@ -4,7 +4,7 @@
  * name declared here; the browser reads the same names and schemas as types.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { annotationQueueItemSchema } from "./annotation-queue.schemas.ts";
@@ -42,13 +42,20 @@ import {
 import { annotationSchema } from "./annotation.schemas.ts";
 
 /** A badge count, for the reviewer's own work and for the Inbox. */
-export const annotationCountSchema = z.object({ count: z.number() });
+const annotationCountSchemaDefinition = z.object({ count: z.number() });
+export interface AnnotationCountSchema extends Named<typeof annotationCountSchemaDefinition> {}
+export const annotationCountSchema: AnnotationCountSchema = annotationCountSchemaDefinition;
 
 /** What a send to a queue did: `skipped` counts trace ids that no longer resolve. */
-export const annotationQueuedTracesSchema = z.object({
+const annotationQueuedTracesSchemaDefinition = z.object({
   created: z.number(),
   skipped: z.number(),
 });
+export interface AnnotationQueuedTracesSchema extends Named<
+  typeof annotationQueuedTracesSchemaDefinition
+> {}
+export const annotationQueuedTracesSchema: AnnotationQueuedTracesSchema =
+  annotationQueuedTracesSchemaDefinition;
 
 export const annotationTrpc = defineTrpcContract("annotation")
   .mutation("create")

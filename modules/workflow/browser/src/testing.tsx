@@ -5,7 +5,7 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
-import { workflowHostSlice } from "./behavior/workflow-host.store.ts";
+import { useWorkflowHostSlice } from "./behavior/workflow-host.store.ts";
 import type {
   WorkflowCopyTarget,
   WorkflowFailureNotice,
@@ -26,6 +26,8 @@ export class FakeWorkflowHost implements WorkflowHostSlice {
   backs = 0;
   readonly queryWrites: QueryWrite[] = [];
   readonly successes: WorkflowSuccessNotice[] = [];
+  readonly warnings: WorkflowSuccessNotice[] = [];
+  readonly infos: WorkflowSuccessNotice[] = [];
   readonly failures: WorkflowFailureNotice[] = [];
 
   constructor(
@@ -78,6 +80,14 @@ export class FakeWorkflowHost implements WorkflowHostSlice {
     this.successes.push(notice);
   }
 
+  warned(notice: WorkflowSuccessNotice): void {
+    this.warnings.push(notice);
+  }
+
+  informed(notice: WorkflowSuccessNotice): void {
+    this.infos.push(notice);
+  }
+
   failed(failure: WorkflowFailureNotice): void {
     this.failures.push(failure);
   }
@@ -85,7 +95,7 @@ export class FakeWorkflowHost implements WorkflowHostSlice {
 
 /** Publishes a host into `workflow:host`, as workflow's host mount does. */
 export function publishWorkflowHost(host: WorkflowHostSlice): void {
-  workflowHostSlice.setState(host, true);
+  useWorkflowHostSlice.setState(host, true);
 }
 
 /** Renders a screen inside the Design System's provider with a host published. */

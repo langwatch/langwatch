@@ -4,7 +4,13 @@ import { useState } from "react";
 import { ScopeFilter, type ScopeFilterValue } from "./scope-filter.tsx";
 
 const meta = {
-  title: "Components/Scope filter",
+  title: "Inputs and forms/Scope filter",
+  parameters: {
+    usage: {
+      use: "Narrowing a page to the organization, teams and projects a reader may see.",
+      avoid: "Choosing where a resource applies: use Scope chip picker.",
+    },
+  },
   tags: ["autodocs"],
 } satisfies Meta;
 

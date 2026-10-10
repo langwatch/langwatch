@@ -4,7 +4,7 @@
  * and a handler to the names stated here.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -24,32 +24,57 @@ import {
 } from "./data-retention.ts";
 
 /** The project every retention procedure is opened from. */
-export const retentionProjectScopeSchema = z.object({ projectId: z.string() });
+const retentionProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface RetentionProjectScopeSchema extends Named<
+  typeof retentionProjectScopeSchemaDefinition
+> {}
+export const retentionProjectScopeSchema: RetentionProjectScopeSchema =
+  retentionProjectScopeSchemaDefinition;
 
 /** One scope an override is written at, as the door spells it. */
-export const retentionScopeInputSchema = z.object({
+const retentionScopeInputSchemaDefinition = z.object({
   scopeType: retentionScopeSchema,
   scopeId: z.string().min(1),
 });
+export interface RetentionScopeInputSchema extends Named<
+  typeof retentionScopeInputSchemaDefinition
+> {}
+export const retentionScopeInputSchema: RetentionScopeInputSchema =
+  retentionScopeInputSchemaDefinition;
 
-export const retentionScopeTargetInputSchema = z.object({
+const retentionScopeTargetInputSchemaDefinition = z.object({
   ...retentionProjectScopeSchema.shape,
   scope: retentionScopeInputSchema,
 });
+export interface RetentionScopeTargetInputSchema extends Named<
+  typeof retentionScopeTargetInputSchemaDefinition
+> {}
+export const retentionScopeTargetInputSchema: RetentionScopeTargetInputSchema =
+  retentionScopeTargetInputSchemaDefinition;
 
 /**
  * A scope write may name the organisation the page sits in, and the target must sit there too;
  * without one the server reads it from the target the door approved (RETENTION-ORG, 2026-10-09).
  */
-export const retentionScopeWriteInputSchema = z.object({
+const retentionScopeWriteInputSchemaDefinition = z.object({
   ...retentionScopeTargetInputSchema.shape,
   organizationId: z.string().min(1).optional(),
 });
+export interface RetentionScopeWriteInputSchema extends Named<
+  typeof retentionScopeWriteInputSchemaDefinition
+> {}
+export const retentionScopeWriteInputSchema: RetentionScopeWriteInputSchema =
+  retentionScopeWriteInputSchemaDefinition;
 
-export const retentionTriggerRetroactiveInputSchema = z.strictObject({
+const retentionTriggerRetroactiveInputSchemaDefinition = z.strictObject({
   ...retroactiveMutationProjectInputSchema.shape,
   category: retentionCategorySchema,
 });
+export interface RetentionTriggerRetroactiveInputSchema extends Named<
+  typeof retentionTriggerRetroactiveInputSchemaDefinition
+> {}
+export const retentionTriggerRetroactiveInputSchema: RetentionTriggerRetroactiveInputSchema =
+  retentionTriggerRetroactiveInputSchemaDefinition;
 
 export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   /**

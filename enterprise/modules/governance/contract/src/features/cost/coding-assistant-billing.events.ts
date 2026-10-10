@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { governanceEventEnvelopeSchema } from "../../governance.ts";
@@ -12,7 +13,7 @@ export const CODING_ASSISTANT_BILLING_EVENT_VERSIONS = {
   RECORDED: "2026-10-06",
 } as const;
 
-export const codingAssistantBillingRecordedEventDataSchema = z
+const codingAssistantBillingRecordedEventDataSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     /** The ingestion source type an assistant kind bills under (`claude_code`, `codex`). */
@@ -23,16 +24,27 @@ export const codingAssistantBillingRecordedEventDataSchema = z
     recordedAtMs: z.number().int().positive(),
   })
   .strict();
+export interface CodingAssistantBillingRecordedEventDataSchema extends Named<
+  typeof codingAssistantBillingRecordedEventDataSchemaDefinition
+> {}
+export const codingAssistantBillingRecordedEventDataSchema: CodingAssistantBillingRecordedEventDataSchema =
+  codingAssistantBillingRecordedEventDataSchemaDefinition;
 export type CodingAssistantBillingRecordedEventData = z.infer<
   typeof codingAssistantBillingRecordedEventDataSchema
 >;
 
-export const codingAssistantBillingRecordedEventSchema = governanceEventEnvelopeSchema.safeExtend({
-  aggregateType: z.literal(CODING_ASSISTANT_BILLING_AGGREGATE_TYPE),
-  type: z.literal(CODING_ASSISTANT_BILLING_EVENT_TYPES.RECORDED),
-  version: z.literal(CODING_ASSISTANT_BILLING_EVENT_VERSIONS.RECORDED),
-  data: codingAssistantBillingRecordedEventDataSchema,
-});
+const codingAssistantBillingRecordedEventSchemaDefinition =
+  governanceEventEnvelopeSchema.safeExtend({
+    aggregateType: z.literal(CODING_ASSISTANT_BILLING_AGGREGATE_TYPE),
+    type: z.literal(CODING_ASSISTANT_BILLING_EVENT_TYPES.RECORDED),
+    version: z.literal(CODING_ASSISTANT_BILLING_EVENT_VERSIONS.RECORDED),
+    data: codingAssistantBillingRecordedEventDataSchema,
+  });
+export interface CodingAssistantBillingRecordedEventSchema extends Named<
+  typeof codingAssistantBillingRecordedEventSchemaDefinition
+> {}
+export const codingAssistantBillingRecordedEventSchema: CodingAssistantBillingRecordedEventSchema =
+  codingAssistantBillingRecordedEventSchemaDefinition;
 export type CodingAssistantBillingRecordedEvent = z.infer<
   typeof codingAssistantBillingRecordedEventSchema
 >;

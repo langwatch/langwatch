@@ -4,6 +4,7 @@ import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const WORKBENCH_CHART_DEFINITION_VERSION = 1;
@@ -53,19 +54,24 @@ const parametersSchema = z
   })
   .default({});
 
-export const savedWorkbenchChartDefinitionSchema = z.object({
+const savedWorkbenchChartDefinitionSchemaDefinition = z.object({
   version: z.literal(WORKBENCH_CHART_DEFINITION_VERSION),
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: parametersSchema,
   vegaLiteSpec: z.record(z.string(), z.unknown()).optional(),
 });
+export interface SavedWorkbenchChartDefinitionSchema extends Named<
+  typeof savedWorkbenchChartDefinitionSchemaDefinition
+> {}
+export const savedWorkbenchChartDefinitionSchema: SavedWorkbenchChartDefinitionSchema =
+  savedWorkbenchChartDefinitionSchemaDefinition;
 
 export const savedWorkbenchChartIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9_-]{1,64}$/, "id must be 1-64 letters, digits, '_' or '-'");
 export const savedWorkbenchChartNameSchema = z.string().trim().min(1).max(255);
 
-export const savedWorkbenchChartPlacementSchema = z
+const savedWorkbenchChartPlacementSchemaDefinition = z
   .object({
     dashboardId: z.string().min(1),
     ...chartGridPlacementSchema.partial().shape,
@@ -78,11 +84,16 @@ export const savedWorkbenchChartPlacementSchema = z
       path: ["colSpan"],
     },
   );
+export interface SavedWorkbenchChartPlacementSchema extends Named<
+  typeof savedWorkbenchChartPlacementSchemaDefinition
+> {}
+export const savedWorkbenchChartPlacementSchema: SavedWorkbenchChartPlacementSchema =
+  savedWorkbenchChartPlacementSchemaDefinition;
 export type SavedWorkbenchChartPlacement = z.infer<typeof savedWorkbenchChartPlacementSchema>;
 
 export type SavedWorkbenchChartDefinition = z.infer<typeof savedWorkbenchChartDefinitionSchema>;
 
-export const savedWorkbenchChartSchema = z
+const savedWorkbenchChartSchemaDefinition = z
   .object({
     id: savedWorkbenchChartIdSchema,
     projectId: z.string().min(1),
@@ -97,4 +108,9 @@ export const savedWorkbenchChartSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface SavedWorkbenchChartSchema extends Named<
+  typeof savedWorkbenchChartSchemaDefinition
+> {}
+export const savedWorkbenchChartSchema: SavedWorkbenchChartSchema =
+  savedWorkbenchChartSchemaDefinition;
 export type SavedWorkbenchChart = z.infer<typeof savedWorkbenchChartSchema>;

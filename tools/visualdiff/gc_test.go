@@ -122,13 +122,13 @@ func TestGCDestroysOrphanStacksThenPrunes(t *testing.T) {
 	}
 	joined := strings.Join(commands, "\n")
 	for _, want := range []string{
-		"haven destroy visualdiff-20260926-111129-base --agent --yes",
+		"haven down --destroy --stack visualdiff-20260926-111129-base --agent --yes",
 		"git worktree remove --force " + filepath.Join(dead, "base"),
-		"haven destroy visualdiff-20260901-000000-base --agent --yes",
+		"haven down --destroy --stack visualdiff-20260901-000000-base --agent --yes",
 	} {
 		mustContain(t, joined, want)
 	}
-	if strings.Contains(joined, "destroy feat-x") {
+	if strings.Contains(joined, "--stack feat-x") {
 		t.Fatal("a developer's own stack is never an orphan")
 	}
 	if commands[len(commands)-1] != "git worktree prune" {

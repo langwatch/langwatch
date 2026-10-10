@@ -144,7 +144,7 @@ function RunRowData({
         isHighlighted
           ? {
               "@keyframes yellowFlash": {
-                "0%": { backgroundColor: "rgba(234, 179, 8, 0.3)" },
+                "0%": { backgroundColor: "yellow.solid/30" },
                 "100%": { backgroundColor: "transparent" },
               },
               animation: "yellowFlash 2s ease-out",
@@ -275,7 +275,8 @@ function RunRowData({
           open={isCancelAllDialogOpen}
           onOpenChange={({ open }) => setIsCancelAllDialogOpen(open)}
         >
-          <Dialog.Content bg="bg" maxWidth="sm">
+          <Dialog.Content maxWidth="sm">
+            <Dialog.CloseTrigger />
             <Dialog.Header>
               <Dialog.Title>Cancel remaining jobs?</Dialog.Title>
             </Dialog.Header>

@@ -9,7 +9,8 @@ import {
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { deriveRunActor, type ScenarioTestSuite } from "@langwatch/scenario-contract";
@@ -24,7 +25,7 @@ import { z } from "zod";
 
 import {
   runPlanRunResultSchema,
-  suiteRunOriginFact,
+  suiteRunOrigin,
   testSuiteCreateInputSchema,
   testSuiteDetailWireSchema,
   testSuiteRunInputSchema,
@@ -36,7 +37,7 @@ import {
 const notFound = documentedResponses({ 404: badRequestSchema });
 
 /** What a route knows about the project and the person behind the credential. */
-type ProjectFacts = z.output<typeof projectRestFacts.schema>;
+type ProjectContext = z.output<typeof projectRequestContext.schema>;
 
 function suiteWire(params: {
   app: SuiteApi;
@@ -161,7 +162,7 @@ async function runTestSuite(params: {
   app: SuiteApi;
   input: z.infer<typeof testSuiteIdParamsSchema> & z.infer<typeof testSuiteRunInputSchema>;
   projectId: string;
-  project: ProjectFacts;
+  project: ProjectContext;
   surface: string | null;
   callerKey: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
@@ -211,7 +212,11 @@ async function runTestSuite(params: {
 export function createTestSuitesRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<SuiteApi>;
+  router: () => RestTransportDeclaration<
+    SuiteApi,
+    RestDoorCredential,
+    typeof projectRequestContext | typeof suiteRunOrigin
+  >;
 }> {
   return defineRestRouter(SuiteApi)
     .withNamespace("test-suites")
@@ -227,7 +232,7 @@ export function createTestSuitesRest(): Readonly<{
       description:
         "List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.",
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(async ({ app, input, scope }, project) =>
       (
         await app.listTestSuites({ projectId: scope.id, includeArchived: input.includeArchived })
@@ -237,6 +242,7 @@ export function createTestSuitesRest(): Readonly<{
     .post("/", "createTestSuite")
     .withInput(testSuiteCreateInputSchema)
     .withPermission("scenarios:create")
+    .withAudit("suites.testSuites.create")
     .withOutput(testSuiteWireSchema)
     .withStatus(201)
     .withDocs({
@@ -244,7 +250,7 @@ export function createTestSuitesRest(): Readonly<{
       description:
         "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start.",
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(async ({ app, input, scope }, project) =>
       suiteWire({
         app,
@@ -269,7 +275,7 @@ export function createTestSuitesRest(): Readonly<{
         "Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(({ app, input, scope }, project) =>
       readTestSuiteDetail({
         app,
@@ -283,6 +289,7 @@ export function createTestSuitesRest(): Readonly<{
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteUpdateInputSchema)
     .withPermission("scenarios:update")
+    .withAudit("suites.testSuites.update")
     .withOutput(testSuiteWireSchema)
     .withDocs({
       tags: ["Test Suites"],
@@ -290,7 +297,7 @@ export function createTestSuitesRest(): Readonly<{
         "Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(({ app, input, scope }, project) =>
       updateTestSuite({
         app,
@@ -303,6 +310,7 @@ export function createTestSuitesRest(): Readonly<{
     .delete("/:id", "archiveTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:manage")
+    .withAudit("suites.testSuites.archive")
     .withOutput(testSuiteArchiveResultSchema)
     .withDocs({
       tags: ["Test Suites"],
@@ -316,6 +324,7 @@ export function createTestSuitesRest(): Readonly<{
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)
     .withPermission("scenarios:create")
+    .withoutAudit("run, not a change")
     .withOutput(runPlanRunResultSchema)
     .withDocs({
       tags: ["Test Suites"],
@@ -324,7 +333,7 @@ export function createTestSuitesRest(): Readonly<{
         "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts, suiteRunOriginFact)
+    .withMiddlewareContext(projectRequestContext, suiteRunOrigin)
     .handle(({ app, input, scope }, project, origin) =>
       runTestSuite({
         app,

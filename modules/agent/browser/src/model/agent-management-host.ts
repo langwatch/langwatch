@@ -1,3 +1,4 @@
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 import type { AgentClient } from "./agent-client.ts";
@@ -61,7 +62,7 @@ export interface AgentManagementHost {
   describeFailure(failure: AgentFailureNotice): string;
 
   /** Fail-closed: a flag not yet answered reads as off. */
-  isFeatureEnabled(flag: string): boolean;
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean;
 
   /** `talk` opens a voice agent's editor straight onto its call panel. */
   openAgentEditor(input: { drawer: AgentEditorDrawer; agentId?: string; talk?: boolean }): void;

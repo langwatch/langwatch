@@ -3,8 +3,8 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { GithubInstallNonceRepository } from "../github-install-nonce.repository.ts";
 
 /**
- * The Redis tier. A Redis that cannot answer reads as "replay cannot be
- * judged here" rather than refusing every install.
+ * The Redis tier. A Redis that cannot answer reads as "unavailable", and the
+ * installation flow refuses rather than proceed without a single-use link.
  */
 export class GithubInstallNonceRedisRepository extends GithubInstallNonceRepository {
   static create(redis: RedisConnection): GithubInstallNonceRedisRepository {

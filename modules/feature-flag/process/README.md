@@ -144,7 +144,7 @@ None: this module declares no REST family.
 
 ### `featureFlag`
 
-Contract `../contract/src/feature-flag.trpc.ts:30`, router `src/transport/feature-flag.trpc.ts:28`.
+Contract `../contract/src/feature-flag.trpc.ts:30`, router `src/transport/feature-flag.trpc.ts:32`.
 
 | Procedure                                  | Kind     | Gate                                                                                                                                                 | Input                                 | Output                              |
 | ------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------- |

@@ -12,12 +12,6 @@ import { otlpIngestRest } from "../otlp-ingest.rest.ts";
 const declaration = otlpIngestRest.router();
 
 const RECEIVERS = ["ingestOtlpTraces"];
-const ALIASES = [
-  "ingestOtlpTracesAlias",
-  "ingestOtlpTracesAliasSlash",
-  "ingestOtlpTracesRootV1",
-  "ingestOtlpTracesRootV1Slash",
-];
 
 describe("the OTLP receiver family", () => {
   describe("given the declaration a process mounts", () => {
@@ -26,7 +20,7 @@ describe("the OTLP receiver family", () => {
         declaration.routes.map((route) => [route.operation, route.bodyLimit?.maxBytes]),
       );
 
-      for (const operation of [...RECEIVERS, ...ALIASES]) {
+      for (const operation of RECEIVERS) {
         expect(caps[operation]).toBe(resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE"));
       }
     });
@@ -37,15 +31,9 @@ describe("the OTLP receiver family", () => {
       }
     });
 
-    it("serves only the traces suffix, leaving logs and metrics to their own modules", () => {
+    it("declares only the canonical traces route; the host rewrites exporter aliases onto it", () => {
       expect(declaration.addressing).toBe("literal");
-      expect(declaration.routes.map((route) => route.path)).toEqual([
-        "/api/otel/v1/traces",
-        "/:otlpBase{.+}/v1/traces",
-        "/:otlpBase{.+}/v1/traces/",
-        "/v1/traces",
-        "/v1/traces/",
-      ]);
+      expect(declaration.routes.map((route) => route.path)).toEqual(["/api/otel/v1/traces"]);
     });
   });
 });

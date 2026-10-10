@@ -52,7 +52,7 @@ function harness({
     cancellationSubscriptions: channel,
     config: { ...scenarioTestConfig, langwatchEndpoint },
     host: {
-      voicePublicUrl: scenarioTestVoicePublicUrl,
+      voicePublicUrl: async () => scenarioTestVoicePublicUrl,
       nlpServiceUrl,
       nlpInternalSecret: void 0,
       isSaas: false,

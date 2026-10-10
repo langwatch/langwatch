@@ -4,7 +4,7 @@
  * poll, per the ADR-128 ingress requirement.
  */
 
-import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
+import type { SessionKeyPresented } from "@langwatch/authorization";
 import { generate } from "@langwatch/ksuid";
 import {
   CALL_POLL_HOLD_MS,
@@ -16,6 +16,8 @@ import {
   LangySessionKeyWrongTypeError,
   type LangyControlRegistered,
   LOCAL_CONTROL_PROTOCOL_VERSION,
+  type LocalControlCredential,
+  type LocalControlKeyHolder,
   type LocalControlRefusedCode,
   type PlatformFrame,
   type RegisterFrame,
@@ -77,32 +79,28 @@ export class LocalControlLongPollService {
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   }
 
-  /** Who holds a minted session key, as the session-key door asks; any other key throws. */
-  async verifySessionKey({ token, projectId }: SessionKeyPresented): Promise<SessionKeyHolder> {
+  /** Who holds a minted session key and what it controls, as the session-key door asks. */
+  async verifySessionKey({
+    token,
+    projectId,
+  }: SessionKeyPresented): Promise<LocalControlKeyHolder> {
     const authenticated = await this.core.authenticateKey({ token, projectId });
     if (!authenticated.ok) throw sessionKeyRefusal(authenticated.code);
     return {
       actor: { type: "user", id: authenticated.credential.userId },
-      projectId: authenticated.credential.projectId,
+      ...authenticated.credential,
     };
   }
 
-  /** Registers a folder over HTTP; a key or conversation the core refuses throws its refusal. */
+  /** Registers a folder over HTTP with its door's credential; a gone conversation throws. */
   async register({
-    authorization,
-    projectId,
+    credential,
     frame,
   }: {
-    authorization: string;
-    projectId: string;
+    credential: LocalControlCredential;
     frame: RegisterFrame;
   }): Promise<LangyControlRegistered> {
-    const authenticated = await this.core.authenticate({ authorization, projectId });
-    if (!authenticated.ok) throw sessionKeyRefusal(authenticated.code);
-    const registered = await this.core.register({
-      credential: authenticated.credential,
-      frame,
-    });
+    const registered = await this.core.register({ credential, frame });
     if (!registered.ok) throw new LangySessionKeyUnboundError({ reason: "conversation_gone" });
 
     const token = `lcs_${generate("langy").toString()}`;

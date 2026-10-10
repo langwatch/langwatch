@@ -199,6 +199,8 @@ export abstract class OrganizationRepository {
   }): Promise<void>;
   /** Clears the licence and both its dates; throws OrganizationNotFoundError. */
   abstract clearLicense(input: { organizationId: string }): Promise<void>;
+  /** Licensing's stored key, read through its share (C3-KEY-HASH); none when it holds none. */
+  abstract findLicensingLicenseKeys(input: { organizationId: string }): Promise<string[]>;
   /** The longest-seated enabled administrator's email, or null when none is. */
   abstract findFirstAdministratorEmail(organizationId: string): Promise<string | null>;
   /** The user's personal team in the organization; throws `TeamNotFoundError`. */
@@ -217,9 +219,10 @@ export abstract class OrganizationRepository {
   abstract findProjectIds(organizationId: string): Promise<string[]>;
   /** The id and name of each named project that exists; an unknown id is left out. */
   abstract findProjectNames(projectIds: readonly string[]): Promise<Pick<Project, "id" | "name">[]>;
-  /** The organization's live projects, governance excluded, newest first; one team's when named. */
+  /** The live projects outside `hiddenKinds`, newest first; one team's when named. */
   abstract findProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]>;

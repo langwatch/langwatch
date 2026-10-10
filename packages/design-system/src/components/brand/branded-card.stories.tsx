@@ -4,10 +4,16 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { BrandedCard, BrandedCardPage } from "./branded-card.tsx";
 
 const meta = {
-  title: "Components/Branded card",
+  title: "Brand/Branded card",
   component: BrandedCard,
   tags: ["autodocs"],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    usage: {
+      use: "Every standalone branded page a link or command line lands on.",
+      avoid: "Product pages: use Page layout.",
+    },
+    layout: "fullscreen",
+  },
   args: {
     title: "Link not valid",
     intro: "This unsubscribe link is invalid or has expired.",

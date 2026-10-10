@@ -1,5 +1,8 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -16,13 +19,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant, toDate } from "@langwatch/time";
-import { MoreVertical, Pencil } from "lucide-react";
+import { MoreVertical, Pencil, SearchX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { useAdminList, useAdminOne, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 /**
@@ -84,7 +87,14 @@ export default function ProjectsView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root variant="line" size="md" width="full">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          variant="line"
+          size="sm"
+          width="full"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>ID</Table.ColumnHeader>
@@ -101,9 +111,11 @@ export default function ProjectsView() {
             {list.data?.data.length === 0 && (
               <Table.Row>
                 <Table.Cell colSpan={8}>
-                  <Text color="fg.muted" textAlign="center" paddingY={6}>
-                    No projects match your search.
-                  </Text>
+                  <NoDataInfoBlock
+                    icon={<SearchX />}
+                    title="No projects match your search."
+                    description="Try a different search or clear the filter to see all records."
+                  />
                 </Table.Cell>
               </Table.Row>
             )}
@@ -112,8 +124,16 @@ export default function ProjectsView() {
                 <Table.Cell fontSize="xs" color="fg.muted">
                   {project.id}
                 </Table.Cell>
-                <Table.Cell>{project.name}</Table.Cell>
-                <Table.Cell>{project.slug}</Table.Cell>
+                <Table.Cell maxWidth="280px">
+                  <Text truncate title={project.name}>
+                    {project.name}
+                  </Text>
+                </Table.Cell>
+                <Table.Cell maxWidth="200px">
+                  <Text truncate title={project.slug}>
+                    {project.slug}
+                  </Text>
+                </Table.Cell>
                 <Table.Cell>{project.language ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{project.framework ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>
@@ -141,7 +161,7 @@ export default function ProjectsView() {
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </AdminTable>
 
       <ProjectEditDrawer project={editing} onClose={() => setEditing(null)} />
@@ -208,6 +228,12 @@ function ProjectEditDrawer({
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const update = useAdminUpdate<AdminProject>("project");
+  const detail = useAdminOne<AdminProject & { traceShareLinkCount?: number }>(
+    "project",
+    project?.id ?? null,
+  );
+  const linkCount = detail.data?.data.traceShareLinkCount ?? 0;
+  const [revokeQuestion, setRevokeQuestion] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
 
   useEffect(() => {
@@ -226,6 +252,16 @@ function ProjectEditDrawer({
       onClose();
       return;
     }
+    if (data.traceSharingEnabled === false && linkCount > 0) {
+      setRevokeQuestion(data);
+      return;
+    }
+    save(data);
+  };
+
+  const save = (data: Record<string, unknown>) => {
+    if (!project) return;
+    setRevokeQuestion(null);
     update.mutate(
       { id: project.id, data },
       {
@@ -247,175 +283,212 @@ function ProjectEditDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={!!project}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-      size="md"
-    >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Edit Project</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {project && form && (
-            <VStack gap={4} align="stretch">
-              <SectionHeading>Identity</SectionHeading>
-              <Field.Root>
-                <Field.Label>Name</Field.Label>
-                <Input value={form.name} onChange={(e) => setField("name", e.target.value)} />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Slug</Field.Label>
-                <Input value={form.slug} onChange={(e) => setField("slug", e.target.value)} />
-                <Field.HelperText>
-                  URL-safe identifier. Changing this can break existing links.
-                </Field.HelperText>
-              </Field.Root>
-              <HStack gap={3}>
-                <Field.Root>
-                  <Field.Label>Language</Field.Label>
-                  <Input
-                    value={form.language}
-                    onChange={(e) => setField("language", e.target.value)}
-                  />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>Framework</Field.Label>
-                  <Input
-                    value={form.framework}
-                    onChange={(e) => setField("framework", e.target.value)}
-                  />
-                </Field.Root>
-              </HStack>
-
-              <SectionHeading>Onboarding flags</SectionHeading>
-              <ToggleRow
-                label="First message received"
-                hint="Flipped by the collector on the first ingested trace."
-                checked={form.firstMessage}
-                onChange={(v) => setField("firstMessage", v)}
-              />
-              <ToggleRow
-                label="Integrated"
-                hint="Tenant-visible ‘setup complete’ state."
-                checked={form.integrated}
-                onChange={(v) => setField("integrated", v)}
-              />
-
-              <SectionHeading>Privacy</SectionHeading>
-              <ToggleRow
-                label="Trace sharing enabled"
-                hint="Allow operators to generate public share links for traces."
-                checked={form.traceSharingEnabled}
-                onChange={(v) => setField("traceSharingEnabled", v)}
-              />
-
-              <SectionHeading>Integrations</SectionHeading>
-              <Field.Root>
-                <Field.Label>User link template</Field.Label>
-                <Input
-                  value={form.userLinkTemplate}
-                  onChange={(e) => setField("userLinkTemplate", e.target.value)}
-                  placeholder="e.g. https://app.acme.com/users/{{userId}}"
-                />
-              </Field.Root>
-              <SectionHeading>Project S3</SectionHeading>
-              <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only. The server never reads them back. Leave blank to
-                keep the stored value; type to replace.
+    <>
+      <Dialog.Root
+        open={revokeQuestion !== null}
+        onOpenChange={({ open }) => {
+          if (!open) setRevokeQuestion(null);
+        }}
+      >
+        <Dialog.Content>
+          <Dialog.CloseTrigger />
+          <Dialog.Header>
+            <Dialog.Title>Turn off sharing</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <VStack align="start" gap={2}>
+              <Text>{linkCount} share links exist for this project.</Text>
+              <Text fontSize="sm" color="fg.muted">
+                Paused links stop working while sharing is off and work again when it is turned back
+                on. Revoked links are gone for good.
               </Text>
-              <Field.Root>
-                <Field.Label>Endpoint</Field.Label>
-                <Input
-                  type="url"
-                  value={form.s3Endpoint}
-                  onChange={(e) => setField("s3Endpoint", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Bucket</Field.Label>
-                <Input
-                  value={form.s3Bucket}
-                  onChange={(e) => setField("s3Bucket", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Access key ID</Field.Label>
-                <Input
-                  type="password"
-                  value={form.s3AccessKeyId}
-                  onChange={(e) => setField("s3AccessKeyId", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                  autoComplete="new-password"
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Secret access key</Field.Label>
-                <Input
-                  type="password"
-                  value={form.s3SecretAccessKey}
-                  onChange={(e) => setField("s3SecretAccessKey", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                  autoComplete="new-password"
-                />
-              </Field.Root>
-
-              <SectionHeading>Lifecycle</SectionHeading>
-              <ToggleRow
-                label="Archived"
-                hint="Hides the project from the UI and stops it from accruing limits."
-                checked={form.archive}
-                onChange={(v) => setField("archive", v)}
-              />
-
-              <Separator my={2} />
-              <VStack align="start" gap={0}>
-                <Text fontSize="xs" color="fg.muted">
-                  Project ID: {project.id}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Team: {project.teamId}
-                </Text>
-                {project.archivedAt && (
-                  <Text fontSize="xs" color="fg.muted">
-                    Archived at: {formatDate(project.archivedAt)}
-                  </Text>
-                )}
-              </VStack>
             </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button loading={update.isPending} onClick={handleSave}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: false })
+                }
+              >
+                Keep links paused
+              </Button>
+              <Button
+                colorPalette="red"
+                onClick={() =>
+                  revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: true })
+                }
+              >
+                Revoke {linkCount} links
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
+      <Drawer.Root
+        open={!!project}
+        onOpenChange={({ open }) => {
+          if (!open) onClose();
+        }}
+        size="md"
+      >
+        <Drawer.Content>
+          <Drawer.Header>
+            <Drawer.Title>Edit Project</Drawer.Title>
+          </Drawer.Header>
+          <Drawer.CloseTrigger />
+          <Drawer.Body>
+            {project && form && (
+              <VStack gap={4} align="stretch">
+                <SectionHeading>Identity</SectionHeading>
+                <Field.Root>
+                  <Field.Label>Name</Field.Label>
+                  <Input value={form.name} onChange={(e) => setField("name", e.target.value)} />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Slug</Field.Label>
+                  <Input value={form.slug} onChange={(e) => setField("slug", e.target.value)} />
+                  <Field.HelperText>
+                    URL-safe identifier. Changing this can break existing links.
+                  </Field.HelperText>
+                </Field.Root>
+                <HStack gap={3}>
+                  <Field.Root>
+                    <Field.Label>Language</Field.Label>
+                    <Input
+                      value={form.language}
+                      onChange={(e) => setField("language", e.target.value)}
+                    />
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Framework</Field.Label>
+                    <Input
+                      value={form.framework}
+                      onChange={(e) => setField("framework", e.target.value)}
+                    />
+                  </Field.Root>
+                </HStack>
+
+                <SectionHeading>Onboarding flags</SectionHeading>
+                <ToggleRow
+                  label="First message received"
+                  hint="Flipped by the collector on the first ingested trace."
+                  checked={form.firstMessage}
+                  onChange={(v) => setField("firstMessage", v)}
+                />
+                <ToggleRow
+                  label="Integrated"
+                  hint="Tenant-visible ‘setup complete’ state."
+                  checked={form.integrated}
+                  onChange={(v) => setField("integrated", v)}
+                />
+
+                <SectionHeading>Privacy</SectionHeading>
+                <ToggleRow
+                  label="Trace sharing enabled"
+                  hint="Allow operators to generate public share links for traces."
+                  checked={form.traceSharingEnabled}
+                  onChange={(v) => setField("traceSharingEnabled", v)}
+                />
+
+                <SectionHeading>Integrations</SectionHeading>
+                <Field.Root>
+                  <Field.Label>User link template</Field.Label>
+                  <Input
+                    value={form.userLinkTemplate}
+                    onChange={(e) => setField("userLinkTemplate", e.target.value)}
+                    placeholder="e.g. https://app.acme.com/users/{{userId}}"
+                  />
+                </Field.Root>
+                <SectionHeading>Project S3</SectionHeading>
+                <Text fontSize="xs" color="fg.muted">
+                  Credentials below are write-only. The server never reads them back. Leave blank to
+                  keep the stored value; type to replace.
+                </Text>
+                <Field.Root>
+                  <Field.Label>Endpoint</Field.Label>
+                  <Input
+                    type="url"
+                    value={form.s3Endpoint}
+                    onChange={(e) => setField("s3Endpoint", e.target.value)}
+                    placeholder="Leave blank to keep current"
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Bucket</Field.Label>
+                  <Input
+                    value={form.s3Bucket}
+                    onChange={(e) => setField("s3Bucket", e.target.value)}
+                    placeholder="Leave blank to keep current"
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Access key ID</Field.Label>
+                  <Input
+                    type="password"
+                    value={form.s3AccessKeyId}
+                    onChange={(e) => setField("s3AccessKeyId", e.target.value)}
+                    placeholder="Leave blank to keep current"
+                    autoComplete="new-password"
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Secret access key</Field.Label>
+                  <Input
+                    type="password"
+                    value={form.s3SecretAccessKey}
+                    onChange={(e) => setField("s3SecretAccessKey", e.target.value)}
+                    placeholder="Leave blank to keep current"
+                    autoComplete="new-password"
+                  />
+                </Field.Root>
+
+                <SectionHeading>Lifecycle</SectionHeading>
+                <ToggleRow
+                  label="Archived"
+                  hint="Hides the project from the UI and stops it from accruing limits."
+                  checked={form.archive}
+                  onChange={(v) => setField("archive", v)}
+                />
+
+                <Separator my={2} />
+                <VStack align="start" gap={0}>
+                  <Text fontSize="xs" color="fg.muted">
+                    Project ID: {project.id}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Team: {project.teamId}
+                  </Text>
+                  {project.archivedAt && (
+                    <Text fontSize="xs" color="fg.muted">
+                      Archived at: {formatDate(project.archivedAt)}
+                    </Text>
+                  )}
+                </VStack>
+              </VStack>
+            )}
+          </Drawer.Body>
+          <Drawer.Footer>
+            <HStack width="full">
+              <Spacer />
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button loading={update.isPending} onClick={handleSave}>
+                Save
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
+      </Drawer.Root>
+    </>
   );
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <Heading
-      as="h3"
-      size="xs"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-      pt={2}
-    >
+    <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
       {children}
     </Heading>
   );
@@ -444,7 +517,11 @@ function ToggleRow({
           )}
         </VStack>
         <Spacer />
-        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
+        <Switch
+          colorPalette="accent"
+          checked={checked}
+          onCheckedChange={(e) => onChange(e.checked)}
+        />
       </HStack>
     </Field.Root>
   );

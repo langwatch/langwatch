@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Alert, Button } from "@langwatch/design-system/primitives";
 import type { RefObject } from "react";
 
 import type { Variable } from "../../variables-section.tsx";
@@ -18,24 +18,21 @@ export function UndefinedVariablesBanner({
   const [firstMissing] = invalidVariables;
   if (firstMissing === undefined) return null;
   return (
-    <HStack
+    <Alert.Root
       ref={bannerRef}
-      backgroundColor="red.subtle"
-      borderRadius="lg"
-      padding={1}
+      status="error"
+      size="sm"
       marginBottom={1}
-      paddingLeft={2}
       position="absolute"
       bottom={borderless ? -2 : 0}
       marginLeft={1}
       width="calc(100% - 8px)"
-      justifyContent="space-between"
-      gap={2}
       data-testid="undefined-variables-banner"
     >
-      <Text fontSize="xs" color="red.fg">
-        Undefined variables: {invalidVariables.join(", ")}
-      </Text>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>Undefined variables: {invalidVariables.join(", ")}</Alert.Description>
+      </Alert.Content>
       {onCreateVariable && (
         <Button
           size="xs"
@@ -49,6 +46,6 @@ export function UndefinedVariablesBanner({
           Create {`"${firstMissing}"`}
         </Button>
       )}
-    </HStack>
+    </Alert.Root>
   );
 }

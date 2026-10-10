@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** Wire contract between playground UI and execution endpoint (framework-free; versioned path). */
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
@@ -26,7 +27,7 @@ const PROMPT_MESSAGES_MAX = resolveRequestBound("promptMessagesMax", "ENTERPRISE
  * `workflow` key is malformed, not an ignorable extra - stripping it silently
  * would let a client believe its workflow was executed.
  */
-export const executeRequestSchema = z
+const executeRequestSchemaDefinition = z
   .object({
     projectId: z.string().min(1).max(64),
     formValues: formSchema,
@@ -38,6 +39,8 @@ export const executeRequestSchema = z
     threadId: z.string().optional(),
   })
   .strict();
+export interface ExecuteRequestSchema extends Named<typeof executeRequestSchemaDefinition> {}
+export const executeRequestSchema: ExecuteRequestSchema = executeRequestSchemaDefinition;
 
 export type PromptExecuteRequest = z.infer<typeof executeRequestSchema>;
 

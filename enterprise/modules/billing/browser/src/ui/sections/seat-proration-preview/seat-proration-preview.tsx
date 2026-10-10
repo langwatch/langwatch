@@ -48,18 +48,18 @@ function PreviewBody({
     <VStack gap={6} align="stretch" paddingY={2}>
       <HStack justify="space-between" paddingX={2}>
         <VStack align="start" gap={1}>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.muted">
             Current seats
           </Text>
           <Text fontSize="2xl" fontWeight="bold">
             {currentSeats}
           </Text>
         </VStack>
-        <Text fontSize="xl" color="gray.400" alignSelf="center">
+        <Text fontSize="xl" color="fg.subtle" alignSelf="center">
           →
         </Text>
         <VStack align="end" gap={1}>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.muted">
             New total seats
           </Text>
           <Text fontSize="2xl" fontWeight="bold">
@@ -89,20 +89,20 @@ function PreviewBody({
               for, and the natural conclusion is that the number is wrong. */}
           {quote.formattedCreditApplied && (
             <HStack justify="space-between" paddingX={2}>
-              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+              <Text fontWeight="normal" fontSize="sm" color="fg.muted">
                 Account credit applied
               </Text>
-              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+              <Text fontWeight="normal" fontSize="sm" color="fg.muted">
                 −{quote.formattedCreditApplied}
               </Text>
             </HStack>
           )}
 
           <HStack justify="space-between" paddingX={2}>
-            <Text fontWeight="normal" fontSize="md" color="gray.500">
+            <Text fontWeight="normal" fontSize="md" color="fg.muted">
               New billing amount
             </Text>
-            <Text fontWeight="normal" fontSize="md" color="gray.500">
+            <Text fontWeight="normal" fontSize="md" color="fg.muted">
               {quote.formattedRecurringTotal}
               {formatBillingPeriod(quote.billingInterval)}
             </Text>

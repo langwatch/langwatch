@@ -5,6 +5,7 @@ import type { Pool } from "pg";
 import type { PrismaConfiguration } from "./config.ts";
 import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter.ts";
 import { type Prisma, PrismaClient } from "./generated/client.ts";
+import { skipTenantCheck } from "./multi-tenancy-guard.ts";
 import { OperatorReadGuard, type OperatorReadMint } from "./operator-read.ts";
 
 /**
@@ -23,6 +24,9 @@ function prismaLoggerLevel(level: Prisma.LogLevel): "error" | "warn" | "info" | 
   return level === "query" ? "debug" : level;
 }
 
+/** P2021/P2022 and Postgres wording: the schema is behind mid-upgrade, which is expected. */
+const SCHEMA_BEHIND_MESSAGE = /P2021|P2022|(table|column) .*does not exist/i;
+
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
   return "query" in event ? event.query : event.message;
@@ -38,8 +42,11 @@ export function forwardPrismaEvent({
   level: Prisma.LogLevel;
   event: Prisma.LogEvent | Prisma.QueryEvent;
 }): void {
-  logger[prismaLoggerLevel(level)](
-    { target: event.target, message: prismaEventMessage(event), timestamp: event.timestamp },
+  const message = prismaEventMessage(event);
+  const loggerLevel =
+    level === "error" && SCHEMA_BEHIND_MESSAGE.test(message) ? "warn" : prismaLoggerLevel(level);
+  logger[loggerLevel](
+    { target: event.target, message, timestamp: event.timestamp },
     PRISMA_EVENT_MESSAGE[level],
   );
 }
@@ -226,7 +233,12 @@ export class PrismaReadinessService {
 
   async check(options: PrismaReadinessOptions): Promise<void> {
     await options.connection.client.$queryRawUnsafe(
-      "-- @tenancy: prisma readiness probe\nSELECT 1 AS ready",
+      `${
+        skipTenantCheck({
+          // A readiness probe asks whether the server answers; it reads no tenant's rows.
+          SKIP_TENANT_CHECK: true,
+        }).sql
+      }SELECT 1 AS ready`,
     );
   }
 }

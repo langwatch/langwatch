@@ -61,6 +61,8 @@ export default function Join() {
         lookup={lookup.data}
         pendingOrganizationId={mine.data?.[0]?.organizationId ?? null}
         onCreateWorkspace={join.continueToWorkspaceCreation}
+        onDeclineJoin={join.declineAndContinue}
+        declining={join.declining}
         onJoinOrganization={join.requestJoin}
         onAlreadyJoined={join.admitAndLand}
       />

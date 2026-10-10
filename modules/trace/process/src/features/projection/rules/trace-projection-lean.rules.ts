@@ -15,7 +15,10 @@ import {
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { clonePayload } from "../../../rules/payload-clone.rules.ts";
-import { capOversizedAttributes, hasOversizedAttribute } from "../../../rules/trace-attribute-cap.rules.ts";
+import {
+  capOversizedAttributes,
+  hasOversizedAttribute,
+} from "../../../rules/trace-attribute-cap.rules.ts";
 
 type LeanableEvent = { id: string; type: string; data: unknown };
 

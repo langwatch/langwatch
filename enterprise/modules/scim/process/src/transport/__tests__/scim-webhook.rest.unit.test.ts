@@ -5,7 +5,8 @@
  */
 import { createHmac } from "node:crypto";
 
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "../../rules/scim-webhook-signature.rules.ts";
@@ -57,6 +58,8 @@ function mount(options: { secret?: string | undefined } = {}) {
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("This family resolves its own credential.");
@@ -68,10 +71,10 @@ function mount(options: { secret?: string | undefined } = {}) {
     app: () => app,
     credential: "public",
     onError: (error, context) => context.json({ error: String(error) }, 500),
-    facts: [
-      bindRestMiddleware(scimWebhookDelivery, (context) => ({
-        signature: context.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
-        authorization: context.req.header("authorization") ?? null,
+    middlewareContext: [
+      bindMiddlewareContext(scimWebhookDelivery, (request) => ({
+        signature: request.headers.get(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
+        authorization: request.headers.get("authorization") ?? null,
       })),
     ],
   });

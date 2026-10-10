@@ -3,7 +3,7 @@
  * adapters implement the queries. Methods return stored facts, no policy,
  * and follow the repository naming convention (findX, never getX).
  */
-import type { ShareableResourceKind } from "@langwatch/authorization";
+import type { GrantCondition, ShareableResourceKind } from "@langwatch/authorization";
 import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -72,20 +72,29 @@ export type AuthzDatabase = Readonly<{
   group: FindManyDelegate;
 }>;
 
+/** One shared read as the minter needs it: the grant, the member project and its window. */
+export type SharedReadRow = {
+  grantId: string;
+  memberProjectId: string;
+  condition: GrantCondition;
+  expiresAt: Instant | null;
+};
+
 /**
  * The lineage reads both ports need: resolving a scope reference (read
  * side) and validating a write target's tenancy (write side) ask the same
  * two questions. Declared once here so the two ports cannot drift apart.
  */
+
 export abstract class ScopeLineageRepository {
   // Properties of function type rather than method shorthand: tests hold a
   // mock built to this class and assert on these members via
   // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
   // method-shorthand member under `unbound-method`.
-  /** A project's team + organization, or null when the project is unknown or archived. */
+  /** A project's team, organization and kind, or null when the project is unknown or archived. */
   abstract findProjectLineage: (args: {
     projectId: string;
-  }) => Promise<{ teamId: string; organizationId: string } | null>;
+  }) => Promise<{ teamId: string; organizationId: string; kind?: string } | null>;
   /** A team's organization, personal flag and name, or null when the team is unknown. */
   abstract findTeamOrganization: (args: {
     teamId: string;
@@ -95,6 +104,13 @@ export abstract class ScopeLineageRepository {
 export abstract class AuthzReadRepository extends ScopeLineageRepository {
   // Function-typed properties below, not method shorthand: test mocks are
   // asserted on directly, which trips `unbound-method` on shorthand members.
+
+  /** The live `project-reader` grants a reader project holds (ADR-177); a window that does
+   *  not parse is left out. */
+  abstract findLiveSharedReads: (args: {
+    organizationId: string;
+    readerProjectId: string;
+  }) => Promise<SharedReadRow[]>;
 
   /**
    * The membership row, disabled or not, or null when there is none. The

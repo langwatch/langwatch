@@ -45,7 +45,15 @@ type Stack struct {
 	WorktreeDir string `json:"worktreeDir"`
 	Branch      string `json:"branch"`
 	LauncherPID int    `json:"launcherPid"`
-	RedisDB     int    `json:"redisDb"`
+	// LauncherStart is the launcher's start time (System.ProcessStart): with
+	// LauncherPID it is the launcher's identity. Empty on records written
+	// before it existed, which fall back to liveness alone.
+	LauncherStart string `json:"launcherStart,omitempty"`
+	// OwnerPID and OwnerStart name the foreground up that stays the stack's
+	// client (D7); empty for a detached stack.
+	OwnerPID   int    `json:"ownerPid,omitempty"`
+	OwnerStart string `json:"ownerStart,omitempty"`
+	RedisDB    int    `json:"redisDb"`
 	// APIPort is the Hono API's loopback port. It is reached two ways: same-
 	// origin at app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort, so
 	// the frontend and its API still share one URL for the browser), and
@@ -115,6 +123,8 @@ type Stack struct {
 	ModeEnv          []string `json:"modeEnv,omitempty"`
 	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
 	EffectiveMode    string   `json:"effectiveMode,omitempty"`
+	// Refresh is the mode this stack was brought up in: still, watch or hmr.
+	Refresh RefreshMode `json:"refresh,omitempty"`
 	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
 	// Evals judge with the app's deterministic stand-in and need no classifier
 	// key or license. Off by default; the instant-eval-mock-judge setting.
@@ -186,7 +196,10 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{VoiceService, "Voice providers (voicesim)"},
 	{LLMService, "LLM providers (llmsim)"},
 	{AnalyticsService, "Product analytics (analyticssim)"},
+	{OutboundService, "Slack, webhooks and SQS (outboundsim)"},
+	{PaymentService, "Stripe (paymentsim)"},
 	{TelemetryService, "OTLP sender (telemetrysim)"},
+	{LambdaService, "NLP Lambda fleet (lambdasim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
 	{LangevalsService, "Evaluators (Python)"},
@@ -279,4 +292,10 @@ func (s Stack) Lanes() []Lane {
 // monolith, where the app lane is the API.
 func (s Stack) HealthProbeURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%d/api/health", s.APIPort)
+}
+
+// ReadinessURL is the api's readiness probe, which answers 503 until the
+// upgrade ledger is current for its image and 200 after.
+func (s Stack) ReadinessURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d/readyz", s.APIPort)
 }

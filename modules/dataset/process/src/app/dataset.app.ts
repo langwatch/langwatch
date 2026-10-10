@@ -9,6 +9,7 @@ import {
   DatasetNotFoundError,
   type DatasetServerConfig,
   type DatasetNormalizePayload,
+  type DatasetNormalizationSettledEventData,
   type AppendStoredObjectToDatasetInput,
   type BatchEvaluationEntry,
   type BatchEvaluationRecord,
@@ -331,7 +332,7 @@ export class DatasetModule implements DatasetApi {
       throw new PermissionDeniedError({
         permission: "datasets:create",
         scope: { type: "project", id: input.sourceProjectId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 
@@ -503,8 +504,11 @@ export class DatasetModule implements DatasetApi {
  * sequences it decides only WHEN a payload is normalized, never HOW.
  */
 export interface DatasetNormalize {
-  normalize(payload: DatasetNormalizePayload): Promise<void>;
+  /** Where the dataset rests afterwards; `skipped` when it was not this run's to settle. */
+  normalize(payload: DatasetNormalizePayload): Promise<DatasetNormalizeOutcome>;
 }
+
+export type DatasetNormalizeOutcome = DatasetNormalizationSettledEventData["status"] | "skipped";
 
 /** The upload seam a dataset service is built over. */
 export abstract class DatasetUpload {

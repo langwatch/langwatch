@@ -5,7 +5,13 @@ import { Database } from "lucide-react";
 import { NoDataInfoBlock } from "./no-data-info-block.tsx";
 
 const meta = {
-  title: "Components/No data info block",
+  title: "Feedback/Empty state",
+  parameters: {
+    usage: {
+      use: "The one empty state: nothing here yet, and what to do next.",
+      avoid: "Still loading: Skeleton from primitives. A failure: Alert.",
+    },
+  },
   component: NoDataInfoBlock,
   tags: ["autodocs"],
   args: {

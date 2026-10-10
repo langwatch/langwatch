@@ -24,20 +24,20 @@ export function ProcessFleetStrip({ rows }: { rows: ProcessFleetSummary[] }) {
       <LinkedStat
         label="Overdue wakes"
         value={formatCount(overdueWakes)}
-        color={overdueWakes > 0 ? "orange.500" : undefined}
+        color={overdueWakes > 0 ? "fg.warning" : undefined}
       />
       <LinkedStat label="Pending messages" value={formatCount(pending)} />
       <LinkedStat
         label="Lapsed leases"
         value={formatCount(lapsed)}
         sublabel={lapsed > 0 ? "died or still delivering" : undefined}
-        color={lapsed > 0 ? "orange.500" : undefined}
+        color={lapsed > 0 ? "fg.warning" : undefined}
       />
       <LinkedStat
         label="Dead messages"
         value={formatCount(dead)}
         sublabel={dead > 0 ? "will not run until redriven" : undefined}
-        color={dead > 0 ? "red.500" : undefined}
+        color={dead > 0 ? "fg.error" : undefined}
       />
     </HStack>
   );

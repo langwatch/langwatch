@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +16,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// `haven install` is the machine check: what haven drives but does not own —
+// `haven self install` is the machine check: what haven drives but does not own —
 // portless, the Node toolchain, the brew formulae behind the managed Postgres
 // and Redis, a container runtime — probed all at once, before anything is
 // running. Until this existed every one of those was discovered as a failed
@@ -70,7 +71,11 @@ func (o *Orchestrator) CheckPrereqs(ctx context.Context) []domain.PrereqStatus {
 			found[c.Key] = o.probeCandidate(ctx, c)
 		}
 	}
-	return domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
+	report := domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
+	if o.platform() != "darwin" {
+		return report
+	}
+	return slices.DeleteFunc(report, func(st domain.PrereqStatus) bool { return st.UnlistedOnDarwin })
 }
 
 // probeCandidate answers one candidate. portless is the one entry with no
@@ -310,24 +315,36 @@ func (o *Orchestrator) installGolangciLint(ctx context.Context) error {
 // REQUIRED and anything is ordered after it, the run ends there: the rest are
 // installed through it, so attempting them would fail on a cause already on
 // screen and blame the wrong tool for it.
-func (o *Orchestrator) InstallPrereqs(ctx context.Context, chosen []domain.Chosen) error {
+func (o *Orchestrator) InstallPrereqs(ctx context.Context, chosen []domain.Chosen) ([]ManualStep, error) {
 	return o.installPrereqsTo(ctx, os.Stdout, chosen)
 }
 
-func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen []domain.Chosen) error {
+// ManualStep is a prerequisite haven cannot install itself: what it is for and the command to
+// run. The caller shows them, so a terminal can set them apart from the install narration.
+type ManualStep struct {
+	Name    string
+	Why     string
+	Command string
+}
+
+func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen []domain.Chosen) ([]ManualStep, error) {
 	ordered := domain.OrderPrereqs(chosen)
 	if len(ordered) == 0 {
 		fmt.Fprintln(w, "nothing selected; nothing installed.")
-		return nil
+		return nil, nil
 	}
 	var failed []string
+	var manual []ManualStep
 	for i, pick := range ordered {
-		err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1})
+		step, err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1})
+		if step.Command != "" {
+			manual = append(manual, step)
+		}
 		if err == nil {
 			continue
 		}
 		if p, ok := domain.LookupPrereq(pick.Key); !ok || p.Requirement == domain.PrereqRequired {
-			return err
+			return manual, err
 		}
 		fmt.Fprintf(w, "✗ %v\n", err)
 		failed = append(failed, pick.Key)
@@ -335,7 +352,7 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 	if len(failed) > 0 {
 		fmt.Fprintf(w, "\nnot installed (not required, haven up still runs): %s\n", strings.Join(failed, ", "))
 	}
-	return nil
+	return manual, nil
 }
 
 // prereqPick is one chosen candidate and whether anything is ordered after it.
@@ -344,21 +361,21 @@ type prereqPick struct {
 	hasMore bool
 }
 
-// installPick installs, records or prints the manual command for one pick.
-func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereqPick) error {
+// installPick installs or records one pick, or returns the manual step haven cannot run.
+func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereqPick) (ManualStep, error) {
 	p, candidate, err := lookupPick(pick.chosen)
 	if err != nil {
-		return err
+		return ManualStep{}, err
 	}
 	// A declining candidate is an answer, not an install: "none, keep this
 	// machine container-free" settles the question rather than putting
 	// something on the machine.
 	if candidate.Declines {
-		return o.recordChoice(w, p, candidate)
+		return ManualStep{}, o.recordChoice(w, p, candidate)
 	}
 	command, manual := candidate.InstallOn(o.platform())
 	if command == "" {
-		fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
+		step := ManualStep{Name: p.Name, Why: p.Summary, Command: manual}
 		// Carrying on past a REQUIRED one haven cannot install is how the
 		// fresh-Mac case produced its worst message: print the Homebrew
 		// line, then run `brew install node`, then report "could not
@@ -366,11 +383,11 @@ func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereq
 		// hand", which blames the wrong tool. Everything ordered after it
 		// is installed THROUGH it, so this is where the run ends.
 		if p.Requirement == domain.PrereqRequired && pick.hasMore {
-			return fmt.Errorf("%s has to be installed first — the rest are installed through it. Run the command above, then re-run `haven install`", p.Name)
+			return step, fmt.Errorf("%s has to be installed first — the rest are installed through it. Run its command, then re-run `haven self install`", p.Name)
 		}
-		return nil
+		return step, nil
 	}
-	return o.installCandidate(ctx, w, prereqInstall{prereq: p, candidate: candidate, command: command})
+	return ManualStep{}, o.installCandidate(ctx, w, prereqInstall{prereq: p, candidate: candidate, command: command})
 }
 
 // lookupPick resolves a pick to its prerequisite and candidate.
@@ -537,7 +554,7 @@ func (o *Orchestrator) unskipPrereq(key string) error {
 	return o.store.WritePrereqSkips(skips)
 }
 
-// ResolvePrereqNames turns the positional form (`haven install clickhouse-client
+// ResolvePrereqNames turns the positional form (`haven self install clickhouse-client
 // runtime=colima`) into choices. An unknown name fails with the list rather
 // than being ignored, and an entry with two candidates takes the first unless
 // one is named after an `=`.

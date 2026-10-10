@@ -1,5 +1,4 @@
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { AlertTriangle } from "lucide-react";
+import { Button, Text } from "@chakra-ui/react";
 
 import { Dialog } from "./dialog.tsx";
 
@@ -14,11 +13,7 @@ type ConfirmDialogProps = {
   onConfirm: () => void;
 };
 
-/**
- * Reusable confirmation modal for destructive gateway actions
- * (revoke VK, archive budget, rotate secret, disable provider binding).
- * Replaces `window.confirm` which is a11y-hostile and not themable.
- */
+/** The one confirmation dialog for an action that needs a second thought. */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -29,17 +24,12 @@ export function ConfirmDialog({
   loading = false,
   onConfirm,
 }: ConfirmDialogProps) {
-  const palette = tone === "danger" ? "red" : "orange";
   return (
     <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
-      <Dialog.Content bg="bg" maxWidth="480px">
+      <Dialog.Content maxWidth="480px">
+        <Dialog.CloseTrigger disabled={loading} />
         <Dialog.Header>
-          <HStack gap={3} align="start">
-            <AlertTriangle size={20} color={tone === "danger" ? "#E53E3E" : "#ED8936"} />
-            <VStack align="start" gap={0}>
-              <Dialog.Title>{title}</Dialog.Title>
-            </VStack>
-          </HStack>
+          <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <Text fontSize="sm" color="fg.muted">
@@ -47,15 +37,16 @@ export function ConfirmDialog({
           </Text>
         </Dialog.Body>
         <Dialog.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
-              Cancel
-            </Button>
-            <Button colorPalette={palette} onClick={onConfirm} loading={loading}>
-              {confirmLabel}
-            </Button>
-          </HStack>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette={tone === "danger" ? "red" : "orange"}
+            onClick={onConfirm}
+            loading={loading}
+          >
+            {confirmLabel}
+          </Button>
         </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>

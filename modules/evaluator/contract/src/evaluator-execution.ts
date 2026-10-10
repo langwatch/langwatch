@@ -1,21 +1,32 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const evaluatorIdOrSlugInputSchema = z
+const evaluatorIdOrSlugInputSchemaDefinition = z
   .object({
     idOrSlug: z.string().min(1),
     projectId: z.string().min(1),
   })
   .strict();
+export interface EvaluatorIdOrSlugInputSchema extends Named<
+  typeof evaluatorIdOrSlugInputSchemaDefinition
+> {}
+export const evaluatorIdOrSlugInputSchema: EvaluatorIdOrSlugInputSchema =
+  evaluatorIdOrSlugInputSchemaDefinition;
 export type EvaluatorIdOrSlugInput = z.infer<typeof evaluatorIdOrSlugInputSchema>;
 
-export const evaluatorExecutionConfigSchema = z
+const evaluatorExecutionConfigSchemaDefinition = z
   .object({
     evaluatorType: z.string().optional(),
     settings: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
+export interface EvaluatorExecutionConfigSchema extends Named<
+  typeof evaluatorExecutionConfigSchemaDefinition
+> {}
+export const evaluatorExecutionConfigSchema: EvaluatorExecutionConfigSchema =
+  evaluatorExecutionConfigSchemaDefinition;
 
-export const resolvedEvaluatorExecutionSchema = z
+const resolvedEvaluatorExecutionSchemaDefinition = z
   .object({
     evaluatorId: z.string().min(1),
     name: z.string().min(1),
@@ -24,6 +35,11 @@ export const resolvedEvaluatorExecutionSchema = z
     requiredFields: z.array(z.string().min(1)).optional(),
   })
   .strict();
+export interface ResolvedEvaluatorExecutionSchema extends Named<
+  typeof resolvedEvaluatorExecutionSchemaDefinition
+> {}
+export const resolvedEvaluatorExecutionSchema: ResolvedEvaluatorExecutionSchema =
+  resolvedEvaluatorExecutionSchemaDefinition;
 export type ResolvedEvaluatorExecution = z.infer<typeof resolvedEvaluatorExecutionSchema>;
 
 export function coerceEvaluatorScalar(value: unknown): unknown {

@@ -86,7 +86,7 @@ export const IntentSelectionScreen: React.FC<OnboardingScreenProps> = ({ surface
             py={4}
             cursor="pointer"
             transition="all 0.2s ease"
-            _hover={{ borderColor: "orange.300" }}
+            _hover={{ borderColor: "orange.emphasized" }}
             focusVisibleRing="outside"
           >
             <RadioCard.ItemHiddenInput />
@@ -100,7 +100,7 @@ export const IntentSelectionScreen: React.FC<OnboardingScreenProps> = ({ surface
                 border="1px solid"
                 borderColor={accentChipBorder}
               >
-                <Icon color="orange.500" boxSize={6}>
+                <Icon color="orange.fg" boxSize={6}>
                   <opt.icon strokeWidth={1.5} />
                 </Icon>
               </Box>

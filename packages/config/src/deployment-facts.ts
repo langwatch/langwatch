@@ -10,6 +10,25 @@ import { environmentExactOneSchema, environmentOneOrTrueSchema } from "./env-sch
 
 const positiveInteger = z.coerce.number().int().positive();
 
+const optionalSetting = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
+/** Log level and format: observability reads them, the scenario child is handed them. */
+export const { logSettings } = Config.define((c) => ({
+  logSettings: {
+    LOG_LEVEL: c.env("LOG_LEVEL", optionalSetting),
+    LOG_CONSOLE_LEVEL: c.env("LOG_CONSOLE_LEVEL", optionalSetting),
+    LOG_OTEL_LEVEL: c.env("LOG_OTEL_LEVEL", optionalSetting),
+    LOG_FORMAT: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),
+    PINO_LOG_LEVEL: c.env("PINO_LOG_LEVEL", optionalSetting),
+    _LOG_LEVEL: c.env("_LOG_LEVEL", optionalSetting),
+    PINO_CONSOLE_LEVEL: c.env("PINO_CONSOLE_LEVEL", optionalSetting),
+    PINO_OTEL_LEVEL: c.env("PINO_OTEL_LEVEL", optionalSetting),
+  },
+}));
+
 /** Whether this deployment is the hosted product; gateway's browser projection reads it too. */
 export const { isSaas } = Config.define((c) => ({
   isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
@@ -359,4 +378,24 @@ export const { posthogKey, posthogHost } = Config.define((c) => ({
 /** How long a fold's cached state lives in Redis (main's knob); the cache floors it at 300. */
 export const { foldCacheTtlSeconds } = Config.define((c) => ({
   foldCacheTtlSeconds: c.env("LANGWATCH_FOLD_CACHE_TTL_SECONDS", positiveInteger.default(300)),
+}));
+
+/** Where Slack is reached: slack and automation both call it; haven points both at outboundsim. */
+export const { slackApiBase, slackWebhookBase } = Config.define((c) => ({
+  slackApiBase: c.env("SLACK_API_BASE", z.string().url().default("https://slack.com/api")),
+  slackWebhookBase: c.env(
+    "SLACK_WEBHOOK_BASE",
+    z.string().url().default("https://hooks.slack.com"),
+  ),
+}));
+
+/** The dev switch that lets a webhook URL be http or carry a port (webhook and automation). */
+export const { allowInsecureLocalUrls } = Config.define((c) => ({
+  allowInsecureLocalUrls: c.env(
+    "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS",
+    z
+      .union([z.boolean(), z.literal("1"), z.literal("0"), z.literal("")])
+      .optional()
+      .transform((value) => value === true || value === "1"),
+  ),
 }));

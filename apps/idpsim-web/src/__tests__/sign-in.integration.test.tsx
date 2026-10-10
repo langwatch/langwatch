@@ -39,6 +39,30 @@ describe("the account picker", () => {
     expect(sent[0]?.path).toBe(`/api/t/1/sign-in?${query}`);
   });
 
+  /** @scenario "The social account picker links back into the provider and can be cancelled" */
+  it("names the social provider it plays and offers a way to cancel", async () => {
+    const social = `${query}&social=github`;
+    const cancel = `/t/1/social/github/login/oauth/authorize?${query}&cancel=1`;
+    fakeSimulator({
+      routes: {
+        [`GET /api/t/1/sign-in?${social}`]: {
+          body: {
+            tenantId: 1,
+            domain: "acme1.test",
+            refusal: null,
+            provider: "github",
+            cancelHref: cancel,
+            users: [{ name: "Ada Admin", email: "admin@acme1.test", href: "/x" }],
+          },
+        },
+      },
+    });
+    render(<SignIn tenantId={1} query={social} />);
+
+    expect(await screen.findByText(/Simulated github sign-in, tenant 1/u)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Cancel" }).getAttribute("href")).toBe(cancel);
+  });
+
   /** @scenario "A registered application may only be sent back to a registered address" */
   it("explains a refused request instead of offering anybody", async () => {
     fakeSimulator({

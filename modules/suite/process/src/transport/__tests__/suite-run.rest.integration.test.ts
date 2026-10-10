@@ -4,17 +4,18 @@
  * @see modules/suite/specs/suite-service.feature
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
-import { suiteRunOriginFact } from "../../rules/suite-wire-v1.rules.ts";
+import { suiteRunOrigin } from "../../rules/suite-wire-v1.rules.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
 
 class ScenarioParameterUnknownTestError extends HandledError {
@@ -57,6 +58,8 @@ function buildApi(run: (...args: never[]) => unknown) {
     getByIdOrTestSuite: async () => ({ kind: "suite", suite: storedPlan }),
   });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -65,14 +68,14 @@ function buildApi(run: (...args: never[]) => unknown) {
     app: () => suites,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "project-key-1",
       })),
-      bindRestMiddleware(suiteRunOriginFact, (context) => ({
-        surface: context.req.header("x-langwatch-surface") ?? null,
+      bindMiddlewareContext(suiteRunOrigin, (request) => ({
+        surface: request.headers.get("x-langwatch-surface") ?? null,
         callerKey: null,
       })),
     ],

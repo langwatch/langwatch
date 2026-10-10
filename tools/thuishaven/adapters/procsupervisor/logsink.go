@@ -59,6 +59,14 @@ func newLogSinkSince(path string, since time.Time) *logSink {
 }
 
 func (s *logSink) writeLine(line string) {
+	if s != nil {
+		s.writeLineAt(s.now(), line)
+	}
+}
+
+// writeLineAt is writeLine stamped at, so a line split across captures keeps
+// one instant and a reader of several can fold it back to one.
+func (s *logSink) writeLineAt(at time.Time, line string) {
 	if s == nil {
 		return
 	}
@@ -73,7 +81,7 @@ func (s *logSink) writeLine(line string) {
 			return
 		}
 	}
-	n, err := fmt.Fprintf(s.file, "%s %s\n", s.now().UTC().Format(time.RFC3339Nano), line)
+	n, err := fmt.Fprintf(s.file, "%s %s\n", at.UTC().Format(time.RFC3339Nano), line)
 	s.written += int64(n)
 	if err != nil {
 		// The descriptor is unusable (the disk filled, the file was replaced).
@@ -107,7 +115,7 @@ func (s *logSink) open() error { return s.openFile(true) }
 // into unbounded recursion and a stack overflow that took the launcher — and
 // with it the whole stack — down.
 func (s *logSink) openFile(mayRotate bool) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)

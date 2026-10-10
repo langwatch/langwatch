@@ -1,9 +1,5 @@
-import {
-  type AnalyticsApi,
-  type AnalyticsServerConfig,
-  langWatchQLKeyReach,
-} from "@langwatch/analytics-contract";
-import { bindRestMiddleware, keyCredentialOfRequest } from "@langwatch/api/rest";
+import { type AnalyticsApi, type AnalyticsServerConfig } from "@langwatch/analytics-contract";
+import { keyCredentialOfRequest } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
@@ -34,9 +30,9 @@ export const analyticsProcessModule: PublishedProcessModule<
     analyticsLwqlTrpcTransport,
   )
   // The query door fans the key it authenticated out to the projects it may read.
-  .withTransportFacts(() => [
-    bindRestMiddleware(langWatchQLKeyReach, (context) => keyCredentialOfRequest(context.req.raw)),
-  ])
+  .provideMiddlewareContext({
+    langWatchQLKeyReach: (request) => keyCredentialOfRequest(request),
+  })
   // Worker-hosted: the access-model reconvergence watch (ADR-159) and the key-map row (§9).
   .withEventing(lwqlReconvergenceEventing)
   .withMigrations(({ app }) => [

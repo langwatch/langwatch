@@ -1,4 +1,7 @@
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Inbox } from "lucide-react";
 
 import { ACTIVATION_CODE_STATUS_COLORS, type ActivationCode } from "../../model/activation-code.ts";
 import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
@@ -17,7 +20,13 @@ export function ActivationCodesTable({
   onRevoke: (code: ActivationCode) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      variant="line"
+      size="sm"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Customer</Table.ColumnHeader>
@@ -63,7 +72,7 @@ export function ActivationCodesTable({
             <Table.Cell>
               {code.status === "active" ? (
                 <Button
-                  size="xs"
+                  size="sm"
                   variant="ghost"
                   color="fg.error"
                   loading={isRevoking}
@@ -76,7 +85,7 @@ export function ActivationCodesTable({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 
@@ -84,9 +93,11 @@ function EmptyRow() {
   return (
     <Table.Row>
       <Table.Cell colSpan={COLUMN_COUNT}>
-        <Text color="fg.muted" fontSize="sm">
-          No activation codes issued yet.
-        </Text>
+        <NoDataInfoBlock
+          icon={<Inbox />}
+          title="No activation codes issued yet."
+          description="Records will appear here when they are available."
+        />
       </Table.Cell>
     </Table.Row>
   );

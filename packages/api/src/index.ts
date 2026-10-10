@@ -31,6 +31,7 @@ export {
   PlatformPermissionDeniedError,
   PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
+  setLedgerCurrent,
   UnsupportedMediaTypeError,
 } from "./errors.ts";
 
@@ -43,6 +44,8 @@ export {
   type ProtocolConnection,
   type WebSocketCaller,
   type WebSocketDoor,
+  type WebSocketSessionCaller,
+  type WebSocketSessionKeyDoor,
 } from "./websocket.ts";
 export {
   RAW_SOCKET_LIVENESS_PATH,
@@ -59,13 +62,13 @@ export {
 } from "./raw-http.ts";
 
 export type {
-  BoundTransportFacts,
+  BoundMiddlewareBindings,
   FeatureRestHost,
   FeatureRestMountOptions,
   FeatureTrpcHost,
   FeatureTrpcMountOptions,
   MountableTransport,
-  TransportFactBinding,
+  MiddlewareBinding,
   TransportPeers,
 } from "./hosting/transport-hosts.ts";
 

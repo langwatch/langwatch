@@ -32,6 +32,7 @@
     "@langwatch/enterprise-governance-client": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/error-views": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",

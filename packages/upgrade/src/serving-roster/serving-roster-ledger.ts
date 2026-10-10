@@ -11,6 +11,8 @@ export const servingRosterDeclarationSchema = z.object({
   image: z.string().min(1),
   release: servingRosterEntrySchema.shape.release,
   steps: z.array(z.string().min(1)),
+  /** `credentialKeyFingerprint` of each credential key the process opens values with. */
+  credentialKeys: z.array(z.string().min(1)).optional(),
 });
 export type ServingRosterDeclaration = z.infer<typeof servingRosterDeclarationSchema>;
 

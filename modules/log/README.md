@@ -18,9 +18,9 @@ Logs: receiving OTLP logs, canonicalising and recording them, and reading a trac
 
 | Kind                      | Name                                       | Declared at                                                                                    |
 | ------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| ClickHouse table (writes) | `log_records`                              | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:254` |
-| ClickHouse table (writes) | `log_usage_estimates`                      | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:260` |
-| Stores required           | clickhouse                                 | `process/src/repositories/live/live.log.repositories.ts:10`                                    |
+| ClickHouse table (writes) | `log_records`                              | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:251` |
+| ClickHouse table (writes) | `log_usage_estimates`                      | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:257` |
+| Stores required           | clickhouse                                 | `process/src/repositories/live/live.log.repositories.ts:9`                                     |
 | Config                    | `processingShards` (LOG_PROCESSING_SHARDS) | `contract/src/log.config.ts:9`                                                                 |
 
 Anything else log needs belongs to another module and is reached through its `*Api`.

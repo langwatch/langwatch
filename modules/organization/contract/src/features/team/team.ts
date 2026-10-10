@@ -1,5 +1,6 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
 import { authzGrantCallerSchema } from "@langwatch/authz-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { organizationIdSchema } from "../../organization.ts";
@@ -7,7 +8,7 @@ import { organizationIdSchema } from "../../organization.ts";
 export const organizationTeamRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER"]);
 export type OrganizationTeamRole = z.infer<typeof organizationTeamRoleSchema>;
 
-export const organizationTeamSchema = z
+const organizationTeamSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
@@ -20,26 +21,38 @@ export const organizationTeamSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface OrganizationTeamSchema extends Named<typeof organizationTeamSchemaDefinition> {}
+export const organizationTeamSchema: OrganizationTeamSchema = organizationTeamSchemaDefinition;
 export type OrganizationTeam = z.infer<typeof organizationTeamSchema>;
 
-export const getOrganizationTeamInputSchema = z
+const getOrganizationTeamInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     teamId: z.string().min(1),
   })
   .strict();
+export interface GetOrganizationTeamInputSchema extends Named<
+  typeof getOrganizationTeamInputSchemaDefinition
+> {}
+export const getOrganizationTeamInputSchema: GetOrganizationTeamInputSchema =
+  getOrganizationTeamInputSchemaDefinition;
 export type GetOrganizationTeamInput = z.infer<typeof getOrganizationTeamInputSchema>;
 
-export const listOrganizationTeamsInputSchema = z
+const listOrganizationTeamsInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     page: z.number().int().positive(),
     limit: z.number().int().positive().max(1_000),
   })
   .strict();
+export interface ListOrganizationTeamsInputSchema extends Named<
+  typeof listOrganizationTeamsInputSchemaDefinition
+> {}
+export const listOrganizationTeamsInputSchema: ListOrganizationTeamsInputSchema =
+  listOrganizationTeamsInputSchemaDefinition;
 export type ListOrganizationTeamsInput = z.infer<typeof listOrganizationTeamsInputSchema>;
 
-export const organizationTeamPageSchema = z
+const organizationTeamPageSchemaDefinition = z
   .object({
     data: z.array(organizationTeamSchema),
     pagination: z
@@ -51,26 +64,41 @@ export const organizationTeamPageSchema = z
       .strict(),
   })
   .strict();
+export interface OrganizationTeamPageSchema extends Named<
+  typeof organizationTeamPageSchemaDefinition
+> {}
+export const organizationTeamPageSchema: OrganizationTeamPageSchema =
+  organizationTeamPageSchemaDefinition;
 export type OrganizationTeamPage = z.infer<typeof organizationTeamPageSchema>;
 
-export const createOrganizationTeamInputSchema = z
+const createOrganizationTeamInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     name: z.string().min(1).max(255),
   })
   .strict();
+export interface CreateOrganizationTeamInputSchema extends Named<
+  typeof createOrganizationTeamInputSchemaDefinition
+> {}
+export const createOrganizationTeamInputSchema: CreateOrganizationTeamInputSchema =
+  createOrganizationTeamInputSchemaDefinition;
 export type CreateOrganizationTeamInput = z.infer<typeof createOrganizationTeamInputSchema>;
 
-export const updateOrganizationTeamInputSchema = z
+const updateOrganizationTeamInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     teamId: z.string().min(1),
     name: z.string().min(1).max(255).optional(),
   })
   .strict();
+export interface UpdateOrganizationTeamInputSchema extends Named<
+  typeof updateOrganizationTeamInputSchemaDefinition
+> {}
+export const updateOrganizationTeamInputSchema: UpdateOrganizationTeamInputSchema =
+  updateOrganizationTeamInputSchemaDefinition;
 export type UpdateOrganizationTeamInput = z.infer<typeof updateOrganizationTeamInputSchema>;
 
-export const changeOrganizationTeamMemberInputSchema = z
+const changeOrganizationTeamMemberInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     teamId: z.string().min(1),
@@ -78,12 +106,22 @@ export const changeOrganizationTeamMemberInputSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface ChangeOrganizationTeamMemberInputSchema extends Named<
+  typeof changeOrganizationTeamMemberInputSchemaDefinition
+> {}
+export const changeOrganizationTeamMemberInputSchema: ChangeOrganizationTeamMemberInputSchema =
+  changeOrganizationTeamMemberInputSchemaDefinition;
 
-export const addOrganizationTeamMemberInputSchema =
+const addOrganizationTeamMemberInputSchemaDefinition =
   changeOrganizationTeamMemberInputSchema.safeExtend({
     role: organizationTeamRoleSchema,
     caller: authzGrantCallerSchema,
   });
+export interface AddOrganizationTeamMemberInputSchema extends Named<
+  typeof addOrganizationTeamMemberInputSchemaDefinition
+> {}
+export const addOrganizationTeamMemberInputSchema: AddOrganizationTeamMemberInputSchema =
+  addOrganizationTeamMemberInputSchemaDefinition;
 export type AddOrganizationTeamMemberInput = z.infer<typeof addOrganizationTeamMemberInputSchema>;
 
 export type RemoveOrganizationTeamMemberInput = z.infer<
@@ -93,7 +131,7 @@ export type RemoveOrganizationTeamMemberInput = z.infer<
 export const organizationTeamMemberRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type OrganizationTeamMemberRole = z.infer<typeof organizationTeamMemberRoleSchema>;
 
-export const organizationTeamMemberInputSchema = z
+const organizationTeamMemberInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     role: z.union([organizationTeamRoleSchema, z.string().regex(/^custom:[a-zA-Z0-9_-]+$/)]),
@@ -117,9 +155,14 @@ export const organizationTeamMemberInputSchema = z
       });
     }
   });
+export interface OrganizationTeamMemberInputSchema extends Named<
+  typeof organizationTeamMemberInputSchemaDefinition
+> {}
+export const organizationTeamMemberInputSchema: OrganizationTeamMemberInputSchema =
+  organizationTeamMemberInputSchemaDefinition;
 export type OrganizationTeamMemberInput = z.infer<typeof organizationTeamMemberInputSchema>;
 
-export const organizationTeamMemberUserSchema = z
+const organizationTeamMemberUserSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string().nullable(),
@@ -127,9 +170,14 @@ export const organizationTeamMemberUserSchema = z
     image: z.string().nullable(),
   })
   .strict();
+export interface OrganizationTeamMemberUserSchema extends Named<
+  typeof organizationTeamMemberUserSchemaDefinition
+> {}
+export const organizationTeamMemberUserSchema: OrganizationTeamMemberUserSchema =
+  organizationTeamMemberUserSchemaDefinition;
 export type OrganizationTeamMemberUser = z.infer<typeof organizationTeamMemberUserSchema>;
 
-export const organizationTeamAssignedRoleSchema = z
+const organizationTeamAssignedRoleSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
@@ -140,9 +188,14 @@ export const organizationTeamAssignedRoleSchema = z
     updatedAt: z.date(),
   })
   .passthrough();
+export interface OrganizationTeamAssignedRoleSchema extends Named<
+  typeof organizationTeamAssignedRoleSchemaDefinition
+> {}
+export const organizationTeamAssignedRoleSchema: OrganizationTeamAssignedRoleSchema =
+  organizationTeamAssignedRoleSchemaDefinition;
 export type OrganizationTeamAssignedRole = z.infer<typeof organizationTeamAssignedRoleSchema>;
 
-export const organizationTeamMemberSchema = z
+const organizationTeamMemberSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     teamId: z.string().min(1),
@@ -154,51 +207,88 @@ export const organizationTeamMemberSchema = z
     user: organizationTeamMemberUserSchema,
   })
   .strict();
+export interface OrganizationTeamMemberSchema extends Named<
+  typeof organizationTeamMemberSchemaDefinition
+> {}
+export const organizationTeamMemberSchema: OrganizationTeamMemberSchema =
+  organizationTeamMemberSchemaDefinition;
 export type OrganizationTeamMember = z.infer<typeof organizationTeamMemberSchema>;
 
-export const organizationTeamWithMembersSchema = organizationTeamSchema.safeExtend({
+const organizationTeamWithMembersSchemaDefinition = organizationTeamSchema.safeExtend({
   members: z.array(organizationTeamMemberSchema),
 });
+export interface OrganizationTeamWithMembersSchema extends Named<
+  typeof organizationTeamWithMembersSchemaDefinition
+> {}
+export const organizationTeamWithMembersSchema: OrganizationTeamWithMembersSchema =
+  organizationTeamWithMembersSchemaDefinition;
 export type OrganizationTeamWithMembers = z.infer<typeof organizationTeamWithMembersSchema>;
 
-export const getOrganizationTeamByIdInputSchema = z.object({ teamId: z.string().min(1) }).strict();
+const getOrganizationTeamByIdInputSchemaDefinition = z
+  .object({ teamId: z.string().min(1) })
+  .strict();
+export interface GetOrganizationTeamByIdInputSchema extends Named<
+  typeof getOrganizationTeamByIdInputSchemaDefinition
+> {}
+export const getOrganizationTeamByIdInputSchema: GetOrganizationTeamByIdInputSchema =
+  getOrganizationTeamByIdInputSchemaDefinition;
 export type GetOrganizationTeamByIdInput = z.infer<typeof getOrganizationTeamByIdInputSchema>;
 
-export const getOrganizationTeamBySlugInputSchema = z
+const getOrganizationTeamBySlugInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     slug: z.string().min(1),
   })
   .strict();
+export interface GetOrganizationTeamBySlugInputSchema extends Named<
+  typeof getOrganizationTeamBySlugInputSchemaDefinition
+> {}
+export const getOrganizationTeamBySlugInputSchema: GetOrganizationTeamBySlugInputSchema =
+  getOrganizationTeamBySlugInputSchemaDefinition;
 export type GetOrganizationTeamBySlugInput = z.infer<typeof getOrganizationTeamBySlugInputSchema>;
 
-export const getOrganizationTeamBySlugForMemberInputSchema =
+const getOrganizationTeamBySlugForMemberInputSchemaDefinition =
   getOrganizationTeamBySlugInputSchema.safeExtend({ userId: z.string().min(1) });
+export interface GetOrganizationTeamBySlugForMemberInputSchema extends Named<
+  typeof getOrganizationTeamBySlugForMemberInputSchemaDefinition
+> {}
+export const getOrganizationTeamBySlugForMemberInputSchema: GetOrganizationTeamBySlugForMemberInputSchema =
+  getOrganizationTeamBySlugForMemberInputSchemaDefinition;
 export type GetOrganizationTeamBySlugForMemberInput = z.infer<
   typeof getOrganizationTeamBySlugForMemberInputSchema
 >;
 
-export const getOrganizationTeamWithMembersInputSchema =
+const getOrganizationTeamWithMembersInputSchemaDefinition =
   getOrganizationTeamBySlugInputSchema.safeExtend({
     callerUserId: z.string().min(1),
     callerCanManage: z.boolean(),
   });
+export interface GetOrganizationTeamWithMembersInputSchema extends Named<
+  typeof getOrganizationTeamWithMembersInputSchemaDefinition
+> {}
+export const getOrganizationTeamWithMembersInputSchema: GetOrganizationTeamWithMembersInputSchema =
+  getOrganizationTeamWithMembersInputSchemaDefinition;
 export type GetOrganizationTeamWithMembersInput = z.infer<
   typeof getOrganizationTeamWithMembersInputSchema
 >;
 
-export const listOrganizationTeamsWithMembersInputSchema = z
+const listOrganizationTeamsWithMembersInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     callerUserId: z.string().min(1),
     callerCanManage: z.boolean(),
   })
   .strict();
+export interface ListOrganizationTeamsWithMembersInputSchema extends Named<
+  typeof listOrganizationTeamsWithMembersInputSchemaDefinition
+> {}
+export const listOrganizationTeamsWithMembersInputSchema: ListOrganizationTeamsWithMembersInputSchema =
+  listOrganizationTeamsWithMembersInputSchemaDefinition;
 export type ListOrganizationTeamsWithMembersInput = z.infer<
   typeof listOrganizationTeamsWithMembersInputSchema
 >;
 
-export const createOrganizationTeamWithMembersInputSchema = z
+const createOrganizationTeamWithMembersInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     name: z.string().trim().min(1).max(255),
@@ -207,11 +297,16 @@ export const createOrganizationTeamWithMembersInputSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface CreateOrganizationTeamWithMembersInputSchema extends Named<
+  typeof createOrganizationTeamWithMembersInputSchemaDefinition
+> {}
+export const createOrganizationTeamWithMembersInputSchema: CreateOrganizationTeamWithMembersInputSchema =
+  createOrganizationTeamWithMembersInputSchemaDefinition;
 export type CreateOrganizationTeamWithMembersInput = z.infer<
   typeof createOrganizationTeamWithMembersInputSchema
 >;
 
-export const updateOrganizationTeamWithMembersInputSchema = z
+const updateOrganizationTeamWithMembersInputSchemaDefinition = z
   .object({
     teamId: z.string().min(1),
     name: z.string().trim().min(1).max(255),
@@ -220,28 +315,43 @@ export const updateOrganizationTeamWithMembersInputSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface UpdateOrganizationTeamWithMembersInputSchema extends Named<
+  typeof updateOrganizationTeamWithMembersInputSchemaDefinition
+> {}
+export const updateOrganizationTeamWithMembersInputSchema: UpdateOrganizationTeamWithMembersInputSchema =
+  updateOrganizationTeamWithMembersInputSchemaDefinition;
 export type UpdateOrganizationTeamWithMembersInput = z.infer<
   typeof updateOrganizationTeamWithMembersInputSchema
 >;
 
-export const organizationTeamAccessProjectSchema = z
+const organizationTeamAccessProjectSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string(),
     teamId: z.string().min(1),
   })
   .strict();
+export interface OrganizationTeamAccessProjectSchema extends Named<
+  typeof organizationTeamAccessProjectSchemaDefinition
+> {}
+export const organizationTeamAccessProjectSchema: OrganizationTeamAccessProjectSchema =
+  organizationTeamAccessProjectSchemaDefinition;
 export type OrganizationTeamAccessProject = z.infer<typeof organizationTeamAccessProjectSchema>;
 
-export const listOrganizationTeamAccessInputSchema = z
+const listOrganizationTeamAccessInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     projects: z.array(organizationTeamAccessProjectSchema),
   })
   .strict();
+export interface ListOrganizationTeamAccessInputSchema extends Named<
+  typeof listOrganizationTeamAccessInputSchemaDefinition
+> {}
+export const listOrganizationTeamAccessInputSchema: ListOrganizationTeamAccessInputSchema =
+  listOrganizationTeamAccessInputSchemaDefinition;
 export type ListOrganizationTeamAccessInput = z.infer<typeof listOrganizationTeamAccessInputSchema>;
 
-export const organizationTeamAccessMemberSchema = z
+const organizationTeamAccessMemberSchemaDefinition = z
   .object({
     bindingId: z.string().nullable(),
     userId: z.string().nullable(),
@@ -256,9 +366,14 @@ export const organizationTeamAccessMemberSchema = z
     customRoleName: z.string().nullable(),
   })
   .strict();
+export interface OrganizationTeamAccessMemberSchema extends Named<
+  typeof organizationTeamAccessMemberSchemaDefinition
+> {}
+export const organizationTeamAccessMemberSchema: OrganizationTeamAccessMemberSchema =
+  organizationTeamAccessMemberSchemaDefinition;
 export type OrganizationTeamAccessMember = z.infer<typeof organizationTeamAccessMemberSchema>;
 
-export const organizationProjectOnlyAccessSchema = z
+const organizationProjectOnlyAccessSchemaDefinition = z
   .object({
     bindingId: z.string().min(1),
     userId: z.string().min(1),
@@ -272,17 +387,27 @@ export const organizationProjectOnlyAccessSchema = z
     projectName: z.string(),
   })
   .strict();
+export interface OrganizationProjectOnlyAccessSchema extends Named<
+  typeof organizationProjectOnlyAccessSchemaDefinition
+> {}
+export const organizationProjectOnlyAccessSchema: OrganizationProjectOnlyAccessSchema =
+  organizationProjectOnlyAccessSchemaDefinition;
 export type OrganizationProjectOnlyAccess = z.infer<typeof organizationProjectOnlyAccessSchema>;
 
-export const organizationProjectAccessMemberSchema = organizationTeamAccessMemberSchema
+const organizationProjectAccessMemberSchemaDefinition = organizationTeamAccessMemberSchema
   .omit({ viaGroupId: true })
   .safeExtend({
     source: z.enum(["team", "direct", "override"]),
     teamRole: organizationTeamMemberRoleSchema.optional(),
   });
+export interface OrganizationProjectAccessMemberSchema extends Named<
+  typeof organizationProjectAccessMemberSchemaDefinition
+> {}
+export const organizationProjectAccessMemberSchema: OrganizationProjectAccessMemberSchema =
+  organizationProjectAccessMemberSchemaDefinition;
 export type OrganizationProjectAccessMember = z.infer<typeof organizationProjectAccessMemberSchema>;
 
-export const organizationTeamAccessSchema = z
+const organizationTeamAccessSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string(),
@@ -293,4 +418,9 @@ export const organizationTeamAccessSchema = z
     projectAccess: z.record(z.string(), z.array(organizationProjectAccessMemberSchema)),
   })
   .strict();
+export interface OrganizationTeamAccessSchema extends Named<
+  typeof organizationTeamAccessSchemaDefinition
+> {}
+export const organizationTeamAccessSchema: OrganizationTeamAccessSchema =
+  organizationTeamAccessSchemaDefinition;
 export type OrganizationTeamAccess = z.infer<typeof organizationTeamAccessSchema>;

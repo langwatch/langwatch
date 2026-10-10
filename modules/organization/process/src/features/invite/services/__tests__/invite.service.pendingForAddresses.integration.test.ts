@@ -53,4 +53,13 @@ describe.skipIf(!DB_URL)("the pending-invitation read on the guarded client", ()
       ).rejects.toThrow(/OrganizationInvite/);
     });
   });
+
+  describe("when an operator looks one address up across every organization", () => {
+    /** @scenario "Outstanding invitations are listed with what is left of them" */
+    it("is admitted by the tenancy guard as a declared operator read", async () => {
+      await expect(
+        invites.findPendingInvitesForAddress({ address: "nobody-invited@acme.example" }),
+      ).resolves.toEqual([]);
+    });
+  });
 });

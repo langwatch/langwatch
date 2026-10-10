@@ -48,27 +48,49 @@ export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
   }
 
   async update(id: string, changes: AnomalyRuleChanges): Promise<AnomalyRule> {
-    const data: Prisma.AnomalyRuleUpdateInput = {};
-    if (changes.name !== undefined) data.name = changes.name;
-    if (changes.description !== undefined) {
-      data.description = changes.description;
-    }
-    if (changes.severity !== undefined) data.severity = changes.severity;
-    if (changes.ruleType !== undefined) data.ruleType = changes.ruleType;
-    if (changes.scope !== undefined) data.scope = changes.scope;
-    if (changes.scopeId !== undefined) data.scopeId = changes.scopeId;
-    if (changes.status !== undefined) data.status = changes.status;
-    if (changes.archivedAt !== undefined) {
-      data.archivedAt = changes.archivedAt;
-    }
-    if (changes.thresholdConfig !== undefined) {
-      data.thresholdConfig = changes.thresholdConfig as Prisma.InputJsonValue;
-    }
-    if (changes.destinationConfig !== undefined) {
-      data.destinationConfig = changes.destinationConfig as Prisma.InputJsonValue;
-    }
-    return toAnomalyRule(await this.prisma.anomalyRule.update({ where: { id }, data }));
+    return toAnomalyRule(
+      await this.prisma.anomalyRule.update({ where: { id }, data: toUpdateData(changes) }),
+    );
   }
+
+  async updateIfUnchanged({
+    id,
+    updatedAt,
+    changes,
+  }: {
+    id: string;
+    updatedAt: Date;
+    changes: AnomalyRuleChanges;
+  }): Promise<boolean> {
+    const { count } = await this.prisma.anomalyRule.updateMany({
+      where: { id, updatedAt },
+      data: toUpdateData(changes),
+    });
+    return count === 1;
+  }
+}
+
+function toUpdateData(changes: AnomalyRuleChanges): Prisma.AnomalyRuleUpdateManyMutationInput {
+  const data: Prisma.AnomalyRuleUpdateManyMutationInput = {};
+  if (changes.name !== undefined) data.name = changes.name;
+  if (changes.description !== undefined) {
+    data.description = changes.description;
+  }
+  if (changes.severity !== undefined) data.severity = changes.severity;
+  if (changes.ruleType !== undefined) data.ruleType = changes.ruleType;
+  if (changes.scope !== undefined) data.scope = changes.scope;
+  if (changes.scopeId !== undefined) data.scopeId = changes.scopeId;
+  if (changes.status !== undefined) data.status = changes.status;
+  if (changes.archivedAt !== undefined) {
+    data.archivedAt = changes.archivedAt;
+  }
+  if (changes.thresholdConfig !== undefined) {
+    data.thresholdConfig = changes.thresholdConfig as Prisma.InputJsonValue;
+  }
+  if (changes.destinationConfig !== undefined) {
+    data.destinationConfig = changes.destinationConfig as Prisma.InputJsonValue;
+  }
+  return data;
 }
 
 function toAnomalyRule(row: {

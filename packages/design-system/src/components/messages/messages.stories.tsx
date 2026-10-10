@@ -4,7 +4,12 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AddMessageButton, MessageRoleLabel, RemoveMessageButton } from "./index.ts";
 
 const meta = {
-  title: "Components/Messages",
+  title: "Data display/Messages",
+  parameters: {
+    usage: {
+      use: "Chat message parts: the role label and the add-message control in prompt and agent panels.",
+    },
+  },
   component: MessageRoleLabel,
   tags: ["autodocs"],
   args: { messageRole: "user" },

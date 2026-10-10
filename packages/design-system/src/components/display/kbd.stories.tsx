@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Kbd } from "./kbd.tsx";
 
 const meta = {
-  title: "Primitives/Kbd",
+  title: "Data display/Keyboard key",
+  parameters: {
+    usage: {
+      use: "A keyboard shortcut in copy or a tooltip.",
+      avoid: "Code or identifiers: use Inline code.",
+    },
+  },
   component: Kbd,
   tags: ["autodocs"],
   args: {

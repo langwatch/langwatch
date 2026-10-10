@@ -1,6 +1,7 @@
 import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
 import type { MfaFoldState } from "../../features/mfa/eventing/mfa-enrollment-state.projection.ts";
 import type { SsoConnectionFoldState } from "../../features/sso-connection/eventing/sso-connection-state.projection.ts";
+import { MemorySsoConnectionHistoryRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-history.repository.ts";
 import { MemorySsoConnectionRegistrationRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-registration.repository.ts";
 import { MemorySsoConnectionRoutingRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-routing.repository.ts";
 import {
@@ -15,6 +16,7 @@ import { MemorySsoDomainOwnershipRepository } from "../../features/sso-domain/re
 import { MemorySsoDomainReproofTargetRepository } from "../../features/sso-domain/repositories/memory/memory.sso-domain-reproof.repository.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-rekey.repository.ts";
+import { MemoryIdentityHistoryRepository } from "./memory.identity-history.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
 import { MemoryIdentityMigrationRepository } from "./memory.identity-migration.repository.ts";
@@ -104,5 +106,7 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
     identityLookup: MemoryIdentityLookupRepository.create(store),
     rateLimits: MemoryIdentityRateLimitRepository.create(),
+    identityHistory: MemoryIdentityHistoryRepository.create(store),
+    ssoConnectionHistory: MemorySsoConnectionHistoryRepository.create(store),
   };
 }

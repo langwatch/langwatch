@@ -16,6 +16,8 @@ const { state } = vi.hoisted(() => ({
   state: {
     accounts: [] as { id: string; provider: string; providerAccountId: string }[],
     hasPassword: false,
+    nudgeReadAt: 1,
+    governedBySso: false,
   },
 }));
 
@@ -24,6 +26,12 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
     user: {
       getLinkedAccounts: { useQuery: () => ({ data: state.accounts }) },
       hasPassword: { useQuery: () => ({ data: { hasPassword: state.hasPassword } }) },
+      secureAccountNudge: { useQuery: () => ({ dataUpdatedAt: state.nudgeReadAt }) },
+    },
+    identity: {
+      mySignInGovernance: {
+        useQuery: () => ({ data: { governedBySso: state.governedBySso } }),
+      },
     },
   };
   return { personalWorkspaceApi: api, api };
@@ -32,6 +40,8 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
 beforeEach(() => {
   state.accounts = [];
   state.hasPassword = false;
+  state.nudgeReadAt = 1;
+  state.governedBySso = false;
 });
 
 const LAPTOP = {
@@ -293,5 +303,45 @@ describe("given an account holding both kinds of authenticator", () => {
 
       expect(await screen.findByText(/stays on your device/i)).toBeTruthy();
     });
+  });
+});
+
+describe("given the account-security nudge created a passkey outside the card", () => {
+  describe("when its offer is re-read", () => {
+    it("lists the new passkey without a reload", async () => {
+      let held: (typeof LAPTOP)[] = [];
+      const host = fakePersonalWorkspaceHost({
+        deployment: {
+          isSaas: true,
+          appBaseUrl: "https://app.langwatch.ai",
+          passkeysEnabled: true,
+          authProvider: "email",
+        },
+        get passkeys() {
+          return held;
+        },
+      });
+      const { rerender } = renderWithPersonalWorkspaceHost(<PasskeysSection />, { host });
+      expect(await screen.findByText("No passkeys yet")).toBeTruthy();
+
+      held = [LAPTOP];
+      state.nudgeReadAt = 2;
+      rerender(<PasskeysSection />);
+
+      expect(await screen.findByText("Work laptop")).toBeTruthy();
+    });
+  });
+});
+
+describe("given an account whose organization's single sign-on governs sign-in", () => {
+  /** @scenario "A person whose organization's single sign-on governs sign-in is not offered a passkey" */
+  it("offers no passkey and says single sign-on handles sign-in", async () => {
+    state.governedBySso = true;
+    renderSection({ passkeys: [] });
+
+    expect(await screen.findByTestId("passkeys-sso-governed")).toHaveTextContent(
+      "Your organization's single sign-on handles sign-in for this account.",
+    );
+    expect(screen.queryByTestId("create-passkey")).toBeNull();
   });
 });

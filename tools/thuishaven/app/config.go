@@ -40,10 +40,14 @@ type Config struct {
 	HeartbeatEvery time.Duration // launcher heartbeat cadence
 	DaemonArgv     []string      // how to (re)launch `haven daemon`
 	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
+	GoWatchArgv    []string      // this Haven executable plus its internal Go watch command
+	UIWatchArgv    []string      // this Haven executable plus its internal UI watch command
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
-	UpArgv                   []string
+	UpArgv []string
+	// KeepArgv is this Haven executable plus `keep`: the stack's keeper.
+	KeepArgv                 []string
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
@@ -97,7 +101,7 @@ type Config struct {
 	ShouldDisableGoogleDLP bool
 	// ShouldMockInstantEvalJudge judges Instant Evals with the app's memory
 	// stand-in (INSTANT_EVAL_CLASSIFIER=memory). Off by default; resolved from
-	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven limits` and the hub also set.
+	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven machine limits` and the hub also set.
 	ShouldMockInstantEvalJudge bool
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the
@@ -120,12 +124,13 @@ type Config struct {
 
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
-	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
-	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
-	// lane: Vite, api and worker in one Node process (ADR-168, B1).
-	ShouldRunOneProcess bool
+	// IsForegroundClient marks an up that stays the stack's owner after the
+	// hand-over, following its log and downing it when it goes (D7).
+	IsForegroundClient bool
+	ShouldGoWatch      bool // rebuild and swap the Go services (haven go-watch; air for langyagent); only under up --watch or --hmr, and never with LANGWATCH_GO_WATCH=0
 	// ShouldRunGoAsOneProcess hosts the linked simulators in the go lane, not a
-	// sims lane of their own: one Go process (LANGWATCH_GO_ONE_PROCESS=1, a trial).
+	// sims lane of their own: one Go process. On unless
+	// LANGWATCH_DEV_ONE_PROCESS=0, which no longer touches the Node lanes.
 	ShouldRunGoAsOneProcess bool
 	// Selection is the worktree's sticky service choice (ADR-064): gateway,
 	// nlp, langy, idp. The three Node lanes — ui, api and workers — always run

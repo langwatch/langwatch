@@ -53,6 +53,9 @@ bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as
 
 ## Where to look before writing a component
 
+Check here first, every time: reuse what exists, and build a component any
+other module would reuse here rather than in your module (rule 5).
+
 - `packages/design-system/src/components/`: one file per component
   (`avatar`, `drawer`, `cached-view`, `section-navigation-frame`, `list-table`, ...).
 - `packages/design-system/src/system/` (tokens, recipes, `config.ts`),

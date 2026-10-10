@@ -6,7 +6,7 @@
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiRpc,
   useUiScope,
@@ -48,7 +48,7 @@ export type UiOrganizationFacts = {
  * the plan reads as not-enterprise and not-loading.
  */
 export function useUiOrganizationFacts(): UiOrganizationFacts {
-  const { session } = useUiCapabilities();
+  const { session } = useUiHostServices();
   const { isSaaS } = useUiDeployment();
   const rpc = useUiRpc();
   const { organizationId } = useUiScope().activeScope();

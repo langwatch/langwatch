@@ -2,6 +2,7 @@ import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
 import {
+  failedInBrowser,
   isCeremonyAbandoned,
   passkeyFailure,
   passkeyFailureFrom,
@@ -43,6 +44,15 @@ describe("given a passkey ceremony that resolved with a refusal", () => {
 
     it("treats a status of 0 the same as no status at all", () => {
       expect(passkeyFailureFrom({ status: 0 })).toEqual({
+        error: "identity_passkey_ceremony_failed",
+      });
+    });
+
+    it("never names a credential refusal for a failure in this browser", () => {
+      expect(
+        passkeyFailureFrom({ status: 400, code: "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY" }),
+      ).toEqual({ error: "identity_passkey_ceremony_failed" });
+      expect(passkeyFailureFrom({ status: 400, code: "AUTH_CANCELLED" })).toEqual({
         error: "identity_passkey_ceremony_failed",
       });
     });
@@ -127,4 +137,20 @@ describe("given every code a passkey ceremony can name", () => {
       expect(spoken).not.toMatch(/credential id|credentialId|table|service|prisma|better-auth/i);
     },
   );
+});
+
+describe("given where a passkey ceremony failed", () => {
+  it("places the client's own codes in this browser", () => {
+    expect(failedInBrowser({ code: "AUTH_CANCELLED" })).toBe(true);
+    expect(failedInBrowser({ code: "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY" })).toBe(true);
+  });
+
+  it("places the server's refusals at the server", () => {
+    expect(failedInBrowser({ code: "PASSKEY_NOT_FOUND" })).toBe(false);
+    expect(failedInBrowser({ code: undefined })).toBe(false);
+  });
+
+  it("reads the passed-through NotAllowedError as a dismissal", () => {
+    expect(isCeremonyAbandoned({ code: "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY" })).toBe(true);
+  });
 });

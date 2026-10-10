@@ -41,6 +41,7 @@ describe("given a verbose migration run", () => {
       const message = messageForSpawnError(result.error?.message ?? "");
       expect(message).toContain("cut off");
       expect(message).toContain("cannot say whether the migrations applied");
+      expect(messageForSpawnError("stdout maxBuffer length exceeded")).toContain("cut off");
     });
   });
 

@@ -183,6 +183,22 @@ describe("the gateway internal control plane", () => {
       expect(changes.since).toHaveBeenCalledWith(ORGANIZATION_ID, 0n, 500);
     });
 
+    it("answers an empty window with the revision the gateway sent, so a change committed after the last read is not skipped", async () => {
+      const changes = testChangeEvents();
+      changes.since.mockResolvedValue({ currentRevision: 7n, events: [] });
+      const app = mountGatewayInternalRest({ changes });
+
+      const response = await app.request(
+        signedGatewayRequest({
+          method: "GET",
+          path: `/api/internal/gateway/changes?organization_id=${ORGANIZATION_ID}&since=7&timeout_s=1`,
+        }),
+      );
+
+      expect(response.status).toBe(204);
+      expect(response.headers.get("X-LangWatch-Revision")).toBe("7");
+    });
+
     /** @scenario "control plane answers the gateway's signed health probe" */
     it("answers the connectivity probe the data plane's status monitor polls", async () => {
       const app = mountGatewayInternalRest({});

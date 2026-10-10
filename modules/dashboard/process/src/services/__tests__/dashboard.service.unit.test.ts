@@ -270,3 +270,39 @@ describe("DashboardService", () => {
     });
   });
 });
+
+describe("DashboardService.getOrCreateFirst", () => {
+  describe("given a project with no dashboard that takes writes", () => {
+    it("creates the first one", async () => {
+      const { service } = serviceWith();
+
+      const [first] = await service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites: true });
+
+      expect(first?.name).toBe("Reports");
+    });
+  });
+
+  describe("given an aggregate project with no dashboard", () => {
+    it("creates nothing and returns none", async () => {
+      const { service } = serviceWith();
+
+      await expect(
+        service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites: false }),
+      ).resolves.toEqual([]);
+      await expect(
+        service.getAll({ projectId: PROJECT, graphCountScope: "builder" }),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe("given an aggregate project that already has a dashboard", () => {
+    it("returns it", async () => {
+      const { service } = serviceWith();
+      const existing = await service.create({ projectId: PROJECT, name: "Mine" });
+
+      const [first] = await service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites: false });
+
+      expect(first?.id).toBe(existing.id);
+    });
+  });
+});

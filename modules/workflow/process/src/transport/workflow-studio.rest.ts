@@ -1,9 +1,8 @@
 /**
  * The two doors the Optimization Studio editor talks to: literal addresses the
- * process mounts BEFORE the packaged workflow family. Code completion asks its
- * permission at the door; the event door keeps main's order (body 400 first).
+ * process mounts BEFORE the packaged workflow family. Both ask workflows:manage at the door:
+ * completion at the queried project, the event at the project its raw body names.
  */
-import { optionalCredential } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestEvent } from "@langwatch/api/rest";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
@@ -17,11 +16,6 @@ import {
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
-/** Why the event door resolves its caller after the body rather than standing behind a door. */
-const EVENT_CHECKED_BEFORE_CALLER =
-  "the event door answers an invalid body 400 before it asks who is calling, as main did; the " +
-  "project it asks workflows:manage at is inside that body, so the app asks it after the check";
-
 export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withNamespace("workflow-studio")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -29,6 +23,7 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/workflows/code-completion", "completeWorkflowCode")
+  .withoutAudit("run, not a change")
   .withQuery(workflowCodeCompletionQuerySchema)
   .withInput(workflowCodeCompletionBodySchema)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -40,19 +35,19 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   })
 
   .post("/api/workflows/post_event", "postWorkflowStudioEvent")
+  .withoutAudit("studio event relay, not a change")
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
-  .withAccess(optionalCredential({ reason: EVENT_CHECKED_BEFORE_CALLER }))
+  .withPermission("workflows:manage", {
+    at: "body",
+    param: "projectId",
+    schema: workflowStudioRestEventSchema,
+  })
   .withResponse("sse", {})
   .withDocs({ requestBody: { schema: workflowStudioRestEventSchema } })
   .handle(async ({ app, raw, response, actor }) =>
     response.events(
-      studioSseEventsOf(
-        await app.streamStudioEvent({
-          body: raw,
-          userId: actor?.type === "user" ? actor.id : undefined,
-        }),
-      ),
+      studioSseEventsOf(await app.streamStudioEvent({ body: raw, userId: actor.id })),
     ),
   )
   .build();

@@ -207,6 +207,13 @@ Feature: SCIM Group Mapping
     And the removal is proved to have left nothing resolving for "user-1" in the organization
     And a permission check for "user-1" in the organization answers no, everywhere
 
+  @unit
+  Scenario: Deleting a directory user removes the membership through organization
+    Given user "user-1" is a member of the organization
+    When Entra pushes a SCIM DELETE for user "user-1"
+    Then SCIM asks organization to remove the member, with no acting user
+    And SCIM writes no membership row of its own
+
   # --- SCIM Settings UI ---
 
   @integration @unimplemented

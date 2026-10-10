@@ -4,6 +4,7 @@ import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type {
   GovernanceCallSurface,
@@ -26,6 +27,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
@@ -66,6 +68,7 @@ async function buildApp() {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -109,6 +112,7 @@ async function buildCliApp() {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -368,6 +372,8 @@ describe("GovernanceModule as the module a process installs", () => {
     it("writes a plan refusal behind its CLI token door in main's CLI body (Q31)", async () => {
       const { app } = await buildCliApp();
       const routes = createRestRuntime({
+        audit: { record: () => {} },
+        authorization: restTestAuthorization(),
         identity: app.cliTokenDoor,
         entitlements: {
           holds: async () => false,

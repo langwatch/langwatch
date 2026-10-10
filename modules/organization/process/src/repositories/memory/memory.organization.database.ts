@@ -170,6 +170,8 @@ interface MemoryProjectRow {
   apiKey: string;
   /** The stored LangWatchQL key; absent reads as none. */
   lwqlKey?: string;
+  /** The project's kind; absent reads as an application project. */
+  kind?: string;
   teamId: string;
   isPersonal: boolean;
   ownerUserId: string | null;
@@ -228,9 +230,6 @@ export function organizationOfRow(row: MemoryOrganizationRow): Organization {
     stripeCustomerId: row.stripeCustomerId,
     currency: "USD",
     pricingModel: "SEAT_EVENT",
-    license: row.license ?? null,
-    licenseExpiresAt: row.licenseExpiresAt ?? null,
-    licenseLastValidatedAt: row.licenseLastValidatedAt ?? null,
   };
 }
 
@@ -243,6 +242,8 @@ export class MemoryOrganizationDatabase {
   readonly organizations = new Map<string, MemoryOrganizationRow>();
   /** Organizations marked as a self-hosted licence customer. */
   readonly selfHostedCustomers = new Set<string>();
+  /** Licensing's licence keys by organization, the twin of its share (C3-KEY-HASH). */
+  readonly licensingLicenseKeys = new Map<string, string>();
   readonly teams = new Map<string, MemoryTeamRow>();
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();

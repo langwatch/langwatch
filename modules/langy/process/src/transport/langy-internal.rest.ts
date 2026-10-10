@@ -19,6 +19,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/internal/langy/turn/:turnId/result", "ingestTurnResult")
+  .withoutAudit("ingestion")
   .withCredential("internal_secret")
   .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   .withParams(langyInternalTurnParamsSchema)
@@ -28,6 +29,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .handle(({ app, input }) => app.ingestInternalTurnResult(input))
 
   .post("/api/internal/langy/credentials/revoke", "revokeWorkerSessionKey")
+  .withAudit("langy.revokeWorkerSessionKey")
   .withCredential("internal_secret")
   .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   .withInput(langyRevokeCredentialsSchema)
@@ -35,6 +37,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .handle(({ app, input }) => app.revokeInternalCredentials(input))
 
   .post("/api/internal/langy/relay/frames", "streamRelayFrames")
+  .withoutAudit("ingestion")
   .withCredential("internal_secret")
   .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   // NDJSON frames arrive on a long-lived stream and cannot be buffered before handling.

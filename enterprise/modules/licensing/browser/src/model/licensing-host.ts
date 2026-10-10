@@ -47,6 +47,12 @@ export abstract class LicensingHostApi {
 
   abstract succeeded(notice: LicensingSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: LicensingSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: LicensingSuccessNotice): void;
+
   abstract failed(failure: LicensingFailureNotice): void;
 
   /** Whether the signed-in member may manage the organization. Fail-closed. */

@@ -175,6 +175,7 @@ const UPGRADE: OpsUpgradeStatus = {
   counts: { done: 4, failed: 1 },
   failedStepIds: ["ops:tenant-split"],
   failedTargets: 2,
+  deprecations: [],
 };
 
 function health(overrides: Partial<OpsHealthReaders> = {}) {

@@ -1,5 +1,6 @@
 import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
+  SSO_ARRIVAL_POLICY_ID,
   type IdentityDomainAdmission,
   type JoinAdmissionsApi,
 } from "@langwatch/identity-contract";
@@ -7,7 +8,7 @@ import {
 import type { JoinRequestListReadRepository } from "../repositories/join-request.repository.ts";
 
 /**
- * Who a matching domain admitted, read off the join-request fold:
+ * Who a matching domain or a single sign-on arrival admitted, read off the join-request fold:
  * the policy's own resolver id marks an admission nobody approved.
  */
 export class JoinAdmissionsService implements JoinAdmissionsApi {
@@ -35,6 +36,7 @@ export class JoinAdmissionsService implements JoinAdmissionsApi {
         userId: request.userId,
         domain: request.domain,
         automatic: request.resolvedById === DOMAIN_AUTO_JOIN_POLICY_ID,
+        connectionId: request.resolvedById === SSO_ARRIVAL_POLICY_ID ? request.connectionId : null,
       }));
   }
 }

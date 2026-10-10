@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The stored filter sets the explorer offers: one row shape, shared by the
  * repository, the application and the tRPC surface that answers with it.
@@ -41,7 +42,7 @@ export const savedViewNameSchema = z.string().min(1).max(255);
  * A saved view as the repository hands it back, and as tRPC ships it: the
  * stored row untouched, so its timestamps are the wire timestamps it carries.
  */
-export const savedViewSchema = z.object({
+const savedViewSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   userId: z.string().nullable(),
@@ -54,14 +55,23 @@ export const savedViewSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface SavedViewSchema extends Named<typeof savedViewSchemaDefinition> {}
+export const savedViewSchema: SavedViewSchema = savedViewSchemaDefinition;
 export type SavedView = z.infer<typeof savedViewSchema>;
 
 /** The stored period a view remembers, exactly as the filter bar writes it. */
-export const savedViewPeriodSchema = z.object({
+const savedViewPeriodSchemaDefinition = z.object({
   relativeDays: z.number().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
+export interface SavedViewPeriodSchema extends Named<typeof savedViewPeriodSchemaDefinition> {}
+export const savedViewPeriodSchema: SavedViewPeriodSchema = savedViewPeriodSchemaDefinition;
 export type SavedViewPeriod = z.infer<typeof savedViewPeriodSchema>;
 
-export const savedViewReorderResponseSchema = z.object({ success: z.literal(true) });
+const savedViewReorderResponseSchemaDefinition = z.object({ success: z.literal(true) });
+export interface SavedViewReorderResponseSchema extends Named<
+  typeof savedViewReorderResponseSchemaDefinition
+> {}
+export const savedViewReorderResponseSchema: SavedViewReorderResponseSchema =
+  savedViewReorderResponseSchemaDefinition;

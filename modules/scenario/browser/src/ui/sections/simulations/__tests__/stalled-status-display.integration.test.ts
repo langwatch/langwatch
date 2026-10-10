@@ -58,7 +58,7 @@ describe("getOverlayConfig()", () => {
       it("provides the established full-card light-mode wash", () => {
         const config = getOverlayConfig(ScenarioRunStatus.STALLED);
         expect(config.lightModeGradient).toContain("radial-gradient");
-        expect(config.lightModeGradient).toContain("rgba(214, 158, 46");
+        expect(config.lightModeGradient).toContain("var(--chakra-colors-yellow-subtle)");
       });
     });
 
@@ -91,7 +91,7 @@ describe("getOverlayConfig()", () => {
       it("uses the established layered green light-mode gradient", () => {
         const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
         expect(config.lightModeGradient.match(/radial-gradient/g)).toHaveLength(3);
-        expect(config.lightModeGradient).toContain("rgba(56, 161, 105");
+        expect(config.lightModeGradient).toContain("var(--chakra-colors-green-subtle)");
       });
 
       /** @scenario Dark mode keeps the compact status scrim */

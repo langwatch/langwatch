@@ -1,8 +1,8 @@
+import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 import {
   Button,
   Center,
   HStack,
-  Input,
   Spacer,
   Spinner,
   Text,
@@ -132,12 +132,12 @@ function BulkActionBar({
   return (
     <HStack gap={2}>
       <Spacer />
-      <Button size="xs" variant="outline" data-testid="dead-redrive-shown" onClick={onRedriveAll}>
+      <Button size="sm" variant="outline" data-testid="dead-redrive-shown" onClick={onRedriveAll}>
         <RotateCcw size={12} />
         Redrive shown ({shownCount})
       </Button>
       <Button
-        size="xs"
+        size="sm"
         variant="outline"
         colorPalette="red"
         data-testid="dead-discard-shown"
@@ -166,13 +166,6 @@ function BulkConfirms({
   processName: string | undefined;
 }) {
   const plural = shownCount === 1 ? "message" : "messages";
-  // The fleet-wide discard crosses every tenant and cannot be undone, so the
-  // operator types the phrase rather than clicking once. The API asks for the
-  // same phrase, which stops a script reaching this breadth by omitting a
-  // field; this is what makes the ask a human one too.
-  const [typed, setTyped] = useState("");
-  const isFleetWide = processName === undefined;
-  const isPhraseValid = !isFleetWide || typed.trim() === FLEET_DISCARD_PHRASE;
   return (
     <>
       {/* Discard asks even for one row, because nothing un-discards it: no
@@ -193,34 +186,31 @@ function BulkConfirms({
         description={`Return all ${shownCount} dead ${plural} for ${shownScope} to pending with a fresh attempt budget. Their deliveries will run again.`}
         isLoading={actions.redriveAll.isPending}
       />
-      <ConfirmDialog
-        open={actions.confirmBulk === "discard"}
-        onClose={() => {
-          setTyped("");
-          actions.setConfirmBulk(null);
-        }}
-        onConfirm={() =>
-          actions.discardAll.mutate(
-            processName ? { processName } : { confirm: FLEET_DISCARD_PHRASE },
-          )
-        }
-        title="Discard dead letters"
-        description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
-        isLoading={actions.discardAll.isPending}
-        confirmDisabled={!isPhraseValid}
-      >
-        {isFleetWide && (
-          <Input
-            marginTop={3}
-            size="sm"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            placeholder={FLEET_DISCARD_PHRASE}
-            aria-label={`Type ${FLEET_DISCARD_PHRASE} to confirm`}
-            data-testid="dead-discard-all-phrase"
-          />
-        )}
-      </ConfirmDialog>
+      {processName ? (
+        <ConfirmDialog
+          open={actions.confirmBulk === "discard"}
+          onClose={() => actions.setConfirmBulk(null)}
+          onConfirm={() => actions.discardAll.mutate({ processName })}
+          title="Discard dead letters"
+          description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
+          isLoading={actions.discardAll.isPending}
+        />
+      ) : (
+        <DeleteConfirmationDialog
+          open={actions.confirmBulk === "discard"}
+          onClose={() => actions.setConfirmBulk(null)}
+          onConfirm={() => actions.discardAll.mutate({ confirm: FLEET_DISCARD_PHRASE })}
+          closeOnConfirm={false}
+          title="Discard dead letters"
+          description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
+          isLoading={actions.discardAll.isPending}
+          confirmationWord={FLEET_DISCARD_PHRASE}
+          caseSensitive
+          trimConfirmation
+          confirmLabel="Confirm"
+          inputTestId="dead-discard-all-phrase"
+        />
+      )}
     </>
   );
 }
@@ -245,11 +235,11 @@ function Pager({
         {start}–{end} of {total}
       </Text>
       <HStack gap={2}>
-        <Button size="xs" variant="outline" disabled={page === 1} onClick={() => onPage(page - 1)}>
+        <Button size="sm" variant="outline" disabled={page === 1} onClick={() => onPage(page - 1)}>
           Previous
         </Button>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           disabled={end >= total}
           onClick={() => onPage(page + 1)}

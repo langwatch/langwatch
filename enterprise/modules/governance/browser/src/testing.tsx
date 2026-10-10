@@ -27,6 +27,7 @@
  */
 
 import { permissionSatisfiedBy } from "@langwatch/authorization";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
@@ -50,6 +51,8 @@ export type GovernanceHostRecording = {
   navigations: string[];
   queries: { next: GovernanceQuery; replace: boolean }[];
   successes: GovernanceSuccessNotice[];
+  warnings: GovernanceSuccessNotice[];
+  infos: GovernanceSuccessNotice[];
   failures: GovernanceFailureNotice[];
 };
 
@@ -95,7 +98,14 @@ export class FakeGovernanceHost extends GovernanceHostApi {
   static create(options: FakeGovernanceHostOptions = {}): FakeGovernanceHost {
     return new FakeGovernanceHost({
       options,
-      recording: { navigations: [], queries: [], successes: [], failures: [] },
+      recording: {
+        navigations: [],
+        queries: [],
+        successes: [],
+        warnings: [],
+        infos: [],
+        failures: [],
+      },
       query: options.query ?? {},
     });
   }
@@ -170,14 +180,14 @@ export class FakeGovernanceHost extends GovernanceHostApi {
     return permissionSatisfiedBy({ granted: this.granted, requested: permission });
   }
 
-  isFeatureEnabled(flag: string): boolean {
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
     return this.featureFlag(flag) === true;
   }
 
-  featureFlag(flag: string): boolean | undefined {
+  featureFlag({ name }: ReleaseFlagToken): boolean | undefined {
     if (this.options.flagsAnswered === false) return void 0;
     const flags = this.options.enabledFlags ?? "all";
-    return flags === "all" || flags.includes(flag);
+    return flags === "all" || flags.includes(name);
   }
 
   isSettled(): boolean {
@@ -203,6 +213,14 @@ export class FakeGovernanceHost extends GovernanceHostApi {
 
   succeeded(notice: GovernanceSuccessNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: GovernanceSuccessNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: GovernanceSuccessNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: GovernanceFailureNotice): void {

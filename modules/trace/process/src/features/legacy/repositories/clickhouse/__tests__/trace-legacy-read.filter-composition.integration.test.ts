@@ -10,14 +10,16 @@ import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwa
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { openProtections } from "../../../../../repositories/clickhouse/__tests__/open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
+import type { LegacyTraceMappingService } from "../../../services/legacy-trace-mapping.service.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 
@@ -31,7 +33,7 @@ const OK_REFUND_U1 = `${tenantId}-ok-refund-u1`;
 const FAILED_HELLO_U1 = `${tenantId}-failed-hello-u1`;
 
 let ch: ClickHouseClient;
-let repo: TraceLegacyReadClickHouseRepository;
+let repo: LegacyTraceMappingService;
 
 function summaryRow({
   traceId,
@@ -83,13 +85,14 @@ async function search({
   const filterWhere = queryText
     ? traceQueryTranslation.translateFilter({
         queryText,
-        tenantId,
         timeRange: { from: window.startDate, to: window.endDate },
       })
     : null;
   const results = await repo.listAllTracesForProject(searchInput(input), openProtections, {
     downloadMode: true,
     ...(filterWhere ? { filterWhere } : {}),
+    authorization: ownProof({ projectId: tenantId }),
+    ownRead: ownProof({ projectId: tenantId }),
   });
   return results.groups
     .flat()
@@ -100,7 +103,7 @@ async function search({
 describe.skipIf(!clickHouseConfigured)("a trace search filter (integration)", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
-    repo = TraceLegacyReadClickHouseRepository.create({
+    repo = mappedLegacyRead({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
       annotations: {

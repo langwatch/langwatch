@@ -3,6 +3,7 @@ import type {
   OrganizationIdPageInput,
   OrganizationWithAdministrators,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 
@@ -75,7 +76,10 @@ export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepo
     // The condition sits on the table: a write parked on the row lock re-checks it against
     // the committed row, so only one of two checkouts started together is told it won.
     const updated = await this.prisma.$executeRaw`
-      -- @tenancy: an organization is addressed by its own primary key.
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "Organization"
          SET "stripeCustomerId" = ${input.stripeCustomerId},
              "updatedAt" = now()

@@ -28,11 +28,22 @@ export function AuditPeriodPicker({
       size="sm"
     >
       <Popover.Trigger asChild>
-        <Button variant="outline" size="sm" minWidth="fit-content">
-          <Calendar size={16} />
+        <Button
+          variant="outline"
+          size="sm"
+          minWidth="fit-content"
+          height="32px"
+          minHeight="32px"
+          paddingX="10px"
+          gap={2}
+          fontSize="13px"
+          lineHeight="20px"
+          borderRadius="4px"
+        >
+          <Calendar size={14} />
           <Text>{label}</Text>
           <Box>
-            <ChevronDown size={16} />
+            <ChevronDown size={14} />
           </Box>
         </Button>
       </Popover.Trigger>

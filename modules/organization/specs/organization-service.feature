@@ -283,6 +283,13 @@ Feature: Shared organization service
       Then no seat revocation is recorded
 
     @unit
+    Scenario: Re-enabling a member records that their seat was given back
+      Given a disabled member of an organization
+      When an administrator re-enables that member
+      Then the membership is written first
+      And organization records that member as re-enabled, naming who re-enabled them
+
+    @unit
     Scenario: A process that cannot record the seat revocation refuses the disable
       Given a process in which organization's lifecycle pipeline is not registered
       When an administrator disables a member
@@ -329,6 +336,13 @@ Feature: Shared organization service
     And it records "lw.organization.personal_workspace_archived" with the archived team ids, awaited, so an unrecorded removal fails loudly
 
   @unit
+  Scenario: Removing a member drops their group and team memberships in that organization only
+    Given a member who belongs to a group and a team in the organization, and to a group in another organization
+    When an administrator removes the member
+    Then the member belongs to no group or team of that organization, so a later rejoin brings back no access
+    And their group in the other organization keeps them
+
+  @unit
   Scenario: Ensuring a returning member's workspace records its revival for project
     Given a returning member whose archived personal team organization has revived
     When the user's personal workspace is ensured and answers pending
@@ -348,3 +362,43 @@ Feature: Shared organization service
     When the organization and its first team are committed
     Then organization records "lw.organization.created" carrying the organization's id and name
     And peers such as prompt seed their own defaults from that fact
+
+  @unit
+  Scenario: The organization presence step records every organization a page at a time
+    Given three organizations with stored presence settings, served two to a page
+    When the organization presence upgrade step runs
+    Then each organization's stored setting is recorded once
+    And the step saves its checkpoint after each page, naming the page's last organization
+
+  @unit
+  Scenario: The organization presence step resumes after the last page it saved
+    Given the organization presence upgrade step's checkpoint names the second organization
+    When the step runs again
+    Then only the organizations after the second are recorded
+
+  @unit
+  Scenario: A dry run of the organization presence step records nothing and saves no checkpoint
+    Given three organizations with stored presence settings
+    When the organization presence upgrade step runs as a dry run
+    Then no setting is recorded and no checkpoint is saved
+    And the report counts the organizations it would visit
+
+  @integration
+  Scenario: The organization presence step is a background step that waits for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then organization:record-presence-settings is a background data step
+    And it runs only once no older image serves
+
+  @unit
+  Scenario: A peer's member fact reaches organization with the fact's own moment
+    Given authz records a proven offboarding, or user records an erasure naming the organisations it sat in
+    When organization hears the fact from its own side
+    Then it records the member removal for each organisation named, keyed on the fact's occurredAt
+    And an erasure records nobody as the remover, so a redelivered fact records nothing new
+
+  @unit
+  Scenario: A member fact for a deleted organisation records nothing
+    Given an organisation was deleted before a proven offboarding or an erasure naming it arrived
+    When organization hears the fact from its own side
+    Then it records no member removal for the deleted organisation
+    And it still records the removal for every live organisation the fact names

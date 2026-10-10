@@ -13,7 +13,7 @@ import { Temporal, toDate } from "@langwatch/time";
  * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
  * an instant serialises to an empty object, so the conversion lives here.
  */
-export function clickHouseTimestamp(epochMs: number): Date {
+function clickHouseTimestamp(epochMs: number): Date {
   return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
 }
 

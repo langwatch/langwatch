@@ -1,4 +1,11 @@
-import { Config, publicBaseUrl, type ConfigOf } from "@langwatch/config";
+import {
+  allowInsecureLocalUrls,
+  Config,
+  publicBaseUrl,
+  slackApiBase,
+  slackWebhookBase,
+  type ConfigOf,
+} from "@langwatch/config";
 import { z } from "zod";
 
 const positiveCount = z.coerce.number().int().positive();
@@ -18,6 +25,11 @@ export const automationServerConfig = Config.define((c) => ({
   ),
   /** The deployment's public origin (the shared leaf); absent, nothing sent links back. */
   publicBaseUrl,
+  /** Where Slack messages go (the shared leaves); haven points them at outboundsim. */
+  slackApiBase,
+  slackWebhookBase,
+  /** The dev switch (the shared leaf): a webhook automation may then use http or a port. */
+  allowInsecureLocalUrls,
 }));
 
 export type AutomationServerConfig = ConfigOf<typeof automationServerConfig>;

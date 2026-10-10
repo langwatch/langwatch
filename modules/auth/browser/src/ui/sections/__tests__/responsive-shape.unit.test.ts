@@ -108,7 +108,7 @@ describe("given the front door in either colour mode", () => {
       const styles = sourceOf("ui/elements/auth-front-door.css");
 
       expect(styles).toContain("@media (color-gamut: p3)");
-      expect(styles).toContain("--chakra-colors-front-door-action:");
+      expect(styles).toContain("--chakra-colors-front-door-detail:");
       expect(styles).toContain("color(display-p3");
     });
   });
@@ -123,7 +123,7 @@ describe("given the hosted panel on a narrow viewport", () => {
       // above a log-in form on a phone they are two screens of scrolling in
       // front of the thing the person came to do.
       expect([...panel.matchAll(/display=\{\{ base: "none", md: "block" \}\}/g)]).toHaveLength(2);
-      expect(panel).toContain('width={{ base: "full", md: "50%" }}');
+      expect(panel).toContain('width={{ base: "full", md: "56%" }}');
     });
   });
 });

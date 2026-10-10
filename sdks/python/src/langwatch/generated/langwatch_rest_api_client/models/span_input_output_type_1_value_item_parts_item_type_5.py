@@ -15,78 +15,61 @@ T = TypeVar("T", bound="SpanInputOutputType1ValueItemPartsItemType5")
 class SpanInputOutputType1ValueItemPartsItemType5:
     """
     Attributes:
-        type_ (Literal['binary']):
-        mime_type (str):
-        data (str | Unset):
-        url (str | Unset):
-        id (str | Unset):
-        filename (str | Unset):
+        type_ (Literal['tool-call']):
+        tool_name (str | Unset):
+        tool_call_id (str | Unset):
+        input_ (Any | Unset):
     """
 
-    type_: Literal["binary"]
-    mime_type: str
-    data: str | Unset = UNSET
-    url: str | Unset = UNSET
-    id: str | Unset = UNSET
-    filename: str | Unset = UNSET
+    type_: Literal["tool-call"]
+    tool_name: str | Unset = UNSET
+    tool_call_id: str | Unset = UNSET
+    input_: Any | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_
 
-        mime_type = self.mime_type
+        tool_name = self.tool_name
 
-        data = self.data
+        tool_call_id = self.tool_call_id
 
-        url = self.url
-
-        id = self.id
-
-        filename = self.filename
+        input_ = self.input_
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "type": type_,
-                "mimeType": mime_type,
             }
         )
-        if data is not UNSET:
-            field_dict["data"] = data
-        if url is not UNSET:
-            field_dict["url"] = url
-        if id is not UNSET:
-            field_dict["id"] = id
-        if filename is not UNSET:
-            field_dict["filename"] = filename
+        if tool_name is not UNSET:
+            field_dict["toolName"] = tool_name
+        if tool_call_id is not UNSET:
+            field_dict["toolCallId"] = tool_call_id
+        if input_ is not UNSET:
+            field_dict["input"] = input_
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        type_ = cast(Literal["binary"], d.pop("type"))
-        if type_ != "binary":
-            raise ValueError(f"type must match const 'binary', got '{type_}'")
+        type_ = cast(Literal["tool-call"], d.pop("type"))
+        if type_ != "tool-call":
+            raise ValueError(f"type must match const 'tool-call', got '{type_}'")
 
-        mime_type = d.pop("mimeType")
+        tool_name = d.pop("toolName", UNSET)
 
-        data = d.pop("data", UNSET)
+        tool_call_id = d.pop("toolCallId", UNSET)
 
-        url = d.pop("url", UNSET)
-
-        id = d.pop("id", UNSET)
-
-        filename = d.pop("filename", UNSET)
+        input_ = d.pop("input", UNSET)
 
         span_input_output_type_1_value_item_parts_item_type_5 = cls(
             type_=type_,
-            mime_type=mime_type,
-            data=data,
-            url=url,
-            id=id,
-            filename=filename,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            input_=input_,
         )
 
         span_input_output_type_1_value_item_parts_item_type_5.additional_properties = d

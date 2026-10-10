@@ -13,13 +13,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ScenarioHostApi, ScenarioHostProvider } from "../scenario-host.ts";
 
-/** The shell's scope host: the demo project, a project grant without the organization one. */
+/** The shell's scope host, standing in the demo project. */
 const shellScope = createUiScopeHost({
   project: () => ({ id: "proj_demo", slug: "demo", name: "Demo" }),
   organization: () => ({ id: "org_1" }),
   team: () => ({ id: "team_1" }),
-  hasPermission: (permission) => permission === "project:manage",
-  hasOrganizationPermission: () => false,
   isDemoProject: () => true,
 });
 
@@ -59,9 +57,6 @@ function ScopeProbe() {
   const scope = useOrganizationTeamProject();
   return (
     <>
-      <output aria-label="manage organization">
-        {String(scope.hasOrgPermission("organization:manage"))}
-      </output>
       <output aria-label="demo project">{String(scope.isDemoProject)}</output>
     </>
   );
@@ -79,14 +74,6 @@ const renderUnderScenarioHost = () =>
 afterEach(cleanup);
 
 describe("given the scenario host is mounted under the shell's scope host", () => {
-  describe("when a screen inside it asks whether the reader may manage the organization", () => {
-    /** @scenario "An organization permission reads the same under every module host" */
-    it("answers no, as the shell's scope answers it", () => {
-      renderUnderScenarioHost();
-      expect(screen.getByLabelText("manage organization").textContent).toBe("false");
-    });
-  });
-
   describe("when a screen inside it reads whether it stands in the demo project", () => {
     /** @scenario "The demo project is recognised under every module host" */
     it("reads yes", () => {

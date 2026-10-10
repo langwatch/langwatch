@@ -186,6 +186,7 @@ describe("the worker process installation", () => {
       expect(pipelines).not.toContain("data_retention_project_scope");
       expect(pipelines).not.toContain("data_privacy_project_scope");
       expect(pipelines).toContain("data_retention_seat_policy");
+      expect(pipelines).toContain("connect_contract_budget");
       expect(pipelines).toContain("audit_log");
       expect(pipelines).toContain("agent_lifecycle");
       expect(pipelines).toContain("annotation_lifecycle");
@@ -223,6 +224,8 @@ describe("the worker process installation", () => {
       expect(schedules).not.toEqual([]);
       expect(schedules).toContain("spendSpikeEvaluation");
       expect(schedules).toContain("governanceTraceFacts");
+      // governance's aggregate reconcile: project and member facts enqueue, a daily wake sweeps.
+      expect(schedules).toContain("aggregateProjectReconcile");
       // user's fact outbox: its delivered intents are pruned on the worker's daily wake.
       expect(schedules).toContain("userLifecycleFacts");
     } finally {
@@ -421,6 +424,38 @@ describe("the worker process installation", () => {
         (definition) => definition.metadata.name === "gateway_spend_processing",
       );
       expect(spend?.processManagers.get("gatewayDebits")?.config.transient).toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("hosts licensing's managed-key attach lane on the licensing_customer pipeline", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const customer = eventing.definitions.find(
+        (definition) => definition.metadata.name === "licensing_customer",
+      );
+      expect(
+        customer?.open((definition) =>
+          (definition.globalProjections ?? []).map(({ name }) => name),
+        ),
+      ).toContain("licensing_customer.licensingManagedKeyProvisioned");
+      const managedKey = eventing.definitions.find(
+        (definition) => definition.metadata.name === "gateway_connect_managed_key",
+      );
+      expect(
+        managedKey?.open((definition) =>
+          (definition.globalProjections ?? []).map(({ name }) => name),
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          "gateway_connect_managed_key.gatewayConnectManagedKeyLicenseSet",
+          "gateway_connect_managed_key.gatewayConnectManagedKeyServicesSet",
+          "gateway_connect_managed_key.gatewayConnectUpstreamSet",
+          "gateway_connect_managed_key.gatewayConnectUpstreamCleared",
+        ]),
+      );
     } finally {
       await runtime.stop();
     }

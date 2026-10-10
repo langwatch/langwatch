@@ -44,7 +44,7 @@ export class BearerIdentity implements RestIdentity {
 }
 
 /** RFC 6750: the "Bearer" scheme in any case, then the token; anything else presents none. */
-function bearerTokenOf(header: string | null): string | null {
+export function bearerTokenOf(header: string | null): string | null {
   const presented = /^Bearer\s+(.+)$/i.exec(header?.trim() ?? "")?.[1]?.trim();
 
   return presented ? presented : null;

@@ -41,17 +41,20 @@ import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts"
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit.ts";
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
+// DefaultProviderSection has been moved out of this drawer to a page-level
+// section on the model-providers settings page (DefaultModelsSection). See
+// specs/model-providers/hierarchical-default-models.feature.
+import { embeddedProviderLabel } from "../../model/embedded-provider-setup.ts";
 import {
   getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../model/model-provider-helpers.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
 import { CodexSignIn } from "./codex-sign-in.tsx";
-// DefaultProviderSection has been moved out of this drawer to a page-level
-// section on the model-providers settings page (DefaultModelsSection). See
-// specs/model-providers/hierarchical-default-models.feature.
-import { GuidedChatModelField } from "./guided-chat-model-field.tsx";
+import { EmbeddedProviderForm } from "./embedded-provider-form.tsx";
+import { GuidedProviderForm } from "./guided-provider-form.tsx";
 import {
   ADVANCED_ACCORDION_VALUE,
   draftFromProvider,
@@ -294,7 +297,6 @@ function ProviderCredentialsArea({
   closeDrawer,
   fieldErrors,
   isOAuthDeviceProvider,
-  guided,
   onFailed,
   onSaved,
   organizationId,
@@ -310,7 +312,6 @@ function ProviderCredentialsArea({
   closeDrawer: () => void;
   fieldErrors: Record<string, string>;
   isOAuthDeviceProvider: boolean;
-  guided: boolean;
   onFailed?: EditModelProviderFormProps["onFailed"];
   onSaved?: () => void;
   organizationId?: string;
@@ -337,7 +338,6 @@ function ProviderCredentialsArea({
 
   return (
     <CodexSignIn
-      guided={guided}
       onFailed={(code) => onFailed?.({ provider: provider.provider, code })}
       projectId={projectId}
       scopes={state.scopes}
@@ -494,23 +494,10 @@ function ProviderAdvancedArea({
   );
 }
 
-function guidedSaveLabel({
-  connected,
-  isBusy,
-  label,
-}: {
-  connected: boolean;
-  isBusy: boolean;
-  label: string;
-}): string {
-  if (connected) return "Connected";
-  return isBusy ? "Checking the key…" : label;
-}
-
-/** Guided Connect waits for a typed credential, not merely a new row. */
 /**
  * `"new"` never resolves, so the Add Model Provider menu can stand up a second instance. The
- * guided step instead edits the provider's stored row, a server-environment one included (main).
+ * guided and embedded setups instead edit the provider's stored row, a server-environment one
+ * included (main).
  */
 function resolveEditedRow<T extends { id: string; provider: string }>({
   guided,
@@ -518,6 +505,7 @@ function resolveEditedRow<T extends { id: string; provider: string }>({
   modelProviderId,
   providerKey,
 }: {
+  /** Guided or embedded: either edits the stored row of this type. */
   guided: boolean;
   providers: readonly T[];
   modelProviderId: string | undefined;
@@ -527,87 +515,20 @@ function resolveEditedRow<T extends { id: string; provider: string }>({
   return findModelProviderById({ providers, modelProviderId });
 }
 
-/** Tells the guided reader the server's own key is in use until they paste one. */
-function GuidedServerKeyHint({
-  guided,
-  isUsingEnvVars,
-  providerName,
-}: {
-  guided: boolean;
-  isUsingEnvVars: boolean;
-  providerName: string;
-}) {
-  if (!guided || !isUsingEnvVars) return null;
-  return (
-    <Text fontSize="xs" color="fg.muted" data-testid="environment-key-hint">
-      This server already has a key for {providerName}. Connect to use it, or paste your own.
-    </Text>
-  );
-}
-
-function isGuidedKeyTyped(
-  state: ReturnType<typeof useModelProviderForm>[0],
-  isUsingEnvVars: boolean,
-): boolean {
-  return (
-    isUsingEnvVars ||
-    hasUserEnteredNewApiKey(state.customKeys) ||
-    hasUserModifiedNonApiKeyFields(state.customKeys, state.initialKeys)
-  );
-}
-
-/** Guided saves once a key is typed or the server holds one; settings saves any edit. */
-function isSaveable({
-  guided,
-  state,
-  isUsingEnvVars,
-  isAdvancedDirty,
-}: {
-  guided: boolean;
-  state: ReturnType<typeof useModelProviderForm>[0];
-  isUsingEnvVars: boolean;
-  isAdvancedDirty: boolean;
-}): boolean {
-  if (guided) return isGuidedKeyTyped(state, isUsingEnvVars);
-  return state.isDirty || isAdvancedDirty;
-}
-
-/** Settings shows headers, routing and custom models; guided shows the one model to use. */
+/** Extra headers, routing and custom models. */
 function ProviderModelArea({
   actions,
-  guidedSave,
-  isBusy,
   isLlmProvider,
   isOAuthDeviceProvider,
   provider,
-  providerName,
   state,
 }: {
   actions: ReturnType<typeof useModelProviderForm>[1];
-  guidedSave: ReturnType<typeof useGuidedSave> | undefined;
-  isBusy: boolean;
   isLlmProvider: boolean;
   isOAuthDeviceProvider: boolean;
   provider: ModelProviderEditorValue;
-  providerName: string;
   state: ReturnType<typeof useModelProviderForm>[0];
 }) {
-  if (guidedSave) {
-    if (isOAuthDeviceProvider) return null;
-    return (
-      <GuidedChatModelField
-        actions={actions}
-        guidedModels={guidedSave.models}
-        pickedModel={guidedSave.chatModel}
-        onPick={guidedSave.pick}
-        locked={isBusy || guidedSave.connected}
-        provider={provider}
-        providerName={providerName}
-        state={state}
-      />
-    );
-  }
-
   return (
     <>
       <ExtraHeadersSection state={state} actions={actions} provider={provider} />
@@ -628,31 +549,13 @@ function SaveProviderButton({
   isDirty,
   label,
   onSave,
-  guided,
 }: {
   canResolveTarget: boolean;
   isBusy: boolean;
   isDirty: boolean;
   label: string;
   onSave: () => void;
-  guided?: { connected: boolean };
 }) {
-  if (guided) {
-    return (
-      <HStack width="full" justify="end">
-        <Button
-          size="sm"
-          colorPalette="orange"
-          disabled={!canResolveTarget || !isDirty || isBusy || guided.connected}
-          data-testid="model-provider-save"
-          onClick={onSave}
-        >
-          {guidedSaveLabel({ connected: guided.connected, isBusy, label })}
-        </Button>
-      </HStack>
-    );
-  }
-
   return (
     <HStack width="full" justify="end">
       <Button
@@ -706,6 +609,7 @@ export const EditModelProviderForm = ({
   providerKey,
   onSaved: onSavedBy,
   guided = false,
+  embedded = false,
   onFailed,
 }: EditModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
@@ -719,9 +623,10 @@ export const EditModelProviderForm = ({
   const { providers: allProviders, isReady: isAllProvidersReady } = useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const toaster = useModelProviderToaster();
-  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
-  const canManageOrganization = hasPermission("organization:manage");
-  const canManageTeam = hasPermission("team:manage");
+  const { project, team, organization } = useOrganizationTeamProject();
+  const modelProviderHost = useModelProviderHost();
+  const canManageOrganization = modelProviderHost.hasPermission("organization:manage");
+  const canManageTeam = modelProviderHost.hasPermission("team:manage");
 
   const enabledProvidersCount = useMemo(
     () => countEnabledProviders({ providerKey, providers }),
@@ -756,8 +661,14 @@ export const EditModelProviderForm = ({
   // without colliding with the first.
   const isTargetingSpecificRow = isResolvableProviderId(modelProviderId);
   const existingRow = useMemo(
-    () => resolveEditedRow({ guided, providers: allProviders, modelProviderId, providerKey }),
-    [guided, allProviders, modelProviderId, providerKey],
+    () =>
+      resolveEditedRow({
+        guided: guided || embedded,
+        providers: allProviders,
+        modelProviderId,
+        providerKey,
+      }),
+    [guided, embedded, allProviders, modelProviderId, providerKey],
   );
 
   // Two DISTINCT concerns, deliberately not collapsed into one flag: - Whether we can SUBMIT.
@@ -991,26 +902,78 @@ export const EditModelProviderForm = ({
   const isBusy = state.isSaving || isValidatingApiKey;
   const providerName = providerDefinition?.name ?? provider.provider;
 
+  if (guided) {
+    return (
+      <GuidedProviderForm
+        providerKey={provider.provider}
+        providerName={providerName}
+        apiKeyField={providerDefinition?.apiKey}
+        state={state}
+        actions={actions}
+        guidedSave={guidedSave}
+        isOAuthDeviceProvider={isOAuthDeviceProvider}
+        isUsingEnvVars={isUsingEnvVars}
+        isBusy={isBusy}
+        canResolveTarget={!cannotResolveTarget}
+        fieldErrors={fieldErrors}
+        setFieldErrors={setFieldErrors}
+        refusal={apiKeyValidationError}
+        clearRefusal={clearApiKeyError}
+        connectLabel={probeRequired ? "Connect" : saveLabel}
+        onConnect={() => void handleSave()}
+        projectId={project?.id ?? ""}
+        onFailed={onFailed}
+      />
+    );
+  }
+
+  if (embedded) {
+    return (
+      <EmbeddedProviderForm
+        provider={provider}
+        providerName={embeddedProviderLabel({ providerKey: provider.provider, providerName })}
+        isOAuthDeviceProvider={isOAuthDeviceProvider}
+        state={state}
+        actions={actions}
+        azureGatewaySwitch={
+          <ApiGatewaySwitch
+            actions={actions}
+            isLlmProvider={isLlmProvider}
+            provider={provider}
+            state={state}
+          />
+        }
+        fieldErrors={fieldErrors}
+        setFieldErrors={setFieldErrors}
+        refusal={apiKeyValidationError}
+        clearRefusal={clearApiKeyError}
+        isBusy={isBusy}
+        canResolveTarget={!cannotResolveTarget}
+        saveLabel={saveLabel}
+        onSave={() => void handleSave()}
+        projectId={project?.id ?? ""}
+        onConnected={() => onSaved?.()}
+        onFailed={(code) => onFailed?.({ provider: provider.provider, code })}
+      />
+    );
+  }
+
   return (
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
-        <Text color="red.500" fontSize="sm">
+        <Text color="red.fg" fontSize="sm">
           This provider configuration no longer exists. It may have been deleted from another
           session.
         </Text>
       )}
       <VStack align="start" width="full" gap={4}>
-        {!guided && (
-          <>
-            <ProviderNameField actions={actions} provider={provider} state={state} />
-            <ApiGatewaySwitch
-              actions={actions}
-              isLlmProvider={isLlmProvider}
-              provider={provider}
-              state={state}
-            />
-          </>
-        )}
+        <ProviderNameField actions={actions} provider={provider} state={state} />
+        <ApiGatewaySwitch
+          actions={actions}
+          isLlmProvider={isLlmProvider}
+          provider={provider}
+          state={state}
+        />
 
         <ProviderScopeSection
           state={state}
@@ -1033,7 +996,6 @@ export const EditModelProviderForm = ({
           closeDrawer={closeDrawer}
           fieldErrors={fieldErrors}
           isOAuthDeviceProvider={isOAuthDeviceProvider}
-          guided={guided}
           onFailed={onFailed}
           onSaved={onSaved}
           organizationId={organizationId}
@@ -1044,52 +1006,38 @@ export const EditModelProviderForm = ({
           toaster={toaster}
         />
 
-        <GuidedServerKeyHint
-          guided={guided}
-          isUsingEnvVars={isUsingEnvVars}
-          providerName={providerName}
-        />
-
         <ProviderModelArea
           actions={actions}
-          guidedSave={guided ? guidedSave : undefined}
-          isBusy={isBusy}
           isLlmProvider={isLlmProvider}
           isOAuthDeviceProvider={isOAuthDeviceProvider}
           provider={provider}
-          providerName={providerName}
           state={state}
         />
 
-        {!guided && (
-          <ProviderAdvancedArea
-            accordionValue={advancedAccordionValue}
-            draft={advancedDraft}
-            jsonError={advancedJsonError}
-            onAccordionValueChange={setAdvancedAccordionValue}
-            onDraftChange={(next) => {
-              setAdvancedDraft(next);
-              setAdvancedJsonError(null);
-              setSkipPermissionsError(null);
-            }}
-            provider={provider}
-            showGatewayFields={gatewayMenuEnabled}
-            showSkipPermissionsField={showSkipPermissionsField}
-            skipPermissionsError={skipPermissionsError}
-            skipPermissionsPlaceholder={skipPermissionsPlaceholder}
-          />
-        )}
+        <ProviderAdvancedArea
+          accordionValue={advancedAccordionValue}
+          draft={advancedDraft}
+          jsonError={advancedJsonError}
+          onAccordionValueChange={setAdvancedAccordionValue}
+          onDraftChange={(next) => {
+            setAdvancedDraft(next);
+            setAdvancedJsonError(null);
+            setSkipPermissionsError(null);
+          }}
+          provider={provider}
+          showGatewayFields={gatewayMenuEnabled}
+          showSkipPermissionsField={showSkipPermissionsField}
+          skipPermissionsError={skipPermissionsError}
+          skipPermissionsPlaceholder={skipPermissionsPlaceholder}
+        />
 
-        {!(guided && isOAuthDeviceProvider) && (
-          <SaveProviderButton
-            canResolveTarget={!cannotResolveTarget}
-            isDirty={isSaveable({ guided, state, isUsingEnvVars, isAdvancedDirty })}
-            isBusy={isBusy}
-            label={guided && probeRequired ? "Connect" : saveLabel}
-            onSave={handleSave}
-            {...(guided ? { guided: { connected: guidedSave.connected } } : {})}
-          />
-        )}
+        <SaveProviderButton
+          canResolveTarget={!cannotResolveTarget}
+          isDirty={state.isDirty || isAdvancedDirty}
+          isBusy={isBusy}
+          label={saveLabel}
+          onSave={handleSave}
+        />
       </VStack>
     </VStack>
   );

@@ -25,6 +25,7 @@
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/scenario-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",

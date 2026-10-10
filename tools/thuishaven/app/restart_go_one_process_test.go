@@ -30,7 +30,7 @@ func TestRestartSimsInOneGoProcess(t *testing.T) {
 			t.Errorf("terminated %v, want the go lane's group once", sys.groupTerminated)
 		}
 		joined := strings.Join(msgs, "\n")
-		if !strings.Contains(joined, "LANGWATCH_GO_ONE_PROCESS") || !strings.Contains(joined, GoLane+" ") {
+		if !strings.Contains(joined, "LANGWATCH_DEV_ONE_PROCESS") || !strings.Contains(joined, GoLane+" ") {
 			t.Errorf("messages %q do not say the go lane restarts with the simulators", joined)
 		}
 	})
@@ -54,7 +54,7 @@ func TestRestartSimsInOneGoProcess(t *testing.T) {
 		if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 301 {
 			t.Errorf("terminated %v, want only the sims lane's group", sys.groupTerminated)
 		}
-		if strings.Contains(strings.Join(msgs, "\n"), "LANGWATCH_GO_ONE_PROCESS") {
+		if strings.Contains(strings.Join(msgs, "\n"), "LANGWATCH_DEV_ONE_PROCESS") {
 			t.Errorf("messages %q mention one-process mode for a split stack", msgs)
 		}
 	})

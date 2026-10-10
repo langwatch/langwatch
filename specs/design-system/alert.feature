@@ -14,7 +14,7 @@ Feature: Alerts in the design language, light and dark
   Scenario: Every alert keeps its text readable in both colour modes
     Given every status in every variant
     When each is resolved in the light and in the dark colour mode
-    Then its title and description reach AA contrast against its ground
+    Then its title and description reach AA contrast against its ground and overlapping mesh peaks
     And its icon reaches the non-text contrast minimum
 
   @unit
@@ -30,3 +30,11 @@ Feature: Alerts in the design language, light and dark
     When it is compared with the default size
     Then its padding, its text and its icon are all smaller
     And its icon still sits on the title's line
+
+  @unit
+  Scenario: Status meshes keep their hierarchy and contrast
+    Given alerts, banners and toasts in either colour mode
+    Then banners have the lightest status mesh and toasts the middle strength
+    And the default alert has the strongest mesh of the three surfaces
+    And alert variants weaken from solid to surface to subtle to outline
+    And banner and toast text reaches AA and their icons reach non-text contrast

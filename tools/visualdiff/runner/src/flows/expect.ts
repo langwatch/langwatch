@@ -28,6 +28,20 @@ const TARGET_FORMS = ["testId", "testIdPrefix", "label"] as const;
 const hasBodyCheck = (args: Record<string, string>): boolean =>
   ["field", "contains", "equals", "min"].some((key) => args[key] !== undefined);
 
+const describeApiExpect = ({
+  args,
+  api,
+}: {
+  args: Record<string, string>;
+  api: string;
+}): string => {
+  const field = args.field === undefined ? "" : ` ${args.field}`;
+  if (args.status !== undefined && !hasBodyCheck(args)) return `api ${api} status ${args.status}`;
+  if (args.contains !== undefined) return `api ${api}${field} contains "${args.contains}"`;
+  if (args.equals !== undefined) return `api ${api}${field} == ${args.equals}`;
+  return `api ${api}${field} length >= ${args.min ?? "1"}`;
+};
+
 /**
  * describeExpect is an expect's one-line proof, the same on both sides:
  * `text "VD Alert"`, `count role=row >= 3`, `url /traces`, `api /api/triggers contains "VD"`,
@@ -46,14 +60,7 @@ export const describeExpect = (args: Record<string, string>): string => {
   }
   if (args.count !== undefined) return `count ${args.count}${bound}`;
   if (args.url !== undefined) return `url ${args.url}`;
-  if (args.api !== undefined) {
-    const field = args.field === undefined ? "" : ` ${args.field}`;
-    if (args.status !== undefined && !hasBodyCheck(args))
-      return `api ${args.api} status ${args.status}`;
-    if (args.contains !== undefined) return `api ${args.api}${field} contains "${args.contains}"`;
-    if (args.equals !== undefined) return `api ${args.api}${field} == ${args.equals}`;
-    return `api ${args.api}${field} length >= ${args.min ?? "1"}`;
-  }
+  if (args.api !== undefined) return describeApiExpect({ args, api: args.api });
   return `unknown expect (${Object.keys(args).join(", ")})`;
 };
 
@@ -110,6 +117,38 @@ export const judgeBody = ({
   return judgeCount({ found: sizeOf(value), args });
 };
 
+/** readApi fetches the expect's api path with the side's credential and judges the answer. */
+const readApi = async ({
+  context,
+  deadline,
+  api,
+}: {
+  context: ActionContext;
+  deadline: number;
+  api: string;
+}): Promise<string> => {
+  const { args, side } = context;
+  const token = args.auth ?? context.credential.projectKey;
+  const response = await side.page.request
+    .get(side.baseUrl + fillPath({ path: api, slug: context.slug }), {
+      headers: token === "none" ? {} : { "X-Auth-Token": token },
+      failOnStatusCode: false,
+      ignoreHTTPSErrors: true,
+      timeout: Math.min(Math.max(deadline - Date.now(), 1000), API_REQUEST_MILLIS),
+    })
+    .then(
+      (reply) => reply,
+      (error: unknown) => `request failed: ${String(error).split("\n")[0]}`,
+    );
+  if (typeof response === "string") return response;
+  if (args.status !== undefined && String(response.status()) !== args.status) {
+    return `answered ${response.status()}, want ${args.status}`;
+  }
+  if (args.status === undefined && !response.ok()) return `answered ${response.status()}`;
+  if (args.status !== undefined && !hasBodyCheck(args)) return "";
+  return judgeBody({ body: await response.json().catch(() => undefined), args });
+};
+
 /** readOnce checks an expect once against the side's current page: "" when it holds. */
 const readOnce = async ({
   context,
@@ -151,27 +190,7 @@ const readOnce = async ({
     const wanted = asRegExp(fillPath({ path: args.url, slug: context.slug }));
     return wanted.test(path) ? "" : `on ${path}`;
   }
-  if (args.api !== undefined) {
-    const token = args.auth ?? context.credential.projectKey;
-    const response = await page.request
-      .get(side.baseUrl + fillPath({ path: args.api, slug: context.slug }), {
-        headers: token === "none" ? {} : { "X-Auth-Token": token },
-        failOnStatusCode: false,
-        ignoreHTTPSErrors: true,
-        timeout: Math.min(Math.max(deadline - Date.now(), 1000), API_REQUEST_MILLIS),
-      })
-      .then(
-        (reply) => reply,
-        (error: unknown) => `request failed: ${String(error).split("\n")[0]}`,
-      );
-    if (typeof response === "string") return response;
-    if (args.status !== undefined && String(response.status()) !== args.status) {
-      return `answered ${response.status()}, want ${args.status}`;
-    }
-    if (args.status === undefined && !response.ok()) return `answered ${response.status()}`;
-    if (args.status !== undefined && !hasBodyCheck(args)) return "";
-    return judgeBody({ body: await response.json().catch(() => undefined), args });
-  }
+  if (args.api !== undefined) return readApi({ context, deadline, api: args.api });
   return `no form: give one of ${EXPECT_FORMS.join(", ")}`;
 };
 

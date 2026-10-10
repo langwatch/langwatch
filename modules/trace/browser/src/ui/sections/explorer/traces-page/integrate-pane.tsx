@@ -5,6 +5,8 @@ import { useUiDeployment } from "@langwatch/browser-host/capabilities";
  * Spec: specs/traces-v2/integrate-pane.feature
  */
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { AggregateReadOnlyNotice } from "@langwatch/error-views";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Code2, Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -47,6 +49,15 @@ export const IntegratePane: React.FC = () => {
   const endpoint = selfHostedEndpoint(appBaseUrl);
 
   if (!project || !organization) return null;
+  // An aggregate (ADR-144) is never sent traces and owns no key, so there is
+  // nothing to instrument and no token to mint.
+  if (isAggregateProjectKind(project.kind)) {
+    return (
+      <Box padding={6}>
+        <AggregateReadOnlyNotice />
+      </Box>
+    );
+  }
 
   const activeProjectContext: ActiveProjectContextValue = {
     project,

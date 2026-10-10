@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The judge's own fact: one judge call priced, on the organization's aggregate (ADR-174 decision
  * 13). The judge writes it as one spend row per request, and gateway writes the ledger row the
@@ -11,7 +12,7 @@ export const INSTANT_EVAL_JUDGE_SPEND_PRICED_EVENT_TYPE =
   "lw.instant_eval_judge.spend_priced" as const;
 export const INSTANT_EVAL_JUDGE_SPEND_EVENT_VERSION = "2026-10-07" as const;
 
-export const instantEvalJudgeSpendPricedEventDataSchema = z.object({
+const instantEvalJudgeSpendPricedEventDataSchemaDefinition = z.object({
   /** The organization, which the aggregate and its tenant are. */
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
@@ -32,6 +33,11 @@ export const instantEvalJudgeSpendPricedEventDataSchema = z.object({
   /** The run a run's spend belongs to, so the ledger row names it. */
   runId: z.string().min(1).optional(),
 });
+export interface InstantEvalJudgeSpendPricedEventDataSchema extends Named<
+  typeof instantEvalJudgeSpendPricedEventDataSchemaDefinition
+> {}
+export const instantEvalJudgeSpendPricedEventDataSchema: InstantEvalJudgeSpendPricedEventDataSchema =
+  instantEvalJudgeSpendPricedEventDataSchemaDefinition;
 export type InstantEvalJudgeSpendPricedEventData = z.infer<
   typeof instantEvalJudgeSpendPricedEventDataSchema
 >;

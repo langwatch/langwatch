@@ -55,7 +55,7 @@ export function GroupDetailDrawer({ queueName = "", groupId = "", onClose }: Pro
 
   return (
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <GroupDrawerHeader
             groupId={groupId}

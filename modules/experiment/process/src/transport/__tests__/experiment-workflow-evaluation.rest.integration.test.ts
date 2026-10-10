@@ -5,15 +5,16 @@
  */
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   WorkflowVersionRequiredError,
   type WorkflowEvaluationStarted,
@@ -40,6 +41,8 @@ function buildApi(options: {
   );
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permissions }) => {
         const missing = permissions.find(
@@ -56,8 +59,8 @@ function buildApi(options: {
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "project-key-1",

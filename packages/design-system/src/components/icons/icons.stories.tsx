@@ -38,6 +38,12 @@ const MARKS = [
 
 const meta = {
   title: "Foundations/Icons",
+  parameters: {
+    usage: {
+      use: "Product glyphs come from lucide-react; this family holds the marks and loaders the product draws itself.",
+      avoid: "A model provider's mark: use Provider icons.",
+    },
+  },
   component: IconGlyph,
   tags: ["autodocs"],
   args: { icon: <OpenAIIcon />, monochrome: true, size: "16px" },

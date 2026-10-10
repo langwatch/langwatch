@@ -28,9 +28,9 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 
-import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
-import type { TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
+import type { TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
+import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

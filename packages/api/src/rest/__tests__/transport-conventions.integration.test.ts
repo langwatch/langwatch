@@ -4,6 +4,7 @@ import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { RateLimitedError } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { canonicalErrorFor, canonicalErrorResponse } from "../response.ts";
@@ -39,24 +40,28 @@ const actions = defineRestRouter(ActionApi)
   .withInput(z.object({}))
   .withPermission("annotations:manage")
   .withOutput(ok)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.run(input))
 
   .put("/archive", "replaceArchive")
   .withInput(z.object({}))
   .withPermission("annotations:manage")
   .withOutput(ok)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.run(input))
 
   .patch("/archive", "patchArchive")
   .withInput(z.object({ reason: z.string().optional() }))
   .withPermission("annotations:manage")
   .withOutput(ok)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.run(input))
 
   .post("/rename", "renameAnnotation")
   .withInput(z.object({ name: z.string() }))
   .withPermission("annotations:manage")
   .withOutput(ok)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.run(input))
 
   .post("/tag", "tagAnnotation")
@@ -72,12 +77,14 @@ const actions = defineRestRouter(ActionApi)
   )
   .withPermission("annotations:manage")
   .withOutput(ok)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.run(input))
 
   .post("/refuse", "refuseAnnotation")
   .withInput(z.object({ waitMs: z.unknown().optional(), status: z.number().optional() }))
   .withPermission("annotations:manage")
   .withOutput(ok)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.refuse(input))
 
   .get("/limited", "readLimited")
@@ -98,6 +105,7 @@ function actionsApp({ onError = canonicalErrorResponse }: { onError?: ErrorHandl
   });
 
   const app = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },

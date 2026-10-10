@@ -92,6 +92,7 @@ export function AgentCardShell({
       variant="elevated"
       onClick={handleCardClick}
       cursor="pointer"
+      _hover={{ boxShadow: "lg" }}
       height="142px"
       transition="all 0.2s ease-in-out"
       data-testid={testId}
@@ -230,7 +231,7 @@ export function AgentCard({
                 </Menu.Item>
               )}
               {onDelete && (
-                <Menu.Item value="delete" color="red.500" onClick={onDelete}>
+                <Menu.Item value="delete" color="red.fg" onClick={onDelete}>
                   <Trash2 aria-hidden="true" size={14} /> Delete
                 </Menu.Item>
               )}

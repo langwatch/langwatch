@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import type { AuthzGrantsService, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { assertRemovalKeepsAnAdministrator } from "../rules/scim-last-administrator.rules.ts";
@@ -19,6 +20,7 @@ export class ScimMembershipAccessService {
     grants: ScimGrantsService;
     lifecycle: ScimSyncLifecycle;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     provenOffboarding: boolean;
   }): ScimMembershipAccessService {
     return new ScimMembershipAccessService(options);
@@ -34,6 +36,7 @@ export class ScimMembershipAccessService {
   private readonly grants: ScimGrantsService;
   private readonly deprovision: ScimDeprovisionService;
   private readonly organization: ScimOrganizationAdministration;
+  private readonly members: Pick<OrganizationApi, "deleteMember">;
   private readonly provenOffboarding: boolean;
 
   private constructor({
@@ -42,6 +45,7 @@ export class ScimMembershipAccessService {
     grants,
     lifecycle,
     organization,
+    members,
     provenOffboarding,
   }: {
     prisma: ScimRepository;
@@ -49,6 +53,7 @@ export class ScimMembershipAccessService {
     grants: ScimGrantsService;
     lifecycle: ScimSyncLifecycle;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     provenOffboarding: boolean;
   }) {
     this.prisma = prisma;
@@ -61,6 +66,7 @@ export class ScimMembershipAccessService {
     });
     this.provenOffboarding = provenOffboarding;
     this.organization = organization;
+    this.members = members;
   }
 
   /**
@@ -101,7 +107,8 @@ export class ScimMembershipAccessService {
         ? [
             {
               principal: { userId },
-              role: "MEMBER" as TeamUserRole,
+              // A Lite Member seat (EXTERNAL) is granted view only, as an invitation maps it.
+              role: (membership?.role === "EXTERNAL" ? "VIEWER" : "MEMBER") as TeamUserRole,
               customRoleId: null,
               scopeType: "ORGANIZATION" as GrantScopeTier,
               scopeId: organizationId,
@@ -150,9 +157,6 @@ export class ScimMembershipAccessService {
       revokedGrantIds: visibleGrants.map((row) => row.id),
       actor: ScimMembershipAccessService.ACTOR,
     });
-    // A leaver stays a member holding nothing; only a deletion takes the row.
-    if (op === "delete_user") {
-      await this.prisma.removeMembership({ userId, organizationId });
-    }
+    await this.members.deleteMember({ organizationId, userId }, null);
   }
 }

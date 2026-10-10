@@ -9,7 +9,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
@@ -18,6 +21,11 @@ import { ScimGrantsService } from "../scim-grants.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ORGANIZATION = "org-1";
 const PERSON = "user-1";
@@ -86,6 +94,7 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
     users,
     repository,
     service: ScimService.create({
+      members: new MembersFake(),
       connections: HeldConnectionsFake.of(),
       prisma: repository,
       writer: new GrantsFake(),
@@ -96,6 +105,7 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** OTLP span kinds after the ingest boundary has normalized numeric/string values. */
@@ -47,7 +48,7 @@ const normalizedLinkSchema = z.object({
 });
 
 /** The canonical span row shared by trace projections and trace readers. */
-export const normalizedSpanSchema = z.object({
+const normalizedSpanSchemaDefinition = z.object({
   id: z.string(),
   traceId: z.string(),
   spanId: z.string(),
@@ -77,6 +78,8 @@ export const normalizedSpanSchema = z.object({
   // The flat-plan portion of cost. The billed portion is cost - nonBilledCost.
   nonBilledCost: z.number().nullable(),
 });
+export interface NormalizedSpanSchema extends Named<typeof normalizedSpanSchemaDefinition> {}
+export const normalizedSpanSchema: NormalizedSpanSchema = normalizedSpanSchemaDefinition;
 
 export type NormalizedEvent = z.infer<typeof normalizedEventSchema>;
 export type NormalizedLink = z.infer<typeof normalizedLinkSchema>;

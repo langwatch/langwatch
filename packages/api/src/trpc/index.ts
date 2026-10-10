@@ -10,14 +10,13 @@ export {
 } from "./compose.ts";
 
 export {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   bindTrpcHeader,
-  browserSessionFact,
-  callerAddressFact,
+  browserSessionContext,
+  callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcHandlerBinding,
   createTrpcRuntime,
-  defineTrpcFact,
   defineTrpcRouter,
   parseGovernedOutput,
   resolveTrustedHandlerArguments,
@@ -30,8 +29,7 @@ export {
   type TrpcContractHandlerArguments,
   type TrpcContractProcedures,
   type TrpcErrorCausePayload,
-  type TrpcFact,
-  type TrpcFactBinding,
+  type TrpcMiddlewareContextBinding,
   type TrpcFeatureApiWitness,
   type TrpcHandlerActor,
   type TrpcMountOptions,
@@ -52,6 +50,9 @@ export {
   type TrpcRuntimeMembers,
   type TrpcRuntimeRequest,
 } from "./runtime.ts";
+
+// The one declaration both doors share: a name and the schema its value is parsed with.
+export { defineMiddlewareContext, type MiddlewareContext } from "@langwatch/module";
 
 export {
   auditScopeIds,

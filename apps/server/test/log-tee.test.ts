@@ -42,13 +42,13 @@ describe("renderEvent", () => {
     it("announces the exit cause, the delay, and the attempt budget", () => {
       const out = renderEvent({
         type: "restarting",
-        service: "workers",
+        service: "langwatch",
         code: 137,
         attempt: 1,
         maxAttempts: 3,
         delayMs: 1000,
       });
-      expect(out).toContain("workers");
+      expect(out).toContain("langwatch");
       expect(out).toContain("exited (code 137)");
       expect(out).toContain("restarting in 1s");
       expect(out).toContain("(attempt 1/3)");
@@ -57,7 +57,7 @@ describe("renderEvent", () => {
     it("names the signal when the child was killed rather than exiting", () => {
       const out = renderEvent({
         type: "restarting",
-        service: "workers",
+        service: "langwatch",
         code: -1,
         signal: "SIGKILL",
         attempt: 2,

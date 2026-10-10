@@ -12,6 +12,7 @@ import {
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
 } from "@langwatch/organization-contract";
+import { hasTracesToShow, projectKindsHiddenFrom } from "@langwatch/project-contract";
 
 import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
@@ -93,6 +94,7 @@ export class OrganizationVisibilityService {
         : [];
 
     for (const organization of organizations) {
+      this.#showProjectKindsTo({ organization, userId });
       this.#redactStoredCredentials(organization);
       this.#narrowToViewer({
         organization,
@@ -166,6 +168,21 @@ export class OrganizationVisibilityService {
   }
 
   /**
+   * An aggregate reads other people's personal projects, so only an
+   * organisation admin sees one (ADR-177 decision 5). It is never sent traces,
+   * so its first-message flag reads through {@link hasTracesToShow}.
+   */
+  #showProjectKindsTo(input: { organization: FullyLoadedOrganization; userId: string }): void {
+    const role = input.organization.members.find((member) => member.userId === input.userId)?.role;
+    const hidden: readonly string[] = projectKindsHiddenFrom(role);
+    for (const team of input.organization.teams) {
+      team.projects = team.projects
+        .filter((project) => !hidden.includes(project.kind))
+        .map((project) => ({ ...project, firstMessage: hasTracesToShow(project) }));
+    }
+  }
+
+  /**
    * A query never carries a credential, because every query is cached, to the
    * browser's disk too. The S3 secret, the project base key and the LangWatchQL
    * key go to nobody; the base key is revealed by a mutation. The repository opened the rest.
@@ -184,8 +201,6 @@ export class OrganizationVisibilityService {
     organization.elasticsearchNodeUrl = null;
     organization.elasticsearchApiKey = null;
     organization.useCustomElasticsearch = false;
-    // The uploaded licence key is shown once at upload and never read back.
-    organization.license = null;
   }
 
   /**

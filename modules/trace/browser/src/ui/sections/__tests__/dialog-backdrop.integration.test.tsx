@@ -1,8 +1,8 @@
 import {
-  UiCapabilityContextProvider,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 /**
  * Integration tests for the Dialog backdrop styling.
  * @vitest-environment jsdom
@@ -16,8 +16,8 @@ import { Dialog } from "../dialog.tsx";
 import { cssRulesForElement } from "./emotion-test-css.ts";
 
 /** The misuse warning is a development affordance, so the shell says so here. */
-const capabilities: UiCapabilities = {
-  ...createUiCapabilitiesFromHost({
+const capabilities: UiHostServices = {
+  ...createUiHostServicesFromHost({
     route: () => ({ params: {}, query: {} }),
     navigate: () => void 0,
   }),
@@ -34,7 +34,7 @@ const capabilities: UiCapabilities = {
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">
-    <UiCapabilityContextProvider value={capabilities}>{children}</UiCapabilityContextProvider>
+    <UiHostServicesContextProvider value={capabilities}>{children}</UiHostServicesContextProvider>
   </DesignSystemProvider>
 );
 

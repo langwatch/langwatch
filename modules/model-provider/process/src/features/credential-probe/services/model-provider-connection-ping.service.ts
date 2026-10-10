@@ -10,7 +10,6 @@ import {
   ProviderUsageLimitError,
   findModelProviderDefinition,
   type ModelProvider,
-  type ModelProviderApi,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -26,6 +25,7 @@ import {
   classifyPingRefusal,
   findPingModels,
 } from "../../../rules/provider-ping.rules.ts";
+import type { ModelProviderExecutionService } from "../../../services/model-provider-execution.service.ts";
 
 const logger = createLogger("langwatch:modelProviders:connectionPing");
 
@@ -36,7 +36,8 @@ type ModelProviderConnectionPingOptions = {
   /** Codex's only road: the AI gateway, on the project's Langy virtual key. */
   codexChannel: ModelProviderCodexGatewayPing;
   secrets: Pick<SecretApi, "getValues">;
-  modelProviders: Pick<ModelProviderApi, "prepareExecution">;
+  /** Prepares the row itself: a `<row id>/<model>` reference only resolves `mp_` ids. */
+  execution: Pick<ModelProviderExecutionService, "prepareRow">;
 };
 
 const NO_GATEWAY_CREDENTIAL =
@@ -98,10 +99,7 @@ export class ModelProviderConnectionPingService {
     projectId: string;
   }): Promise<ModelProviderPingReply> {
     try {
-      const parameters = await this.options.modelProviders.prepareExecution({
-        model: `${row.id}/${model}`,
-        projectId,
-      });
+      const parameters = await this.options.execution.prepareRow({ id: row.id, model, projectId });
       return await this.options.channel.ping({
         providerKey: row.provider,
         model: `${row.provider}/${model}`,

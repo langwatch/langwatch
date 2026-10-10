@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
@@ -10,7 +11,7 @@ import {
   Table,
   Text,
 } from "@langwatch/design-system/primitives";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
@@ -19,7 +20,7 @@ import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-ta
 import { type PendingDlqAction, useDlqActions } from "../../behavior/use-dlq-actions.ts";
 
 const DLQ_VIEWPORT_HEIGHT = 360;
-const DLQ_ROW_HEIGHT = 36;
+const DLQ_ROW_HEIGHT = 49;
 
 /**
  * Process-manager intents that retired, under the same heading as the queue's dead letters. Two
@@ -45,7 +46,7 @@ function ProcessOutboxDeadRow({
       borderBottom={hasQueueGroups ? "1px solid" : undefined}
       borderBottomColor="border"
     >
-      <Text textStyle="sm" fontWeight="medium" color="red.500">
+      <Text textStyle="sm" fontWeight="medium" color="fg.error">
         Process outbox: {total} dead message{total !== 1 ? "s" : ""}
       </Text>
       <Text textStyle="xs" color="fg.muted">
@@ -56,7 +57,7 @@ function ProcessOutboxDeadRow({
         {byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""}
       </Text>
       <Spacer />
-      <Button size="2xs" variant="outline" asChild>
+      <Button size="sm" variant="outline" asChild>
         <Link href="/ops/event-sourcing/dead-letters">Inspect</Link>
       </Button>
     </HStack>
@@ -146,7 +147,7 @@ function DlqToolbar({
           <HStack key={qn} gap={1}>
             <Button
               variant="outline"
-              size="2xs"
+              size="sm"
               colorPalette="green"
               data-testid={`dlq-redrive-shown-${qn}`}
               onClick={() => onBulk("redrive", qn)}
@@ -155,7 +156,7 @@ function DlqToolbar({
             </Button>
             <Button
               variant="outline"
-              size="2xs"
+              size="sm"
               colorPalette="red"
               data-testid={`dlq-discard-shown-${qn}`}
               onClick={() => onBulk("discard", qn)}
@@ -170,7 +171,7 @@ function DlqToolbar({
           Canary:
         </Text>
         <Input
-          size="xs"
+          size="sm"
           type="number"
           value={canaryCount}
           onChange={(e) =>
@@ -182,7 +183,7 @@ function DlqToolbar({
           <Button
             key={`c-${qn}`}
             variant="ghost"
-            size="2xs"
+            size="sm"
             // Every one of these reads "Go", so the queue has to come from the
             // accessible name or a screen reader hears the same button twice.
             aria-label={`Canary redrive from ${qn}`}
@@ -208,25 +209,25 @@ export function DlqRow({
 }) {
   return (
     <Table.Row>
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Badge size="xs" variant="subtle">
           {group.queueDisplayName}
         </Badge>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">
           {group.groupId}
         </Text>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Text textStyle="xs" color="fg.muted">
           {group.pipelineName ?? "\u2014"}
         </Text>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Text
           textStyle="xs"
-          color="red.500"
+          color="fg.error"
           truncate
           maxWidth="220px"
           title={group.error ?? undefined}
@@ -234,15 +235,15 @@ export function DlqRow({
           {group.error ?? ""}
         </Text>
       </Table.Cell>
-      <Table.Cell textAlign="end">
+      <Table.Cell height="49px" textAlign="end">
         <Text textStyle="xs">{group.jobCount}</Text>
       </Table.Cell>
       {canManage && (
-        <Table.Cell>
+        <Table.Cell height="49px">
           <HStack gap={1}>
             <Button
               variant="outline"
-              size="2xs"
+              size="sm"
               colorPalette="green"
               onClick={() => onAct("redrive", group)}
             >
@@ -250,7 +251,7 @@ export function DlqRow({
             </Button>
             <Button
               variant="outline"
-              size="2xs"
+              size="sm"
               colorPalette="red"
               onClick={() => onAct("discard", group)}
             >
@@ -275,8 +276,8 @@ export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const actions = useDlqActions();
 
-  const groups = useMemo(() => dlqQuery.data ?? [], [dlqQuery.data]);
-  const shownGroups = useMemo(() => filterDlqGroups(groups, filterText), [groups, filterText]);
+  const groups = dlqQuery.data ?? [];
+  const shownGroups = filterDlqGroups(groups, filterText);
   const processDead = processDeadQuery.data ?? [];
   const processDeadTotal = processDead.reduce((sum, r) => sum + r.count, 0);
   const isStillLoading = dlqQuery.isLoading || processDeadQuery.isLoading;
@@ -291,7 +292,7 @@ export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
 
   return (
     <>
-      <Card.Root>
+      <Card.Root borderColor="border.muted" boxShadow="none">
         <Card.Body padding={0}>
           <DlqCardHeader
             groupCount={groups.length}
@@ -380,12 +381,12 @@ function DlqCardHeader({
           a red process-outbox count. */}
       {groupCount > 0 && (
         <>
-          <Text textStyle="sm" fontWeight="medium" color="orange.500">
+          <Text textStyle="sm" fontWeight="medium" color="orange.fg">
             Dead Letter Queue: {isFiltering ? `${shownCount} of ` : ""}
             {groupCount} group{groupCount !== 1 ? "s" : ""}
           </Text>
           <Input
-            size="xs"
+            size="sm"
             width="220px"
             placeholder="Filter by group, pipeline, or error"
             value={filterText}
@@ -431,7 +432,13 @@ function DlqTable({
       overflowY="auto"
       hidden={hidden}
     >
-      <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflow: "visible" }}
+        size="sm"
+        variant="line"
+      >
         <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
           <Table.Row>
             <Table.ColumnHeader>Queue</Table.ColumnHeader>
@@ -459,7 +466,7 @@ function DlqTable({
             )}
           />
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Box>
   );
 }

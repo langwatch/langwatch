@@ -16,8 +16,8 @@ function conditionBorderColor({
   hasError: boolean;
   hasMissingVariables: boolean;
 }): string {
-  if (hasError) return "red.400";
-  if (hasMissingVariables) return "orange.400";
+  if (hasError) return "red.fg";
+  if (hasMissingVariables) return "orange.fg";
   return "border";
 }
 
@@ -193,12 +193,12 @@ export function LiquidConditionEditor({
         </Text>
       </HStack>
       {hasError && (
-        <Text fontSize="12px" color="red.500" data-testid="if-else-condition-error">
+        <Text fontSize="12px" color="red.fg" data-testid="if-else-condition-error">
           {validation.error}
         </Text>
       )}
       {hasMissingVariables && (
-        <Text fontSize="12px" color="orange.600" data-testid="if-else-condition-warning">
+        <Text fontSize="12px" color="orange.fg" data-testid="if-else-condition-warning">
           Unknown input
           {validation.missingVariables.length > 1 ? "s" : ""}:{" "}
           {validation.missingVariables.join(", ")}

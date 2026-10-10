@@ -63,11 +63,11 @@ stack keeps **no volume**, so stopping it reclaims every byte regardless. Overri
 
 ## What ships where
 
-| Signal   | Backend    | TS applications (`apps/{ui,api,worker}`)   | Go services (nlpgo, aigateway)                         |
-| -------- | ---------- | ------------------------------------------ | ------------------------------------------------------ |
-| Traces   | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`              | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`        |
-| Logs     | Loki       | `PINO_OTEL_ENABLED=true`                   | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT`   |
-| Metrics  | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
+| Signal   | Backend                         | TS applications (`apps/{ui,api,worker}`)   | Go services (nlpgo, aigateway)                         |
+| -------- | ------------------------------- | ------------------------------------------ | ------------------------------------------------------ |
+| Traces   | Tempo                           | `OTEL_EXPORTER_OTLP_ENDPOINT`              | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`        |
+| Logs     | Loki                            | `PINO_OTEL_ENABLED=true`                   | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT`   |
+| Metrics  | Prometheus                      | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
 | Profiles | Pyroscope (container tier only) | `PYROSCOPE_SERVER_ADDRESS`                 | `PYROSCOPE_SERVER_ADDRESS`                             |
 
 `make observability-connect` sets all of these in `.env` for you

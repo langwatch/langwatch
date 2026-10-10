@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/onboarding-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { OrganizationAdmission } from "./admission-seat.ts";
 import type {
   GroupDetail,
   GroupListItem,
@@ -52,7 +53,9 @@ import type {
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
+  PendingInvitationsByEmail,
   PendingInvitationsForCaller,
+  InviteLanding,
   OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -251,9 +254,10 @@ export interface OrganizationApi {
   }>;
   /**
    * Whether this address may create a new account on the installation
-   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read.
+   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read;
+   * `hasAnyAccount` (the caller's read) lets the first account bootstrap an invite-only one.
    */
-  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+  checkSignUp(input: Readonly<{ email: string; hasAnyAccount: boolean }>): Promise<SignUpVerdict>;
   /**
    * The invitation waiting for a caller who belongs to no organization yet, on an
    * installation where accounts are created by invitation. Only addresses the account
@@ -265,6 +269,13 @@ export interface OrganizationApi {
    * organization (ADR-171 v6). Carries the invitation code, so verified addresses only.
    */
   listPendingInvitationsForCaller(by: OrganizationCaller): Promise<PendingInvitationsForCaller>;
+  /**
+   * Every pending invitation on one address, in any organization (main's operator read). An
+   * operator-scope read: only the identity lookup, behind its own operator gate, asks it.
+   */
+  findPendingInvitationsByEmail(
+    input: Readonly<{ email: string }>,
+  ): Promise<PendingInvitationsByEmail>;
   deleteMember(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
@@ -410,9 +421,9 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with
-   * `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission.
-   * `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
+   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts).
+   * A MEMBER's grant lands now or resumes on SSO arrival; a DEVELOPER or Lite row is the whole
+   * admission, held `pending` when no seat is free. `"already-present"` answers a retry.
    */
   createMembership(
     input: Readonly<{
@@ -424,7 +435,7 @@ export interface OrganizationApi {
       /** Where a join request was made, written on the Developer admission audit row. */
       origin?: OrganizationJoinOrigin;
     }>,
-  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+  ): Promise<OrganizationAdmission>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -462,11 +473,12 @@ export interface OrganizationApi {
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
   /** Every member row, disabled and deactivated included: governance's identity match reads it. */
   findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Promise<User[]>;
-  /** Every member's department column with their name (main `department.service.ts:112-119`). */
+  /** Every member's department, name and disabledAt (main `department.service.ts:112-119`). */
   findMembersWithDepartments(input: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   >;
@@ -559,17 +571,6 @@ export interface OrganizationApi {
   getWithAdministrators(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationWithAdministrators>;
-  /** The licence and its expiry; the mint stamps `validatedAt` null, an activation now. */
-  setLicense(
-    input: Readonly<{
-      organizationId: string;
-      licenseKey: string;
-      expiresAt: Instant;
-      validatedAt: Instant | null;
-    }>,
-  ): Promise<void>;
-  /** The licence and both its dates cleared; throws `OrganizationNotFoundError`. */
-  clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
   /** The support contact set in settings, else the longest-seated enabled administrator's email. */
   findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
@@ -695,6 +696,13 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted>;
   /**
+   * The invitation behind a code, for whoever holds it. Missing and revoked both throw
+   * `InviteNotFoundError`, so a guessed code learns nothing; expired throws `InviteExpiredError`.
+   */
+  getInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
+  /** Tells an expired invitation's admins somebody is waiting; mints nothing (D11). */
+  requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void>;
+  /**
    * Applies the PENDING invitation this address already holds here, for a
    * caller that never saw an invitation code. Its role and team assignments
    * replace a default membership entirely.
@@ -784,6 +792,7 @@ export interface OrganizationApi {
   ): Promise<TeamWithProjects[]>;
   listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
   ): Promise<OrganizationTeamAccess[]>;
   getTeamWithProjects(
     input: Readonly<{ organizationId: string; slug: string }>,

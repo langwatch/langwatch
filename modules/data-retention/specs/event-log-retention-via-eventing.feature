@@ -50,3 +50,11 @@ Feature: Event-log retention through eventing's retention operation
     When eventing's retention operation is asked to retain an unknown category
     Then it refuses by name
     And no statement reaches the event log
+
+  # Only customer telemetry expires (Alex, 2026-10-09); rows stamped before then are re-stamped.
+  @unit
+  Scenario: Event-log rows stamped before the ruling are re-stamped to be kept forever
+    Given event-log rows of never-expiring events stamped with the default retention
+    When data-retention's background upgrade step runs
+    Then eventing's retention operation re-stamps them to 0 days on every ClickHouse target
+    And a resumed run skips the targets its checkpoint lists as done

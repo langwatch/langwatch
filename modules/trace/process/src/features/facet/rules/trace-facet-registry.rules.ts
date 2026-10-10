@@ -1,20 +1,23 @@
 import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
 
+import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
+
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export interface FacetQueryContext {
-  tenantId: string;
   timeRange: { from: number; to: number; live?: boolean };
   limit: number;
   offset: number;
   prefix?: string;
   /**
-   * The active trace filter as a predicate on this facet's own table (see
-   * `scopeTraceFilterToTable`), AND-ed into the query's window predicate.
-   * Absent for the unfiltered discover read and for value lookups.
+   * The active trace filter; the facet store scopes it to its own table and
+   * AND-s it into the window predicate. Absent for the unfiltered discover
+   * read and for value lookups.
    */
-  traceScope?: { sql: string; params: Record<string, unknown> };
+  filterWhere?: TraceFilterWhere;
+  /** The window's `to` is rolling, so the scoped filter leaves it uncapped. */
+  isLiveWindow?: boolean;
 }
 
 export interface FacetQuery {

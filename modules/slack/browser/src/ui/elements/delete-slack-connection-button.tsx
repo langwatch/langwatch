@@ -1,6 +1,7 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { type SlackConnection, unusedDeleteConfirmation } from "@langwatch/slack-contract";
+import { Info } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -41,9 +42,10 @@ export function DeleteSlackConnectionButton({
         Delete
       </Button>
       {refusals.map((refusal) => (
-        <Text key="in-use" fontSize="sm" color="fg.error" data-testid="slack-connection-in-use">
-          {inUseRefusalLabel(refusal)}
-        </Text>
+        <HStack key="in-use" gap={1.5} color="fg.muted" data-testid="slack-connection-in-use">
+          <Info size={14} aria-hidden />
+          <Text fontSize="sm">{inUseRefusalLabel(refusal)}</Text>
+        </HStack>
       ))}
       <ConfirmDialog
         open={isConfirming && refusals.length === 0}

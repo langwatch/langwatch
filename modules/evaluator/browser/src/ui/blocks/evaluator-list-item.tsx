@@ -139,7 +139,7 @@ export function EvaluatorListItem({
             <Menu.Item
               value="delete"
               onClick={stopPropagation(onDelete)}
-              color="red.500"
+              color="red.fg"
               data-testid={`evaluator-delete-${evaluator.id}`}
             >
               <LuTrash2 size={14} />

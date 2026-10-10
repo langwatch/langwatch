@@ -558,7 +558,7 @@ export type TraceApiMap = {
 
   organization: {
     /**
-     * The scope skeleton, narrowed to the presence switches this family reads.
+     * The scope skeleton, narrowed to the presence switches and project names this family reads.
      */
     getScopeGraph: {
       query: {
@@ -566,7 +566,10 @@ export type TraceApiMap = {
         output: {
           id: string;
           presenceEnabled: boolean;
-          teams: { id: string; projects: { id: string; presenceEnabled: boolean }[] }[];
+          teams: {
+            id: string;
+            projects: { id: string; name: string; presenceEnabled: boolean }[];
+          }[];
         }[];
       };
     };

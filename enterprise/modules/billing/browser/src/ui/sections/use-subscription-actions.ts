@@ -60,7 +60,10 @@ function assertSeatChangeWentThrough(result: { success?: boolean } | undefined):
 
 type BillingHost = ReturnType<typeof useBillingHost>;
 
-/** Runs a request that answers with a hosted page, then leaves for it; a failure is toasted. */
+/** A payment that fails on our side is not something a retry fixes. */
+const CONTACT_SUPPORT = "Contact support at support@langwatch.ai and we'll sort it out.";
+
+/** Runs a request answering a hosted page, then leaves for it; no page or a failure is toasted. */
 async function leaveToAnsweredUrl({
   host,
   request,
@@ -72,11 +75,12 @@ async function leaveToAnsweredUrl({
 }): Promise<void> {
   try {
     const result = await request();
-    if (result.url) {
-      host.leaveTo(result.url);
+    if (!result.url) {
+      throw new Error("The provider did not answer a page to continue on");
     }
+    host.leaveTo(result.url);
   } catch (error) {
-    host.failed({ error, fallbackTitle });
+    host.failed({ error, fallbackTitle, description: CONTACT_SUPPORT });
   }
 }
 

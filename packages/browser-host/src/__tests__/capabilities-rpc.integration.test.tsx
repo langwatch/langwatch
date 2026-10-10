@@ -1,5 +1,5 @@
 /**
- * The by-path dispatcher reaches a screen as a CAPABILITY, not through a
+ * The by-path dispatcher reaches a screen as a HOST SERVICE, not through a
  * context of its own — record 10.1 rules out ambient React context as a
  * cross-module transport.
  * @vitest-environment jsdom
@@ -10,15 +10,15 @@ import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import {
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
-  UiCapabilityUnavailableError,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
+  UiHostServiceUnavailableError,
   UiNavigation,
   UiRoute,
   UiRpc,
   useUiRpc,
   BrowserUiDocumentTitle,
-  type UiCapabilities,
+  type UiHostServices,
   type UiRouteReadingValues,
   type UiRpcSubscription,
 } from "../capabilities";
@@ -52,8 +52,8 @@ class RecordedUiRpc extends UiRpc {
   }
 }
 
-function capabilitiesWith(rpc?: UiRpc): UiCapabilities {
-  return resolveUiCapabilities({
+function hostServicesWith(rpc?: UiRpc): UiHostServices {
+  return resolveUiHostServices({
     install: {},
     documentTitle: BrowserUiDocumentTitle.create(),
     navigation: new InertUiNavigation(),
@@ -62,16 +62,16 @@ function capabilitiesWith(rpc?: UiRpc): UiCapabilities {
   });
 }
 
-function mounted(capabilities: UiCapabilities) {
+function mounted(hostServices: UiHostServices) {
   return ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={capabilities}>{children}</UiCapabilityContextProvider>
+    <UiHostServicesContextProvider value={hostServices}>{children}</UiHostServicesContextProvider>
   );
 }
 
 describe("given a shell that composed the by-path dispatcher", () => {
-  it("hands it to a screen through the capabilities", async () => {
+  it("hands it to a screen through the host services", async () => {
     const { result } = renderHook(() => useUiRpc(), {
-      wrapper: mounted(capabilitiesWith(new RecordedUiRpc())),
+      wrapper: mounted(hostServicesWith(new RecordedUiRpc())),
     });
 
     await expect(result.current.query("organization.getAll", {})).resolves.toEqual({
@@ -82,10 +82,10 @@ describe("given a shell that composed the by-path dispatcher", () => {
 
 describe("given a screen mounted with no dispatcher above it", () => {
   it("refuses by name rather than answering with a fabricated result", () => {
-    const { result } = renderHook(() => useUiRpc(), { wrapper: mounted(capabilitiesWith()) });
+    const { result } = renderHook(() => useUiRpc(), { wrapper: mounted(hostServicesWith()) });
 
     expect(() => result.current.query("organization.getAll", {})).toThrow(
-      UiCapabilityUnavailableError,
+      UiHostServiceUnavailableError,
     );
   });
 
@@ -93,7 +93,7 @@ describe("given a screen mounted with no dispatcher above it", () => {
     const { result } = renderHook(() => useUiRpc());
 
     expect(() => result.current.mutate("organization.update", {})).toThrow(
-      UiCapabilityUnavailableError,
+      UiHostServiceUnavailableError,
     );
   });
 });

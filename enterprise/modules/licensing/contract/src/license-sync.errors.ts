@@ -67,6 +67,19 @@ export class ConnectWrongInstanceError extends HandledError {
   }
 }
 
+/** The licence's managed key is still being provisioned; a retry soon succeeds (C3B-PENDING-CODE). */
+export class ConnectCredentialPendingError extends HandledError {
+  declare readonly code: "connect_credential_pending";
+
+  constructor() {
+    super("connect_credential_pending", "This license's hosted-services key is being set up", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ConnectCredentialPendingError";
+  }
+}
+
 /** A sync carries a version and two whole, non-negative seat counts, and nothing else. */
 export class LicenseSyncPayloadInvalidError extends HandledError {
   declare readonly code: "validation_error";

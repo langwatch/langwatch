@@ -36,7 +36,7 @@ function declaredWith(contract: TrpcContract) {
       feature: "runs",
       transports: [{ protocol: "trpc" as const, namespace: "runs", router: () => ({}), contract }],
       provided: () => ({}),
-      facts: [],
+      middlewareBindings: [],
     },
   ];
 }

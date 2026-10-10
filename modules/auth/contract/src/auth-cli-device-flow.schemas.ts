@@ -1,6 +1,7 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const deviceCodeRequestSchema = z.object({
+const deviceCodeRequestSchemaDefinition = z.object({
   scopes: z.array(z.string()).optional(),
   credential_type: z.enum(["device_session", "project_api_key"]).default("device_session"),
   /**
@@ -10,8 +11,10 @@ export const deviceCodeRequestSchema = z.object({
    */
   management: z.boolean().default(false),
 });
+export interface DeviceCodeRequestSchema extends Named<typeof deviceCodeRequestSchemaDefinition> {}
+export const deviceCodeRequestSchema: DeviceCodeRequestSchema = deviceCodeRequestSchemaDefinition;
 
-export const clientInfoSchema = z
+const clientInfoSchemaDefinition = z
   .object({
     device_label: z.string().max(128).optional(),
     hostname: z.string().max(255).optional(),
@@ -19,20 +22,26 @@ export const clientInfoSchema = z
     platform: z.string().max(32).optional(),
   })
   .optional();
+export interface ClientInfoSchema extends Named<typeof clientInfoSchemaDefinition> {}
+export const clientInfoSchema: ClientInfoSchema = clientInfoSchemaDefinition;
 
-export const exchangeRequestSchema = z.object({
+const exchangeRequestSchemaDefinition = z.object({
   device_code: z.string().min(1),
   client_info: clientInfoSchema,
 });
+export interface ExchangeRequestSchema extends Named<typeof exchangeRequestSchemaDefinition> {}
+export const exchangeRequestSchema: ExchangeRequestSchema = exchangeRequestSchemaDefinition;
 
 /** A rotation may re-scope the session to another project the person can reach, by id or slug. */
-export const refreshRequestSchema = z.object({
+const refreshRequestSchemaDefinition = z.object({
   refresh_token: z.string().min(1),
   project_id: z.string().min(1).optional(),
   project_slug: z.string().min(1).optional(),
 });
+export interface RefreshRequestSchema extends Named<typeof refreshRequestSchemaDefinition> {}
+export const refreshRequestSchema: RefreshRequestSchema = refreshRequestSchemaDefinition;
 
-export const approveRequestSchema = z.object({
+const approveRequestSchemaDefinition = z.object({
   user_code: z.string().min(1),
   organization_id: z.string().min(1),
   project_id: z.string().optional(),
@@ -50,18 +59,31 @@ export const approveRequestSchema = z.object({
     })
     .optional(),
 });
+export interface ApproveRequestSchema extends Named<typeof approveRequestSchemaDefinition> {}
+export const approveRequestSchema: ApproveRequestSchema = approveRequestSchemaDefinition;
 
-export const denyRequestSchema = z.object({ user_code: z.string().min(1) });
+const denyRequestSchemaDefinition = z.object({ user_code: z.string().min(1) });
+export interface DenyRequestSchema extends Named<typeof denyRequestSchemaDefinition> {}
+export const denyRequestSchema: DenyRequestSchema = denyRequestSchemaDefinition;
 
-export const logoutRequestSchema = z.object({
+const logoutRequestSchemaDefinition = z.object({
   refresh_token: z.string().optional(),
   access_token: z.string().optional(),
 });
+export interface LogoutRequestSchema extends Named<typeof logoutRequestSchemaDefinition> {}
+export const logoutRequestSchema: LogoutRequestSchema = logoutRequestSchemaDefinition;
 
-export const lookupQuerySchema = z.object({ user_code: z.string().optional() });
+const lookupQuerySchemaDefinition = z.object({ user_code: z.string().optional() });
+export interface LookupQuerySchema extends Named<typeof lookupQuerySchemaDefinition> {}
+export const lookupQuerySchema: LookupQuerySchema = lookupQuerySchemaDefinition;
 
 /** The approval stream the CLI waits on: its device code is the whole credential. */
-export const deviceApprovalQuerySchema = z.object({ device_code: z.string().min(1) });
+const deviceApprovalQuerySchemaDefinition = z.object({ device_code: z.string().min(1) });
+export interface DeviceApprovalQuerySchema extends Named<
+  typeof deviceApprovalQuerySchemaDefinition
+> {}
+export const deviceApprovalQuerySchema: DeviceApprovalQuerySchema =
+  deviceApprovalQuerySchemaDefinition;
 
 export function cliUserTokensIndexKey(userId: string): string {
   return `lwcli:user:${userId}:tokens`;

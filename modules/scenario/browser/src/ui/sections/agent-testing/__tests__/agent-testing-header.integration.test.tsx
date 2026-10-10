@@ -45,7 +45,7 @@ describe("<AgentTestingHeader/>", () => {
     it("holds the title, then the tabs", () => {
       renderHeader({ tab: "results" });
 
-      const title = screen.getByRole("heading", { name: "Agent Testing" });
+      const title = screen.getByRole("heading", { name: "Results" });
       const tabs = screen.getByRole("tablist");
 
       expect(comesBefore(title, tabs)).toBe(true);
@@ -125,7 +125,7 @@ describe("<AgentTestingHeader/>", () => {
       expect(title).toBeInTheDocument();
       expect(screen.getByTestId("agent-testing-title-note")).toHaveTextContent("Run plan");
       expect(comesBefore(title, screen.getByRole("tablist"))).toBe(true);
-      expect(screen.queryByRole("heading", { name: "Agent Testing" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Results" })).not.toBeInTheDocument();
     });
 
     /** @scenario "A long run plan name stays on one line" */
@@ -142,7 +142,7 @@ describe("<AgentTestingHeader/>", () => {
     });
 
     /** @scenario "Leaving the run plan gives the page title back" */
-    it("reads Agent Testing again once the plan is left", () => {
+    it("reads Results again once the plan is left", () => {
       const view = renderHeader({
         tab: "results",
         openPlan: { name: "Checkout", note: "Run plan" },
@@ -150,7 +150,7 @@ describe("<AgentTestingHeader/>", () => {
 
       view.rerender(<AgentTestingHeader tab="results" onTabChange={vi.fn()} openPlan={null} />);
 
-      expect(screen.getByRole("heading", { name: "Agent Testing" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
       expect(screen.queryByTestId("agent-testing-title-note")).not.toBeInTheDocument();
     });
   });

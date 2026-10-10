@@ -77,7 +77,7 @@ function ColophonLink({ href, children }: { href: string; children: ReactNode })
       fontFamily="mono"
       fontSize="10.5px"
       color="fg.subtle"
-      _hover={{ color: "orange.500" }}
+      _hover={{ color: "orange.fg" }}
     >
       {children}
     </Link>

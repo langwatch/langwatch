@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Choices contract (ADR-060 §6): selection payload and lock-state derivation.
  * Answerable iff no later entry (event order only, no timers). See ADR-060.
@@ -9,7 +10,7 @@ import * as z from "zod";
  * option(s) (`multiSelect`); `otherText` carries free text (`allowOther`).
  * At least one must say something - an empty selection answers nothing.
  */
-export const langyChoiceSelectionSchema = z
+const langyChoiceSelectionSchemaDefinition = z
   .object({
     blockId: z.string().min(1),
     optionIds: z.array(z.string().min(1)).default([]),
@@ -21,6 +22,11 @@ export const langyChoiceSelectionSchema = z
       (selection.otherText !== undefined && selection.otherText.trim().length > 0),
     { message: "a selection must pick an option or carry other-text" },
   );
+export interface LangyChoiceSelectionSchema extends Named<
+  typeof langyChoiceSelectionSchemaDefinition
+> {}
+export const langyChoiceSelectionSchema: LangyChoiceSelectionSchema =
+  langyChoiceSelectionSchemaDefinition;
 export type LangyChoiceSelection = z.infer<typeof langyChoiceSelectionSchema>;
 
 /**

@@ -36,6 +36,13 @@ Feature: Automation reacts to trace's and evaluation's existing events from its 
     Then the run's trace is read through EvaluationApi and the evaluation triggers are matched
 
   @unit
+  Scenario: An evaluation settled late still matches, judged stale by its processing time
+    Given a monitor evaluation dated by its trace's span end, which ended over an hour ago
+    When its settling event, created now, reaches evaluation trigger matching
+    Then the evaluation triggers are matched
+    And an event created over an hour ago is still skipped as stale
+
+  @unit
   Scenario: Project activity wakes the graph-alert sweep, the same on redelivery
     Given trace or evaluation recorded activity for a project
     When automation's peer subscriber receives it twice

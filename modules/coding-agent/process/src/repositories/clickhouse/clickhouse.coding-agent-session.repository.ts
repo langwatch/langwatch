@@ -24,7 +24,6 @@ import {
   asStringArray,
   parseClickHouseDateTimeMs,
   routingTenantOf,
-  CROSS_TENANT_ROLLUP,
   type ClickHouseMoment,
 } from "./clickhouse.mapper.ts";
 
@@ -685,11 +684,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       tenantId: routingTenantOf(tenantIds),
       table: TABLE_NAME,
       kind: "read",
-      unscoped: CROSS_TENANT_ROLLUP,
+      tenantIds,
       sql: `
         SELECT ${BRANCH_SESSION_COLUMNS}
         FROM ${TABLE_NAME}
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId IN ({tenantIds:Array(String)})
           AND lower(RepositoryHost) = {repositoryHost:String}
           AND lower(RepositoryOwner) = {repositoryOwner:String}
           AND lower(RepositoryName) = {repositoryName:String}
@@ -701,7 +700,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           AND (TenantId, SessionId, UpdatedAt) IN (
             SELECT TenantId, SessionId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId IN {tenantIds:Array(String)}
+            WHERE TenantId IN ({tenantIds:Array(String)})
             GROUP BY TenantId, SessionId
           )
         ORDER BY StartedAt ASC
@@ -765,17 +764,17 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       tenantId: routingTenantOf(tenantIds),
       table: TABLE_NAME,
       kind: "read",
-      unscoped: CROSS_TENANT_ROLLUP,
+      tenantIds,
       sql: `
           SELECT ${BRANCH_SESSION_COLUMNS}
           FROM ${TABLE_NAME}
-          WHERE TenantId IN {tenantIds:Array(String)}
+          WHERE TenantId IN ({tenantIds:Array(String)})
             AND SessionId IN {sessionIds:Array(String)}
             AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
             AND (TenantId, SessionId, UpdatedAt) IN (
               SELECT TenantId, SessionId, max(UpdatedAt)
               FROM ${TABLE_NAME}
-              WHERE TenantId IN {tenantIds:Array(String)}
+              WHERE TenantId IN ({tenantIds:Array(String)})
               GROUP BY TenantId, SessionId
             )
           ORDER BY StartedAt ASC

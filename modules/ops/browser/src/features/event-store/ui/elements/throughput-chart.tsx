@@ -9,7 +9,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { readableDate } from "@langwatch/time";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -22,12 +22,15 @@ import {
 } from "recharts";
 
 const COLORS = {
-  staged: { stroke: "#06b6d4", fill: "#06b6d4" },
-  completed: { stroke: "#22c55e", fill: "#22c55e" },
-  failed: { stroke: "#ef4444", fill: "#ef4444" },
-  pending: "#a78bfa",
-  blocked: "#f97316",
-  parked: "#eab308",
+  staged: { stroke: "var(--chakra-colors-cyan-solid)", fill: "var(--chakra-colors-cyan-solid)" },
+  completed: {
+    stroke: "var(--chakra-colors-green-solid)",
+    fill: "var(--chakra-colors-green-solid)",
+  },
+  failed: { stroke: "var(--chakra-colors-red-solid)", fill: "var(--chakra-colors-red-solid)" },
+  pending: "var(--chakra-colors-purple-solid)",
+  blocked: "var(--chakra-colors-orange-solid)",
+  parked: "var(--chakra-colors-yellow-solid)",
 };
 
 interface ChartPoint {
@@ -267,14 +270,11 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
   const stableYMaxRef = useRef(1);
   const [bucketMs, setBucketMs] = useState(5_000);
 
-  const chartData = useMemo(
-    () => downsample(data.throughputHistory, bucketMs),
-    [data.throughputHistory, bucketMs],
-  );
+  const chartData = downsample(data.throughputHistory, bucketMs);
 
-  const timeTicks = useMemo(() => computeTimeTicks(chartData), [chartData]);
+  const timeTicks = computeTimeTicks(chartData);
 
-  const yMax = useMemo(() => {
+  const yMax = (() => {
     if (chartData.length === 0) return 1;
     let max = 0;
     for (const p of chartData) {
@@ -287,20 +287,20 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
       stableYMaxRef.current = target;
     }
     return stableYMaxRef.current;
-  }, [chartData]);
+  })();
 
-  const hasCountData = useMemo(() => {
+  const hasCountData = (() => {
     return chartData.some((p) => p.pending > 0 || p.blocked > 0 || p.parked > 0);
-  }, [chartData]);
+  })();
 
-  const yMaxRight = useMemo(() => {
+  const yMaxRight = (() => {
     if (!hasCountData) return 10;
     let max = 0;
     for (const p of chartData) {
       max = Math.max(max, p.pending, p.blocked, p.parked);
     }
     return max <= 0 ? 10 : niceMax(max * 1.3);
-  }, [chartData, hasCountData]);
+  })();
 
   if (chartData.length < 2) {
     return (
@@ -325,7 +325,7 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
           {BUCKET_OPTIONS.map((opt) => (
             <Button
               key={opt.ms}
-              size="2xs"
+              size="sm"
               variant={bucketMs === opt.ms ? "subtle" : "ghost"}
               colorPalette={bucketMs === opt.ms ? "orange" : "gray"}
               onClick={() => setBucketMs(opt.ms)}

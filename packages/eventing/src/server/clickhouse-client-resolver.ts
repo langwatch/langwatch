@@ -33,7 +33,7 @@ export interface EventingClickHouseReplayStatement {
   sql: string;
   params?: Record<string, unknown> | undefined;
   /** Set when the statement genuinely spans tenants; see the member's tenant-scope guard. */
-  unscoped?: { reason: string } | undefined;
+  SKIP_TENANT_CHECK?: true | undefined;
 }
 
 /**

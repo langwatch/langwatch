@@ -93,6 +93,9 @@
       "path": "../../presence/contract/tsconfig.build.json"
     },
     {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/client/tsconfig.build.json"
     },
     {

@@ -83,5 +83,9 @@ export interface WorkflowHostSlice {
   /** Steps back one entry in the reader's own history. */
   back(): void;
   succeeded(notice: WorkflowSuccessNotice): void;
+  /** A caution that is not a failure, drawn as a warning. */
+  warned(notice: WorkflowSuccessNotice): void;
+  /** A plain fact, drawn as information. */
+  informed(notice: WorkflowSuccessNotice): void;
   failed(failure: WorkflowFailureNotice): void;
 }

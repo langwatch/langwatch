@@ -5,14 +5,15 @@ export const MAX_PORT_SLOT_ATTEMPTS = 30;
 
 export type PortAllocation = {
   base: number;
-  // App tier: base..base+9. Each LangWatch-shipped service gets a slot.
-  // 5565..5567 reserved for future services so we never trample the infra
-  // tier when we add the next data plane.
+  // App tier: base..base+9. Each LangWatch-shipped service gets a slot;
+  // 5566..5569 stay free for the next one, clear of the infra tier.
   langwatch: number;
   nlp: number;
   langevals: number;
   aigateway: number;
   langyagent: number;
+  // The backend's worker half answers its own health door (WORKER_METRICS_PORT).
+  workerHealth: number;
   // Infra tier: base+1000..base+1009. Embedded data stores live here so a
   // user with their own postgres/redis/clickhouse on canonical ports
   // doesn't collide. Auto-shift moves both tiers together by +10.
@@ -22,10 +23,9 @@ export type PortAllocation = {
   clickhouseNative: number;
 };
 
-// `npx @langwatch/server` ships the production Hono build, so the langwatch
-// app is a single port (5560) with workers in-process — no separate vite or
-// API split, no separate worker metrics port. See the worker's liveness server:
-// "In production, only the API server runs on PORT (default 5560)".
+// `npx @langwatch/server` runs apps/backend: the api and the worker in one Node
+// process. The api serves the browser bundle on `langwatch`; the worker half
+// still opens its own health door, so it gets a slot instead of the default 2999.
 export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation {
   const infra = base + PORT_INFRA_OFFSET;
   return {
@@ -35,6 +35,7 @@ export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation 
     langevals: base + 2,
     aigateway: base + 3,
     langyagent: base + 4,
+    workerHealth: base + 5,
     postgres: infra,
     redis: infra + 1,
     clickhouseHttp: infra + 2,
@@ -49,6 +50,7 @@ export function portsToCheck(alloc: PortAllocation): { port: number; label: stri
     { port: alloc.langevals, label: "langevals" },
     { port: alloc.aigateway, label: "ai gateway" },
     { port: alloc.langyagent, label: "langy agent" },
+    { port: alloc.workerHealth, label: "langwatch worker health" },
     { port: alloc.postgres, label: "postgres" },
     { port: alloc.redis, label: "redis" },
     { port: alloc.clickhouseHttp, label: "clickhouse http" },

@@ -5,9 +5,11 @@
  * @see specs/analytics/custom-chart-playground.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { interpolateColor, parseHexRgb } from "../index";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("parseHexRgb", () => {
   describe("when given a 6-digit hex", () => {
@@ -41,9 +43,12 @@ describe("interpolateColor", () => {
 
   describe("when an end is unparsable", () => {
     it("falls back to the default scale instead of blanking the cell", () => {
+      vi.stubGlobal("window", {
+        LW: { dashboardContext: { colors: { "blue.subtle": "#ebf8ff" } } },
+      });
       const color = interpolateColor("garbage", "#4338ca", 0);
-      // t=0 pins the output to the `from` end; the fallback is #eef2ff.
-      expect(color).toBe("rgb(238, 242, 255)");
+      // t=0 uses the host’s active semantic colour.
+      expect(color).toBe("rgb(235, 248, 255)");
     });
   });
 });

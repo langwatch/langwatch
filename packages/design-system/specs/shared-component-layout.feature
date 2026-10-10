@@ -12,12 +12,6 @@ Feature: Shared components sit cleanly on the page
     And only the front card shows its text
 
   @integration
-  Scenario: The count of waiting toasts clears the front card's edge
-    Given more toasts are raised than the stack shows
-    When the reader looks at the front card
-    Then the count sits above the front card's top border, not across it
-
-  @integration
   Scenario: The selected segment sits evenly inside the segmented control
     Given a segmented control with a selected option
     When the reader looks at the control
@@ -38,7 +32,6 @@ Feature: Shared components sit cleanly on the page
     When the stack has settled
     Then the top edges of the front card and the two behind it are one equal step apart
     And every visible card is centred on the front card
-    And the count of waiting toasts ends at or above the front card's top edge
 
   @integration @browser
   Scenario: The marker of a dark segmented control measures evenly in a real browser

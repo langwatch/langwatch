@@ -10,7 +10,7 @@ import (
 // toolchain, the brew formulae behind the managed Postgres and Redis, a
 // container runtime. `haven up` discovers a missing one the hard way — as a
 // failure, one at a time, at the moment it first needs it. This file is the
-// catalogue so `haven install` can ask all of those questions at once, before
+// catalogue so `haven self install` can ask all of those questions at once, before
 // anything is running.
 //
 // Everything here is pure: what the prerequisites are, how to tell whether one
@@ -134,6 +134,9 @@ type Prereq struct {
 	// story. Elsewhere they are reported not-applicable rather than missing,
 	// because "missing" implies haven could fix it.
 	DarwinOnly bool
+	// UnlistedOnDarwin keeps an entry off the macOS report and picker; it is
+	// installed there only when named (`haven self install runtime=colima`).
+	UnlistedOnDarwin bool
 }
 
 // Manual reports whether no candidate can be installed by haven, so the only
@@ -237,6 +240,21 @@ var Prereqs = []Prereq{{
 		Install:  "brew install go",
 	}},
 }, {
+	Key:         "bun",
+	Name:        "Bun",
+	Summary:     "builds the langy-worker binary `haven up +langy` runs",
+	Requirement: PrereqRecommended,
+	After:       []string{"brew"},
+	Detail: "services/langyworker builds with `bun run scripts/build-binary.ts`\n" +
+		"    (bun >= 1.3.13). Without it the stack still comes up, minus Langy:\n" +
+		"    `haven up +langy` cannot build the worker, so Langy is off for that run.",
+	Candidates: []Candidate{{
+		Key:      "bun",
+		Label:    "bun",
+		Binaries: []string{"bun"},
+		Install:  "brew install bun",
+	}},
+}, {
 	// The trap this entry exists to name: golangci-lint's pinned release
 	// cannot read export data from a Go newer than go.work's, and a
 	// golangci-lint at any OTHER version satisfies nothing either, however
@@ -273,8 +291,8 @@ var Prereqs = []Prereq{{
 		Install: "npm install -g " + PortlessPackage(),
 	}},
 }, {
-	// A machine setting, not a tool: haven never runs sudo, so it prints the
-	// command. Cause traced in .claude/handoffs/haven-vite-502.md.
+	// A machine setting, not a tool. Installing it runs sudo in the
+	// developer's terminal, so the password prompt is their consent.
 	Key:         "somaxconn",
 	Name:        "Accept queue",
 	Summary:     fmt.Sprintf("at least %d, so vite cold loads through the proxy do not 502", SomaxconnFloor),
@@ -287,9 +305,10 @@ var Prereqs = []Prereq{{
 	Candidates: []Candidate{{
 		Key:   "somaxconn",
 		Label: "kern.ipc.somaxconn",
-		Manual: fmt.Sprintf("vite cold loads through the proxy can 502 under bursts: "+
-			"sudo sysctl kern.ipc.somaxconn=%d (lasts until reboot; to persist, "+
-			"add kern.ipc.somaxconn=%d to /etc/sysctl.conf)", SomaxconnFloor, SomaxconnFloor),
+		// Sets it now, and replaces any older line in /etc/sysctl.conf so it survives a reboot.
+		Install: fmt.Sprintf("sudo sysctl -w kern.ipc.somaxconn=%[1]d && "+
+			"{ sudo sed -i '' '/^kern\\.ipc\\.somaxconn/d' /etc/sysctl.conf 2>/dev/null; "+
+			"echo kern.ipc.somaxconn=%[1]d | sudo tee -a /etc/sysctl.conf >/dev/null; }", SomaxconnFloor),
 	}},
 }, {
 	Key:         "postgres",
@@ -361,17 +380,18 @@ var Prereqs = []Prereq{{
 		Install: "download the pinned ClickHouse, Tempo, Alloy and Pyroscope releases",
 	}},
 }, {
-	Key:         "runtime",
-	Name:        "Container runtime",
-	Summary:     "optional on macOS: the container fallback, haven play and sandboxed langy — pick one",
-	Requirement: PrereqOptional,
-	After:       []string{"brew"},
-	DarwinOnly:  true,
+	Key:              "runtime",
+	Name:             "Container runtime",
+	Summary:          "optional on macOS: the container fallback, haven pr --throwaway and sandboxed langy — pick one",
+	Requirement:      PrereqOptional,
+	After:            []string{"brew"},
+	DarwinOnly:       true,
+	UnlistedOnDarwin: true,
 	Detail: "Nothing in the day-to-day loop needs one, and answering \"none\" is a\n" +
 		"    supported answer rather than a refusal: on macOS ClickHouse and the\n" +
 		"    telemetry stack (traces included) run natively either way, and langy\n" +
 		"    on the host tier. A runtime buys you the container fallback\n" +
-		"    (HAVEN_CH_RUNTIME, LANGWATCH_HAVEN_OBS_TIER), `haven play` and\n" +
+		"    (HAVEN_CH_RUNTIME, LANGWATCH_HAVEN_OBS_TIER), `haven pr --throwaway` and\n" +
 		"    langy's sandboxed worker tier.\n" +
 		"    haven's own stack is built on colima: its ceiling is explicit and\n" +
 		"    per-profile, and it needs no license. Docker Desktop works too.",
@@ -475,7 +495,7 @@ func (s PrereqState) String() string {
 	}
 }
 
-// Actionable reports whether this state is one `haven install` can do
+// Actionable reports whether this state is one `haven self install` can do
 // something about — which is the same question as "should the picker offer
 // it". A skipped entry is deliberately not actionable: that is what the
 // developer asked for, and naming it explicitly is how they take it back.
@@ -595,7 +615,7 @@ func OrderPrereqs(chosen []Chosen) []Chosen {
 }
 
 // LookupPrereq finds a catalogue entry by key, for the positional form
-// (`haven install clickhouse-client`).
+// (`haven self install clickhouse-client`).
 func LookupPrereq(key string) (Prereq, bool) {
 	for _, p := range Prereqs {
 		if p.Key == key {

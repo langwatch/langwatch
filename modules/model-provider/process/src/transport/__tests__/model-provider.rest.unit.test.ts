@@ -12,6 +12,7 @@ import {
   type ModelProviderApi,
   type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelProviderKeysService } from "../../services/model-provider-keys.service.ts";
@@ -86,6 +87,8 @@ function summary(
 function mount(modelProviders: Partial<ModelProviderApi>) {
   const { app } = mountableModelProviderApp({ modelProviders });
   const hono = createRestRuntime({
+    audit: { record: async () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user-1" },

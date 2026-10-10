@@ -11,6 +11,7 @@ import { generateSpecs } from "hono-openapi";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import {
   anyAuthenticated,
   deferredScope,
@@ -22,11 +23,13 @@ import {
   createErrorHandler,
   OrganizationPermissionError,
   PayloadTooLargeError,
+  ProjectInvalidCredentialsError,
 } from "../../errors.ts";
+import type { RestCaller } from "../../hosting/api-door.ts";
 import { getRoutePolicy } from "../../route-registry.ts";
-import { defineRestRouter, projectRestFacts } from "../declaration.ts";
+import { defineRestRouter, projectRequestContext } from "../declaration.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
-import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
+import { bindMiddlewareContext, defineMiddlewareContext } from "../request.ts";
 import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
 
@@ -92,6 +95,7 @@ const annotations = defineRestRouter(AnnotationApi)
   .withParams(z.object({ id: z.string() }))
   .withPermission("annotations:manage")
   .withDocs({ summary: "Delete an annotation in the caller’s project" })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.remove({ id: input.id }))
   .build();
 
@@ -103,6 +107,7 @@ const application: AnnotationApi = {
 /** The runtime's mount: the process authenticates, the declaration is inert. */
 function runtimeApp(app: () => AnnotationApi = () => application): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -151,6 +156,7 @@ const secrets = defineRestRouter(SecretApi)
   .withPermission("secrets:manage")
   .withOutput(z.object({ id: z.string() }))
   .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.create({ name: input.name }))
   .build();
 
@@ -163,6 +169,7 @@ const secretApplication: SecretApi = {
 /** The same mount, with the boundary that serialises a handled refusal. */
 function secretsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -346,7 +353,7 @@ describe("the document a declared route publishes", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The facts a mount binds, and what the handler is handed beside its input.
+// The middleware context a mount binds, and what the handler is handed beside its input.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ReportApi {
@@ -354,7 +361,7 @@ interface ReportApi {
 }
 
 const ReportApi = moduleApi<ReportApi>()("ops");
-const surface = defineRestMiddleware("surface", z.string().nullable());
+const surface = defineMiddlewareContext("surface", z.string().nullable());
 
 const reports = defineRestRouter(ReportApi)
   .withNamespace("reports")
@@ -363,7 +370,7 @@ const reports = defineRestRouter(ReportApi)
   .withParams(z.object({ id: z.string() }))
   .withPermission("annotations:view")
   .withOutput(z.object({ id: z.string(), platformUrl: z.string(), surface: z.string() }))
-  .withMiddleware(projectRestFacts, surface)
+  .withMiddlewareContext(projectRequestContext, surface)
   .handle(async ({ app, input }, project, header) => {
     const report = await app.read({ id: input.id });
 
@@ -377,6 +384,7 @@ const reports = defineRestRouter(ReportApi)
 
 function reportsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -386,21 +394,21 @@ function reportsApp(): Hono {
     app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
     credential: "project",
     onError: createErrorHandler(),
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "acme",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestHeader(surface, "x-langwatch-surface"),
+      bindMiddlewareContext(surface, (request) => request.headers.get("x-langwatch-surface")),
     ],
   });
 }
 
-describe("a route whose declaration names the facts it needs", () => {
-  describe("given the mount bound each of them once", () => {
-    /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-    it("hands the handler each parsed fact, in declaration order, beside its input", async () => {
+describe("a route whose declaration names the middleware context it needs", () => {
+  describe("given its module provided each of them", () => {
+    /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+    it("hands the handler each parsed context, in declaration order, beside its input", async () => {
       const response = await reportsApp().request(`/api/reports/${VERSION}/report-1`, {
         headers: { "x-langwatch-surface": "cli" },
       });
@@ -414,8 +422,8 @@ describe("a route whose declaration names the facts it needs", () => {
       });
     });
 
-    /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-    it("resolves the facts at every address the route answers at", async () => {
+    /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+    it("resolves the context at every address the route answers at", async () => {
       for (const path of [
         "/api/reports/report-1",
         "/api/reports/latest/report-1",
@@ -447,6 +455,7 @@ const runPlans = defineRestRouter(ReportApi)
 
 function runPlansApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -533,6 +542,7 @@ function legacyReportsApp(deprecationLog?: RestDeprecationLog): {
   }));
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate },
     ...(deprecationLog ? { deprecationLog } : {}),
   });
@@ -678,8 +688,8 @@ interface RoleApi {
 }
 
 const RoleApi = moduleApi<RoleApi>()("role");
-const roleRestFacts = defineRestMiddleware(
-  "roleRestFacts",
+const roleRestContext = defineMiddlewareContext(
+  "roleRestContext",
   z.object({ organizationId: z.string() }),
 );
 
@@ -698,16 +708,16 @@ const roles = defineRestRouter(RoleApi)
     z.object({
       tier: z.literal("organization"),
       scopeId: z.string(),
-      factOrganizationId: z.string(),
+      contextOrganizationId: z.string(),
       roles: z.array(z.string()),
     }),
   )
   .withDocs({ summary: "List the organization's roles", tags: ["Roles"] })
-  .withMiddleware(roleRestFacts)
+  .withMiddlewareContext(roleRestContext)
   .handle(async ({ app, scope }, organization) => ({
     tier: scope.tier,
     scopeId: scope.id,
-    factOrganizationId: organization.organizationId,
+    contextOrganizationId: organization.organizationId,
     roles: (await app.listRoles({ organizationId: scope.id })).map((role) => role.id),
   }))
 
@@ -715,6 +725,7 @@ const roles = defineRestRouter(RoleApi)
   .withInput(z.object({ organizationId: z.string(), name: z.string() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope }) =>
     app.createRole({ organizationId: scope.id, name: input.name }),
   )
@@ -747,12 +758,17 @@ function rolesApp(
 ): { app: Hono; authenticate: ReturnType<typeof vi.fn> } {
   const authenticate = vi.fn(() => ({ actor: null, scope }));
 
-  const runtime = createRestRuntime({ identity: { authenticate } });
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: { authenticate },
+  });
 
   const app = runtime.mount(roles.router(), {
     app: () => roleApplication,
     onError: createErrorHandler(),
-    facts: [bindRestMiddleware(roleRestFacts, () => ({ organizationId: ORGANIZATION_ID }))],
+    middlewareContext: [
+      bindMiddlewareContext(roleRestContext, () => ({ organizationId: ORGANIZATION_ID })),
+    ],
   });
 
   return { app, authenticate };
@@ -761,7 +777,7 @@ function rolesApp(
 describe("a family whose declaration names the organization door", () => {
   describe("given a caller the door resolved an organization for", () => {
     /** @scenario "A handler on an organization door receives the organization scope" */
-    it("hands the handler the organization scope, and the fact the mount bound", async () => {
+    it("hands the handler the organization scope, and the context the mount bound", async () => {
       const response = await rolesApp().app.request(`/api/roles/${VERSION}`);
 
       expect(response.status).toBe(200);
@@ -769,7 +785,7 @@ describe("a family whose declaration names the organization door", () => {
       await expect(response.json()).resolves.toEqual({
         tier: "organization",
         scopeId: ORGANIZATION_ID,
-        factOrganizationId: ORGANIZATION_ID,
+        contextOrganizationId: ORGANIZATION_ID,
         roles: [`role-in-${ORGANIZATION_ID}`],
       });
     });
@@ -875,6 +891,7 @@ const codingAgent = defineRestRouter(RoleApi)
 describe("a v1-only family on the organization door", () => {
   function codingAgentApp(): Hono {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: null,
@@ -976,7 +993,10 @@ function projectsApp(permitted = true): {
 
   const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
 
-  const runtime = createRestRuntime({ identity: { authenticate, identify, authorize } });
+  const runtime = createRestRuntime({
+    identity: { authenticate, identify, authorize },
+    authorization: authorizationPort,
+  });
 
   const app = runtime.mount(projects.router(), {
     app: () => projectApplication,
@@ -1049,6 +1069,7 @@ describe("a route whose permission is checked at the scope its path names", () =
     const authorize = vi.fn(() => ({ permitted: true, organizationRole: null }));
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: { type: "api_key", id: "key-1" } as const,
@@ -1161,6 +1182,7 @@ const webhooks = defineRestRouter(ProjectApi)
 
 function webhooksApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: PROJECT_ID } }),
     },
@@ -1258,6 +1280,7 @@ function platformHealthApp(
   );
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("A platform-health route asks no permission of its credential.");
@@ -1386,6 +1409,7 @@ describe("a route that declares the several answers it may give", () => {
   /** @scenario "An endpoint that declares several answers may not also declare one" */
   it("fails rather than serving a status the declaration never named", async () => {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: null,
@@ -1441,6 +1465,7 @@ const scimUsers = defineRestRouter(RoleApi)
 
 function scimApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({
         actor: null,
@@ -1506,6 +1531,7 @@ const hooks = defineRestRouter(HookApi)
   .withPermission("annotations:manage")
   .withOutput(z.object({ digest: z.string(), length: z.number() }))
   .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withoutAudit("test route")
   .handle(({ raw }) => ({ digest: new TextDecoder().decode(raw), length: raw.length }))
 
   .post("/text/:id", "recordHookText")
@@ -1513,11 +1539,13 @@ const hooks = defineRestRouter(HookApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("annotations:manage")
   .withOutput(z.object({ id: z.string(), body: z.string() }))
+  .withoutAudit("test route")
   .handle(({ input, raw }) => ({ id: input.id, body: raw }))
   .build();
 
 function hooksApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -1617,7 +1645,7 @@ const storedObjects = defineRestRouter(ObjectApi)
   .withAddressing("v1-only")
   .get("/:id", "readStoredObject")
   .withParams(z.object({ id: z.string() }))
-  .withPermission("traces:view")
+  .withPermission("annotations:view")
   .withRawResponse({ produces: ["application/octet-stream", "text/plain"] })
   .methods(["GET", "HEAD"])
   .handle(async ({ app, input }) => {
@@ -1633,6 +1661,7 @@ const storedObjects = defineRestRouter(ObjectApi)
 
 function storedObjectsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -1721,6 +1750,7 @@ const aliases = defineRestRouter(ObjectApi)
 
 function aliasHost(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate: () => ({ actor: null, scope: null }) },
   });
 
@@ -1832,12 +1862,14 @@ const runRunner = defineRestRouter(RunApi)
   .withInput(z.object({ name: z.string() }))
   .withPermission("experiments:manage")
   .withOutput(z.object({ started: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.execute({ name: input.name }))
 
   .post("/:slug/abort", "abortRun")
   .withParams(z.object({ slug: z.string() }))
   .withPermission("experiments:manage")
   .withOutput(z.object({ aborted: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.abort({ slug: input.slug }))
   .build();
 
@@ -1856,6 +1888,7 @@ const runApplication: RunApi = {
 /** Both families on one host, in the order a module lists its transports. */
 function runsHost(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -1975,6 +2008,7 @@ const uploads = defineRestRouter(UploadApi)
   .withInput(z.object({ name: z.string() }))
   .withPermission("datasets:manage")
   .withOutput(createdUpload)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => {
     const found = await app.create({ name: input.name });
 
@@ -1988,6 +2022,7 @@ const uploads = defineRestRouter(UploadApi)
 
 function uploadsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2073,12 +2108,14 @@ const evaluationsLegacy = defineRestRouter(EvaluationsApi)
   .withParams(z.object({ evaluator: z.string() }))
   .withPermission("evaluations:manage")
   .withOutput(z.object({ status: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.evaluate({ evaluator: input.evaluator }))
   .build();
 
 /** A sibling family under the same prefix, mounted after the literal one. */
 function evaluationsHost(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2176,6 +2213,7 @@ const scimV2 = defineRestRouter(DirectoryApi)
 
 function scimV2App(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({
         actor: null,
@@ -2266,6 +2304,7 @@ const fileApplication: FilesApi = {
 function filesApp(options: { identified?: boolean } = {}): Hono {
   filesHanded.length = 0;
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("A deferred route asks no permission of its credential.");
@@ -2340,6 +2379,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
   .withPermission("datasets:manage")
   .withOutput(z.object({ id: z.string(), name: z.string(), size: z.number() }))
   .withDocs({ summary: "Upload a dataset file" })
+  .withoutAudit("test route")
   .handle(async ({ app, input, files: parts, scope }) => {
     const bytes = await parts.file.text();
     const stored = await app.store({ name: input.name, bytes });
@@ -2353,6 +2393,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
   .withPermission("datasets:manage")
   .responds({ 200: datasetRecord, 201: datasetRecord })
   .withDocs({ summary: "Create or replace one dataset record" })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => {
     const { created } = await app.upsert({ id: input.recordId, bytes: input.bytes });
 
@@ -2362,6 +2403,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
 
 function datasetApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2509,6 +2551,7 @@ const bugReports = defineRestRouter(BugReportApi)
   .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
   .withStatus(201)
   .withDocs({ summary: "File an issue report" })
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope, actor }) => {
     const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
 
@@ -2533,6 +2576,7 @@ function bugReportsApp(options: { caller?: "none" | "project"; optional?: boolea
   );
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("An optional-credential route asks no permission of its credential.");
@@ -2592,6 +2636,78 @@ describe("a route the family's credential reaches optionally", () => {
   });
 });
 
+// The same intake, answering a key its door refuses as no key at all (W02, Alex 2026-10-10).
+const anonymousBugReports = defineRestRouter(BugReportApi)
+  .withNamespace("bug-reports")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/", "submitBugReport")
+  .withInput(z.object({ title: z.string() }))
+  .withAccess(optionalCredential({ reason: KEY_ONLY_ENRICHES, refused: "anonymous" }))
+  .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
+  .withStatus(201)
+  .withDocs({ summary: "File an issue report" })
+  .withoutAudit("test route")
+  .handle(async ({ app, input, scope }) => {
+    const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
+
+    return { id: report.id, filedUnder: scope?.id ?? "none" };
+  })
+  .build();
+
+function anonymousBugReportsApp(identify: () => RestCaller): Hono {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: {
+      authenticate: () => {
+        throw new Error("An optional-credential route asks no permission of its credential.");
+      },
+      identify,
+    },
+  });
+
+  return runtime.mount(anonymousBugReports.router(), {
+    app: () => ({ submit: async () => ({ id: "report-1" }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a route that answers a refused credential as none", () => {
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("files under the project the door verified", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => ({ actor: null, scope: { tier: "project", id: "project-7" } })),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "project-7" });
+  });
+
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("answers a missing or bad credential unattributed, never 401", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => {
+        throw new ProjectInvalidCredentialsError();
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
+  });
+
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("answers unattributed when the door fails for a reason that is not a refusal", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => {
+        throw new Error("the key store is down");
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
+  });
+});
+
 interface InstanceApi {
   createOrganization(input: { name: string }): Promise<{ id: string }>;
 }
@@ -2611,6 +2727,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
   .withInput(z.object({ name: z.string() }))
   .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
   .withOutput(z.object({ id: z.string(), scope: z.null() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope, actor }) => {
     instanceSetupHanded.push({ actor });
 
@@ -2623,6 +2740,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
 function instanceSetupApp(options: { tenanted?: boolean } = {}): Hono {
   instanceSetupHanded.length = 0;
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("The instance setup door asks no permission of its key.");
@@ -2716,6 +2834,7 @@ function catalogueApp(options: { allowed?: boolean; ported?: boolean } = {}): {
   const reads = vi.fn(async ({ id }: { id: string }) => ({ id, evaluators: 41 }));
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2803,6 +2922,7 @@ function meteredApp() {
   const reads: string[] = [];
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: ({ request }) => ({
         actor: null,
@@ -2944,6 +3064,7 @@ describe("a route whose answer stands for a while", () => {
     const { app } = catalogueApp();
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
       },
@@ -3003,11 +3124,13 @@ const waitlist = defineRestRouter(WaitlistApi)
   .post("/", "joinWaitlist")
   .withAccess(publicRoute({ reason: "waitlist sign-up; reads no project data" }))
   .withInput(z.object({ email: z.string().email() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.join({ email: input.email }))
   .build();
 
 function waitlistApp(): Hono {
   return createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -3069,6 +3192,7 @@ describe("three families mounted on one host", () => {
 
   beforeEach(() => {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: { authenticate: () => ({ actor: null, scope: null }) },
     });
 

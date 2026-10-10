@@ -100,7 +100,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
   describe("when getAll runs", () => {
     /** @scenario First-visit projects auto-seed and show All Traces plus 4 seed views */
     it("seeds views on first access for a project", async () => {
-      const result = await service().getAll({ projectId });
+      const result = await service().getAll({ projectId, acceptsWrites: true });
 
       expect(result).toHaveLength(5);
       expect(result.map((v) => v.name)).toEqual([
@@ -114,7 +114,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
 
     /** @scenario getAll returns views ordered by position */
     it("returns views ordered by the order field ascending", async () => {
-      const result = await service().getAll({ projectId });
+      const result = await service().getAll({ projectId, acceptsWrites: true });
 
       for (let i = 1; i < result.length; i++) {
         expect(result[i]!.order).toBeGreaterThanOrEqual(result[i - 1]!.order);
@@ -125,7 +125,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
   describe("when createView runs", () => {
     /** @scenario create adds a new view at the end */
     it("adds a view whose order comes after every existing one", async () => {
-      const before = await service().getAll({ projectId });
+      const before = await service().getAll({ projectId, acceptsWrites: true });
       const lastOrder = Math.max(...before.map((v) => v.order));
 
       const created = await service().createView({
@@ -148,7 +148,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
 
       await service().delete({ projectId, viewId: created.id, userId: "user-1" });
 
-      const all = await service().getAll({ projectId });
+      const all = await service().getAll({ projectId, acceptsWrites: true });
       expect(all.find((v) => v.id === created.id)).toBeUndefined();
     });
   });
@@ -195,7 +195,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
         userId: "user-1",
       });
 
-      const result = await service().getAll({ projectId });
+      const result = await service().getAll({ projectId, acceptsWrites: true });
       const reordered = result
         .map((v) => v.name)
         .filter((name) => ["View A", "View B", "View C"].includes(name));

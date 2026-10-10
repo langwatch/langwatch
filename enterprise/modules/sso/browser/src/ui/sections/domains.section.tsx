@@ -35,6 +35,7 @@ export function DomainsSection({
   organizationId,
   connectionId,
   canManage,
+  live = false,
   provesWithLicense,
   evidence,
   claims,
@@ -43,6 +44,8 @@ export function DomainsSection({
   organizationId: string;
   connectionId: string;
   canManage: boolean;
+  /** The connection decides sign-in, so a proved domain stays until the connection goes. */
+  live?: boolean;
   /** A licensed installation proves with its licence, with nothing to publish. */
   provesWithLicense: boolean;
   evidence: readonly DomainEvidenceView[];
@@ -119,6 +122,7 @@ export function DomainsSection({
                 key={row.domain}
                 row={row}
                 canManage={canManage}
+                live={live}
                 organizationId={organizationId}
                 connectionId={connectionId}
                 provesWithLicense={provesWithLicense}
@@ -185,6 +189,7 @@ export function DomainsSection({
 function DomainTableRow({
   row,
   canManage,
+  live,
   organizationId,
   connectionId,
   provesWithLicense,
@@ -195,6 +200,7 @@ function DomainTableRow({
 }: {
   row: DomainRow;
   canManage: boolean;
+  live: boolean;
   organizationId: string;
   connectionId: string;
   provesWithLicense: boolean;
@@ -245,6 +251,11 @@ function DomainTableRow({
           </Text>
           {/* The reviewer's own words, so a second attempt starts from what
               a person here already said. */}
+          {canManage && live && row.proved && (
+            <Text fontSize="xs" color="fg.muted" maxWidth="52ch">
+              It stays while the connection is on. To stop routing it, remove the connection.
+            </Text>
+          )}
           {row.claim?.note && (
             <Text fontSize="sm" color="fg.muted">
               {row.claim.note}
@@ -269,10 +280,10 @@ function DomainTableRow({
               {next.action}
             </Button>
           )}
-          {/* The way back out, quiet beside the way forward. Removing a
-              proved domain from a connection that is deciding sign-in is
-              refused by the server, naming what leaves instead. */}
-          {canManage && (
+          {/* The way back out, quiet beside the way forward. A proved domain
+              on a live connection leaves only with the connection, so the
+              row says that instead of offering a refusal. */}
+          {canManage && !(live && row.proved) && (
             <Button
               size="xs"
               variant="ghost"

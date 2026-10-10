@@ -4,13 +4,13 @@
  * Spec: specs/ui/module-host-mounting.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -70,15 +70,11 @@ class AdminSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
 function harness(scope: UiActiveScope, gatewayBaseUrl?: string) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new AdminSession(),
     ),
@@ -97,9 +93,9 @@ function harness(scope: UiActiveScope, gatewayBaseUrl?: string) {
 
   return function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <GatewayHostMount>{children}</GatewayHostMount>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   };
 }

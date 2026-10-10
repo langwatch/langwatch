@@ -18,10 +18,12 @@
  */
 import { anyAuthenticated, publicRoute } from "@langwatch/api/access";
 import {
-  defineRestMiddleware,
+  defineRestDoor,
+  defineMiddlewareContext,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
+  recordScimCredential,
   type DocumentedRouteResponse,
   type RestProtocolProducer,
   type RestProtocolRefusal,
@@ -43,6 +45,25 @@ import {
 import { z } from "zod";
 
 import { scimRefusalDocument } from "../rules/scim-refusal.rules.ts";
+
+/** The `scim_token` door: SCIM's own service looks the per-customer token up (TYPED-DOORS). */
+export const scimTokenDoor = defineRestDoor("scim_token", {
+  needs: ScimApi,
+  identify: async ({ bearer, request }, scim) => {
+    const directory = await scim.authenticateDirectory({
+      bearer,
+      method: request.method,
+      path: new URL(request.url).pathname,
+    });
+
+    recordScimCredential(request, directory);
+
+    return {
+      actor: { type: "api_key", id: directory.id },
+      scope: { tier: "organization", id: directory.organizationId },
+    };
+  },
+});
 
 const SCIM_MEDIA_TYPE = "application/scim+json";
 const MAX_PAGE_SIZE = 100;
@@ -126,10 +147,10 @@ const BEARER_IS_THE_WHOLE_GATE =
 
 /**
  * The directory connection the presented token belongs to, when it belongs
- * to one — bound from the SCIM door's own resolution (§8: a module fact
+ * to one — bound from the SCIM door's own resolution (§8: a middleware context
  * reads the door's credential back, it never re-verifies the bearer itself).
  */
-export const scimRestCredential = defineRestMiddleware(
+export const scimRestCredential = defineMiddlewareContext(
   "scimRestCredential",
   z.object({ connectionId: z.string().nullable() }),
 );
@@ -489,7 +510,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .get("/Users", "scimListUsers")
   .withQuery(listQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "List provisioned users",
@@ -519,9 +540,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .post("/Users", "scimCreateUser")
+  .withAudit("scim.createUser")
   .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE, mismatch: "accepted" })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withStatus(201)
   .withDocs({
@@ -558,7 +580,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .get("/Users/:id", "scimGetUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Get a provisioned user",
@@ -575,10 +597,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .put("/Users/:id", "scimReplaceUser")
+  .withAudit("scim.replaceUser")
   .withParams(idParams)
   .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE, mismatch: "accepted" })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     requestBody: { schema: scimCreateUserRequestSchema },
@@ -604,10 +627,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .patch("/Users/:id", "scimPatchUser")
+  .withAudit("scim.patchUser")
   .withParams(idParams)
   .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE, mismatch: "accepted" })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     requestBody: { schema: scimPatchRequestSchema },
@@ -633,9 +657,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .delete("/Users/:id", "scimDeleteUser")
+  .withAudit("scim.deleteUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Deprovision a user",
@@ -658,7 +683,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .get("/Groups", "scimListGroups")
   .withQuery(groupListQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "List provisioned groups",
@@ -689,9 +714,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .post("/Groups", "scimCreateGroup")
+  .withAudit("scim.createGroup")
   .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE, mismatch: "accepted" })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withStatus(201)
   .withDocs({
@@ -734,7 +760,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withParams(idParams)
   .withQuery(excludedAttributesQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Get a provisioned group",
@@ -759,10 +785,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .put("/Groups/:id", "scimReplaceGroup")
+  .withAudit("scim.replaceGroup")
   .withParams(idParams)
   .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE, mismatch: "accepted" })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     requestBody: { schema: scimReplaceGroupRequestSchema },
@@ -788,10 +815,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .patch("/Groups/:id", "scimPatchGroup")
+  .withAudit("scim.patchGroup")
   .withParams(idParams)
   .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE, mismatch: "accepted" })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     requestBody: { schema: scimPatchRequestSchema },
@@ -817,9 +845,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .delete("/Groups/:id", "scimDeleteGroup")
+  .withAudit("scim.deleteGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
-  .withMiddleware(scimRestCredential)
+  .withMiddlewareContext(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Deprovision a group",

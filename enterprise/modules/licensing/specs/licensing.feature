@@ -90,9 +90,11 @@ Feature: Enterprise licensing lifecycle
     Round 37 (D6) moved the licence and its dates from organization's columns
     to a table licensing owns. Until organization reads the licence through
     LicensingApi, every write also lands on organization's columns, and an
-    organization licensing holds no row for is read from those columns. Once
-    no old image is still writing, a background step copies the rest and
-    overwrites any row that differs from organization's columns (R42).
+    organization is read from those columns where licensing holds no row for it
+    or the columns were written after the row. Once no old image is still
+    writing, a background step copies the rest and overwrites a row that
+    differs from organization's columns written after it (R42; newest wins,
+    Alex 2026-10-09).
 
     @unit
     Scenario: A stored licence lands on licensing's own row and on organization's columns
@@ -114,16 +116,23 @@ Feature: Enterprise licensing lifecycle
       Then it answers the key from organization's columns
 
     @unit
+    Scenario: A licence written to organization's columns after licensing's row is read from them
+      Given an organization whose row of licensing's holds a key
+      When an old image writes another key to organization's columns afterwards
+      Then licensing reads the columns' key, and the platform-access scan lists it
+
+    @unit
     Scenario: The worker brings licensing's licence rows level with organization's columns
       Given organizations whose licences are only on organization's columns
-      And one whose row differs from its columns and one whose row matches them
+      And one whose row differs from columns written after it, one whose row differs from older columns, and one whose row matches
       When the licence copy runs twice
-      Then the first run copies each missing licence with its dates and overwrites the row that differs
+      Then the first run copies each missing licence with its dates and overwrites the row older than its differing columns
+      And it leaves the row newer than its columns
       And the second run copies nothing and organization's columns are as they were
 
     @unit
     Scenario: A licence cleared on organization's columns alone is cleared on licensing's row
-      Given an organization whose row holds a key its columns no longer hold
+      Given an organization whose row holds a key its columns, written after it, no longer hold
       When the licence copy runs
       Then licensing reads no key for it and leaves it out of the platform-access scan
 
@@ -132,6 +141,12 @@ Feature: Enterprise licensing lifecycle
       Given a licence copy that has read an organization's row
       When licensing writes that organization's licence before the copy overwrites it
       Then the copy leaves the row licensing wrote
+
+    @unit
+    Scenario: The licence copy keeps a licence written to both sides between its reads
+      Given a licence copy that has read organization's columns but not yet licensing's row
+      When a live write puts the same licence on both sides before the copy reads licensing's row
+      Then the copy leaves both sides holding the licence that write put there
 
     @unit
     Scenario: A dry run of the licence copy writes nothing
@@ -175,23 +190,30 @@ Feature: Enterprise licensing lifecycle
       When an operator lists the self-hosted instances
       Then the install is listed with no organization name
 
-  Rule: Every deployment composes the licence registry from its own stores
+  Rule: Licensing records that a customer's contract terms moved
 
-    Main built the licence registry, activation codes and licence sync from
-    Postgres on every deployment. The managed keys and the contract budget are
-    the gateway's, reached through its operations.
-
-    @unit
-    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
-      Given the organization's gateway budgets include one carrying the contract's external id
-      When licensing reads the organization's contract budget
-      Then it answers that budget's limit in cents and whether the customer set the cap
+    The contract budget follows the customer's terms, and the budget is connect's. Licensing says only
+    that the terms moved, as a fact on the licensing_customer aggregate keyed by the organization;
+    connect syncs the budget from it, seconds later.
 
     @unit
-    Scenario: An archived contract budget is no contract budget
-      Given the organization's only contract budget is archived
-      When licensing reads the organization's contract budget
-      Then it answers none
+    Scenario: Issuing, revoking, changing terms or linking a licence records contract_terms_changed
+      Given a licence registry that records licensing's customer facts
+      When an operator issues, revokes, changes the terms of, or links a licence to an organization
+      Then each change records a contract_terms_changed fact for the licence's organization
+      And moving a licence between organizations records one for the organization it left as well
+
+    @unit
+    Scenario: A licence linked to no organization records no contract_terms_changed fact
+      Given a licence that no organization carries
+      When an operator revokes it or changes its terms
+      Then no contract_terms_changed fact is recorded
+
+    @unit
+    Scenario: Each contract_terms_changed fact is its own message
+      Given the same operator changes the same organization's terms twice, a moment apart
+      When both facts are recorded
+      Then they carry different idempotency keys, so neither is dropped as a repeat
 
   Rule: Licensing owns the licence signing key
 
@@ -210,70 +232,18 @@ Feature: Enterprise licensing lifecycle
       When a peer asks licensing to sign a licence
       Then it is refused as license_signing_not_configured
 
-  Rule: Every deployment composes the hosted Connect services from their owners
+  Rule: Licensing answers which active licence a managed key runs under
 
-    Main composed the hosted services on every deployment: instant-eval judges a hosted call,
-    prices it at its judge's rate and records the spend under the calling key; the gateway keeps
-    the budgets a connected install reads.
-
-    @integration
-    Scenario: A hosted judgement is priced at the rate of the judge that made it
-      Given LangWatch Cloud judges hosted calls with a judge at its own rate and markup
-      When licensing asks what a judgement's input tokens were worth
-      Then it is told the cost and the customer price at that judge's rate
-
-    @integration
-    Scenario: A hosted judgement stops when the calling install hangs up
-      Given a hosted classify call is being judged
-      When the calling install's request is abandoned
-      Then the judge is handed that request's signal
-
-    @integration
-    Scenario: Hosted spend is billed to the calling key on the spend spine
-      Given the spend spine is registered
-      When a hosted call's spend is recorded
-      Then one outcome at the customer price is recorded under the project's organization and the calling key
-
-    @integration
-    Scenario: Hosted spend is refused while the spend spine is not registered
-      Given the spend spine is not registered
-      When a hosted call's spend is recorded
-      Then the record is refused, so the caller keeps the spend and tries again
+    The hosted Connect routes are the connect module's; whether the calling key belongs to an
+    active licence of the calling organization, and what that licence is entitled to, is licensing's.
 
     @unit
-    Scenario: Hosted usage lists only the budgets that apply to the calling key
-      Given the organization has budgets of which only some apply to the calling key
-      When a connected install reads its hosted usage
-      Then only the applicable budgets are listed, and the contract budget is marked as the contract
-
-    @unit
-    Scenario: Hosted usage resolves no team for a project authz does not know
-      Given the calling key names a project authz holds no scope for
-      When a connected install reads its hosted usage
-      Then the budgets are resolved with no team rather than the read failing
-
-    @unit
-    Scenario: Hosted usage reports spend as unknown when live spend cannot be read
-      Given live spend cannot be read
-      When a connected install reads its hosted usage
-      Then each budget's spend is unknown rather than zero
-
-  Rule: The hosted Connect routes answer behind the gateway's own signed-call door
-
-    Main mounted the hosted routes behind the gateway's signature check. The gateway hands its
-    door out through its Api, so the hosted family verifies the same signature, never a copy.
-
-    @unit
-    Scenario: A hosted call with a bad signature is refused before any route runs
-      Given the Go data plane's call is not signed with the gateway's secret
-      When it reaches a hosted Connect route
-      Then it is refused as unauthenticated and no licence is read
-
-    @unit
-    Scenario: A signed hosted call from a key without a licence is refused by its code
-      Given a correctly signed hosted call from a key no licence carries
-      When it asks for a hosted judgement
-      Then it passes the gateway's door and is refused as connect_service_not_entitled
+    Scenario: findManagedKeyLicense answers the active licence behind a managed key, empty otherwise
+      Given licences held by managed keys, some revoked, expired or of another organization
+      When a peer asks which active licence of an organization holds one managed key
+      Then an active licence of that organization answers as one entry naming its entitled services
+      And an active licence entitled to no hosted service answers as one entry with no services
+      And a revoked, expired or other organization's licence, or none, answers empty
 
   @unit
   Scenario: A hosted service's state names which half said no
@@ -311,6 +281,19 @@ Feature: Enterprise licensing lifecycle
     license sync ended; organization writes its own columns from those facts.
 
     @unit
+    Scenario: Licensing records a stored or cleared licence as a fact for organization to apply
+      Given licensing stores an organization's licence and later clears it
+      When each write lands
+      Then licensing records a licence-stored fact with the key's fingerprint and its dates, never the key, then a licence-cleared fact
+      And it writes organization's licence columns through no organization operation
+
+    @unit
+    Scenario: Organization mirrors the licence licensing stored and clears it when licensing does
+      Given organization subscribes to licensing's licence facts
+      When licensing records a licence stored and then cleared
+      Then organization's licence columns hold the key read from licensing's row and the fact's dates, then hold none
+
+    @unit
     Scenario: Licensing records a hosted-service switch as a fact for organization to apply
       Given an administrator switches a hosted service off for their organisation
       When licensing records the switch
@@ -329,3 +312,70 @@ Feature: Enterprise licensing lifecycle
       Given licensing has recorded that a license sync landed and then that one failed
       When organization receives each fact in order
       Then the organisation keeps when the sync last landed and the code the latest one failed on
+
+    @unit
+    Scenario: Licensing records ending or re-resolving a licence's managed key as a fact for gateway to apply
+      Given a licence whose managed key licensing must end, and another whose install binding was reset
+      When licensing ends the first key and asks for the second to be resolved again
+      Then it records a managed-key-retired fact naming the key, its organisation and the actor
+      And a managed-key-invalidated fact naming the other key and its organisation
+
+    @unit
+    Scenario: Licensing records a managed key's licence as a fact gateway applies
+      Given a licence resolved to its managed key
+      When licensing records the licence that key serves
+      Then it records a managed-key-licence-set fact naming the key, its token's registry hash, the bound install and the term's end, never the token
+      And gateway rewrites that key's licence from the fact, the same values however often it arrives
+
+    @unit
+    Scenario: Licensing records a managed key's services as a fact gateway applies
+      Given a licence resolved to its managed key
+      When licensing records the platform services that key may serve
+      Then it records a managed-key-services-set fact naming the key and the whole service list
+      And gateway replaces that key's services from the fact, the same list however often it arrives
+
+    @unit
+    Scenario: Licensing records the install's hosted provider slot set and cleared as facts
+      Given an organization whose licence names managed models with the service switched on
+      When licensing decides the organization's gateway reaches LangWatch-hosted models, and later that it no longer does
+      Then it records a connect-upstream-set fact and then a connect-upstream-cleared fact, each naming only the organisation
+      And gateway pulls the slot from licensing on the set fact and drops it on the cleared fact, in that order
+
+    @unit
+    Scenario: The install's hosted provider slot falls back to the instance-wide licence
+      Given an organization that holds no licence of its own on a deployment licensed through LANGWATCH_LICENSE_KEY
+      When licensing serves the organization's connect upstream
+      Then the upstream carries the token derived from the instance-wide licence, the install's instance id and the Connect gateway endpoint
+
+    @unit
+    Scenario: Gateway keeps the install's hosted provider slot from licensing's upstream
+      Given licensing serves an upstream for the organization
+      When gateway handles licensing's connect-upstream-set fact
+      Then it reads the upstream from licensing and seals the token into its own slot
+
+    @unit
+    Scenario: Gateway leaves the hosted provider slot unset when licensing serves no upstream
+      Given licensing serves no upstream for the organization, or refuses the read
+      When gateway handles licensing's connect-upstream-set fact
+      Then the slot is left unset and the outcome is logged
+      And a refused read throws, so the delivery is retried with the slot untouched
+
+    @unit
+    Scenario: Licensing records a licence's connect credential issued as a fact for gateway to provision
+      Given a bound licence with no managed key
+      When its token is resolved
+      Then licensing records a connect-credential-issued fact naming the licence, its install, the token's registry hash and its services, never the token
+      And the call answers connect_credential_pending
+
+    @unit
+    Scenario: Licensing attaches gateway's provisioned key once, however often the fact arrives
+      Given gateway has recorded a managed key provisioned for a licence
+      When licensing receives the fact once and then again
+      Then the licence holds that key and nothing is ended on the repeat
+
+    @unit
+    Scenario: Gateway ends or re-resolves a licence's managed key from licensing's fact, however often it arrives
+      Given gateway subscribes to licensing's managed-key facts
+      When a managed-key-retired fact arrives once and then again
+      Then gateway revokes that key under the fact's organisation and actor, the same revoke each time
+      And a managed-key-invalidated fact asks every gateway to resolve that key's licence again

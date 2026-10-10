@@ -147,8 +147,8 @@ export function FloatingCellEditor({
         borderRadius="md"
         boxShadow={
           validationError
-            ? "0 0 0 2px var(--chakra-colors-red-solid), 0 4px 12px rgba(0,0,0,0.15)"
-            : "0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
+            ? "0 0 0 2px var(--chakra-colors-red-solid), var(--chakra-shadows-md)"
+            : "0 0 0 2px var(--chakra-colors-blue-solid), var(--chakra-shadows-md)"
         }
         overflow="hidden"
         position="relative"

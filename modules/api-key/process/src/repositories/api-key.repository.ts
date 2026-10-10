@@ -57,7 +57,11 @@ export abstract class ApiKeyRepository {
    * on `revokedAt` stops a `"cap"` retirement from overwriting a `"user"`
    * revoke that already landed.
    */
-  abstract revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<ApiKeyRow>;
+  abstract revoke(input: {
+    id: string;
+    organizationId: string;
+    cause: ApiKeyRevocationCause;
+  }): Promise<ApiKeyRow>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
   /** The newest live ingest key of this source among keys the caller named. */

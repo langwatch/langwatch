@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const LANGY_RESOURCE_KINDS = [
@@ -159,10 +160,12 @@ const langySkillContextSchema = z.object({
   on: z.string().max(MAX_LANGY_CONTEXT_LABEL_LENGTH).optional(),
 });
 
-export const langyTurnContextSchema = z.object({
+const langyTurnContextSchemaDefinition = z.object({
   pageContext: z.array(langyResourceContextSchema).max(maxResourceChips).optional(),
   skills: z.array(langySkillContextSchema).max(maxSkillChips).optional(),
 });
+export interface LangyTurnContextSchema extends Named<typeof langyTurnContextSchemaDefinition> {}
+export const langyTurnContextSchema: LangyTurnContextSchema = langyTurnContextSchemaDefinition;
 
 export function sanitizeLangyPromptValue(value: string, max: number): string {
   return value

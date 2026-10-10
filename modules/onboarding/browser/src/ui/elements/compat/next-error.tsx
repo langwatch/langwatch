@@ -24,7 +24,9 @@ export default function ErrorPage({ statusCode, title }: { statusCode?: number; 
             {statusCode}
           </h1>
         )}
-        <p style={{ fontSize: "1rem", color: "#666" }}>{title ?? "An error occurred"}</p>
+        <p style={{ fontSize: "1rem", color: "var(--chakra-colors-fg-muted)" }}>
+          {title ?? "An error occurred"}
+        </p>
       </div>
     </div>
   );

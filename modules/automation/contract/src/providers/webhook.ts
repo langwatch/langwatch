@@ -1,5 +1,6 @@
+import type { Named } from "@langwatch/module";
 import {
-  findWebhookUrlProblemMessage,
+  findWebhookUrlProblem,
   sanitizeWebhookHeaders,
   webhookMethodSchema,
   type WebhookMethod,
@@ -29,15 +30,22 @@ export function isWebhookContentType(value: string): boolean {
   return MEDIA_TYPE_RX.test(value.trim());
 }
 
-export const webhookActionParamsSchema = z.object({
-  url: z
+/** The URL field; the dev switch `allowInsecureLocalUrls` admits http and any port. */
+export function webhookUrlSchema({
+  allowInsecureLocalUrls = false,
+}: { allowInsecureLocalUrls?: boolean } = {}): z.ZodType<string> {
+  return z
     .string()
     .trim()
     .min(1, "A webhook URL is required.")
     .superRefine((url, context) => {
-      const problem = findWebhookUrlProblemMessage(url);
-      if (problem) context.addIssue({ code: "custom", message: problem });
-    }),
+      const problem = findWebhookUrlProblem(url, { allowInsecureOrigin: allowInsecureLocalUrls });
+      if (problem) context.addIssue({ code: "custom", message: problem.message });
+    });
+}
+
+const webhookActionParamsSchemaDefinition = z.object({
+  url: webhookUrlSchema(),
   method: webhookMethodSchema.default("POST"),
   headers: z.record(z.string(), z.string()).default({}).transform(sanitizeWebhookHeaders),
   /** NULL = the framework default envelope for a JSON content type, an empty body otherwise. */
@@ -51,6 +59,11 @@ export const webhookActionParamsSchema = z.object({
     .refine(isWebhookContentType, "Enter a media type, like application/json or text/plain."),
   signingSecret: z.string().trim().nullable().optional(),
 });
+export interface WebhookActionParamsSchema extends Named<
+  typeof webhookActionParamsSchemaDefinition
+> {}
+export const webhookActionParamsSchema: WebhookActionParamsSchema =
+  webhookActionParamsSchemaDefinition;
 export type WebhookActionParams = z.infer<typeof webhookActionParamsSchema>;
 
 export interface WebhookPreview extends PreviewEnvelope {

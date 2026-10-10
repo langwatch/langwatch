@@ -6,6 +6,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * building one.
  */
 import type { Actor } from "@langwatch/authorization";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
@@ -16,6 +17,7 @@ function permissivePorts(actor: (Actor & { id: string }) | null): TrpcRuntimeMem
     identity: { caller: () => ({ actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

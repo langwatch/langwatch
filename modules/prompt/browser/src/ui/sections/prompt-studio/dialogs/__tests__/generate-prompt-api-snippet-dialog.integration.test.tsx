@@ -10,14 +10,20 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Shiki is loaded lazily by the code block's adapter; in jsdom the real wasm
+// Shiki is loaded lazily by the design system's shared adapter; in jsdom the real wasm
 // highlighter is slow and adds nothing these assertions read.
-vi.mock("shiki", () => ({
-  createHighlighter: () =>
-    Promise.resolve({
-      codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
-    }),
-}));
+vi.mock("shiki", () => {
+  const highlighter = {
+    codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
+    getLoadedLanguages: () => ["json", "bash", "shellscript", "python", "typescript"],
+    loadLanguage: () => Promise.resolve(),
+  };
+  return {
+    bundledLanguagesInfo: [],
+    createHighlighter: () => Promise.resolve(highlighter),
+    getSingletonHighlighter: () => Promise.resolve(highlighter),
+  };
+});
 
 type MintArgs = Parameters<typeof ApiKeyClient.useMintPersonalToken>[0];
 type MintCall = {

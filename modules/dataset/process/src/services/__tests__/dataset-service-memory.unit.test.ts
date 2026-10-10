@@ -210,6 +210,14 @@ describe("DatasetService", () => {
 
     expect(result.records).toEqual([]);
     expect(calls).toEqual(["read:dataset_1"]);
+
+    await service.copyDataset({
+      sourceDatasetId: dataset.id,
+      sourceProjectId: dataset.projectId,
+      targetProjectId: "project_2",
+    });
+
+    expect(calls).toEqual(["read:dataset_1", "copy"]);
   });
 
   /** @scenario "Upload storage remains an injected Dataset seam" */

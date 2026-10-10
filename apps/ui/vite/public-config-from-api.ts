@@ -1,6 +1,7 @@
 import { request } from "node:https";
 
 import {
+  injectPublicAppConfigIntoHtml,
   PUBLIC_APP_CONFIG_META_NAME,
   parsePublicAppConfigMetaContent,
   type PublicAppConfig,
@@ -46,6 +47,33 @@ export async function fetchPublicConfigFromApi({
       `Start the api (haven up, or pnpm dev) or point LANGWATCH_API_URL at it.`,
     { cause: lastFailure },
   );
+}
+
+/**
+ * The page for a shell, read per request and never waited on: the api's config once it answers,
+ * the last config while a reload has it briefly down, and with none yet the bare shell, which
+ * boots into the browser's waiting page (apps/ui/src/shell/ui-waiting-for-api-page.tsx).
+ */
+export function publicConfigPages({
+  apiUrl,
+  warn,
+  fetchShell = fetchShellOf,
+}: {
+  apiUrl: string;
+  warn: (message: string) => void;
+  fetchShell?: (url: string) => Promise<Response>;
+}): (html: string) => Promise<string> {
+  let last: PublicAppConfig | undefined;
+  let warned = false;
+  return async (html) => {
+    try {
+      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: 0, fetchShell });
+    } catch (failure) {
+      if (!last && !warned) warn(failure instanceof Error ? failure.message : String(failure));
+      warned = true;
+    }
+    return last ? injectPublicAppConfigIntoHtml({ html, config: last }) : html;
+  };
 }
 
 /** The hosts whose self-signed certificate the dev proxy (`secure: false`) already trusts. */

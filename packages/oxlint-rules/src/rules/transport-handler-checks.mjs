@@ -15,7 +15,14 @@ import {
 // `text(node)`, the node's source as written. `produced` holds the fields the
 // handler's own route chain declared a producer for (`declaredProducerFields`).
 
-const ALLOWED_HANDLER_FIELDS = new Set(["input", "app", "actor", "scope", "signal"]);
+const ALLOWED_HANDLER_FIELDS = new Set([
+  "input",
+  "app",
+  "actor",
+  "scope",
+  "authorization",
+  "signal",
+]);
 const RAW_CONTEXT_FIELDS = new Set([
   "ctx",
   "context",

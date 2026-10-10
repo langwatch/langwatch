@@ -10,6 +10,14 @@ export {
   recordProviderInputSchema,
   recordTourInputSchema,
   recordVirtualKeyRevealInputSchema,
+  type GuidedPathInputSchema,
+  type RecordPathsInputSchema,
+  type RecordTourInputSchema,
+  type AttachConversationInputSchema,
+  type GuidedStateWithInstanceOutputSchema,
+  type GuidedStateWithVariantOutputSchema,
+  type RecordProviderInputSchema,
+  type RecordVirtualKeyRevealInputSchema,
 } from "./onboarding.trpc.ts";
 export {
   type GuidedOnboardingCheck,
@@ -17,6 +25,8 @@ export {
   type IntegrationsCheckStatus,
   integrationsCheckStatusSchema,
   type OrganizationInitialized,
+  type GuidedOnboardingCheckSchema,
+  type IntegrationsCheckStatusSchema,
 } from "./onboarding.responses.ts";
 export { integrationsChecksTrpc } from "./onboarding.trpc.ts";
 export * from "./onboarding.api.ts";

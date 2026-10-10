@@ -118,3 +118,37 @@ describe("given the dataset editor opened from a bare drawer address", () => {
     });
   });
 });
+
+describe("given the dataset editor opened on an existing dataset", () => {
+  describe("when the reader edits its name and column after it loads", () => {
+    /** @scenario "An edited dataset's typed name and column are the ones applied" */
+    it("applies the typed values, not the loaded ones", async () => {
+      const applied = vi.fn();
+      mount(
+        <AddOrEditDatasetDrawer
+          open
+          localOnly
+          onSuccess={applied}
+          datasetToSave={{
+            datasetId: "dataset_1",
+            name: "Old name",
+            columnTypes: [{ name: "input", type: "string" }],
+          }}
+        />,
+      );
+
+      const nameInput = await screen.findByDisplayValue("Old name");
+      // The loaded values land after layout; let that reset run before typing.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      fireEvent.change(nameInput, { target: { value: "New name" } });
+      fireEvent.change(screen.getByDisplayValue("input"), { target: { value: "question" } });
+      fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() => expect(applied).toHaveBeenCalled());
+      expect(applied.mock.calls[0]?.[0]).toMatchObject({
+        name: "New name",
+        columnTypes: [{ name: "question", type: "string" }],
+      });
+    });
+  });
+});

@@ -1,7 +1,7 @@
 import {
+  type AutomationEmailPreview,
   defaultsForSourceKind,
   EXAMPLE_MATCHES,
-  renderTriggerEmail,
   renderTriggerSlack,
   renderWebhookBody,
   TemplateValidationError,
@@ -21,6 +21,8 @@ import {
   type TestFireTemplateDraft,
   type TriggerTemplateDefaults,
 } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract/templating";
+import { DispatchError } from "@langwatch/eventing";
 
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 
@@ -31,6 +33,11 @@ const LIQUID_TEMPLATE_COLUMNS = [
   "emailSubjectTemplate",
   "emailBodyTemplate",
 ] as const satisfies readonly (keyof TestFireTemplateDraft)[];
+
+export type TemplatePreviewInput = Pick<
+  TestFireInput,
+  "trigger" | "project" | "draft" | "graphAlert" | "report"
+>;
 
 type TestFireContext = {
   sourceKind: TemplateSourceKind;
@@ -83,6 +90,17 @@ export class AutomationTemplateService {
     return this.sendSlack(input, testContext.context, defaults);
   }
 
+  async previewEmail(input: TemplatePreviewInput): Promise<AutomationEmailPreview> {
+    const { sourceKind, context } = this.buildContext(input);
+
+    return renderTriggerEmail({
+      subjectTemplate: input.draft.emailSubjectTemplate ?? null,
+      bodyTemplate: input.draft.emailBodyTemplate ?? null,
+      context,
+      defaults: defaultsForSourceKind(sourceKind),
+    });
+  }
+
   private validateSlackType(draft: TestFireTemplateDraft): void {
     const type = draft.slackTemplateType;
     const knownType = type === null || type === void 0 || SLACK_TEMPLATE_TYPE_SET.has(type);
@@ -104,7 +122,7 @@ export class AutomationTemplateService {
     }
   }
 
-  private buildContext(input: TestFireInput): TestFireContext {
+  private buildContext(input: TemplatePreviewInput): TestFireContext {
     if (input.report) {
       return {
         sourceKind: "report",
@@ -244,10 +262,17 @@ export class AutomationTemplateService {
     });
 
     if (input.botDestination) {
-      await this.delivery.sendSlackBot({
-        ...input.botDestination,
-        payload: rendered.payload,
-      });
+      try {
+        await this.delivery.sendSlackBot({
+          ...input.botDestination,
+          payload: rendered.payload,
+        });
+      } catch (error) {
+        if (error instanceof DispatchError && error.customerMessage) {
+          throw new TestFireUnavailableError("slack", error.customerMessage);
+        }
+        throw error;
+      }
     } else {
       if (!input.webhook) {
         throw new TestFireUnavailableError(

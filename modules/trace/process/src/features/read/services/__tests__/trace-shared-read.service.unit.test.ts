@@ -7,11 +7,13 @@ import {
   TraceNotFoundError,
   type Protections,
   type Span,
+  type SpanResourceInfo,
   type TraceApi,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProofAuthorizer } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceReadMapperPorts } from "../../../../rules/trace-read-mapper-ports.rules.ts";
 import { TraceSharedReadService } from "../trace-shared-read.service.ts";
 
@@ -101,6 +103,7 @@ type Setup = {
   archived?: boolean;
   missingTrace?: boolean;
   spans?: Span[];
+  resources?: SpanResourceInfo[];
   cached?: unknown;
   refuseKey?: string;
   canSeeCosts?: boolean;
@@ -133,7 +136,7 @@ function setup(options: Setup = {}) {
       return options.spans ?? [];
     },
     readLangwatchSignals: async () => [],
-    readSpanResources: async () => [],
+    readSpanResources: async () => options.resources ?? [],
     readTraceEvents: async () => [],
     readEvaluations: async () => ({}),
   });
@@ -150,6 +153,7 @@ function setup(options: Setup = {}) {
     },
   });
   const service = TraceSharedReadService.create({
+    authorize: ownProofAuthorizer,
     reads,
     share: shareApi,
     projects: {
@@ -284,6 +288,28 @@ describe("TraceSharedReadService", () => {
         language: "python",
         framework: "openai",
       });
+    });
+
+    /** @scenario A shared link never reveals which API key sent the trace */
+    it("never discloses the API key that ingested the trace", async () => {
+      const attrs = { "service.name": "svc", "langwatch.api_key.id": "key-row-id" };
+      const { service } = setup({
+        resources: [
+          {
+            spanId: "s1",
+            parentSpanId: null,
+            startTimeMs: 0,
+            resourceAttributes: attrs,
+            scopeName: "x",
+            scopeVersion: null,
+          },
+        ],
+      });
+
+      const { resources } = await service.getSharedTrace(ANONYMOUS);
+
+      expect(resources.resourceAttributes).toEqual({ "service.name": "svc" });
+      expect(resources.spans[0]?.resourceAttributes).toEqual({ "service.name": "svc" });
     });
 
     it("shows spend only to a viewer who may see it in-app", async () => {

@@ -1,17 +1,19 @@
 /**
  * SCIM's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -22,12 +24,13 @@ import {
   type ScimSuccessNotice,
 } from "../model/scim-host.ts";
 
-class CapabilityScimHost extends ScimHostApi {
+class HostServiceScimHost extends ScimHostApi {
   private readonly orgId: string | undefined;
   private readonly appBaseUrl: string;
   private readonly feedback: UiFeedback;
   private readonly uiRoute: UiRoute;
   private readonly session: UiSession;
+  private readonly flags: UiFlags;
   private readonly closeDrawer: () => void;
 
   constructor({
@@ -36,6 +39,7 @@ class CapabilityScimHost extends ScimHostApi {
     feedback,
     uiRoute,
     session,
+    flags,
     closeDrawer,
   }: {
     orgId: string | undefined;
@@ -43,6 +47,7 @@ class CapabilityScimHost extends ScimHostApi {
     feedback: UiFeedback;
     uiRoute: UiRoute;
     session: UiSession;
+    flags: UiFlags;
     closeDrawer: () => void;
   }) {
     super();
@@ -51,6 +56,7 @@ class CapabilityScimHost extends ScimHostApi {
     this.feedback = feedback;
     this.uiRoute = uiRoute;
     this.session = session;
+    this.flags = flags;
     this.closeDrawer = closeDrawer;
   }
 
@@ -71,8 +77,8 @@ class CapabilityScimHost extends ScimHostApi {
     return this.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.session.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.flags.flag(flag) === true;
   }
 
   succeeded(notice: ScimSuccessNotice): void {
@@ -98,22 +104,24 @@ class CapabilityScimHost extends ScimHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ScimHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route, session } = useUiCapabilities();
+  const { feedback, route, session } = useUiHostServices();
+  const flags = useUiFlags();
   const { organizationId } = useUiScope().activeScope();
   const { appBaseUrl } = useUiDeployment();
   const { closeDrawer } = useDrawer();
 
   const host = useMemo(
     () =>
-      new CapabilityScimHost({
+      new HostServiceScimHost({
         orgId: organizationId ?? void 0,
         appBaseUrl,
         feedback,
         uiRoute: route,
         session,
+        flags,
         closeDrawer,
       }),
-    [organizationId, appBaseUrl, feedback, route, session, closeDrawer],
+    [organizationId, appBaseUrl, feedback, route, session, flags, closeDrawer],
   );
 
   return <ScimHostProvider value={host}>{children}</ScimHostProvider>;

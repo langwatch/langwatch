@@ -6,6 +6,8 @@ import { useScrollEdges } from "../surfaces/use-scroll-edges.ts";
 import { ThemeToggle } from "../theme/theme-toggle.tsx";
 import { tokens } from "../tokens.ts";
 
+const havenIcon = new URL("../../assets/haven.svg", import.meta.url).href;
+
 /** A link with a `group` sits in that group's menu ("Sims", "Tools"), not flat in the bar. */
 export type ConsoleLink = { label: string; href: string; current?: boolean; group?: string };
 
@@ -24,7 +26,7 @@ export type TopBarProps = {
 const Brand = ({ name, slug, homeHref }: Pick<TopBarProps, "name" | "slug" | "homeHref">) => {
   const content = (
     <>
-      <span className="ds-topbar-mark" aria-hidden="true" />
+      <img className="ds-topbar-icon" src={havenIcon} width={24} height={24} alt="" />
       {name}
       {slug !== undefined && (
         <span className="ds-topbar-slug" title={slug}>

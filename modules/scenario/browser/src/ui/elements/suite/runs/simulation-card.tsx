@@ -23,10 +23,10 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
-function SimulationCardHeader({ title, isComplete }: { title: string; isComplete: boolean }) {
+function SimulationCardHeader({ title }: { title: string }) {
   return (
     <Box py={2} px={3} w="100%" position="relative" zIndex={2}>
-      <Text fontSize="xs" fontWeight="semibold" color={isComplete ? "white" : "fg"} lineClamp={2}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg" lineClamp={2}>
         {title}
       </Text>
     </Box>
@@ -257,7 +257,7 @@ export function SimulationCard({
       }}
     >
       <VStack height="100%" gap={0}>
-        {!isLoading && <SimulationCardHeader title={title} isComplete={isComplete} />}
+        {!isLoading && <SimulationCardHeader title={title} />}
         <Box
           className="simulation-card-content"
           opacity={shouldDim ? 0.8 : 1}

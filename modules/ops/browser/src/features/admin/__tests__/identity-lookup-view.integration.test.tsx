@@ -121,7 +121,7 @@ describe("given an operator who has resolved an address", () => {
       renderView();
 
       expect(screen.getByText("Shown the sign-in methods")).toBeInTheDocument();
-      expect(screen.getByTestId("routing-reason")).toHaveTextContent("connection_suspended");
+      expect(screen.getByTestId("routing-reason")).toHaveTextContent("connection suspended");
     });
 
     /** @scenario "The address is resolved the way the auth screens resolves it" */
@@ -175,7 +175,7 @@ describe("given an operator who has resolved an address", () => {
 
       expect(screen.getByText("Sam Carter")).toBeInTheDocument();
       expect(screen.getByText("Sam (older account)")).toBeInTheDocument();
-      expect(screen.getByText("email (DETACHED)")).toBeInTheDocument();
+      expect(screen.getByText("email (removed)")).toBeInTheDocument();
     });
   });
 
@@ -235,6 +235,36 @@ describe("given an operator who may look but may not repair", () => {
       // And no repair is rendered, rather than rendered and refused when
       // pressed.
       expect(screen.queryByText("End every session")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given repeated operator activity", () => {
+  describe("when the activity is rendered", () => {
+    /** @scenario "Recent operator activity uses plain words and groups repeated reads" */
+    it("groups repeated reads with their count and keeps separate repairs", () => {
+      const activity = {
+        auditId: "audit_1",
+        operatorUserId: "op_1",
+        operatorName: "Olive",
+        act: "claimQueue",
+        address: null,
+        atMs: 1_800_000_000_000,
+      };
+      activityState.current = {
+        data: [
+          activity,
+          activity,
+          { ...activity, auditId: "audit_2", atMs: activity.atMs + 1_000 },
+          { ...activity, auditId: "audit_3", act: "endSessions" },
+          { ...activity, auditId: "audit_4", act: "endSessions" },
+        ],
+      };
+      renderView();
+      expect(screen.getAllByText("Olive reviewed domain claims")).toHaveLength(1);
+      expect(screen.getByText("2 times · latest shown")).toBeVisible();
+      expect(screen.getAllByText("Olive ended sessions")).toHaveLength(2);
+      expect(screen.queryByText(/claimQueue|endSessions/)).not.toBeInTheDocument();
     });
   });
 });

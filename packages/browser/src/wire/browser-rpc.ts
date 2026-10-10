@@ -1,7 +1,7 @@
 /**
  * The shell's by-path dispatcher. Cache key is `trpcQueryKey`'s, so a dispatch
  * here and a typed hook share ONE entry. The `UiRpc` port and `useUiRpc` are
- * the host's capability; this is its one implementation.
+ * a host service; this is its one implementation.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";

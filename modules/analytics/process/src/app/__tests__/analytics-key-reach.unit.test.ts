@@ -3,6 +3,7 @@
  * for a key that cannot run it, and only a one-project scope may judge.
  * @see specs/analytics/query-reference.feature
  * @see specs/lwql/eval-functions.feature
+ * @see specs/lwql/api.feature
  * @vitest-environment node
  */
 import type { LangWatchQLKeyReach } from "@langwatch/analytics-contract";
@@ -109,11 +110,10 @@ async function appOver(input: {
       }),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
-        listByOrganization: ({ limit }) =>
-          Promise.resolve({
-            data: [...input.listed],
-            pagination: { page: 1, limit, total: input.listed.length },
-          }),
+        listByOrganization: ({ limit, projectIds }) => {
+          const data = input.listed.filter(({ id }) => !projectIds || projectIds.includes(id));
+          return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });
+        },
       }),
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
@@ -273,6 +273,26 @@ describe("AnalyticsModule.describeLangWatchQLSchemaForKey", () => {
         false,
       );
       expect(flagsAsked).toEqual([]);
+    });
+  });
+});
+
+describe("AnalyticsModule.runLangWatchQLForKey", () => {
+  describe("when the body names a project the key cannot read", () => {
+    /** @scenario "A run naming a project the key cannot read is refused as not found" */
+    it("refuses before the statement reaches the engine", async () => {
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: KEY,
+          sql: "SELECT count() FROM analytics.traces",
+          projectId: "project-elsewhere",
+        }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
     });
   });
 });

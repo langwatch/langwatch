@@ -16,7 +16,7 @@ import {
 } from "@langwatch/metric-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 import type { FeatureSetup } from "@langwatch/process";
-import { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 
 import {
   buildMetricProcessingPipeline,
@@ -101,8 +101,11 @@ export class MetricModule implements MetricApiContract {
     return this.#service.prepareMetricDataPoints(input);
   }
 
-  receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult> {
-    return this.#receiver.receive(request);
+  receiveOtlpMetrics(input: {
+    request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
+  }): Promise<MetricOtlpDoorResult> {
+    return this.#receiver.receive(input);
   }
 
   collectOtlpMetrics(input: MetricCollectionInput): Promise<MetricRequestCollectionResult> {

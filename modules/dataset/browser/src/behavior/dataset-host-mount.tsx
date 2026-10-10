@@ -1,11 +1,11 @@
 /**
  * Dataset's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability. `isLiteMember` reads the scope
+ * `@langwatch/browser-host` host service. `isLiteMember` reads the scope
  * host's organization role. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -27,7 +27,7 @@ import {
   type DatasetSuccessNotice,
 } from "../model/dataset-host.ts";
 
-class CapabilityDatasetHost extends DatasetHostApi {
+class HostServiceDatasetHost extends DatasetHostApi {
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly session: UiSession;
   private readonly lent: UiCopyTargets;
@@ -61,7 +61,9 @@ class CapabilityDatasetHost extends DatasetHostApi {
 
   project(): DatasetHostProject | undefined {
     const project = this.scopeHost?.project();
-    return project ? { id: project.id, slug: project.slug, name: project.name } : void 0;
+    return project
+      ? { id: project.id, slug: project.slug, name: project.name, kind: project.kind }
+      : void 0;
   }
 
   hasPermission(permission: string): boolean {
@@ -120,13 +122,20 @@ class CapabilityDatasetHost extends DatasetHostApi {
  * is what `mounts.load` resolves.
  */
 export default function DatasetHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
 
   const host = useMemo(
     () =>
-      new CapabilityDatasetHost({ scopeHost, session, lent, uiRoute: route, navigation, feedback }),
+      new HostServiceDatasetHost({
+        scopeHost,
+        session,
+        lent,
+        uiRoute: route,
+        navigation,
+        feedback,
+      }),
     [scopeHost, session, lent, route, navigation, feedback],
   );
 

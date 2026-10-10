@@ -2,6 +2,7 @@
  * through mappings, blank values mean "skip this evaluator".
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The value types a field can hold. */
@@ -44,7 +45,7 @@ export const SUITE_FIELD_IDENTIFIER_RESERVED_MESSAGE = `Field identifiers cannot
 export const SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE = "Two fields cannot share an identifier";
 
 /** One field a suite declares. */
-export const suiteFieldDefinitionSchema = z.object({
+const suiteFieldDefinitionSchemaDefinition = z.object({
   identifier: z
     .string()
     .min(1)
@@ -59,10 +60,15 @@ export const suiteFieldDefinitionSchema = z.object({
     ),
   type: z.enum(SUITE_FIELD_TYPES).describe("The value type every scenario carries for this field."),
 });
+export interface SuiteFieldDefinitionSchema extends Named<
+  typeof suiteFieldDefinitionSchemaDefinition
+> {}
+export const suiteFieldDefinitionSchema: SuiteFieldDefinitionSchema =
+  suiteFieldDefinitionSchemaDefinition;
 export type SuiteFieldDefinition = z.infer<typeof suiteFieldDefinitionSchema>;
 
 /** The fields a suite declares, identifiers unique. */
-export const suiteFieldDefinitionsSchema = z
+const suiteFieldDefinitionsSchemaDefinition = z
   .array(suiteFieldDefinitionSchema)
   .max(MAX_SUITE_FIELDS)
   .superRefine((fields, ctx) => {
@@ -78,20 +84,35 @@ export const suiteFieldDefinitionsSchema = z
       seen.add(field.identifier);
     });
   });
+export interface SuiteFieldDefinitionsSchema extends Named<
+  typeof suiteFieldDefinitionsSchemaDefinition
+> {}
+export const suiteFieldDefinitionsSchema: SuiteFieldDefinitionsSchema =
+  suiteFieldDefinitionsSchemaDefinition;
 
 /** One scenario field value as stored. */
-export const scenarioFieldValueSchema = z.union([
+const scenarioFieldValueSchemaDefinition = z.union([
   z.string().max(MAX_SUITE_FIELD_TEXT_LENGTH),
   z.number(),
   z.boolean(),
 ]);
+export interface ScenarioFieldValueSchema extends Named<
+  typeof scenarioFieldValueSchemaDefinition
+> {}
+export const scenarioFieldValueSchema: ScenarioFieldValueSchema =
+  scenarioFieldValueSchemaDefinition;
 export type ScenarioFieldValue = z.infer<typeof scenarioFieldValueSchema>;
 
 /** The values one scenario carries, keyed by field identifier. */
-export const scenarioFieldValuesSchema = z.record(
+const scenarioFieldValuesSchemaDefinition = z.record(
   z.string().max(MAX_SUITE_FIELD_IDENTIFIER_LENGTH),
   scenarioFieldValueSchema,
 );
+export interface ScenarioFieldValuesSchema extends Named<
+  typeof scenarioFieldValuesSchemaDefinition
+> {}
+export const scenarioFieldValuesSchema: ScenarioFieldValuesSchema =
+  scenarioFieldValuesSchemaDefinition;
 export type ScenarioFieldValues = z.infer<typeof scenarioFieldValuesSchema>;
 
 /** Reads a stored `fields` column. Null and a bad shape both read as none. */

@@ -39,6 +39,9 @@
       "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-views/tsconfig.build.json"
+    },
+    {
       "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
@@ -55,6 +58,9 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../client/tsconfig.build.json"

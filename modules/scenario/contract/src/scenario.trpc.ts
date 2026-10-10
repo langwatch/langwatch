@@ -12,7 +12,7 @@ import {
   httpAgentTestInputSchema,
   httpProxyResultSchema,
 } from "@langwatch/agent-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { runNoteSchema } from "./features/run/run-note.ts";
@@ -74,7 +74,7 @@ const dateRangeFields = {
 
 const scenarioIdSchema = z.object({ ...projectSchema.shape, id: z.string() });
 
-export const scenarioTrpcCreateSchema = z.object({
+const scenarioTrpcCreateSchemaDefinition = z.object({
   ...projectSchema.shape,
   name: z.string().min(1),
   situation: z.string(),
@@ -98,8 +98,13 @@ export const scenarioTrpcCreateSchema = z.object({
   // valid Prisma JSON write.
   callerVoice: callerVoiceConfigSchema.optional(),
 });
+export interface ScenarioTrpcCreateSchema extends Named<
+  typeof scenarioTrpcCreateSchemaDefinition
+> {}
+export const scenarioTrpcCreateSchema: ScenarioTrpcCreateSchema =
+  scenarioTrpcCreateSchemaDefinition;
 
-export const scenarioTrpcUpdateSchema = z.object({
+const scenarioTrpcUpdateSchemaDefinition = z.object({
   ...projectSchema.shape,
   id: z.string(),
   name: z.string().min(1).optional(),
@@ -124,8 +129,13 @@ export const scenarioTrpcUpdateSchema = z.object({
   // the newer save. Absent = save over whatever is there.
   expectedVersion: z.number().int().min(1).optional(),
 });
+export interface ScenarioTrpcUpdateSchema extends Named<
+  typeof scenarioTrpcUpdateSchemaDefinition
+> {}
+export const scenarioTrpcUpdateSchema: ScenarioTrpcUpdateSchema =
+  scenarioTrpcUpdateSchemaDefinition;
 
-export const scenarioTrpcRunSchema = z.object({
+const scenarioTrpcRunSchemaDefinition = z.object({
   ...projectSchema.shape,
   scenarioId: z.string(),
   target: simulationTargetSchema,
@@ -141,13 +151,15 @@ export const scenarioTrpcRunSchema = z.object({
   /** One short line describing why this run was started. */
   note: runNoteSchema,
 });
+export interface ScenarioTrpcRunSchema extends Named<typeof scenarioTrpcRunSchemaDefinition> {}
+export const scenarioTrpcRunSchema: ScenarioTrpcRunSchema = scenarioTrpcRunSchemaDefinition;
 
 /**
  * What the Results tab is showing. `endDate` is optional on purpose: the
  * period picker pins its end at mount, so a live view sends only `startDate`
  * and a run that begins while the page is open still lands in the window.
  */
-export const resultsFilterSchema = z.object({
+const resultsFilterSchemaDefinition = z.object({
   projectId: z.string(),
   startDate: z.number().int().nonnegative().optional(),
   endDate: z.number().int().nonnegative().optional(),
@@ -158,6 +170,8 @@ export const resultsFilterSchema = z.object({
   targetKeys: z.array(z.string()).optional(),
   outcome: z.enum(["passed", "failed", "pending"]).optional(),
 });
+export interface ResultsFilterSchema extends Named<typeof resultsFilterSchemaDefinition> {}
+export const resultsFilterSchema: ResultsFilterSchema = resultsFilterSchemaDefinition;
 
 /** The window alone: the scenario filter lists what the window holds. */
 const windowSchema = z.object({

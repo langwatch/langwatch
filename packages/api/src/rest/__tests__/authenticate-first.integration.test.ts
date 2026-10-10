@@ -10,7 +10,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated, type Authorize } from "../../access/access.ts";
 import {
   createErrorHandler,
@@ -77,6 +77,7 @@ const notes = defineRestRouter(NoteApi)
   .withPermission("organization:manage")
   .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.create({ title: input.title }))
 
   .post("/attachments", "attachNote")
@@ -84,6 +85,7 @@ const notes = defineRestRouter(NoteApi)
   .withMultipart({ fields: z.object({ name: z.string() }), files: { file: { required: true } } })
   .withPermission("project:view", { at: "route", param: "projectId" })
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.attach({ projectId: input.projectId, name: input.name }))
 
   .post("/signed/:id", "recordSignedNote")
@@ -91,6 +93,7 @@ const notes = defineRestRouter(NoteApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withAccess(anyAuthenticated({ reason: "the body's signature is the whole gate" }))
   .withOutput(z.object({ id: z.string(), raw: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input, raw }) => app.record({ id: input.id, raw }))
   .build();
 
@@ -109,7 +112,10 @@ function notesApp() {
     return { actor: null, scope: ORGANIZATION };
   });
 
-  const runtime = createRestRuntime({ identity: { authenticate, identify, authorize } });
+  const runtime = createRestRuntime({
+    identity: { authenticate, identify, authorize },
+    authorization: authorizationPort,
+  });
 
   const hono = runtime.mount(notes.router(), { app: () => api, onError: createErrorHandler() });
 
@@ -262,6 +268,7 @@ describe("a request authenticated before its body is parsed", () => {
       .withInput(z.object({ title: z.string().min(1) }))
       .withAccess(anyAuthenticated({ reason: "a signed-in user may draft" }))
       .withOutput(z.object({ id: z.string() }))
+      .withoutAudit("test route")
       .handle(async ({ app, input }) => app.create({ title: input.title }))
       .build();
 
@@ -276,7 +283,10 @@ describe("a request authenticated before its body is parsed", () => {
         publicBaseUrl: "https://app.example",
       });
 
-      const hono = createRestRuntime({ identity }).mount(drafts.router(), {
+      const hono = createRestRuntime({
+        authorization: authorizationPort,
+        identity,
+      }).mount(drafts.router(), {
         app: () => api,
         onError: createErrorHandler(),
       });

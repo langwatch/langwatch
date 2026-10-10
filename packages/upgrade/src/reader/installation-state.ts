@@ -12,6 +12,8 @@ export interface InstallationFacts {
   steps: readonly { id: string; status: string }[];
   failedTargets: number;
   holdsLease: boolean;
+  /** The newest run ended failed: a reconciler can fail after every step settled. */
+  lastRunFailed: boolean;
 }
 
 export interface InstallationVerdict {
@@ -54,6 +56,13 @@ function checkNeedsAttention(facts: InstallationFacts): InstallationVerdict | nu
   if (facts.failedTargets > 0) {
     const count = plural({ count: facts.failedTargets, one: "target", many: "targets" });
     return { state: "needs-attention", reason: "failed-target", summary: `${count} failed.` };
+  }
+  if (facts.lastRunFailed) {
+    return {
+      state: "needs-attention",
+      reason: "failed-run",
+      summary: "The last upgrade run failed.",
+    };
   }
   return null;
 }

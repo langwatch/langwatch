@@ -5,6 +5,7 @@
  */
 
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import { narrowAuthorization } from "@langwatch/authorization";
 import {
   customersAndLabelsResultSchema,
   discoverResultSchema,
@@ -14,7 +15,7 @@ import {
   TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
-  traceSummaryDataSchema,
+  traceSummaryReadSchema,
   tracesEvaluationRunsSchema,
   tracesTrpc,
 } from "@langwatch/trace-contract";
@@ -25,6 +26,7 @@ import {
 } from "../rules/trace-read-mapper-ports.rules.ts";
 import {
   buildSpanContentRedactions,
+  deriveTraceDropPrivacy,
   gateTraceLogVisibility,
   mapLegacySpanSummaryToTreeNode,
   mapSpansToDetailDtos,
@@ -44,16 +46,17 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
   defineTrpcRouter(TraceApi, tracesTrpc)
     .procedure("getAllForProject")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
       return app.listTraces({
         query: input,
         protections,
-        options: { scrollId: input.scrollId, refuseAbove: "tracesPageSizeMax" },
+        options: { scrollId: input.scrollId, refuseAbove: "tracesPageSizeMax", authorization },
       });
     })
 
@@ -70,16 +73,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getEvaluations")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-      });
-
+    .handle(async ({ app, input, actor, authorization }) => {
       const evaluations = await app.readEvaluations({
-        projectId: input.projectId,
-        traceIds: [input.traceId],
-        protections,
+        ...input,
+        authorization,
+        viewerUserId: actor.id,
       });
 
       return evaluationSchema.array().optional().parse(evaluations[input.traceId]);
@@ -87,10 +85,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getEvaluationsMultiple")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
       const evaluations = await app.readEvaluations({
@@ -115,9 +114,13 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getTracesByThreadId")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const { projectId, threadId } = input;
-      const protections = await app.resolveViewerProtections({ projectId, userId: actor.id });
+      const protections = await app.resolveViewerProtections({
+        projectId,
+        userId: actor.id,
+        authorization,
+      });
 
       // Thread-detail read consumes conversation content, so the application
       // resolves full IO (#4991) rather than the 64 KB preview. Anonymous
@@ -128,9 +131,13 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getTracesWithSpans")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const { projectId, traceIds } = input;
-      const protections = await app.resolveViewerProtections({ projectId, userId: actor.id });
+      const protections = await app.resolveViewerProtections({
+        projectId,
+        userId: actor.id,
+        authorization,
+      });
 
       return app.readTracesWithSpans({
         projectId,
@@ -142,9 +149,13 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getFormattedSpansDigest")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const { projectId, traceIds } = input;
-      const protections = await app.resolveViewerProtections({ projectId, userId: actor.id });
+      const protections = await app.resolveViewerProtections({
+        projectId,
+        userId: actor.id,
+        authorization,
+      });
 
       // The digest reads the same spans the other columns map from; without
       // it, the trace-quoting column would spell out spans the reviewer
@@ -173,9 +184,13 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getTracesWithSpansByThreadIds")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const { projectId, threadIds } = input;
-      const protections = await app.resolveViewerProtections({ projectId, userId: actor.id });
+      const protections = await app.resolveViewerProtections({
+        projectId,
+        userId: actor.id,
+        authorization,
+      });
 
       // Thread reads consume conversation content, so the application resolves
       // full IO (#4991).
@@ -189,10 +204,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getSampleTracesDataset")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
       // Dataset builder persists trace content, so the application resolves
@@ -250,10 +266,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("getAllForDownload")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
       // A download must never serve the 64 KB preview (#4991 AC1), spans or
@@ -268,6 +285,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           resolveBlobs: true,
           scrollId: input.scrollId,
           refuseAbove: "tracesDownloadPageSizeMax",
+          authorization,
         },
       });
     })
@@ -288,10 +306,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("list")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const filterWhere = app.compileExplorerTraceFilter({
         query: input.query ?? "",
@@ -304,7 +323,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const page = traceListPageSchema.parse(
         await app.readTraceList({
-          tenantId: input.projectId,
+          authorization,
           timeRange: input.timeRange,
           sort: input.sort,
           page: input.page,
@@ -325,9 +344,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("listEvents")
     .withPermission("traces:view")
-    .handle(({ app, input }) =>
+    .handle(({ app, input, authorization }) =>
       app.readTraceEventRollups({
-        projectId: input.projectId,
+        authorization,
         traceIds: input.traceIds,
         timeRange: input.timeRange,
       }),
@@ -335,7 +354,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("newCount")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, authorization }) => {
       const filterWhere = app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
@@ -346,7 +365,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         }),
       });
       const count = await app.readNewCount({
-        tenantId: input.projectId,
+        authorization,
         timeRange: input.timeRange,
         since: input.since,
         filterWhere,
@@ -357,9 +376,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("suggest")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, authorization }) => {
       const values = await app.readSuggestions({
-        tenantId: input.projectId,
+        authorization,
         field: input.field,
         prefix: input.prefix,
         limit: input.limit,
@@ -375,20 +394,23 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("conversationContext")
     .withPermission("traces:view")
-    .handle(({ app, input, actor }) =>
+    .handle(({ app, input, actor, authorization }) =>
       app.readConversationContextForViewer({
         projectId: input.projectId,
+        authorization,
         conversationId: input.conversationId,
+        tenantId: input.tenantId,
         viewerUserId: actor.id,
       }),
     )
 
     .procedure("discover")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, authorization }) =>
       discoverResultSchema.parse(
         await app.readDiscoverForQuery({
           projectId: input.projectId,
+          authorization,
           timeRange: input.timeRange,
           query: input.query,
           evalRuns: input.evalRuns,
@@ -412,10 +434,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("facets")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, authorization }) =>
       discoverResultSchema.parse(
         await app.readFilteredFacets({
           projectId: input.projectId,
+          authorization,
           timeRange: input.timeRange,
           query: input.query ?? "",
           evalRuns: await app.findExplorerEvalRuns({
@@ -428,10 +451,10 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("facetValues")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, authorization }) =>
       facetValuesResultSchema.parse(
         await app.readFacetValues({
-          tenantId: input.projectId,
+          authorization,
           timeRange: input.timeRange,
           facetKey: input.facetKey,
           prefix: input.prefix,
@@ -470,33 +493,45 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("header")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization, actor }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
-      const summary = traceSummaryDataSchema.parse(
+      const summary = traceSummaryReadSchema.parse(
         await app.readTraceSummary({
-          projectId: input.projectId,
+          authorization,
           traceId: input.traceId,
+          tenantId: input.tenantId,
           occurredAtMs: input.occurredAtMs,
           visibilityCutoffMs: protections.visibilityCutoffMs,
           full: input.full,
         }),
       );
       const rawHeader = mapTraceSummaryToHeader(summary);
+      // Privacy follows the member the trace was found in (ADR-177 decision 9).
+      const memberProtections = await app.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+        authorization:
+          narrowAuthorization({ authorization, projectId: summary.tenantId }) ?? authorization,
+      });
       // Cost is gated by the viewer's own `cost:view` (via `protections`), the
       // same rule the detail-pane spans apply through `applySpanProtections`.
       const header = gateHeaderCost({
-        header: redactV2Content(rawHeader, protections, traceReadMapperPorts.contentPrivacy),
-        protections,
+        header: redactV2Content(rawHeader, memberProtections, traceReadMapperPorts.contentPrivacy),
+        protections: memberProtections,
       });
-      // The "content dropped at ingestion" banner needs a live data-privacy
-      // policy read this transport does not have wired yet (merge-traces-v2
-      // handoff), so it stays unset rather than guessed.
-      header.privacy = null;
-
-      return header;
+      return {
+        ...header,
+        privacy: await deriveTraceDropPrivacy(
+          rawHeader,
+          summary.tenantId,
+          traceReadMapperPorts.contentPrivacy,
+        ),
+        projectId: summary.tenantId,
+      };
     })
 
     /**
@@ -521,18 +556,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("evals")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, authorization, actor }) =>
       tracesEvaluationRunsSchema.parse(
-        await app.readEvaluationRuns({ tenantId: input.projectId, traceId: input.traceId }),
+        await app.readEvaluationRuns({ ...input, authorization, viewerUserId: actor.id }),
       ),
     )
 
     .procedure("traceLogs")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const rows = await app.readTraceLogRecords({
         projectId: input.projectId,
@@ -552,13 +588,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spansPaginated")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization: routeProof, actor }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const page = await app.readSpansPage({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         visibilityCutoffMs: protections.visibilityCutoffMs,
         limit: input.limit,
@@ -581,13 +623,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spansDelta")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization: routeProof, actor }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const sinceSpans = await app.readSpansSince({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
@@ -610,24 +658,44 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("spanTreePaginated")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization: routeProof }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
-      return app.readSpanTreePage({ ...input, canSeeCosts: protections.canSeeCosts === true });
+      return app.readSpanTreePage({
+        ...input,
+        authorization,
+        canSeeCosts: protections.canSeeCosts === true,
+      });
     })
 
     .procedure("spanTreeDelta")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization: routeProof }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
-      return app.readSpanTreeDelta({ ...input, canSeeCosts: protections.canSeeCosts === true });
+      return app.readSpanTreeDelta({
+        ...input,
+        authorization,
+        canSeeCosts: protections.canSeeCosts === true,
+      });
     })
 
     /**
@@ -637,13 +705,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("spanTree")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization: routeProof, actor }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const rows = await app.readSpanSummaries({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });
@@ -653,9 +727,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spanLangwatchSignals")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, authorization: routeProof }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const rows = await app.readLangwatchSignals({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });
@@ -669,13 +748,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("spansFull")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization: routeProof, actor }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const storedSpans = await app.readSpans({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
@@ -695,9 +780,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spanDetail")
     .withPermission("traces:view")
-    .handle(({ app, input, actor }) =>
+    .handle(async ({ app, input, actor, authorization }) =>
       app.readSpanDetailForViewer({
         projectId: input.projectId,
+        authorization: await app.authorizationForTrace({
+          authorization,
+          traceId: input.traceId,
+          tenantId: input.tenantId,
+        }),
         traceId: input.traceId,
         spanId: input.spanId,
         occurredAtMs: input.occurredAtMs,
@@ -711,13 +801,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("resourceInfo")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization: routeProof, actor }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const rows = await app.readSpanResources({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });
@@ -746,13 +842,19 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("traceEvents")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, authorization: routeProof, actor }) => {
+      const authorization = await app.authorizationForTrace({
+        authorization: routeProof,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+      });
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
       const events = await app.readTraceEvents({
-        projectId: input.projectId,
+        authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });

@@ -95,7 +95,8 @@ describe("ClickHouseQueryClient.stream()", () => {
           client.stream({
             tenantId: "",
             sql: "SELECT EventId FROM event_log",
-            unscoped: { reason: "a replay discovery across every tenant" },
+            // A replay discovery reads across every tenant.
+            SKIP_TENANT_CHECK: true,
           }),
         );
 
@@ -136,7 +137,7 @@ describe("ClickHouseQueryClient.stream()", () => {
       const execute = vi.spyOn(driver, "execute");
 
       const batches = await collect(
-        new ClickHouseQueryClient({ driver }).stream({
+        new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }).stream({
           tenantId: "project-a",
           sql: TENANT_READ,
           params: { tenantId: "project-a" },

@@ -1,5 +1,6 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { z } from "zod";
@@ -75,7 +76,7 @@ export type CarriedOverCell = {
   evaluatorResults: { evaluatorId: string; result: unknown }[];
 };
 
-export const carriedOverCellSchema = z.object({
+const carriedOverCellSchemaDefinition = z.object({
   rowIndex: z.number(),
   targetId: z.string(),
   output: z.unknown().optional(),
@@ -88,9 +89,11 @@ export const carriedOverCellSchema = z.object({
     .optional(),
   evaluatorResults: z.array(z.object({ evaluatorId: z.string(), result: z.unknown() })),
 });
+export interface CarriedOverCellSchema extends Named<typeof carriedOverCellSchemaDefinition> {}
+export const carriedOverCellSchema: CarriedOverCellSchema = carriedOverCellSchemaDefinition;
 
 /** What subset of the evaluation a run executes; the request's and a run plan's `scope`. */
-export const executionScopeSchema = z.discriminatedUnion("type", [
+const executionScopeSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("full") }),
   z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
   z.object({ type: z.literal("target"), targetId: z.string() }),
@@ -124,6 +127,8 @@ export const executionScopeSchema = z.discriminatedUnion("type", [
     traceIds: z.record(z.coerce.number(), z.string().optional()),
   }),
 ]);
+export interface ExecutionScopeSchema extends Named<typeof executionScopeSchemaDefinition> {}
+export const executionScopeSchema: ExecutionScopeSchema = executionScopeSchemaDefinition;
 
 /**
  * Input to start an evaluation execution.
@@ -160,7 +165,7 @@ export type ExecutionRequest = {
   parameters?: Record<string, string | number | boolean>;
 };
 
-export const executionRequestSchema = z
+const executionRequestSchemaDefinition = z
   .object({
     projectId: z.string(),
     experimentId: z.string().optional(),
@@ -210,25 +215,37 @@ export const executionRequestSchema = z
     message: "Pass either inline data or a dataset_id, not both",
     path: ["data"],
   });
+export interface ExecutionRequestSchema extends Named<typeof executionRequestSchemaDefinition> {}
+export const executionRequestSchema: ExecutionRequestSchema = executionRequestSchemaDefinition;
 
 /** `/api/experiments/abort`'s body: the two fields it has always required. */
-export const abortExperimentRunRequestSchema = z.object({
+const abortExperimentRunRequestSchemaDefinition = z.object({
   projectId: z.string().min(1),
   runId: z.string().min(1),
 });
+export interface AbortExperimentRunRequestSchema extends Named<
+  typeof abortExperimentRunRequestSchemaDefinition
+> {}
+export const abortExperimentRunRequestSchema: AbortExperimentRunRequestSchema =
+  abortExperimentRunRequestSchemaDefinition;
 
-export const abortExperimentRunResponseSchema = z.object({
+const abortExperimentRunResponseSchemaDefinition = z.object({
   success: z.literal(true),
   runId: z.string(),
   message: z.literal("Abort requested"),
 });
+export interface AbortExperimentRunResponseSchema extends Named<
+  typeof abortExperimentRunResponseSchemaDefinition
+> {}
+export const abortExperimentRunResponseSchema: AbortExperimentRunResponseSchema =
+  abortExperimentRunResponseSchemaDefinition;
 
 /**
  * Optional run inputs accepted as a JSON body by the run API and the workflow
  * evaluate endpoint: inline data, a dataset id, override parameters, and a
  * row-index subset. `data` and `dataset_id` are mutually exclusive.
  */
-export const runInputsBodySchema = z
+const runInputsBodySchemaDefinition = z
   .object({
     data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
     dataset_id: z.string().optional(),
@@ -239,6 +256,8 @@ export const runInputsBodySchema = z
     message: "Pass either inline data or a dataset_id, not both",
     path: ["data"],
   });
+export interface RunInputsBodySchema extends Named<typeof runInputsBodySchemaDefinition> {}
+export const runInputsBodySchema: RunInputsBodySchema = runInputsBodySchemaDefinition;
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
 
 // True when a run evaluates the experiment's own saved dataset untouched.

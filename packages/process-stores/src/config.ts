@@ -5,6 +5,7 @@
  */
 import type { PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { EventingParticipation, ExecutionTarget } from "@langwatch/eventing";
+import type { EventLogRetentionClassifier } from "@langwatch/eventing/server";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 
 /** Postgres, as one guarded client per process. */
@@ -79,6 +80,8 @@ export type EventingStoreConfig =
       readonly kind: "event-log";
       /** The fallback retention for rows whose tenant states none, in days. */
       readonly defaultRetentionDays: number;
+      /** Each event_log row's retention class; absent stamps every row with the default. */
+      readonly classifyEventLogRetention?: EventLogRetentionClassifier;
     }>;
 
 /**

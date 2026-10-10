@@ -3,6 +3,10 @@ import type { ObjectStorage } from "@langwatch/process-stores/members";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { ObjectStorageStoredObjectBytesRepository } from "../object-storage/object-storage.stored-object-bytes.repository.ts";
 import { ObjectStorageStoredObjectLegacyStorageRepository } from "../object-storage/object-storage.stored-object-legacy-storage.repository.ts";
+import {
+  type LegacyStoredObjectRow,
+  StoredObjectLegacySourceRepository,
+} from "../stored-object-legacy-source.repository.ts";
 import type { StoredObjectRepositories } from "../stored-object.repositories.ts";
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 import { MemoryStoredObjectRateLimitRepository } from "./memory.stored-object-rate-limit.repository.ts";
@@ -26,6 +30,25 @@ class MemoryStoredObjectsRepository extends StoredObjectsRepository {
     Promise.resolve(null);
 }
 
+/** The legacy index's import source in this tier: nothing to import. */
+class MemoryStoredObjectLegacySourceRepository extends StoredObjectLegacySourceRepository {
+  static create(): MemoryStoredObjectLegacySourceRepository {
+    return new MemoryStoredObjectLegacySourceRepository();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  findPage(_input: {
+    projectId: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<readonly LegacyStoredObjectRow[]> {
+    return Promise.resolve([]);
+  }
+}
+
 /**
  * The "memory" tier. Bytes go to the memory stores' own `objectStorage` twin
  * (ADR-158), the one store this tier answers; every other repository is a twin here.
@@ -41,6 +64,7 @@ export class MemoryStoredObjectRepositories {
       bytes: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
       legacyIndex: MemoryStoredObjectsRepository.create(),
       legacyStorage: ObjectStorageStoredObjectLegacyStorageRepository.create(objectStorage),
+      legacySource: MemoryStoredObjectLegacySourceRepository.create(),
       rateLimits: MemoryStoredObjectRateLimitRepository.create(),
       seals: MemoryStoredObjectSealRepository.create(),
     };

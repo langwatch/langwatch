@@ -165,6 +165,18 @@ describe("given an organization that has claimed no domain", () => {
   });
 });
 
+describe("given an organization not on an Enterprise plan", () => {
+  /** @scenario "The sign-on card says up front that single sign-on needs an Enterprise plan" */
+  it("says Enterprise on the card and offers neither control", () => {
+    state.view = { ...viewWith(null), enterpriseRequired: true };
+    renderCard();
+
+    expect(screen.getByTestId("sso-card-enterprise-gate")).toHaveTextContent(/Enterprise/);
+    expect(screen.queryByTestId("sso-prove-domain")).toBeNull();
+    expect(screen.queryByTestId("single-sign-on-preview-action")).toBeNull();
+  });
+});
+
 describe("when the reader may not see single sign-on", () => {
   /** @scenario "Verifying a domain is answerable from here" */
   it("sends no request and says who can tell them", () => {

@@ -3,6 +3,7 @@
  * datasets they ran against. Experiment serves them as `batchRecord.*`.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -10,13 +11,18 @@ import { z } from "zod";
  * cost, and the mean score. Shaped as the grouped read answers it, so the
  * index page reads the same keys it always has.
  */
-export const batchEvaluationSummarySchema = z.object({
+const batchEvaluationSummarySchemaDefinition = z.object({
   experimentId: z.string(),
   datasetSlug: z.string(),
   _count: z.object({ experimentId: z.number() }),
   _sum: z.object({ cost: z.number().nullable() }),
   _avg: z.object({ score: z.number().nullable() }),
 });
+export interface BatchEvaluationSummarySchema extends Named<
+  typeof batchEvaluationSummarySchemaDefinition
+> {}
+export const batchEvaluationSummarySchema: BatchEvaluationSummarySchema =
+  batchEvaluationSummarySchemaDefinition;
 export type BatchEvaluationSummary = z.infer<typeof batchEvaluationSummarySchema>;
 
 /**
@@ -24,7 +30,7 @@ export type BatchEvaluationSummary = z.infer<typeof batchEvaluationSummarySchema
  * the row is the stored one, and the export beside it reads columns this
  * schema names as well as the whole `data` payload it does not.
  */
-export const batchEvaluationRecordSchema = z.looseObject({
+const batchEvaluationRecordSchemaDefinition = z.looseObject({
   id: z.string(),
   experimentId: z.string(),
   projectId: z.string(),
@@ -42,4 +48,9 @@ export const batchEvaluationRecordSchema = z.looseObject({
   updatedAt: z.date(),
   dataset: z.looseObject({ id: z.string(), name: z.string(), slug: z.string() }),
 });
+export interface BatchEvaluationRecordSchema extends Named<
+  typeof batchEvaluationRecordSchemaDefinition
+> {}
+export const batchEvaluationRecordSchema: BatchEvaluationRecordSchema =
+  batchEvaluationRecordSchemaDefinition;
 export type BatchEvaluationRecord = z.infer<typeof batchEvaluationRecordSchema>;

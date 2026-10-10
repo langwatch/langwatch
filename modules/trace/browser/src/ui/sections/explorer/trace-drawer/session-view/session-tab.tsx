@@ -1,5 +1,6 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
+import { useTraceQueryArgs } from "../../../../../behavior/explorer/use-trace-query-args.ts";
 import {
   useCodingAgentSession,
   useCodingAgentTranscript,
@@ -23,10 +24,12 @@ export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps
   // sibling traces is a reasonable follow-up, not done here. Shares its
   // cache key with the Terminal tab's own read, so switching tabs on a
   // session already opened once costs nothing extra.
+  const { tenantId } = useTraceQueryArgs();
   const transcriptQuery = useCodingAgentTranscript({
     projectId,
     traceId,
     occurredAtMs,
+    tenantId,
     enabled: !!query.data,
   });
 

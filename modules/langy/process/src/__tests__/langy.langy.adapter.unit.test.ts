@@ -127,6 +127,7 @@ describe("LangyPostgresService", () => {
   it("builds one service graph from the same private repositories", () => {
     const options = composition({
       models: { resolve: vi.fn() },
+      projects: { findById: vi.fn() },
       worker: null,
       permits: {
         reserve: vi.fn(),
@@ -287,6 +288,7 @@ function publicSurfaceOf(service: object): string[] {
 function compositionOptions() {
   return composition({
     models: { resolve: vi.fn() },
+    projects: { findById: vi.fn() },
     worker: null,
     permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
     perDayPrCap: 0,

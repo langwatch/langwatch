@@ -39,6 +39,7 @@ export function RemoveScopeConfirmDialog({
       }}
     >
       <Dialog.Content>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Remove retention policy{group ? ` for ${group.name}` : ""}?</Dialog.Title>
         </Dialog.Header>

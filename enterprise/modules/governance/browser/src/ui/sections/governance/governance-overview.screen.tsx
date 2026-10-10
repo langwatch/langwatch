@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
@@ -46,20 +47,31 @@ function GovernanceOverviewPage() {
   // The Insights screen rides the billed-cost flag, the same way the section
   // rail decides whether to list it. Offering the button without the flag
   // would point at a page the guard refuses.
-  const canSetUpInsights = host.isFeatureEnabled("release_ui_governance_billed_cost_enabled");
+  const canSetUpInsights = host.isFeatureEnabled(
+    FrontendFlags.release_ui_governance_billed_cost_enabled,
+  );
 
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <PageLayout.Container>
-        <VStack align="stretch" gap={8} width="full" maxW={HOME_MEASURE} marginX="auto">
-          <HStack gap={2} height="48px">
+        {/* zIndex 1 is load-bearing: the stacking context the hero's zIndex -1 light sits in. */}
+        <VStack
+          align="stretch"
+          gap={8}
+          width="full"
+          maxW={HOME_MEASURE}
+          marginX="auto"
+          position="relative"
+          zIndex={1}
+        >
+          <PageLayout.Header>
             <PageLayout.Heading>AI Governance</PageLayout.Heading>
             <Badge colorPalette="purple" size="sm" variant="surface">
               Preview
             </Badge>
             <Spacer />
             <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
-          </HStack>
+          </PageLayout.Header>
           <VStack align="stretch" gap={6}>
             {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
 

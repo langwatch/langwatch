@@ -1,4 +1,5 @@
 import type { VoiceTransport } from "@langwatch/agent-contract";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { VOICE_TRANSPORTS, VOICE_TRANSPORT_LABELS } from "./voice-form.ts";
 
@@ -6,7 +7,7 @@ import { VOICE_TRANSPORTS, VOICE_TRANSPORT_LABELS } from "./voice-form.ts";
 export const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
 
 /** The release flag every voice surface reads (AC29). */
-export const VOICE_AGENTS_FLAG_KEY = "release_voice_agents_enabled";
+export const VOICE_AGENTS_FLAG_KEY = FrontendFlags.release_voice_agents_enabled;
 
 type TalkPrerequisites = {
   transport: VoiceTransport;

@@ -13,10 +13,13 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
-import { type AndChain, buildAndChain } from "../rules/trace-query-evaluation-scope.rules.ts";
+import {
+  type AndChain,
+  buildAndChain,
+  evaluateEvaluationScope,
+} from "../rules/trace-query-evaluation-scope.rules.ts";
 import { collectQueryNeeds, evaluateTraceTag } from "../rules/trace-query-evaluation.rules.ts";
 import { normalizeQuery } from "../rules/trace-query.rules.ts";
-import type { TraceQueryEvaluationScopeService } from "./trace-query-evaluation-scope.service.ts";
 import type { TraceQueryFieldsService } from "./trace-query-fields.service.ts";
 import type { TraceQueryTranslationService } from "./trace-query-translation.service.ts";
 
@@ -31,28 +34,20 @@ interface WalkState {
 /** Evaluates saved queries against traces in memory, mirroring the CH compiler. */
 export class TraceQueryEvaluationService {
   readonly #fields: TraceQueryFieldsService;
-  readonly #evaluationScope: TraceQueryEvaluationScopeService;
   readonly #translation: TraceQueryTranslationService;
 
   static create({
     fields,
-    evaluationScope,
     translation,
   }: {
     fields: TraceQueryFieldsService;
-    evaluationScope: TraceQueryEvaluationScopeService;
     translation: TraceQueryTranslationService;
   }): TraceQueryEvaluationService {
-    return new TraceQueryEvaluationService(fields, evaluationScope, translation);
+    return new TraceQueryEvaluationService(fields, translation);
   }
 
-  private constructor(
-    fields: TraceQueryFieldsService,
-    evaluationScope: TraceQueryEvaluationScopeService,
-    translation: TraceQueryTranslationService,
-  ) {
+  private constructor(fields: TraceQueryFieldsService, translation: TraceQueryTranslationService) {
     this.#fields = fields;
-    this.#evaluationScope = evaluationScope;
     this.#translation = translation;
   }
 
@@ -67,7 +62,6 @@ export class TraceQueryEvaluationService {
     try {
       compiled = this.#translation.translateFilter({
         queryText,
-        tenantId: "__in_memory__",
         timeRange: { from: 0, to: 0 },
       });
     } catch {
@@ -239,7 +233,7 @@ export class TraceQueryEvaluationService {
     if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
     let matched = true;
     if (chain.scope) {
-      const bound = this.#evaluationScope.evaluateEvaluationScope(chain.scope, trace);
+      const bound = evaluateEvaluationScope({ scope: chain.scope, trace, fields: this.#fields });
       if (bound === UNSUPPORTED) {
         state.unsupportedFields.push("evaluator");
         return UNSUPPORTED;

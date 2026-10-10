@@ -1,11 +1,11 @@
 /**
  * Workflow's answer to the host its screens, and experiment's, declare: every
- * action projects a `@langwatch/browser-host` capability and is published as the
+ * action projects a `@langwatch/browser-host` host service and is published as the
  * `workflow:host` slice, so the module mounts it, not the application.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -24,7 +24,7 @@ import type {
   WorkflowRouteReading,
   WorkflowScope,
 } from "../model/workflow-host.ts";
-import { workflowHostSlice } from "./workflow-host.store.ts";
+import { useWorkflowHostSlice } from "./workflow-host.store.ts";
 
 function capabilityWorkflowHost({
   scopeHost,
@@ -50,7 +50,7 @@ function capabilityWorkflowHost({
         projectName: project?.name,
         organizationId: scopeHost?.organization()?.id,
         teamId: scopeHost?.team()?.id,
-        isResolved: scopeHost ? !scopeHost.isLoading() : false,
+        isResolved: scopeHost ? !scopeHost.isLoading() && session.isSettled() : false,
       };
     },
 
@@ -80,6 +80,8 @@ function capabilityWorkflowHost({
     navigate: (to) => navigation.navigate(to),
     back: () => navigation.back(),
     succeeded: (notice) => feedback.succeeded(notice),
+    warned: (notice) => feedback.warned(notice),
+    informed: (notice) => feedback.informed(notice),
     failed: (failure) => feedback.failed(failure),
   };
 }
@@ -90,7 +92,7 @@ function capabilityWorkflowHost({
  * because that is what `mounts.load` resolves.
  */
 export default function WorkflowHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
   const [published, setPublished] = useState(false);
@@ -109,7 +111,7 @@ export default function WorkflowHostMount({ children }: { children?: ReactNode }
   );
 
   useLayoutEffect(() => {
-    workflowHostSlice.setState(host, true);
+    useWorkflowHostSlice.setState(host, true);
     setPublished(true);
   }, [host]);
 

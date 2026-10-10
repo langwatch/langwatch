@@ -75,7 +75,7 @@ describe("given a module that declares other modules' Apis as peers", () => {
       const constructed: string[] = [];
       const container = new WorkerProcessContainer(runtime(), [dependentModule({ constructed })]);
 
-      const refusal = await container.boot().then(
+      const refusal = await container.boot({ classifyEventLogRetention: () => "traces" }).then(
         () => undefined,
         (error: unknown) => error,
       );
@@ -96,7 +96,7 @@ describe("given a module that declares other modules' Apis as peers", () => {
         dependentModule({ constructed }),
       ]);
 
-      const booted = await container.boot();
+      const booted = await container.boot({ classifyEventLogRetention: () => "traces" });
 
       expect(constructed).toEqual(["agent"]);
       expect(booted.service(WorkflowApi).read()).toBe("workflow");

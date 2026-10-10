@@ -9,6 +9,12 @@ import type {
   GrantRevoked,
 } from "./authz-grants-rest.schemas.ts";
 import type {
+  AuthzAttachSharedProjectGrantInput,
+  AuthzAttachSharedProjectGrantOutput,
+  AuthzAwaitSharedProjectGrantsInput,
+  AuthzFindLiveSharedProjectGrantsInput,
+  AuthzRevokeSharedProjectGrantsInput,
+  AuthzSharedProjectGrant,
   AuthzAttachBindingsInput,
   AuthzAttachBindingsOutput,
   AuthzAttachResourceGrantInput,
@@ -68,6 +74,14 @@ export abstract class AuthzGrantsService {
   abstract revokeResourceGrants(
     args: AuthzRevokeResourceGrantsInput,
   ): Promise<AuthzRevokeResourceGrantsOutput>;
+  abstract findLiveSharedProjectGrants(
+    args: AuthzFindLiveSharedProjectGrantsInput,
+  ): Promise<AuthzSharedProjectGrant[]>;
+  abstract attachSharedProjectGrant(
+    args: AuthzAttachSharedProjectGrantInput,
+  ): Promise<AuthzAttachSharedProjectGrantOutput>;
+  abstract awaitSharedProjectGrants(args: AuthzAwaitSharedProjectGrantsInput): Promise<void>;
+  abstract revokeSharedProjectGrants(args: AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
 
   abstract changeBindingRole(
     args: AuthzChangeBindingRoleInput,

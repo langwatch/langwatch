@@ -98,6 +98,8 @@ export interface OnboardingScreen {
   id: string;
   required: boolean;
   component: React.ComponentType<OnboardingScreenProps>;
+  /** A quiet action drawn under the step's navigation, outside the form. */
+  footer?: React.ComponentType<OnboardingScreenProps>;
   heading: string;
   subHeading?: string;
   widthVariant?: "narrow" | "full";

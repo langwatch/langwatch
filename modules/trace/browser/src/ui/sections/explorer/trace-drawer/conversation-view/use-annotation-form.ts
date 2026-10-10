@@ -39,9 +39,10 @@ function saveCallbacks({
       });
       onDone();
     },
-    onError: (error: unknown) => {
-      showErrorToast({ error, fallbackTitle: "Couldn't save the annotation" });
-    },
+    // A refusal the server can name (the aggregate's read-only answer among
+    // them) reads as its registered copy; anything else keeps this title.
+    onError: (error: unknown) =>
+      showErrorToast({ error, fallbackTitle: "Could not save annotation" }),
   };
 }
 
@@ -162,9 +163,11 @@ export function useAnnotationMutations({
           toaster.create({ title: "Annotation deleted", type: "success" });
           onDone();
         },
-        onError: (error: unknown) => {
-          showErrorToast({ error, fallbackTitle: "Couldn't delete the annotation" });
-        },
+        onError: (error: unknown) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Could not delete annotation",
+          }),
       },
     );
   };

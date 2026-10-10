@@ -378,3 +378,48 @@ describe("given placement read from project's and organization's rows", () => {
     });
   });
 });
+
+describe("given an aggregate project", () => {
+  const aggregate = { ...retentionTestScopeRow(PROJECT), kind: "aggregate" };
+  const service = () =>
+    createService({
+      projectScopes: MemoryDataRetentionProjectScopeRepository.create({ projects: [aggregate] }),
+    });
+
+  describe("when a trace is pinned under it", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("refuses with aggregate_project_is_read_only", async () => {
+      await expect(service().pin({ projectId: PROJECT, traceId: "trace-1" })).rejects.toMatchObject(
+        {
+          code: "aggregate_project_is_read_only",
+        },
+      );
+    });
+  });
+
+  describe("when a trace is unpinned under it", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("refuses with aggregate_project_is_read_only", async () => {
+      await expect(
+        service().unpin({ projectId: PROJECT, traceId: "trace-1" }),
+      ).rejects.toMatchObject({
+        code: "aggregate_project_is_read_only",
+      });
+    });
+  });
+
+  describe("when a trace is pinned under an application project", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("pins it", async () => {
+      const application = createService({
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          projects: [retentionTestScopeRow(PROJECT)],
+        }),
+      });
+
+      await expect(
+        application.pin({ projectId: PROJECT, traceId: "trace-1" }),
+      ).resolves.toMatchObject({ traceId: "trace-1" });
+    });
+  });
+});

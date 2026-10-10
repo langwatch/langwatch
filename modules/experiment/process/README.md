@@ -6,7 +6,7 @@ The server half of [experiment](../README.md). Experiments: saved definitions, t
 
 ## Installation
 
-`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentWorkflowEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:37`.
+`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentWorkflowEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).provideMiddlewareContext(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:37`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -460,7 +460,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<E
 
 |             |                                                 |
 | ----------- | ----------------------------------------------- |
-| Declared at | `src/transport/experiment-batch-log.rest.ts:85` |
+| Declared at | `src/transport/experiment-batch-log.rest.ts:67` |
 | Base URL    | none: each route's path is its address          |
 | Addressing  | literal                                         |
 | Credential  | project                                         |
@@ -469,13 +469,14 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<E
 
 Report batch evaluation results
 
-Permission `evaluations:manage`. Declared at `src/transport/experiment-batch-log.rest.ts:91`.
+Permission `evaluations:manage`. Declared at `src/transport/experiment-batch-log.rest.ts:73`.
 
 Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_results`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/experiment-batch-log.rest.ts:92)
-// Response: inline, src/transport/experiment-batch-log.rest.ts:95
+// Body: inline, src/transport/experiment-batch-log.rest.ts:74
+type Body = Record<string, unknown>;
+// Response: inline, src/transport/experiment-batch-log.rest.ts:77
 type Response = unknown;
 ```
 
@@ -483,7 +484,7 @@ type Response = unknown;
 
 |             |                                                          |
 | ----------- | -------------------------------------------------------- |
-| Declared at | `src/transport/experiment-dataset-evaluation.rest.ts:79` |
+| Declared at | `src/transport/experiment-dataset-evaluation.rest.ts:56` |
 | Base URL    | none: each route's path is its address                   |
 | Addressing  | literal                                                  |
 | Credential  | project                                                  |
@@ -492,13 +493,14 @@ type Response = unknown;
 
 Evaluate a dataset
 
-Permission `evaluations:manage`. Declared at `src/transport/experiment-dataset-evaluation.rest.ts:85`.
+Permission `evaluations:manage`. Declared at `src/transport/experiment-dataset-evaluation.rest.ts:62`.
 
 Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/experiment-dataset-evaluation.rest.ts:87)
-// Response: inline, src/transport/experiment-dataset-evaluation.rest.ts:90
+// Body: inline, src/transport/experiment-dataset-evaluation.rest.ts:64
+type Body = Record<string, unknown>;
+// Response: inline, src/transport/experiment-dataset-evaluation.rest.ts:67
 type Response = unknown;
 ```
 
@@ -532,7 +534,7 @@ interface Response {
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/experiment-init.rest.ts:13`   |
+| Declared at | `src/transport/experiment-init.rest.ts:17`   |
 | Base URL    | `/api/experiment`, twin `/api/v1/experiment` |
 | Addressing  | dated                                        |
 | Credential  | project                                      |
@@ -542,7 +544,7 @@ interface Response {
 
 Create an experiment
 
-Permission `experiments:manage`. Declared at `src/transport/experiment-init.rest.ts:17`.
+Permission `experiments:manage`. Declared at `src/transport/experiment-init.rest.ts:21`.
 
 Answers at `/api/experiment/init`, `/api/v1/experiment/init`; also, undocumented, `/api/experiment/2026-08-07/init`, `/api/v1/experiment/2026-08-07/init`, `/api/experiment/latest/init`, `/api/v1/experiment/latest/init`.
 
@@ -915,7 +917,7 @@ type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract
 
 |             |                                                           |
 | ----------- | --------------------------------------------------------- |
-| Declared at | `src/transport/experiment-workflow-evaluation.rest.ts:27` |
+| Declared at | `src/transport/experiment-workflow-evaluation.rest.ts:31` |
 | Base URL    | `/api/workflows`, twin `/api/v1/workflows`                |
 | Addressing  | dated                                                     |
 | Credential  | project                                                   |
@@ -925,7 +927,7 @@ type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract
 
 Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser.
 
-Permission `workflows:create or evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:32`.
+Permission `workflows:create or evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:36`.
 
 Answers at `/api/workflows/:id/evaluate`, `/api/v1/workflows/:id/evaluate`; also, undocumented, `/api/workflows/2026-08-07/:id/evaluate`, `/api/v1/workflows/2026-08-07/:id/evaluate`, `/api/workflows/latest/:id/evaluate`, `/api/v1/workflows/latest/:id/evaluate`.
 
@@ -1173,7 +1175,7 @@ interface Input {
 type Output = z.infer<typeof experimentSchema>; // ../contract/src/experiment.ts:13
 
 // experiments.getExperimentWithDSLBySlug
-// Input: inline, ../contract/src/experiment.trpc.ts:202
+// Input: inline, ../contract/src/experiment.trpc.ts:203
 interface Input {
   projectId: string;
   experimentSlug: string;
@@ -1183,7 +1185,7 @@ type Output = z.infer<typeof experimentWithDslSchema>; // ../contract/src/experi
 
 // experiments.getAllByProjectId
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
-// Output: z.array(experimentSchema) (inline, ../contract/src/experiment.trpc.ts:212)
+// Output: z.array(experimentSchema) (inline, ../contract/src/experiment.trpc.ts:213)
 
 // experiments.getAllForEvaluationsList
 // Input: experimentEvaluationsListInputSchema, ../contract/src/experiment.trpc.ts:99
@@ -1196,10 +1198,10 @@ type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contrac
 
 // experiments.getLastExperiment
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
-// Output: experimentSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:221)
+// Output: experimentSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:222)
 
 // experiments.deleteExperiment
-// Input: inline, ../contract/src/experiment.trpc.ts:229
+// Input: inline, ../contract/src/experiment.trpc.ts:230
 interface Input {
   projectId: string;
   experimentId: string;
@@ -1220,15 +1222,15 @@ interface Input {
 type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:120
 
 // experiments.getExperimentDSPyRuns
-// Input: inline, ../contract/src/experiment.trpc.ts:239
+// Input: inline, ../contract/src/experiment.trpc.ts:240
 interface Input {
   projectId: string;
   experimentSlug: string;
 }
-// Output: z.array(dSPyRunsSummarySchema) (inline, ../contract/src/experiment.trpc.ts:240)
+// Output: z.array(dSPyRunsSummarySchema) (inline, ../contract/src/experiment.trpc.ts:241)
 
 // experiments.getExperimentDSPyStep
-// Input: inline, ../contract/src/experiment.trpc.ts:244
+// Input: inline, ../contract/src/experiment.trpc.ts:245
 interface Input {
   projectId: string;
   experimentSlug: string;
@@ -1238,7 +1240,7 @@ interface Input {
 type Output = z.infer<typeof dSPyStepSchema>; // ../contract/src/experiment-legacy.ts:60
 
 // experiments.getExperimentBatchEvaluationRuns
-// Input: inline, ../contract/src/experiment.trpc.ts:257
+// Input: inline, ../contract/src/experiment.trpc.ts:258
 interface Input {
   projectId: string;
   experimentId: string;
@@ -1246,13 +1248,13 @@ interface Input {
 type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:111
 
 // experiments.getExperimentBatchEvaluationRun
-// Input: inline, ../contract/src/experiment.trpc.ts:268
+// Input: inline, ../contract/src/experiment.trpc.ts:269
 interface Input {
   projectId: string;
   experimentId: string;
   runId: string;
 }
-// Output: experimentRunWithItemsSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:269)
+// Output: experimentRunWithItemsSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:270)
 ```
 
 ## Sockets
@@ -1287,12 +1289,14 @@ Declared at `src/eventing/experiment-run-processing.pipeline.ts:128`. Events: `e
 
 ## Configuration
 
-| Kind   | Leaf                  | Environment variable     | Declared at                               |
-| ------ | --------------------- | ------------------------ | ----------------------------------------- |
-| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS` | `../contract/src/experiment.config.ts:13` |
-| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`    | `../contract/src/experiment.config.ts:14` |
-| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`    | `../contract/src/experiment.config.ts:16` |
-| config | `publicBaseUrl`       | `BASE_HOST`              | `../contract/src/experiment.config.ts:18` |
-| config | `isSaas`              | `IS_SAAS`                | `../contract/src/experiment.config.ts:20` |
+| Kind   | Leaf                  | Environment variable               | Declared at                               |
+| ------ | --------------------- | ---------------------------------- | ----------------------------------------- |
+| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS`           | `../contract/src/experiment.config.ts:14` |
+| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:15` |
+| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:17` |
+| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:19` |
+| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:21` |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:29` |
+| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:30` |
 
 <!-- readme:generated:end -->

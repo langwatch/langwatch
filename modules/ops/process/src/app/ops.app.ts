@@ -9,7 +9,11 @@ import { BearerIdentity } from "@langwatch/api/rest";
  */
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
-import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import {
+  AuthzApi,
+  type AuthzApi as AuthzApiContract,
+  PLATFORM_TENANT_ID,
+} from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { releaseVersionOf } from "@langwatch/config";
@@ -232,12 +236,17 @@ import {
   type OpsUpgradeIdInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
+  type OpsUpgradeListTenantsInput,
+  type OpsUpgradePreview,
+  type OpsUpgradePreviewInput,
   type OpsUpgradeReleasePage,
   type OpsUpgradeRun,
   type OpsUpgradeRunPage,
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
   type OpsUpgradeStepPage,
+  type OpsUpgradeTenantPage,
+  type OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -253,10 +262,13 @@ import {
   credentialsSecretPrevious,
   sessionSecret,
 } from "@langwatch/secrets/shared-secrets";
+import { ShareApi, type ShareApi as ShareApiContract } from "@langwatch/share-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
+import { isTenantMigrationStep } from "@langwatch/upgrade/step";
+import { TenantStepSettleService } from "@langwatch/upgrade/step/tenant-state";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -312,6 +324,7 @@ import {
 import {
   type InstanceAdminAccounts,
   InstanceAdminService,
+  type InstanceAdminShares,
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
@@ -366,6 +379,9 @@ function actingIdentityOf(operator: OpsOperator | null): OpsOperator {
 /** How far back an event-log search reaches when the caller names no bound. */
 const EVENT_LOG_SEARCH_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
 
+/** Who asks for the pass `upgrade` requests: the event's tenant, routed to the shared cluster. */
+const UPGRADE_PASS_REQUESTER = PLATFORM_TENANT_ID;
+
 /** What every audited row on the support inbox points at. */
 const BUG_REPORT_TARGET_KIND = "bugReport";
 
@@ -376,7 +392,7 @@ const ADMIN_RESOURCE_NAMES: Readonly<Record<string, string>> = {
 };
 
 /** One process ref, the triple every process-manager read is keyed by. */
-export type OpsProcessRef = {
+type OpsProcessRef = {
   processName: string;
   projectId: string;
   processKey: string;
@@ -517,6 +533,8 @@ export type OpsExplorers = Readonly<{
 /** What the process composes this feature's application from. */
 export interface OpsAppDependencies {
   users: UserApiContract;
+  /** The trace links a project holds, counted before its sharing is switched off. */
+  shares: Pick<ShareApiContract, "countTraceShares">;
   auth: AuthApiContract;
   /**
    * Which of an organization's two routes decides its sign-in — the module that owns connections
@@ -532,11 +550,7 @@ export interface OpsAppDependencies {
   /** The report schedules the operator scheduler lists and controls. */
   automations: Pick<
     AutomationApi,
-    | "findAllReportSchedules"
-    | "setReportScheduleActive"
-    | "requestReportRun"
-    | "clearReportRun"
-    | "registeredMigrations"
+    "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun" | "clearReportRun"
   >;
 }
 
@@ -547,6 +561,7 @@ export interface OpsAppDependencies {
  */
 export interface OpsSystemMigrationRunner {
   getOverview(): Promise<OpsMigrationOverview[]>;
+  listTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage>;
   getEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
   searchOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
   /**
@@ -624,12 +639,12 @@ export interface OpsPipelineRegistry {
 }
 
 /** The bound on an event-log search, as this deployment is configured. */
-export interface OpsEventLogWindowReader {
+interface OpsEventLogWindowReader {
   read(): OpsEventLogSearchWindow;
 }
 
 /** Grafana deep-link configuration, or null where no Grafana is configured. */
-export interface OpsGrafanaLinks {
+interface OpsGrafanaLinks {
   findLinkConfig(): OpsGrafanaLinkConfig;
 }
 
@@ -717,7 +732,7 @@ type OpsSetup = FeatureSetup<
 >;
 
 /** The badge's two integers, and when they were computed. */
-export interface OpsBadgeReading {
+interface OpsBadgeReading {
   blockedCount: number;
   dlqCount: number;
   /** Null when no snapshot collector is running: "we cannot say", not "all clear". */
@@ -741,6 +756,7 @@ export class OpsModule implements OpsApi {
     retention: DataRetentionApi,
     // The same identity app, asked through its lookup surface for proved domains (D12).
     projects: ProjectApi,
+    shares: ShareApi,
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,
     featureFlags: FeatureFlagApi,
@@ -786,6 +802,7 @@ export class OpsModule implements OpsApi {
     const cloudOps = await setup.secrets.into(OpsModule.secrets.licensePrivateKey, (privateKey) =>
       decideCloudOps({
         asked: setup.config.cloudOps,
+        isLocalDevelopment: setup.config.nodeEnvironment === "development",
         privateKey,
         builtInPublicKey: DEFAULT_LICENSE_PUBLIC_KEY,
       }),
@@ -795,6 +812,7 @@ export class OpsModule implements OpsApi {
     const logger = createLogger("langwatch:ops");
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
+      declaredMigrationSteps: setup.declaredMigrationSteps,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -1580,6 +1598,10 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.systemMigrations.getOverview();
   }
 
+  listUpgradeTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage> {
+    return this.#dependencies.systemMigrations.listTenants(input);
+  }
+
   listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing> {
     return this.#dependencies.systemMigrations.getEnrollments(input);
   }
@@ -1659,6 +1681,11 @@ export class OpsModule implements OpsApi {
   /** The startup convergence's pass, for the tasks process's own task; not on {@link OpsApi}. */
   systemMigrationPass(): SystemMigrationPass {
     return ({ signal }) => this.#dependencies.systemMigrations.runConvergencePass({ signal });
+  }
+
+  /** The pass `upgrade` asks a worker for once it finishes; not on {@link OpsApi}. */
+  requestSystemMigrationPassAfterUpgrade(): Promise<void> {
+    return this.#dependencies.systemMigrations.startPass({ actorUserId: UPGRADE_PASS_REQUESTER });
   }
 
   /** One requested run of `ops_projection_replay`, on its worker; not on {@link OpsApi}. */
@@ -1789,15 +1816,12 @@ export class OpsModule implements OpsApi {
   submitBugReport(input: {
     report: SubmitBugReport;
     callerKey: string;
-    apiToken?: string | undefined;
-    projectIdHint?: string | null;
+    linkedProjectId?: string | null;
   }): Promise<{ id: string }> {
     return this.#dependencies.intake.submit({
       input: input.report,
       callerKey: input.callerKey,
-      apiToken: input.apiToken,
-      projectIdHint: input.projectIdHint,
-      apiKeys: this.#dependencies.apiKeys,
+      linkedProjectId: input.linkedProjectId ?? null,
     });
   }
 
@@ -1805,14 +1829,13 @@ export class OpsModule implements OpsApi {
   async receiveBugReport(input: {
     report: SubmitBugReport;
     forwardedFor: string | null;
-    credential: Readonly<{ token: string; projectId: string | null }> | null;
+    linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer> {
     try {
       const { id } = await this.submitBugReport({
         report: input.report,
         callerKey: toCallerKey(input.forwardedFor),
-        apiToken: input.credential?.token,
-        projectIdHint: input.credential?.projectId ?? null,
+        linkedProjectId: input.linkedProjectId,
       });
 
       return { status: 201, body: { id } };
@@ -1947,6 +1970,14 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.upgrades.getRun(input);
   }
 
+  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
+    return this.#dependencies.upgrades.preview(input);
+  }
+
+  listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]> {
+    return this.#dependencies.upgrades.listTargets();
+  }
+
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
     return this.#dependencies.upgrades.retryStep(input);
   }
@@ -2008,6 +2039,13 @@ export class OpsModule implements OpsApi {
     const { operatorSeed } = this.#dependencies;
     if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
     return this.#platformOperators().seedOnce(operatorSeed);
+  }
+
+  /** Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it. */
+  seedPlatformOperatorsFromAdminEmails({ dryRun }: { dryRun: boolean }): Promise<number> {
+    const { operatorSeed } = this.#dependencies;
+    if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
+    return this.#platformOperators().seedFromAdminEmails({ settings: operatorSeed, dryRun });
   }
 
   /** The grants `ops_platform_operator_seed`'s recorded decision asks for, as the system. */
@@ -2270,6 +2308,8 @@ function buildOpsInfrastructure(input: {
   repositories: OpsRepositories;
   featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
   cloudOps: boolean;
+  /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
+  declaredMigrationSteps: (() => readonly unknown[]) | undefined;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2324,6 +2364,7 @@ function buildOpsInfrastructure(input: {
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         accounts: dependencies.auth,
+        shares: dependencies.shares,
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
@@ -2375,6 +2416,14 @@ function buildOpsInfrastructure(input: {
         routes: () => repositories.clickhouseRoutes.findPrivateRoutes(),
         dependencies,
         passRequests,
+        declared: {
+          steps: () => (input.declaredMigrationSteps?.() ?? []).filter(isTenantMigrationStep),
+          state: repositories.tenantStepState,
+          settle: TenantStepSettleService.create({
+            state: repositories.tenantStepState,
+            ledger: repositories.tenantStepLedger,
+          }),
+        },
       }),
     bugReportNotifier: input.bugReportNotifier,
     explainClients: explainRuntime,
@@ -2400,7 +2449,7 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
   };
 }
 
-export interface OpsOperationsOptions {
+interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
@@ -2416,6 +2465,7 @@ export interface OpsOperationsOptions {
   now?: (() => Instant) | undefined;
   users: UserApi;
   accounts: InstanceAdminAccounts;
+  shares: InstanceAdminShares;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
@@ -2455,6 +2505,8 @@ export class OpsOperations {
         users: this.options.users,
         accounts: this.options.accounts,
         audit: this.options.audit,
+        projects: this.options.scheduler.projects,
+        shares: this.options.shares,
         ssoRouting: this.options.ssoRouting,
       }),
       blobStore: BlobStoreService.create(repositories.blobStore),

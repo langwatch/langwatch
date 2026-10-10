@@ -60,11 +60,10 @@ export class PrismaDriverAdapterService extends PrismaDriverAdapterFactory {
     return {
       connectionString: databaseUrl,
       schema,
-      // `options` reaches Postgres as startup parameters: raw SQL
-      // (`$queryRaw` / `$executeRaw`) is passed through unqualified, so the
-      // session search_path must name the schema the same way the engine used
-      // to set it. The `schema` adapter option only qualifies model queries.
-      ...(schema ? { options: `-c search_path="${schema}"` } : {}),
+      // Startup parameters. search_path: raw SQL is unqualified, so it must name
+      // the URL schema. TimeZone=UTC: the adapter sends a Date with no offset,
+      // which Postgres reads in the session zone, so any other zone shifts it.
+      options: schema ? `-c search_path="${schema}" -c TimeZone=UTC` : "-c TimeZone=UTC",
       ...(connectionLimit !== undefined ? { max: connectionLimit } : {}),
       // pg's `connectionTimeoutMillis` bounds the whole `pool.connect()` wait —
       // queueing for a free slot included — which is what the engine's

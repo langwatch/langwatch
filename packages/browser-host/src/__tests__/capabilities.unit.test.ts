@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   BrowserUiDocumentTitle,
-  resolveUiCapabilities,
-  UiCapabilityUnavailableError,
+  resolveUiHostServices,
+  UiHostServiceUnavailableError,
   UiFeedback,
   UiNavigation,
   UiRoute,
@@ -49,6 +49,14 @@ class RecordingFeedback extends UiFeedback {
     this.notices.push(notice);
   }
 
+  warned(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
+  informed(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
   failed(failure: UiFailureNotice): void {
     this.notices.push(failure);
   }
@@ -67,10 +75,6 @@ class UnusableSession extends UiSession {
   isSettled(): never {
     throw new Error("the installed session should have answered");
   }
-
-  featureFlag(): never {
-    throw new Error("the installed session should have answered");
-  }
 }
 
 class StubSession extends UiSession {
@@ -85,31 +89,27 @@ class StubSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
-describe("given the capability ports a screen asks instead of reaching for the browser", () => {
+describe("given the host service ports a screen asks instead of reaching for the browser", () => {
   describe("when the composing application installs none of them", () => {
     it("takes the defaults this package can build for the document title and navigation", () => {
       const navigation = new RecordingNavigation();
       const documentTitle = BrowserUiDocumentTitle.create({ title: "" });
 
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: {},
         documentTitle,
         navigation,
         route: recordingRoute(),
       });
 
-      expect(capabilities.navigation).toBe(navigation);
-      expect(capabilities.documentTitle).toBe(documentTitle);
+      expect(hostServices.navigation).toBe(navigation);
+      expect(hostServices.documentTitle).toBe(documentTitle);
     });
 
     it("refuses feedback by name rather than swallowing what the user should read", () => {
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -117,41 +117,38 @@ describe("given the capability ports a screen asks instead of reaching for the b
       });
 
       expect(() =>
-        capabilities.feedback.failed({ error: new Error("boom"), fallbackTitle: "Couldn't save" }),
-      ).toThrow(UiCapabilityUnavailableError);
-      expect(() => capabilities.feedback.succeeded({ title: "Saved" })).toThrow(
-        /"feedback" UI capability has no implementation/,
+        hostServices.feedback.failed({ error: new Error("boom"), fallbackTitle: "Couldn't save" }),
+      ).toThrow(UiHostServiceUnavailableError);
+      expect(() => hostServices.feedback.succeeded({ title: "Saved" })).toThrow(
+        /"feedback" UI host service has no implementation/,
       );
     });
 
     it("refuses the session by name rather than answering an empty permission set", () => {
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
         route: recordingRoute(),
       });
 
-      expect(() => capabilities.session.hasPermission("prompt:read")).toThrow(
-        /"session" UI capability has no implementation/,
+      expect(() => hostServices.session.hasPermission("prompt:read")).toThrow(
+        /"session" UI host service has no implementation/,
       );
-      expect(() => capabilities.session.currentUser()).toThrow(UiCapabilityUnavailableError);
-      expect(() => capabilities.session.isFeatureEnabled("some_flag")).toThrow(
-        UiCapabilityUnavailableError,
-      );
+      expect(() => hostServices.session.currentUser()).toThrow(UiHostServiceUnavailableError);
     });
 
     it("refuses the scope by name rather than answering an unresolved one", () => {
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
         route: recordingRoute(),
       });
 
-      expect(capabilities.scope).toBeDefined();
-      expect(() => capabilities.scope?.activeScope()).toThrow(
-        /"scope" UI capability has no implementation/,
+      expect(hostServices.scope).toBeDefined();
+      expect(() => hostServices.scope?.activeScope()).toThrow(
+        /"scope" UI host service has no implementation/,
       );
     });
   });
@@ -160,7 +157,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
     it("answers with it, so a mounted composition stops refusing", () => {
       const session = new StubSession();
 
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -168,13 +165,13 @@ describe("given the capability ports a screen asks instead of reaching for the b
         session,
       });
 
-      expect(capabilities.session).toBe(session);
+      expect(hostServices.session).toBe(session);
     });
 
     it("still lets an installed session win over it", () => {
       const installed = new StubSession();
 
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: { session: installed },
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -182,7 +179,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
         session: new UnusableSession(),
       });
 
-      expect(capabilities.session).toBe(installed);
+      expect(hostServices.session).toBe(installed);
     });
   });
 
@@ -192,24 +189,24 @@ describe("given the capability ports a screen asks instead of reaching for the b
       const session = new StubSession();
       const installedNavigation = new RecordingNavigation();
 
-      const capabilities = resolveUiCapabilities({
+      const hostServices = resolveUiHostServices({
         install: { feedback, session, navigation: installedNavigation },
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
         route: recordingRoute(),
       });
 
-      capabilities.feedback.succeeded({ title: "Saved" });
-      capabilities.navigation.replace("/settings");
+      hostServices.feedback.succeeded({ title: "Saved" });
+      hostServices.navigation.replace("/settings");
 
       expect(feedback.notices).toEqual([{ title: "Saved" }]);
       expect(installedNavigation.moves).toEqual(["replace /settings"]);
-      expect(capabilities.session.hasPermission("prompt:read")).toBe(true);
+      expect(hostServices.session.hasPermission("prompt:read")).toBe(true);
     });
   });
 });
 
-describe("given the document title capability", () => {
+describe("given the document title host service", () => {
   describe("when a screen sets the title", () => {
     it("writes it to the document it was built over", () => {
       const target = { title: "LangWatch" };
@@ -234,10 +231,10 @@ describe("given the document title capability", () => {
   describe("when two screens set the title in turn", () => {
     it("restores each to what it found, not to the original", () => {
       const target = { title: "LangWatch" };
-      const capability = BrowserUiDocumentTitle.create(target);
+      const hostService = BrowserUiDocumentTitle.create(target);
 
-      const restoreFirst = capability.set("Prompts");
-      const restoreSecond = capability.set("Prompt Studio");
+      const restoreFirst = hostService.set("Prompts");
+      const restoreSecond = hostService.set("Prompt Studio");
       restoreSecond();
 
       expect(target.title).toBe("Prompts");

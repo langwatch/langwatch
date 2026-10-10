@@ -20,6 +20,10 @@ export function useTraceQueryArgs() {
   const traceId = viewer.traceId ?? storeTraceId;
   const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
   const projectId = useDrawerProjectId();
+  const addressedTenantId = useTraceDrawer((s) => s.tenantId);
+  // The owning member on an aggregate only: a plain project's own id would split its cache.
+  const tenantId =
+    addressedTenantId !== null && addressedTenantId !== projectId ? addressedTenantId : null;
 
   const isLive =
     occurredAtMs !== null && nowInstant().epochMilliseconds - occurredAtMs < LIVE_WINDOW_MS;
@@ -28,6 +32,7 @@ export function useTraceQueryArgs() {
     projectId,
     traceId: traceId ?? "",
     ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+    ...(tenantId !== null ? { tenantId } : {}),
   };
 
   const isReady =
@@ -40,6 +45,7 @@ export function useTraceQueryArgs() {
     projectId,
     traceId,
     occurredAtMs,
+    tenantId,
     isLive,
     isReady,
     hintReady,

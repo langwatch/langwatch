@@ -4,7 +4,7 @@ import {
   type RoutingDecision,
   type SignInMethod,
 } from "@langwatch/identity-contract";
-import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
+import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
 
 import { decideLocalSignUp, isSettledByRouting } from "../rules/local-sign-up.rules.ts";
 
@@ -19,7 +19,7 @@ interface SignUpEnrollmentServiceDeps {
   resolveDefaultMethods(): Promise<readonly SignInMethod[]>;
   passwordIsAllowed(): Promise<boolean>;
   /** Whether the installation admits a new account for this address. */
-  checkSignUp: OrganizationApi["checkSignUp"];
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
 }
 
 /**

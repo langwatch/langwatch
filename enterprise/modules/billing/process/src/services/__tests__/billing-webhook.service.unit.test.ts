@@ -167,7 +167,6 @@ const makeSubscriptionWithOrg = (
       id: "org_123",
       name: "Acme",
       stripeCustomerId: null,
-      license: null,
       ...organization,
     },
   };
@@ -200,9 +199,14 @@ const subscriptionsTwin = (...held: BillingSubscription[]) => {
   return twin;
 };
 
-/** The trial licences the lifecycle asked licensing to remove, in order. */
+/** The organizations licensing reports holding a licence, and those it was asked to clear. */
+const licensedOrganizations = new Set<string>();
 const clearedLicenses: { organizationId: string }[] = [];
 const licenses = createApiFixture<LicensingApi>({
+  getLicenseStatus: async (organizationId) =>
+    licensedOrganizations.has(organizationId)
+      ? { hasLicense: true, valid: false, corrupted: true }
+      : { hasLicense: false, valid: false },
   removeLicense: async (organizationId) => {
     clearedLicenses.push({ organizationId });
     return { removed: true };
@@ -221,6 +225,7 @@ describe("EEWebhookService", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     clearedLicenses.length = 0;
+    licensedOrganizations.clear();
     subRepo = createMockBillingSubscription();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
@@ -666,11 +671,9 @@ describe("EEWebhookService", () => {
         );
         subRepo.activate.mockResolvedValue({
           outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            organization: { name: "Acme", license: "trial-license-key" },
-          }),
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
         });
+        licensedOrganizations.add("org_123");
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -693,23 +696,39 @@ describe("EEWebhookService", () => {
       });
 
       /** @scenario "A paid subscription asks organization to retire the trial licence" */
+      /** @scenario "A paid subscription asks licensing whether the organization still holds a trial licence" */
       it("asks licensing to remove only that organization's licence", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
         subRepo.activate.mockResolvedValue({
           outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            organization: { name: "Acme", license: "trial-license-key" },
-          }),
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
         });
+        licensedOrganizations.add("org_123");
 
         const promise = service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" });
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
         expect(clearedLicenses).toEqual([{ organizationId: "org_123" }]);
+      });
+
+      /** @scenario "A paid subscription asks licensing whether the organization still holds a trial licence" */
+      it("removes nothing when licensing reports no licence", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
+
+        const promise = service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(clearedLicenses).toEqual([]);
       });
     });
 
@@ -1495,10 +1514,7 @@ describe("EEWebhookService", () => {
         );
         subRepo.activate.mockResolvedValue({
           outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            organization: { name: "Acme", license: null },
-          }),
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
         });
 
         const promise = service.handleInvoicePaymentSucceeded({

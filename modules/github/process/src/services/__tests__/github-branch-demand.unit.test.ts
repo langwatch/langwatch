@@ -130,6 +130,7 @@ describe("GitHub branch demand", () => {
 
   describe("given a host this instance cannot map", () => {
     /** @scenario "An unmappable repository host is never resolved to an organization" */
+    /** @scenario "Demand declines a repository host this instance cannot answer for" */
     it("never resolves the tenant, so nothing is read or written", async () => {
       const { service, mapping, project } = demand(1);
 

@@ -389,6 +389,18 @@ describe("<RunDialog/>", () => {
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTypeSelector");
   });
 
+  /** @scenario "A project with no target shows a Setup agent box" */
+  it("selects an agent saved from any editor the Setup agent box opens, voice included", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [] });
+    renderDialog(suiteSubject());
+    await user.click(screen.getByTestId("run-dialog-setup-agent"));
+
+    const onSave = flowCallbacksStore.agentVoiceEditor?.onSave as (agent: unknown) => void;
+    expect(onSave).toBeTypeOf("function");
+    expect(flowCallbacksStore.agentHttpEditor?.onSave).toBeTypeOf("function");
+  });
+
   /** @scenario "The reason a refused run cannot start is readable without a mouse" */
   it("prints why the run is refused beside the disabled Run button", () => {
     mockAgentsGetAll.mockReturnValue({ data: [] });

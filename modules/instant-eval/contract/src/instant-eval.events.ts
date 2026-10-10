@@ -4,6 +4,7 @@
  * hundred events. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -13,7 +14,7 @@ import {
 } from "./instant-eval-event.constants.ts";
 
 /** Portable event envelope owned by Instant Evals; Eventing consumes it structurally. */
-export const instantEvalEventSchema = z.object({
+const instantEvalEventSchemaDefinition = z.object({
   id: z.string(),
   aggregateId: z.string(),
   aggregateType: z.string().trim().min(1),
@@ -26,9 +27,11 @@ export const instantEvalEventSchema = z.object({
   metadata: z.object({ processingTraceparent: z.string().optional() }).passthrough().optional(),
   idempotencyKey: z.string().optional(),
 });
+export interface InstantEvalEventSchema extends Named<typeof instantEvalEventSchemaDefinition> {}
+export const instantEvalEventSchema: InstantEvalEventSchema = instantEvalEventSchemaDefinition;
 
 /** The run's whole definition, so the log holds what was asked. */
-export const instantEvalRequestedEventDataSchema = z.object({
+const instantEvalRequestedEventDataSchemaDefinition = z.object({
   runId: z.string().min(1),
   /** What the caller called the run, or null when they named nothing. */
   name: z.string().nullable(),
@@ -39,17 +42,27 @@ export const instantEvalRequestedEventDataSchema = z.object({
   questions: z.array(z.object({ id: z.string(), kind: z.string() }).passthrough()),
   rowLimit: z.number().int().positive(),
 });
+export interface InstantEvalRequestedEventDataSchema extends Named<
+  typeof instantEvalRequestedEventDataSchemaDefinition
+> {}
+export const instantEvalRequestedEventDataSchema: InstantEvalRequestedEventDataSchema =
+  instantEvalRequestedEventDataSchemaDefinition;
 export type InstantEvalRequestedEventData = z.infer<typeof instantEvalRequestedEventDataSchema>;
 
-export const instantEvalRequestedEventSchema = z.object({
+const instantEvalRequestedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.REQUESTED),
   version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.REQUESTED),
   data: instantEvalRequestedEventDataSchema,
 });
+export interface InstantEvalRequestedEventSchema extends Named<
+  typeof instantEvalRequestedEventSchemaDefinition
+> {}
+export const instantEvalRequestedEventSchema: InstantEvalRequestedEventSchema =
+  instantEvalRequestedEventSchemaDefinition;
 export type InstantEvalRequestedEvent = z.infer<typeof instantEvalRequestedEventSchema>;
 
-export const instantEvalPlannedEventDataSchema = z.object({
+const instantEvalPlannedEventDataSchemaDefinition = z.object({
   runId: z.string().min(1),
   /** Rows the key pass found, already bounded by the run's own limit. */
   total: z.number().int().nonnegative(),
@@ -64,17 +77,27 @@ export const instantEvalPlannedEventDataSchema = z.object({
    */
   keyColumns: z.array(z.string()),
 });
+export interface InstantEvalPlannedEventDataSchema extends Named<
+  typeof instantEvalPlannedEventDataSchemaDefinition
+> {}
+export const instantEvalPlannedEventDataSchema: InstantEvalPlannedEventDataSchema =
+  instantEvalPlannedEventDataSchemaDefinition;
 export type InstantEvalPlannedEventData = z.infer<typeof instantEvalPlannedEventDataSchema>;
 
-export const instantEvalPlannedEventSchema = z.object({
+const instantEvalPlannedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.PLANNED),
   version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.PLANNED),
   data: instantEvalPlannedEventDataSchema,
 });
+export interface InstantEvalPlannedEventSchema extends Named<
+  typeof instantEvalPlannedEventSchemaDefinition
+> {}
+export const instantEvalPlannedEventSchema: InstantEvalPlannedEventSchema =
+  instantEvalPlannedEventSchemaDefinition;
 export type InstantEvalPlannedEvent = z.infer<typeof instantEvalPlannedEventSchema>;
 
-export const instantEvalPageJudgedEventDataSchema = z.object({
+const instantEvalPageJudgedEventDataSchemaDefinition = z.object({
   runId: z.string().min(1),
   page: z.number().int().positive(),
   /** Rows this page judged. */
@@ -91,34 +114,54 @@ export const instantEvalPageJudgedEventDataSchema = z.object({
   cursorSpanId: z.string().nullable().default(null),
   hasNextPage: z.boolean(),
 });
+export interface InstantEvalPageJudgedEventDataSchema extends Named<
+  typeof instantEvalPageJudgedEventDataSchemaDefinition
+> {}
+export const instantEvalPageJudgedEventDataSchema: InstantEvalPageJudgedEventDataSchema =
+  instantEvalPageJudgedEventDataSchemaDefinition;
 export type InstantEvalPageJudgedEventData = z.infer<typeof instantEvalPageJudgedEventDataSchema>;
 
-export const instantEvalPageJudgedEventSchema = z.object({
+const instantEvalPageJudgedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED),
   version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.PAGE_JUDGED),
   data: instantEvalPageJudgedEventDataSchema,
 });
+export interface InstantEvalPageJudgedEventSchema extends Named<
+  typeof instantEvalPageJudgedEventSchemaDefinition
+> {}
+export const instantEvalPageJudgedEventSchema: InstantEvalPageJudgedEventSchema =
+  instantEvalPageJudgedEventSchemaDefinition;
 export type InstantEvalPageJudgedEvent = z.infer<typeof instantEvalPageJudgedEventSchema>;
 
-export const instantEvalCancelRequestedEventDataSchema = z.object({
+const instantEvalCancelRequestedEventDataSchemaDefinition = z.object({
   runId: z.string().min(1),
   /** Who asked, when a member did rather than the platform. */
   requestedByUserId: z.string().nullable(),
 });
+export interface InstantEvalCancelRequestedEventDataSchema extends Named<
+  typeof instantEvalCancelRequestedEventDataSchemaDefinition
+> {}
+export const instantEvalCancelRequestedEventDataSchema: InstantEvalCancelRequestedEventDataSchema =
+  instantEvalCancelRequestedEventDataSchemaDefinition;
 export type InstantEvalCancelRequestedEventData = z.infer<
   typeof instantEvalCancelRequestedEventDataSchema
 >;
 
-export const instantEvalCancelRequestedEventSchema = z.object({
+const instantEvalCancelRequestedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.CANCEL_REQUESTED),
   version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.CANCEL_REQUESTED),
   data: instantEvalCancelRequestedEventDataSchema,
 });
+export interface InstantEvalCancelRequestedEventSchema extends Named<
+  typeof instantEvalCancelRequestedEventSchemaDefinition
+> {}
+export const instantEvalCancelRequestedEventSchema: InstantEvalCancelRequestedEventSchema =
+  instantEvalCancelRequestedEventSchemaDefinition;
 export type InstantEvalCancelRequestedEvent = z.infer<typeof instantEvalCancelRequestedEventSchema>;
 
-export const instantEvalFinishedEventDataSchema = z.object({
+const instantEvalFinishedEventDataSchemaDefinition = z.object({
   runId: z.string().min(1),
   outcome: z.enum(INSTANT_EVAL_OUTCOMES),
   /** The code of the failure that ended it, when one did. Never prose. */
@@ -130,14 +173,24 @@ export const instantEvalFinishedEventDataSchema = z.object({
   costUsd: z.number().nonnegative(),
   priceUsd: z.number().nonnegative(),
 });
+export interface InstantEvalFinishedEventDataSchema extends Named<
+  typeof instantEvalFinishedEventDataSchemaDefinition
+> {}
+export const instantEvalFinishedEventDataSchema: InstantEvalFinishedEventDataSchema =
+  instantEvalFinishedEventDataSchemaDefinition;
 export type InstantEvalFinishedEventData = z.infer<typeof instantEvalFinishedEventDataSchema>;
 
-export const instantEvalFinishedEventSchema = z.object({
+const instantEvalFinishedEventSchemaDefinition = z.object({
   ...instantEvalEventSchema.shape,
   type: z.literal(INSTANT_EVAL_EVENT_TYPES.FINISHED),
   version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.FINISHED),
   data: instantEvalFinishedEventDataSchema,
 });
+export interface InstantEvalFinishedEventSchema extends Named<
+  typeof instantEvalFinishedEventSchemaDefinition
+> {}
+export const instantEvalFinishedEventSchema: InstantEvalFinishedEventSchema =
+  instantEvalFinishedEventSchemaDefinition;
 export type InstantEvalFinishedEvent = z.infer<typeof instantEvalFinishedEventSchema>;
 
 /** Every event one run's pipeline folds. */

@@ -5,7 +5,13 @@ import { MoreVertical } from "lucide-react";
 import { Menu } from "./menu.tsx";
 
 const meta = {
-  title: "Components/Menu",
+  title: "Overlays/Menu",
+  parameters: {
+    usage: {
+      use: "A list of actions from a button, including a row's overflow menu.",
+      avoid: "Choosing a value: use Select.",
+    },
+  },
   component: Menu.Root,
   tags: ["autodocs"],
   args: { children: null },

@@ -80,6 +80,7 @@ function buildApp(): void {
             organizationId: row.team.organizationId,
             isPersonal: false,
             ownerUserId: null,
+            kind: "application",
           })),
       }),
       budgetSpend: undefined,

@@ -33,7 +33,7 @@ export function PendingJoinRequests() {
   return (
     <Box width="full" data-testid="home-pending-join-requests">
       <Card.Root
-        bg="bg.surface/50"
+        bg="bg.card/50"
         backdropBlur="md"
         borderWidth="1px"
         borderColor="border"

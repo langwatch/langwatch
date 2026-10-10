@@ -37,7 +37,7 @@ export class TraceExportRateLimitedError extends HandledError {
         retryable: true,
         fault: "customer",
         ...(input.retryAfterSeconds !== undefined
-          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+          ? { meta: { retryAfterMs: input.retryAfterSeconds * 1000 } }
           : {}),
       },
     );

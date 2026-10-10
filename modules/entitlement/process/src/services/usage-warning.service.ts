@@ -1,13 +1,14 @@
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type {
   SendUsageLimitWarningInput,
   UsageLimitWarning,
+  UsageThresholdCrossedEventData,
 } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
-import { toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 import { findCrossedUsageThreshold } from "../rules/usage-warning-thresholds.rules.ts";
 import type { EntitlementService } from "./entitlement.service.ts";
+import { UsageCountingService } from "./usage-counting.service.ts";
 import {
   USAGE_UNKNOWN,
   type UsageService,
@@ -18,18 +19,18 @@ import {
   UsageWarningSweepService,
 } from "./usage-warning-sweep.service.ts";
 
-/** The approaching-limit mail: entitlement decides the threshold and counts; billing sends. */
+/** The approaching-limit warning: entitlement records the crossed threshold; billing mails it. */
 export interface UsageWarning {
-  /** Reports nothing sent when the reading crossed no threshold, or the window still holds. */
+  /** Reports sent whenever a threshold is crossed and recorded; nothing below them all. */
   sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
   /** Main's daily check of every organization; Cloud only. */
   sweep(): Promise<void>;
 }
 
-/** The warning over billing's send: the threshold and the per-project counts are decided here. */
+/** Decides the threshold and the per-project counts, and records them as entitlement's fact. */
 export class UsageWarningService implements UsageWarning {
   static create(input: {
-    billing: Pick<BillingApi, "sendUsageWarning">;
+    record: (data: UsageThresholdCrossedEventData) => Promise<void>;
     counter: UsageService;
     plans: Pick<EntitlementService, "getActivePlan">;
     tenancy: UsageTenancy;
@@ -38,7 +39,7 @@ export class UsageWarningService implements UsageWarning {
   }): UsageWarningService {
     const projectIds = (organizationId: string) => input.tenancy.findProjectIds({ organizationId });
     return new UsageWarningService({
-      billing: input.billing,
+      record: input.record,
       counter: input.counter,
       projectIds,
       sweep: (send) =>
@@ -55,19 +56,19 @@ export class UsageWarningService implements UsageWarning {
   }
 
   readonly #sweep: UsageWarningSweepService;
-  readonly #billing: Pick<BillingApi, "sendUsageWarning">;
+  readonly #record: (data: UsageThresholdCrossedEventData) => Promise<void>;
   readonly #counter: UsageService;
   readonly #projectIds: (organizationId: string) => Promise<string[]>;
 
   private constructor(input: {
-    billing: Pick<BillingApi, "sendUsageWarning">;
+    record: (data: UsageThresholdCrossedEventData) => Promise<void>;
     counter: UsageService;
     projectIds: (organizationId: string) => Promise<string[]>;
     sweep: (
       send: (input: CountedUsageReading) => Promise<UsageLimitWarning>,
     ) => UsageWarningSweepService;
   }) {
-    this.#billing = input.billing;
+    this.#record = input.record;
     this.#counter = input.counter;
     this.#projectIds = input.projectIds;
     this.#sweep = input.sweep((reading) => this.#decide(reading));
@@ -92,14 +93,14 @@ export class UsageWarningService implements UsageWarning {
   async #decide(input: CountedUsageReading): Promise<UsageLimitWarning> {
     const crossedThreshold = findCrossedUsageThreshold(input);
     if (crossedThreshold === undefined) return { sent: false };
-    const { sent, notificationId, sentAt } = await this.#billing.sendUsageWarning({
+    const occurredAt = nowInstant().epochMilliseconds;
+    // Ruling M5-EVENT: billing's mail is asynchronous, so the answer is the recording alone.
+    await this.#record({
       ...input,
       crossedThreshold,
+      month: UsageCountingService.monthOf(occurredAt),
+      occurredAt,
     });
-    return {
-      sent,
-      ...(notificationId === undefined ? {} : { notificationId }),
-      ...(sentAt === undefined ? {} : { sentAt: toDate(sentAt) }),
-    };
+    return { sent: true };
   }
 }

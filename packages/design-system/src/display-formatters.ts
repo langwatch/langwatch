@@ -27,6 +27,10 @@ export function formatCost(cost: number, estimated?: boolean): string {
     }
   }
 
+  if (cost >= 1_000) {
+    return `${prefix}${compactNumber({ value: cost, currency: "USD" })}`;
+  }
+
   if (cost < 0.01) {
     return `${prefix}$${cost.toFixed(4)}`;
   }
@@ -34,18 +38,53 @@ export function formatCost(cost: number, estimated?: boolean): string {
   return `${prefix}$${cost.toFixed(2)}`;
 }
 
-export function formatTokens(tokens: number): string {
+export function formatTokens(tokens: number, locale?: string): string {
   if (tokens === 0) {
     return "—";
   }
 
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1)}M`;
-  }
-
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}K`;
+  if (Math.abs(tokens) >= 1_000) {
+    return compactNumber({ value: tokens, locale });
   }
 
   return `${tokens}`;
+}
+
+/** Scales to the right unit (3e9 reads "3B", never "3000M") in the viewer's locale. */
+export function compactNumber({
+  value,
+  locale,
+  currency,
+}: {
+  value: number;
+  locale?: string;
+  currency?: string;
+}): string {
+  return new Intl.NumberFormat(locale, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+    ...(currency ? { style: "currency", currency } : {}),
+  }).format(value);
+}
+
+/** The same value through every lens a hover popover lists. */
+export function describeNumber({
+  value,
+  locale,
+  currency,
+}: {
+  value: number;
+  locale?: string;
+  currency?: string;
+}) {
+  const style = currency ? { style: "currency" as const, currency } : {};
+  return {
+    compact: compactNumber({ value, locale, currency }),
+    integer: new Intl.NumberFormat(locale, { ...style, maximumFractionDigits: 0 }).format(value),
+    precise: new Intl.NumberFormat(locale, {
+      ...style,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value),
+  };
 }

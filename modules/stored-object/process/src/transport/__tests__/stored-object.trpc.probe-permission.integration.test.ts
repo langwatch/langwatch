@@ -11,6 +11,7 @@ import type {
   PermissionDecision,
 } from "@langwatch/authorization";
 import { StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -48,10 +49,7 @@ class PurposeFiles implements StoredObjectFileReader {
 }
 
 /** A viewer whose only grant is `granted`, answered the same way by both steps. */
-function viewer(
-  granted: readonly AuthzPermission[],
-  denialReason: AuthzDenialReason = "no-binding",
-) {
+function viewer(granted: readonly AuthzPermission[], denialReason: AuthzDenialReason = "no-grant") {
   const files = new PurposeFiles();
   const permissions = new GrantedStoredObjectPermissions(granted, denialReason);
   const app = createStoredObjectTestApp({ parts: { files }, permissions });
@@ -62,12 +60,13 @@ function viewer(
   }): Promise<PermissionDecision> =>
     input.permissions.some((permission) => granted.includes(permission))
       ? { permitted: true, organizationRole: "MEMBER" }
-      : { permitted: false, organizationRole: "MEMBER", denialReason: "no-binding" };
+      : { permitted: false, organizationRole: "MEMBER", denialReason: "no-grant" };
 
   const members: TrpcRuntimeMembers<TestContext> = {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: (input) => permissions.getDecision(input),
         getProjectAnyDecision: anyOf,
         checkScopeLineage: async () => ({ kind: "consistent" }),

@@ -3,7 +3,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 
 const meta = {
-  title: "Components/Confirm dialog",
+  title: "Overlays/Confirm dialog",
+  parameters: {
+    usage: {
+      use: "The second thought before an action that is hard to undo.",
+      avoid: "A delete: use Delete confirmation dialog.",
+    },
+  },
   component: ConfirmDialog,
   tags: ["autodocs"],
   args: {

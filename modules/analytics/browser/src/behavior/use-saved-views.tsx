@@ -5,6 +5,7 @@
  */
 
 import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import { reloadingWriteOptions } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -144,14 +145,27 @@ function useStoredSelection(projectId: string) {
   return { selectedViewId, setSelectedViewIdState, skipNextMatchRef, pendingRestoreRef };
 }
 
-/** The four writes, each refreshing the list once it lands. */
+/**
+ * The four writes. Each edits the cached list before the server answers, so a success reads
+ * the list again for server ids and order, and a refusal says why and reads it again so the
+ * refused edit does not stick on screen.
+ */
 function useSavedViewMutations(projectId: string, utils: SavedViewsUtils) {
-  const refresh = { onSuccess: () => void utils.savedViews.getAll.invalidate({ projectId }) };
+  const reload = () => void utils.savedViews.getAll.invalidate({ projectId });
+  const writeOptions = (fallbackTitle: string) => reloadingWriteOptions({ fallbackTitle, reload });
   return {
-    createMutation: analyticsApi.savedViews.create.useMutation(refresh),
-    deleteMutation: analyticsApi.savedViews.delete.useMutation(refresh),
-    renameMutation: analyticsApi.savedViews.rename.useMutation(refresh),
-    reorderMutation: analyticsApi.savedViews.reorder.useMutation(refresh),
+    createMutation: analyticsApi.savedViews.create.useMutation(
+      writeOptions("Couldn't save the view"),
+    ),
+    deleteMutation: analyticsApi.savedViews.delete.useMutation(
+      writeOptions("Couldn't delete the view"),
+    ),
+    renameMutation: analyticsApi.savedViews.rename.useMutation(
+      writeOptions("Couldn't rename the view"),
+    ),
+    reorderMutation: analyticsApi.savedViews.reorder.useMutation(
+      writeOptions("Couldn't reorder the views"),
+    ),
   };
 }
 
@@ -321,6 +335,7 @@ function useSaveView(input: {
           : old,
       );
 
+      setSelectedViewIdState(tempId);
       createMutation.mutate(
         { projectId, name: trimmedName, filters, query: queryParam, period, scope },
         {
@@ -328,10 +343,16 @@ function useSaveView(input: {
             setSelectedViewIdState(newView.id);
             writeSelectedViewId(projectId, newView.id);
           },
+          // The temporary view never reached the server: take it out now and drop the
+          // selection pointing at it, so view matching picks the highlight again.
+          onError: () => {
+            utils.savedViews.getAll.setData({ projectId }, (old: StoredSavedView[] | undefined) =>
+              old?.filter((view) => view.id !== tempId),
+            );
+            setSelectedViewIdState(null);
+          },
         },
       );
-
-      setSelectedViewIdState(tempId);
       return optimisticView;
     },
     [

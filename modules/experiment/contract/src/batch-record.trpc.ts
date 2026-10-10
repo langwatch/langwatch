@@ -8,14 +8,19 @@ import {
   batchEvaluationSummarySchema,
   datasetApiProjectInputSchema,
 } from "@langwatch/dataset-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** `batchRecord.getAllByexperimentSlug`: one experiment, named by its URL slug. */
-export const batchRecordApiExperimentSlugInputSchema = z.object({
+const batchRecordApiExperimentSlugInputSchemaDefinition = z.object({
   projectId: z.string(),
   experimentSlug: z.string(),
 });
+export interface BatchRecordApiExperimentSlugInputSchema extends Named<
+  typeof batchRecordApiExperimentSlugInputSchemaDefinition
+> {}
+export const batchRecordApiExperimentSlugInputSchema: BatchRecordApiExperimentSlugInputSchema =
+  batchRecordApiExperimentSlugInputSchemaDefinition;
 
 export const batchRecordTrpc = defineTrpcContract("batchRecord")
   /** One row per experiment and dataset, for the batch-evaluations index. */

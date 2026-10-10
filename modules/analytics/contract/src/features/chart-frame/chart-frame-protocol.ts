@@ -27,6 +27,8 @@ export interface ChartFrameDashboardContext {
   /** IANA zone name, e.g. "America/Sao_Paulo". */
   readonly timezone?: string;
   readonly theme: ChartFrameTheme;
+  /** Active design-system colours resolved by the host for the opaque frame. */
+  readonly colors?: Readonly<Record<string, string>>;
   readonly widgetId?: string;
   readonly dashboardId?: string;
   readonly projectId?: string;

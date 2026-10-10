@@ -51,6 +51,7 @@ function harness(
           input: member.input.parse(input),
           actor: { type: "user", id: USER_ID },
           scope: null,
+          authorization: null,
           signal: undefined,
         });
 

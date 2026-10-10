@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"time"
@@ -45,8 +46,8 @@ func (tenancy Tenancy) writeOrganizations(out *strings.Builder) {
 			quote(org.ID), quote(org.Name), quote(org.Slug), sqlTime(org.CreatedAt), sqlTime(org.CreatedAt))
 	}
 	for _, sub := range tenancy.Subscriptions {
-		fmt.Fprintf(out, "INSERT INTO \"Subscription\" (id, \"organizationId\", plan, status, \"startDate\", \"createdAt\", \"updatedAt\") VALUES (%s, %s, %s, 'ACTIVE', %s, %s, %s);\n",
-			quote(sub.ID), quote(sub.OrganizationID), quote(sub.Plan), sqlTime(sub.StartDate), sqlTime(sub.StartDate), sqlTime(sub.StartDate))
+		fmt.Fprintf(out, "INSERT INTO \"Subscription\" (id, \"organizationId\", plan, status, \"startDate\", \"createdAt\", \"updatedAt\") VALUES (%s, %s, %s, %s, %s, %s, %s);\n",
+			quote(sub.ID), quote(sub.OrganizationID), quote(sub.Plan), quote(cmp.Or(sub.Status, "ACTIVE")), sqlTime(sub.StartDate), sqlTime(sub.StartDate), sqlTime(sub.StartDate))
 	}
 }
 

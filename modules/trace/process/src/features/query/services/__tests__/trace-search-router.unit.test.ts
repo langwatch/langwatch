@@ -14,6 +14,7 @@ import {
   deps,
   input,
   NoModel,
+  PROOF,
   ProviderDisabled,
   ProviderError,
   RANGE,
@@ -25,7 +26,7 @@ const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(
 const classifiedAs = (
   classified: SearchRouteKind,
   overrides: Partial<RouteSearchInput> = {},
-): RouteSearchInput => input({ classified, isInstantEvalAvailable: true, ...overrides });
+): ReturnType<typeof input> => input({ classified, isInstantEvalAvailable: true, ...overrides });
 
 describe("given a text with only field:value terms", () => {
   describe("when routed", () => {
@@ -64,6 +65,7 @@ describe("given the browser brings Instant Eval's classification", () => {
       });
       expect(d.buildFilter).toHaveBeenCalledWith({
         projectId: "project-1",
+        authorization: PROOF,
         prompt: "errors from gpt-4",
         timeRange: RANGE,
       });

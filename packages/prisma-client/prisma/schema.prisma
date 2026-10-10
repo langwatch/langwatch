@@ -961,6 +961,8 @@ model JoinRequest {
   resolvedById      String?
   /// user | invite-accepted, on a withdrawal.
   withdrawalCause   String?
+  /// The SSO connection a single sign-on arrival was admitted through; null otherwise.
+  connectionId      String?
   occurredAt        DateTime
   lastEventId       String
   acceptedAt        DateTime
@@ -1823,9 +1825,18 @@ model Project {
   ///     (project picker, /api/v1/projects, billing exports, RBAC
   ///     pickers, etc.) - the regression-test invariant in
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
+  ///   - "aggregate": a project that owns no traces and reads its member
+  ///     projects through shared project-reader grants (ADR-177). Hidden
+  ///     from every "send traces here" picker and from ingestion; visible in
+  ///     the project switcher to organisation admins only.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
   kind                String                    @default("application")
+  /// The scope rule an aggregate project materialises into grants. Null on
+  /// every other kind; decided in ADR-177. Shapes: { kind: "all-personal" } |
+  /// { kind: "personal-by-department", departmentId } |
+  /// { kind: "explicit", projectIds: string[] }.
+  aggregateRule       Json?
   firstMessage        Boolean                   @default(false)
   integrated          Boolean                   @default(false)
   createdAt           DateTime                  @default(now())
@@ -2479,6 +2490,10 @@ model WebhookEndpoint {
   /// `t=,v1=`. `legacy_sha256`: one raw message per POST signed `sha256=`, kept
   /// only for endpoints migrated from governance anomaly destinations.
   signatureScheme             String?
+  /// Set only by governance's anomaly destination migration: a create that
+  /// repeats it in the same organization answers the endpoint it made. An
+  /// archived endpoint gives its key up, so a retry after cleanup creates anew.
+  idempotencyKey              String?
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
   /// swaps secrets on its own schedule instead of dropping deliveries in the
@@ -2500,6 +2515,9 @@ model WebhookEndpoint {
   maxBatchSize                Int                    @default(100)
   maxBatchDelayMs             Int                    @default(250)
   maxInFlight                 Int                    @default(4)
+  /// Self-hosted only: deliveries accept the receiver's self-signed TLS
+  /// certificate. Off by default; the hosted product ignores it.
+  allowSelfSignedCertificate  Boolean                @default(false)
   lastSuccessAt               DateTime?
   lastFailureAt               DateTime?
   archivedAt                  DateTime?
@@ -2508,6 +2526,7 @@ model WebhookEndpoint {
 
   deliveries WebhookEndpointDelivery[]
 
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, status])
 }
 
@@ -3532,8 +3551,9 @@ model DataPrivacyPolicy {
   @@index([scopeType, scopeId])
 }
 
-// Data privacy's fold of where each project sits, from project's lifecycle facts (record §5;
-// Alex, 2026-10-06). Each column group keeps its newest fact; no relation to Project.
+/// @deprecated No reader or writer since privacy reads placement from Project and Team. Kept
+/// (Alex, 2026-10-10), @@ignore'd so no client reaches it; removed in a future release.
+/// Declared in packages/upgrade/releases/deprecations/deprecations.json.
 model DataPrivacyProjectScope {
   projectId            String    @id
   organizationId       String
@@ -3546,10 +3566,12 @@ model DataPrivacyProjectScope {
   updatedAt            DateTime  @default(now()) @updatedAt
 
   @@index([organizationId])
+  @@ignore
 }
 
-// Data retention's copy of where each project sits, a peer fold over project's lifecycle facts
-// (Alex, 2026-10-06, Q151 Q1); updatedAt is the newest fact's time. No relation to Project.
+/// @deprecated No reader or writer since retention reads placement from Project and Team. Kept
+/// (Alex, 2026-10-10), @@ignore'd so no client reaches it; removed in a future release.
+/// Declared in packages/upgrade/releases/deprecations/deprecations.json.
 model DataRetentionProjectScope {
   projectId      String    @id
   organizationId String
@@ -3560,6 +3582,7 @@ model DataRetentionProjectScope {
 
   @@index([organizationId])
   @@index([teamId])
+  @@ignore
 }
 
 // The Instant Evals judge's copy of each project's organization, folded from project's
@@ -4289,7 +4312,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-process; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration | aggregate-reconciler (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-process; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
@@ -4313,6 +4336,12 @@ model Grant {
   createdByUserId String?
   expiresAt       DateTime?
   maxViews        Int?
+
+  // ADR-177 / ADR-166: what a SHARED grant lets its principal reach. Null on
+  // every own grant. Shape: { type: "trace" | "span" | "log", where?: OTTL
+  // (empty in v1), from?: ISO date, until?: ISO date }. Owned by the fold
+  // like every other fact column; the proof minted at the door copies it.
+  condition Json?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
@@ -4827,6 +4856,8 @@ model VirtualKey {
   licenseTokenHash  String?   @unique
   licenseInstanceId String?
   licenseExpiresAt  DateTime?
+  // The licence a CONNECT key serves; gateway finds the key by it before minting one (C3b).
+  licenseId         String?
 
   @@unique([hashedSecret])
   @@unique([organizationId, externalId])

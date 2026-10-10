@@ -10,7 +10,7 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { drawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
+import { useDrawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
 import { TraceEditButton } from "../trace-edit-button.tsx";
 
 const mocks = vi.hoisted(() => ({ openDrawer: vi.fn() }));
@@ -27,7 +27,7 @@ function renderButton() {
 }
 
 afterEach(() => {
-  drawerChrome.setState(drawerChrome.getInitialState(), true);
+  useDrawerChrome.setState(useDrawerChrome.getInitialState(), true);
   cleanup();
   vi.clearAllMocks();
 });
@@ -49,7 +49,7 @@ describe("when the reviewer chooses Edit trace", () => {
   describe("given the drawer last showed the conversation tab", () => {
     /** @scenario "Edit trace uses the trace drawer in annotation mode" */
     it("opens the drawer on the summary tab instead", async () => {
-      drawerChrome.getState().rememberViewMode("conversation");
+      useDrawerChrome.getState().rememberViewMode("conversation");
       renderButton();
 
       await userEvent.click(screen.getByRole("button", { name: "Edit trace" }));

@@ -14,7 +14,6 @@ import {
   type Heartbeat,
   type LivenessThread,
   type UpgradeConsole,
-  type UpgradeHolding,
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
@@ -104,6 +103,8 @@ export class Server {
       logger: options.logger,
       shutdownDeadlineMs: options.shutdownDeadlineMs,
       exit,
+      // An embedded server's process stays up, so a timed-out drain must still release the door.
+      terminating: options.ownsProcess !== false,
     });
     // Hosted first, so it stops LAST: the health door outlives every drain
     // phase, and a probe during shutdown still sees the process as alive.
@@ -129,6 +130,7 @@ export class Server {
   private readonly healthRoutes = new Map<string, HealthRoute>();
   /** The ONE handler the application composed. Absent until `serve`. */
   private served: ApplicationHandler | undefined;
+  private applicationExpected = false;
   private healthListener: http.Server | undefined;
   /** Set by `run`: a process with no HTTP surface answers liveness off its main loop. */
   private livenessOffLoop = false;
@@ -156,11 +158,13 @@ export class Server {
     logger,
     shutdownDeadlineMs,
     exit,
+    terminating,
   }: {
     name: string;
     logger: ServerLogger;
     shutdownDeadlineMs: number | undefined;
     exit: (code: number) => never;
+    terminating: boolean;
   }) {
     this.name = name;
     this.logger = logger;
@@ -168,7 +172,7 @@ export class Server {
       logger,
       ...(shutdownDeadlineMs === undefined ? {} : { deadlineMs: shutdownDeadlineMs }),
       exit,
-      terminating: true,
+      terminating,
     });
   }
 
@@ -200,6 +204,11 @@ export class Server {
     return this.livenessThread?.address ?? this.healthListener.address();
   }
 
+  /** An application will be served: until then a product request is told to retry, not 404. */
+  expectApplication(): void {
+    this.applicationExpected = true;
+  }
+
   /**
    * Opens the health door ahead of `listen`, off the main loop, so liveness answers while a
    * slow boot stage (the voice tunnel mint) is still running. `listen` finds it open.
@@ -211,17 +220,17 @@ export class Server {
   }
 
   /**
-   * Answers every request but the probes with the upgrade holding page until called with
-   * `undefined`. A door on the main loop has no thread to hold it.
-   * Spec: upgrade-holding-page.feature
+   * Shows a failed first install's console in front of every route but the probes; true on Retry,
+   * false with no thread to show it. Spec: upgrade-holding-page.feature
    */
-  async holdForUpgrade(holding: UpgradeHolding | undefined): Promise<void> {
-    await this.livenessThread?.hold(holding);
+  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
+    const passThrough = [...this.healthRoutes.keys()];
+    return (await this.livenessThread?.holdConsole({ ...upgradeConsole, passThrough })) ?? false;
   }
 
-  /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */
-  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
-    return (await this.livenessThread?.holdConsole(upgradeConsole)) ?? false;
+  /** Takes the upgrade console down once the ledger is current. */
+  async liftUpgradeConsole(): Promise<void> {
+    await this.livenessThread?.liftConsole();
   }
 
   private openHealth(): Promise<void> {
@@ -329,11 +338,44 @@ export class Server {
 
     const application = this.served;
     if (application === undefined) {
-      if (!response.headersSent) response.writeHead(404).end();
+      if (response.headersSent) return;
+      if (this.applicationExpected) {
+        response
+          .writeHead(503, { "Content-Type": "text/plain", "Retry-After": "5" })
+          .end(`${this.name} is starting`);
+        return;
+      }
+      response.writeHead(404).end();
       return;
     }
 
-    void this.answer("application", () => application(request, response), response);
+    void this.answer(
+      "application",
+      () => this.whenStarted(application, request, response),
+      response,
+    );
+  }
+
+  /**
+   * A request that arrives while the components still start waits for them, so no handler runs
+   * before the runtime it calls into (API-UP); a start that failed answers 503.
+   */
+  private async whenStarted(
+    application: ApplicationHandler,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    if (!this.started) {
+      const started = await this.listening?.then(
+        () => true,
+        () => false,
+      );
+      if (started === false) {
+        response.writeHead(503, { "Content-Type": "text/plain" }).end(`${this.name} did not start`);
+        return;
+      }
+    }
+    await application(request, response);
   }
 
   private async answerReadiness(response: ServerResponse): Promise<void> {
@@ -480,9 +522,17 @@ export class Server {
     this.started = true;
   }
 
-  /** A door opened by `openLiveness` whose `listen` never came has no phase to close it. */
+  /**
+   * A server whose `listen` never came has no phases, yet a component with no `start` (the
+   * telemetry the preamble set up) and an opened door are live already: release them.
+   */
   private async closeUnlistened(): Promise<void> {
-    if (this.listening === undefined && this.healthOpening !== undefined) {
+    if (this.listening !== undefined) return;
+    await this.stopStarted(
+      this.components.filter((component) => component !== this.health && !component.start),
+    );
+    await this.resources.close();
+    if (this.healthOpening !== undefined) {
       await this.healthOpening.catch(() => void 0);
       await this.health?.stop();
     }

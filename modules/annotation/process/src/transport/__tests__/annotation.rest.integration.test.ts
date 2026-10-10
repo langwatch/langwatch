@@ -1,6 +1,7 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { annotationRest } from "../annotation.rest.ts";
@@ -65,6 +66,7 @@ describe("annotation REST read failures", () => {
     /** @scenario "An annotation read failure returns no driver diagnostic" */
     it("answers the canonical internal_error 500 rather than the store's own message", async () => {
       const runtime = createRestRuntime({
+        authorization: restTestAuthorization(),
         identity: {
           authenticate: () => ({
             actor: { type: "user", id: "user-1" },

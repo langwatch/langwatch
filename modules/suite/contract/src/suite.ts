@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   evaluatorAttachmentsSchema,
   MAX_PARAMETER_NAME_LENGTH,
@@ -51,7 +52,7 @@ export const suiteTargetTypeSchema = z.enum([
 ]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;
 
-export const suiteFieldMappingSchema = z.discriminatedUnion("type", [
+const suiteFieldMappingSchemaDefinition = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("source"),
@@ -61,6 +62,8 @@ export const suiteFieldMappingSchema = z.discriminatedUnion("type", [
     .strict(),
   z.object({ type: z.literal("value"), value: z.string() }).strict(),
 ]);
+export interface SuiteFieldMappingSchema extends Named<typeof suiteFieldMappingSchemaDefinition> {}
+export const suiteFieldMappingSchema: SuiteFieldMappingSchema = suiteFieldMappingSchemaDefinition;
 export type SuiteFieldMapping = z.infer<typeof suiteFieldMappingSchema>;
 
 const suiteTargetBaseSchema = z
@@ -76,7 +79,7 @@ const suiteTargetBaseSchema = z
   })
   .strict();
 
-export const suiteTargetSchema = suiteTargetBaseSchema.superRefine((target, context) => {
+const suiteTargetSchemaDefinition = suiteTargetBaseSchema.superRefine((target, context) => {
   if (target.type === "prompt" || target.scenarioMappings === undefined) return;
   context.addIssue({
     code: "custom",
@@ -84,6 +87,8 @@ export const suiteTargetSchema = suiteTargetBaseSchema.superRefine((target, cont
     message: `A ${target.type} target cannot carry scenarioMappings.`,
   });
 });
+export interface SuiteTargetSchema extends Named<typeof suiteTargetSchemaDefinition> {}
+export const suiteTargetSchema: SuiteTargetSchema = suiteTargetSchemaDefinition;
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
 /** What a run's ownership check reads about one agent it targets, and nothing more. */
@@ -105,7 +110,7 @@ export const MAX_SUITE_REPEAT_COUNT = 5;
 /** The same limit under the name the run dialog and the plan editor read. */
 export const MAX_REPEAT_COUNT = MAX_SUITE_REPEAT_COUNT;
 
-export const suiteSchema = z
+const suiteSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -125,13 +130,15 @@ export const suiteSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface SuiteSchema extends Named<typeof suiteSchemaDefinition> {}
+export const suiteSchema: SuiteSchema = suiteSchemaDefinition;
 export type Suite = z.infer<typeof suiteSchema>;
 
 /**
  * The named values a run carries. The name is bounded in a refinement rather than as
  * `z.string().min(1)` on the key.
  */
-export const suiteRunParametersSchema = z
+const suiteRunParametersSchemaDefinition = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
   .superRefine((parameters, ctx) => {
     for (const name of Object.keys(parameters)) {
@@ -146,9 +153,14 @@ export const suiteRunParametersSchema = z
       }
     }
   });
+export interface SuiteRunParametersSchema extends Named<
+  typeof suiteRunParametersSchemaDefinition
+> {}
+export const suiteRunParametersSchema: SuiteRunParametersSchema =
+  suiteRunParametersSchemaDefinition;
 export type SuiteRunParameters = z.infer<typeof suiteRunParametersSchema>;
 
-export const suiteRunInputSchema = z
+const suiteRunInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -165,12 +177,16 @@ export const suiteRunInputSchema = z
     actor: runActorSchema.optional(),
   })
   .strict();
+export interface SuiteRunInputSchema extends Named<typeof suiteRunInputSchemaDefinition> {}
+export const suiteRunInputSchema: SuiteRunInputSchema = suiteRunInputSchemaDefinition;
 export type SuiteRunInput = z.infer<typeof suiteRunInputSchema>;
 
-export const suiteRunAllInputSchema = suiteRunInputSchema
+const suiteRunAllInputSchemaDefinition = suiteRunInputSchema
   .omit({ id: true })
   .safeExtend({ targets: z.array(suiteTargetSchema).optional() })
   .strict();
+export interface SuiteRunAllInputSchema extends Named<typeof suiteRunAllInputSchemaDefinition> {}
+export const suiteRunAllInputSchema: SuiteRunAllInputSchema = suiteRunAllInputSchemaDefinition;
 export type SuiteRunAllInput = z.infer<typeof suiteRunAllInputSchema>;
 
 /**
@@ -178,7 +194,7 @@ export type SuiteRunAllInput = z.infer<typeof suiteRunAllInputSchema>;
  * the two simulation model overrides, and — for a hand-picked scope only —
  * the scenarios it names.
  */
-export const runPlanConfigSchema = z
+const runPlanConfigSchemaDefinition = z
   .object({
     scope: suiteScopeSchema,
     targets: z.array(suiteTargetSchema),
@@ -191,6 +207,8 @@ export const runPlanConfigSchema = z
     evaluators: evaluatorAttachmentsSchema.optional(),
   })
   .strict();
+export interface RunPlanConfigSchema extends Named<typeof runPlanConfigSchemaDefinition> {}
+export const runPlanConfigSchema: RunPlanConfigSchema = runPlanConfigSchemaDefinition;
 export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;
 
 /**
@@ -198,13 +216,15 @@ export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;
  * config, or creates one.
  * @see specs/suites/run-plan-identity-by-name.feature
  */
-export const suiteRunPlanInputSchema = suiteRunInputSchema
+const suiteRunPlanInputSchemaDefinition = suiteRunInputSchema
   .omit({ id: true })
   .safeExtend({
     name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH).optional(),
     config: runPlanConfigSchema,
   })
   .strict();
+export interface SuiteRunPlanInputSchema extends Named<typeof suiteRunPlanInputSchemaDefinition> {}
+export const suiteRunPlanInputSchema: SuiteRunPlanInputSchema = suiteRunPlanInputSchemaDefinition;
 export type SuiteRunPlanInput = z.infer<typeof suiteRunPlanInputSchema>;
 
 export type SuiteRunPlanResult = SuiteRunResult & {
@@ -215,7 +235,7 @@ export type SuiteRunPlanResult = SuiteRunResult & {
   created: boolean;
 };
 
-export const suiteArchivedNamesInputSchema = z
+const suiteArchivedNamesInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     organizationId: z.string().min(1),
@@ -223,6 +243,11 @@ export const suiteArchivedNamesInputSchema = z
     targets: z.array(suiteTargetSchema),
   })
   .strict();
+export interface SuiteArchivedNamesInputSchema extends Named<
+  typeof suiteArchivedNamesInputSchemaDefinition
+> {}
+export const suiteArchivedNamesInputSchema: SuiteArchivedNamesInputSchema =
+  suiteArchivedNamesInputSchemaDefinition;
 export type SuiteArchivedNamesInput = z.infer<typeof suiteArchivedNamesInputSchema>;
 
 export type SuiteRunResult = {
@@ -244,7 +269,7 @@ export type SuiteRunResult = {
 export type SuiteRunAllResult = SuiteRunResult & { suiteId: string; planSlug: string };
 
 /** The durable fold state exposed by the Suite run read model. */
-export const suiteRunStateDataSchema = z
+const suiteRunStateDataSchemaDefinition = z
   .object({
     SuiteRunId: z.string(),
     BatchRunId: z.string(),
@@ -266,6 +291,8 @@ export const suiteRunStateDataSchema = z
     GradedCount: z.number(),
   })
   .strict();
+export interface SuiteRunStateDataSchema extends Named<typeof suiteRunStateDataSchemaDefinition> {}
+export const suiteRunStateDataSchema: SuiteRunStateDataSchema = suiteRunStateDataSchemaDefinition;
 export type SuiteRunStateData = z.infer<typeof suiteRunStateDataSchema>;
 
 const INTERNAL_SET_PREFIX = "__internal__";

@@ -30,12 +30,12 @@ async function buildSimulationRunsFamily(
     simulations: { findBatchSummary, getRunDataForBatchRun, getRunDataForScenarioSet },
     featureFlags: options.featureFlags,
   });
-  const { runtime, projectFacts } = createScenarioRestTestRuntime();
+  const { runtime, projectContext } = createScenarioRestTestRuntime();
   const declaration = createSimulationRunsRest();
   const mounted = runtime.mount(declaration.router(), {
     app: () => world.app,
     onError: canonicalErrorResponse,
-    facts: [projectFacts],
+    middlewareContext: [projectContext],
   });
 
   return {

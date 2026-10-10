@@ -19,6 +19,7 @@ import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -259,11 +260,11 @@ const renderGridItems = (
           <Card.Root>
             <Card.Header>
               <HStack gap={2}>
-                <BarChart2 color="orange" />
+                <BarChart2 color="var(--chakra-colors-orange-fg)" />
                 <Heading size="sm">{check.name}</Heading>
               </HStack>
               {!check.enabled && (
-                <Text color="gray" fontSize="sm">
+                <Text color="fg.muted" fontSize="sm">
                   (disabled)
                 </Text>
               )}
@@ -287,12 +288,12 @@ const renderGridItems = (
           <Card.Root>
             <Card.Header>
               <HStack gap={2}>
-                <BarChart2 color="orange" />
+                <BarChart2 color="var(--chakra-colors-orange-fg)" />
                 <Heading size="sm">{check.name}</Heading>
                 {traceCheck && <Text fontWeight={300}>- {traceCheck.name}</Text>}
               </HStack>
               {!check.enabled && (
-                <Text color="gray" fontSize="sm">
+                <Text color="fg.muted" fontSize="sm">
                   (disabled)
                 </Text>
               )}
@@ -320,7 +321,7 @@ const renderGridItems = (
             <Card.Root>
               <Card.Header>
                 <HStack gap={2}>
-                  <BarChart2 color="orange" />
+                  <BarChart2 color="var(--chakra-colors-orange-fg)" />
                   <Heading size="sm">{check.name} - Pass Rate Trend</Heading>
                 </HStack>
               </Card.Header>
@@ -496,4 +497,4 @@ function EvaluationsContent() {
  * gating and layout chrome are stated once in `analytics-routes.tsx`, in
  * front of the loader registry these screens are children of.
  */
-export default EvaluationsContent;
+export default withAggregateAnalyticsGate("Online Evaluations", EvaluationsContent);

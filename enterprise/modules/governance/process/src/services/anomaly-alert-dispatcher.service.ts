@@ -130,6 +130,9 @@ export class AnomalyAlertDispatcherService {
     if (input.destination.type === "webhook_endpoint") {
       return this.recordEndpointDelivery({ ...input, endpointId: input.destination.endpointId });
     }
+    if (input.destination.endpointId !== undefined) {
+      return this.recordEndpointDelivery({ ...input, endpointId: input.destination.endpointId });
+    }
 
     return this.dispatchWebhook({
       destination: input.destination,

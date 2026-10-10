@@ -8,7 +8,6 @@ import {
 /** Which event-log rows each retention category owns, handed to eventing's retention (Q205). */
 export const EVENT_LOG_RETENTION_CLASSIFICATION = {
   categories: retentionCategories,
-  fallbackCategory: "traces",
   indefiniteClass: "indefinite",
   classByAggregateType: RETENTION_CLASS_BY_AGGREGATE_TYPE,
   indefiniteEventTypePrefixes: INDEFINITE_EVENT_TYPE_PREFIXES,

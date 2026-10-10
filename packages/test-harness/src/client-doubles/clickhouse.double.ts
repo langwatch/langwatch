@@ -1,5 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 
 import { type ClientScript, scriptedClient } from "./scripted-client.ts";
 
@@ -11,7 +11,10 @@ const silentDriver: QueryDriver = { execute: neverRuns, insert: neverRuns, comma
 export function clickHouseQueryClientDouble(
   script: ClientScript<ClickHouseQueryClient> = {},
 ): ClickHouseQueryClient {
-  const client = new ClickHouseQueryClient({ driver: silentDriver });
+  const client = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
+    driver: silentDriver,
+  });
   return scriptedClient({ client, script, name: "clickhouse" });
 }
 

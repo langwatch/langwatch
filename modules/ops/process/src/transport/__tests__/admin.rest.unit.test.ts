@@ -5,14 +5,20 @@
  */
 import { createErrorHandler } from "@langwatch/api";
 import { SessionReader, type SessionCaller } from "@langwatch/api/hosting";
-import { bindRestMiddleware, BrowserSessionIdentity, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  BrowserSessionIdentity,
+  browserSessionContext,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { AdminSurfaceHiddenError, type OpsApi } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp, platformOperatorAuthz } from "../../app/__tests__/ops.fixture.ts";
-import { adminAuditRequest, adminAuthSession, adminRest } from "../admin.rest.ts";
+import { adminAuditRequest, adminRest } from "../admin.rest.ts";
 
 const SAME_SITE = { "content-type": "application/json", "sec-fetch-site": "same-origin" };
 const SESSIONS: Record<string, SessionCaller> = {
@@ -51,12 +57,17 @@ function mount(app: OpsApi) {
     publicBaseUrl: void 0,
   });
 
-  return createRestRuntime({ identity: door, doors: { browser: door } }).mount(adminRest.router(), {
+  return createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
+    identity: door,
+    doors: { browser: door },
+  }).mount(adminRest.router(), {
     app: () => app,
     onError: createErrorHandler(),
-    facts: [
-      bindRestMiddleware(adminAuthSession, () => ({ id: "session_1" })),
-      bindRestMiddleware(adminAuditRequest, () => ({ headers: { "user-agent": "test" } })),
+    middlewareContext: [
+      bindMiddlewareContext(browserSessionContext, () => ({ id: "session_1" })),
+      bindMiddlewareContext(adminAuditRequest, () => ({ headers: { "user-agent": "test" } })),
     ],
   });
 }
@@ -95,7 +106,7 @@ describe("the admin REST declaration", () => {
   });
 
   describe("given an operator holding ops:manage", () => {
-    it("passes validated impersonation input and audit facts to one app operation", async () => {
+    it("passes validated impersonation input and audit context to one app operation", async () => {
       const startAdminImpersonation = vi.fn(async () => ({
         message: "Impersonation started" as const,
       }));

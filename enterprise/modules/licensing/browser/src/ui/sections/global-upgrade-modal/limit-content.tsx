@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { AccessState } from "@langwatch/design-system/access-state";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { LIMIT_TYPE_LABELS } from "@langwatch/enterprise-licensing-contract";
@@ -24,50 +25,57 @@ export function LimitContent({
   isSaaS: boolean;
   onClose: () => void;
 }) {
-  const buttonLabel = isSaaS ? "Upgrade Plan" : "Upgrade License";
+  const buttonLabel = isSaaS ? "Compare plans" : "Manage license";
   const href = planManagementUrl(isSaaS);
 
   return (
     <>
       <Dialog.Header>
-        <Dialog.Title>Upgrade Required</Dialog.Title>
+        <Dialog.Title>Upgrade required</Dialog.Title>
       </Dialog.Header>
       <Dialog.Body>
-        <VStack gap={4} align="start">
-          {typeof variant.max === "number" ? (
-            <>
+        <AccessState
+          kind="upgrade"
+          title="You've reached your plan's limit"
+          compact
+          description="Choose a plan with more capacity to continue, or ask an organization admin to review your plan."
+        >
+          <VStack gap={4} align="start">
+            {typeof variant.max === "number" ? (
+              <>
+                <Text>
+                  You've reached the limit of {variant.max} {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
+                  on your current plan.
+                </Text>
+                <Text color="fg.muted">
+                  Current usage: {variant.current} / {variant.max}
+                </Text>
+              </>
+            ) : (
               <Text>
-                You've reached the limit of {variant.max} {LIMIT_TYPE_LABELS[variant.limitType]} on
-                your current plan.
+                You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]} on your current
+                plan.
               </Text>
-              <Text color="gray.500">
-                Current usage: {variant.current} / {variant.max}
+            )}
+            {CREATION_LIMIT_TYPES.has(variant.limitType) && (
+              <Text color="fg.muted">
+                Everything you already have keeps working and stays editable.
               </Text>
-            </>
-          ) : (
-            <Text>
-              You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]} on your current
-              plan.
-            </Text>
-          )}
-          {CREATION_LIMIT_TYPES.has(variant.limitType) && (
-            <Text color="gray.500">
-              Everything you already have keeps working and stays editable.
-            </Text>
-          )}
-          {SEAT_LIMIT_TYPES.has(variant.limitType) && (
-            <Text color="gray.500">
-              To free a seat instead, disable a membership from the members page. That is
-              reversible, and it keeps their role and everything they did.
-            </Text>
-          )}
-        </VStack>
+            )}
+            {SEAT_LIMIT_TYPES.has(variant.limitType) && (
+              <Text color="fg.muted">
+                To free a seat instead, disable a membership from the members page. That is
+                reversible, and it keeps their role and everything they did.
+              </Text>
+            )}
+          </VStack>
+        </AccessState>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button variant="ghost" onClick={onClose}>
+        <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button asChild colorPalette="blue">
+        <Button asChild colorPalette="orange">
           <Link href={href} onClick={onClose}>
             {buttonLabel}
           </Link>

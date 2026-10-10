@@ -137,6 +137,12 @@ Feature: Nurturing sends the signals its owners record
     When an evaluation in that older project settles
     Then nurturing counts it toward the organization
 
+  @integration
+  Scenario: Concurrent events recording one organization leave one row and raise no error
+    Given several events record the same organization at once
+    When they all settle
+    Then every one succeeds and the organization has one row
+
   @unit
   Scenario: An evaluation in an organization nurturing never learned raises nothing
     Given a project its owners hold, in an organization nurturing never learned

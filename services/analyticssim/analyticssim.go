@@ -68,6 +68,7 @@ type Server struct {
 	now     func() time.Time
 	mux     *http.ServeMux
 	console http.Handler
+	fault   forcedError
 }
 
 // NewServer builds the server over the embedded console bundle.
@@ -94,7 +95,7 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	// PostHog: posthog-node's batch, posthog-js's capture paths, and the legacy ones.
 	for _, path := range []string{"/batch/", "/e/", "/i/v0/e/", "/capture/", "/track/", "/engage/"} {
-		mux.HandleFunc("POST "+path, s.handlePostHogCapture)
+		mux.HandleFunc("POST "+path, s.failing(s.handlePostHogCapture))
 	}
 	mux.HandleFunc("POST /s/", s.handleDiscard) // session recordings: accepted, not kept
 	mux.HandleFunc("POST /flags/", s.handlePostHogFlags)
@@ -102,13 +103,15 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("GET /array/", s.handlePostHogRemoteConfig)
 	mux.HandleFunc("GET /static/", handlePostHogExtension)
 	// Customer.io: the CDP API nurturing posts to, and the Track API.
-	mux.HandleFunc("POST /v1/{call}", s.handleCustomerIOCDP)
-	mux.HandleFunc("PUT /api/v1/customers/{id}", s.handleCustomerIOTrack)
-	mux.HandleFunc("POST /api/v1/customers/{id}/events", s.handleCustomerIOTrack)
+	mux.HandleFunc("POST /v1/{call}", s.failing(s.handleCustomerIOCDP))
+	mux.HandleFunc("PUT /api/v1/customers/{id}", s.failing(s.handleCustomerIOTrack))
+	mux.HandleFunc("POST /api/v1/customers/{id}/events", s.failing(s.handleCustomerIOTrack))
 	// The query API.
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("GET /_sim/api/records", s.handleRecords)
 	mux.HandleFunc("DELETE /_sim/api/records", s.handleClear)
+	mux.HandleFunc("GET /_sim/api/settings", s.handleSettings)
+	mux.HandleFunc("PUT /_sim/api/settings", s.handleSettings)
 	// A provider or console path analyticssim does not fake is a 404, never the console page.
 	for _, pattern := range []string{"POST /", "PUT /", "GET /api/", "GET /_sim/api/"} {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {

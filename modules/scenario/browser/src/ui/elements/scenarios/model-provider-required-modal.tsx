@@ -15,14 +15,14 @@ export function ModelProviderRequiredModal({
 }: ModelProviderRequiredModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(d) => !d.open && onClose()}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Model provider not ready</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} py={4} align="center" justify="center">
-            <Box p={3} borderRadius="full" bg="orange.100" color="orange.600">
+            <Box p={3} borderRadius="full" bg="orange.subtle" color="orange.fg">
               <Icon as={AlertTriangle} boxSize={6} />
             </Box>
             <Text color="fg.muted" fontSize="sm" textAlign="center">
@@ -33,16 +33,15 @@ export function ModelProviderRequiredModal({
         </Dialog.Body>
         <Dialog.Footer>
           <HStack gap={2} justify="flex-end">
-            <Button variant="ghost" onClick={onProceedAnyway}>
+            <Button variant="outline" onClick={onProceedAnyway}>
               Proceed anyway
             </Button>
-            <Button colorPalette="blue" asChild>
+            <Button colorPalette="orange" asChild>
               <a
                 data-testid="model-provider-required-modal-configure-button"
                 href="/settings/model-providers"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "white" }}
               >
                 Configure model provider
               </a>

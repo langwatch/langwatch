@@ -1,8 +1,9 @@
 import { useMintPersonalToken } from "@langwatch/api-key-client";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
 import {
@@ -33,9 +34,9 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { Edge } from "@xyflow/react";
-import { useCallback, useState } from "react";
-import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "react-feather";
-import { FormProvider, useForm } from "react-hook-form";
+import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "lucide-react";
+import { useState } from "react";
+import { FormProvider, useForm, useWatch } from "react-hook-form";
 
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import {
@@ -51,7 +52,6 @@ import {
 } from "../../../model/studio-dataset.utils.ts";
 import { exportedDatasetCutNotice } from "../../../model/workflow-export-dataset.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
-import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./use-version-state.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
@@ -445,7 +445,8 @@ function PublishModalContent({
     },
   });
 
-  const formVersion = form.watch("version");
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const formVersion = useWatch({ control: form.control, name: "version" });
 
   const { versions, versionToBeEvaluated } = useVersionState({
     project,
@@ -475,94 +476,82 @@ function PublishModalContent({
     },
   );
 
-  const onSubmit = useCallback(
-    async ({ version, commitMessage }: { version: string; commitMessage: string }) => {
-      if (!project || !workflowId) return;
+  const onSubmit = async ({
+    version,
+    commitMessage,
+  }: {
+    version: string;
+    commitMessage: string;
+  }) => {
+    if (!project || !workflowId) return;
 
-      let versionId: string | undefined;
+    let versionId: string | undefined;
 
-      if (canSave) {
-        try {
-          const versionResponse = await commitVersion.mutateAsync({
-            projectId: project.id,
-            workflowId,
-            commitMessage,
-            dsl: {
-              ...getWorkflow(),
-              version,
-            },
-          });
-          versionId = versionResponse.id;
-          setLastCommittedWorkflow(getWorkflow());
-          setCurrentVersionId(versionId);
-        } catch (error) {
-          toaster.create({
-            error,
-            title: "Couldn't save the version",
-            type: "error",
-            duration: 5000,
-          });
-          throw error;
-        }
-      } else {
-        versionId = currentVersionId;
-      }
-
-      if (!versionId) {
+    if (canSave) {
+      try {
+        const versionResponse = await commitVersion.mutateAsync({
+          projectId: project.id,
+          workflowId,
+          commitMessage,
+          dsl: {
+            ...getWorkflow(),
+            version,
+          },
+        });
+        versionId = versionResponse.id;
+        setLastCommittedWorkflow(getWorkflow());
+        setCurrentVersionId(versionId);
+      } catch (error) {
         toaster.create({
-          title: "Version ID not found for publishing",
+          error,
+          title: "Couldn't save the version",
           type: "error",
           duration: 5000,
         });
-        return;
+        throw error;
       }
+    } else {
+      versionId = currentVersionId;
+    }
 
-      void versions.refetch();
-      void publishedWorkflow.refetch();
+    if (!versionId) {
+      toaster.create({
+        title: "Version ID not found for publishing",
+        type: "error",
+        duration: 5000,
+      });
+      return;
+    }
 
-      publishWorkflow.mutate(
-        {
-          projectId: project?.id ?? "",
-          workflowId: workflowId ?? "",
-          versionId,
+    void versions.refetch();
+    void publishedWorkflow.refetch();
+
+    publishWorkflow.mutate(
+      {
+        projectId: project?.id ?? "",
+        workflowId: workflowId ?? "",
+        versionId,
+      },
+      {
+        onSuccess: () => {
+          setIsPublished(true);
+          if (workflow_type === "evaluator") {
+            toggleSaveAsEvaluator();
+          } else if (workflow_type === "component") {
+            toggleSaveAsComponent();
+          }
         },
-        {
-          onSuccess: () => {
-            setIsPublished(true);
-            if (workflow_type === "evaluator") {
-              toggleSaveAsEvaluator();
-            } else if (workflow_type === "component") {
-              toggleSaveAsComponent();
-            }
-          },
-          onError: (error) => {
-            toaster.create({
-              error,
-              title: "Couldn't publish the workflow",
-              type: "error",
-              duration: 5000,
-            });
-          },
+        onError: (error) => {
+          toaster.create({
+            error,
+            title: "Couldn't publish the workflow",
+            type: "error",
+            duration: 5000,
+          });
         },
-      );
-    },
-    [
-      canSave,
-      commitVersion,
-      currentVersionId,
-      getWorkflow,
-      project,
-      publishWorkflow,
-      publishedWorkflow,
-      setCurrentVersionId,
-      setLastCommittedWorkflow,
-      versions,
-      workflowId,
-      workflow_type,
-      toggleSaveAsComponent,
-      toggleSaveAsEvaluator,
-    ],
-  );
+      },
+    );
+  };
 
   const openApiModal = () => {
     onApiToggle();
@@ -571,7 +560,7 @@ function PublishModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content bg="bg" borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content borderTop="5px solid" borderColor="green.emphasized">
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
         </Dialog.Header>
@@ -594,11 +583,10 @@ function PublishModalContent({
   return (
     <FormProvider {...form}>
       <Dialog.Content
-        bg="bg"
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
-        borderColor="green.400"
+        borderColor="green.emphasized"
       >
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
@@ -606,7 +594,7 @@ function PublishModalContent({
         <Dialog.CloseTrigger />
         <Dialog.Body>
           <VStack align="start" width="full" gap={10}>
-            <Text fontSize="15px" color="black">
+            <Text fontSize="15px" color="fg">
               Publish your workflow to make it available via API, as a component to other workflows,
               or as a custom evaluator.
             </Text>
@@ -651,7 +639,7 @@ function PublishModalContent({
                   </Alert.Content>
                 </Alert.Root>
                 <VStack width="full" align="start">
-                  <Button colorPalette="green" onClick={() => openApiModal()} variant="outline">
+                  <Button colorPalette="orange" onClick={() => openApiModal()} variant="outline">
                     <Code size={16} /> View API Reference
                   </Button>
                 </VStack>
@@ -673,7 +661,7 @@ export const ApiModalContent = () => {
   const minting = useMintPersonalToken({
     organizationId: organization?.id,
     projectId: project?.id,
-    userId: useOptionalUiCapabilities()?.session.currentUser()?.id,
+    userId: useOptionalUiHostServices()?.session.currentUser()?.id,
     name: "Personal access token",
     permissions: ["workflows:manage"],
   });
@@ -710,7 +698,7 @@ export const ApiModalContent = () => {
     2,
   );
   return (
-    <Dialog.Content bg="bg">
+    <Dialog.Content>
       <Dialog.Header>
         <Dialog.Title>Workflow API</Dialog.Title>
       </Dialog.Header>
@@ -720,8 +708,8 @@ export const ApiModalContent = () => {
           Incorporate the following JSON payload within the body of your HTTP POST request to get
           the workflow result.
         </Text>
-        <Box padding={4} backgroundColor={"#272822"}>
-          <RenderCode
+        <Box>
+          <CodePreview
             code={`# Set your API key
 LANGWATCH_API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 

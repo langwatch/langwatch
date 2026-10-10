@@ -1,7 +1,9 @@
 /**
  * The hosted provider slot a connected install's gateway adds for one organization (ADR-156 §8).
  * Spec: specs/self-hosting/connected-services/managed-models-provider.feature
+ * @see enterprise/modules/licensing/specs/licensing.feature
  */
+import type { ConnectUpstream, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGatewayConnectUpstreamRepository } from "../../repositories/memory/memory.gateway-connect-upstream.repository.ts";
@@ -17,23 +19,61 @@ const upstream = {
   instanceId: "instance-1",
 };
 
-function harness() {
+/** Licensing's read as gateway sees it: what it serves now, or a refusal. */
+function harness(findConnectUpstream: LicensingApi["findConnectUpstream"] = async () => [served]) {
   const repository = MemoryGatewayConnectUpstreamRepository.create();
-  return { repository, service: GatewayConnectUpstreamService.create({ repository }) };
+  return {
+    repository,
+    service: GatewayConnectUpstreamService.create({
+      repository,
+      licensing: { findConnectUpstream },
+    }),
+  };
 }
 
+const served: ConnectUpstream = {
+  baseUrl: upstream.baseUrl,
+  token: upstream.token,
+  instanceId: upstream.instanceId,
+};
+
 describe("the hosted provider slot of a connected install", () => {
-  it("reads the license token back whole", async () => {
+  /** @scenario "Gateway keeps the install's hosted provider slot from licensing's upstream" */
+  it("pulls the license token from licensing on the set fact and reads it back whole", async () => {
     const { service } = harness();
 
-    await service.set(upstream);
+    await service.setFromLicensing({ organizationId: "org-1" });
 
     expect(await service.findForOrganization("org-1")).toEqual([upstream]);
   });
 
+  /** @scenario "Gateway leaves the hosted provider slot unset when licensing serves no upstream" */
+  it("leaves the slot unset when licensing serves no upstream any more", async () => {
+    let answer: ConnectUpstream[] = [served];
+    const { service } = harness(async () => answer);
+    await service.setFromLicensing({ organizationId: "org-1" });
+
+    answer = [];
+    await service.setFromLicensing({ organizationId: "org-1" });
+
+    expect(await service.findForOrganization("org-1")).toEqual([]);
+  });
+
+  /** @scenario "Gateway leaves the hosted provider slot unset when licensing serves no upstream" */
+  it("throws to be retried and writes nothing when licensing refuses the read", async () => {
+    const { service, repository } = harness(async () => {
+      throw new Error("licensing unavailable");
+    });
+
+    await expect(service.setFromLicensing({ organizationId: "org-1" })).rejects.toThrow(
+      "licensing unavailable",
+    );
+    expect(await repository.findForOrganization("org-1")).toEqual([]);
+  });
+
   it("is gone once licensing clears it, and clearing twice is harmless", async () => {
     const { service } = harness();
-    await service.set(upstream);
+    await service.setFromLicensing({ organizationId: "org-1" });
 
     await service.clear({ organizationId: "org-1" });
     await service.clear({ organizationId: "org-1" });
@@ -43,7 +83,7 @@ describe("the hosted provider slot of a connected install", () => {
 
   it("belongs to one organization only", async () => {
     const { service } = harness();
-    await service.set(upstream);
+    await service.setFromLicensing({ organizationId: "org-1" });
 
     expect(await service.findForOrganization("org-2")).toEqual([]);
   });

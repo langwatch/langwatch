@@ -19,7 +19,9 @@ export const teamTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof te
 
     .procedure("getTeamsWithGrants")
     .withPermission("organization:manage")
-    .handle(({ app, input }) => app.listTeamAccessMatrix({ organizationId: input.organizationId }))
+    .handle(({ app, input, actor }) =>
+      app.listTeamAccessMatrix({ organizationId: input.organizationId }, { id: actor.id }),
+    )
 
     .procedure("getTeamWithMembers")
     .withPermission("organization:view")

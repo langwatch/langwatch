@@ -89,7 +89,7 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
     });
   }
   /** The project feature's answers for the projects "acme" owns. */
-  projects(): Pick<ProjectApi, "findIdentity" | "listIdsByOrganization"> {
+  projects(): Pick<ProjectApi, "findIdentity" | "listIdsByOrganization" | "findTraceDestination"> {
     return createApiFixture<ProjectApi>({
       findIdentity: async (id) => {
         const teamId = TEAM_OF_PROJECT[id];
@@ -102,11 +102,16 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
               organizationId: "acme",
               isPersonal: false,
               ownerUserId: null,
+              kind: "application",
             }
           : null;
       },
       listIdsByOrganization: async ({ organizationId }) =>
         organizationId === "acme" ? Object.keys(TEAM_OF_PROJECT) : [],
+      findTraceDestination: async (id) => {
+        const teamId = TEAM_OF_PROJECT[id];
+        return teamId ? { id, teamId, archivedAt: null, kind: "application" } : null;
+      },
     });
   }
   async findProjectIdsForTeams({ teamIds }: { teamIds: string[] }) {

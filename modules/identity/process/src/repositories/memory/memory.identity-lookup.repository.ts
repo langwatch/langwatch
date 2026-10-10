@@ -10,7 +10,6 @@ import {
   type LookupConnectionRow,
   type LookupDomainClaimRow,
   type LookupIdentifierRow,
-  type LookupInvitationRow,
   type LookupMembershipRow,
   type LookupUserRow,
 } from "../identity-lookup.repository.ts";
@@ -30,7 +29,6 @@ export class MemoryIdentityLookupRepository implements IdentityLookupRepository 
 
   readonly users = new Map<string, LookupUserRow>();
   readonly memberships = new Map<string, LookupMembershipRow[]>();
-  readonly invitations: LookupInvitationRow[] = [];
   readonly activity: LookupOperatorActivityRow[] = [];
 
   async findIdentifiersByValue({
@@ -81,11 +79,6 @@ export class MemoryIdentityLookupRepository implements IdentityLookupRepository 
     userIds: readonly string[];
   }): Promise<readonly LookupMembershipRow[]> {
     return userIds.flatMap((userId) => this.memberships.get(userId) ?? []);
-  }
-
-  async findInvitations({ email }: { email: string }): Promise<readonly LookupInvitationRow[]> {
-    const target = email.toLowerCase();
-    return this.invitations.filter((row) => row.email.toLowerCase() === target);
   }
 
   async findConnectionForDomain({

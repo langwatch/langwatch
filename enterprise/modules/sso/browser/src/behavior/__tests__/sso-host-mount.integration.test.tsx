@@ -6,13 +6,13 @@
 
 import { SsoTestSignInToken, type SsoTestSignInOperations } from "@langwatch/auth-contract";
 import {
-  UiCapabilityContextProvider,
-  UiCapabilityUnavailableError,
+  UiHostServicesContextProvider,
+  UiHostServiceUnavailableError,
   UiScope,
   type UiActiveScope,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiLend } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,14 +34,14 @@ class OrganizationScope extends UiScope {
 
 function renderHost(lends: readonly UiLend[]) {
   const capabilities = {
-    ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate() {} }),
+    ...createUiHostServicesFromHost({ route: () => ({ params: {}, query: {} }), navigate() {} }),
     scope: new OrganizationScope(),
     declarations: uiDeclarations([{ name: "auth", installation: { capabilities: {}, lends } }]),
   };
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <SsoHostMount>{children}</SsoHostMount>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 
   return renderHook(() => useSsoHost(), { wrapper }).result.current;
@@ -71,6 +71,6 @@ describe("given nothing lent the sign-in", () => {
 
     await expect(
       host.testSignIn({ connectionId: "conn-1", callbackQuery: {} }),
-    ).rejects.toBeInstanceOf(UiCapabilityUnavailableError);
+    ).rejects.toBeInstanceOf(UiHostServiceUnavailableError);
   });
 });

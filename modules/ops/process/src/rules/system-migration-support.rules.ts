@@ -64,10 +64,12 @@ export interface SystemMigrationEnrollmentStore {
 export interface SystemMigrationStateReader {
   findStatusCounts(args: { migrationName: string }): Promise<Record<TenantMigrationStatus, number>>;
 
+  /** Newest movement first; no `migrationName` reads every migration's rows. */
   findRecordsByStatus(args: {
-    migrationName: string;
+    migrationName?: string | undefined;
     statuses: TenantMigrationStatus[];
     limit: number;
+    offset?: number;
   }): Promise<OpsMigrationOverview["attention"]>;
 
   getRecord(args: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;

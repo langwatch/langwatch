@@ -223,7 +223,7 @@ export function FeatureFlagRulesDialog({
               Cancel
             </Button>
           </Dialog.ActionTrigger>
-          <Button colorPalette="blue" loading={saving} onClick={() => void save()}>
+          <Button colorPalette="orange" loading={saving} onClick={() => void save()}>
             Save rules
           </Button>
         </Dialog.Footer>
@@ -309,6 +309,7 @@ function RuleEditorRow({
         <Field.Label fontSize="xs">Enabled</Field.Label>
         <HStack height="32px" alignItems="center">
           <Switch
+            colorPalette="accent"
             checked={rule.enabled}
             onCheckedChange={(details) => onChange({ enabled: details.checked })}
           />

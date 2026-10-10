@@ -18,7 +18,7 @@ export interface DirectorySyncSource {
 export function directorySyncChipFor(sources: DirectorySyncSource[]): DirectorySyncChip {
   if (sources.length === 0) {
     return {
-      label: "Not set up yet",
+      label: "Not set up",
       tone: "neutral",
       title: "No identity provider creates people here yet.",
     };

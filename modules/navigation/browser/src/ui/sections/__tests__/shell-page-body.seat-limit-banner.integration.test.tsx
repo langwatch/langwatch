@@ -102,7 +102,7 @@ describe("<ShellPageBody/> seat limit banner", () => {
       expect(screen.getByTestId("seat-limit-banner")).toHaveTextContent(
         "Your organization uses 3 member seats and your plan includes 2 member seats. Upgrade your plan to keep everyone.",
       );
-      expect(screen.getByRole("link", { name: "Upgrade your plan" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
         "href",
         "/settings/subscription",
       );
@@ -119,7 +119,7 @@ describe("<ShellPageBody/> seat limit banner", () => {
       expect(screen.getByTestId("seat-limit-banner")).toHaveTextContent(
         "Over the limit. Contact sales to add seats.",
       );
-      expect(screen.queryByRole("link", { name: "Upgrade your plan" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Compare plans" })).toBeNull();
     });
   });
 

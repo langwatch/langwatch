@@ -198,12 +198,11 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       const out = render([...ALL_WORKLOADS, ...IDENTITY_SERVICE_ACCOUNT]);
 
       const named = out.match(/serviceAccountName: t$/gm) ?? [];
-      // App, workers and the pre-roll migrate Job (the app image). Cron pods
-      // curl the app over HTTP and never touch storage, so binding the Blob
-      // identity to them would hand every cron image access it has no use for.
-      expect(named).toHaveLength(3);
+      // App and workers; the pre-roll Job renders only with serialized upgrades.
+      // Cron pods never touch storage, so they get no Blob identity.
+      expect(named).toHaveLength(2);
 
-      // And the webhook label on each of those same three pod templates:
+      // And the webhook label on each of those same two pod templates:
       // a count short here means one workload silently never gets a token.
       const labelled = out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
       expect(labelled).toHaveLength(0);
@@ -750,7 +749,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         "global.serviceAccount.name=preexisting-identity",
       ]);
 
-      expect(out.match(/serviceAccountName: preexisting-identity$/gm) ?? []).toHaveLength(3);
+      expect(out.match(/serviceAccountName: preexisting-identity$/gm) ?? []).toHaveLength(2);
       // create=false, so we must not manufacture the account.
       expect(out).not.toMatch(/kind: ServiceAccount\n[\s\S]{0,200}?name: preexisting-identity\n/);
     });

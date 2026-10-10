@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Langy's guided onboarding fact: one failed turn of the organization's guided conversation.
  * Peers react from their side (§9); langy sends no analytics itself.
@@ -13,7 +14,7 @@ export const GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE =
 export const GUIDED_ONBOARDING_TURN_FAILED_EVENT_VERSION = "2026-10-06" as const;
 
 /** A failed turn of the guided conversation, attributed to the conversation's owner. */
-export const guidedOnboardingTurnFailedEventDataSchema = z.object({
+const guidedOnboardingTurnFailedEventDataSchemaDefinition = z.object({
   /** The project the conversation lives in. */
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
@@ -29,6 +30,11 @@ export const guidedOnboardingTurnFailedEventDataSchema = z.object({
   /** Absent for an organization older than the experiment, or self-hosted. */
   onboardingVariant: onboardingVariantSchema.nullish(),
 });
+export interface GuidedOnboardingTurnFailedEventDataSchema extends Named<
+  typeof guidedOnboardingTurnFailedEventDataSchemaDefinition
+> {}
+export const guidedOnboardingTurnFailedEventDataSchema: GuidedOnboardingTurnFailedEventDataSchema =
+  guidedOnboardingTurnFailedEventDataSchemaDefinition;
 export type GuidedOnboardingTurnFailedEventData = z.infer<
   typeof guidedOnboardingTurnFailedEventDataSchema
 >;

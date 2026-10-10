@@ -11,6 +11,7 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
+import type { SsoConnectionHistoryEntry } from "../../features/sso-connection/repositories/sso-connection-history.repository.ts";
 import type { SsoConnectionRegistrationSlot } from "../../features/sso-connection/repositories/sso-connection-registration.repository.ts";
 import type { SsoEngineProviderRow } from "../../features/sso-connection/rules/sso-engine-provider.rules.ts";
 import type { BackfillAccountRow } from "../identity-backfill.repository.ts";
@@ -74,6 +75,8 @@ export class MemoryIdentityStore {
     authenticatedAtMs: number;
     providerAccountId: string | null;
   }[] = [];
+  /** Each connection's history panel, keyed `organizationId:connectionId`, newest first. */
+  readonly ssoConnectionHistory = new Map<string, SsoConnectionHistoryEntry[]>();
   /** The identity log: every person's events, in the order they landed. */
   readonly identityEvents: IdentityEvent[] = [];
   readonly organizationNames = new Map<string, string>();

@@ -68,7 +68,7 @@ export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditor
             </VStack>
           )}
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <Button onClick={props.onClose} data-testid="close-drawer-button">
             Close
           </Button>

@@ -56,7 +56,7 @@ export function ExpandedTextDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => onOpenChange(open)} size="5xl">
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header
           background="bg.muted"
           padding={3}
@@ -128,11 +128,11 @@ export function HoverableBigText({
             {expandable && (
               <Text
                 textAlign="center"
-                background="black"
+                background="yellow.subtle"
                 width="calc(100% + 16px)"
                 marginLeft="-8px"
                 marginTop="-4px"
-                color="yellow.400"
+                color="yellow.fg"
               >
                 click anywhere to expand
               </Text>

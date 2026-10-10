@@ -1,9 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import {
-  PersonalWorkspacePendingError,
-  type OrganizationApi,
-} from "@langwatch/organization-contract";
+import { PersonalWorkspacePendingError } from "@langwatch/organization-contract";
 import { fromDate, nowInstant, type Instant } from "@langwatch/time";
 import {
   UserEmailAmbiguousError,
@@ -54,6 +51,7 @@ import {
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
+import type { UserOrganizationDirectoryRepository } from "../repositories/user-organization-directory.repository.ts";
 import type { CreatedCredentialUser, UserRepository } from "../repositories/user.repository.ts";
 import type { UserAvatarStorage } from "./user-avatar-object.service.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
@@ -64,10 +62,13 @@ type PlatformOperatorList = Pick<AuthzApi, "listPlatformOperators">;
 /** What the service asks of auth: the SSO set-up read, over user's bound channel. */
 type UserAuthCalls = Pick<AuthApi, "getSsoSetupStatus">;
 
+/** The caller's personal-workspace project an avatar is stored under (U1-AVATAR a). */
+type PersonalProjects = Pick<UserOrganizationDirectoryRepository, "findPersonalProjectId">;
+
 export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
   private readonly repository: UserRepository;
-  private readonly organizations: OrganizationApi;
+  private readonly personalProjects: PersonalProjects;
   private readonly auth: UserAuthCalls;
   private readonly avatarStorage: UserAvatarStorage;
   /** The issuer every credential account row this service mints is stored under. */
@@ -78,7 +79,7 @@ export class UserService {
 
   private constructor({
     repository,
-    organizations,
+    personalProjects,
     auth,
     avatarStorage,
     credentialIssuer,
@@ -87,7 +88,7 @@ export class UserService {
     lifecycle,
   }: {
     repository: UserRepository;
-    organizations: OrganizationApi;
+    personalProjects: PersonalProjects;
     auth: UserAuthCalls;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
@@ -96,7 +97,7 @@ export class UserService {
     lifecycle: UserLifecycleNoticeService;
   }) {
     this.repository = repository;
-    this.organizations = organizations;
+    this.personalProjects = personalProjects;
     this.auth = auth;
     this.avatarStorage = avatarStorage;
     this.credentialIssuer = credentialIssuer;
@@ -107,7 +108,7 @@ export class UserService {
 
   static create(options: {
     repository: UserRepository;
-    organizations: OrganizationApi;
+    personalProjects: PersonalProjects;
     auth: UserAuthCalls;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
@@ -117,7 +118,7 @@ export class UserService {
   }): UserService {
     return new UserService({
       repository: options.repository,
-      organizations: options.organizations,
+      personalProjects: options.personalProjects,
       auth: options.auth,
       avatarStorage: options.avatarStorage,
       credentialIssuer: options.credentialIssuer,
@@ -417,22 +418,19 @@ export class UserService {
   async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
     const parsed = setUserAvatarInputSchema.parse(input);
     const { mediaType, bytes } = this.avatars.parse(parsed.imageDataUrl);
-    const ensured = await this.organizations.ensurePersonalWorkspace({
+    const projectId = await this.personalProjects.findPersonalProjectId({
       userId: parsed.userId,
       organizationId: parsed.organizationId,
-      displayName: parsed.displayName,
-      displayEmail: parsed.displayEmail,
     });
-    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
-    const { workspace } = ensured;
+    if (!projectId) throw new PersonalWorkspacePendingError();
     const stored = await this.avatarStorage.store({
-      projectId: workspace.project.id,
+      projectId,
       userId: parsed.userId,
       mediaType,
       bytes,
     });
     const image = this.avatars.buildUrl({
-      projectId: workspace.project.id,
+      projectId,
       id: stored.id,
     });
     await this.repository.setAvatar({ id: parsed.userId, image });

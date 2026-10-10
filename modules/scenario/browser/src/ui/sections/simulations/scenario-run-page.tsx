@@ -45,12 +45,7 @@ export function ScenarioRunPage({
 
   return (
     <VStack width="full" height="full" gap={0} overflowY="auto" data-testid="scenario-run-page">
-      <Box
-        width="full"
-        maxWidth="960px"
-        marginX="auto"
-        bg={{ base: "bg.surface", _dark: "bg.panel" }}
-      >
+      <Box width="full" maxWidth="960px" marginX="auto" bg={"bg.card"}>
         <RunPageBody detail={detail} headerEnd={backToBatch} />
       </Box>
       <RunDetailDialogs detail={detail} />

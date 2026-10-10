@@ -143,6 +143,24 @@ describe("PersonalSidebarLinks", () => {
     });
   });
 
+  describe("given the reader can also see another member's personal team", () => {
+    it("links Traces to their own personal project, not the other member's", () => {
+      const own = orgWithPersonalProject({ orgId: "org-admin", slug: "personal-own" });
+      const otherTeam = {
+        id: "team-other",
+        name: "Personal",
+        isPersonal: true,
+        ownerUserId: "user-2",
+        projects: [{ id: "proj-other", name: "Personal", slug: "personal-other" }],
+      };
+      state.organization = { ...own, teams: [otherTeam, ...own.teams] };
+
+      renderLinks();
+
+      expect(tracesHref()).toBe("/personal-own/traces");
+    });
+  });
+
   describe("given the personal entries that address no organization", () => {
     it("renders them whichever organization is selected", () => {
       renderLinks();

@@ -10,9 +10,49 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./format-money-display": {
-      "types": "./dist/components/display/format-money-display.d.ts",
-      "default": "./src/components/display/format-money-display.tsx"
+    "./detail-drawer-header": {
+      "types": "./dist/components/overlays/detail-drawer-header.d.ts",
+      "default": "./src/components/overlays/detail-drawer-header.tsx"
+    },
+    "./summary-list": {
+      "types": "./dist/components/display/summary-list.d.ts",
+      "default": "./src/components/display/summary-list.tsx"
+    },
+    "./resource-row": {
+      "types": "./dist/components/display/resource-row.d.ts",
+      "default": "./src/components/display/resource-row.tsx"
+    },
+    "./activity-timeline": {
+      "types": "./dist/components/display/activity-timeline.d.ts",
+      "default": "./src/components/display/activity-timeline.tsx"
+    },
+    "./formatted-number": {
+      "types": "./dist/components/values/formatted-number.d.ts",
+      "default": "./src/components/values/formatted-number.tsx"
+    },
+    "./formatted-date": {
+      "types": "./dist/components/values/formatted-date.d.ts",
+      "default": "./src/components/values/formatted-date.tsx"
+    },
+    "./money": {
+      "types": "./dist/components/values/money.d.ts",
+      "default": "./src/components/values/money.tsx"
+    },
+    "./describe-instant": {
+      "types": "./dist/describe-instant.d.ts",
+      "default": "./src/describe-instant.ts"
+    },
+    "./unified-diff": {
+      "types": "./dist/unified-diff.d.ts",
+      "default": "./src/unified-diff.ts"
+    },
+    "./json-value-preview": {
+      "types": "./dist/components/display/json-value-preview.d.ts",
+      "default": "./src/components/display/json-value-preview.tsx"
+    },
+    "./code-preview": {
+      "types": "./dist/components/display/code-preview.d.ts",
+      "default": "./src/components/display/code-preview.tsx"
     },
     "./copy-button": {
       "types": "./dist/components/display/copy-button.d.ts",
@@ -94,9 +134,9 @@
       "types": "./dist/components/display/external-image.d.ts",
       "default": "./src/components/display/external-image.tsx"
     },
-    "./format-money": {
-      "types": "./dist/format-money.d.ts",
-      "default": "./src/format-money.ts"
+    "./format-currency": {
+      "types": "./dist/format-currency.d.ts",
+      "default": "./src/format-currency.ts"
     },
     "./back-link": {
       "types": "./dist/components/layout/back-link.d.ts",
@@ -117,6 +157,18 @@
     "./langy-mark": {
       "types": "./dist/components/brand/langy-mark.d.ts",
       "default": "./src/components/brand/langy-mark.tsx"
+    },
+    "./access-state": {
+      "types": "./dist/components/states/access-state.d.ts",
+      "default": "./src/components/states/access-state.tsx"
+    },
+    "./restricted-access": {
+      "types": "./dist/components/states/restricted-access.d.ts",
+      "default": "./src/components/states/restricted-access.tsx"
+    },
+    "./banner": {
+      "types": "./dist/components/states/banner.d.ts",
+      "default": "./src/components/states/banner.tsx"
     },
     "./personal-access-token-banner": {
       "types": "./dist/components/states/personal-access-token-banner.d.ts",
@@ -204,8 +256,8 @@
       "default": "./src/metric-value-formatters.ts"
     },
     "./pass-rate-indicator": {
-      "types": "./dist/components/display/pass-rate-indicator.d.ts",
-      "default": "./src/components/display/pass-rate-indicator.tsx"
+      "types": "./dist/components/values/pass-rate-indicator.d.ts",
+      "default": "./src/components/values/pass-rate-indicator.tsx"
     },
     "./dialog": {
       "types": "./dist/components/overlays/dialog.d.ts",
@@ -243,6 +295,10 @@
       "types": "./dist/json-value-text.d.ts",
       "default": "./src/json-value-text.ts"
     },
+    "./list-page": {
+      "types": "./dist/components/layout/list-page.d.ts",
+      "default": "./src/components/layout/list-page.tsx"
+    },
     "./list-table": {
       "types": "./dist/components/layout/list-table.d.ts",
       "default": "./src/components/layout/list-table.tsx"
@@ -252,8 +308,8 @@
       "default": "./src/components/overlays/menu.tsx"
     },
     "./meter-bar": {
-      "types": "./dist/components/display/meter-bar.d.ts",
-      "default": "./src/components/display/meter-bar.tsx"
+      "types": "./dist/components/values/meter-bar.d.ts",
+      "default": "./src/components/values/meter-bar.tsx"
     },
     "./page-layout": {
       "types": "./dist/components/layout/page-layout.d.ts",
@@ -303,6 +359,10 @@
       "types": "./dist/components/scope/scope-filter.d.ts",
       "default": "./src/components/scope/scope-filter.tsx"
     },
+    "./option-list": {
+      "types": "./dist/components/forms/option-list.d.ts",
+      "default": "./src/components/forms/option-list.tsx"
+    },
     "./select": {
       "types": "./dist/components/forms/select.d.ts",
       "default": "./src/components/forms/select.tsx"
@@ -347,6 +407,10 @@
       "types": "./dist/components/brand/hero-lead-pill.d.ts",
       "default": "./src/components/brand/hero-lead-pill.tsx"
     },
+    "./inline-code": {
+      "types": "./dist/components/display/inline-code.d.ts",
+      "default": "./src/components/display/inline-code.tsx"
+    },
     "./kbd": {
       "types": "./dist/components/display/kbd.d.ts",
       "default": "./src/components/display/kbd.tsx"
@@ -356,12 +420,16 @@
       "default": "./src/format-milliseconds.ts"
     },
     "./stat-tile": {
-      "types": "./dist/components/display/stat-tile.d.ts",
-      "default": "./src/components/display/stat-tile.tsx"
+      "types": "./dist/components/values/stat-tile.d.ts",
+      "default": "./src/components/values/stat-tile.tsx"
     },
     "./tab-count": {
-      "types": "./dist/components/display/tab-count.d.ts",
-      "default": "./src/components/display/tab-count.tsx"
+      "types": "./dist/components/values/tab-count.d.ts",
+      "default": "./src/components/values/tab-count.tsx"
+    },
+    "./cron-schedule": {
+      "types": "./dist/components/display/cron-schedule.d.ts",
+      "default": "./src/components/display/cron-schedule.tsx"
     },
     "./settings-section": {
       "types": "./dist/components/layout/settings-section.d.ts",
@@ -426,6 +494,14 @@
     "./workflow-card": {
       "types": "./dist/components/layout/workflow-card.d.ts",
       "default": "./src/components/layout/workflow-card.tsx"
+    },
+    "./app-shell": {
+      "types": "./dist/components/layout/app-shell.d.ts",
+      "default": "./src/components/layout/app-shell.tsx"
+    },
+    "./charts": {
+      "types": "./dist/charts.d.ts",
+      "default": "./src/charts.ts"
     }
   },
   "scripts": {
@@ -436,6 +512,7 @@
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
+    "@chakra-ui/charts": "^3.36.0",
     "@langwatch/time": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lodash-es": "catalog:",
@@ -483,5 +560,29 @@
   },
   "langwatch": {
     "group": "browser"
+  },
+  "nx": {
+    "targets": {
+      "build:storybook": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild",
+          "{projectRoot}/.storybook/**/*",
+          "{workspaceRoot}/apps/ui/public/**/*",
+          "{workspaceRoot}/apps/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/modules/*/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/enterprise/modules/*/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/packages/*/src/**/*.{ts,tsx}"
+        ],
+        "outputs": [
+          "{projectRoot}/storybook-static"
+        ]
+      }
+    }
   }
 }

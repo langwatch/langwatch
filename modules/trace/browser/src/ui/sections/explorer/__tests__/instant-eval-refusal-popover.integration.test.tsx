@@ -47,7 +47,9 @@ describe("given the organization has spent its free Instant Evals budget", () =>
         "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Upgrade to keep judging. The words are searched as a phrase in the meantime.",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Upgrade" }).getAttribute("href")).toBe(UPGRADE_HREF);
+    expect(screen.getByRole("link", { name: "Compare plans" }).getAttribute("href")).toBe(
+      UPGRADE_HREF,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 

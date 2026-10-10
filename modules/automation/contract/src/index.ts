@@ -20,6 +20,9 @@ export {
   triggerSchema,
   triggerTemplateDraftSchema,
   triggerTemplateSchema,
+  type TriggerSchema,
+  type TriggerTemplateSchema,
+  type TriggerTemplateDraftSchema,
 } from "./trigger.ts";
 export type { Trigger, TriggerKind, TriggerTemplate, TriggerTemplateDraft } from "./trigger.ts";
 export * from "./trigger.commands.ts";
@@ -38,8 +41,6 @@ export * from "./templating/block-kit-allowlist.ts";
 export * from "./templating/defaults.ts";
 export * from "./templating/engine.ts";
 export * from "./templating/example-context.ts";
-export * from "./templating/markdown.ts";
-export * from "./templating/render-email.ts";
 export type {
   SlackPayload,
   SlackRenderDefaults,

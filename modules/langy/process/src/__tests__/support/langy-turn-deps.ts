@@ -1,4 +1,5 @@
 import type { LangyWorkerCredentials } from "@langwatch/langy-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
@@ -37,6 +38,7 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
     prompts: optional(over.prompts, "prompts"),
     promptProjectId: over.promptProjectId,
     models: createApiFixture(over.models, "models"),
+    projects: createApiFixture(over.projects ?? projectsOfKind("application"), "projects"),
     worker: nullable(over.worker, "worker"),
     tokenBuffer: over.tokenBuffer
       ? createApiFixture(over.tokenBuffer, "tokenBuffer")
@@ -96,4 +98,39 @@ export function conversationDetail(over: Partial<ConversationDetail> = {}): Conv
     eventCursor: null,
     ...over,
   };
+}
+
+/** A project lookup answering one project of the given kind. */
+export function projectsOfKind(kind: string): Pick<ProjectApi, "findById"> {
+  const project: Project = {
+    id: "proj-1",
+    name: "Project",
+    slug: "project",
+    apiKey: "",
+    lwqlKey: "",
+    teamId: "team-1",
+    language: "en",
+    framework: "other",
+    kind,
+    firstMessage: false,
+    integrated: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+  };
+  return { findById: async () => project };
 }

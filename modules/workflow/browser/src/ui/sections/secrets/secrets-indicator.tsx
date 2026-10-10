@@ -10,8 +10,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  ExternalLink as LuExternalLink,
+  KeyRound as LuKeyRound,
+  Settings as LuSettings,
+} from "lucide-react";
 import { useState } from "react";
-import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
 
 import { workflowApi } from "../../../behavior/workflow-api.ts";
 
@@ -47,9 +51,9 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
           as="button"
           gap={1}
           fontSize="13px"
-          color="gray.400"
+          color="fg.subtle"
           cursor="pointer"
-          _hover={{ color: "white" }}
+          _hover={{ color: "fg" }}
           paddingX={2}
           paddingY={1}
           borderRadius="md"
@@ -97,7 +101,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
                     target="_blank"
                     rel="noopener noreferrer"
                     fontSize="xs"
-                    color="blue.500"
+                    color="blue.fg"
                   >
                     Add secrets in Settings{" "}
                     <LuExternalLink

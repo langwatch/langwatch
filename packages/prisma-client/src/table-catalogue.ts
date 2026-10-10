@@ -89,8 +89,6 @@ export const prismaTableCatalogue = {
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
-  "DataPrivacyProjectScope": "DataPrivacyProjectScope",
-  "DataRetentionProjectScope": "DataRetentionProjectScope",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
   "InstantEvalJudgeSpend": "InstantEvalJudgeSpend",
@@ -516,6 +514,7 @@ export const prismaModelFieldCatalogue = {
     "resolvedByType",
     "resolvedById",
     "withdrawalCause",
+    "connectionId",
     "occurredAt",
     "lastEventId",
     "acceptedAt",
@@ -837,6 +836,7 @@ export const prismaModelFieldCatalogue = {
     "language",
     "framework",
     "kind",
+    "aggregateRule",
     "firstMessage",
     "integrated",
     "createdAt",
@@ -1159,6 +1159,7 @@ export const prismaModelFieldCatalogue = {
     "sqsSecretAccessKeyEncrypted",
     "secretEncrypted",
     "signatureScheme",
+    "idempotencyKey",
     "previousSecretEncrypted",
     "previousSecretExpiresAt",
     "enabledEvents",
@@ -1169,6 +1170,7 @@ export const prismaModelFieldCatalogue = {
     "maxBatchSize",
     "maxBatchDelayMs",
     "maxInFlight",
+    "allowSelfSignedCertificate",
     "lastSuccessAt",
     "lastFailureAt",
     "archivedAt",
@@ -1612,25 +1614,6 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
-  "DataPrivacyProjectScope": [
-    "projectId",
-    "organizationId",
-    "teamId",
-    "isPersonal",
-    "departmentId",
-    "teamRecordedAt",
-    "departmentRecordedAt",
-    "archivedAt",
-    "updatedAt"
-  ],
-  "DataRetentionProjectScope": [
-    "projectId",
-    "organizationId",
-    "teamId",
-    "teamRecordedAt",
-    "archivedAt",
-    "updatedAt"
-  ],
   "InstantEvalJudgeProject": [
     "projectId",
     "organizationId",
@@ -2040,6 +2023,7 @@ export const prismaModelFieldCatalogue = {
     "createdByUserId",
     "expiresAt",
     "maxViews",
+    "condition",
     "occurredAt",
     "createdAt",
     "updatedAt",
@@ -2156,7 +2140,8 @@ export const prismaModelFieldCatalogue = {
     "connectServices",
     "licenseTokenHash",
     "licenseInstanceId",
-    "licenseExpiresAt"
+    "licenseExpiresAt",
+    "licenseId"
   ],
   "VirtualKeyScope": [
     "id",
@@ -3204,8 +3189,6 @@ export const prismaRelationCatalogue = {
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
-  "DataPrivacyProjectScope": {},
-  "DataRetentionProjectScope": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
   "InstantEvalJudgeSpend": {},

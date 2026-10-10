@@ -8,7 +8,7 @@
 // than in eight children each inventing a pretty console of its own.
 //
 // A line that is not that JSON (a raw Node stack frame under
-// LANGWATCH_DEV_RAW_CRASH=1, a Vite banner, a `dev-supervisor: restarting`
+// LANGWATCH_DEV_RAW_CRASH=1, a Vite banner, a leftover wrapper
 // line) is passed through under the same lane column, so a mixed stream
 // still lines up. procsupervisor's own restart-loop line ("exited —
 // restarting in 1s") is not one of these: it is a structured warn record
@@ -119,6 +119,13 @@ var droppedFields = map[string]bool{
 var numericLevels = map[int]Level{
 	10: LevelTrace, 20: LevelDebug, 30: LevelInfo,
 	40: LevelWarn, 50: LevelError, 60: LevelFatal,
+}
+
+// Failed reports whether a record is a failure: error or worse, or a boot that
+// failed, which dev-runtime writes at warn while an older generation serves on.
+func Failed(rec Record) bool {
+	return rec.Level == LevelError || rec.Level == LevelFatal ||
+		(rec.Level == LevelWarn && strings.Contains(rec.Message, "boot failed"))
 }
 
 // Parse reads one line as the shared structured format. ok is false for

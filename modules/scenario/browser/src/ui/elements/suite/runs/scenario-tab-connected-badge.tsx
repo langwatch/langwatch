@@ -36,11 +36,11 @@ export function ScenarioTabConnectedBadge({ visible }: { visible: boolean }) {
         <Box
           boxSize={2}
           borderRadius="full"
-          background="green.500"
+          background="green.solid"
           css={{
             "@keyframes connected-dot": {
               "0%, 100%": {
-                boxShadow: "0 0 0 0 var(--chakra-colors-green-300)",
+                boxShadow: "0 0 0 0 var(--chakra-colors-green-muted)",
               },
               "50%": { boxShadow: "0 0 0 3px transparent" },
             },

@@ -14,7 +14,7 @@ export function ActiveOperationsSection({ data }: { data: DashboardData }) {
       replayStatus={statusQuery.data}
       renderProgressLink={(runId) => (
         <RoutedLink href={`/ops/projections/${runId}`} style={{ textDecoration: "none" }}>
-          <Text textStyle="xs" color="blue.500" cursor="pointer">
+          <Text textStyle="xs" color="blue.fg" cursor="pointer">
             View progress
           </Text>
         </RoutedLink>

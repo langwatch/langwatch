@@ -71,7 +71,9 @@ async function storage() {
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
-      identity: createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
+      identity: createApiFixture<IdentityApi>({
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+      }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -84,7 +86,9 @@ async function storage() {
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    channels: MemoryAuthChannels.create(),
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (handle, build) =>
       build({ NEXTAUTH_SECRET: SECRET }[handle.id]),

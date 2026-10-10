@@ -105,7 +105,7 @@ export function CreateGroupDialog({
       }}
       size="lg"
     >
-      <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
+      <Dialog.Content maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>Create group</Dialog.Title>
         </Dialog.Header>
@@ -243,7 +243,7 @@ export function CreateGroupDialog({
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             data-testid="groups-create-submit"
             disabled={!name.trim()}
             loading={createGroup.isPending}

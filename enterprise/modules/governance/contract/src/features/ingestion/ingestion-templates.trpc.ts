@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every `ingestionTemplates.*` procedure, declared once, at main's wire names. */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { governanceWriteAcknowledgedSchema } from "../../governance.responses.ts";
@@ -9,7 +9,7 @@ import { ingestionTemplateSchema } from "./ingestion-template.ts";
 const organizationScope = z.object({ organizationId: z.string() });
 const templateInOrganization = z.object({ ...organizationScope.shape, id: z.string() });
 
-export const ingestionTemplateCreateSchema = z.object({
+const ingestionTemplateCreateSchemaDefinition = z.object({
   ...organizationScope.shape,
   sourceType: z.string(),
   displayName: z.string().min(1).max(80),
@@ -18,6 +18,11 @@ export const ingestionTemplateCreateSchema = z.object({
   credentialSchema: z.enum(["otlp_token", "static_api_key", "agent_id"]).nullable().optional(),
   ottlRules: z.string().max(50_000).optional(),
 });
+export interface IngestionTemplateCreateSchema extends Named<
+  typeof ingestionTemplateCreateSchemaDefinition
+> {}
+export const ingestionTemplateCreateSchema: IngestionTemplateCreateSchema =
+  ingestionTemplateCreateSchemaDefinition;
 
 export const ingestionTemplatesTrpc = defineTrpcContract("ingestionTemplates")
   .query("list")

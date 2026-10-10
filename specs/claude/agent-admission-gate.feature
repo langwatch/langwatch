@@ -345,7 +345,7 @@ Feature: haven answers an agent's tool call before it runs
   # --- Installing the hook, which edits a file haven does not own ---
   #
   # The gate only runs if Claude Code is told about it, and telling it means
-  # writing settings in the developer's checkout. It is opt-in — `haven setup
+  # writing settings in the developer's checkout. It is opt-in — `haven self setup
   # gate-hook`, never `haven up` — and worktree-local, so it configures this
   # checkout and commits nothing into anyone else's.
 

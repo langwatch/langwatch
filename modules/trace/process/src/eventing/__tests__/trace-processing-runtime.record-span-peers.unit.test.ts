@@ -16,8 +16,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import {
   type TraceProcessingPipelineInput,
   TraceProcessingRuntimeAdapter,
@@ -117,6 +118,7 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
   );
   const pipeline = TraceProcessingRuntimeAdapter.create({
     role: "worker",
+    authorizeFoldRead: ownProofAuthorizer,
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>({
       computeTokenCount: async () => 0,
     }),

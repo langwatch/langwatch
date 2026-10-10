@@ -1,7 +1,7 @@
 # With no terminal (an agent, CI) it runs `--yes`: installs what haven needs,
 # asks nothing; a human gets the picker.
 #
-# `|| true` because the check is advice.	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) install; else go run $(HAVEN_PKG) install --yes; fi || true# =============================================================================
+# `|| true` because the check is advice.	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) self install; else go run $(HAVEN_PKG) self install --yes; fi || true# =============================================================================
 # THUISHAVEN — hostname-based local dev
 # =============================================================================
 # Included from the repo-root Makefile (`include dev/haven.mk`, last line).
@@ -72,11 +72,10 @@ endif
 # already done.
 haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
-	@pnpm exec nx run haven:build --outputStyle=static && echo "built .bin/haven/haven"
+	@$(NX) run haven:build --outputStyle=static && echo "built .bin/haven/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
-	@$(MAKE) --no-print-directory haven-web || echo "haven-web did not build; the hub and stack homes will name 'make haven-web' until it does"
-	@go install $(HAVEN_PKG)
-	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) install; else go run $(HAVEN_PKG) install --yes; fi || true
+	@go run $(HAVEN_PKG) self install --build
+	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) self install; else go run $(HAVEN_PKG) self install --yes; fi || true
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
@@ -86,7 +85,7 @@ endif
 # runs it first; a console that fails to build (--no-bail keeps the others)
 # serves a page naming this target instead.
 haven-web:
-	@pnpm exec nx run-many -t build -p @langwatch/haven-web @langwatch/mailsim-web @langwatch/idpsim-web @langwatch/storagesim-web @langwatch/voicesim-web @langwatch/llmsim-web @langwatch/analyticssim-web --outputStyle=static
+	@$(NX) run-many -t build --projects tag:haven-console --outputStyle=static
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

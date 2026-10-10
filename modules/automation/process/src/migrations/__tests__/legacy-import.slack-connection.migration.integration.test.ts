@@ -1,5 +1,6 @@
 /** One organization's Slack connection pass. @see modules/slack/specs/slack-connections.feature */
 import { SystemMigrationRunnerService, type TenantSource } from "@langwatch/system-migrations";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -385,6 +386,7 @@ describe("SlackConnectionMigration", () => {
       const state = new MemoryMigrationState();
       const runner = new SystemMigrationRunnerService({
         state,
+        now: nowInstant,
         lease: soleProcessLease,
         tenants,
         cohort: () => true,

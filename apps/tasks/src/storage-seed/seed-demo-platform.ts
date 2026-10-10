@@ -2,8 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { ExperimentType, type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
-  DEMO_HTTP_AGENT_CONFIG,
   DEMO_PLATFORM_IDS,
+  demoHttpAgentConfig,
   DEMO_PROMPT_CONFIG_DATA,
 } from "./demo-platform-ids.ts";
 
@@ -51,14 +51,16 @@ export async function seedDemoPlatform({
   projectId,
   organizationId,
   userId,
+  environment,
 }: {
   prisma: PrismaClient;
   projectId: string;
   organizationId: string;
   userId: string;
+  environment: Readonly<Record<string, string | undefined>>;
 }): Promise<void> {
   const supportAgent = await prisma.agent.upsert({
-    where: { id: DEMO_PLATFORM_IDS.agents.support },
+    where: { id: DEMO_PLATFORM_IDS.agents.support, projectId },
     create: {
       id: DEMO_PLATFORM_IDS.agents.support,
       projectId,
@@ -73,7 +75,7 @@ export async function seedDemoPlatform({
   });
 
   await prisma.agent.upsert({
-    where: { id: DEMO_PLATFORM_IDS.agents.retrieval },
+    where: { id: DEMO_PLATFORM_IDS.agents.retrieval, projectId },
     create: {
       id: DEMO_PLATFORM_IDS.agents.retrieval,
       projectId,
@@ -88,13 +90,13 @@ export async function seedDemoPlatform({
   });
 
   await prisma.agent.upsert({
-    where: { id: DEMO_PLATFORM_IDS.agents.httpEcho },
+    where: { id: DEMO_PLATFORM_IDS.agents.httpEcho, projectId },
     create: {
       id: DEMO_PLATFORM_IDS.agents.httpEcho,
       projectId,
       name: "HTTP Echo Agent",
       type: "http",
-      config: DEMO_HTTP_AGENT_CONFIG as Prisma.InputJsonValue,
+      config: demoHttpAgentConfig({ environment }) as Prisma.InputJsonValue,
     },
     update: { archivedAt: null },
   });
@@ -128,7 +130,7 @@ export async function seedDemoPlatform({
   });
 
   const qualityEvaluator = await prisma.evaluator.upsert({
-    where: { id: DEMO_PLATFORM_IDS.evaluators.quality },
+    where: { id: DEMO_PLATFORM_IDS.evaluators.quality, projectId },
     create: {
       id: DEMO_PLATFORM_IDS.evaluators.quality,
       projectId,
@@ -144,7 +146,7 @@ export async function seedDemoPlatform({
   });
 
   await prisma.evaluator.upsert({
-    where: { id: DEMO_PLATFORM_IDS.evaluators.groundedness },
+    where: { id: DEMO_PLATFORM_IDS.evaluators.groundedness, projectId },
     create: {
       id: DEMO_PLATFORM_IDS.evaluators.groundedness,
       projectId,
@@ -200,7 +202,7 @@ export async function seedDemoPlatform({
 
   for (const scenario of scenarios) {
     await prisma.scenario.upsert({
-      where: { id: scenario.id },
+      where: { id: scenario.id, projectId },
       create: {
         ...scenario,
         criteria: [...scenario.criteria],

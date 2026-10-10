@@ -20,6 +20,12 @@ VITEST_MAX_WORKERS=2 pnpm --filter <package> test <paths>
 Prefix that with `rtk` when the machine has it — `rtk` is optional here, so drop
 the prefix rather than let a `command not found` swallow the run.
 
+The root `test`, `test:unit`, `test:cli` and `test:sdk` run through Nx
+(`nx run-many -t test`, two tasks at once, `.env` loading and colour off so the
+cache key is the whole environment), so an unchanged package replays from
+cache in milliseconds; only a package whose files or dependency closure changed
+reruns. `test:integration` is never cached.
+
 `test:integration` exists only in packages that declare a datastore. The root
 `test:integration` and `test:component` scripts are stubs that exit 1 and say so.
 Never set `CI=1` locally - it forces testcontainers and disables the native mode.

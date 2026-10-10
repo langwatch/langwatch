@@ -29,10 +29,11 @@ describe("the preamble's telemetry and metrics slots", () => {
   });
 
   describe("given the Prometheus transport", () => {
-    it("starts with the scrape door hosted on the built-in health door", async () => {
+    it("starts with the pull door on a listener of its own", async () => {
       const server = await start({
         OTEL_METRICS_EXPORTER: "otlp,prometheus",
-        LANGWATCH_METRICS_TOKEN: "scrape-me",
+        OTEL_EXPORTER_PROMETHEUS_PORT: "0",
+        METRICS_API_KEY: "scrape-me",
       });
 
       await expect(server.close()).resolves.not.toThrow();

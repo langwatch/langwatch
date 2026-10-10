@@ -32,6 +32,7 @@ beforeEach(() => {
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-app-settings-"));
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
+  delete process.env.CLAUDE_CONFIG_DIR;
 });
 
 afterEach(() => {
@@ -300,5 +301,27 @@ describe("removeAppEnvVars", () => {
       expect(changed).toBe(false);
       expect(fs.readFileSync(target.path, "utf8")).toBe("{not valid json");
     });
+  });
+});
+
+describe("appSettingsTargetFor claude with CLAUDE_CONFIG_DIR", () => {
+  const orig = process.env.CLAUDE_CONFIG_DIR;
+  afterEach(() => {
+    if (orig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = orig;
+  });
+
+  it("targets $CLAUDE_CONFIG_DIR/settings.json when set", () => {
+    process.env.CLAUDE_CONFIG_DIR = path.join(tmpHome, "scratch-claude");
+    expect(appSettingsTargetFor("claude")?.path).toBe(
+      path.join(tmpHome, "scratch-claude", "settings.json"),
+    );
+  });
+
+  it("targets ~/.claude/settings.json when unset", () => {
+    delete process.env.CLAUDE_CONFIG_DIR;
+    expect(appSettingsTargetFor("claude")?.path).toBe(
+      path.join(os.homedir(), ".claude", "settings.json"),
+    );
   });
 });

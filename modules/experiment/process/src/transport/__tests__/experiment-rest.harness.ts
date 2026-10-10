@@ -1,16 +1,17 @@
 /**
  * The `/api/experiments` family on a runtime that stands in for the process:
- * one project door, the credential fact its create is attributed through, and
+ * one project door, the credential context its create is attributed through, and
  * the flat legacy envelope this family publishes.
  */
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   ForbiddenError,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { experimentRest, experimentRestCredential } from "../experiment.rest.ts";
 
@@ -64,6 +65,8 @@ export function mountExperimentRest(
   const checked = options.checked ?? [];
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {
         checked.push(`authenticate`);
@@ -83,9 +86,9 @@ export function mountExperimentRest(
   const hono = runtime.mount(experimentRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(experimentRestCredential, (c) => {
-        const userId = callerOf(c.req.raw);
+    middlewareContext: [
+      bindMiddlewareContext(experimentRestCredential, (request) => {
+        const userId = callerOf(request);
 
         return userId === null
           ? { kind: "legacyProjectKey" as const }

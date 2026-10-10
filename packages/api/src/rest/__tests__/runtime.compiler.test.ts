@@ -45,10 +45,12 @@ const transportDeclaration = defineRestRouter(AnnotationApi)
   .withInput(z.object({ title: z.string() }))
   .withPermission("annotations:update")
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.updateAnnotation(input))
   .delete("/:id", "deleteAnnotation")
   .withParams(z.object({ id: z.string() }))
   .withPermission("annotations:update")
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.deleteAnnotation(input))
   .build();
 transportDeclaration.router();
@@ -98,7 +100,7 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-});
+}, 60_000); // four cold tsc programs in one test
 
 /** @scenario "Registering a route without an access policy is a type error" */
 it("refuses a route registered with no access decision, because it has no handler to call", () => {
@@ -131,7 +133,7 @@ route().get("/", "list").withPermission("annotations:view").withOutput(z.object(
 });
 
 /** @scenario "A route answers one of several shapes, told apart by a field" */
-it("infers trailing middleware arguments and rejects wrong facts and responses", () => {
+it("infers trailing middleware arguments and rejects wrong middleware context and responses", () => {
   const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-middleware-"));
   const fixture = join(directory, "fixture.ts");
 
@@ -140,12 +142,12 @@ it("infers trailing middleware arguments and rejects wrong facts and responses",
     `import { z } from "zod";
 import { moduleApi } from "@langwatch/module";
 import { defineRestRouter } from "../src/rest/declaration.ts";
-import { defineRestMiddleware } from "../src/rest/request.ts";
+import { defineMiddlewareContext } from "../src/rest/request.ts";
 const api = moduleApi<object>()("annotation");
-const facts = defineRestMiddleware("caller", z.object({ userId: z.string() }));
+const callerContext = defineMiddlewareContext("caller", z.object({ userId: z.string() }));
 const route = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .get("/", "read").withPermission("annotations:view")
-  .withOutput(z.object({ id: z.string() })).withMiddleware(facts);
+  .withOutput(z.object({ id: z.string() })).withMiddlewareContext(callerContext);
 route().handle((_args, caller) => ({ id: caller.userId }));
 route().handle((_args, caller) => ({ id: caller.token }));
 route().handle(() => ({ id: 42 }));
@@ -157,7 +159,7 @@ const payload = z.discriminatedUnion("kind", [
 const unionRoute = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .post("/:id", "write").withParams(z.object({ id: z.string() }))
   .withInput(payload).withPermission("annotations:view").withOutput(z.object({ id: z.string() }));
-unionRoute().handle(({ input }) => ({ id: input.kind === "text" ? input.text : String(input.count) }));
+unionRoute().withoutAudit("test route").handle(({ input }) => ({ id: input.kind === "text" ? input.text : String(input.count) }));
 unionRoute().handle(({ input }) => ({ id: input.text }));
 const conflict = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), id: z.string() }),
@@ -205,6 +207,7 @@ const tier = z.object({ tier: z.literal("organization") });
 defineRestRouter(api).withNamespace("roles").withVersion("2026-09-08")
   .withCredential("organization")
   .get("/", "listRoles").withPermission("organization:manage").withOutput(tier)
+  .withoutAudit("test route")
   .handle(({ scope }) => ({ tier: scope.tier }));
 defineRestRouter(api).withNamespace("secrets").withVersion("2026-09-08")
   .get("/", "listSecrets").withPermission("secrets:view").withOutput(tier)

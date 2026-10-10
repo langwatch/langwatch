@@ -34,6 +34,25 @@ export const DEMO_HTTP_AGENT_CONFIG = {
   timeoutMs: 15000,
 };
 
+/** A haven stack names llmsim's loopback port in OPENAI_BASE_URL; langy-echo replaces httpbin. */
+export function demoHttpAgentConfig({
+  environment,
+}: {
+  environment: Readonly<Record<string, string | undefined>>;
+}) {
+  const base = environment.OPENAI_BASE_URL;
+  if (!base?.startsWith("http://127.0.0.1:")) return DEMO_HTTP_AGENT_CONFIG;
+  return {
+    description: "Echoes the conversation back through llmsim.",
+    url: `${base.replace(/\/$/, "")}/chat/completions`,
+    method: "POST",
+    headers: [{ key: "Content-Type", value: "application/json" }],
+    bodyTemplate: '{"model":"langy-echo","messages":{{messages}}}',
+    outputPath: "$.choices[0].message.content",
+    timeoutMs: 15000,
+  };
+}
+
 /**
  * Version 1 configData for the demo prompt. Must parse against the prompt
  * feature's latest version schema (same reason as above: read paths validate;

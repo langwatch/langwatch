@@ -14,6 +14,7 @@ export type LedgerTableNames = {
   target: string;
   lease: string;
   roster: string;
+  tenantState: string;
 };
 
 /** The unqualified table names inside the ledger schema. */
@@ -23,6 +24,7 @@ export const LEDGER_TABLE = {
   target: "_langwatch_upgrade_target",
   lease: "_langwatch_upgrade_lease",
   roster: "_langwatch_serving_roster",
+  tenantState: "_langwatch_upgrade_tenant_state",
 } as const;
 
 const quote = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`;
@@ -43,6 +45,7 @@ export function ledgerTablesIn({ schema }: { schema: string }): LedgerTableNames
     target: qualified(LEDGER_TABLE.target),
     lease: qualified(LEDGER_TABLE.lease),
     roster: qualified(LEDGER_TABLE.roster),
+    tenantState: qualified(LEDGER_TABLE.tenantState),
   };
 }
 
@@ -109,6 +112,7 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
 )`,
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "owner" TEXT`,
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "description" TEXT`,
+    `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "finish_by" TEXT`,
     `ALTER TABLE ${tables.run} ADD COLUMN IF NOT EXISTS "floor" TEXT`,
     `CREATE TABLE IF NOT EXISTS ${tables.target} (
     "step_id" TEXT NOT NULL,
@@ -136,13 +140,33 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
     "image" TEXT NOT NULL,
     "release" TEXT,
     "steps" JSONB NOT NULL DEFAULT '[]',
+    "credential_keys" JSONB NOT NULL DEFAULT '[]',
     "started_at" TIMESTAMP(3) NOT NULL,
     "heartbeat_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "_langwatch_serving_roster_pkey" PRIMARY KEY ("process_id")
 )`,
+    `ALTER TABLE ${tables.roster} ADD COLUMN IF NOT EXISTS "credential_keys" JSONB NOT NULL DEFAULT '[]'`,
+    `CREATE TABLE IF NOT EXISTS ${tables.tenantState} (
+    "step_id" TEXT NOT NULL,
+    "tenant_id" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "report" JSONB,
+    "held_reason" TEXT,
+    "held_since" TIMESTAMPTZ(3),
+    "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "_langwatch_upgrade_tenant_state_pkey" PRIMARY KEY ("step_id", "tenant_id")
+)`,
   ];
 }
+
+/**
+ * `lock_timeout` for the ledger DDL, which runs before the timed lease exists: a session holding
+ * a ledger table fails this run fast instead of queueing it, and every read behind it, forever.
+ * About 2 s, as for the schema DDL (Alex, 2026-10-09; DEFAULT_LOCK_TIMEOUT_MS in upgrade-runner).
+ */
+export const LEDGER_LOCK_TIMEOUT_MS = 2_000;
 
 /** Serialises concurrent creators of one installation's ledger for the rest of the transaction. */
 const lockOf = ({ tables }: { tables: LedgerTableNames }) =>
@@ -157,6 +181,7 @@ export function createLedgerTablesSql({ tables }: { tables: LedgerTableNames }):
   return [
     "DO $ledger$",
     "BEGIN",
+    `  PERFORM set_config('lock_timeout', '${LEDGER_LOCK_TIMEOUT_MS}ms', true);`,
     `  ${lockOf({ tables })}`,
     `  IF to_regnamespace(${literal(quote(tables.schema))}) IS NULL THEN`,
     `    CREATE SCHEMA ${quote(tables.schema)};`,

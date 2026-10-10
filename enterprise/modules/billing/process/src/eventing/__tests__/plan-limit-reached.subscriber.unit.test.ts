@@ -34,6 +34,7 @@ describe("billing's plan-limit-reached subscriber", () => {
         tenantId: createTenantId("org_acme"),
         aggregateId: "org_acme",
         occurredAt: 1_000,
+        createdAt: 1_000,
         eventId: "evt_1",
       },
     );

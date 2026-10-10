@@ -29,6 +29,9 @@
   ],
   "references": [
     {
+      "path": "../authorization/tsconfig.build.json"
+    },
+    {
       "path": "../group-queue/tsconfig.build.json"
     },
     {

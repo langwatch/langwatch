@@ -1,4 +1,3 @@
-import { Select } from "@chakra-ui/react";
 import {
   Box,
   Button,
@@ -6,16 +5,15 @@ import {
   Flex,
   HStack,
   Input,
-  Portal,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Select } from "@langwatch/design-system/select";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import {
-  SPAN_TYPE_ICONS,
   SPAN_TYPES,
   type SpanConfig,
   type SpanInputOutput,
@@ -44,7 +42,7 @@ function findSpan(spans: SpanConfig[], id: string): SpanConfig | undefined {
 
 const spanTypeCollection = createListCollection({
   items: SPAN_TYPES.map((t) => ({
-    label: `${SPAN_TYPE_ICONS[t]} ${t}`,
+    label: t === "llm" || t === "rag" ? t.toUpperCase() : t,
     value: t,
   })),
 });
@@ -74,10 +72,20 @@ export function SpanEditorPanel() {
           {span.name}
         </Text>
         <HStack gap={1}>
-          <Button size="xs" variant="outline" onClick={() => indentSpan(span.id)}>
+          <Button
+            aria-label="Indent span"
+            size="sm"
+            variant="outline"
+            onClick={() => indentSpan(span.id)}
+          >
             <ArrowRight size={14} />
           </Button>
-          <Button size="xs" variant="outline" onClick={() => outdentSpan(span.id)}>
+          <Button
+            aria-label="Outdent span"
+            size="sm"
+            variant="outline"
+            onClick={() => outdentSpan(span.id)}
+          >
             <ArrowLeft size={14} />
           </Button>
         </HStack>
@@ -107,17 +115,13 @@ export function SpanEditorPanel() {
             <Select.Trigger>
               <Select.ValueText />
             </Select.Trigger>
-            <Portal>
-              <Select.Positioner>
-                <Select.Content>
-                  {SPAN_TYPES.map((t) => (
-                    <Select.Item key={t} item={t}>
-                      {SPAN_TYPE_ICONS[t]} {t}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
-            </Portal>
+            <Select.Content>
+              {SPAN_TYPES.map((t) => (
+                <Select.Item key={t} item={t}>
+                  {t === "llm" || t === "rag" ? t.toUpperCase() : t}
+                </Select.Item>
+              ))}
+            </Select.Content>
           </Select.Root>
         </Box>
       </Flex>
@@ -164,22 +168,18 @@ export function SpanEditorPanel() {
             <Select.Trigger>
               <Select.ValueText />
             </Select.Trigger>
-            <Portal>
-              <Select.Positioner>
-                <Select.Content>
-                  <Select.Item item="ok">OK</Select.Item>
-                  <Select.Item item="error">Error</Select.Item>
-                  <Select.Item item="unset">Unset</Select.Item>
-                </Select.Content>
-              </Select.Positioner>
-            </Portal>
+            <Select.Content>
+              <Select.Item item="ok">OK</Select.Item>
+              <Select.Item item="error">Error</Select.Item>
+              <Select.Item item="unset">Unset</Select.Item>
+            </Select.Content>
           </Select.Root>
         </Box>
       </Flex>
 
       {span.status === "error" && (
-        <Box rounded="lg" border="1px solid" borderColor="red.500/30" bg="red.500/5" p={3}>
-          <Text fontSize="xs" fontWeight="medium" color="red.400" mb={1}>
+        <Box rounded="lg" border="1px solid" borderColor="red.muted" bg="red.subtle" p={3}>
+          <Text fontSize="xs" fontWeight="medium" color="fg.error" mb={1}>
             Exception
           </Text>
           <Input
@@ -257,8 +257,8 @@ export function SpanEditorPanel() {
         <Text
           fontSize="xs"
           fontWeight="medium"
-          textTransform="uppercase"
-          letterSpacing="wider"
+          textTransform="none"
+          letterSpacing="normal"
           color="fg.muted"
           mb={1}
         >

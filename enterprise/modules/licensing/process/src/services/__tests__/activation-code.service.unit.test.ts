@@ -25,6 +25,14 @@ import {
 } from "../activation-code.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
+
+/** The door's lookup, then the claim, as the connect host runs them (W02-ACTIVATE-DOOR). */
+async function redeemCode(
+  service: ActivationCodeService,
+  input: { code: string; instanceId: string },
+) {
+  return service.redeem(await service.verify(input));
+}
 const CODE = "LW-A1B2-C3D4-E5F6-G7H8";
 const NORMALISED = "LWA1B2C3D4E5F6G7H8";
 
@@ -138,10 +146,49 @@ describe("the shape of an activation code", () => {
 });
 
 describe("redeeming an activation code", () => {
+  /** @scenario "The connect host's door finds the code and the redemption claims it" */
+  it("looks the code up at the door without claiming it, and the redemption claims it", async () => {
+    const { service, repository, licenses } = harness();
+
+    const caller = await service.verifyPresented({
+      bearer: CODE,
+      instanceId: " install-1 ",
+    });
+
+    expect(caller).toEqual({
+      activationCodeId: "code-1",
+      organizationId: "org-acme",
+      instanceId: "install-1",
+    });
+    expect((await repository.findById("code-1"))?.redemptionCount).toBe(0);
+    expect(licenses.issued).toEqual([]);
+
+    await service.answer(caller);
+    expect((await repository.findById("code-1"))?.redemptionCount).toBe(1);
+  });
+
+  /** @scenario "A revoked, expired or already redeemed code is refused at the connect host with its own code" */
+  it("refuses a code revoked or claimed between the door and the redemption by the claim", async () => {
+    const { service, repository, licenses } = harness();
+    const caller = await service.verify({ code: CODE, instanceId: "install-1" });
+
+    await repository.revoke({ id: "code-1", at: NOW, revokedById: "operator" });
+    await expect(service.redeem(caller)).rejects.toBeInstanceOf(ActivationCodeNotFoundError);
+
+    const fresh = harness();
+    const first = await fresh.service.verify({ code: CODE, instanceId: "install-1" });
+    const second = await fresh.service.verify({ code: CODE, instanceId: "install-2" });
+    await fresh.service.redeem(first);
+    await expect(fresh.service.redeem(second)).rejects.toBeInstanceOf(
+      ActivationCodeAlreadyRedeemedError,
+    );
+    expect(licenses.issued).toEqual([]);
+  });
+
   it("binds the minted license to the install that redeemed it, so its first hosted call resolves", async () => {
     const { service, credentials } = harness();
 
-    await service.redeem({ code: CODE, instanceId: "install-1" });
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
 
     expect(credentials.resolved).toEqual([
       { token: "token-of(LW-SIGNED-LICENSE)", instanceId: "install-1" },
@@ -152,7 +199,7 @@ describe("redeeming an activation code", () => {
   it("mints the license the code describes and names the code's services", async () => {
     const { service, licenses } = harness();
 
-    const redemption = await service.redeem({ code: CODE, instanceId: "install-1" });
+    const redemption = await redeemCode(service, { code: CODE, instanceId: "install-1" });
 
     expect(redemption).toEqual({
       licenseKey: "LW-SIGNED-LICENSE",
@@ -173,16 +220,16 @@ describe("redeeming an activation code", () => {
   it("refuses text that is not a code, before any lookup", async () => {
     const { service } = harness();
 
-    await expect(service.redeem({ code: "nope", instanceId: "install-1" })).rejects.toBeInstanceOf(
-      ActivationCodeMalformedError,
-    );
+    await expect(
+      redeemCode(service, { code: "nope", instanceId: "install-1" }),
+    ).rejects.toBeInstanceOf(ActivationCodeMalformedError);
   });
 
   /** @scenario "A code must be presented with an instance id" */
   it("refuses a code presented without an instance id", async () => {
     const { service } = harness();
 
-    await expect(service.redeem({ code: CODE, instanceId: "  " })).rejects.toBeInstanceOf(
+    await expect(redeemCode(service, { code: CODE, instanceId: "  " })).rejects.toBeInstanceOf(
       ConnectInstanceRequiredError,
     );
   });
@@ -193,10 +240,10 @@ describe("redeeming an activation code", () => {
     const unknown = harness({ rows: [] });
 
     await expect(
-      revoked.service.redeem({ code: CODE, instanceId: "install-1" }),
+      redeemCode(revoked.service, { code: CODE, instanceId: "install-1" }),
     ).rejects.toBeInstanceOf(ActivationCodeNotFoundError);
     await expect(
-      unknown.service.redeem({ code: CODE, instanceId: "install-1" }),
+      redeemCode(unknown.service, { code: CODE, instanceId: "install-1" }),
     ).rejects.toBeInstanceOf(ActivationCodeNotFoundError);
   });
 
@@ -206,18 +253,18 @@ describe("redeeming an activation code", () => {
       rows: [rowFor({ expiresAt: Temporal.Instant.from("2025-12-01T00:00:00.000Z") })],
     });
 
-    await expect(service.redeem({ code: CODE, instanceId: "install-1" })).rejects.toBeInstanceOf(
-      ActivationCodeExpiredError,
-    );
+    await expect(
+      redeemCode(service, { code: CODE, instanceId: "install-1" }),
+    ).rejects.toBeInstanceOf(ActivationCodeExpiredError);
   });
 
   /** @scenario "Too many attempts on one code are refused" */
   it("refuses once the limiter says this code has been tried enough", async () => {
     const { service } = harness({ allow: false });
 
-    await expect(service.redeem({ code: CODE, instanceId: "install-1" })).rejects.toBeInstanceOf(
-      ActivationRateLimitedError,
-    );
+    await expect(
+      redeemCode(service, { code: CODE, instanceId: "install-1" }),
+    ).rejects.toBeInstanceOf(ActivationRateLimitedError);
   });
 
   /** @scenario "A single-use code is redeemed by exactly one of two simultaneous installs" */
@@ -225,8 +272,8 @@ describe("redeeming an activation code", () => {
     const { service, licenses } = harness();
 
     const outcomes = await Promise.allSettled([
-      service.redeem({ code: CODE, instanceId: "install-1" }),
-      service.redeem({ code: CODE, instanceId: "install-2" }),
+      redeemCode(service, { code: CODE, instanceId: "install-1" }),
+      redeemCode(service, { code: CODE, instanceId: "install-2" }),
     ]);
 
     expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
@@ -242,7 +289,7 @@ describe("redeeming an activation code", () => {
     const { service, licenses, repository } = harness();
     licenses.refusing = true;
 
-    await expect(service.redeem({ code: CODE, instanceId: "install-1" })).rejects.toThrow(
+    await expect(redeemCode(service, { code: CODE, instanceId: "install-1" })).rejects.toThrow(
       "the signing key is not configured",
     );
     expect(await repository.findById("code-1")).toMatchObject({
@@ -252,7 +299,9 @@ describe("redeeming an activation code", () => {
     });
 
     licenses.refusing = false;
-    await expect(service.redeem({ code: CODE, instanceId: "install-1" })).resolves.toMatchObject({
+    await expect(
+      redeemCode(service, { code: CODE, instanceId: "install-1" }),
+    ).resolves.toMatchObject({
       licenseKey: "LW-SIGNED-LICENSE",
     });
   });
@@ -261,8 +310,8 @@ describe("redeeming an activation code", () => {
   it("lets every install redeem a reusable code, counting each redemption", async () => {
     const { service, repository, licenses } = harness({ rows: [rowFor({ reusable: true })] });
 
-    await service.redeem({ code: CODE, instanceId: "install-1" });
-    await service.redeem({ code: CODE, instanceId: "install-2" });
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
+    await redeemCode(service, { code: CODE, instanceId: "install-2" });
 
     expect(licenses.issued).toHaveLength(2);
     expect(await repository.findById("code-1")).toMatchObject({
@@ -274,7 +323,7 @@ describe("redeeming an activation code", () => {
   it("names the license a single-use redemption minted", async () => {
     const { service, repository } = harness();
 
-    await service.redeem({ code: CODE, instanceId: "install-1" });
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
 
     expect(await repository.findById("code-1")).toMatchObject({
       issuedLicenseId: "issued-license-1",
@@ -349,7 +398,7 @@ describe("lite seats on an activation code", () => {
     const { code, row } = await service.issue(enterpriseInput());
     expect(row.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
 
-    await service.redeem({ code, instanceId: "install-1" });
+    await redeemCode(service, { code, instanceId: "install-1" });
 
     expect(licenses.liteSeats).toEqual([ENTERPRISE_TEMPLATE.maxMembersLite]);
   });
@@ -361,7 +410,7 @@ describe("lite seats on an activation code", () => {
     const { code, row } = await service.issue(enterpriseInput({ maxMembersLite: 3 }));
     expect(row.maxMembersLite).toBe(3);
 
-    await service.redeem({ code, instanceId: "install-1" });
+    await redeemCode(service, { code, instanceId: "install-1" });
 
     expect(licenses.liteSeats).toEqual([3]);
   });

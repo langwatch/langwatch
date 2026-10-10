@@ -1,5 +1,5 @@
 /**
- * Which projects the reader could replicate a thing into, as a capability of
+ * Which projects the reader could replicate a thing into, as a host service of
  * its own: organization lends it by declaration and the shell installs it
  * beside scope. ARCHITECTURE.md §10.1 "A capability travels by declaration".
  */

@@ -8,7 +8,9 @@ import {
   type OrganizationInvite,
   type OrganizationJsonValue,
   type OrganizationUser,
+  type PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import {
@@ -18,6 +20,7 @@ import {
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
+  type InviteWithOrganizationAndRequester,
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
@@ -199,6 +202,14 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     return this.#withOrganization(invite);
   }
 
+  async getInviteLandingByCode(input: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester> {
+    const invite = await this.getInviteByCodeWithOrganization(input);
+    const requester = invite.requestedBy ? this.memory.users.get(invite.requestedBy) : undefined;
+    return { ...invite, requestedByUser: requester ? { name: requester.name } : null };
+  }
+
   async findAdminEmails(input: { organizationId: string }): Promise<string[]> {
     return this.#membersOf(input.organizationId)
       .filter((member) => member.role === OrganizationUserRole.ADMIN)
@@ -210,7 +221,12 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
 
   async findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]> {
     return [...this.memory.projects.values()]
-      .filter((project) => input.teamIds.includes(project.teamId) && project.archivedAt === null)
+      .filter(
+        (project) =>
+          input.teamIds.includes(project.teamId) &&
+          project.archivedAt === null &&
+          !isNeverLandedOn(project.kind),
+      )
       .map((project) => project.slug);
   }
 
@@ -220,6 +236,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
         const team = this.memory.teams.get(project.teamId);
         return (
           project.archivedAt === null &&
+          !isNeverLandedOn(project.kind) &&
           team?.organizationId === input.organizationId &&
           team.archivedAt === null
         );
@@ -242,9 +259,30 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     return inviteOfRow(invite);
   }
 
+  async findPendingInvitesForAddress(input: {
+    address: string;
+  }): Promise<PendingInvitationsByEmail> {
+    return [...this.memory.invites.values()]
+      .filter(
+        (candidate) =>
+          sameAddress(candidate.email, input.address) && candidate.status === "PENDING",
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
+      .map((invite) => ({
+        inviteId: invite.id,
+        email: invite.email,
+        organizationId: invite.organizationId,
+        organizationName: this.memory.organizations.get(invite.organizationId)?.name ?? null,
+        invitedByName:
+          (invite.requestedBy && this.memory.users.get(invite.requestedBy)?.name) || null,
+        expiresAtMs: invite.expiration?.epochMilliseconds ?? null,
+      }));
+  }
+
   async findOldestPendingInviteForAddress(input: { address: string }): Promise<{
     inviteCode: string;
     organizationName: string;
+    inviterName: string | null;
     role: OrganizationUserRole;
   } | null> {
     const now = nowInstant();
@@ -260,6 +298,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     return {
       inviteCode: invite.inviteCode,
       organizationName: this.memory.organizations.get(invite.organizationId)?.name ?? "",
+      inviterName: (invite.requestedBy && this.memory.users.get(invite.requestedBy)?.name) || null,
       role: invite.role,
     };
   }
@@ -440,4 +479,9 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
 /** A copy, so a caller holding the answer never writes through to the table. */
 function inviteOfRow(row: MemoryOrganizationInviteRow): OrganizationInvite {
   return { ...row };
+}
+
+/** Whether the app never lands on this kind (main's `NEVER_LANDED_ON_PROJECT_KINDS`). */
+function isNeverLandedOn(kind: string | undefined): boolean {
+  return kind !== undefined && NEVER_LANDED_ON_PROJECT_KINDS.includes(kind);
 }

@@ -17,7 +17,12 @@ export const departmentsTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("assignments")
   .withPermission("governance:view")
-  .handle(({ app, input }) => app.departmentAssignments({ organizationId: input.organizationId }))
+  .handle(({ app, input, actor }) =>
+    app.departmentAssignments({
+      organizationId: input.organizationId,
+      callerUserId: actor.type === "user" ? actor.id : null,
+    }),
+  )
 
   .procedure("create")
   .withPermission("governance:manage")

@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { LogoIcon } from "./logo-icon.tsx";
 
 const meta = {
-  title: "Foundations/Logo icon",
+  title: "Brand/Logo icon",
+  parameters: { usage: { use: "The LangWatch mark alone, where the lockup does not fit." } },
   component: LogoIcon,
   tags: ["autodocs"],
 } satisfies Meta<typeof LogoIcon>;

@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HorizontalFormControl } from "./horizontal-form-control.tsx";
 
 const meta = {
-  title: "Components/Horizontal form control",
+  title: "Inputs and forms/Horizontal form control",
+  parameters: {
+    usage: {
+      use: "Wide settings forms where the label and its help sit to the left of the control.",
+      avoid: "Drawers, dialogs and narrow columns: use Vertical form control.",
+    },
+  },
   component: HorizontalFormControl,
   tags: ["autodocs"],
   args: {

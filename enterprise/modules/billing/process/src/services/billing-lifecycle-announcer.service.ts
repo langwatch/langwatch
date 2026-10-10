@@ -141,7 +141,7 @@ export class BillingLifecycleAnnouncerService {
         if (attempt === USAGE_BILLING_SEND_ATTEMPTS) {
           (this.deps.logger ?? logger).error(
             { error, organizationId },
-            "a usage-billing fact was not recorded; re-run usage-billing-catch-up",
+            "a usage-billing fact was not recorded; retry billing:record-usage-billing-catch-up in Ops > Upgrades",
           );
           return;
         }

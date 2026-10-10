@@ -473,7 +473,7 @@ function McpTab({
                 <Text fontSize="2xs" fontWeight="medium" color="fg">
                   {ep.editor}
                 </Text>
-                <Clipboard size={9} color="var(--chakra-colors-gray-400)" />
+                <Clipboard size={9} color="var(--chakra-colors-fg-subtle)" />
               </button>
             </HStack>
           </Tooltip>

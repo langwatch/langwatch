@@ -98,6 +98,9 @@ export {
   runEvaluatorsSchema,
   type RunEvaluatorDefinition,
   type RunEvaluators,
+  type RunEvaluatorFieldSchema,
+  type RunEvaluatorsSchema,
+  type RunEvaluatorDefinitionSchema,
 } from "./features/run/scenario-run-evaluators.ts";
 // The parent-child protocol of the scenario child: the environment codecs, the nlpgo error envelope
 // both sides read, and the voice IPC messages.

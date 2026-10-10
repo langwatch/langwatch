@@ -7,6 +7,7 @@ import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   type CanonicalLogRecord,
 } from "@langwatch/log-contract";
+import { parseOtlpLogs } from "@langwatch/otlp";
 import { describe, expect, it } from "vitest";
 
 import { CanonicalLogStorageMapProjection } from "../../eventing/canonical-log-storage.projection.ts";
@@ -110,6 +111,39 @@ describe("canonical log preparation", () => {
         { key: "answer", value: { type: "int", value: "9223372036854775807" } },
         { key: "ok", value: { type: "bool", value: true } },
       ],
+    });
+  });
+
+  /** @scenario "A protobuf log export is canonicalised like its JSON twin" */
+  it("accepts a protobuf-decoded export, whose messages are class instances", async () => {
+    const wire = request([
+      {
+        traceId: "W47/95gDgQPSabYzgT/GDA==",
+        spanId: "7uGbfsPBsXQ=",
+        timeUnixNano: "1700000000123456789",
+        body: { stringValue: "from protobuf" },
+      },
+    ]);
+    const parsed = parseOtlpLogs(
+      new TextEncoder().encode(JSON.stringify(wire)).buffer,
+      "application/x-protobuf",
+    );
+    if (!parsed.ok) throw new Error(parsed.error);
+
+    const result = await prepareCanonicalLogRecords({
+      tenantId: "project_test",
+      organizationId: "organization_test",
+      request: parsed.request,
+      piiRedactionLevel: "DISABLED",
+      acceptedAt: 1_700_000_000_000,
+    });
+
+    expect(result.rejectedLogRecords).toBe(0);
+    expect(result.accepted).toHaveLength(1);
+    expect(result.accepted[0]!.record).toMatchObject({
+      wireTraceId: "5b8efff798038103d269b633813fc60c",
+      correlationSource: "wire",
+      timeUnixNano: "1700000000123456789",
     });
   });
 

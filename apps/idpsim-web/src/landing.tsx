@@ -61,11 +61,31 @@ export const CONTROL_API = [
     request: "GET /control/t/{n}/activity",
     does: "What the tenant has been asked and what it answered",
   },
+  {
+    request: "POST /control/t/{n}/rotate-key",
+    does: "Rotates the signing key, or drops the old one",
+  },
+  { request: "POST /control/t/{n}/tamper", does: "Breaks the next ID token or SAML response once" },
+  {
+    request: "POST /control/t/{n}/saml/unsolicited",
+    does: "Signs an IdP-initiated SAML response for an ACS",
+  },
+  { request: "POST /control/t/{n}/user-active", does: "Disables or re-enables one person" },
+  {
+    request: "GET /control/t/{n}/legacy-env",
+    does: "The env lines a stack needs for the legacy provider",
+  },
+  {
+    request: "POST /control/t/{n}/scim-event",
+    does: "Sends one SCIM request through the connection",
+  },
   { request: "PUT /control/dns/txt", does: "Publishes a TXT record this machine will answer for" },
+  { request: "DELETE /control/dns/txt", does: "Takes a TXT record back out" },
   {
     request: "PUT /control/verification",
-    does: "Publishes a domain proof on both DNS and HTTP at once",
+    does: "Serves a token as the domain's well-known verification file",
   },
+  { request: "DELETE /control/verification", does: "Stops serving that file" },
 ];
 
 type ControlRow = (typeof CONTROL_API)[number];

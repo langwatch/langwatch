@@ -7,6 +7,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { SessionReader } from "../../hosting/session-reader.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
@@ -54,6 +55,7 @@ function host(): TrpcHost {
   return TrpcHost.create({
     sessions: SessionReader.unverified(),
     authz: {
+      ...authorizeDefaults,
       getDecision: () => Promise.reject(new Error("no decision is asked here")),
       getProjectAnyDecision: () => Promise.reject(new Error("no decision is asked here")),
       checkScopeLineage: () => Promise.reject(new Error("no decision is asked here")),

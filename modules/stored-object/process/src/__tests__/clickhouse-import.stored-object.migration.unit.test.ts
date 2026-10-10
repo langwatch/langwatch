@@ -3,19 +3,17 @@ import { describe, expect, it } from "vitest";
 
 import { ClickHouseImportStoredObjectMigration } from "../migrations/clickhouse-import.stored-object.migration.ts";
 import { MemoryStoredObjectRecordRepository } from "../repositories/memory/memory.stored-object-record.repository.ts";
-import { StoredObjectLegacyLocationRepository } from "../repositories/stored-object-legacy-location.repository.ts";
-import { StoredObjectLegacySourceRepository } from "../repositories/stored-object-legacy-source.repository.ts";
-import { StoredObjectLegacyWriterDrainRepository } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
-import { StoredObjectProjectSourceRepository } from "../repositories/stored-object-project-source.repository.ts";
-
-class OneProject extends StoredObjectProjectSourceRepository {
-  async findForOrganization() {
-    return [{ id: "project_1" }];
-  }
-}
+import {
+  type LegacyStoredObjectRow,
+  StoredObjectLegacySourceRepository,
+} from "../repositories/stored-object-legacy-source.repository.ts";
 
 class OneLegacyObject extends StoredObjectLegacySourceRepository {
-  async findPage(input: { afterId?: string }) {
+  constructor(private readonly storageUri = "s3://bucket/project_1/so_legacy") {
+    super();
+  }
+
+  async findPage(input: { afterId?: string }): Promise<readonly LegacyStoredObjectRow[]> {
     if (input.afterId) return [];
     return [
       {
@@ -27,7 +25,7 @@ class OneLegacyObject extends StoredObjectLegacySourceRepository {
         mediaType: "application/octet-stream",
         sizeBytes: 3,
         sha256: "a".repeat(64),
-        storageUri: "s3://bucket/project_1/so_legacy",
+        storageUri: this.storageUri,
         createdAt: Temporal.Instant.from("2026-08-21T00:00:00.000Z"),
         insertedAt: Temporal.Instant.from("2026-08-21T00:01:00.000Z"),
       },
@@ -35,76 +33,37 @@ class OneLegacyObject extends StoredObjectLegacySourceRepository {
   }
 }
 
-class LegacyLocations extends StoredObjectLegacyLocationRepository {
-  parse() {
-    return {
-      provider: "s3",
-      destinationId: "bucket",
-      relativeId: "project_1/so_legacy",
-    };
-  }
-}
-
-class ProvedDrain extends StoredObjectLegacyWriterDrainRepository {
-  async get() {
-    return {
-      valid: true as const,
-      minimumWriterGeneration: "2026.08.22",
-      assertedAt: Temporal.Instant.from("2026-08-22T00:00:00.000Z"),
-    };
-  }
-}
-
-class DrainBecomesValidAfterFirstScan extends StoredObjectLegacyWriterDrainRepository {
-  private calls = 0;
-  async get() {
-    this.calls += 1;
-    return this.calls === 1
-      ? { valid: false as const, reason: "writers active" }
-      : {
-          valid: true as const,
-          minimumWriterGeneration: "2026.08.22",
-          assertedAt: Temporal.Instant.from("2026-08-22T00:00:00.000Z"),
-        };
-  }
-}
-
-function newMigration() {
-  return ClickHouseImportStoredObjectMigration.create({
-    projects: new OneProject(),
-    legacy: new OneLegacyObject(),
-    locations: new LegacyLocations(),
-    drain: new ProvedDrain(),
-    records: MemoryStoredObjectRecordRepository.create(),
-  });
-}
-
-describe("ClickHouseImportStoredObjectMigration", () => {
-  describe("when the runner reads its declaration", () => {
-    it("registers for automatic startup completion", () => {
-      const declared = newMigration();
-
-      // The state table's key. Renaming it orphans every stored record.
-      expect(declared.name).toBe("stored-objects-clickhouse-import-v0");
-      expect(declared.requiresOperatorConfirmation).toBe(false);
-      expect(declared.runsAutomaticallyOnSelfHosted).toBe(true);
-      expect(declared.enrolledAutomatically).toBe(true);
-    });
-  });
-
-  it("imports directly into the one row store through system migrations", async () => {
-    const records = MemoryStoredObjectRecordRepository.create();
-    const migration = ClickHouseImportStoredObjectMigration.create({
-      projects: new OneProject(),
+describe("ClickHouseImportStoredObjectMigration.step", () => {
+  /** @scenario "The Stored Objects import waits until no old image serves" */
+  it("declares a per-project tenant step that waits for old writers to leave", () => {
+    const step = ClickHouseImportStoredObjectMigration.create({
       legacy: new OneLegacyObject(),
-      locations: new LegacyLocations(),
-      drain: new ProvedDrain(),
-      records,
-    });
+      records: MemoryStoredObjectRecordRepository.create(),
+    }).step();
 
-    await expect(migration.migrateTenant({ tenantId: "organization_1" })).resolves.toMatchObject({
+    expect(step).toMatchObject({
+      id: "stored-object:import-clickhouse-index",
+      kind: "tenant",
+      mode: "background",
+      tenants: "project",
+      needsOldWritersGone: true,
+      requiresOperatorConfirmation: false,
+      runsAutomaticallyOnSelfHosted: true,
+      enrolledAutomatically: true,
+    });
+  });
+
+  /** @scenario "The Stored Objects import copies one project's latest legacy rows" */
+  it("copies the project's legacy row into the row store at its legacy location", async () => {
+    const records = MemoryStoredObjectRecordRepository.create();
+    const step = ClickHouseImportStoredObjectMigration.create({
+      legacy: new OneLegacyObject(),
+      records,
+    }).step();
+
+    await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
       status: "finalized",
-      report: { imported: 1, drainProved: true },
+      report: { kind: "stored_objects_imported", scanned: 1, imported: 1 },
     });
     await expect(
       records.findById({ tenantId: "project_1", id: "so_legacy" }),
@@ -112,24 +71,36 @@ describe("ClickHouseImportStoredObjectMigration", () => {
       status: "available",
       source: "imported",
       audiences: ["traces:view"],
-    });
-    await expect(migration.migrateTenant({ tenantId: "organization_1" })).resolves.toMatchObject({
-      status: "finalized",
-      report: { imported: 0, unchanged: 1, drainProved: true },
+      storage: { provider: "s3", destinationId: "bucket", relativeId: "project_1/so_legacy" },
     });
   });
 
-  it("holds the first scan when the writer drain becomes valid during it", async () => {
-    const migration = ClickHouseImportStoredObjectMigration.create({
-      projects: new OneProject(),
+  /** @scenario "A second Stored Objects import of a project changes nothing" */
+  it("reports the row unchanged on a second run", async () => {
+    const step = ClickHouseImportStoredObjectMigration.create({
       legacy: new OneLegacyObject(),
-      locations: new LegacyLocations(),
-      drain: new DrainBecomesValidAfterFirstScan(),
       records: MemoryStoredObjectRecordRepository.create(),
+    }).step();
+
+    await step.migrateTenant({ tenantId: "project_1" });
+
+    await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
+      status: "finalized",
+      report: { imported: 0, unchanged: 1 },
     });
-    const first = await migration.migrateTenant({ tenantId: "org_1" });
-    expect(first.status).toBe("migrated");
-    const second = await migration.migrateTenant({ tenantId: "org_1" });
-    expect(second.status).toBe("finalized");
+  });
+
+  /** @scenario "A legacy row stored outside its project fails the Stored Objects import" */
+  it("refuses a row whose location is outside its project and writes nothing", async () => {
+    const records = MemoryStoredObjectRecordRepository.create();
+    const step = ClickHouseImportStoredObjectMigration.create({
+      legacy: new OneLegacyObject("s3://bucket/project_2/so_legacy"),
+      records,
+    }).step();
+
+    await expect(step.migrateTenant({ tenantId: "project_1" })).rejects.toThrow(
+      "Legacy Stored Object location is outside its project",
+    );
+    await expect(records.findById({ tenantId: "project_1", id: "so_legacy" })).resolves.toBeNull();
   });
 });

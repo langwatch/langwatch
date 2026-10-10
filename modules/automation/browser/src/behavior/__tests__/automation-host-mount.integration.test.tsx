@@ -4,14 +4,14 @@
  * undefined. Spec: specs/ui/module-host-mounting.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -53,10 +53,6 @@ class SignedInSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
 class TestScope extends UiScope {
@@ -87,8 +83,8 @@ class TestScope extends UiScope {
 }
 
 function harness(scope: UiActiveScope) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new SignedInSession(),
     ),
@@ -97,9 +93,9 @@ function harness(scope: UiActiveScope) {
 
   return function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <AutomationHostMount>{children}</AutomationHostMount>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   };
 }
@@ -125,7 +121,7 @@ describe("given an automation host above the drawer that writes through it", () 
       render(<ScopeReader />, { wrapper: Harness });
 
       expect(screen.getByTestId("org")).toHaveTextContent("local-dev-organization");
-      // The port wants the team's slug; the scope capability carries only its id.
+      // The port wants the team's slug; the scope host service carries only its id.
       expect(screen.getByTestId("team")).toHaveTextContent("local-dev-team");
     });
   });

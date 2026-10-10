@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { match } from "ts-pattern";
 import { z } from "zod";
 
@@ -54,7 +55,7 @@ const GenAIToolCall = z.object({
   function: GenAIFunctionCall,
 });
 
-export const OpenTelemetryGenAIMessage = z
+const OpenTelemetryGenAIMessageDefinition = z
   .object({
     role: z.enum(["system", "user", "assistant", "function", "tool", "unknown"]).optional(),
     content: z.union([z.string(), z.array(GenAIRichContent), z.null()]).optional(),
@@ -66,6 +67,11 @@ export const OpenTelemetryGenAIMessage = z
   .refine((data) => data.role !== undefined || data.content !== undefined, {
     message: "At least one of 'role' or 'content' must be present",
   });
+export interface OpenTelemetryGenAIMessageSchema extends Named<
+  typeof OpenTelemetryGenAIMessageDefinition
+> {}
+export const OpenTelemetryGenAIMessage: OpenTelemetryGenAIMessageSchema =
+  OpenTelemetryGenAIMessageDefinition;
 
 export type OpenTelemetryGenAIMessage = z.infer<typeof OpenTelemetryGenAIMessage>;
 
@@ -80,7 +86,7 @@ type LangWatchMessage = OpenTelemetryGenAIMessage;
  * OpenAI message format
  * Mostly compatible with OpenTelemetry GenAI, but may have slight variations
  */
-export const OpenAIMessage = z.object({
+const OpenAIMessageDefinition = z.object({
   role: z.enum(["system", "user", "assistant", "function", "tool"]),
   content: z
     .union([
@@ -124,6 +130,8 @@ export const OpenAIMessage = z.object({
     .optional(),
   tool_call_id: z.string().optional(),
 });
+export interface OpenAIMessageSchema extends Named<typeof OpenAIMessageDefinition> {}
+export const OpenAIMessage: OpenAIMessageSchema = OpenAIMessageDefinition;
 
 export type OpenAIMessage = z.infer<typeof OpenAIMessage>;
 
@@ -169,10 +177,12 @@ const AnthropicContentBlock = z.union([
 export type AnthropicContentBlock = z.infer<typeof AnthropicContentBlock>;
 type AnthropicTextBlock = z.infer<typeof AnthropicTextBlock>;
 
-export const AnthropicMessage = z.object({
+const AnthropicMessageDefinition = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.union([z.string(), z.array(AnthropicContentBlock)]),
 });
+export interface AnthropicMessageSchema extends Named<typeof AnthropicMessageDefinition> {}
+export const AnthropicMessage: AnthropicMessageSchema = AnthropicMessageDefinition;
 
 export type AnthropicMessage = z.infer<typeof AnthropicMessage>;
 
@@ -214,17 +224,19 @@ const GeminiPart = z.union([
 
 type GeminiPart = z.infer<typeof GeminiPart>;
 
-export const GeminiMessage = z.object({
+const GeminiMessageDefinition = z.object({
   role: z.enum(["user", "model", "function"]),
   parts: z.array(GeminiPart),
 });
+export interface GeminiMessageSchema extends Named<typeof GeminiMessageDefinition> {}
+export const GeminiMessage: GeminiMessageSchema = GeminiMessageDefinition;
 
 export type GeminiMessage = z.infer<typeof GeminiMessage>;
 
 /**
  * Cohere message format
  */
-export const CohereMessage = z.object({
+const CohereMessageDefinition = z.object({
   role: z.enum(["USER", "CHATBOT", "SYSTEM", "TOOL"]),
   message: z.string().optional(),
   text: z.string().optional(),
@@ -248,6 +260,8 @@ export const CohereMessage = z.object({
     )
     .optional(),
 });
+export interface CohereMessageSchema extends Named<typeof CohereMessageDefinition> {}
+export const CohereMessage: CohereMessageSchema = CohereMessageDefinition;
 
 export type CohereMessage = z.infer<typeof CohereMessage>;
 
@@ -255,7 +269,7 @@ export type CohereMessage = z.infer<typeof CohereMessage>;
  * AWS Bedrock message formats (supports multiple models)
  * Claude format via Bedrock
  */
-export const BedrockClaudeMessage = z.object({
+const BedrockClaudeMessageDefinition = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.union([
     z.string(),
@@ -274,6 +288,8 @@ export const BedrockClaudeMessage = z.object({
     ),
   ]),
 });
+export interface BedrockClaudeMessageSchema extends Named<typeof BedrockClaudeMessageDefinition> {}
+export const BedrockClaudeMessage: BedrockClaudeMessageSchema = BedrockClaudeMessageDefinition;
 
 export type BedrockClaudeMessage = z.infer<typeof BedrockClaudeMessage>;
 
@@ -282,7 +298,7 @@ export type BedrockClaudeMessage = z.infer<typeof BedrockClaudeMessage>;
  * More specific formats are checked first to avoid false matches
  * and prevent data loss from premature OpenTelemetry matching
  */
-export const AnyProviderMessage = z.union([
+const AnyProviderMessageDefinition = z.union([
   GeminiMessage, // Most specific: has "parts" field
   CohereMessage, // Specific: uppercase roles, "message"/"text" fields
   AnthropicMessage, // Specific: content blocks with specific structure
@@ -291,6 +307,8 @@ export const AnyProviderMessage = z.union([
   OpenTelemetryGenAIMessage, // Most permissive, checked last
   LangWatchMessage, // Same as OpenTelemetryGenAIMessage, redundant but kept for compatibility
 ]);
+export interface AnyProviderMessageSchema extends Named<typeof AnyProviderMessageDefinition> {}
+export const AnyProviderMessage: AnyProviderMessageSchema = AnyProviderMessageDefinition;
 
 export type AnyProviderMessage = z.infer<typeof AnyProviderMessage>;
 

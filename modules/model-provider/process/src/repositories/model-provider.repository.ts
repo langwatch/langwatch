@@ -4,6 +4,7 @@ import type {
   ModelProvider,
   ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
+import type { Instant } from "@langwatch/time";
 
 /** How a ModelProvider's `customKeys` column read back. */
 export interface CustomKeysRead {
@@ -37,6 +38,7 @@ export interface ModelProviderLegacyColumns {
   customKeys: unknown;
   customModels: unknown;
   customEmbeddingsModels: unknown;
+  updatedAt: Instant;
 }
 
 /** The migrated columns: `customKeys` arrives in plaintext and the store seals it. */
@@ -88,4 +90,8 @@ export interface ModelProviderRepository {
   findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]>;
   /** Writes migrated columns as given, sealing `customKeys` with the credential codec. */
   updateLegacyColumns(input: ModelProviderLegacyColumnsUpdate): Promise<void>;
+  /** As `updateLegacyColumns`, only while the row is unchanged since `updatedAt`. */
+  updateLegacyColumnsIfUnchanged(
+    input: ModelProviderLegacyColumnsUpdate & { updatedAt: Instant },
+  ): Promise<boolean>;
 }

@@ -1,4 +1,5 @@
 import type { EventHandler, IntentContext, IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { SSO_ARRIVAL_POLICY_ID } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "../rules/join-request-id.rules.ts";
@@ -185,7 +186,9 @@ export const onJoinApproved: EventHandler<
   { resolvedBy: { type: "user" | "policy" | "invite"; id: string } },
   JoinRequestLifecycleIntents
 > = (state, data, ctx) => {
-  const kind = APPROVAL_NOTICE[data.resolvedBy.type];
+  // Recording a single sign-on arrival is not news: the arrival itself sent no notice.
+  const kind =
+    data.resolvedBy.id === SSO_ARRIVAL_POLICY_ID ? null : APPROVAL_NOTICE[data.resolvedBy.type];
   if (kind === null) return { state: JOIN_REQUEST_LIFECYCLE_INITIAL_STATE, nextWakeAt: null };
   return {
     state: JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,

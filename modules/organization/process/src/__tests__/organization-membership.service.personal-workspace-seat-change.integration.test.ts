@@ -51,6 +51,7 @@ const seats: OrganizationSeatLicense = {
 };
 const seatNotices: OrganizationSeatRevocationNotice = {
   memberDisabled: vi.fn(),
+  memberEnabled: vi.fn(),
 };
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
@@ -72,6 +73,10 @@ describe.skipIf(!DB_URL)(
     const prisma = connection.client as PrismaClient;
     const memberships = OrganizationMembershipService.create({
       workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+      memberNotices: {
+        memberRemoved: () => Promise.resolve(),
+        memberDepartmentChanged: () => Promise.resolve(),
+      },
       repository: PrismaOrganizationMembershipRepository.create({
         database: prisma,
         cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },

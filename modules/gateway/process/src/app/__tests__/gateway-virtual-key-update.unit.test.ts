@@ -51,9 +51,10 @@ async function gatewayHolding({ updateAt }: { updateAt: string[] }) {
           organizationId: ORGANIZATION_ID,
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         }),
         listTraceDestinations: async (projectIds) =>
-          projectIds.map((id) => ({ id, teamId: "team_1", archivedAt: null })),
+          projectIds.map((id) => ({ id, teamId: "team_1", archivedAt: null, kind: "application" })),
       }),
       evaluators: createApiFixture({}),
       evaluations: createApiFixture({}),
@@ -64,6 +65,7 @@ async function gatewayHolding({ updateAt }: { updateAt: string[] }) {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {

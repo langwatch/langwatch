@@ -1,13 +1,12 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { UPGRADE_LOG_TAIL_LINES } from "../runner/run-log.ts";
+
 /** The image's tasks app, where `pnpm task upgrade` runs (rethink 6.9). */
 export const TASKS_APP_DIRECTORY = fileURLToPath(
   new URL("../../../../apps/tasks/", import.meta.url),
 );
-
-/** How many of the run's last lines the upgrade console shows (in-app-upgrade.feature). */
-export const UPGRADE_LOG_TAIL_LINES = 50;
 
 /** Runs one `upgrade`: its exit code (a launch failure answers 1) and its last lines of output. */
 export type FirstInstallUpgrade = () => Promise<

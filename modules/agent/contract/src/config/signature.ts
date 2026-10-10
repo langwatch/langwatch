@@ -1,8 +1,9 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { baseAgentConfigSchema } from "./code.ts";
 
-export const llmConfigSchema = z.object({
+const llmConfigSchemaDefinition = z.object({
   model: z.string(),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
@@ -20,13 +21,17 @@ export const llmConfigSchema = z.object({
   verbosity: z.string().optional(),
   litellm_params: z.record(z.string(), z.string()).optional(),
 });
+export interface LlmConfigSchema extends Named<typeof llmConfigSchemaDefinition> {}
+export const llmConfigSchema: LlmConfigSchema = llmConfigSchemaDefinition;
 
-export const agentChatMessageSchema = z.object({
+const agentChatMessageSchemaDefinition = z.object({
   role: z.enum(["system", "user", "assistant"]).optional(),
   content: z.string().optional(),
 });
+export interface AgentChatMessageSchema extends Named<typeof agentChatMessageSchemaDefinition> {}
+export const agentChatMessageSchema: AgentChatMessageSchema = agentChatMessageSchemaDefinition;
 
-export const signatureAgentConfigSchema = z.object({
+const signatureAgentConfigSchemaDefinition = z.object({
   ...baseAgentConfigSchema.shape,
   configId: z.string().optional(),
   handle: z.string().nullable().optional(),
@@ -42,5 +47,10 @@ export const signatureAgentConfigSchema = z.object({
   messages: z.array(agentChatMessageSchema).optional(),
   promptDraft: z.boolean().optional(),
 });
+export interface SignatureAgentConfigSchema extends Named<
+  typeof signatureAgentConfigSchemaDefinition
+> {}
+export const signatureAgentConfigSchema: SignatureAgentConfigSchema =
+  signatureAgentConfigSchemaDefinition;
 
 export type SignatureAgentConfig = z.infer<typeof signatureAgentConfigSchema>;

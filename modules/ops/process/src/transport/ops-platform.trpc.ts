@@ -6,7 +6,7 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsPlatformTrpc } from "@langwatch/ops-contract";
 
-import { opsOperatorFact } from "#transport/ops-operator.trpc";
+import { opsOperatorContext } from "#transport/ops-operator.trpc";
 
 /** The one acknowledgement each operator feature-flag write answers with. */
 const acknowledged = { ok: true } as const;
@@ -67,7 +67,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
 
     // A dry run destroys nothing, so it does not ask for the confirmation.
     .procedure("runBlobCleanup")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input, actor }, operator) =>
       app.runBlobCleanup({
@@ -81,7 +81,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     )
 
     .procedure("deleteBlob")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input, actor }, operator) => {
       app.assertDestructiveOperator(operator, input.confirm);

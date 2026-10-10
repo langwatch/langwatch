@@ -130,6 +130,8 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
     },
     countAccountsForUser: async ({ userId }) =>
       db.Account?.filter((account) => account.userId === userId).length ?? 0,
+    countPasskeysForUser: async ({ userId }) =>
+      db.passkey?.filter((passkey) => passkey.userId === userId).length ?? 0,
     findFederatedAccountsForUser: async () => [],
     findFederatedAccountsForUsers: async () => [],
     deleteAccounts: unused,

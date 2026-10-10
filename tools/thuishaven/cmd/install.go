@@ -16,28 +16,31 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// `haven install` checks the machine for everything haven drives but does not
+// `haven self install` checks the machine for everything haven drives but does not
 // own — portless, the Node toolchain, the brew formulae behind the managed
 // Postgres and Redis, a container runtime — and offers to install what is
 // missing.
 //
-// It is the counterpart to `haven setup`, and the split is the same one that
+// It is the counterpart to `haven self setup`, and the split is the same one that
 // runs through this CLI: setup installs optional integrations into a
 // CHECKOUT, install brings the MACHINE up to what haven needs. Neither one
 // assumes: a human with a terminal is asked, an agent is told.
 //
 // Three shapes, and the difference between them is who is there to answer:
 //
-//	haven install              a terminal gets the picker; a pipe gets the report
-//	haven install --yes        installs what haven needs, asks nothing
-//	haven install redis        installs exactly what is named, skips and all
+//	haven self install              a terminal gets the picker; a pipe gets the report
+//	haven self install --yes        installs what haven needs, asks nothing
+//	haven self install redis        installs exactly what is named, skips and all
 
 func runInstall(ctx context.Context, d deps, inv invocation) error {
+	if inv.has("--build") {
+		return runInstallBuild(ctx, d)
+	}
 	if isDone, err := resetSkipsFirst(d, inv); isDone || err != nil {
 		return err
 	}
 	// --list is resolved BEFORE the positional form, and refuses to be
-	// combined with it. It promises to change nothing, and `haven install
+	// combined with it. It promises to change nothing, and `haven self install
 	// --list redis` reaching the installer below would break that promise in
 	// the one place a reader has been told it is safe to look.
 	if inv.has("--list") {
@@ -51,7 +54,7 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		if err != nil {
 			return err
 		}
-		return d.orch.InstallPrereqs(ctx, chosen)
+		return installAndShow(ctx, d, chosen)
 	}
 	return installFromReport(ctx, d, inv)
 }
@@ -68,10 +71,10 @@ func resetSkipsFirst(d deps, inv invocation) (bool, error) {
 	return len(inv.args) == 0 && !inv.has("--list") && !inv.has("--yes"), nil
 }
 
-// listPrereqs is `haven install --list`: the report, installing nothing.
+// listPrereqs is `haven self install --list`: the report, installing nothing.
 func listPrereqs(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) > 0 {
-		return fmt.Errorf("haven install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
+		return fmt.Errorf("haven self install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
 	}
 	painterFor(d.isAgent).prereqReport(os.Stdout, d.orch.CheckPrereqs(ctx), resolvedPosture(ctx, d))
 	return nil
@@ -108,7 +111,7 @@ func installFromReport(ctx context.Context, d deps, inv invocation) error {
 
 // installCanAsk decides whether there is anyone to show a picker to.
 //
-// Both ends have to be a terminal, for the reason `haven setup` gives: stdout
+// Both ends have to be a terminal, for the reason `haven self setup` gives: stdout
 // alone says the answer would be seen, not that anyone can give one — with
 // stdin on a pipe that never closes, a picker paints its question and blocks
 // on a reply that is never coming. An agent is never asked at all: there is
@@ -128,7 +131,7 @@ func installAuto(ctx context.Context, d deps, report []domain.PrereqStatus) erro
 		printOptionalHint(os.Stdout, report)
 		return nil
 	}
-	return d.orch.InstallPrereqs(ctx, chosen)
+	return installAndShow(ctx, d, chosen)
 }
 
 // installInteractive shows the picker, records the never-ask-agains, and then
@@ -149,7 +152,7 @@ func installInteractive(ctx context.Context, d deps, report []domain.PrereqStatu
 			return err
 		}
 		if len(recorded) > 0 {
-			fmt.Printf("· will not ask about %s again (undo: haven install --reset-skips)\n", strings.Join(recorded, ", "))
+			fmt.Printf("· will not ask about %s again (undo: haven self install --reset-skips)\n", strings.Join(recorded, ", "))
 		}
 	}
 	if len(result.Install) == 0 {
@@ -158,7 +161,36 @@ func installInteractive(ctx context.Context, d deps, report []domain.PrereqStatu
 		}
 		return nil
 	}
-	return d.orch.InstallPrereqs(ctx, result.Install)
+	return installAndShow(ctx, d, result.Install)
+}
+
+// installAndShow installs the chosen prerequisites, then shows what is left for the developer to
+// run, after the install narration so it is the last thing on screen.
+func installAndShow(ctx context.Context, d deps, chosen []domain.Chosen) error {
+	manual, err := d.orch.InstallPrereqs(ctx, chosen)
+	printManualSteps(os.Stdout, manual, painterFor(d.isAgent))
+	return err
+}
+
+// printManualSteps sets each step apart: its name, why it matters, and the command alone on its
+// own line, so it copies cleanly.
+func printManualSteps(w io.Writer, steps []app.ManualStep, paint painter) {
+	if len(steps) == 0 {
+		return
+	}
+	heading := "1 step needs you"
+	if len(steps) > 1 {
+		heading = fmt.Sprintf("%d steps need you", len(steps))
+	}
+	fmt.Fprintf(w, "\n%s %s\n", paint(havenui.Warn, "!"), paint(havenui.Title, heading))
+	for _, step := range steps {
+		fmt.Fprintf(w, "\n  %s\n", paint(havenui.Selected, step.Name))
+		if step.Why != "" {
+			fmt.Fprintf(w, "  %s\n", paint(havenui.Muted, step.Why))
+		}
+		fmt.Fprintf(w, "\n    %s\n", step.Command)
+	}
+	fmt.Fprintln(w)
 }
 
 // resolvedPosture is the machine's container posture for the report. A
@@ -214,7 +246,7 @@ func printPrereqReportStyled(w io.Writer, report []domain.PrereqStatus, paint pa
 // this machine has decided about containers — which is the setting the whole
 // lower half of the report is downstream of.
 func (paint painter) prereqReport(w io.Writer, report []domain.PrereqStatus, posture app.ContainerPosture) {
-	fmt.Fprintln(w, paint(havenui.Title, "haven install"))
+	fmt.Fprintln(w, paint(havenui.Title, "haven self install"))
 	fmt.Fprintln(w, paint(havenui.Muted, "  what this machine has"))
 	fmt.Fprintln(w)
 	for _, st := range report {
@@ -324,7 +356,7 @@ func prereqCommand(st domain.PrereqStatus) string {
 	if len(st.Candidates) > 1 {
 		// A choice reported as one command would hide the alternative, and
 		// this is the only place a pipe reader ever sees it.
-		return command + "   (or: haven install " + st.Key + "=" + otherCandidate(st.Prereq, candidate) + ")"
+		return command + "   (or: haven self install " + st.Key + "=" + otherCandidate(st.Prereq, candidate) + ")"
 	}
 	// Only a self-answered row carries an Observed while still missing — the
 	// shell config the PATH row would append to. Naming it is the difference
@@ -354,7 +386,7 @@ func printSkippedNote(w io.Writer, report []domain.PrereqStatus) {
 	if len(skipped) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "not asking about %s (undo: haven install --reset-skips)\n", strings.Join(skipped, ", "))
+	fmt.Fprintf(w, "not asking about %s (undo: haven self install --reset-skips)\n", strings.Join(skipped, ", "))
 }
 
 // printPostureNote names the machine's container posture under the report.
@@ -362,6 +394,10 @@ func printSkippedNote(w io.Writer, report []domain.PrereqStatus) {
 // in truth it is the setting that decides how three other tiers run.
 func printPostureNote(w io.Writer, posture app.ContainerPosture, paint painter) {
 	if posture.Posture == domain.PostureUnset {
+		return
+	}
+	// macOS needs no runtime, so only a posture someone chose is worth a line.
+	if runtime.GOOS == "darwin" && posture.Source == domain.PostureDetected {
 		return
 	}
 	fmt.Fprintln(w, "  "+paint(havenui.Muted, posture.Line()))
@@ -381,8 +417,8 @@ func printNonInteractiveHint(w io.Writer, report []domain.PrereqStatus) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Nothing was installed: there is no terminal here to ask.")
-	fmt.Fprintln(w, "  haven install --yes              install what haven needs (not the optional ones)")
-	fmt.Fprintf(w, "  haven install %-18s install exactly that one\n", actionable[0])
+	fmt.Fprintln(w, "  haven self install --yes              install what haven needs (not the optional ones)")
+	fmt.Fprintf(w, "  haven self install %-18s install exactly that one\n", actionable[0])
 }
 
 // printOptionalHint is the tail of a successful --yes run: the optional
@@ -398,6 +434,6 @@ func printOptionalHint(w io.Writer, report []domain.PrereqStatus) {
 	if len(optional) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "optional and not installed: %s (haven install %s)\n",
+	fmt.Fprintf(w, "optional and not installed: %s (haven self install %s)\n",
 		strings.Join(optional, ", "), optional[0])
 }

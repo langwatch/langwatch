@@ -126,7 +126,7 @@ func (watch *bootWatch) stalled(now time.Time, stack watchedStack) error {
 	return nil
 }
 
-// watchedStack is the slice of one `haven status --json` stack the watch reads.
+// watchedStack is the slice of one `haven status --json stacks` stack the watch reads.
 type watchedStack struct {
 	Slug        string                `json:"slug"`
 	Live        bool                  `json:"live"`

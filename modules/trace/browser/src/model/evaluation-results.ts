@@ -109,19 +109,16 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
  * trace views and evaluator renderings.
  */
 export const EVALUATION_STATUS_COLORS = {
-  pending: "gray.400",
-  running: "blue.400",
-  passed: "green.500",
-  failed: "red.500",
-  processed: "blue.500", // Neutral color for score-only evaluators (no pass/fail)
-  // Errors get one step deeper red than a fail verdict — distinct
-  // enough to read as "the evaluator broke" without going so dark it
-  // looks like a different colour entirely.
-  error: "red.600",
+  pending: "fg.subtle",
+  running: "blue.fg",
+  passed: "green.fg",
+  failed: "red.fg",
+  processed: "blue.fg", // Neutral color for score-only evaluators (no pass/fail)
+  error: "red.fg",
   // Skipped is a setup state, not a verdict — light grey (closer to
   // the muted bg than to fg) keeps it from competing for attention
   // next to real pass/fail rows.
-  skipped: "gray.300",
+  skipped: "fg.subtle",
 } as const;
 
 /**
@@ -135,9 +132,7 @@ export const EVALUATION_STATUS_TONES = {
   passed: { bg: "green.subtle", fg: "green.fg" },
   failed: { bg: "red.subtle", fg: "red.fg" },
   processed: { bg: "blue.subtle", fg: "blue.fg" },
-  // Slightly deeper red foreground to match the dot, but a step
-  // lighter than red.700 so it still reads as red rather than maroon.
-  error: { bg: "red.subtle", fg: "red.600" },
+  error: { bg: "red.subtle", fg: "red.fg" },
   // Gray-on-gray skipped tone — neutral, low-attention.
   skipped: { bg: "bg.muted", fg: "fg.muted" },
 } as const;

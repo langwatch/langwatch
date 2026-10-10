@@ -1,6 +1,7 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const startSuiteRunCommandDataSchema = z.object({
+const startSuiteRunCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   batchRunId: z.string(),
   scenarioSetId: z.string(),
@@ -11,20 +12,30 @@ export const startSuiteRunCommandDataSchema = z.object({
   idempotencyKey: z.string(),
   occurredAt: z.number(),
 });
+export interface StartSuiteRunCommandDataSchema extends Named<
+  typeof startSuiteRunCommandDataSchemaDefinition
+> {}
+export const startSuiteRunCommandDataSchema: StartSuiteRunCommandDataSchema =
+  startSuiteRunCommandDataSchemaDefinition;
 export type StartSuiteRunCommandData = z.infer<typeof startSuiteRunCommandDataSchema>;
 
-export const recordSuiteRunItemStartedCommandDataSchema = z.object({
+const recordSuiteRunItemStartedCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),
   occurredAt: z.number(),
 });
+export interface RecordSuiteRunItemStartedCommandDataSchema extends Named<
+  typeof recordSuiteRunItemStartedCommandDataSchemaDefinition
+> {}
+export const recordSuiteRunItemStartedCommandDataSchema: RecordSuiteRunItemStartedCommandDataSchema =
+  recordSuiteRunItemStartedCommandDataSchemaDefinition;
 export type RecordSuiteRunItemStartedCommandData = z.infer<
   typeof recordSuiteRunItemStartedCommandDataSchema
 >;
 
-export const completeSuiteRunItemCommandDataSchema = z.object({
+const completeSuiteRunItemCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
@@ -36,9 +47,14 @@ export const completeSuiteRunItemCommandDataSchema = z.object({
   error: z.string().optional(),
   occurredAt: z.number(),
 });
+export interface CompleteSuiteRunItemCommandDataSchema extends Named<
+  typeof completeSuiteRunItemCommandDataSchemaDefinition
+> {}
+export const completeSuiteRunItemCommandDataSchema: CompleteSuiteRunItemCommandDataSchema =
+  completeSuiteRunItemCommandDataSchemaDefinition;
 export type CompleteSuiteRunItemCommandData = z.infer<typeof completeSuiteRunItemCommandDataSchema>;
 
-export const regradeSuiteRunItemCommandDataSchema = z.object({
+const regradeSuiteRunItemCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
@@ -50,4 +66,9 @@ export const regradeSuiteRunItemCommandDataSchema = z.object({
   idempotencyKey: z.string(),
   occurredAt: z.number(),
 });
+export interface RegradeSuiteRunItemCommandDataSchema extends Named<
+  typeof regradeSuiteRunItemCommandDataSchemaDefinition
+> {}
+export const regradeSuiteRunItemCommandDataSchema: RegradeSuiteRunItemCommandDataSchema =
+  regradeSuiteRunItemCommandDataSchemaDefinition;
 export type RegradeSuiteRunItemCommandData = z.infer<typeof regradeSuiteRunItemCommandDataSchema>;

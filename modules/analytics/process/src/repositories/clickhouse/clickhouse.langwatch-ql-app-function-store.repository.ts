@@ -6,10 +6,6 @@ import { LangWatchQLAppFunctionStoreRepository } from "../langwatch-ql-app-funct
 
 const logger = createLogger("langwatch:analytics:lwql-app-function-store");
 
-const UNSCOPED = {
-  reason: "the replica layout and server settings describe the server, which no tenant owns",
-} as const;
-
 /**
  * Reads the replica layout and the UDF store setting. A server that cannot
  * answer (no `system.server_settings`, no access to `system.replicas`) answers
@@ -32,12 +28,14 @@ export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQL
         this.clickhouse.query<{ max_total_replicas: string }>({
           tenantId: "",
           sql: "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-          unscoped: UNSCOPED,
+          // The replica layout and server settings describe the server, which no tenant owns.
+          SKIP_TENANT_CHECK: true,
         }),
         this.clickhouse.query<{ value: string }>({
           tenantId: "",
           sql: "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-          unscoped: UNSCOPED,
+          // The replica layout and server settings describe the server, which no tenant owns.
+          SKIP_TENANT_CHECK: true,
         }),
       ]);
       return [

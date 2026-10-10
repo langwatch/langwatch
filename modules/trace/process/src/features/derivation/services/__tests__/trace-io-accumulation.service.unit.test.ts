@@ -10,6 +10,10 @@ import {
   createInitState,
   createTestSpan,
 } from "../../../../eventing/__tests__/trace-summary-test.fixtures.ts";
+import type {
+  TraceMediaReferenceResolver,
+  TraceMediaReference,
+} from "../../../media/services/trace-media-reference.service.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 import type {
@@ -17,10 +21,6 @@ import type {
   TraceIoSide,
   TraceIoValue,
 } from "../trace-io-extraction.service.ts";
-import type {
-  TraceMediaReferenceResolver,
-  TraceMediaReference,
-} from "../../../media/services/trace-media-reference.service.ts";
 
 type Extracted = { rich?: TraceIoValue | null; fallback?: TraceIoValue | null };
 

@@ -15,7 +15,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import {
   ScimSyncLedgerWriterService,
@@ -27,6 +30,11 @@ import {
   type ScimSyncLifecycleGuards,
 } from "../scim-sync-lifecycle.service.ts";
 import { ScimService } from "../scim.service.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";
@@ -97,6 +105,7 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
   let commandIds = 0;
 
   return ScimService.create({
+    members: new MembersFake(),
     connections: HeldConnectionsFake.of([CONNECTION]),
     prisma: store,
     writer: new GrantsFake(),
@@ -113,6 +122,7 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
     }),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 

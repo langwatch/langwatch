@@ -1,8 +1,8 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   canonicalErrorResponse,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /**
  * The `/api/monitors` family over the REAL monitor application: memory
@@ -11,6 +11,7 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { type MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import {
   createMonitorTestApp,
@@ -52,6 +53,7 @@ export function mountMonitorRest(
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user-1" },
@@ -64,8 +66,8 @@ export function mountMonitorRest(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: TEST_PROJECT.slug,
         viewerUserId: "user-1",
         actorId: "user-1",

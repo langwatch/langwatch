@@ -30,6 +30,8 @@ import {
   RecordProjectPresenceSettingChangedCommand,
   RecordProjectMovedCommand,
   RecordProjectArchivedCommand,
+  RecordProjectAggregateRuleChangedCommand,
+  RecordProjectRevivedCommand,
   RecordProjectDepartmentAssignedCommand,
   RecordProjectTraceSharingDisabledCommand,
 } from "./project-lifecycle.commands.ts";
@@ -39,6 +41,8 @@ import {
   projectPresenceSettingChangedEventSchema,
   projectMovedEventSchema,
   projectArchivedEventSchema,
+  projectAggregateRuleChangedEventSchema,
+  projectRevivedEventSchema,
   projectDepartmentAssignedEventSchema,
   projectTraceSharingDisabledEventSchema,
 } from "./project-lifecycle.events.ts";
@@ -56,6 +60,8 @@ function lifecycleCommands() {
       projectArchivedEventSchema,
       projectDepartmentAssignedEventSchema,
       projectTraceSharingDisabledEventSchema,
+      projectAggregateRuleChangedEventSchema,
+      projectRevivedEventSchema,
     ])
     .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
     .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand)
@@ -63,7 +69,9 @@ function lifecycleCommands() {
     .withCommand("recordProjectMoved", RecordProjectMovedCommand)
     .withCommand("recordProjectArchived", RecordProjectArchivedCommand)
     .withCommand("recordProjectDepartmentAssigned", RecordProjectDepartmentAssignedCommand)
-    .withCommand("recordProjectTraceSharingDisabled", RecordProjectTraceSharingDisabledCommand);
+    .withCommand("recordProjectTraceSharingDisabled", RecordProjectTraceSharingDisabledCommand)
+    .withCommand("recordProjectAggregateRuleChanged", RecordProjectAggregateRuleChangedCommand)
+    .withCommand("recordProjectRevived", RecordProjectRevivedCommand);
 }
 
 type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
@@ -100,7 +108,8 @@ export function buildProjectLifecyclePipeline(deps: {
     .withPeerSubscriber("revivePersonalWorkspaceProject", {
       eventType: PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
       data: personalWorkspaceRevivedEventDataSchema,
-      handle: ({ teamId }) => deps.personalProjects.revive({ teamId }),
+      handle: ({ teamId, organizationId }) =>
+        deps.personalProjects.revive({ teamId, organizationId }),
     })
     .withPeerSubscriber("setPersonalWorkspaceFeatures", {
       eventType: PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,

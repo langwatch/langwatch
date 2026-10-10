@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** Evaluator result shape; kept dependency-free to break import cycle with
  * event-schemas and scenario-run.
  */
@@ -18,7 +19,7 @@ export type ScenarioEvaluationStatus = (typeof SCENARIO_EVALUATION_STATUSES)[num
 /** Wire shape for `results.evaluations` on finished event; required evaluators
  * with failed/error status fail the run.
  */
-export const scenarioEvaluationResultSchema = z
+const scenarioEvaluationResultSchemaDefinition = z
   .object({
     /**
      * The saved evaluator id, or the evaluator type (for example
@@ -50,4 +51,9 @@ export const scenarioEvaluationResultSchema = z
     message: "A result with status failed needs passed: false",
     path: ["passed"],
   });
+export interface ScenarioEvaluationResultSchema extends Named<
+  typeof scenarioEvaluationResultSchemaDefinition
+> {}
+export const scenarioEvaluationResultSchema: ScenarioEvaluationResultSchema =
+  scenarioEvaluationResultSchemaDefinition;
 export type ScenarioEvaluationResult = z.infer<typeof scenarioEvaluationResultSchema>;

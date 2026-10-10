@@ -14,6 +14,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const authServerConfig = Config.define((c) => ({
@@ -89,7 +90,7 @@ export function assertAuthServerConfig(
  * the passkey button, and whether the identifier-first screens are the front
  * door here. Both derived, never the raw setting.
  */
-export const authWebConfigSchema = z.strictObject({
+const authWebConfigSchemaDefinition = z.strictObject({
   passkeys: z.boolean(),
   identityFrontDoor: z.boolean(),
   /** `AUTH_PROVIDER` (or its NextAuth-era name): a provider id, never a credential. */
@@ -98,14 +99,36 @@ export const authWebConfigSchema = z.strictObject({
   publicUrl: z.string().min(1).optional(),
   /** Whether the email/password routes mount here, so the password section shows. */
   emailPasswordEnabled: z.boolean(),
+  /** Provider ids the Connect buttons offer: the named one, then each social one set up. */
+  federatedProviders: z.array(z.string().min(1)),
   /**
    * `invite_only` hides the create-account links. The server refuses an uninvited sign-up
    * either way; this only stops offering a door most visitors cannot use.
    */
   signUpMode: z.enum(["open", "invite_only"]),
 });
+export interface AuthWebConfigSchema extends Named<typeof authWebConfigSchemaDefinition> {}
+export const authWebConfigSchema: AuthWebConfigSchema = authWebConfigSchemaDefinition;
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
+
+/** Rail order; Microsoft keeps its legacy callback id, as the sign-in rail does. */
+function federatedProvidersOf({
+  authProvider,
+  providers,
+}: {
+  authProvider: string | undefined;
+  providers: AuthServerConfig["signInProviders"];
+}): string[] {
+  if (!authProvider || authProvider === "email") return [];
+  const social = [
+    providers.googleClientId && "google",
+    providers.githubClientId && "github",
+    providers.gitlabClientId && "gitlab",
+    providers.azureAdClientId && providers.azureAdTenantId && "azure-ad",
+  ].filter((id): id is string => !!id);
+  return Array.from(new Set([authProvider, ...social]));
+}
 
 /** The identifier-first screens are the only sign-in front door (ADR-117, bake end). */
 export const authBrowserConfig = defineBrowserConfig({
@@ -121,6 +144,10 @@ export const authBrowserConfig = defineBrowserConfig({
         authProvider: authProvider ?? "email",
         isSaas: config.isSaas,
         localPasswords: config.localPasswords,
+      }),
+      federatedProviders: federatedProvidersOf({
+        authProvider,
+        providers: config.signInProviders,
       }),
       signUpMode: config.signUpMode,
       ...(authProvider ? { authProvider } : {}),

@@ -1,3 +1,5 @@
+import { type Instant, Temporal } from "@langwatch/time";
+
 /**
  * The per-tenant migration state: `finalized` is a one-way latch consumers
  * key legacy-path removal on. Blanking a finalized row does NOT roll it
@@ -43,7 +45,24 @@ export type TenantMigrationRecord = {
   report: unknown;
   /** Set only while held (`migrated`): why it is held. */
   heldReason?: HeldReason;
+  /** Set only while held: when it became held, kept across re-proofs. */
+  heldSince?: Instant;
 };
+
+/** Held longer than this reads as failed. A chosen value, pending Alex's ruling. */
+export const HELD_FAILED_AFTER = Temporal.Duration.from({ hours: 24 });
+
+/** Failed is worked out on read, never stored: held, and held too long. */
+export function isHeldTenantFailed({
+  record,
+  now,
+}: {
+  record: TenantMigrationRecord;
+  now: Instant;
+}): boolean {
+  if (record.status !== "migrated" || !record.heldSince) return false;
+  return Temporal.Instant.compare(record.heldSince.add(HELD_FAILED_AFTER), now) < 0;
+}
 
 /**
  * What one pass over one tenant concluded. `migrated` is the held state: the
@@ -59,8 +78,6 @@ export type MigrationPassSummary = {
   tenantsSeen: number;
   finalized: number;
   held: number;
-  /** Held outcomes from migrations that must settle before startup. */
-  finiteHeld?: number;
   parked: number;
   /** Outside the cohort, or an operator's mid-pass pin discarded the
    *  outcome. Never "already done" - that is `alreadyFinalized` /

@@ -233,7 +233,7 @@ export const VariableInsertMenu = ({
       }}
       // Only allow auto-focus when in editable mode (has search input)
       // When onQueryChange is NOT provided (readonly mode), don't steal focus
-
+      {...(onQueryChange ? {} : { autoFocus: false })}
       lazyMount
       unmountOnExit
     >
@@ -433,7 +433,7 @@ function MenuCreateOption({
       marginTop={filteredSources.length > 0 ? 2 : 0}
       onClick={() => onCreateVariable?.(normalizedQuery)}
     >
-      <Plus size={12} color="var(--chakra-colors-blue-500)" />
+      <Plus size={12} color="var(--chakra-colors-blue-fg)" />
       <Text fontSize="13px" color="fg.info">
         Create variable "{`{{${normalizedQuery}}}`}"
       </Text>

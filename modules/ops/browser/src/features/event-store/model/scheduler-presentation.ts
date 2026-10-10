@@ -70,6 +70,13 @@ export function canRunNow({
   return status !== "paused" && status !== "running" && status !== "retrying";
 }
 
+const TARGET_NOUNS: Record<string, string> = { reportTrigger: "report schedule" };
+
+/** The human noun for a target type, for the start of a sentence ("This report schedule"). */
+export function targetNoun({ targetType }: { targetType: string }): string {
+  return TARGET_NOUNS[targetType] ?? targetType;
+}
+
 /** Whether a slot has been held long enough that clearing it is a repair. */
 export function isSlotStale({
   job,

@@ -13,6 +13,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -26,8 +27,6 @@ const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
 export const opsConfig = Config.define((c) => ({
   /** The ClickHouse EXPLAIN endpoint's operator secret. */
   apiKey: c.env("LANGWATCH_OPS_API_KEY", z.string().optional()),
-  /** The metrics-scrape bearer, under the name every LangWatch tier reads it by. */
-  metricsApiKey: c.env("METRICS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
   usageStats: {
@@ -72,12 +71,14 @@ export type OpsServerConfig = ConfigOf<typeof opsConfig>;
 export type ProductAnalyticsTarget = Readonly<{ key: string; host?: string }>;
 
 /** What a browser is told about product analytics and whether Cloud admin is on. */
-export const opsWebConfigSchema = z.strictObject({
+const opsWebConfigSchemaDefinition = z.strictObject({
   cloudOps: z.boolean(),
   posthog: z
     .strictObject({ key: z.string().min(1), host: z.string().min(1).optional() })
     .optional(),
 });
+export interface OpsWebConfigSchema extends Named<typeof opsWebConfigSchemaDefinition> {}
+export const opsWebConfigSchema: OpsWebConfigSchema = opsWebConfigSchemaDefinition;
 
 export type OpsWebConfig = z.infer<typeof opsWebConfigSchema>;
 

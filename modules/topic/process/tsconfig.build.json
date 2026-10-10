@@ -27,6 +27,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -67,6 +70,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     }
   ]
 }

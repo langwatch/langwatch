@@ -32,10 +32,12 @@ function installed() {
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: refuse("a seat revocation record"),
+    memberEnabled: refuse("a seat restoration record"),
   };
   const grantCache: OrganizationGrantCache = { invalidateOrganization: refuse("a grant cache") };
   const service = OrganizationMembershipService.create({
     workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+    memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
     creations,
     seats,

@@ -1,69 +1,25 @@
 import { defineConfig } from "@langwatch/design-system/system";
 
-/** Chakra semantic tokens for the front door: site identity separate from app theme. */
-
-/** The brand ramp, as the marketing site cuts it. */
-const brand = {
-  /** Lifted for dark grounds, where the solid orange reads as a light source. */
-  300: "#ffb380",
-  400: "#ff8a3d",
-  500: "#f56b1a",
-  /** Deepened for white grounds, where white text has to survive on it. */
-  600: "#c2510a",
-  700: "#a83e05",
-} as const;
-
-const ink = { 900: "#141417", 950: "#0a0a0c" } as const;
-
-/** Dark elevation and hairlines are white at an alpha, never a lighter grey. */
-const white = (alpha: number) => `rgba(255, 255, 255, ${alpha})`;
-const orange = (alpha: number) => `rgba(245, 107, 26, ${alpha})`;
-const orange300 = (alpha: number) => `rgba(255, 138, 61, ${alpha})`;
-
-/** A token with one value per ground. */
-const mode = (light: string, dark: string) => ({
-  value: { _light: light, _dark: dark },
-});
-
+/** Front-door roles inherit the product palette in both modes. */
 export const frontDoorThemeConfig = defineConfig({
   theme: {
     semanticTokens: {
       colors: {
         frontDoor: {
-          /** The ground the whole viewport stands on: the site's paper, or
-           *  the site's dark band — never the app's panel grey. */
-          ground: mode("#ffffff", ink[950]),
-          /** The primary action, on BOTH grounds. It was an ink pill on paper
-           *  and orange on ink, which meant the two themes disagreed about
-           *  what the most important thing on the screen looks like. */
-          action: mode(brand[600], orange(0.92)),
-          actionHover: mode(brand[700], brand[400]),
-          /** Text that sits on the action colour. */
-          onAction: mode("#ffffff", "#ffffff"),
-          /** Text on a tinted surface: readable where the tint alone is not. */
-          ink: mode(brand[700], brand[400]),
-          /** The tint itself. */
-          tint: mode("#fdece0", orange(0.18)),
-          hairline: mode("rgba(20, 20, 23, 0.12)", "rgba(239, 238, 233, 0.14)"),
-          /**
-           * Refusals. A dark ground needs a lighter red: the light cut fails
-           * contrast there and reads as brown, which is not a colour anybody
-           * reads as "wrong".
-           */
-          danger: mode("#c53030", "#e08573"),
-          /**
-           * Focus rings, badges and hairline accents: the brand without being
-           * the button. It steps up a stop on dark, where the solid orange
-           * that reads as an action on white disappears into a dark field.
-           */
-          detail: mode(brand[500], orange300(0.75)),
-          focusRing: mode(orange(0.22), orange300(0.22)),
-          glow: mode(orange(0.28), orange300(0.22)),
-          /** Fields: a translucent pane over the card's glass. */
-          fieldBg: mode(white(0.62), white(0.06)),
-          fieldBorder: mode("rgba(20, 20, 23, 0.14)", white(0.14)),
-          /** A near-solid floor for a card that is one sentence with nothing to operate. */
-          cardBgSolid: mode(white(0.85), "rgba(12, 12, 15, 0.88)"),
+          ground: { value: "{colors.bg.surface}" },
+          action: { value: "{colors.orange.solid}" },
+          actionHover: { value: "{colors.orange.hover}" },
+          onAction: { value: "{colors.orange.contrast}" },
+          ink: { value: "{colors.orange.fg}" },
+          tint: { value: "{colors.orange.subtle}" },
+          hairline: { value: "{colors.border}" },
+          danger: { value: "{colors.fg.error}" },
+          detail: { value: "{colors.orange.fg}" },
+          focusRing: { value: "{colors.accent.focusRing}" },
+          glow: { value: "color-mix(in srgb, {colors.orange.fg} 25%, transparent)" },
+          fieldBg: { value: "{colors.bg.control}" },
+          fieldBorder: { value: "{colors.border.control}" },
+          cardBgSolid: { value: "{colors.bg.card}" },
         },
       },
     },

@@ -484,6 +484,25 @@ describe("createTraceEvaluationTrigger", () => {
         expect(dispatch.sent[0]!.data.promptIds).toBeUndefined();
       });
 
+      /** @scenario "A monitor evaluation is dated by the evaluated trace's last span end" */
+      it("stamps the span end, start plus duration, onto every command", async () => {
+        const { built, dispatch } = subscriber({});
+        const startedAt = Date.now() - 60_000;
+
+        await run(built, spanEvent(), foldState({ occurredAt: startedAt, totalDurationMs: 2_500 }));
+
+        expect(dispatch.sent[0]!.data.spanEndedAt).toBe(startedAt + 2_500);
+      });
+
+      /** @scenario "A summary with no span time leaves the evaluation dated as before" */
+      it("leaves the span end out when the summary has no span time", async () => {
+        const { built, dispatch } = subscriber({});
+
+        await run(built, spanEvent(), foldState({ occurredAt: 0 }));
+
+        expect(dispatch.sent[0]!.data.spanEndedAt).toBeUndefined();
+      });
+
       /**
        * @scenario "One monitor's failed send does not stop the others"
        *

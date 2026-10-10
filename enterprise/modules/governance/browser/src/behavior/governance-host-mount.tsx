@@ -1,17 +1,19 @@
 /**
  * Governance's answer to the port its screens declare: organization graph
  * and plan come from this module's own tRPC reads, everything else projects
- * a `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * a `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -27,7 +29,7 @@ import { governanceApi } from "./governance-api.ts";
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly GovernanceOrganization[] = [];
 
-class CapabilityGovernanceHost extends GovernanceHostApi {
+class HostServiceGovernanceHost extends GovernanceHostApi {
   constructor(
     private readonly inputs: {
       orgs: readonly GovernanceOrganization[];
@@ -35,6 +37,7 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
       plan: { isEnterprise: boolean; isLoading: boolean };
       routeReading: GovernanceRouteReading;
       session: UiSession;
+      flags: UiFlags;
       routeCapability: UiRoute;
       navigation: UiNavigation;
       feedback: UiFeedback;
@@ -59,12 +62,12 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
     return this.inputs.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.inputs.session.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.inputs.flags.flag(flag) === true;
   }
 
-  featureFlag(flag: string): boolean | undefined {
-    return this.inputs.session.featureFlag(flag);
+  featureFlag(flag: ReleaseFlagToken): boolean | undefined {
+    return this.inputs.flags.flag(flag);
   }
 
   isSettled(): boolean {
@@ -94,6 +97,14 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
     this.inputs.feedback.succeeded(notice);
   }
 
+  warned(notice: GovernanceSuccessNotice): void {
+    this.inputs.feedback.warned(notice);
+  }
+
+  informed(notice: GovernanceSuccessNotice): void {
+    this.inputs.feedback.informed(notice);
+  }
+
   failed(failure: GovernanceFailureNotice): void {
     this.inputs.feedback.failed(failure);
   }
@@ -105,7 +116,8 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
  * is what `mounts.load` resolves.
  */
 export default function GovernanceHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, navigation, route } = useUiCapabilities();
+  const { session, feedback, navigation, route } = useUiHostServices();
+  const flags = useUiFlags();
   const { organizationId } = useUiScope().activeScope();
 
   const organizations = governanceApi.organization.getScopeGraph.useQuery(
@@ -135,17 +147,18 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityGovernanceHost({
+      new HostServiceGovernanceHost({
         orgs,
         org,
         plan,
         routeReading,
         session,
+        flags,
         routeCapability: route,
         navigation,
         feedback,
       }),
-    [orgs, org, plan, routeReading, session, route, navigation, feedback],
+    [orgs, org, plan, routeReading, session, flags, route, navigation, feedback],
   );
 
   return <GovernanceHostProvider value={host}>{children}</GovernanceHostProvider>;

@@ -51,6 +51,29 @@ function event(
 const projection = AuthzGrantProjection.create(new NullAuthzGrantProjectionRepository());
 
 describe("AuthzGrantProjection", () => {
+  it("carries a writer's ask to skip an identical live grant onto the write", () => {
+    const write = projection.map(
+      event(
+        {
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            principal: { type: "user", id: "user_1" },
+            roleKey: "member",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "grants-service",
+            actor: ACTOR,
+            onDuplicate: "skip",
+          },
+        },
+        "grant_1",
+        1,
+      ),
+    );
+
+    expect(write).toMatchObject({ kind: "grant.upsert", onDuplicate: "skip" });
+  });
+
   it("takes grant and role ownership from tenantId, never aggregateId", () => {
     const grant = projection.map(
       event(

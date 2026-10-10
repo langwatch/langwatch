@@ -5,6 +5,7 @@
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { TraceModule, type TraceAppDependencies } from "../../app/trace.app.ts";
@@ -32,6 +33,7 @@ function moduleWithoutRecorder() {
 
 async function post({ family, path }: { family: typeof trackedEventRest; path: string }) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "api-key-1" },

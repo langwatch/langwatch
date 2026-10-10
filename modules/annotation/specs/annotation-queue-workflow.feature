@@ -158,3 +158,9 @@ Feature: Walking an annotation queue into a dataset
       Given an item assigned to me
       When I mark it done
       Then it is recorded as done
+
+    @integration
+    Scenario: A member with no display name is named by their email in the queue editor
+      Given an organization member whose account has no display name
+      When I pick participants for a queue, or open a queue they are on
+      Then they are shown by their email address

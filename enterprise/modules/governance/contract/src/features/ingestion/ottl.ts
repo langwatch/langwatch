@@ -1,6 +1,8 @@
+import { ValidationError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const ottlValidationErrorSchema = z
+const ottlValidationErrorSchemaDefinition = z
   .object({
     statementIndex: z.number().int().nonnegative(),
     line: z.number().int().nonnegative(),
@@ -8,6 +10,11 @@ export const ottlValidationErrorSchema = z
     message: z.string(),
   })
   .strict();
+export interface OttlValidationErrorSchema extends Named<
+  typeof ottlValidationErrorSchemaDefinition
+> {}
+export const ottlValidationErrorSchema: OttlValidationErrorSchema =
+  ottlValidationErrorSchemaDefinition;
 export type OttlValidationError = z.infer<typeof ottlValidationErrorSchema>;
 
 export const ottlValidationDeferredReasonSchema = z.enum([
@@ -16,7 +23,7 @@ export const ottlValidationDeferredReasonSchema = z.enum([
 ]);
 export type OttlValidationDeferredReason = z.infer<typeof ottlValidationDeferredReasonSchema>;
 
-export const ottlValidationResultSchema = z.discriminatedUnion("status", [
+const ottlValidationResultSchemaDefinition = z.discriminatedUnion("status", [
   z.object({ status: z.literal("valid") }).strict(),
   z
     .object({
@@ -31,12 +38,17 @@ export const ottlValidationResultSchema = z.discriminatedUnion("status", [
     })
     .strict(),
 ]);
+export interface OttlValidationResultSchema extends Named<
+  typeof ottlValidationResultSchemaDefinition
+> {}
+export const ottlValidationResultSchema: OttlValidationResultSchema =
+  ottlValidationResultSchemaDefinition;
 export type OttlValidationResult = z.infer<typeof ottlValidationResultSchema>;
 
 export const ottlEncodingSchema = z.enum(["proto", "json"]);
 export type OttlEncoding = z.infer<typeof ottlEncodingSchema>;
 
-export const ottlTransformInputSchema = z
+const ottlTransformInputSchemaDefinition = z
   .object({
     sourceId: z.string().min(1),
     kind: z.enum(["log", "metric"]),
@@ -45,9 +57,14 @@ export const ottlTransformInputSchema = z
     statements: z.array(z.string()),
   })
   .strict();
+export interface OttlTransformInputSchema extends Named<
+  typeof ottlTransformInputSchemaDefinition
+> {}
+export const ottlTransformInputSchema: OttlTransformInputSchema =
+  ottlTransformInputSchemaDefinition;
 export type OttlTransformInput = z.infer<typeof ottlTransformInputSchema>;
 
-export const ottlTransformResultSchema = z.discriminatedUnion("ok", [
+const ottlTransformResultSchemaDefinition = z.discriminatedUnion("ok", [
   z
     .object({
       ok: z.literal(true),
@@ -62,6 +79,11 @@ export const ottlTransformResultSchema = z.discriminatedUnion("ok", [
     })
     .strict(),
 ]);
+export interface OttlTransformResultSchema extends Named<
+  typeof ottlTransformResultSchemaDefinition
+> {}
+export const ottlTransformResultSchema: OttlTransformResultSchema =
+  ottlTransformResultSchemaDefinition;
 export type OttlTransformResult = z.infer<typeof ottlTransformResultSchema>;
 
 export abstract class GovernanceOttlGateway {
@@ -73,5 +95,56 @@ export class OttlGatewayUnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "OttlGatewayUnavailableError";
+  }
+}
+
+const UNEXPECTED_TOKEN = /unexpected token "((?:[^"\\]|\\.)*)"(?: \(expected (.*)\))?/;
+const QUOTED = /"((?:[^"\\]|\\.)*)"/g;
+const NOISE_PREFIX =
+  /^(?:.*?invalid syntax: |unable to parse OTTL statement ".*?": )?(?:\d+:\d+: )?/;
+
+/** The parser's grammar dump as a sentence an admin can act on. */
+export function describeOttlError({
+  statement,
+  error,
+}: {
+  statement: string;
+  error: OttlValidationError;
+}): string {
+  const match = UNEXPECTED_TOKEN.exec(error.message);
+  if (!match) {
+    const rest = error.message.replace(NOISE_PREFIX, "");
+    return rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
+  const [, token = "", expectedRaw = ""] = match;
+  const expected = [...expectedRaw.matchAll(QUOTED)].map((m) => `\`${m[1]}\``).join(" or ");
+  if (token === "<EOF>") {
+    return expected ? `The statement ends early: expected ${expected}` : "The statement ends early";
+  }
+  const lines = statement.split("\n");
+  const before = (lines[error.line - 1] ?? statement).slice(0, Math.max(0, error.col - 1));
+  const after = /[^\s(,]*$/.exec(before.trimEnd())?.[0] ?? "";
+  const where = after ? ` after \`${after}\`` : "";
+  return expected
+    ? `Expected ${expected}${where}, found \`${token}\``
+    : `Unexpected \`${token}\`${where}`;
+}
+
+/** Save refused: the gateway's parser rejected at least one statement. */
+export class OttlStatementsInvalidError extends ValidationError {
+  constructor({ statements, errors }: { statements: string[]; errors: OttlValidationError[] }) {
+    const problems = errors.map(
+      (error) =>
+        `Statement ${error.statementIndex + 1}: ${describeOttlError({ statement: statements[error.statementIndex] ?? "", error })}.`,
+    );
+    super(`These OTTL statements don't parse. ${problems.join(" ")}`, {
+      meta: {
+        fieldErrors: Object.fromEntries(
+          errors.map((error, i) => [`ottlStatements.${error.statementIndex}`, [problems[i]]]),
+        ),
+        ottlErrors: errors,
+      },
+    });
+    this.name = "OttlStatementsInvalidError";
   }
 }

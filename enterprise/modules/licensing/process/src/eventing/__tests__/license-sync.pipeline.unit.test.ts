@@ -45,7 +45,9 @@ function wakeAt({ at, lastSyncAt }: { at: number; lastSyncAt: number | null }) {
 describe("given the license sync's eventing declaration", () => {
   describe("when the module is declared", () => {
     it("carries the daily sync onto the installable module", () => {
-      expect(licensingProcessModule.eventing).toBe(licenseSyncEventing);
+      expect(licensingProcessModule.eventing?.pipeline.split(", ")).toContain(
+        LICENSE_SYNC_PIPELINE_NAME,
+      );
       expect(licenseSyncEventing.pipeline).toBe(LICENSE_SYNC_PIPELINE_NAME);
     });
   });
@@ -157,7 +159,7 @@ describe("given the license sync's eventing declaration", () => {
           occurredAt: 1,
           organizationName: "ACME",
         },
-        { tenantId: "org-1", aggregateId: "org-1", occurredAt: 1, eventId: "evt-1" },
+        { tenantId: "org-1", aggregateId: "org-1", occurredAt: 1, createdAt: 1, eventId: "evt-1" },
       );
 
       expect(subscriber.eventType).toBe(ORGANIZATION_SIGNED_UP_EVENT_TYPE);

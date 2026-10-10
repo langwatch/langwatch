@@ -174,7 +174,7 @@ export class ParameterRegistry {
   getIcon(name: string): { icon: LucideIcon; color: string } {
     const reg = this.parameters.get(name);
     if (!reg) {
-      return { icon: Settings, color: "gray.500" };
+      return { icon: Settings, color: "fg.subtle" };
     }
     return { icon: reg.icon, color: reg.iconColor };
   }
@@ -262,7 +262,7 @@ parameterRegistry.register({
     dynamicOptions: true,
   },
   icon: Brain,
-  iconColor: "cyan.500",
+  iconColor: "cyan.fg",
   displayOrder: 0,
   isCore: true,
   isReasoning: true,
@@ -278,7 +278,7 @@ parameterRegistry.register({
     helper: "Low = brief responses. High = detailed explanations.",
   },
   icon: MessageSquare,
-  iconColor: "teal.500",
+  iconColor: "teal.fg",
   displayOrder: 4,
   isCore: true,
   isReasoning: true,
@@ -297,7 +297,7 @@ parameterRegistry.register({
     helper: "Lower = more focused and consistent. Higher = more creative and varied.",
   },
   icon: Thermometer,
-  iconColor: "orange.500",
+  iconColor: "orange.fg",
   displayOrder: 5,
   isCore: true,
 });
@@ -316,7 +316,7 @@ parameterRegistry.register({
     dynamicMax: true,
   },
   icon: Hash,
-  iconColor: "green.500",
+  iconColor: "green.fg",
   displayOrder: 6,
   isCore: true,
 });
@@ -334,7 +334,7 @@ parameterRegistry.register({
     helper: "Limits word choices. Lower = more focused responses.",
   },
   icon: Gauge,
-  iconColor: "blue.500",
+  iconColor: "blue.fg",
   displayOrder: 7,
   isCore: true,
 });
@@ -352,7 +352,7 @@ parameterRegistry.register({
     helper: "Higher = less likely to repeat the same words.",
   },
   icon: Repeat,
-  iconColor: "purple.500",
+  iconColor: "purple.fg",
   displayOrder: 8,
   isCore: true,
 });
@@ -370,7 +370,7 @@ parameterRegistry.register({
     helper: "Higher = more likely to talk about new topics.",
   },
   icon: Target,
-  iconColor: "pink.500",
+  iconColor: "pink.fg",
   displayOrder: 9,
   isCore: true,
 });
@@ -406,7 +406,7 @@ parameterRegistry.register({
     helper: "Filters out unlikely words. Higher = only likely choices.",
   },
   icon: ArrowUpDown,
-  iconColor: "red.500",
+  iconColor: "red.fg",
   displayOrder: 11,
 });
 
@@ -423,7 +423,7 @@ parameterRegistry.register({
     helper: "Higher = less repetition of phrases.",
   },
   icon: Repeat,
-  iconColor: "yellow.600",
+  iconColor: "yellow.fg",
   displayOrder: 12,
 });
 
@@ -439,6 +439,6 @@ parameterRegistry.register({
     helper: "Set a number for reproducible results. Same seed = same output.",
   },
   icon: Dices,
-  iconColor: "gray.500",
+  iconColor: "fg.subtle",
   displayOrder: 13,
 });

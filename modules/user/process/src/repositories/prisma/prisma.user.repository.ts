@@ -1,7 +1,12 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import {
+  isUniqueConstraintError,
+  PrismaRepository,
+  skipTenantCheck,
+} from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
+  EmailAlreadyRegisteredError,
   userAccountInfoSchema,
   userFullProfileSchema,
   userProfileSchema,
@@ -34,6 +39,7 @@ import type {
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
   UserCreatedRow,
+  UserStandingRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -139,7 +145,10 @@ export class PrismaUserRepository
   /** One clock for every server, so user's facts order however the servers' clocks drift. */
   async readClock(): Promise<Instant> {
     const [row] = await this.#database.$queryRaw<{ now: Date }[]>`
-      -- @tenancy: reads the database clock; no table is touched.
+      ${skipTenantCheck({
+        // Reads the database clock; no table is touched.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT now() AS "now"
     `;
     if (!row) throw new Error("The database answered no clock reading");
@@ -199,6 +208,25 @@ export class PrismaUserRepository
     return rows.map((row) => ({ id: row.id, createdAt: fromDate(row.createdAt) }));
   }
 
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    const rows = await this.prisma.user.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: { id: true, deactivatedAt: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      deactivatedAt: row.deactivatedAt ? fromDate(row.deactivatedAt) : null,
+    }));
+  }
+
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
@@ -226,14 +254,20 @@ export class PrismaUserRepository
     return rows.map((row) => userProfileSchema.parse(row));
   }
 
+  /** A racing mint of the same address loses on the store's unique email and reads as taken. */
   async create(input: CreateUserInput): Promise<UserProfile> {
-    return this.transaction(async (transaction) => {
-      const user = userProfileSchema.parse(
-        await transaction.user.create({ data: input, select: userProfileSelect }),
-      );
-      await this.#appendMintFacts({ transaction, userId: user.id, createdAt: user.createdAt });
-      return user;
-    });
+    try {
+      return await this.transaction(async (transaction) => {
+        const user = userProfileSchema.parse(
+          await transaction.user.create({ data: input, select: userProfileSelect }),
+        );
+        await this.#appendMintFacts({ transaction, userId: user.id, createdAt: user.createdAt });
+        return user;
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) throw new EmailAlreadyRegisteredError();
+      throw error;
+    }
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
@@ -365,7 +399,7 @@ export class PrismaUserRepository
       this.prisma.passkey.count({ where: { userId: id } }),
       this.prisma.user.findUnique({
         where: { id },
-        select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true },
+        select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true, createdAt: true },
       }),
     ]);
 
@@ -373,6 +407,7 @@ export class PrismaUserRepository
       hasPasskey: passkeyCount > 0,
       twoStepEnabled: user?.twoFactorEnabled ?? false,
       dismissedAt: user?.passkeyNudgeDismissedAt ?? null,
+      accountCreatedAt: user?.createdAt ?? new Date(0),
     });
   }
 

@@ -84,7 +84,7 @@ flows. summary.txt, findings.md, report.html and the PR comment all say so.
    decided (see "Findings stream and recapture" below), not only at the end.
 5. Writes `report.html`, `findings.md` and `findings.json` into the run
    directory.
-6. Tears both stacks down. On the haven path: `haven destroy` for exactly the
+6. Tears both stacks down. On the haven path: `haven down --destroy --stack` for exactly the
    two slugs this run started, detached into `teardown.log` so the run exits
    at once; a run-scoped worktree is removed after its destroy. With
    `-no-haven`: both stacks are killed by process group through
@@ -197,7 +197,7 @@ So wherever `haven` is on PATH, `visualdiff run` boots each ref as a haven
 stack under a run-scoped slug (`visualdiff-<run>-base`,
 `visualdiff-<run>-candidate`) instead of provisioning ports and an
 environment itself: `LANGWATCH_SLUG=<slug> haven up --agent --detach` in each
-worktree, then poll `haven status --agent --json` until both the `ui` and the
+worktree, then poll `haven status --agent --json stacks` until both the `ui` and the
 `backend` lane are listening. The stack's URL is the routed `app.<slug>...`
 hostname `haven status` reports - the origin the browser actually renders,
 with the API served under `/api` on it, same as every other haven stack.
@@ -605,7 +605,8 @@ go run ./cmd/visualdiff run -keep -agent    # stacks stay up when the run ends
 # ...fix something in the candidate checkout...
 go run ./cmd/visualdiff recapture -run 20260910-030000 -routes /{slug}/analytics,/{slug}/settings
 # ...repeat recapture as many times as needed...
-haven destroy visualdiff-20260910-030000-base visualdiff-20260910-030000-candidate   # when done
+haven down --destroy --stack visualdiff-20260910-030000-base --yes   # when done
+haven down --destroy --stack visualdiff-20260910-030000-candidate --yes
 ```
 
 `recapture` reads the run's own persisted plan

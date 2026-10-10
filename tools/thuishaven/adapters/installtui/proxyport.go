@@ -124,7 +124,7 @@ func (m proxyModel) confirm() (tea.Model, tea.Cmd) {
 
 func (m proxyModel) View() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n", havenui.Title.Render("haven install"))
+	fmt.Fprintf(&b, "%s\n", havenui.Title.Render("haven self install"))
 	fmt.Fprintf(&b, "%s\n\n", havenui.Muted.Render("  portless proxy port"))
 	fmt.Fprintf(&b, "  bound to :%d — every URL carries it\n\n", m.current)
 	b.WriteString(m.row(proxyRow{0, "1", "443", "privileged bind; sudo prompts after this closes"}))

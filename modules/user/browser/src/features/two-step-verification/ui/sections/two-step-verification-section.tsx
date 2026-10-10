@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Smartphone } from "lucide-react";
 import { useState } from "react";
 
@@ -43,23 +44,20 @@ export function TwoStepVerificationSection() {
   const held = twoStep.requiringOrganizations.length > 0;
 
   return (
-    <VStack width="full" align="start" gap={4} data-testid="two-factor-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Smartphone size={18} />
-          <Text fontWeight={600}>Two-step verification</Text>
-          {twoStep.enabled ? (
-            <Badge colorPalette="green" data-testid="two-factor-status">
-              On
-            </Badge>
-          ) : null}
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          Ask for a code from your phone as well as your password. Somebody who learns your password
-          still cannot sign in as you.
-        </Text>
-      </VStack>
-
+    <SettingsSection
+      anchorId="two-step-verification"
+      icon={<Smartphone size={18} />}
+      title="Two-step verification"
+      hint="Ask for a code from your phone as well as your password. Somebody who learns your password still cannot sign in as you."
+      badge={
+        twoStep.enabled ? (
+          <Badge colorPalette="green" data-testid="two-factor-status">
+            On
+          </Badge>
+        ) : null
+      }
+      data-testid="two-factor-section"
+    >
       {twoStep.loading ? <Spinner size="sm" /> : null}
 
       {!twoStep.loading && !twoStep.enabled ? (
@@ -164,6 +162,6 @@ export function TwoStepVerificationSection() {
         }}
         onCloseCodes={() => setRegenerated(NO_CODES)}
       />
-    </VStack>
+    </SettingsSection>
   );
 }

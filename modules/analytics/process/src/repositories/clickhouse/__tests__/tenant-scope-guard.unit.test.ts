@@ -9,6 +9,8 @@ import { checkTenantScope } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
+import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
+import { buildEvalRollupTimeseriesQuery } from "../clickhouse.eval-rollup-timeseries-query.mapper.ts";
 import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
@@ -154,5 +156,60 @@ describe("tenant scope guard vs the timeseries builders", () => {
         filters: { "metadata.key": ["a", "b"] },
       }),
     ).toThrow(/Eval slim builder cannot serve filter "metadata.key"/);
+  });
+
+  describe.each([
+    [
+      "LLM calls grouped by model",
+      { metric: "metadata.trace_id", aggregation: "cardinality" },
+      "metadata.model",
+      1440,
+    ],
+    [
+      "evaluation runs grouped by pass",
+      { metric: "evaluations.evaluation_runs", aggregation: "cardinality" },
+      "evaluations.evaluation_passed",
+      "full",
+    ],
+  ])("given the overview's %s (WEB-985)", (_label, series, groupBy, timeScale) => {
+    it.each([["buildTimeseriesQuery", buildTimeseriesQuery]])(
+      "keeps the tenant predicate undisjoined in %s",
+      (_builder, build) => {
+        resetParamCounter();
+        const { sql, params } = build({
+          projectId: "tenant-a",
+          ...dates,
+          series: [series as AnalyticsSeries],
+          groupBy,
+          timeScale,
+        } as Parameters<typeof buildTimeseriesQuery>[0]);
+
+        expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+      },
+    );
+  });
+
+  // WEB-985: the eval slim builder is still refused; flip to `it` once fixed (routed to fix-hi).
+  it("passes the overview's evaluation summary on the table it routes to (WEB-985)", () => {
+    const input = {
+      projectId: "tenant-a",
+      ...dates,
+      series: [
+        { metric: "evaluations.evaluation_runs", aggregation: "cardinality" },
+      ] as AnalyticsSeries[],
+      groupBy: "evaluations.evaluation_passed",
+      timeScale: "full" as const,
+      timeZone: "Europe/Amsterdam",
+    };
+    const table = pickAnalyticsTable(input);
+    const build =
+      {
+        evaluation_analytics_rollup: buildEvalRollupTimeseriesQuery,
+        evaluation_analytics: buildEvalSlimTimeseriesQuery,
+      }[table as string] ?? buildTimeseriesQuery;
+    resetParamCounter();
+    const { sql, params } = build(input as Parameters<typeof buildTimeseriesQuery>[0]);
+
+    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
   });
 });

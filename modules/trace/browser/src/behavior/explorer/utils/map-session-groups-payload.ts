@@ -18,6 +18,7 @@ export function mapSessionGroupToConversationGroup(
 ): ConversationGroup {
   return {
     conversationId: item.conversationId,
+    projectId: item.projectId,
     traces: [],
     traceCount: item.traceCount,
     totalDuration: item.totalDurationMs,

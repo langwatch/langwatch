@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   canonicalErrorResponse,
   principalOfCredential,
@@ -7,6 +7,7 @@ import {
 /** @vitest-environment node */
 import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -35,6 +36,7 @@ function keyCredential(apiKeyId: string): RestResolvedProjectCredential {
       organizationId: "org_1",
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     },
   };
 }
@@ -44,6 +46,7 @@ function mount(
   caller: { userId: string | null; credential: RestResolvedProjectCredential } | null = null,
 ) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: caller?.userId ? { type: "user", id: caller.userId } : null,
@@ -56,8 +59,10 @@ function mount(
     app: () => createApiFixture<WorkflowApi>({ runSynchronous }, "WorkflowApi"),
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(workflowRunCallerKey, () => (caller ? keyRowOf(caller.credential) : null)),
+    middlewareContext: [
+      bindMiddlewareContext(workflowRunCallerKey, () =>
+        caller ? keyRowOf(caller.credential) : null,
+      ),
     ],
   });
 }

@@ -21,7 +21,7 @@ import type { TraceProjectMilestonesService } from "../services/trace-project-mi
 
 /** The three things the projectMetadata subscriber does to a project. Narrowed
  * from the full ProjectApi so background processes can compose just this. */
-export interface TraceProjectMetadata {
+interface TraceProjectMetadata {
   findById(id: string): Promise<Project | null>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
   /**

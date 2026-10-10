@@ -5,13 +5,18 @@ import {
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { signUpDataSchema } from "@langwatch/onboarding-contract";
 import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";
 
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
+  MEMBERS_INVITED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
 } from "./organization-lifecycle.events.ts";
 import {
@@ -40,12 +45,17 @@ import { organizationIntentSchema } from "./organization.ts";
 import { organizationApiScopeGraphInputSchema, scopeGraphSchema } from "./scope-graph.ts";
 
 /** The first organization a person creates, and the name they gave it. */
-export const organizationApiCreateAndAssignInputSchema = z.object({
+const organizationApiCreateAndAssignInputSchemaDefinition = z.object({
   orgName: z.string().optional(),
   phoneNumber: z.string().optional(),
   signUpData: signUpDataSchema.optional(),
   primaryIntent: organizationIntentSchema.optional(),
 });
+export interface OrganizationApiCreateAndAssignInputSchema extends Named<
+  typeof organizationApiCreateAndAssignInputSchemaDefinition
+> {}
+export const organizationApiCreateAndAssignInputSchema: OrganizationApiCreateAndAssignInputSchema =
+  organizationApiCreateAndAssignInputSchemaDefinition;
 export type OrganizationApiCreateAndAssignInput = z.infer<
   typeof organizationApiCreateAndAssignInputSchema
 >;
@@ -55,7 +65,25 @@ export type OrganizationApiCreateAndAssignInput = z.infer<
  * four row types across two features and no schema describes them yet, and a
  * partial one would strip fields the shell reads.
  */
-export const organizationFullyLoadedListSchema = z.array(z.unknown());
+const organizationFullyLoadedListSchemaDefinition = z.array(z.unknown());
+export interface OrganizationFullyLoadedListSchema extends Named<
+  typeof organizationFullyLoadedListSchemaDefinition
+> {}
+export const organizationFullyLoadedListSchema: OrganizationFullyLoadedListSchema =
+  organizationFullyLoadedListSchemaDefinition;
+
+/** Every fact that changes who is in the organization, their seat or their role. */
+const MEMBERSHIP_CHANGED = [
+  { event: MEMBERS_INVITED_EVENT_TYPE, scope: "organizationId" },
+  { event: INVITE_ACCEPTED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE, scope: "organizationId" },
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+];
 
 export const organizationTrpc = defineTrpcContract("organization")
   /** Sign-up: the caller's first organization and its first team. */
@@ -100,21 +128,21 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withOutput(organizationWriteAckSchema)
 
   /** The member pickers' read: names always, addresses only for an administrator. */
-  .query("getOrganizationWithMembersAndTheirTeams")
+  .query("getOrganizationWithMembersAndTheirTeams", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiWithMembersInputSchema)
   .withOutput(organizationMemberDirectorySchema)
 
   /** The Directory's tab badges: counts only, so a closed tab loads no list. */
-  .query("getDirectoryCounts")
+  .query("getDirectoryCounts", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationDirectoryCountsSchema)
 
-  .query("getMemberById")
+  .query("getMemberById", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiMemberScopeSchema)
   .withOutput(organizationMemberRecordSchema)
 
   /** The members invitations brought; the browser joins identity's admissions to it. */
-  .query("getInvitedMemberIds")
+  .query("getInvitedMemberIds", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationInvitedMemberIdsSchema)
 
@@ -122,7 +150,7 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withInput(organizationApiUpdateTeamMemberRoleInputSchema)
   .withOutput(organizationWriteAckSchema)
 
-  .query("getAllOrganizationMembers")
+  .query("getAllOrganizationMembers", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationUserRowsSchema)
 

@@ -62,7 +62,7 @@ function fieldError(message: string | undefined) {
   if (!message) return undefined;
 
   return (
-    <Text color="red.500" fontSize="xs">
+    <Text color="red.fg" fontSize="xs">
       {message}
     </Text>
   );

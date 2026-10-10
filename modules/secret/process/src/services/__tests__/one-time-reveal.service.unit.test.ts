@@ -14,7 +14,9 @@ const STASH = {
   keyId: "vk_1",
   preview: "sk-…4f2a",
   secret: "sk-live-9f2c",
+  recipientUserId: "user_jane",
 };
+const RECIPIENT = { id: STASH.recipientUserId };
 
 function fixture() {
   let nowMs = 1_700_000_000_000;
@@ -49,7 +51,7 @@ describe("the one-time reveal", () => {
     const { revealId } = await service.stash(STASH);
 
     await expect(
-      service.reveal({ organizationId: STASH.organizationId, revealId }),
+      service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
     ).resolves.toEqual({
       kind: "virtual_key",
       keyId: "vk_1",
@@ -58,7 +60,9 @@ describe("the one-time reveal", () => {
     });
 
     expect(
-      await codeOf(() => service.reveal({ organizationId: STASH.organizationId, revealId })),
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+      ),
     ).toBe("secret_already_revealed");
   });
 
@@ -68,7 +72,10 @@ describe("the one-time reveal", () => {
 
     expect(
       await codeOf(() =>
-        service.reveal({ organizationId: STASH.organizationId, revealId: "rvl_invented" }),
+        service.reveal(
+          { organizationId: STASH.organizationId, revealId: "rvl_invented" },
+          RECIPIENT,
+        ),
       ),
     ).toBe("secret_reveal_expired");
   });
@@ -80,13 +87,34 @@ describe("the one-time reveal", () => {
 
     const { revealId } = await service.stash(STASH);
 
-    expect(await codeOf(() => service.reveal({ organizationId: "org_other", revealId }))).toBe(
-      "secret_reveal_expired",
-    );
+    expect(
+      await codeOf(() => service.reveal({ organizationId: "org_other", revealId }, RECIPIENT)),
+    ).toBe("secret_reveal_expired");
     // And the near miss consumed nothing: the owner's read still works.
     await expect(
-      service.reveal({ organizationId: STASH.organizationId, revealId }),
+      service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
     ).resolves.toMatchObject({ secret: STASH.secret });
+  });
+
+  /** @scenario "A reveal is served only to the person it was stashed for" */
+  it("refuses another member of the organization, consuming nothing", async () => {
+    const { service } = fixture();
+
+    const { revealId } = await service.stash(STASH);
+
+    expect(
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, { id: "user_mallory" }),
+      ),
+    ).toBe("secret_reveal_expired");
+    await expect(
+      service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+    ).resolves.toMatchObject({ secret: STASH.secret });
+    expect(
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, { id: "user_mallory" }),
+      ),
+    ).toBe("secret_reveal_expired");
   });
 
   /** @scenario "A reveal left unread past its window is gone" */
@@ -97,7 +125,9 @@ describe("the one-time reveal", () => {
     pass(ONE_TIME_REVEAL_TTL_MS + 1);
 
     expect(
-      await codeOf(() => service.reveal({ organizationId: STASH.organizationId, revealId })),
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+      ),
     ).toBe("secret_reveal_expired");
   });
 });

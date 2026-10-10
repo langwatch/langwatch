@@ -292,18 +292,19 @@ Feature: Entitlement's meters, decisions and who learns them
     When they call limits.checkAndSendUsageLimitNotification
     Then the call is refused as forbidden
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Asking for a warning records it rather than sending it
     Given the organization at 92% of its allowance with no warning recorded this month
     When an organization manager calls limits.checkAndSendUsageLimitNotification
-    Then a warning_threshold_crossed event is recorded for the 90% threshold
+    Then a lw.entitlement.usage_threshold_crossed event is recorded for the 90% threshold
     And the answer says the warning was recorded, without a notification id
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Asking twice in a month records the threshold once
     Given a warning is already recorded for the 90% threshold this month
     When an organization manager calls limits.checkAndSendUsageLimitNotification at 92%
-    Then no warning is recorded and the answer says none was sent
+    Then the 90% threshold stays recorded once for the month
+    And the answer still says the warning was recorded
 
   @integration @usage @unimplemented
   Scenario: The spend roll-up keeps its wire path

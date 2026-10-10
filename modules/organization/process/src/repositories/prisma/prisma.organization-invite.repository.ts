@@ -8,8 +8,11 @@ import type {
   Organization,
   OrganizationInvite,
   OrganizationUser,
+  PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -19,6 +22,7 @@ import {
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
+  type InviteWithOrganizationAndRequester,
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
@@ -319,6 +323,21 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return inviteWithOrganizationFromRecord(invite);
   }
 
+  async getInviteLandingByCode({
+    inviteCode,
+  }: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester> {
+    const found = await this.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      include: { organization: true, requestedByUser: { select: { name: true } } },
+    });
+    if (found === null) throw new InviteNotFoundError("Invitation not found");
+
+    const { requestedByUser, ...invite } = found;
+    return { ...inviteWithOrganizationFromRecord(invite), requestedByUser };
+  }
+
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
     const admins = await this.prisma.organizationUser.findMany({
       where: { organizationId, role: "ADMIN" },
@@ -332,7 +351,11 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
 
   async findProjectSlugsForTeams({ teamIds }: { teamIds: string[] }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
-      where: { teamId: { in: teamIds }, archivedAt: null },
+      where: {
+        teamId: { in: teamIds },
+        archivedAt: null,
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+      },
       select: { slug: true },
     });
 
@@ -345,7 +368,11 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
   }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId, archivedAt: null }, archivedAt: null },
+      where: {
+        team: { organizationId, archivedAt: null },
+        archivedAt: null,
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+      },
       select: { slug: true },
     });
 
@@ -372,9 +399,48 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return inviteFromRecord(invite);
   }
 
+  async findPendingInvitesForAddress({
+    address,
+  }: {
+    address: string;
+  }): Promise<PendingInvitationsByEmail> {
+    const rows = await this.prisma.$queryRaw<
+      {
+        id: string;
+        email: string;
+        organizationId: string;
+        organizationName: string | null;
+        invitedByName: string | null;
+        expiration: Date | null;
+      }[]
+    >`
+      ${skipTenantCheck({
+        // An operator's lookup of one address across every organization, behind ops:manage.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT i."id", i."email", i."organizationId", o."name" AS "organizationName",
+             u."name" AS "invitedByName", i."expiration"
+        FROM "OrganizationInvite" i
+        LEFT JOIN "Organization" o ON o."id" = i."organizationId"
+        LEFT JOIN "User" u ON u."id" = i."requestedBy"
+       WHERE lower(i."email") = lower(${address})
+         AND i."status" = 'PENDING'
+       ORDER BY i."createdAt" DESC
+    `;
+    return rows.map((row) => ({
+      inviteId: row.id,
+      email: row.email,
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      invitedByName: row.invitedByName,
+      expiresAtMs: row.expiration?.getTime() ?? null,
+    }));
+  }
+
   async findOldestPendingInviteForAddress({ address }: { address: string }): Promise<{
     inviteCode: string;
     organizationName: string;
+    inviterName: string | null;
     role: OrganizationUserRole;
   } | null> {
     // Stored as the administrator typed it, so matched case-insensitively.
@@ -384,13 +450,19 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         status: "PENDING",
         OR: [{ expiration: null }, { expiration: { gt: new Date() } }],
       },
-      select: { inviteCode: true, role: true, organization: { select: { name: true } } },
+      select: {
+        inviteCode: true,
+        role: true,
+        organization: { select: { name: true } },
+        requestedByUser: { select: { name: true } },
+      },
       orderBy: { createdAt: "asc" },
     });
     if (invite === null) return null;
     return {
       inviteCode: invite.inviteCode,
       organizationName: invite.organization.name,
+      inviterName: invite.requestedByUser?.name ?? null,
       role: invite.role,
     };
   }

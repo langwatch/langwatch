@@ -41,11 +41,17 @@ an OpenAI provider with a base URL into chat completions before it leaves.
   `format` (date-time, date, email, uri, uuid), numbers within
   `minimum`/`maximum`, a seeded `enum`/`const` pick, arrays of `minItems` to
   `maxItems`, required keys always, optional keys half the time, `$ref`/`$defs`
-  resolved. `json_object` gets `{"answer": "..."}`.
+  resolved. `json_object` follows the fields its prompt names (an embedded
+  `JSON schema:` block, else the `**bold**` fields of numbered instructions; a field
+  whose line asks for a count range or a list is an array) and otherwise gets
+  `{"answer": "..."}`.
 - **Tools**: a forced tool (`tool_choice` required, a named function, or
   Anthropic `any`/`tool`) is always called; otherwise, when tools are offered
-  and the last message is not a tool result, half of all prompts call the first
-  tool. Arguments are drawn from the tool's JSON schema.
+  and the last message is not a tool result, half of all prompts call a tool.
+  **Tools mode** (model name containing `tools`, e.g. `markov-tools`, or
+  `X-Llmsim-Tools: auto`) makes every such prompt call one; after a tool result
+  it answers text. The tool is the one the last user message names (longest
+  match), else a seeded pick. Arguments are drawn from the tool's JSON schema.
 - **Langy mode** (model name containing `langy-echo`, or `X-Llmsim-Mode:
 langy`): no Markov text; llmsim does what the last user message says.
   - A plain message is echoed back verbatim, streaming included.
@@ -66,12 +72,13 @@ langy`): no Markov text; llmsim does what the last user message says.
 
 ## Switches
 
-| Switch                                            | Effect                                          |
-| ------------------------------------------------- | ----------------------------------------------- |
-| `X-Llmsim-Seed: <value>`                          | pins the random source, whatever the prompt     |
-| `X-Llmsim-Seed: random`                           | a fresh source per call (load and fuzz tests)   |
-| `X-Llmsim-Error: 429` / model `...error-500...`   | answers that status in the caller's error shape |
-| `X-Llmsim-Mode: langy` / model `...langy-echo...` | Langy mode                                      |
+| Switch                                            | Effect                                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `X-Llmsim-Seed: <value>`                          | pins the random source, whatever the prompt                                                        |
+| `X-Llmsim-Seed: random`                           | a fresh source per call (load and fuzz tests)                                                      |
+| `X-Llmsim-Error: 429` / model `...error-500...`   | answers that status in the caller's error shape                                                    |
+| `X-Llmsim-Mode: langy` / model `...langy-echo...` | Langy mode                                                                                         |
+| model `...delay-<ms>...`                          | waits that long before the first byte (max 5 min); a caller that hangs up first is recorded as 499 |
 
 The gateway forwards no custom headers upstream, so through the product use
 the model-name forms. The console's settings tab sets a forced error and a

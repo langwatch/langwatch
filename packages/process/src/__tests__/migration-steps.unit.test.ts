@@ -96,8 +96,8 @@ describe("given a module that declares its migration steps over its own app", ()
   });
 
   describe("when it is installed in each role", () => {
-    /** @scenario "The tasks and worker roles build a module's migration steps and the api never does" */
-    it("builds both steps in tasks and worker, in order, and never runs the binder in the api", async () => {
+    /** @scenario "Every role builds a module's migration steps and only tasks and worker answer for them" */
+    it("builds both steps in every role, in order, and the api refuses to answer for them", async () => {
       const tasks = await installIn("tasks");
       const worker = await installIn("worker");
       const api = await installIn("api");
@@ -109,8 +109,7 @@ describe("given a module that declares its migration steps over its own app", ()
 
       expect(ids(tasks)).toEqual(["dataset:dataset-copy-keys", "dataset:drop-legacy-keys"]);
       expect(ids(worker)).toEqual(["dataset:dataset-copy-keys", "dataset:drop-legacy-keys"]);
-      expect(api.state.migrationSteps).toBeUndefined();
-      expect(api.built).toEqual([]);
+      expect(ids(api)).toEqual(["dataset:dataset-copy-keys", "dataset:drop-legacy-keys"]);
       expect(() =>
         migrationStepsOf({
           process: "langwatch-api",

@@ -82,7 +82,7 @@ Feature: The Agent Testing page
   Scenario: The header holds the title and the tabs on one line
     Given the Agent Testing page is open
     When the header is read
-    Then "Agent Testing" is on the far left
+    Then the selected suite name, or "Results" on the results tab, is on the far left
     And the tabs "Scenarios" and "Results" are in the middle
     And the header spans the full width of the page
 
@@ -94,7 +94,7 @@ Feature: The Agent Testing page
     And what the plan is reads small and muted beside it
     And the tabs are still in the middle
     When the plan is left
-    Then "Agent Testing" is on the far left again
+    Then "Results" is on the far left again
 
   @integration
   Scenario: A long run plan name stays on one line
@@ -110,6 +110,12 @@ Feature: The Agent Testing page
     When the header is read
     Then "Scenarios" carries the number of scenarios
     And "Results" carries the number of run plans
+
+  @unit
+  Scenario: The number beside the Scenarios tab counts what the suite rail can reach
+    Given a project with two scenarios filed in a listed suite and one filed in no listed suite
+    When the number beside "Scenarios" is worked out
+    Then only the two filed scenarios are counted
 
   @unit
   Scenario: The number beside the Results tab counts what the Test Runs list holds

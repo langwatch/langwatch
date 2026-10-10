@@ -102,7 +102,7 @@ describe("the Roles screen", () => {
         new FakeAuthzHost({ plan: { isEnterprise: false, isLoading: true } }),
       );
 
-      expect(screen.queryByText("Enterprise Feature")).not.toBeInTheDocument();
+      expect(screen.queryByText("Custom roles on Enterprise")).not.toBeInTheDocument();
       expect(screen.queryByText("Predefined roles")).not.toBeInTheDocument();
     });
   });
@@ -115,8 +115,11 @@ describe("the Roles screen", () => {
         new FakeAuthzHost({ plan: { isEnterprise: false, isLoading: false } }),
       );
 
-      expect(screen.getByText("Enterprise Feature")).toBeInTheDocument();
-      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(screen.getByText("Custom roles on Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+        "href",
+        "/settings/plans",
+      );
       expect(screen.queryByText("Custom roles")).not.toBeInTheDocument();
     });
   });

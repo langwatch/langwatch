@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { frontendFeatureFlagSchema } from "./frontend-feature-flags.ts";
@@ -45,10 +46,15 @@ export const experimentTenantPolicySchema = z.enum(["inherit", "enabled", "disab
 export type ExperimentTenantPolicy = z.infer<typeof experimentTenantPolicySchema>;
 
 /** The exact scope a tenant policy is written against. */
-export const experimentTenantScopeSchema = z.discriminatedUnion("kind", [
+const experimentTenantScopeSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("project"), projectId: z.string().min(1) }),
   z.object({ kind: z.literal("organization"), organizationId: z.string().min(1) }),
 ]);
+export interface ExperimentTenantScopeSchema extends Named<
+  typeof experimentTenantScopeSchemaDefinition
+> {}
+export const experimentTenantScopeSchema: ExperimentTenantScopeSchema =
+  experimentTenantScopeSchemaDefinition;
 
 export type ExperimentTenantScope = z.infer<typeof experimentTenantScopeSchema>;
 
@@ -70,7 +76,7 @@ export type ExperimentDecision = z.infer<typeof experimentDecisionSchema>;
  * One experiment as a viewer sees it (only those with true base availability
  * for that viewer).
  */
-export const experimentCatalogueEntrySchema = z
+const experimentCatalogueEntrySchemaDefinition = z
   .object({
     key: frontendFeatureFlagSchema,
     title: z.string(),
@@ -85,6 +91,11 @@ export const experimentCatalogueEntrySchema = z
     organizationPolicy: experimentTenantPolicySchema.optional(),
   })
   .strict();
+export interface ExperimentCatalogueEntrySchema extends Named<
+  typeof experimentCatalogueEntrySchemaDefinition
+> {}
+export const experimentCatalogueEntrySchema: ExperimentCatalogueEntrySchema =
+  experimentCatalogueEntrySchemaDefinition;
 export type ExperimentCatalogueEntry = z.infer<typeof experimentCatalogueEntrySchema>;
 
 /**

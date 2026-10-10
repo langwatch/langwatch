@@ -9,12 +9,7 @@ import {
   legacySentenceErrorSchema,
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
@@ -45,16 +40,13 @@ const LEGACY_DESCRIPTION =
  * rather than a child of it, so it owns no prefix and publishes exactly the one
  * address it answers at, beside the `/api/v1` twin it has always carried.
  */
-export const analyticsLegacyRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<AnalyticsLegacyApi>;
-}> = defineRestRouter(AnalyticsLegacyApi)
+export const analyticsLegacyRest = defineRestRouter(AnalyticsLegacyApi)
   .withNamespace("analytics-legacy")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")
 
   .post("/api/analytics", "postApiAnalytics")
+  .withoutAudit("read sent as a POST")
   // Main parsed the body as JSON under any Content-Type; a mislabelled one is still read.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })

@@ -16,7 +16,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },
     team: { id: "team-1", name: "Platform" },
-    hasPermission: () => true,
   }),
 }));
 
@@ -123,6 +122,20 @@ describe("given an in-memory dataset", () => {
       expect(screen.getByText("ping")).toBeInTheDocument();
       expect(screen.getByText("pong")).toBeInTheDocument();
       expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("2 records");
+    });
+  });
+
+  describe("when the page hands the editor a header slot", () => {
+    it("puts the count and buttons in the slot and keeps the grid outside it", () => {
+      const slot = document.createElement("div");
+      document.body.appendChild(slot);
+
+      renderInMemory({ headerSlot: slot });
+
+      expect(slot).toContainElement(screen.getByTestId("dataset-row-count"));
+      expect(slot).toContainElement(screen.getByTestId("download-csv"));
+      expect(slot).not.toContainElement(screen.getByTestId("dataset-editor-table"));
+      slot.remove();
     });
   });
 
@@ -373,6 +386,56 @@ describe("given a saved dataset", () => {
         },
         { timeout: 2000 },
       );
+    });
+  });
+});
+
+describe("given a saved dataset with two rows and a third typed into the trailing row", () => {
+  beforeEach(() => {
+    getAllQuery.mockReturnValue({
+      data: {
+        id: "ds-2",
+        name: "Saved DS",
+        columnTypes,
+        datasetRecords: [
+          { id: "rec-1", entry: { input: "What is LangWatch?", expected_output: "" } },
+          { id: "rec-2", entry: { input: "How do I add a key?", expected_output: "" } },
+        ],
+      },
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    updateMutate.mockImplementation((_args: unknown, opts: { onSuccess: () => void }) => {
+      opts.onSuccess();
+    });
+    deleteManyMutate.mockImplementation((_args: unknown, opts: { onSuccess: () => void }) => {
+      opts.onSuccess();
+    });
+  });
+
+  describe("when only the third row is ticked and deleted", () => {
+    /** @scenario Bulk delete removes exactly the ticked rows */
+    it("sends the third row's own id and never the second row's", async () => {
+      const user = userEvent.setup();
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds-2" />);
+
+      await screen.findByText("How do I add a key?");
+      await user.click(screen.getByTestId("add-row"));
+      await user.dblClick(screen.getByTestId("cell-2-input_0"));
+      await user.type(await screen.findByRole("textbox"), "t51 added question{Enter}");
+      await waitFor(() => expect(updateMutate).toHaveBeenCalled(), { timeout: 2000 });
+      const [createdUpdate] = updateMutate.mock.calls.at(-1) ?? [];
+      const createdId = (createdUpdate as { recordId: string }).recordId;
+
+      await user.click(screen.getByLabelText("Select row 3"));
+      await user.click(await screen.findByTestId("delete-selected-rows"));
+
+      await waitFor(() => expect(deleteManyMutate).toHaveBeenCalled(), { timeout: 2000 });
+      const sent = deleteManyMutate.mock.calls.flatMap(
+        ([args]) => (args as { recordIds: string[] }).recordIds,
+      );
+      expect(sent).toEqual([createdId]);
+      expect(screen.getByText("How do I add a key?")).toBeInTheDocument();
     });
   });
 });

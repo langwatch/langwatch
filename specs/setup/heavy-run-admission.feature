@@ -82,11 +82,11 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Admitted exactly once ---
 
-  # ADR-091's gate rewraps an agent's command under `haven run --class heavy`,
+  # ADR-091's gate rewraps an agent's command under `haven machine run --class heavy`,
   # which holds a slot of its own. The wrapped command is still a package script
   # that routes through this counter, so without a handoff the outer run waits
   # for the inner one and at a limit of 1 it waits for itself. #6598 already
-  # established the rule for `haven typecheck`, which passes CHECK_SLOTS=0.
+  # established the rule for `haven machine typecheck`, which passes CHECK_SLOTS=0.
   @unit @unimplemented
   Scenario: A run already admitted by haven is not admitted a second time
     Given a run that haven has already taken a slot for

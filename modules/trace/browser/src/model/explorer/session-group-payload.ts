@@ -5,6 +5,8 @@
  */
 export interface SessionGroupPayloadItem {
   conversationId: string;
+  /** The project the session belongs to; on an aggregate, the member. */
+  projectId: string;
   traceCount: number;
   totalCost: number;
   totalTokens: number;

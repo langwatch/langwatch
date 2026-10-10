@@ -26,6 +26,8 @@ import (
 type Server struct {
 	config  Config
 	console http.Handler
+	// reads are config.CLIReads plus the orb's, which this adapter owns.
+	reads map[string]CLIRead
 }
 
 // Probes are the optional OS checks the page uses to show live health. A nil
@@ -65,11 +67,18 @@ type Config struct {
 	IdPTenants func(ctx context.Context, port int) []IdPTenant
 	// Console is the haven-web bundle; nil serves the one embedded at build.
 	Console fs.FS
+	// CLIReads are the stack console's tabs, by CLI command name; an absent
+	// name answers 404 like an unknown command.
+	CLIReads map[string]CLIRead
+	// Browser is the console's view of the stack's headless browser lanes.
+	Browser Browser
 }
 
 // New builds a Server.
 func New(config Config) *Server {
-	return &Server{config: config, console: newConsole(config.Console)}
+	s := &Server{config: config, console: newConsole(config.Console)}
+	s.reads = s.cliReads()
+	return s
 }
 
 // routes is the whole HTTP surface, built apart from Serve so a test can drive
@@ -83,9 +92,22 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/hub", s.handleHub)
 	mux.HandleFunc("GET /api/stacks/{slug}", s.handleStackHome)
 	mux.HandleFunc("POST /api/stacks/{slug}/api-key", s.handleRevealAPIKey)
+	mux.HandleFunc("GET /api/stacks/{slug}/orb", s.handleOrbFacts)
+	mux.HandleFunc("POST /api/stacks/{slug}/orb/feedback", s.handleOrbFeedback)
+	mux.HandleFunc("POST /api/stacks/{slug}/orb/page", s.handleOrbPage)
+	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb", s.handleOrbPreflight)
+	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb/", s.handleOrbPreflight)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
+	mux.HandleFunc("/api/stacks/{slug}/start", s.handleStartKeeper)
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
+	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)
+	mux.HandleFunc("/api/stacks/{slug}/reset-databases", s.handleResetDatabases)
+	mux.HandleFunc("/api/stacks/{slug}/seed", s.handleSeed)
+	mux.HandleFunc("GET /api/stacks/{slug}/cli/{name}", s.handleCLIRead)
+	mux.HandleFunc("/api/stacks/{slug}/feedback/{id}/resolve", s.handleFeedbackResolve)
+	mux.HandleFunc("GET /api/stacks/{slug}/browser/{lane}/snapshot", s.handleBrowserSnapshot)
+	mux.HandleFunc("GET /api/stacks/{slug}/browser/{lane}/screenshot", s.handleBrowserScreenshot)
 	mux.HandleFunc("/api/worktrees/start", s.handleStart)
 	mux.HandleFunc("GET /api/limits", s.handleLimits)
 	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)
@@ -97,7 +119,7 @@ func (s *Server) routes() *http.ServeMux {
 
 // Serve runs the HTTP surface until the context is canceled.
 func (s *Server) Serve(ctx context.Context, port int) error {
-	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.routes()), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.serveWaiting(s.routes())), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

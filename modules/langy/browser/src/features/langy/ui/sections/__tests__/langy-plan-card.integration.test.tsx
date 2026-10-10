@@ -41,6 +41,7 @@ const markers = (container: HTMLElement) =>
 describe("LangyPlanCard", () => {
   describe("given a running turn with finished, current and not-yet-started steps", () => {
     /** @scenario "Multi-step work shows a live checklist" */
+    /** @scenario "Completed steps read as one line each" */
     it("lists the steps in order with one current step and the finished one marked done", () => {
       const { container } = render(ui({ isStreaming: true }));
 

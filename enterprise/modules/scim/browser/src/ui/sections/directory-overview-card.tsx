@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How accounts arrive, beside how people sign in: how much of the membership
@@ -18,6 +19,7 @@ import {
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { directorySyncChipFor } from "../../model/directory-sync-chip.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
+import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 import { CONNECTORS_PAGE, useScimHost } from "../../model/scim-host.ts";
 
 /** Groups named before the rest collapse into a count. */
@@ -44,7 +46,7 @@ export function DirectoryOverviewCard({
   if (reconciliation.isError) {
     return (
       <OverviewCard title="Directory" data-testid="directory-card">
-        <DirectoryReadFailure />
+        <DirectoryReadFailure error={reconciliation.error} />
       </OverviewCard>
     );
   }
@@ -87,7 +89,21 @@ export function DirectoryOverviewCard({
 export default DirectoryOverviewCard;
 
 /** The read failed: said on the card, never drawn as an empty directory. */
-function DirectoryReadFailure() {
+function DirectoryReadFailure({ error }: { error: unknown }) {
+  if (isEnterpriseGateError(error)) {
+    return (
+      <UpgradeRequired
+        feature="Directory sync"
+        compact
+        data-testid="directory-card-enterprise-gate"
+        actions={
+          <Button asChild size="sm" colorPalette="orange">
+            <Link href="/settings/plans">Compare plans</Link>
+          </Button>
+        }
+      />
+    );
+  }
   return (
     <Text fontSize="13px" color="fg.muted" data-testid="directory-card-failure">
       Couldn&apos;t read your directory. Try again in a moment.

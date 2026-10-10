@@ -2,6 +2,7 @@ import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
+import { useTraceQueryArgs } from "../../../../../behavior/explorer/use-trace-query-args.ts";
 import {
   useCodingAgentSession,
   useCodingAgentTranscript,
@@ -46,14 +47,17 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
-  const transcriptQuery = useCodingAgentTranscript({ projectId, traceId, occurredAtMs });
-
-  const spansQuery = useSpansFullRead({ projectId, traceId, occurredAtMs });
-  const eventsQuery = useTraceEventsRead({ projectId, traceId, occurredAtMs });
+  // On an aggregate, the member the drawer is on: the opened turn and the
+  // session's earlier turns are both read from it.
+  const { tenantId } = useTraceQueryArgs();
+  const turn = { projectId, traceId, occurredAtMs, tenantId };
+  const transcriptQuery = useCodingAgentTranscript(turn);
+  const spansQuery = useSpansFullRead(turn);
+  const eventsQuery = useTraceEventsRead(turn);
   // The version/model/repo Claude Code itself would print above the prompt,
   // off the resource attributes (the session fold deliberately carries no
   // identity strings, ADR-041).
-  const resourceQuery = useResourceInfoRead({ projectId, traceId, occurredAtMs });
+  const resourceQuery = useResourceInfoRead(turn);
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
@@ -76,6 +80,7 @@ export function TerminalTab({
 
   const session = useSessionScrollback({
     projectId,
+    tenantId,
     traceId,
     occurredAtMs,
     conversationId,

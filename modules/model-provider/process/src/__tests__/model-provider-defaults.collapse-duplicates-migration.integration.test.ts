@@ -1,12 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /**
  * ("Migration collapses pre-invariant duplicate configs per scope")
  * @vitest-environment node
  * @see specs/model-providers/model-default-config-cascade.feature
  */
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -18,6 +19,9 @@ import {
   testNamespace,
   type TenancyFixture,
 } from "./support/model-provider-integration.support.ts";
+
+// Replaying the shipped collapse, narrowed to this test's synthetic rows.
+const REPLAY = skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql;
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 const MIGRATION_FILE = join(
@@ -124,12 +128,8 @@ describe.skipIf(!DB_URL)(
             }
 
             const narrowing = `AND c."organizationId" = '${organizationId}'`;
-            await tx.$executeRawUnsafe(
-              `-- @tenancy: replaying the shipped collapse, narrowed to this test's synthetic rows\n${shadowed} ${narrowing}`,
-            );
-            await tx.$executeRawUnsafe(
-              `-- @tenancy: replaying the shipped collapse, narrowed to this test's synthetic rows\n${orphaned} ${narrowing}`,
-            );
+            await tx.$executeRawUnsafe(`${REPLAY}\n${shadowed} ${narrowing}`);
+            await tx.$executeRawUnsafe(`${REPLAY}\n${orphaned} ${narrowing}`);
 
             const orgHolders = await tx.modelDefaultConfigScope.findMany({
               where: { scopeType: "ORGANIZATION", scopeId: organizationId },

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, VStack } from "@langwatch/design-system/primitives";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type { ComponentType } from "react";
 
 import { useGovernanceHost } from "../../model/governance-host.ts";
@@ -9,13 +11,13 @@ import { NotFoundScene } from "../elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../elements/permission-required-notice.tsx";
 import GovernanceLayout from "./governance-layout.tsx";
 
-export const GOVERNANCE_SECTION_FLAG = "release_ui_ai_governance_enabled";
-export const GOVERNANCE_BILLED_COST_FLAG = "release_ui_governance_billed_cost_enabled";
+export const GOVERNANCE_SECTION_FLAG = FrontendFlags.release_ui_ai_governance_enabled;
+export const GOVERNANCE_BILLED_COST_FLAG = FrontendFlags.release_ui_governance_billed_cost_enabled;
 const GOVERNANCE_VIEW = "governance:view";
 
 type GovernanceSectionGate = {
   /** A release flag composed on top of the section flag, never instead of it. */
-  releaseFlag?: string;
+  releaseFlag?: ReleaseFlagToken;
   /** The grant the page needs once it exists; `governance:view` unless named. */
   permission?: string;
 };

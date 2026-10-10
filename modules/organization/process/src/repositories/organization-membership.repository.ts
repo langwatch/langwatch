@@ -13,7 +13,9 @@ import type {
   PricingModel,
   TeamUserRole,
   User,
+  OrganizationAdmission,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
@@ -95,36 +97,8 @@ export interface AuditLogFilters {
   targetId?: string;
 }
 
-/**
- * Enriched audit log entry with resolved user and project data. Backed by one `AuditLog` table
- * storing both gateway-shape and platform-shape rows; `source` is computed from `targetKind`.
- */
-export interface EnrichedAuditLog {
-  id: string;
-  createdAt: ContractEnrichedAuditLog["createdAt"];
-  /** Nullable to support system-actor writes (background jobs, migrations). */
-  userId: string | null;
-  organizationId: string | null;
-  projectId: string | null;
-  action: string;
-  payload: unknown;
-  ipAddress: string | null;
-  userAgent: string | null;
-  error: string | null;
-  args: unknown;
-  user: { id: string; name: string | null; email: string | null } | null;
-  project: { id: string; name: string } | null;
-  /** Computed: gateway = `targetKind` populated, platform = otherwise. */
-  source: "platform" | "gateway";
-  /** Gateway resource kind — only set when source="gateway". */
-  targetKind: string | null;
-  /** Gateway resource id — only set when source="gateway". */
-  targetId: string | null;
-  /** Gateway-side diff (before state). Only set when source="gateway". */
-  before: unknown;
-  /** Gateway-side diff (after state). Only set when source="gateway". */
-  after: unknown;
-}
+/** Enriched audit log entry: the contract's row, which both twins produce. */
+export type EnrichedAuditLog = ContractEnrichedAuditLog;
 
 /**
  * A membership row with the user it belongs to, as the members management
@@ -306,6 +280,7 @@ export abstract class OrganizationMembershipRepository {
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   >;
@@ -381,21 +356,24 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
   }) => Promise<MemberTeamBinding[]>;
 
+  /** The seat a joiner lands on when nobody decided one (ADR-171). */
+  abstract readJoinerSeat: (input: { organizationId: string }) => Promise<"MEMBER" | "DEVELOPER">;
+
   /**
-   * Admits somebody on the joiner seat (ADR-171): a MEMBER carries the grant
-   * intent an unfinished admission resumes from (ADR-129), a DEVELOPER none.
-   * A row already there is `"already-present"`: a retry, not a failure.
+   * Writes the seat the service decided (ADR-171): a MEMBER carries the grant intent an
+   * unfinished admission resumes from (ADR-129), any other seat none; `pending` writes it disabled.
+   * A row already there is `"already-present"`, answered from that row: a retry, not a failure.
    */
   abstract createMembership: (input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+  }) => Promise<OrganizationAdmission>;
 
   /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */
   abstract createSsoDomainMembership: (input: {

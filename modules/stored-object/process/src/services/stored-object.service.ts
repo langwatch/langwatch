@@ -156,7 +156,7 @@ export class StoredObjectService {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: input.projectId },
-        denialReason: decision.denialReason ?? "no-binding",
+        denialReason: decision.denialReason ?? "no-grant",
       });
     }
 

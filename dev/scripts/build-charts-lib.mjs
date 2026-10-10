@@ -12,8 +12,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-// ponytail: borrows apps/worker's esbuild until dev/scripts declares its own.
-const { build } = createRequire(path.join(ROOT, "apps/worker/package.json"))("esbuild");
+// Use the bundler already installed for the UI’s Vite build.
+const uiRequire = createRequire(path.join(ROOT, "apps/ui/package.json"));
+const { build } = createRequire(uiRequire.resolve("vite"))("esbuild");
 const ENTRY = path.join(
   ROOT,
   "modules/analytics/browser/src/model/dashboard-widget/chartsLib/index.ts",

@@ -6,6 +6,7 @@ import { bindRestCredential, BearerIdentity, RestHost } from "@langwatch/api/res
 import type { PlatformHealthApi as PlatformHealthCapability } from "@langwatch/platform-health-contract";
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { PlatformHealthModule } from "../../app/platform-health.app.ts";
@@ -32,11 +33,11 @@ async function mount(app: PlatformHealthCapability, key: string | null = "monito
   const door = await monitorDoor(key);
   const closed = BearerIdentity.create({ name: "unbound", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -44,7 +45,7 @@ async function mount(app: PlatformHealthCapability, key: string | null = "monito
     audit: { record: async () => {} },
   });
   host.mount(platformHealthRest.router(), () => app, {
-    facts: [bindRestCredential("internal_secret", () => door)],
+    middlewareBindings: [bindRestCredential("internal_secret", () => door)],
   });
 
   return host.app;

@@ -36,6 +36,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -69,7 +70,6 @@ function process(
     .withConfig({
       ops: {
         apiKey: undefined,
-        metricsApiKey: undefined,
         clickhouseOpsUrl: undefined,
         usageStats: {
           disabled: false,
@@ -105,6 +105,7 @@ function process(
       authz,
       "data-retention": createApiFixture<DataRetentionApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      share: createApiFixture<ShareApi>(),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
@@ -119,7 +120,7 @@ function process(
       experiment: createApiFixture<ExperimentApi>(),
       prompt: createApiFixture<PromptApi>(),
       workflow: createApiFixture<WorkflowApi>(),
-      automation: createApiFixture<AutomationApi>({ registeredMigrations: () => [] }),
+      automation: createApiFixture<AutomationApi>({}),
       github: createApiFixture<GithubApi>(),
       langy: createApiFixture<LangyApi>(),
       dashboard: createApiFixture<DashboardApi>(),
@@ -261,7 +262,7 @@ describe("ops app installation", () => {
       registeredMigrations: () => [migration("authz-grants-genesis-import", "Grant import")],
     });
 
-    /** @scenario "The migrations page lists every registered migration when served by the api role" */
+    /** @scenario "The tenant migrations tab lists every registered migration when served by the api role" */
     /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
     it("lists each peer's migrations, in running order, with the owner's title and description", async () => {
       vi.spyOn(

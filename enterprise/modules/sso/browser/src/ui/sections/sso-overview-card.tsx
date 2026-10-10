@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How everyone signs in, on the Authentication overview: the live connection
@@ -46,10 +47,11 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   const connection = view?.connection ?? null;
   const refusal = view && !view.availability.available ? view.availability.refusal : null;
   // A refusal is said above the cards, and nothing is offered that it would refuse.
-  const canOffer = canManage && refusal === null;
+  const enterpriseRequired = view?.enterpriseRequired === true;
+  const canOffer = canManage && refusal === null && !enterpriseRequired;
 
   return (
-    <>
+    <VStack align="stretch" gap={3} width="full" height="full">
       {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
       {view && connection?.state === "ACTIVE" ? (
         <SingleSignOnCard view={view} connection={connection} canManage={canOffer} />
@@ -57,6 +59,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
         <SingleSignOnPreviewCard
           state={connection?.state ?? null}
           canManage={canOffer}
+          enterpriseRequired={enterpriseRequired}
           updatePhase={view?.migration?.phase ?? null}
           goLiveBlockedBecause={
             setupProgressFor(goLiveFactsOf(view?.goLive ?? null)).goLiveBlockedBecause
@@ -64,7 +67,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
           domains={view ? <DomainsDetail view={view} canManage={canOffer} /> : void 0}
         />
       )}
-    </>
+    </VStack>
   );
 }
 
@@ -276,12 +279,15 @@ function UpdateNotice({
 export function SingleSignOnPreviewCard({
   state = null,
   canManage = false,
+  enterpriseRequired = false,
   goLiveBlockedBecause = null,
   updatePhase = null,
   domains,
 }: {
   state?: SetupConnection["state"] | null;
   canManage?: boolean;
+  /** The plan refuses single sign-on: said on the card, no control offered. */
+  enterpriseRequired?: boolean;
   goLiveBlockedBecause?: string | null;
   /** Where an update to the organization's own identity provider got to. */
   updatePhase?: NonNullable<SsoSetupPageView["migration"]>["phase"] | null;
@@ -308,6 +314,19 @@ export function SingleSignOnPreviewCard({
         )
       }
     >
+      {enterpriseRequired && (
+        <UpgradeRequired
+          feature="Single sign-on"
+          compact
+          data-testid="sso-card-enterprise-gate"
+          actions={
+            <Button asChild size="sm" colorPalette="orange">
+              <Link href="/settings/plans">Compare plans</Link>
+            </Button>
+          }
+        />
+      )}
+
       <OverviewDetail label="What it does">
         <Text>
           Your people sign in with your company&apos;s identity provider, and you decide there who

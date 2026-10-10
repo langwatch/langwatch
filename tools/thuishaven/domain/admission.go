@@ -195,7 +195,7 @@ const unitTestRAMPerWorker = uint64(1) << 30
 //
 // override is HAVEN_TEST_WORKERS, read the same way HAVEN_TYPECHECK_SLOTS is: a
 // parseable positive integer wins outright, named by its own source so
-// `haven slot explain` can say why. Unset (or unparseable, which is treated the
+// `haven machine slot explain` can say why. Unset (or unparseable, which is treated the
 // same as unset rather than fatal - a typo must not silently zero the width),
 // it is derived from the machine: half the cores, which is already what the
 // repository's vitest configs ask for with maxWorkers: "50%", bounded by memory

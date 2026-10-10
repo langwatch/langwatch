@@ -216,7 +216,7 @@ jobs:
         working-directory: apps/tasks
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
-        run: pnpm run task prisma-migrate
+        run: pnpm run task upgrade
 
       - name: Generate a throwaway CREDENTIALS_SECRET
         # The api refuses to boot without a 32-byte hex encryption key.

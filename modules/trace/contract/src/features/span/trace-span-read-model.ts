@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -15,7 +16,7 @@ const traceEventNameCountSchema = z.object({
 });
 
 /** A trace's events as the list renders them: named groups plus true totals. */
-export const traceEventRollupSchema = z.object({
+const traceEventRollupSchemaDefinition = z.object({
   /**
    * Ordered by first occurrence, at most `MAX_EVENT_NAMES_PER_TRACE` entries.
    * Shorter than `distinctCount` when the trim bit.
@@ -26,6 +27,8 @@ export const traceEventRollupSchema = z.object({
   /** Distinct event names the trace recorded, counting those beyond the trim. */
   distinctCount: z.number(),
 });
+export interface TraceEventRollupSchema extends Named<typeof traceEventRollupSchemaDefinition> {}
+export const traceEventRollupSchema: TraceEventRollupSchema = traceEventRollupSchemaDefinition;
 
 export type TraceEventRollup = z.infer<typeof traceEventRollupSchema>;
 
@@ -75,7 +78,7 @@ export interface SpanResourceInfo {
  * inspector. The `traceId` is implied by the query; `attributes` carries the
  * emitter's event payload (`body`, `event.name`, `request_id`, `cost_usd`, …).
  */
-export const traceLogRecordDtoSchema = z.object({
+const traceLogRecordDtoSchemaDefinition = z.object({
   spanId: z.string(),
   timeUnixMs: z.number(),
   body: z.string(),
@@ -88,6 +91,8 @@ export const traceLogRecordDtoSchema = z.object({
   /** Audience label naming who CAN see the withheld content, when restricted. */
   bodyVisibleTo: z.string().nullable().optional(),
 });
+export interface TraceLogRecordDtoSchema extends Named<typeof traceLogRecordDtoSchemaDefinition> {}
+export const traceLogRecordDtoSchema: TraceLogRecordDtoSchema = traceLogRecordDtoSchemaDefinition;
 
 export type TraceLogRecordDto = z.infer<typeof traceLogRecordDtoSchema>;
 

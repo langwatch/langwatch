@@ -223,15 +223,15 @@ func stackScimToken(ctx context.Context, request scimTokenRequest) string {
 	return scimTokenIn(out.Bytes())
 }
 
-// scimTokenIn is the HAVEN_SEED_SCIM_TOKEN in haven's JSON overlay, which may be
-// preceded by log lines on the same stream.
+// scimTokenIn is the HAVEN_SEED_SCIM_TOKEN in haven's JSON overlay (beside its
+// "v" and "stack" keys), which may be preceded by log lines on the same stream.
 func scimTokenIn(output []byte) string {
 	start := bytes.IndexByte(output, '{')
 	if start < 0 {
 		return ""
 	}
-	overlay := map[string]string{}
-	if json.NewDecoder(bytes.NewReader(output[start:])).Decode(&overlay) != nil {
+	overlay, err := havenrun.ParseEnv(output[start:])
+	if err != nil {
 		return ""
 	}
 	return overlay["HAVEN_SEED_SCIM_TOKEN"]

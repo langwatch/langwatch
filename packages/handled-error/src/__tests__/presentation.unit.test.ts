@@ -1112,3 +1112,32 @@ describe("UNKNOWN_ERROR_PRESENTATION", () => {
     );
   });
 });
+
+describe("model_provider_invalid", () => {
+  /** @scenario "A refused endpoint on save says why" */
+  it("names the base URL when the endpoint was refused", () => {
+    const { description } = explainHandledError(
+      shape({ code: "model_provider_invalid", meta: { reason: "endpoint_not_allowed" } }),
+    );
+
+    expect(description).toContain("base URL");
+  });
+
+  /** @scenario "A refused endpoint on save says why" */
+  it("still says something specific without a reason", () => {
+    const { title } = explainHandledError(shape({ code: "model_provider_invalid" }));
+
+    expect(title).toBe("That provider can't be saved");
+  });
+});
+
+describe("webhook_endpoint_invalid", () => {
+  /** @scenario "A refused cloud metadata destination says why on save" */
+  it("says the address is reserved when it is a metadata address", () => {
+    const { description } = explainHandledError(
+      shape({ code: "webhook_endpoint_invalid", meta: { reason: "metadata_address" } }),
+    );
+
+    expect(description).toContain("reserved");
+  });
+});

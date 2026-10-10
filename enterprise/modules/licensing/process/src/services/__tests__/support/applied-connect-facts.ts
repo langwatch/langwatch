@@ -5,7 +5,10 @@ import type { LicensingCustomerFactsService } from "../../licensing-customer-fac
 /** Licensing's Connect facts, applied to the memory rows the way organization's subscriber does. */
 export function appliedConnectFacts(
   rows: Map<string, ConnectOrganizationRecord>,
-): Pick<LicensingCustomerFactsService, "connectServiceSwitched" | "licenseSyncFinished"> {
+): Pick<
+  LicensingCustomerFactsService,
+  "connectServiceSwitched" | "licenseSyncFinished" | "connectUpstreamSet" | "connectUpstreamCleared"
+> {
   const update = (
     organizationId: string,
     change: (row: ConnectOrganizationRecord) => ConnectOrganizationRecord,
@@ -27,5 +30,8 @@ export function appliedConnectFacts(
       update(organizationId, (row) =>
         error ? { ...row, lastSyncError: error } : { ...row, lastSyncAt: at, lastSyncError: null },
       ),
+    // Gateway applies these; nothing on organization's row moves.
+    connectUpstreamSet: async () => undefined,
+    connectUpstreamCleared: async () => undefined,
   };
 }

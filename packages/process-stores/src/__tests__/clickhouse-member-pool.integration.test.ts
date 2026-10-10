@@ -81,7 +81,8 @@ describe("given the ClickHouse member in front of a server", () => {
           member.value.query({
             tenantId: "project-1",
             sql: `SELECT ${index}`,
-            unscoped: { reason: "a pool-bound probe with no tenant table" },
+            // A pool-bound probe that reads no tenant table.
+            SKIP_TENANT_CHECK: true,
           }),
         ),
       );

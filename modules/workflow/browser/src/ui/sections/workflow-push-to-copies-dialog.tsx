@@ -126,7 +126,8 @@ export function WorkflowPushToCopiesDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content bg="bg" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Push to Replicas</Dialog.Title>
         </Dialog.Header>
@@ -144,11 +145,11 @@ export function WorkflowPushToCopiesDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={() => void push()}
             loading={pushToCopies.isPending}
             disabled={selected.size === 0 || copies.isLoading}

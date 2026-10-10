@@ -161,9 +161,10 @@ EXCLUDES=(
   --exclude=.github
   # No source maps. Four were re-included ahead of this exclude for the
   # monolith's dist/server bundles (server, workers, task, scenario child);
-  # none of those bundles exists any more. apps/api and apps/worker ship as
-  # SOURCE and run through tsx, so a production stack trace already names a
-  # real file and line, and the one bundle left — apps/server/dist/cli.cjs —
+  # none of those bundles exists any more. apps/backend (hosting apps/api and
+  # apps/worker) ships as SOURCE and runs through node, so a production stack
+  # trace already names a real file and line, and the one bundle left —
+  # apps/server/dist/cli.cjs —
   # is built with `sourcemap: false` and emits no map to re-include.
   # A future bundle that does emit one needs an --include line here, ahead of
   # this rule: rsync takes the FIRST matching filter.
@@ -287,6 +288,12 @@ done < <(node -p "require('./apps/server/distribution-files.json').join('\n')")
 # The workspace root's own manifest. pnpm resolves the lockfile's `.` importer
 # against it, so `--frozen-lockfile` fails without it.
 cp "$ROOT/package.json" "$APP/package.json"
+
+# The npx server is a release build (dev/docs/ARCHITECTURE.md, build stamp).
+stamp="$APP/packages/config/src/release-build.ts"
+sed -i.bak 's/^export const isReleaseBuild: boolean = false;$/export const isReleaseBuild: boolean = true;/' "$stamp"
+rm "$stamp.bak"
+grep -q '^export const isReleaseBuild: boolean = true;$' "$stamp" || { echo "✗ release stamp not set in $stamp" >&2; exit 1; }
 
 # The published manifest is owned by apps/server. Its entrypoint, file list and
 # module map are adjusted only for the staged layout.

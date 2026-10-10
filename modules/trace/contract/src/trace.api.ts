@@ -1,4 +1,4 @@
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
@@ -204,7 +204,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
   recordSpan(input: RecordSpanCommandData): Promise<void>;
   /** Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresolved. */
   findNormalizedSpansByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit?: number;
   }): Promise<NormalizedSpan[]>;
@@ -217,7 +217,10 @@ export interface TraceApi extends TraceOtlpIngestApi {
   getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]>;
   deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
   /** The query-language field catalogue an AI composer's prompt is grounded on. */
-  buildQueryFieldCatalogue(input: TraceQueryFieldCatalogueInput): Promise<string>;
+  buildQueryFieldCatalogue(request: {
+    input: TraceQueryFieldCatalogueInput;
+    authorization: Authorization;
+  }): Promise<string>;
   classifyQuery(input: TraceQueryClassificationInput): TraceQueryClassification;
   /** A polling read: absent summaries and disabled projections both read as null. */
   findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
@@ -232,6 +235,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       scrollId?: string | null;
       /** The v1 REST search's compiled query-language filter, ANDed into the read. */
       filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
+      authorization?: Authorization;
       /** Refuse above this plan bound instead of clamping to the list bound. */
       refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
     };
@@ -276,10 +281,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     conversationId: string;
     viewerUserId: string;
+    authorization: Authorization;
+    tenantId?: string | undefined;
   }): Promise<TracesConversationContext>;
   /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
   readSpanDetailForViewer(input: {
     projectId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
     occurredAtMs?: number;
@@ -290,6 +298,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     query: TraceFacetsQuery;
     principal: PrincipalRef | null;
+    authorization: Authorization;
   }): Promise<TraceFacetsAnswer>;
   /** The discover vocabulary, or the facet counts under `query` when one is given. */
   readDiscoverForQuery(input: {
@@ -297,6 +306,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     timeRange: { from: number; to: number; live?: boolean };
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+    authorization: Authorization;
   }): Promise<DiscoverResult>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
@@ -308,10 +318,17 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     spanId: string;
     viewerUserId: string;
+    trace?: {
+      authorization: Authorization;
+      traceId: string;
+      tenantId?: string;
+      occurredAtMs?: number;
+    };
   }): Promise<unknown>;
   /** The trace's edit overlay as the viewer may see it; `overlay` is null when none exists. */
   readTraceEditOverlayForViewer(input: {
     projectId: string;
+    authorization: Authorization;
     traceId: string;
     viewerUserId: string;
   }): Promise<{ overlay: TraceEditOverlayDto | null }>;
@@ -378,6 +395,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   resolveViewerProtections(input: {
     projectId: string;
     userId: string | null;
+    /** The read's proof; its projects' policies fold in, strictest wins (ADR-177 decision 9). */
+    authorization?: Authorization;
   }): Promise<Protections>;
   /**
    * The same redactions for an API-KEY caller: the public branch of every
@@ -442,19 +461,19 @@ export interface TraceApi extends TraceOtlpIngestApi {
     }[]
   >;
   readSpanSummaries(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<SpanSummaryRow[]>;
   readSpans(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     limit?: number;
   }): Promise<Span[]>;
   readSpansPage(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     limit: number;
     offset: number;
@@ -462,49 +481,51 @@ export interface TraceApi extends TraceOtlpIngestApi {
     visibilityCutoffMs?: number | null;
   }): Promise<{ spans: Span[]; total: number }>;
   readSpansSince(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     sinceStartTimeMs: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span[]>;
   findSpan(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null>;
   readSpanEvents(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
     occurredAtMs?: number;
   }): Promise<ElasticSearchEvent[]>;
   readLangwatchSignals(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
   readSpanResources(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<SpanResourceInfo[]>;
   readTraceEvents(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<DerivedTraceEvent[]>;
   readTraceEventRollups(input: {
-    projectId: string;
+    authorization: Authorization;
     traceIds: string[];
     timeRange: { from: number; to: number };
   }): Promise<Record<string, TraceEventRollup>>;
-  readSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage>;
-  readSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]>;
+  readSpanTreePage(input: SpanTreeInput & { authorization: Authorization }): Promise<SpanTreePage>;
+  readSpanTreeDelta(
+    input: SpanTreeDeltaInput & { authorization: Authorization },
+  ): Promise<SpanTreeNode[]>;
   readModelUsageStats(input: {
-    projectId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]>;
@@ -618,17 +639,24 @@ export interface TraceApi extends TraceOtlpIngestApi {
     countSinceMs: readonly number[];
   }): Promise<TraceAttributedRecency>;
   readRecentSpansByModels(input: {
-    projectId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;
     limit: number;
   }): Promise<ModelSpanSampleRow[]>;
-  readEvaluations(input: {
-    projectId: string;
-    traceIds: string[];
-    protections: unknown;
-  }): Promise<Record<string, unknown[]>>;
+  /** With a proof, one trace's evaluations from its member, for the viewer (ADR-177 block F). */
+  readEvaluations(
+    input:
+      | { projectId: string; traceIds: string[]; protections: unknown }
+      | {
+          projectId: string;
+          traceId: string;
+          tenantId?: string | undefined;
+          authorization: Authorization;
+          viewerUserId: string;
+        },
+  ): Promise<Record<string, unknown[]>>;
   readTopicCounts(input: TraceLegacyListInput): Promise<unknown>;
   readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
   /**
@@ -676,6 +704,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   findTraceIdsForFilter(input: {
     projectId: string;
+    authorization: Authorization;
     filter: string;
     window: { from: number; to: number };
     limit: number;
@@ -693,7 +722,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     protections: unknown;
   }): Promise<unknown>;
   readTraceList(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     sort: { columnId: string; direction: "asc" | "desc" };
     page?: number;
@@ -707,7 +736,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
    * gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
    */
   readSessionGroups(
-    input: TraceSessionGroupsInput & { protections: Protections },
+    input: TraceSessionGroupsInput & { protections: Protections; authorization: Authorization },
   ): Promise<TracesSessionsPage>;
   /**
    * The sidebar's facets under the active query: descriptors counted in the
@@ -718,30 +747,39 @@ export interface TraceApi extends TraceOtlpIngestApi {
     timeRange: { from: number; to: number; live?: boolean };
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    authorization: Authorization;
   }): Promise<unknown>;
   readNewCount(params: unknown): Promise<number>;
   readSuggestions(params: unknown): Promise<string[]>;
   readDiscover(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
   }): Promise<DiscoverResult>;
   readFacetValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     facetKey: string;
     prefix?: string;
     limit: number;
     offset: number;
   }): Promise<FacetValuesResult>;
-  readTraceSummary(input: {
-    projectId: string;
+  /** The proof narrowed to the member holding the trace; an unreadable member is not found. */
+  authorizationForTrace(input: {
+    authorization: Authorization;
     traceId: string;
+    tenantId?: string | undefined;
+  }): Promise<Authorization>;
+  readTraceSummary(input: {
+    authorization: Authorization;
+    traceId: string;
+    /** The member the header named; narrows an aggregate's proof (ADR-177 block F). */
+    tenantId?: string | undefined;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     full?: boolean;
   }): Promise<unknown>;
   isTraceWindowRedacted(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     visibilityCutoffMs: number | null | undefined;
   }): Promise<boolean>;
@@ -764,13 +802,25 @@ export interface TraceApi extends TraceOtlpIngestApi {
     by: { id: string },
   ): Promise<TraceEditOverlayDto>;
   deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void>;
-  readEvaluationRuns(input: { tenantId: string; traceId: string }): Promise<unknown>;
+  /** With a proof, the trace member's runs, content gated for the viewer (ADR-177 block F). */
+  readEvaluationRuns(
+    input:
+      | { tenantId: string; traceId: string }
+      | {
+          projectId: string;
+          traceId: string;
+          tenantId?: string | undefined;
+          authorization: Authorization;
+          viewerUserId: string;
+        },
+  ): Promise<unknown>;
   /** The transcript through the viewer's own protections; `codingAgents.transcript` reads it. */
   readCodingAgentTranscript(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number | undefined;
     viewerUserId: string;
+    authorization?: Authorization;
   }): Promise<unknown>;
   /**
    * Main's `GET /api/traces/:traceId/transcript`: the key's protections, the trace by id or

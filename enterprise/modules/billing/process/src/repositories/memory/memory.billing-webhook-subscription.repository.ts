@@ -77,7 +77,7 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
   }): Promise<ActivateSubscriptionResult> {
     if (!this.present(input.id)) return { outcome: "missing_subscription" };
     const activated = await this.subscriptions.activate(input);
-    return { outcome: "activated", subscription: this.withLicense(activated) };
+    return { outcome: "activated", subscription: activated };
   }
 
   async recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void> {
@@ -106,19 +106,10 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
   }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>> {
     if (!this.present(input.id)) return { outcome: "missing_subscription" };
     const updated = await this.subscriptions.updateQuantities(input);
-    return { outcome: "updated", subscription: this.withLicense(updated) };
+    return { outcome: "updated", subscription: updated };
   }
 
   private present(id: string): boolean {
     return this.store.subscriptions.some((subscription) => subscription.id === id);
-  }
-
-  private withLicense(
-    subscription: BillingSubscriptionRecord & {
-      organization: { id: string; name: string; stripeCustomerId: string | null };
-    },
-  ): SubscriptionWithOrg {
-    const license = this.store.organizations.get(subscription.organizationId)?.license ?? null;
-    return { ...subscription, organization: { ...subscription.organization, license } };
   }
 }

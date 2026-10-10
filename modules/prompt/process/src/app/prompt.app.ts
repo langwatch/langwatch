@@ -794,7 +794,7 @@ export class PromptModule implements PromptApi {
       throw new PermissionDeniedError({
         permission: "prompts:update",
         scope: { type: "project", id: input.projectId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 
@@ -817,7 +817,7 @@ export class PromptModule implements PromptApi {
     throw new PermissionDeniedError({
       permission: input.permission,
       scope: { type: "project", id: input.projectId },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   }
 

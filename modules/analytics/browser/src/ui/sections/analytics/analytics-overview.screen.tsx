@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
@@ -28,13 +29,14 @@ import {
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 function AnalyticsContent() {
   const host = useAnalyticsHost();
   const project = host.project();
 
   return (
-    <AnalyticsLayout title="Analytics" railEntry="overview">
+    <AnalyticsLayout title="Overview" railEntry="overview">
       {project && !project.hasFirstMessage && (
         <Alert.Root status="warning" marginBottom={6}>
           <Alert.Indicator />
@@ -101,7 +103,7 @@ function DocumentsMetrics() {
               <Tabs.Indicator
                 mt="-1.5px"
                 height="4px"
-                bg="orange.400"
+                bg="orange.solid"
                 borderRadius="1px"
                 bottom={0}
               />
@@ -123,6 +125,8 @@ function CustomReportsSection({ slug }: { slug: string }) {
   const dashboards = dashboardsQuery.data ?? [];
 
   if (dashboards.length === 0 && !dashboardsQuery.isLoading) {
+    // An aggregate (ADR-177) keeps no dashboards of its own, so it is not invited to build one.
+    if (isAggregateProjectKind(project?.kind)) return null;
     return (
       <>
         <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
@@ -172,7 +176,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
               width="full"
               cursor="pointer"
               borderColor="border"
-              _hover={{ borderColor: "orange.400", shadow: "sm" }}
+              _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
               transition="all 0.15s ease"
             >
               <Card.Body paddingX={4} paddingY={3}>
@@ -206,4 +210,4 @@ function CustomReportsSection({ slug }: { slug: string }) {
  * `analytics:view` permission and layout chrome are stated once in
  * `analytics-routes.tsx`, in front of the same loader registry.
  */
-export default AnalyticsContent;
+export default withAggregateAnalyticsGate("Analytics", AnalyticsContent);

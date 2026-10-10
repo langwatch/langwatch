@@ -4,6 +4,7 @@
  * authorization answer the test decides.
  */
 import type { createTrpcRuntime } from "@langwatch/api/trpc";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 /** What a mount reads off the request. Both halves are absent when signed out. */
 export type AuthTrpcTestContext = {
@@ -32,6 +33,7 @@ export function authTrpcTestMembers(): AuthTrpcRuntimeDependencies {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

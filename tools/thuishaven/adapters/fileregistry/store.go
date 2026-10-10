@@ -22,6 +22,8 @@ import (
 // Store is the filesystem-backed implementation of app.Store.
 type Store struct {
 	home string
+	// daemonLock is the held haven.lock while this process is the daemon.
+	daemonLock *os.File
 }
 
 // New builds a Store rooted at the thuishaven home dir (~/.langwatch/portless).
@@ -30,9 +32,11 @@ func New(home string) *Store { return &Store{home: home} }
 func (s *Store) registryDir() string          { return filepath.Join(s.home, "registry") }
 func (s *Store) stackPath(slug string) string { return filepath.Join(s.registryDir(), slug+".json") }
 func (s *Store) daemonPath() string           { return filepath.Join(s.home, "haven.json") }
+func (s *Store) daemonLockPath() string       { return filepath.Join(s.home, "haven.lock") }
 
-// SaveStack persists one stack's registry entry. Mode 0o600: the entry carries
-// LocalAPIKey, so it must not be world-readable.
+// SaveStack persists one stack's registry entry, atomically so the reaper never
+// reads a torn file mid-heartbeat and drops a live stack. Mode 0o600: the entry
+// carries LocalAPIKey, so it must not be world-readable.
 func (s *Store) SaveStack(st domain.Stack) error {
 	if err := os.MkdirAll(s.registryDir(), 0o755); err != nil {
 		return err
@@ -41,7 +45,7 @@ func (s *Store) SaveStack(st domain.Stack) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.stackPath(st.Slug), append(b, '\n'), 0o600)
+	return writeFileAtomic(s.stackPath(st.Slug), append(b, '\n'), 0o600)
 }
 
 // RemoveStack drops a stack's registry entry.
@@ -128,7 +132,13 @@ type selectionFields struct {
 	Voice        *bool `json:"voice"`
 	LLM          *bool `json:"llm"`
 	Analytics    *bool `json:"analytics"`
-	Telemetry    *bool `json:"telemetry"`
+	Outbound     *bool `json:"outbound"`
+	// Payment is stored as "paymentsim": every file written while the lane was
+	// opt-in says `"payment": false`, which would keep the new default off, so
+	// that key is no longer decoded (the "workers" precedent above).
+	Payment   *bool `json:"paymentsim"`
+	Telemetry *bool `json:"telemetry"`
+	Lambda    *bool `json:"lambda"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -152,7 +162,10 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Voice, nil, &sel.Voice},
 		{f.LLM, nil, &sel.LLM},
 		{f.Analytics, nil, &sel.Analytics},
+		{f.Outbound, nil, &sel.Outbound},
+		{f.Payment, nil, &sel.Payment},
 		{f.Telemetry, nil, &sel.Telemetry},
+		{f.Lambda, nil, &sel.Lambda},
 	} {
 		switch {
 		case field.stated != nil:
@@ -183,7 +196,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	}
 	sel := domain.DefaultSelection()
 	f.Services.applyTo(&sel)
-	sel.Mode = f.Mode
+	sel.Mode = f.Mode // the retired held, watch, watch-ui and bundled-ui keys are not decoded
 	return sel, true
 }
 
@@ -208,7 +221,10 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Voice:        &sel.Voice,
 		LLM:          &sel.LLM,
 		Analytics:    &sel.Analytics,
+		Outbound:     &sel.Outbound,
+		Payment:      &sel.Payment,
 		Telemetry:    &sel.Telemetry,
+		Lambda:       &sel.Lambda,
 	}}, "", "  ")
 	if err != nil {
 		return err
@@ -228,7 +244,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 // answer from every checkout, and so is the developer's decision about it.
 func (s *Store) prereqSkipsPath() string { return filepath.Join(s.home, "install-skips.json") }
 
-// prereqSkipsFile is the on-disk shape: what `haven install` was told about
+// prereqSkipsFile is the on-disk shape: what `haven self install` was told about
 // this machine. A list for the skips rather than a map, so the file reads as
 // the sentence it is ("never ask me about these") and a hand edit is obvious.
 type prereqSkipsFile struct {
@@ -348,27 +364,31 @@ func (s *Store) writeDBActivity(m map[string]time.Time) error {
 
 // ClaimDaemon / Daemon / ClearDaemon manage the singleton daemon record.
 
-// ClaimDaemon writes the daemon record only if none exists yet. The O_EXCL
-// create is atomic across processes, so of two daemons racing to start exactly
-// one claims the slot; the loser gets (false, nil) and an untouched record. A
-// stale record left by a crashed daemon must be cleared (ClearDaemon) before the
-// claim can succeed — ClaimDaemon itself never overwrites.
+// ClaimDaemon takes haven.lock without waiting and keeps it for the life of
+// this process (D9); the loser gets (false, nil) and an untouched record. The
+// lock is its own file because the record is renamed over, as lockDurations.
+// The kernel drops the lock with its holder, so a crash leaves nothing to clear.
 func (s *Store) ClaimDaemon(info app.DaemonInfo) (bool, error) {
 	if err := os.MkdirAll(s.home, 0o755); err != nil {
 		return false, err
 	}
-	f, err := os.OpenFile(s.daemonPath(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(s.daemonLockPath(), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // G703: a fixed name under haven's own home
 	if err != nil {
-		if os.IsExist(err) {
+		return false, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
 			return false, nil
 		}
 		return false, err
 	}
-	defer func() { _ = f.Close() }()
 	b, _ := json.MarshalIndent(info, "", "  ")
-	if _, err := f.Write(append(b, '\n')); err != nil {
+	if err := writeFileAtomic(s.daemonPath(), append(b, '\n'), 0o644); err != nil {
+		_ = f.Close()
 		return false, err
 	}
+	s.daemonLock = f
 	return true, nil
 }
 
@@ -384,7 +404,15 @@ func (s *Store) Daemon() (app.DaemonInfo, bool) {
 	return d, true
 }
 
-func (s *Store) ClearDaemon() { _ = os.Remove(s.daemonPath()) }
+// ClearDaemon drops the record, then the lock if this process holds it: in that
+// order, so a successor never claims and then loses its fresh record.
+func (s *Store) ClearDaemon() {
+	_ = os.Remove(s.daemonPath())
+	if s.daemonLock != nil {
+		_ = s.daemonLock.Close()
+		s.daemonLock = nil
+	}
+}
 
 func (s *Store) heavyRunsDir() string  { return filepath.Join(s.home, "heavy-runs") }
 func (s *Store) durationsPath() string { return filepath.Join(s.home, "run-durations.json") }
@@ -617,7 +645,7 @@ func readWaiterClaim(path string) (WaiterClaim, bool) {
 
 func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "holders", name) }
 
-// HolderClaim is one `haven slot run` holding name's slot: the label a waiter
+// HolderClaim is one `haven machine slot run` holding name's slot: the label a waiter
 // sees it under and when it took the slot.
 type HolderClaim struct {
 	Label     string    `json:"label"`

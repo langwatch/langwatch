@@ -5,7 +5,11 @@
  */
 import { createHmac } from "crypto";
 
-import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
   ModelProviderNotFoundError,
@@ -26,6 +30,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -183,6 +188,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       trace: traces,
       secret: peer("secret"),
       "api-key": peer("api key"),
+      licensing: peer("licensing"),
     })
     .boot();
   // The runtime hands out the API reference; it forwards every method of the installed
@@ -200,6 +206,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     },
   });
   const rest = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The public webhook must not authenticate a project credential");
@@ -214,9 +221,9 @@ async function mountWebhook(): Promise<MountableRestApp> {
         { error: { type: "internal_error", code: "internal_error", message: String(error) } },
         500,
       ),
-    facts: [
-      bindRestMiddleware(elevenLabsSignature, (context) => ({
-        signature: context.req.header("elevenlabs-signature"),
+    middlewareContext: [
+      bindMiddlewareContext(elevenLabsSignature, (request) => ({
+        signature: request.headers.get("elevenlabs-signature") ?? undefined,
       })),
     ],
   });

@@ -13,6 +13,8 @@ import {
   type EventSourcingOptions,
   type EventStore,
   EventStoreProducerOnly,
+  EventUpcastReader,
+  pipelineRetentionOf,
   pipelineUpcastsOf,
   type ProcessStore,
   replayLeanOf,
@@ -31,6 +33,7 @@ import {
   OtelProcessRetentionMetricsAdapter,
   PrismaProcessStore,
   type EventingClickHouseClientResolver,
+  type EventLogRetentionPolicyLookup,
 } from "@langwatch/eventing/server";
 import {
   GroupQueueDependenciesAdapter,
@@ -79,9 +82,13 @@ export function buildEventing(options: {
 }): BuiltMember<EventSourcing> {
   const { config } = options;
   const processStore = PrismaProcessStore.create({ database: options.prisma });
+  // Read at append, after registration: each row takes its own pipeline's tenant retention.
+  const retentionPolicyFor = (aggregateType: string) =>
+    pipelineRetentionOf({ definitions: eventing.definitions, aggregateType });
   const eventStore = eventingEventStore({
     store: config.store,
     processName: options.processName,
+    retentionPolicyFor,
     ...(options.eventLog === undefined ? {} : { eventLog: options.eventLog }),
   });
   const eventReadSeat =
@@ -125,7 +132,19 @@ export function buildEventing(options: {
         }),
   });
 
-  return { value: eventing, close: () => eventing.close() };
+  const eventLogMembers = options.eventLog;
+  // The kernel's eventing host reads it by name; the tasks role hands it to the upgrade (§9).
+  const value =
+    eventLogMembers === undefined
+      ? eventing
+      : Object.assign(eventing, {
+          upcastReader: () =>
+            upcastReaderOver({
+              clickhouse: eventLogMembers.clickhouse,
+              definitions: eventing.definitions,
+            }),
+        });
+  return { value, close: () => eventing.close() };
 }
 
 /**
@@ -213,10 +232,31 @@ function replayEngineOver({
   };
 }
 
+/**
+ * The declared upcasts, counted on the raw event log: the upcast-wrapped replay source answers
+ * stored types as current ones (Alex, 2026-10-09).
+ */
+function upcastReaderOver({
+  clickhouse,
+  definitions,
+}: {
+  readonly clickhouse: ClickHouseQueryClient;
+  readonly definitions: EventSourcing["definitions"];
+}): EventUpcastReader {
+  return EventUpcastReader.create({
+    upcasts: pipelineUpcastsOf(definitions),
+    coverage: new EventingClickHouseReplayEventSource({
+      clickhouse,
+      lean: replayLeanOf(definitions),
+    }),
+  });
+}
+
 /** Where this role appends: a producer refuses reads, a draining role reads the event log. */
 function eventingEventStore(options: {
   readonly store: EventingStoreConfig;
   readonly processName: string;
+  readonly retentionPolicyFor: EventLogRetentionPolicyLookup;
   readonly eventLog?: EventingEventLogMembers;
 }): EventStore {
   if (options.store.kind === "producer-only") {
@@ -238,6 +278,10 @@ function eventingEventStore(options: {
       retention,
     }),
     retention,
+    retentionPolicyFor: options.retentionPolicyFor,
+    ...(options.store.classifyEventLogRetention === undefined
+      ? {}
+      : { classifyEventLogRetention: options.store.classifyEventLogRetention }),
   });
 }
 

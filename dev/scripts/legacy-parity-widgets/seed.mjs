@@ -23,31 +23,30 @@ function requireEnv(name) {
 }
 
 /**
- * Refuses a credential-bearing endpoint that would send LW_API_KEY in
- * cleartext (CWE-319): https is required, and http is allowed only for a
- * loopback host where nothing leaves the machine.
+ * Refuses any LW_ENDPOINT but a local host: this is a fixture seed for a dev stack, never for a
+ * real installation (the check legacy-parity-widgets/seed-demo-traffic.mjs already makes).
  */
-function assertSecureEndpoint(raw) {
-  let url;
+function assertLocalEndpoint(raw) {
+  let hostname;
   try {
-    url = new URL(raw);
+    hostname = new URL(raw).hostname;
   } catch {
-    console.error(`Invalid LW_ENDPOINT URL: ${raw}`);
+    console.error(`Refusing to seed: LW_ENDPOINT is not a valid URL (${raw}).`);
     process.exit(1);
   }
-  const loopback = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-  const httpsOrLoopbackHttp =
-    url.protocol === "https:" || (url.protocol === "http:" && loopback.has(url.hostname));
-  if (!httpsOrLoopbackHttp) {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const local = ["localhost", "127.0.0.1", "::1"].includes(host) || host.endsWith(".localhost");
+  if (!local) {
     console.error(
-      `Refusing to send LW_API_KEY over ${url.protocol} to ${url.host}. Use https:// (http:// is allowed only for localhost).`,
+      `Refusing to seed: LW_ENDPOINT host "${hostname}" is not local. ` +
+        "This fixture seed only targets localhost, 127.0.0.1, ::1 or *.localhost.",
     );
     process.exit(1);
   }
 }
 
 const endpoint = requireEnv("LW_ENDPOINT").replace(/\/+$/, "");
-assertSecureEndpoint(endpoint);
+assertLocalEndpoint(endpoint);
 const apiKey = requireEnv("LW_API_KEY");
 const projectId = requireEnv("PROJECT_ID");
 

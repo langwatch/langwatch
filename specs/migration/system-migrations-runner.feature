@@ -326,12 +326,30 @@ Feature: Running system migrations across organizations
     When a pass runs
     Then "org_acme" is held with reason "proof"
 
-  # Gap: heldSince needs @langwatch/time in system-migrations and a stored column (handoff s5).
-  @unit @unimplemented
+  @unit
+  Scenario: A held tenant records the moment it became held
+    Given a migration whose own proof disagrees for "org_acme"
+    When a pass runs at a known moment
+    Then "org_acme" is held since that moment
+
+  @unit
   Scenario: Re-proving a held tenant keeps the moment it was first held
     Given "org_acme" has been held since an earlier pass
     When a later pass re-proves it held
     Then the moment it was first held is unchanged
+
+  # Failed is worked out on read, never stored (Alex, 2026-10-09).
+  @unit
+  Scenario: A tenant held past the threshold reads as failed
+    Given "org_acme" has been held for longer than the held threshold
+    When its record is read
+    Then it reads as failed
+
+  @unit
+  Scenario: A tenant held within the threshold does not read as failed
+    Given "org_acme" was held moments ago
+    When its record is read
+    Then it does not read as failed
 
   @unit
   Scenario: A tenant whose queued work has not drained is held as pending
@@ -477,9 +495,9 @@ Feature: Running system migrations across organizations
     Then the migration runs for that organization
 
   @unit
-  Scenario: The migrations page is told there is nothing to enroll
+  Scenario: The tenant migrations tab is told there is nothing to enroll
     Given a migration declared enrolled automatically
-    When the migrations page reads that migration
+    When the tenant migrations tab reads that migration
     Then it is told every organization runs it
     And it is offered no enrollment count
 
@@ -705,13 +723,13 @@ Feature: Running system migrations across organizations
 
   @unit
   Scenario: Each migration presents a title and a description, in running order
-    When an operator opens the migrations page
+    When an operator opens the tenant migrations tab
     Then every registered migration is listed with a title and a description
     And they appear in the order they run
 
   @unit
   Scenario: The page shows how many organizations each migration could still enroll
-    When an operator opens the migrations page
+    When an operator opens the tenant migrations tab
     Then each migration shows how many eligible organizations remain
 
   @integration
@@ -757,16 +775,16 @@ Feature: Running system migrations across organizations
     And it does not report "org_acme" as held
 
   @unit
-  Scenario: The migrations page lists every registered migration when served by the api role
-    Given the api role serves the migrations page
+  Scenario: The tenant migrations tab lists every registered migration when served by the api role
+    Given the api role serves the tenant migrations tab
     And identity registers an organization-rooted and a user-rooted migration
-    When an operator opens the migrations page
+    When an operator opens the tenant migrations tab
     Then both migrations are listed, organization-rooted first, with their rollups
 
   @unit
   Scenario: A migration registered by a peer module appears on the page with its title and description
     Given a peer module registers a migration with its own title and description
-    When an operator opens the migrations page
+    When an operator opens the tenant migrations tab
     Then the migration is listed with that title and description
 
   # Authz answers its grant import through AuthzApi, as identity answers D04; ops composes both in
@@ -786,7 +804,7 @@ Feature: Running system migrations across organizations
   @unit
   Scenario: The authorization engine's migration runs ahead of identity's, as on main
     Given authz registers the grant import and identity registers D04
-    When an operator opens the migrations page
+    When an operator opens the tenant migrations tab
     Then the grant import is listed first and D04 second
 
   # The exclusion list is the ClickHouse member's own routing table, parsed once at boot from the

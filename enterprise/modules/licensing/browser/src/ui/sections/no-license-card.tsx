@@ -227,10 +227,10 @@ export function NoLicenseCard({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                borderColor={isDragging ? "orange.500" : "border"}
+                borderColor={isDragging ? "orange.emphasized" : "border"}
                 backgroundColor={isDragging ? "orange.subtle" : "transparent"}
                 transition="all 0.2s"
-                _hover={{ borderColor: "orange.300" }}
+                _hover={{ borderColor: "orange.emphasized" }}
               >
                 <VStack gap={2}>
                   <Box color="fg.muted">

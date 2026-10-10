@@ -3,6 +3,7 @@
  * credentials — from there it rides along on the worker probe, the handoff stash, and the dispatch
  * payload, unset when no harness resolver is composed.
  */
+import { AggregateProjectIsReadOnlyError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,6 +11,7 @@ import {
   type LangyTurnDepsOverrides,
   workerCredentials,
   conversationDetail,
+  projectsOfKind,
 } from "../../../../__tests__/support/langy-turn-deps.ts";
 import type { LangyWorkerProbeInput } from "../../../../channels/langy-worker.channel.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
@@ -118,5 +120,37 @@ describe("LangyTurnBaseDependenciesService harness resolution", () => {
       const probeArgs = fixture.probe.mock.calls[0]![0];
       expect(probeArgs.harness).toBeUndefined();
     });
+  });
+});
+
+describe("LangyTurnBaseDependenciesService on an aggregate project", () => {
+  /** @scenario Langy refuses to start on an aggregate with the read-only refusal */
+  it("refuses as read only before writing a conversation, resolving a model or a key", async () => {
+    const ensureConversation = vi.fn();
+    const resolve = vi.fn();
+    const getOrProvision = vi.fn();
+    const claim = vi.fn();
+    const mint = vi.fn();
+    const fixture = makeFixture({
+      projects: projectsOfKind("aggregate"),
+      conversations: { ensureConversation },
+      models: { resolve },
+      credentials: { getOrProvision },
+      admission: { claim },
+      sessionKeys: { mint },
+    });
+
+    const refusal = await LangyTurnService.create(fixture.deps)
+      .startConversationTurn(input)
+      .then(() => null)
+      .catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(AggregateProjectIsReadOnlyError);
+    expect(refusal).toMatchObject({ code: "aggregate_project_is_read_only", httpStatus: 403 });
+    expect(ensureConversation).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
+    expect(getOrProvision).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
   });
 });

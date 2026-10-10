@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -32,11 +33,13 @@ const waitedToFinishSchema = z.object({
  * `waited_to_finish`). Custom event types validate against
  * `trackEventRESTParamsValidatorSchema` only.
  */
-export const predefinedEventsSchemas = z.union([
+const predefinedEventsSchemasDefinition = z.union([
   thumbsUpDownSchema,
   selectedTextSchema,
   waitedToFinishSchema,
 ]);
+export interface PredefinedEventsSchemas extends Named<typeof predefinedEventsSchemasDefinition> {}
+export const predefinedEventsSchemas: PredefinedEventsSchemas = predefinedEventsSchemasDefinition;
 
 export const predefinedEventTypes = predefinedEventsSchemas.options.map(
   (schema) => schema.shape.event_type.value,

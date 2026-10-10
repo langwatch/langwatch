@@ -5,15 +5,15 @@
 import type { Span } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { extractLlmMessagesForTrace } from "../../features/conversation/rules/trace-llm-messages.rules.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
+import { SpanNormalizationPipelineService } from "../../features/span/services/span-normalization.service.ts";
 import {
   deserializeAttributes,
   serializeAttributes,
 } from "../../repositories/clickhouse/stored-span-row.mapper.ts";
-import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
-import { extractLlmMessagesForTrace } from "../../features/conversation/rules/trace-llm-messages.rules.ts";
 import { formatSpansDigest } from "../../rules/trace-readable-span.rules.ts";
-import { SpanNormalizationPipelineService } from "../../features/span/services/span-normalization.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   genAiToolAgentTrace,
   type JudgeLabTrace,

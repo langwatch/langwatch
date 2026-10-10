@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
@@ -14,13 +14,14 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { organizationModuleSetup } from "../../app/__tests__/support/organization-module-setup.ts";
 import { OrganizationModule } from "../../app/organization.app.ts";
 import type { RecordMemberDisabledCommandData } from "../../eventing/organization-lifecycle.events.ts";
 import {
-  organizationKeyFacts,
+  organizationKeyContext,
   organizationManagementRest,
 } from "../organization-management.rest.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
@@ -102,6 +103,8 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     userId: MEMBER_ID,
     pendingAdmissionId: "admission-member",
     via: "invite",
+    seat: "MEMBER",
+    pending: false,
   });
   await repositories.organization.ensurePersonalWorkspace({
     workspace: { userId: ADMIN_ID, organizationId: ORGANIZATION_ID, displayName: "Admin" },
@@ -128,9 +131,14 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     recordPresenceSettingChanged: accepts,
     recordTraceSharingDisabled: accepts,
     recordMemberDisabled: { send: async (data) => void disabledMembers.push(data) },
+    recordMemberEnabled: accepts,
+    recordMemberRemoved: accepts,
+    recordMemberDepartmentChanged: accepts,
   });
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {
         if (request.headers.get("Authorization") !== `Bearer ${CREDENTIAL}`) {
@@ -157,7 +165,9 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   const hono = runtime.mount(organizationManagementRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: "key-1" })),
+    ],
   });
   const send = (path: string, init: { method?: string; body?: unknown } = {}) =>
     hono.fetch(

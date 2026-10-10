@@ -6,9 +6,24 @@ import { type Info, saveSettings } from "./llm-api.ts";
 
 const ERROR_OPTIONS = [
   { value: "0", label: "Off: answer normally" },
+  { value: "400", label: "400 bad request" },
+  { value: "401", label: "401 unauthorised" },
+  { value: "403", label: "403 forbidden" },
+  { value: "404", label: "404 model not found" },
   { value: "429", label: "429 rate limited" },
   { value: "500", label: "500 server error" },
-  { value: "503", label: "503 overloaded" },
+  { value: "502", label: "502 bad gateway" },
+  { value: "503", label: "503 unavailable" },
+  { value: "529", label: "529 overloaded (Anthropic)" },
+];
+
+/** What one call can ask for itself; each wins over the settings above. */
+const OVERRIDES = [
+  { label: "X-Llmsim-Seed", value: 'Pins the seed for this call; "random" draws a fresh one.' },
+  { label: "X-Llmsim-Mode", value: '"langy" echoes the last message and runs its /tool lines.' },
+  { label: "X-Llmsim-Error", value: "Answers this call with that 4xx or 5xx status." },
+  { label: "Model error-<status>", value: 'A model name holding "error-429" answers 429.' },
+  { label: "Model langy-echo", value: "Same as X-Llmsim-Mode langy." },
 ];
 
 /** The switches every call without its own X-Llmsim-* header follows. */
@@ -56,6 +71,11 @@ export const SettingsPanel = ({ info, onSaved }: { info: Info; onSaved: () => vo
               </Button>
             </div>
           </Stack>
+        </Panel>
+        <Panel title="Per-call overrides">
+          <KeyValue
+            items={OVERRIDES.map((override) => ({ ...override, mono: false, copy: false }))}
+          />
         </Panel>
         <Panel title="Simulator">
           <KeyValue

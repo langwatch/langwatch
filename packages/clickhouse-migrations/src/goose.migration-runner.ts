@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import * as path from "node:path";
 
 import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
@@ -31,9 +31,9 @@ const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
 const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
 
 /**
- * `spawnSync` defaults to one megabyte and kills a verbose migration run
- * past it with ENOBUFS, which reads as a failed migration that in fact
- * applied. See specs/clickhouse/migration-output-buffer.feature.
+ * The child-process default is one megabyte and kills a verbose migration run
+ * past it, which reads as a failed migration that in fact applied.
+ * See specs/clickhouse/migration-output-buffer.feature.
  */
 const GOOSE_OUTPUT_MAX_BYTES = 64 * 1024 * 1024;
 
@@ -46,7 +46,7 @@ export function messageForSpawnError(message: string): string {
   if (message.includes("ENOENT")) {
     return "Goose binary not found. Install from https://github.com/pressly/goose";
   }
-  if (message.includes("ENOBUFS")) {
+  if (message.includes("ENOBUFS") || message.includes("maxBuffer")) {
     return `Goose printed more than ${GOOSE_OUTPUT_MAX_BYTES} bytes and was cut off, so this run cannot say whether the migrations applied. Re-run it, and raise GOOSE_OUTPUT_MAX_BYTES if it happens again: ${message}`;
   }
   return message;
@@ -65,6 +65,8 @@ export interface GooseOptions {
   waitSeconds?: number;
   /** Stop at this goose version (`goose up-to`); unset runs `up`. */
   upTo?: number;
+  /** Aborting kills goose: the upgrade lease was lost (upgrade-stuck-states-locks.feature). */
+  signal?: AbortSignal;
 }
 
 export const GOOSE_INHERITED_VARIABLES = [
@@ -713,7 +715,31 @@ export function appliedMigrationVersions(output: string): readonly string[] {
   return [...output.matchAll(/^OK\s+(\d+)[^\n]*$/gm)].map((match) => match[1]!);
 }
 
-function executeGoose({
+/** Async, so the upgrade lease heartbeat keeps renewing while goose runs. */
+function runGoose({
+  args,
+  env,
+  signal,
+}: {
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  signal: AbortSignal | undefined;
+}): Promise<{ status: number | null; stdout: string; stderr: string; error?: Error }> {
+  return new Promise((resolve) => {
+    execFile(
+      locateGoose(),
+      args,
+      { encoding: "utf-8", env, maxBuffer: GOOSE_OUTPUT_MAX_BYTES, signal },
+      (error, stdout, stderr) => {
+        if (!error) resolve({ status: 0, stdout, stderr });
+        else if (typeof error.code === "number") resolve({ status: error.code, stdout, stderr });
+        else resolve({ status: null, stdout, stderr, error });
+      },
+    );
+  });
+}
+
+async function executeGoose({
   command,
   config,
   options = {},
@@ -724,7 +750,7 @@ function executeGoose({
   config: ClickHouseConfig;
   options?: GooseOptions;
   allowDimensionsOutsideSortingKey?: boolean;
-}): string {
+}): Promise<string> {
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
   const envVars = buildMigrationEnvVars({
     config,
@@ -754,13 +780,7 @@ function executeGoose({
     args.unshift("-v");
   }
 
-  // Always pipe output so we can check for specific messages
-  const result = spawnSync(locateGoose(), args, {
-    encoding: "utf-8",
-    stdio: "pipe",
-    env: envVars,
-    maxBuffer: GOOSE_OUTPUT_MAX_BYTES,
-  });
+  const result = await runGoose({ args, env: envVars, signal: options.signal });
 
   if (result.error) {
     const message = messageForSpawnError(result.error.message);
@@ -846,7 +866,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
     requiresDimensionCompat: config.requiresDimensionCompat === true,
     upTo: options.upTo,
   })) {
-    result = executeGoose({
+    result = await executeGoose({
       command: pass.command,
       config,
       options,
@@ -865,7 +885,7 @@ export async function migrateDown(options: GooseOptions = {}): Promise<string> {
   // Pre-flight checks (skip bootstrap for down migration)
   await preflight(config, options);
 
-  const result = executeGoose({ command: ["down"], config, options });
+  const result = await executeGoose({ command: ["down"], config, options });
   logger.info("ClickHouse migration rollback completed.");
   return result;
 }
@@ -878,7 +898,7 @@ export async function migrateReset(options: GooseOptions = {}): Promise<string> 
   // Pre-flight checks (skip bootstrap for reset)
   await preflight(config, options);
 
-  const result = executeGoose({ command: ["reset"], config, options });
+  const result = await executeGoose({ command: ["reset"], config, options });
   logger.info("ClickHouse migrations reset completed.");
   return result;
 }

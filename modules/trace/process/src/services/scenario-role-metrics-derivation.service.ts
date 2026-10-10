@@ -1,9 +1,9 @@
 import { nowInstant } from "@langwatch/time";
 import type { ScenarioRoleMetrics, ScenarioRoleMetricsInput } from "@langwatch/trace-contract";
 
+import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
 import type { TraceDerivationSpanReaderRepository } from "../repositories/trace-derivation-span-reader.repository.ts";
 import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules.ts";
-import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
 
 /**
  * Window after which a memo entry is dropped purely as a memory backstop — correctness comes from

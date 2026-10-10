@@ -24,6 +24,9 @@ import { TasksDone } from "../elements/tasks-done-icon.tsx";
 import { AnnotationQueueBar } from "./annotation-queue-bar.tsx";
 import AnnotationsLayout from "./annotation-queue-layout.tsx";
 
+/** How much room the bar takes over the bottom of the conversation. */
+const BAR_CLEARANCE = "100px";
+
 export function AnnotationQueueWalker() {
   const host = useAnnotationHost();
   const queueItem = host.route().query["queue-item"];
@@ -182,7 +185,8 @@ export function AnnotationQueueWalker() {
   return (
     <>
       <VStack height="100%" width="full" gap={0} alignItems="stretch" position="relative" flex="1">
-        {/* The conversation owns the scroll; the bottom padding is the bar's clearance. */}
+        {/* The conversation scrolls under the bar and pads its own end by the bar's
+            clearance; a gone trace's card has no scroller, so it stops above the bar. */}
         <Box
           flex="1"
           minHeight={0}
@@ -190,7 +194,8 @@ export function AnnotationQueueWalker() {
           flexDirection="column"
           overflow="hidden"
           position="relative"
-          paddingBottom={currentQueueItem ? "100px" : 0}
+          paddingBottom={currentQueueItem && !currentQueueItem.trace ? BAR_CLEARANCE : 0}
+          css={{ "--lw-scroll-clearance-bottom": currentQueueItem ? BAR_CLEARANCE : "0px" }}
         >
           <WalkedItemBody
             isTraceGone={!!currentQueueItem && !currentQueueItem.trace}
@@ -211,7 +216,8 @@ export function AnnotationQueueWalker() {
             left={0}
             right={0}
             width="full"
-            backgroundColor="bg.panel"
+            backgroundColor="bg.panel/70"
+            backdropFilter="var(--lw-backdrop-blur, blur(12px))"
             borderTop="1px solid"
             borderColor="border"
             zIndex={10}

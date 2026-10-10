@@ -4,6 +4,7 @@ import {
   type FeatureEventing,
   type FeatureEventingSetup,
 } from "@langwatch/eventing";
+import { moduleApi } from "@langwatch/module";
 /**
  * The module/eventing seam, with structural shapes standing in for a runtime.
  * Spec: specs/server/declarative-process-composition.feature
@@ -441,6 +442,58 @@ describe("given a module that declares its event sourcing with withEventing", ()
       await runtime.start();
       expect(calls).toEqual(["hold", "register agent_sandbox_maintenance", "start"]);
       await runtime.stop();
+    });
+  });
+
+  describe("when the worker stops with a handler still in flight", () => {
+    interface ProjectApi {
+      classify(): string;
+    }
+    const ProjectApi = moduleApi<ProjectApi>()("project");
+    class ProjectModule implements ProjectApi {
+      static readonly contract = ProjectApi;
+      static readonly dependencies = {};
+      static create(): ProjectModule {
+        return new ProjectModule();
+      }
+      classify(): string {
+        return "kept";
+      }
+    }
+
+    /** @scenario "Shutdown drains in-flight work before releasing infrastructure" */
+    it("drains the consumers before the peer Apis close", async () => {
+      let release = (): void => void 0;
+      let inFlight: Promise<string> | undefined;
+      const host = {
+        participation: "consume" as const,
+        processStore: { pruned: [] as string[] },
+        register: () => ({ commands: {} }),
+        holdConsumers: () => void 0,
+        startConsumers: () => {
+          const gate = new Promise<void>((resolve) => (release = resolve));
+          inFlight = gate.then(() => runtime.service(ProjectApi).classify());
+        },
+        stopConsumers: async () => {
+          release();
+          await inFlight;
+        },
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+      const runtime = await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module, defineProcessModule("project").withApi(ProjectModule).build()])
+        .boot();
+
+      await runtime.start();
+      await runtime.stop();
+
+      await expect(inFlight).resolves.toBe("kept");
     });
   });
 

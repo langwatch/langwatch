@@ -197,7 +197,8 @@ independently. Collapsing them is a _dev-only_ convenience, never a prod change.
 Make **single-process dev the default**. `pnpm dev` sets
 `WORKERS_IN_PROCESS=1` and hosts the worker stack inside the app process; the
 two-process topology is still available as `pnpm dev:concurrent`, and
-`pnpm dev:app` / `pnpm dev:worker` run one side on its own. Amended after the
+`pnpm dev:app` / `pnpm dev:worker` run one side on its own (`dev:concurrent` and
+`dev:app` were deleted on 2026-10-10, ADR-168; `dev:api` and `dev:worker` remain). Amended after the
 default was inverted: a laptop running several worktrees cannot afford a second
 Node process per stack, and haven had already defaulted this way, so plain
 `pnpm dev` disagreeing with it was the surprise rather than the safeguard.
@@ -245,7 +246,9 @@ development but changes its physical owner. The contributor-only
 `tools/dev-runtime` composition imports the API and worker runtime construction
 entry points, owns their shared infrastructure scope and closes it once. The API
 application no longer imports or starts the worker application itself. The
-separate `dev:app`, `dev:worker` and `dev:concurrent` modes remain available.
+separate `dev:app`, `dev:worker` and `dev:concurrent` modes remained available until
+2026-10-10, when `dev:app` and `dev:concurrent` were deleted (ADR-168); `dev:api` and
+`dev:worker` remain.
 
 When `platform/app` is retired, the contributor source of truth moves from
 `.env` to repository-root `.env`; quickstart and Haven write the
@@ -388,7 +391,9 @@ is started.
   successful build** — a broken edit prints the compile error once and leaves
   the previous process serving.
 - One knob sets both quiet periods, so they cannot drift:
-  `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`, **default 750 ms** after the last write.
+  `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`: the Node side **defaults to 2 s** after
+  the last write, at most 30 s after the first (ADR-168; 750 ms saw an agent's
+  edits as separate bursts), and air's delay to 750 ms.
   An agent writing hundreds of files across a feature package in a few seconds
   produces one restart, not hundreds of reconnects to Postgres, ClickHouse and
   Redis.
@@ -468,6 +473,5 @@ process boots, migrate, then report healthy.**
 
 Spec: `specs/setup/boot-sequence.feature`. See also
 `specs/setup/schema-migrations-on-start.feature` for the deployed start path.
-
 
 **Amendment 2026-10-09:** on macOS haven now runs ClickHouse natively by default; the container tier (colima) is the fallback.

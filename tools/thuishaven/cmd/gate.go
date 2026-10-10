@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// runHeavy is `haven run` — take a machine-wide slot, run the command, release.
+// runHeavy is `haven machine run` — take a machine-wide slot, run the command, release.
 //
 // The command arrives as ONE argument on --sh rather than as trailing argv,
 // because the gate hands over a shell string and splicing it bare would let
@@ -18,13 +18,13 @@ import (
 func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	shell := inv.value("--sh")
 	if shell == "" {
-		return fmt.Errorf("haven run needs a command: haven run --sh 'pnpm test:unit'")
+		return fmt.Errorf("haven machine run needs a command: haven machine run --sh 'pnpm test:unit'")
 	}
 	// One pool exists, so any other name is a request haven cannot honour.
 	// Accepting it silently would run the command against the heavy pool while
 	// the caller believes it took a different one.
 	if class := inv.value("--class"); class != "" && class != domain.HeavySlotClass {
-		return fmt.Errorf("haven run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
+		return fmt.Errorf("haven machine run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
 	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{
 		Shell:   shell,
@@ -53,10 +53,10 @@ func positiveInt(s string) int {
 
 // runGate answers one PreToolUse hook in the selected client protocol.
 //
-// `haven setup gate-hook` registers the hook by hand, and `haven up` now
+// `haven self setup gate-hook` registers the hook by hand, and `haven up` now
 // registers it automatically for the worktree it starts - a per-worktree hook
 // only guards the checkout it was installed in, and remembering to run setup in
-// every one of them is exactly what stopped happening. `haven setup gate-hook
+// every one of them is exactly what stopped happening. `haven self setup gate-hook
 // --off` opts a worktree back out of both.
 //
 // It always exits 0. Exit code 2 BLOCKS the tool call, and an unrecovered Go

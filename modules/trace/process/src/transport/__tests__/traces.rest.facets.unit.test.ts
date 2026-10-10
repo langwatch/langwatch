@@ -1,8 +1,8 @@
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /**
  * `GET /api/v1/traces/facets`: the discovery payload with no `field`, one
@@ -10,6 +10,7 @@ import {
  * is never read as a trace id.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -20,6 +21,10 @@ import { TraceFacetValuesService } from "../../features/facet/services/trace-fac
 import { TraceTopicNamingService } from "../../features/topic/services/trace-topic-naming.service.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
+
+const PROOF = expect.objectContaining({
+  grants: [expect.objectContaining({ projectId: "project-1", kind: "own" })],
+});
 
 function mount(
   overrides: Readonly<{
@@ -58,25 +63,27 @@ function mount(
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     identity: {
       authenticate: () => ({
         actor: { type: "user" as const, id: "user-1" },
         scope: { tier: "project" as const, id: "project-1" },
       }),
     },
+    authorization: restTestAuthorization(),
   });
 
   const hono = runtime.mount(tracesRest.router(), {
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({ principal: null })),
+      bindMiddlewareContext(tracesRestCredential, () => ({ principal: null })),
     ],
   });
 
@@ -95,7 +102,7 @@ describe("GET /api/v1/traces/facets", () => {
 
       expect(response.status).toBe(200);
       expect(readDiscover).toHaveBeenCalledWith({
-        tenantId: "project-1",
+        authorization: PROOF,
         timeRange: expect.objectContaining({ from: expect.any(Number), to: expect.any(Number) }),
       });
       await expect(response.json()).resolves.toEqual({ facets: [], pending: false });
@@ -111,7 +118,7 @@ describe("GET /api/v1/traces/facets", () => {
 
       expect(response.status).toBe(200);
       expect(readFacetValues).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "project-1", facetKey: "model", limit: 1, offset: 0 }),
+        expect.objectContaining({ authorization: PROOF, facetKey: "model", limit: 1, offset: 0 }),
       );
       await expect(response.json()).resolves.toEqual({
         values: [{ value: "gpt-5-mini", count: 3 }],

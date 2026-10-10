@@ -14,6 +14,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -261,7 +262,7 @@ describe("a route whose API key does not grant the permission it requires", () =
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: "project-secret" },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     },
   };
@@ -273,7 +274,11 @@ describe("a route whose API key does not grant the permission it requires", () =
 
   /** @scenario "An API-key ceiling denial carries the same channel" */
   it("answers a denial carrying the tips, documentation link and fault for re-scoping the key", async () => {
-    const runtime = createRestRuntime({ identity: ceilingDoor, doors: { api_key: ceilingDoor } });
+    const runtime = createRestRuntime({
+      authorization: authorizationPort,
+      identity: ceilingDoor,
+      doors: { api_key: ceilingDoor },
+    });
     const hono = runtime.mount(keys.router(), {
       app: () => ({ read: () => ({ ok: true }) }),
       onError: createCanonicalFamilyErrorHandler({
@@ -296,7 +301,11 @@ describe("a route whose API key does not grant the permission it requires", () =
 
   /** @scenario "An API-key ceiling denial carries no identifier fields" */
   it("answers a denial whose body names no apiKeyId, userId or projectId", async () => {
-    const runtime = createRestRuntime({ identity: door, doors: { api_key: door } });
+    const runtime = createRestRuntime({
+      authorization: authorizationPort,
+      identity: door,
+      doors: { api_key: door },
+    });
     const hono = runtime.mount(keys.router(), {
       app: () => ({ read: () => ({ ok: true }) }),
       onError: createCanonicalFamilyErrorHandler({

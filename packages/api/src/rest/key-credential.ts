@@ -13,6 +13,7 @@ import {
   keyDoorPrincipalOfRequest,
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
+  recordedKeyCredentialOf,
 } from "./credential.ts";
 
 /** Every kind of key a key door resolves; an allow-list fails closed when a kind is added. */
@@ -112,6 +113,19 @@ export function keyCredentialOfDoor({
     case "api_key":
       return keyCredentialOf(keyDoorPrincipalOfRequest(request));
   }
+}
+
+/** The key behind `door` for this request, or null where the door recorded none (the trail). */
+export function recordedKeyOfDoor({
+  door,
+  request,
+}: {
+  door: RestKeyDoor;
+  request: Request;
+}): RestKeyCredential | null {
+  const recorded = recordedKeyCredentialOf({ door, request });
+
+  return recorded ? keyCredentialOf(recorded) : null;
 }
 
 /** Refuses a key whose kind the route does not admit, naming the kind and never the key. */

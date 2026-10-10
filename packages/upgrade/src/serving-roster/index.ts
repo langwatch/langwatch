@@ -4,6 +4,7 @@ export {
   servingRosterDeclarationSchema,
 } from "./serving-roster-ledger.ts";
 export { type ServingRoster, createServingRoster } from "./serving-roster.service.ts";
+export { credentialKeyFingerprint } from "./credential-key-fingerprint.ts";
 export {
   type PreRosterHistory,
   type PreRosterVerdict,

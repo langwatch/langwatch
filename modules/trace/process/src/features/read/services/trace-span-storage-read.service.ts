@@ -1,3 +1,4 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type {
   DerivedTraceEvent,
@@ -17,16 +18,18 @@ import type {
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanStorageRepository,
+  StoredTraceSpan,
   TraceEventRollupParams,
 } from "../../../repositories/span-storage.repository.ts";
+import { hasEventRefs, parseSpanEventRefs } from "../../../rules/trace-event-ref-parsing.rules.ts";
+import { redactSpanContent } from "../../../rules/trace-visibility-teaser.rules.ts";
+import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
+import type { TraceIOExtractionService } from "../../derivation/services/trace-io-extraction.service.ts";
 import {
   mapNormalizedSpanToSpan,
   mapNormalizedSpansToSpans,
 } from "../../legacy/rules/trace-legacy-span-mapping.rules.ts";
-import { redactSpanContent } from "../../../rules/trace-visibility-teaser.rules.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
-import type { TraceIOExtractionService } from "../../derivation/services/trace-io-extraction.service.ts";
-import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, the
@@ -38,7 +41,8 @@ interface SpanReadBlobResolutionDeps {
   ioExtractionService: TraceIOExtractionService;
 }
 
-type ByTraceId = { tenantId: string; traceId: string } & OccurredAtHint;
+/** Every read carries the sealed proof; the repository fences its statement by it (ADR-177). */
+type ByTraceId = { authorization: Authorization; traceId: string } & OccurredAtHint;
 type BySpanId = ByTraceId & { spanId: string };
 type Paginated = ByTraceId & { limit: number; offset: number };
 /** Full-span delta: keyed on span start (see `findSpansSince`). */
@@ -68,6 +72,12 @@ const applyVisibilityGate = <T extends Span>(
     span.timestamps.started_at < visibilityCutoffMs ? redactSpanContent(span) : span,
   );
 };
+
+/** A span with its reserved eventref pointers dropped and its previews kept. */
+const withoutEventRefs = (span: NormalizedSpan): NormalizedSpan =>
+  hasEventRefs(span.spanAttributes)
+    ? { ...span, spanAttributes: parseSpanEventRefs(span.spanAttributes).cleanedAttrs }
+    : span;
 
 export class SpanStorageService {
   static create({
@@ -111,12 +121,10 @@ export class SpanStorageService {
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
     const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
-      projectId: params.tenantId,
+    const resolvedSpans = await this.resolveOffloadedBodies({
+      authorization: params.authorization,
       normalizedSpans,
-      blobStore: this.blobResolutionDeps.blobStore,
-      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
-      logger: this.logger,
+      deps: this.blobResolutionDeps,
     });
 
     return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
@@ -126,6 +134,13 @@ export class SpanStorageService {
     params: ByTraceId & { limit?: number },
   ): Promise<NormalizedSpan[]> {
     return this.repository.findNormalizedSpansByTraceId(params);
+  }
+
+  /** A trace's spans with their attributes as stored, unparsed, for a reader that hands them on. */
+  async findStoredSpansByTraceId(
+    params: ByTraceId & { limit?: number },
+  ): Promise<StoredTraceSpan[]> {
+    return this.repository.findStoredSpansByTraceId(params);
   }
 
   /**
@@ -152,12 +167,10 @@ export class SpanStorageService {
 
     // Resolve the single span via the normalized+resolve path.
     const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
-      projectId: params.tenantId,
+    const resolvedSpans = await this.resolveOffloadedBodies({
+      authorization: params.authorization,
       normalizedSpans,
-      blobStore: this.blobResolutionDeps.blobStore,
-      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
-      logger: this.logger,
+      deps: this.blobResolutionDeps,
     });
     const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
     if (!resolved) {
@@ -165,6 +178,35 @@ export class SpanStorageService {
     }
 
     return gateOne(mapNormalizedSpanToSpan(resolved));
+  }
+
+  /**
+   * Restores offloaded span bodies (ADR-022), which live outside ClickHouse under one project id:
+   * read only when the proof reads exactly one project. While it spans an aggregate's members each
+   * span keeps its preview and its reserved pointers are dropped (ADR-177).
+   */
+  private async resolveOffloadedBodies({
+    authorization,
+    normalizedSpans,
+    deps,
+  }: {
+    authorization: Authorization;
+    normalizedSpans: NormalizedSpan[];
+    deps: SpanReadBlobResolutionDeps;
+  }): Promise<NormalizedSpan[]> {
+    const [projectId, ...others] = projectIdsReadBy(authorization);
+    if (projectId === undefined || others.length > 0) {
+      return normalizedSpans.map(withoutEventRefs);
+    }
+    const { resolvedSpans } = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
+      projectId,
+      normalizedSpans,
+      blobStore: deps.blobStore,
+      ioExtractionService: deps.ioExtractionService,
+      logger: this.logger,
+    });
+
+    return resolvedSpans;
   }
 
   async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
@@ -221,7 +263,7 @@ export class SpanStorageService {
   }
 
   async getModelUsageStats(params: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
@@ -229,7 +271,7 @@ export class SpanStorageService {
   }
 
   async getRecentSpansByModels(params: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;

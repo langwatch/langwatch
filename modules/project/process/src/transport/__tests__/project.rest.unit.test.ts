@@ -16,7 +16,7 @@ import {
 } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountProjectRest, ORGANIZATION_ID } from "./project.rest.harness.ts";
+import { API_KEY_ID, mountProjectRest, ORGANIZATION_ID } from "./project.rest.harness.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -175,6 +175,7 @@ describe("the projects REST family", () => {
         projectId: "project_1",
         organizationId: ORGANIZATION_ID,
         data: { name: "Updated Project Name", language: "typescript" },
+        by: { type: "apiKey", id: API_KEY_ID },
       });
     });
 

@@ -187,6 +187,19 @@ export class TestAuthzApi implements AuthzApi {
   checkDetailed = unsupported<AuthzApi["checkDetailed"]>("checkDetailed");
   can = unsupported<AuthzApi["can"]>("can");
   authorize = unsupported<AuthzApi["authorize"]>("authorize");
+  authorizeInternal = unsupported<AuthzApi["authorizeInternal"]>("authorizeInternal");
+  findLiveSharedProjectGrants = unsupported<AuthzApi["findLiveSharedProjectGrants"]>(
+    "findLiveSharedProjectGrants",
+  );
+  attachSharedProjectGrant = unsupported<AuthzApi["attachSharedProjectGrant"]>(
+    "attachSharedProjectGrant",
+  );
+  awaitSharedProjectGrants = unsupported<AuthzApi["awaitSharedProjectGrants"]>(
+    "awaitSharedProjectGrants",
+  );
+  revokeSharedProjectGrants = unsupported<AuthzApi["revokeSharedProjectGrants"]>(
+    "revokeSharedProjectGrants",
+  );
   effectivePermissions = unsupported<AuthzApi["effectivePermissions"]>("effectivePermissions");
   checkByIds = unsupported<AuthzApi["checkByIds"]>("checkByIds");
   canAnyByIds = unsupported<AuthzApi["canAnyByIds"]>("canAnyByIds");

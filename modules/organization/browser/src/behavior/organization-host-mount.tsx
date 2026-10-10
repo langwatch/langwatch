@@ -5,13 +5,14 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { useLent, useLentAll } from "@langwatch/browser-host/lent";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
+import { useLent, useLentAll } from "@langwatch/browser-host/lent";
 import { DirectorySummaryToken } from "@langwatch/enterprise-scim-client";
 import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
@@ -49,7 +50,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       isPlanLoading: boolean;
       /** Whether this deployment can send the invitation rather than only mint a link. */
       hasEmailProvider: boolean;
-      isFeatureEnabled: (flag: string) => boolean;
+      flags: UiFlags;
       openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
       closeOverlay: () => void;
       succeeded: (notice: OrganizationSuccessNotice) => void;
@@ -104,8 +105,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     return this.deps.hasEmailProvider;
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.deps.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.deps.flags.flag(flag) === true;
   }
 
   openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
@@ -168,17 +169,19 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
 }
 
 export default function OrganizationHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback, navigation } = useUiCapabilities();
+  const { session, route, feedback, navigation } = useUiHostServices();
   const deployment = useUiDeployment();
   const uiScope = useUiScope();
   const activeScope = uiScope.activeScope();
   const { openDrawer, closeDrawer } = useDrawer();
+  const sessionActor = session.currentUser();
   const graph = useOrganizationGraph({
     organizationId: activeScope.organizationId ?? void 0,
     projectId: activeScope.projectId ?? void 0,
+    signedIn: !!sessionActor,
   });
   const facts = useUiOrganizationFacts();
-  const sessionActor = session.currentUser();
+  const flags = useUiFlags();
   const reading = route.reading();
   const lentCards = useLentAll(AuthenticationOverviewCardToken);
   const overviewCards = useMemo(
@@ -204,7 +207,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         isEnterprise: facts.isEnterprise,
         isPlanLoading: facts.isPlanLoading,
         hasEmailProvider: deployment.hasEmailProvider,
-        isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
+        flags,
         openOverlay: (drawer, props) => openDrawer(drawer, props),
         closeOverlay: () => closeDrawer(),
         succeeded: (notice) => feedback.succeeded(notice),
@@ -222,6 +225,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       graph,
       session,
       sessionActor,
+      flags,
       facts.isEnterprise,
       facts.isPlanLoading,
       deployment.hasEmailProvider,

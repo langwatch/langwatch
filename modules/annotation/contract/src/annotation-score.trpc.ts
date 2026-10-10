@@ -4,7 +4,7 @@
  * same schemas as their client's types.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -13,7 +13,7 @@ import {
 } from "./annotation-score.schemas.ts";
 import { annotationApiProjectScopeSchema } from "./annotation-trpc.schemas.ts";
 
-export const annotationScoreUpsertInputSchema = z.object({
+const annotationScoreUpsertInputSchemaDefinition = z.object({
   annotationScoreId: z.string().optional().nullable(),
   projectId: z.string(),
   name: z.string(),
@@ -26,19 +26,34 @@ export const annotationScoreUpsertInputSchema = z.object({
   defaultRadioOption: z.string().optional().nullable(),
   defaultCheckboxOption: z.array(z.string()).optional().nullable(),
 });
+export interface AnnotationScoreUpsertInputSchema extends Named<
+  typeof annotationScoreUpsertInputSchemaDefinition
+> {}
+export const annotationScoreUpsertInputSchema: AnnotationScoreUpsertInputSchema =
+  annotationScoreUpsertInputSchemaDefinition;
 export type AnnotationScoreUpsertInput = z.input<typeof annotationScoreUpsertInputSchema>;
 
-export const annotationScoreScopeSchema = z.object({
+const annotationScoreScopeSchemaDefinition = z.object({
   projectId: z.string(),
   scoreId: z.string(),
 });
+export interface AnnotationScoreScopeSchema extends Named<
+  typeof annotationScoreScopeSchemaDefinition
+> {}
+export const annotationScoreScopeSchema: AnnotationScoreScopeSchema =
+  annotationScoreScopeSchemaDefinition;
 
 /** Deactivating is not deleting: scores already recorded against it stay readable. */
-export const annotationScoreToggleInputSchema = z.object({
+const annotationScoreToggleInputSchemaDefinition = z.object({
   scoreId: z.string(),
   active: z.boolean(),
   projectId: z.string(),
 });
+export interface AnnotationScoreToggleInputSchema extends Named<
+  typeof annotationScoreToggleInputSchemaDefinition
+> {}
+export const annotationScoreToggleInputSchema: AnnotationScoreToggleInputSchema =
+  annotationScoreToggleInputSchemaDefinition;
 
 export const annotationScoreTrpc = defineTrpcContract("annotationScore")
   .mutation("upsert")

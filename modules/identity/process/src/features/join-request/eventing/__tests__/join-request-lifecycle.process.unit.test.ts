@@ -202,6 +202,19 @@ describe("given a request that reached an ending", () => {
     expect(evolution.state).toEqual(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE);
   });
 
+  /** @scenario "Single sign-on records the arrival it admitted" */
+  it("sends no notice for a recorded single sign-on arrival", () => {
+    const context = ctx(REQUESTED_AT);
+    const evolution = onJoinApproved(
+      armed(),
+      { resolvedBy: { type: "policy", id: "sso-arrival" } },
+      context,
+    );
+
+    expect(evolution.state).toEqual(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE);
+    expect(context.intents.prepareNotification).not.toHaveBeenCalled();
+  });
+
   it("closes an invitation answer without sending an approval notice", () => {
     const context = ctx(REQUESTED_AT);
     const evolution = onJoinApproved(

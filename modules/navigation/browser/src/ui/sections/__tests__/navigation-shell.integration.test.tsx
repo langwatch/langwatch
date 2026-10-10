@@ -159,6 +159,28 @@ function renderShell({
   );
 }
 
+describe("the content card beside the docked Langy panel", () => {
+  describe("when the docked panel is open", () => {
+    it("keeps the dock's room on the right and closes the card's right edge", () => {
+      renderShell({ readings: { langyDockInset: 404 } });
+
+      expect(screen.getByTestId("shell-content-column")).toHaveStyle({ paddingRight: "404px" });
+      const card = screen.getByTestId("page-body").closest("[data-tour='main-content']");
+      expect(card).toHaveStyle({
+        borderRightWidth: "1px",
+      });
+    });
+  });
+
+  describe("when the panel is closed", () => {
+    it("gives the card the whole row", () => {
+      renderShell();
+
+      expect(screen.getByTestId("shell-content-column")).toHaveStyle({ paddingRight: "0px" });
+    });
+  });
+});
+
 describe("the front door at /", () => {
   afterEach(() => cleanup());
 
@@ -267,6 +289,76 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
+describe("an address naming a product whose release flag is off", () => {
+  afterEach(() => cleanup());
+
+  const governanceOff = {
+    ...BASE_READINGS.flags,
+    release_ui_ai_governance_enabled: { enabled: false, isLoading: false },
+  };
+
+  describe("when governance is switched off", () => {
+    /** @scenario A governance address with the flag off is a 404 with no product sidebar */
+    it("draws the not-found page with no product sidebar around it", () => {
+      renderShell({
+        readings: {
+          pathname: "/governance/costs",
+          flags: governanceOff,
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+      expect(screen.queryByTestId("product-sidebar")).toBeNull();
+      expect(screen.queryByTestId("page-body")).toBeNull();
+    });
+
+    it("still draws a project page in its chrome", () => {
+      renderShell({ readings: { pathname: "/demo/traces", flags: governanceOff } });
+
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the gateway menu flag is off", () => {
+    it("still draws a gateway page in its chrome, the flag hiding only the menu", () => {
+      renderShell({
+        readings: {
+          pathname: "/gateway/virtual-keys",
+          flags: {
+            ...BASE_READINGS.flags,
+            release_ui_ai_gateway_menu_enabled: { enabled: false, isLoading: false },
+          },
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.queryByTestId("not-found")).toBeNull();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the flag has not answered yet", () => {
+    it("keeps the chrome and leaves the wait to the page", () => {
+      renderShell({
+        readings: {
+          pathname: "/governance/costs",
+          flags: {
+            ...BASE_READINGS.flags,
+            release_ui_ai_governance_enabled: { enabled: false, isLoading: true },
+          },
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.queryByTestId("not-found")).toBeNull();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("the seat gate on a page", () => {
   afterEach(() => cleanup());
 
@@ -279,7 +371,7 @@ describe("the seat gate on a page", () => {
         });
 
         expect(screen.queryByTestId("page-body")).toBeNull();
-        expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+        expect(screen.getByText(/You don't have access to/)).toBeInTheDocument();
         expect(screen.getByText("Missing permission: virtualKeys:view")).toBeInTheDocument();
       });
     });
@@ -293,7 +385,7 @@ describe("the seat gate on a page", () => {
         });
 
         expect(screen.getByTestId("page-body")).toBeInTheDocument();
-        expect(screen.queryByText("Access Restricted")).toBeNull();
+        expect(screen.queryByText(/You don't have access to/)).toBeNull();
       });
     });
 

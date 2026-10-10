@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const evaluationStatusSchema = z.enum([
@@ -9,13 +10,15 @@ export const evaluationStatusSchema = z.enum([
 ]);
 export type EvaluationStatus = z.infer<typeof evaluationStatusSchema>;
 
-export const evaluationCostSchema = z.object({
+const evaluationCostSchemaDefinition = z.object({
   amount: z.number(),
   currency: z.string(),
 });
+export interface EvaluationCostSchema extends Named<typeof evaluationCostSchemaDefinition> {}
+export const evaluationCostSchema: EvaluationCostSchema = evaluationCostSchemaDefinition;
 export type EvaluationCost = z.infer<typeof evaluationCostSchema>;
 
-export const evaluationRunDataSchema = z.object({
+const evaluationRunDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -40,6 +43,8 @@ export const evaluationRunDataSchema = z.object({
   completedAt: z.number().nullable(),
   costId: z.string().nullable(),
 });
+export interface EvaluationRunDataSchema extends Named<typeof evaluationRunDataSchemaDefinition> {}
+export const evaluationRunDataSchema: EvaluationRunDataSchema = evaluationRunDataSchemaDefinition;
 export type EvaluationRunData = z.infer<typeof evaluationRunDataSchema>;
 
 /**
@@ -47,7 +52,7 @@ export type EvaluationRunData = z.infer<typeof evaluationRunDataSchema>;
  * shape from the durable evaluation-run record: transports need the nested
  * timestamps and may omit the heavy inputs payload on a degraded read.
  */
-export const traceEvaluationDataSchema = z.object({
+const traceEvaluationDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -67,9 +72,14 @@ export const traceEvaluationDataSchema = z.object({
     completedAt: z.number().nullable(),
   }),
 });
+export interface TraceEvaluationDataSchema extends Named<
+  typeof traceEvaluationDataSchemaDefinition
+> {}
+export const traceEvaluationDataSchema: TraceEvaluationDataSchema =
+  traceEvaluationDataSchemaDefinition;
 export type TraceEvaluationData = z.infer<typeof traceEvaluationDataSchema>;
 
-export const evaluationSummarySchema = evaluationRunDataSchema.pick({
+const evaluationSummarySchemaDefinition = evaluationRunDataSchema.pick({
   evaluationId: true,
   evaluatorId: true,
   evaluatorType: true,
@@ -81,9 +91,11 @@ export const evaluationSummarySchema = evaluationRunDataSchema.pick({
   passed: true,
   label: true,
 });
+export interface EvaluationSummarySchema extends Named<typeof evaluationSummarySchemaDefinition> {}
+export const evaluationSummarySchema: EvaluationSummarySchema = evaluationSummarySchemaDefinition;
 export type EvaluationSummary = z.infer<typeof evaluationSummarySchema>;
 
-export const evaluationExecutionResultSchema = z.object({
+const evaluationExecutionResultSchemaDefinition = z.object({
   status: z.enum(["processed", "error", "skipped"]),
   score: z.number().optional(),
   passed: z.boolean().optional(),
@@ -95,6 +107,11 @@ export const evaluationExecutionResultSchema = z.object({
   evaluationThreadId: z.string().optional(),
   inputs: z.record(z.string(), z.unknown()).optional(),
 });
+export interface EvaluationExecutionResultSchema extends Named<
+  typeof evaluationExecutionResultSchemaDefinition
+> {}
+export const evaluationExecutionResultSchema: EvaluationExecutionResultSchema =
+  evaluationExecutionResultSchemaDefinition;
 export type EvaluationExecutionResult = z.infer<typeof evaluationExecutionResultSchema>;
 
 /**

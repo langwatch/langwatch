@@ -6,6 +6,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  */
 import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { TabCount } from "@langwatch/design-system/tab-count";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Suspense } from "react";
 
 import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";
@@ -30,7 +31,7 @@ export default function DirectoryScreen() {
   const { organizationId } = host.scope();
   if (!organizationId) return null;
   if (!host.hasOrganizationPermission(DIRECTORY_PERMISSION)) {
-    return <PermissionAlert permission={DIRECTORY_PERMISSION} />;
+    return <PermissionAlert permission={DIRECTORY_PERMISSION} area="the directory" />;
   }
 
   return <Directory host={host} organizationId={organizationId} />;
@@ -46,7 +47,7 @@ function Directory({
   const route = host.route();
   const department = useDepartmentColumn(
     organizationId,
-    host.isFeatureEnabled("release_ui_ai_governance_enabled"),
+    host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled),
   );
   const departmentsShown = department.show && host.hasOrganizationPermission("governance:view");
   const tab = parseDirectoryTab({

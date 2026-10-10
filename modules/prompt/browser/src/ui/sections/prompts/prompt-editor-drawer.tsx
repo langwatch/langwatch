@@ -5,15 +5,7 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  Box,
-  Button,
-  Circle,
-  Heading,
-  HStack,
-  Spinner,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, Circle, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PromptEditorDrawerToken, type PromptEditorDrawerProps } from "@langwatch/prompt-client";
@@ -29,6 +21,7 @@ import {
 } from "../../../behavior/prompts/use-prompt-editor-form.ts";
 import { usePromptEditorSave } from "../../../behavior/prompts/use-prompt-editor-save.ts";
 import { useLatestPromptVersion } from "../../../behavior/use-latest-prompt-version.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import { usePromptVersion } from "../../../behavior/use-prompt-version.ts";
 import { useModelProvidersSettings } from "../../../features/model-selection/behavior/use-model-providers-settings.ts";
 import { usePromptDefaultModel } from "../../../features/model-selection/behavior/use-prompt-default-model.ts";
@@ -139,12 +132,12 @@ function EditorTitle({
   versionBadge: ReactNode;
   hasUnsavedChanges: boolean;
 }) {
-  if (!handle) return <Heading>New Prompt</Heading>;
+  if (!handle) return <Drawer.Title>New Prompt</Drawer.Title>;
   return (
     <>
       <HStack asChild gap={1} cursor="pointer" _hover={{ "& .edit-icon": { display: "block" } }}>
         <button type="button" onClick={onRename}>
-          <Heading>{handle}</Heading>
+          <Drawer.Title>{handle}</Drawer.Title>
           <Box className="edit-icon" display="none" transition="opacity 0.2s" color="fg.muted">
             <LuPencil size={16} />
           </Box>
@@ -158,7 +151,7 @@ function EditorTitle({
           openDelay={0}
           showArrow
         >
-          <Circle size="10px" bg="orange.400" data-testid="unsaved-changes-indicator" />
+          <Circle size="10px" bg="orange.solid" data-testid="unsaved-changes-indicator" />
         </Tooltip>
       )}
     </>
@@ -207,7 +200,8 @@ function EditorDialogs({
  * another drawer; in an experiment it edits one target and maps its variables.
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const { hasPermission } = usePromptProject();
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { canGoBack, goBack } = useDrawer();
   const opened = useEditorOpenedWith(props);
@@ -281,7 +275,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // Drift reads the actual latest: a pinned promptVersionId makes promptQuery
   // return that version.
-  const currentVersion = methods.watch("versionMetadata.versionNumber");
+  const currentVersion = useWatch({
+    control: methods.control,
+    name: "versionMetadata.versionNumber",
+  });
   const { latestVersion, isOutdated, nextVersion } = useLatestPromptVersion({
     configId: promptId,
     currentVersion,
@@ -293,13 +290,18 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     onInputMappingsChange,
   });
 
-  const watchedInputs = methods.watch("version.configData.inputs");
+  // useWatch, not methods.watch: the React Compiler memoises watch() on the stable form object.
+  const watchedInputs = useWatch({ control: methods.control, name: "version.configData.inputs" });
   const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
   const availableFields = inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
-  const watchedMessages = methods.watch("version.configData.messages");
+  const watchedMessages = useWatch({
+    control: methods.control,
+    name: "version.configData.messages",
+  });
+  const versionMetadata = useWatch({ control: methods.control, name: "versionMetadata" });
   const missingMappingIds = useMemo(
     () =>
       missingMappingIdsFor({
@@ -324,7 +326,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         onVersionRestore={save.handleVersionRestore}
         configId={promptQuery.data?.id}
         handle={promptQuery.data?.handle ?? undefined}
-        currentVersionId={methods.watch("versionMetadata")?.versionId}
+        currentVersionId={versionMetadata?.versionId}
         onApply={targetId || props.headless ? handleClose : undefined}
       />
     </FormProvider>
@@ -449,9 +451,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           {loadingContent ?? formBodyContent}
         </Drawer.Body>
 
-        <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
-          {footerElement}
-        </Drawer.Footer>
+        <Drawer.Footer>{footerElement}</Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );

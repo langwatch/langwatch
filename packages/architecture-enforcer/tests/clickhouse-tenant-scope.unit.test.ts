@@ -290,7 +290,7 @@ function callSitesIn(file: string, source: string): CallSite[] {
     const property = /(?:^|[\s,{])(?:query|sql)\s*:\s*/.exec(argumentsText);
     if (property === null) continue;
     const line = source.slice(0, call.index).split("\n").length;
-    if (/(?:^|[\s,{])unscoped\s*:/.test(argumentsText)) {
+    if (/(?:^|[\s,{])SKIP_TENANT_CHECK\s*:/.test(argumentsText)) {
       sites.push({ file, line, verdict: "declared-unscoped" });
       continue;
     }
@@ -344,7 +344,7 @@ describe("ClickHouse repositories", () => {
         .filter((site) => site.verdict === "unscoped")
         .map(
           (site) =>
-            `${site.file}:${site.line} — no tenant predicate and no \`unscoped: { reason }\``,
+            `${site.file}:${site.line} — no tenant predicate and no \`SKIP_TENANT_CHECK: true\``,
         );
 
       expect(offenders).toEqual([]);
@@ -383,7 +383,7 @@ describe("ClickHouse repositories", () => {
     it("passes the same statement once it declares why it spans tenants", () => {
       expect(
         classify(
-          'await client.query({ query: "SELECT 1 FROM trace_summaries", unscoped: { reason: "why" } });',
+          'await client.query({ query: "SELECT 1 FROM trace_summaries", SKIP_TENANT_CHECK: true });',
         ),
       ).toBe("declared-unscoped");
     });

@@ -24,7 +24,8 @@ export function EndSessionDialog({
         if (!nextOpen) onCancel();
       }}
     >
-      <Dialog.Content bg="bg" maxWidth="480px">
+      <Dialog.Content maxWidth="480px">
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="sm" fontWeight="500">
             {END_SESSION_QUESTION}
@@ -34,7 +35,7 @@ export function EndSessionDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button colorPalette="blue" onClick={onConfirm}>
+          <Button colorPalette="orange" onClick={onConfirm}>
             Confirm
           </Button>
         </Dialog.Footer>

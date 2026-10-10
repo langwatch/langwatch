@@ -9,11 +9,12 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/trace-analytics-projection.repository.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
@@ -56,7 +57,11 @@ function storeOver(row: TraceAnalyticsRow): TraceAnalyticsStore {
       return { row, appliedEventIds: ["evt-1", "evt-2"] };
     }
   })();
-  return TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
+  return TraceAnalyticsStore.create({
+    storage,
+    defaultRetentionDays: () => 90,
+    authorize: ownProofAuthorizer,
+  });
 }
 
 const context = {
@@ -190,7 +195,11 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       it("resumes the classification from the committed row instead of losing it", async () => {
         const { storage, rows } = recordingPort();
         const fold = TraceAnalyticsFoldProjection.create({
-          store: TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 }),
+          store: TraceAnalyticsStore.create({
+            storage,
+            defaultRetentionDays: () => 90,
+            authorize: ownProofAuthorizer,
+          }),
           traceCanonicalisation: TraceCanonicalisationService.create(),
           runtime: createTestRuntime(),
         });

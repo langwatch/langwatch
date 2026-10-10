@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/react-rum",
-  "langwatch": { "group": "browser" },
   "version": "0.0.1",
   "private": true,
   "description": "Real user monitoring for React apps: browser tracing that joins to backend traces, plus session identity",
@@ -48,5 +47,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "packageManager": "pnpm@12.6.0"
+  "packageManager": "pnpm@12.6.0",
+  "langwatch": {
+    "group": "browser"
+  }
 }

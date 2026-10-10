@@ -20,6 +20,7 @@ export {
 export {
   adminEmails,
   allowedProxyHosts,
+  allowInsecureLocalUrls,
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   foldCacheTtlSeconds,
@@ -35,6 +36,7 @@ export {
   idpSimulatorUrl,
   LOCAL_GATEWAY_URL,
   localPasswords,
+  logSettings,
   mfaEnrollmentOpen,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
@@ -52,9 +54,12 @@ export {
   signInProviders,
   signUpAllowedDomains,
   signUpMode,
+  slackApiBase,
+  slackWebhookBase,
   telemetryExporterEndpoint,
   trustedIdpOrigins,
 } from "./deployment-facts.ts";
+export { isReleaseBuild } from "./release-build.ts";
 export {
   environmentBooleanSchema,
   environmentExactOneSchema,

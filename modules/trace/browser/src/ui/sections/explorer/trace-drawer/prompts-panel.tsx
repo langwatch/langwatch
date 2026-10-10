@@ -1,5 +1,5 @@
-import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Link } from "@langwatch/browser-host/link";
 import { formatDuration } from "@langwatch/design-system/display-formatters";
 import {
   Badge,
@@ -23,7 +23,7 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { useSpanPlaygroundHref } from "../../../../behavior/prompts/use-span-playground-href.ts";
 import { useSpansFull } from "../../../../features/span/behavior/use-spans-full.ts";
 import { usePromptByHandle } from "../../../../features/trace-drawer/behavior/use-prompt-by-handle.ts";
 import type { PromptReference } from "../../../../model/prompt-attributes.ts";
@@ -355,12 +355,12 @@ function PromptUsageCard({
 }) {
   const { ref, spanIds, variables } = usage;
   const variableEntries = Object.entries(variables).toSorted(([a], [b]) => a.localeCompare(b));
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  const playgroundHrefFor = useSpanPlaygroundHref();
   // Prefer the first emitting span (Prompt.compile / PromptApiService.get)
   // — the server-side playground loader walks descendants/siblings to
   // find the actual llm call for it.
   const playgroundSpanId = spanIds[0] ?? null;
-  const playgroundHref = playgroundSpanId ? (buildUrl(playgroundSpanId)?.toString() ?? "") : "";
+  const playgroundHref = playgroundSpanId ? playgroundHrefFor(playgroundSpanId) : "";
 
   return (
     <VStack align="stretch" gap={2.5} paddingY={3}>

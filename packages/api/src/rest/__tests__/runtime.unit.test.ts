@@ -9,6 +9,7 @@ import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated, publicRoute, type Entitlements } from "../../access/access.ts";
 import {
   ApiVersionConflictError,
@@ -20,20 +21,18 @@ import {
   RestVersionSelector,
   restVersionSelectorMiddleware,
 } from "../addressing.ts";
-import { defineRestRouter, projectRestFacts } from "../declaration.ts";
+import { defineRestRouter, projectRequestContext } from "../declaration.ts";
 import { withIdempotency } from "../idempotency.ts";
 import type {
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
 } from "../repositories/prisma/prisma.idempotency-receipt.ts";
 import {
-  bindRestHeader,
-  bindRestMiddleware,
-  defineRestMiddleware,
-  type RestTransportMiddlewareBinding,
+  bindMiddlewareContext,
+  defineMiddlewareContext,
+  type MiddlewareContextBinding,
 } from "../request.ts";
 import { createRestRuntime } from "../runtime.ts";
-import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 
 describe("defineRestRouter", () => {
   /** @scenario "A REST endpoint is one complete declaration in the server" */
@@ -52,6 +51,7 @@ describe("defineRestRouter", () => {
       .delete("/:id", "deleteAnnotation")
       .withParams(z.object({ id: z.string() }))
       .withPermission("annotations:view")
+      .withoutAudit("test route")
       .handle(async () => {})
       .build();
 
@@ -109,6 +109,7 @@ describe("defineRestRouter", () => {
       router()
         .get(dynamicPath, "missingParams")
         .withPermission("annotations:view")
+        .withoutAudit("test route")
         .handle(() => {});
     }).toThrow(/must declare withParams/);
 
@@ -139,6 +140,7 @@ describe("defineRestRouter", () => {
           .post("/report", "reportBug")
           .withInput(z.object({ projectId: z.string() }))
           .withAccess(publicRoute({ reason: "issue intake; reporters may hold no credential" }))
+          .withoutAudit("test route")
           .handle(() => {}),
       ).toThrow(/cannot take "projectId" as input/);
     });
@@ -187,6 +189,7 @@ describe("defineRestRouter", () => {
           .withInput(z.object({ name: z.string() }))
           .withPermission("project:create")
           .withAccess(anyAuthenticated({ reason: "the key's own ceiling is the whole gate" }))
+          .withoutAudit("test route")
           .handle(() => {}),
       ).toThrow(/declares both a permission and authenticated access/);
     });
@@ -204,6 +207,7 @@ describe("defineRestRouter", () => {
         .router();
 
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: {
           authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
         },
@@ -284,6 +288,7 @@ describe("defineRestRouter", () => {
         .router();
 
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: {
           authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
         },
@@ -408,6 +413,7 @@ describe("defineRestRouter", () => {
           .withInput(z.object({ a: z.number() }))
           .methods(["POST", "GET"])
           .withOutput(answer)
+          .withoutAudit("test route")
           .handle(() => ({ ok: true })),
       ).toThrow(/declares a body and answers GET, which carries none/);
 
@@ -423,6 +429,7 @@ describe("defineRestRouter", () => {
           .withInput(z.object({ a: z.number() }))
           .anyMethod()
           .withRawResponse({ produces: "application/json" })
+          .withoutAudit("test route")
           .handle(() => new Response()),
       ).toThrow(/a body reaches only some of them/);
 
@@ -431,6 +438,7 @@ describe("defineRestRouter", () => {
           .anyMethod()
           .methods(["POST"])
           .withRawResponse({ produces: "application/json" })
+          .withoutAudit("test route")
           .handle(() => new Response()),
       ).toThrow(/answers every method and also names some of them/);
 
@@ -438,6 +446,7 @@ describe("defineRestRouter", () => {
         hook()
           .anyMethod()
           .withOutput(answer)
+          .withoutAudit("test route")
           .handle(() => ({ ok: true })),
       ).toThrow(/it must declare withResponse\("forwarded"\)/);
     });
@@ -514,6 +523,7 @@ describe("defineRestRouter", () => {
         .router();
 
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: {
           authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
         },
@@ -601,9 +611,9 @@ describe("defineRestRouter", () => {
   });
 });
 
-describe("a mount binding the facts a declaration names", () => {
+describe("a mount given the middleware context a declaration names", () => {
   const OpsApi = moduleApi<{ ping(): Promise<void> }>("ops");
-  const surface = defineRestMiddleware("surface", z.string().nullable());
+  const surface = defineMiddlewareContext("surface", z.string().nullable());
 
   function declaration() {
     return defineRestRouter(OpsApi)
@@ -611,20 +621,21 @@ describe("a mount binding the facts a declaration names", () => {
       .withVersion("2026-08-07")
       .get("/health", "readOpsHealth")
       .withPermission("project:view")
-      .withMiddleware(projectRestFacts, surface)
+      .withMiddlewareContext(projectRequestContext, surface)
       .handle(() => {})
       .build()
       .router();
   }
 
-  const project = bindRestMiddleware(projectRestFacts, () => ({
+  const project = bindMiddlewareContext(projectRequestContext, () => ({
     projectSlug: "acme",
     viewerUserId: null,
     actorId: "user-1",
   }));
 
-  function mountWith(facts: readonly RestTransportMiddlewareBinding[]): () => void {
+  function mountWith(middlewareContext: readonly MiddlewareContextBinding[]): () => void {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
       },
@@ -637,21 +648,26 @@ describe("a mount binding the facts a declaration names", () => {
         onError: (error) => {
           throw error;
         },
-        facts,
+        middlewareContext,
       });
     };
   }
 
-  /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-  it("refuses a mount that bound no value for a declared fact, naming the fact and the route", () => {
+  /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+  it("refuses a mount with no value for a declared middleware context, naming it and the route", () => {
     expect(mountWith([project])).toThrow(
-      /GET \/api\/ops\/health declares the fact "surface", and this mount bound no value for it/,
+      /GET \/api\/ops\/health declares the middleware context "surface", and its module provides no value for it/,
     );
   });
 
-  /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-  it("mounts once every declared fact is bound", () => {
-    expect(mountWith([project, bindRestHeader(surface, "x-langwatch-surface")])).not.toThrow();
+  /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+  it("mounts once every declared middleware context has a value", () => {
+    expect(
+      mountWith([
+        project,
+        bindMiddlewareContext(surface, (request) => request.headers.get("x-langwatch-surface")),
+      ]),
+    ).not.toThrow();
   });
 });
 
@@ -739,6 +755,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
 
   function mounted({ holds, handle }: { holds: Entitlements["holds"]; handle: () => void }) {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -807,6 +824,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
     ).toThrow(/no tenant to ask whether it holds "enterprise"/);
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -842,6 +860,7 @@ describe("a route whose plan question names a capability and asks only for some 
         when: (input) => customRole.validate(input),
       })
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         handle();
 
@@ -851,6 +870,7 @@ describe("a route whose plan question names a capability and asks only for some 
       .router();
 
     return createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -910,19 +930,19 @@ describe("a create declared replayable under a caller's key", () => {
     let next = 0;
 
     return {
-      $executeRaw: async (sql, ...values) => {
-        const write = readFencedReceiptWrite(sql, values);
-        const row = [...rows.values()].find(
-          (candidate) => candidate.id === write.id && candidate.claimId === write.claimId,
-        );
-
-        if (!row) return 0;
-
-        Object.assign(row, write.data);
-
-        return 1;
-      },
       idempotencyReceipt: {
+        updateMany: async ({ where, data }) => {
+          const row = [...rows.values()].find(
+            (candidate) => candidate.id === where.id && candidate.claimId === where.claimId,
+          );
+
+          if (!row) return { count: 0 };
+          if (where.responseStatus === null && row.responseStatus !== null) return { count: 0 };
+
+          Object.assign(row, data);
+
+          return { count: 1 };
+        },
         create: async ({ data }) => {
           const at = `${data.scopeId} ${data.key}`;
 
@@ -969,6 +989,7 @@ describe("a create declared replayable under a caller's key", () => {
       .withInput(z.object({ name: z.string() }))
       .withOutput(z.object({ name: z.string(), secret: z.string() }))
       .withStatus(201)
+      .withoutAudit("test route")
       .handle(async ({ input }) => ({
         name: await handle(input.name),
         secret: `secret-for-${input.name}`,
@@ -985,6 +1006,7 @@ describe("a create declared replayable under a caller's key", () => {
     handle: (name: string) => Promise<string> | string;
   }) {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -1104,6 +1126,7 @@ describe("a create declared replayable under a caller's key", () => {
     expect(runs).toBe(2);
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -1127,6 +1150,7 @@ describe("a route declared as minting a credential", () => {
 
   function mounted({ impersonatorId, handle }: { impersonatorId?: string; handle: () => void }) {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: { type: "user", id: "user-1", ...(impersonatorId ? { impersonatorId } : {}) },
@@ -1142,6 +1166,7 @@ describe("a route declared as minting a credential", () => {
       .withPermission("organization:view")
       .mintsCredential("organization:view")
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         handle();
 
@@ -1187,6 +1212,7 @@ describe("a route declared as minting a credential", () => {
         .post("/", "createKey")
         .withAccess(publicRoute({ reason: "no caller" }))
         .mintsCredential("organization:view")
+        .withoutAudit("test route")
         .handle(() => {}),
     ).toThrow(/mints a credential, so it cannot answer with no caller/);
   });

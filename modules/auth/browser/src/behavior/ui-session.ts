@@ -1,11 +1,15 @@
 /**
- * Who is here, what they may do, what is switched on — ALL THREE ANSWER
+ * Who is here and what they may do — BOTH ANSWER
  * SYNCHRONOUSLY AND FAIL CLOSED: a permission that flickers open while
  * loading is a permission that leaked. Where they stand is scope's (§10.1).
  */
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { permissionSatisfiedBy } from "@langwatch/authorization";
+import {
+  isRegistryPermission,
+  permissionSatisfiedBy,
+  refusedOnAggregate,
+} from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
 import { UiSession } from "@langwatch/browser-host/capabilities";
@@ -16,9 +20,8 @@ import type {
   UiSessionSnapshot,
 } from "@langwatch/browser-host/session";
 import { setUiStorageReader } from "@langwatch/browser-host/storage";
-import { readFeatureFlagOverride } from "@langwatch/feature-flag-client";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 import {
   readUiActor,
@@ -28,7 +31,6 @@ import {
 } from "./ui-session-client";
 import {
   useUiEffectivePermissions,
-  useUiFeatureFlags,
   type UiEffectivePermissionsRead,
   type UiFeatureApiTransport,
 } from "./ui-session-queries";
@@ -61,38 +63,7 @@ export function uiSignedOutDeparture({
   return `${UI_SIGN_IN_PATH}?callbackUrl=${encodeURIComponent(address)}`;
 }
 
-/**
- * A screen names its flag mid-render, where React refuses a state update
- * — so the ask is recorded and broadcast on the microtask queue instead;
- * the render that asked finishes with `false`, the next has it in flight.
- */
-export class UiFeatureFlagRequests {
-  private readonly asked = new Set<string>();
-  private readonly listeners = new Set<() => void>();
-  private ordered: readonly string[] = [];
-
-  ask = (flag: string): void => {
-    if (this.asked.has(flag)) return;
-    this.asked.add(flag);
-    this.ordered = [...this.asked];
-    queueMicrotask(() => {
-      for (const listener of this.listeners) listener();
-    });
-  };
-
-  requested = (): readonly string[] => this.ordered;
-
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  };
-}
-
 export type BrowserUiSessionState = {
-  readonly flags: ReadonlyMap<string, boolean>;
-  readonly askFlag: (flag: string) => void;
   /** Absent where nothing can re-read the session, as in a recorded test. */
   readonly refresh?: () => Promise<void>;
 } & (
@@ -156,18 +127,6 @@ export class BrowserUiSession extends UiSession {
     if (!this.state.refresh) return super.refresh();
     return this.state.refresh();
   }
-
-  featureFlag(flag: string): boolean | undefined {
-    // This browser's own `?ff_` answer wins and is never asked of the server.
-    const override = readFeatureFlagOverride(flag);
-    if (override !== void 0) return override;
-    const answer = this.state.flags.get(flag);
-    if (answer === void 0) {
-      this.state.askFlag(flag);
-      return void 0;
-    }
-    return answer;
-  }
 }
 
 /**
@@ -182,7 +141,7 @@ export function useUiSessionReading({
 }: {
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
-  /** Whether this address renders without a session — the scope capability reads it. */
+  /** Whether this address renders without a session — the scope host service reads it. */
   isPublicRoute: boolean;
   /** The deployment's own client unless a test answers with a recorded session. */
   authClient?: UiAuthClient;
@@ -246,7 +205,6 @@ export function useBrowserUiSession({
   /** The address renders without a session: no grant is read, none is held. */
   isPublicRoute: boolean;
 }): BrowserUiSession {
-  const [flagRequests] = useState(() => new UiFeatureFlagRequests());
   const userId = session.user?.id;
   const projectId = scope.project?.id;
   const organizationId = scope.organization?.id;
@@ -259,22 +217,6 @@ export function useBrowserUiSession({
     isPublicRoute,
   });
 
-  const requestedFlags = useSyncExternalStore(
-    flagRequests.subscribe,
-    flagRequests.requested,
-    flagRequests.requested,
-  );
-  const flags = useUiFeatureFlags({
-    transport,
-    flags: requestedFlags,
-    projectId: projectId ?? null,
-    organizationId: organizationId ?? null,
-    // A flag read that leaves out a scope it should have named cannot match
-    // the rule that names it, so nothing is asked until the scope has settled.
-    enabled: !!userId && scope.status !== "loading",
-  });
-
-  const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);
   const refresh = useRefreshUiSession();
 
   const snapshot: UiSessionSnapshot = {
@@ -282,10 +224,10 @@ export function useBrowserUiSession({
     scope,
     permissions: isPublicRoute
       ? NO_PERMISSIONS_ON_A_PUBLIC_PAGE
-      : readPermissions(scope.status, permissions),
+      : readPermissions(scope, permissions),
   };
 
-  return BrowserUiSession.create({ snapshot, flags, askFlag, refresh });
+  return BrowserUiSession.create({ snapshot, refresh });
 }
 
 /**
@@ -308,16 +250,25 @@ function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading
   return { status: "anonymous", user: null };
 }
 
-/** One grant read answers both, as on main: organization permissions follow it (scope knot Q2). */
+/**
+ * One grant read answers both, as on main: organization permissions follow it
+ * (scope knot Q2). A project write on an aggregate is refused (ADR-177 decision 8).
+ */
 function readPermissions(
-  scopeStatus: UiActiveScopeReading["status"],
+  scope: UiActiveScopeReading,
   grantRead: UseQueryResult<UiEffectivePermissionsRead>,
 ): UiSessionSnapshot["permissions"] {
-  const status = permissionStatus(scopeStatus, grantRead);
+  const status = permissionStatus(scope.status, grantRead);
   const grants = new Set(grantRead.isError ? [] : grantRead.data?.permissions);
+  const canInOrganization = (requested: string) =>
+    scope.status === "ready" && permissionSatisfiedBy({ granted: grants, requested });
   const can = (requested: string) =>
-    scopeStatus === "ready" && permissionSatisfiedBy({ granted: grants, requested });
-  return { status, isLoading: status === "loading", can, canInOrganization: can };
+    canInOrganization(requested) &&
+    !(
+      isRegistryPermission(requested) &&
+      refusedOnAggregate({ kind: scope.project?.kind, permission: requested })
+    );
+  return { status, isLoading: status === "loading", can, canInOrganization };
 }
 
 function permissionStatus(

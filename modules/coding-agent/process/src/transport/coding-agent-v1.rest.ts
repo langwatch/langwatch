@@ -6,7 +6,7 @@
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
   baseResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -22,7 +22,7 @@ import {
  * What the organization door resolved: the key, the member it acts as — null
  * for a service key — and the stable actor string the audits are written with.
  */
-export const codingAgentV1RestCaller = defineRestMiddleware(
+export const codingAgentV1RestCaller = defineMiddlewareContext(
   "codingAgentV1RestCaller",
   z.object({
     apiKeyId: z.string(),
@@ -48,7 +48,7 @@ export const codingAgentV1Rest = defineRestRouter(CodingAgentApi)
   .withQuery(pullRequestUsageQuerySchema)
   .withAccess(anyAuthenticated({ reason: AUTHORIZED_BY_THE_CALLER_CUT }))
   .withOutput(pullRequestUsageResponseSchema)
-  .withMiddleware(codingAgentV1RestCaller)
+  .withMiddlewareContext(codingAgentV1RestCaller)
   .withDocs({
     operationId: "getPullRequestUsage",
     summary: "Get pull request coding agent usage",

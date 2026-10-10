@@ -61,6 +61,7 @@ import type {
   OrganizationTeamProject,
 } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
+import { OrganizationLicensingFactsService } from "./organization-licensing-facts.service.ts";
 import {
   OrganizationSettingsService,
   type OrganizationSettingsNotices,
@@ -101,9 +102,11 @@ export class OrganizationService {
     this.teamMembers = OrganizationTeamMembersService.create({
       ...options,
       createTeam: (input) => this.createTeam(input),
+      assertTeamNameFree: (input) => this.teamService.assertNameFree(input),
     });
     this.teamService = OrganizationTeamService.create(options);
     this.settingsService = OrganizationSettingsService.create(options);
+    this.licensingFacts = OrganizationLicensingFactsService.create(options);
     this.personalWorkspaces = PersonalWorkspaceService.create({
       ...options,
       diagnostics: options.diagnostics,
@@ -122,6 +125,8 @@ export class OrganizationService {
   private readonly teamService: OrganizationTeamService;
 
   private readonly settingsService: OrganizationSettingsService;
+
+  private readonly licensingFacts: OrganizationLicensingFactsService;
 
   async isMember(input: {
     organizationId: string;
@@ -164,6 +169,7 @@ export class OrganizationService {
 
   listProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]> {
@@ -274,20 +280,10 @@ export class OrganizationService {
   }
 
   /** Licensing's switch, from its fact: the switched-off list gains or loses one name. */
-  async switchConnectService({
-    organizationId,
-    service,
-    enabled,
-  }: {
-    organizationId: string;
-    service: string;
-    enabled: boolean;
-  }): Promise<void> {
-    const current = await this.repository.findConnectServicesDisabled(organizationId);
-    const servicesDisabled = enabled
-      ? current.filter((name) => name !== service)
-      : [...new Set([...current, service])];
-    await this.repository.updateConnectServicesDisabled({ organizationId, servicesDisabled });
+  switchConnectService(
+    input: Parameters<OrganizationLicensingFactsService["switchConnectService"]>[0],
+  ): Promise<void> {
+    return this.licensingFacts.switchConnectService(input);
   }
 
   /** How licensing's last sync ended, from its fact. */
@@ -299,13 +295,9 @@ export class OrganizationService {
     return this.repository.updateConnectSyncOutcome(input);
   }
 
-  setLicense(input: {
-    organizationId: string;
-    licenseKey: string;
-    expiresAt: Instant;
-    validatedAt: Instant | null;
-  }): Promise<void> {
-    return this.repository.setLicense(input);
+  /** Writes licensing's key only while its row still holds the one the fact names (C3-KEY-HASH). */
+  setLicense(input: Parameters<OrganizationLicensingFactsService["setLicense"]>[0]): Promise<void> {
+    return this.licensingFacts.setLicense(input);
   }
 
   clearLicense(input: { organizationId: string }): Promise<void> {

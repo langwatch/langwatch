@@ -3,7 +3,7 @@ import type { TenantSource } from "@langwatch/system-migrations";
 import type {
   OrganizationMemberTenantSourceRepository,
   UserTenantSourceRepository,
-} from "../user-tenant-source.repository.ts";
+} from "../tenant-source.repository.ts";
 
 const NO_TENANTS: TenantSource = { findTenantIdsAfter: async () => [] };
 

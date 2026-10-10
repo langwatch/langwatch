@@ -5,7 +5,7 @@ Feature: The test suites rail
 
   Background: what the rail holds.
     The rail is glued to the left edge of the page. It holds the test suites
-    of the project under a heading, then the external sets that run from code
+    of the project directly under the section title, then the external sets that run from code
     under a heading of their own. The period picker sits at the foot of the
     rail.
 
@@ -29,7 +29,7 @@ Feature: The test suites rail
   Scenario: The rail lists the test suites, then the external sets
     Given a project with two test suites and one external set
     When the Agent Testing page is opened
-    Then the two test suites read first under a "Test Suites" heading
+    Then the two test suites read first directly under the "Agent Testing" section title
     And the external set follows them under a "From Code" heading
     And no entry carries a count
 
@@ -38,7 +38,7 @@ Feature: The test suites rail
     Given a project with two test suites
     When the rail is read
     Then no entry named "All scenarios" is offered
-    And the test suites heading is a plain label and not a control
+    And the section title is a plain label and not a control
 
   @integration
   Scenario: The Default suite is listed first
@@ -70,7 +70,7 @@ Feature: The test suites rail
   @integration
   Scenario: The rail offers to create a test suite
     Given the Agent Testing page is open
-    When the test suites heading is read
+    When the section title is read
     Then a control to create a test suite is offered
     And using it adds the new suite to the rail
     And the new suite is opened

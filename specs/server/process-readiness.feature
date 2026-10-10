@@ -40,8 +40,8 @@ Feature: A process says when it is ready to take traffic
     Scenario: A failed boot never turns ready
       Given a process whose module boot fails
       When the kubelet asks /readyz
-      Then /readyz answers 503
-      And /healthz still answers 200 until the process exits
+      Then /readyz never answers 200
+      And the health door closes, so a boot in the same process can bind its port again
 
     @unit
     Scenario: A draining process is no longer ready

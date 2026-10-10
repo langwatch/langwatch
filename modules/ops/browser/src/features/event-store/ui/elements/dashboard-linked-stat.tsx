@@ -1,72 +1,26 @@
-import { Stat } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
-import { HStack, Text } from "@langwatch/design-system/primitives";
-import { ArrowUpRight } from "lucide-react";
+import { CompactStat, type CompactStatProps } from "@langwatch/design-system/stat-tile";
 import type { ReactNode } from "react";
 
-export interface LinkedStatProps {
-  label: string;
+export type LinkedStatProps = Omit<CompactStatProps, "renderLink" | "children" | "value"> & {
   value: string;
-  sublabel?: string;
-  href?: string;
-  color?: string;
-  testId?: string;
-  warning?: boolean;
-  /** Hover explanation of what the figure is measured over. */
-  hint?: string;
-  /** App/router-owned link wrapper; defaults to a normal anchor. */
+  /** App/router-owned link wrapper; defaults to the host's in-app link. */
   link?: (content: ReactNode, href: string) => ReactNode;
-}
+};
 
-/** A compact stat tile that can optionally link to an operator drill-down. */
-export function LinkedStat({
-  label,
-  value,
-  sublabel,
-  href,
-  color,
-  testId,
-  warning,
-  hint,
-  link,
-}: LinkedStatProps) {
-  const warningAttribute = warning === void 0 ? void 0 : String(warning);
-  const content = (
-    <Stat.Root
-      cursor={href ? "pointer" : void 0}
-      _hover={href ? { bg: "bg.subtle" } : void 0}
-      borderRadius="md"
-      flexShrink={0}
-      padding={2}
-      transition="background 0.1s"
-      data-testid={testId}
-      title={hint}
-      data-warning={warningAttribute}
-    >
-      <Stat.Label whiteSpace="nowrap">
-        <HStack gap={1}>
-          <Text>{label}</Text>
-          {href && <ArrowUpRight size={10} />}
-        </HStack>
-      </Stat.Label>
-      <Stat.ValueText color={color} whiteSpace="nowrap">
-        {value}
-      </Stat.ValueText>
-      {sublabel && (
-        <Text textStyle="xs" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
-          {sublabel}
-        </Text>
-      )}
-    </Stat.Root>
-  );
-
-  if (!href) return content;
-
-  return link ? (
-    link(content, href)
-  ) : (
-    <Link unstyled href={href} style={{ textDecoration: "none" }}>
-      {content}
-    </Link>
+/** The design system's compact stat, linked to an operator drill-down through the host. */
+export function LinkedStat({ link, ...props }: LinkedStatProps) {
+  return (
+    <CompactStat
+      {...props}
+      renderLink={
+        link ??
+        ((content, href) => (
+          <Link unstyled href={href} style={{ textDecoration: "none" }}>
+            {content}
+          </Link>
+        ))
+      }
+    />
   );
 }

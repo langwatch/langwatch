@@ -105,7 +105,9 @@ async function appFor(
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
-      identity: providers.identity ?? createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
+      identity:
+        providers.identity ??
+        createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -121,7 +123,9 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    channels: MemoryAuthChannels.create(),
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
     resources: { own: () => undefined } as never,
     // The deployment's session key reaches the app through its declared handle.
     secrets: new ScopedSecrets(async (handle, build) =>
@@ -233,7 +237,7 @@ describe("when Better Auth deletes a user", () => {
     const erased: { id: string }[] = [];
     const app = await appFor(true, {
       identity: createApiFixture<IdentityApi>({
-    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         ceremonies: () => ({
           beforeUserDelete: async (user) => void erased.push(user),
           createAccountIdentifier: async () => ({ pinned: false }),
@@ -343,7 +347,7 @@ describe("given enterprise SSO answers the deployment's sign-in providers", () =
     const askedFor: MountsRequest[] = [];
     const moved: unknown[] = [];
     const identity = createApiFixture<IdentityApi>({
-    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+      createStorageAdapter: ({ legacyEngine }) => legacyEngine,
       moveLegacyMicrosoftAccountKey: async ({ profile }) => {
         moved.push(profile);
       },

@@ -126,13 +126,13 @@ func runLimits(_ context.Context, _ deps, inv invocation) error {
 	case args[0] == "set" && len(args) == 3:
 		n, err := strconv.Atoi(args[2])
 		if err != nil {
-			return fmt.Errorf("haven limits set: %q is not a whole number", args[2])
+			return fmt.Errorf("haven machine limits set: %q is not a whole number", args[2])
 		}
 		return printLimitResult(setLimit(args[1], n))
 	case args[0] == "unset" && len(args) == 2:
 		return printLimitResult(unsetLimit(args[1]))
 	}
-	return errors.New("usage: haven limits [--json] | haven limits set <name> <value> | haven limits unset <name>")
+	return errors.New("usage: haven machine limits [--json] | haven machine limits set <name> <value> | haven machine limits unset <name>")
 }
 
 func printLimitResult(message string, err error) error {

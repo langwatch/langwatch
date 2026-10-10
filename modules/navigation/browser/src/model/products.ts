@@ -10,6 +10,8 @@ export type ProductScopeKind = "personal" | "project" | "organization";
 export interface ProductAccessGate {
   flag?: FrontendFeatureFlag;
   permission?: AuthzPermission;
+  /** The flag off closes the product's pages too (a 404), not only its menu entry. */
+  closesPages?: boolean;
 }
 
 export interface ProductDefinition {
@@ -37,7 +39,7 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     icon: UserRound,
     scopeKind: "personal",
     homeHref: () => "/me",
-    gates: [{ flag: "release_ui_ai_governance_enabled" }],
+    gates: [{ flag: "release_ui_ai_governance_enabled", closesPages: true }],
   },
   {
     id: "llm-ops",
@@ -64,7 +66,10 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     icon: Building2,
     scopeKind: "organization",
     homeHref: () => "/governance",
-    gates: [{ flag: "release_ui_ai_governance_enabled" }, { permission: "governance:view" }],
+    gates: [
+      { flag: "release_ui_ai_governance_enabled", closesPages: true },
+      { permission: "governance:view" },
+    ],
   },
 ];
 

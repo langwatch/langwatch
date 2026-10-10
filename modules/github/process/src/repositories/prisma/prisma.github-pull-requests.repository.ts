@@ -1,5 +1,6 @@
 import type { GithubUsageCount } from "@langwatch/github-contract";
 import { generate } from "@langwatch/ksuid";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -472,7 +473,10 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     const branchChecks = await this.prisma.$executeRaw`
       DELETE FROM "GithubBranchPullRequestCheck"
       WHERE "lastRequestedAt" < ${cutoff}::timestamp
-      -- @tenancy: GitHub branch bookkeeping retention sweep (system-owned maintenance)
+      ${skipTenantCheck({
+        // GitHub branch bookkeeping retention sweep (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return { branchChecks };
   }

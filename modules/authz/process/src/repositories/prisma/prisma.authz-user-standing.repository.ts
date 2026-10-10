@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -33,7 +34,10 @@ export class PrismaAuthzUserStandingRepository extends AuthzUserStandingReposito
   async recordErased({ userId, at }: { userId: string; at: Instant }): Promise<void> {
     const when = toDate(at);
     await this.database.$executeRaw`
-      -- @tenancy: platform-wide; a user's standing belongs to no organization
+      ${skipTenantCheck({
+        // Platform-wide; a user's standing belongs to no organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       INSERT INTO "AuthzUserStanding" ("userId", "erasedAt", "standingChangedAt")
       VALUES (${userId}, ${when}, ${when})
       ON CONFLICT ("userId") DO UPDATE
@@ -44,7 +48,10 @@ export class PrismaAuthzUserStandingRepository extends AuthzUserStandingReposito
   async findInactiveUserIds({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
     if (userIds.length === 0) return [];
     const rows = await this.database.$queryRaw`
-      -- @tenancy: platform-wide; a user's standing belongs to no organization
+      ${skipTenantCheck({
+        // Platform-wide; a user's standing belongs to no organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT "userId" FROM "AuthzUserStanding"
       WHERE "userId" = ANY(${[...new Set(userIds)]})
         AND ("deactivatedAt" IS NOT NULL OR "erasedAt" IS NOT NULL)
@@ -69,7 +76,10 @@ export class PrismaAuthzUserStandingRepository extends AuthzUserStandingReposito
   }): Promise<void> {
     const when = toDate(at);
     await this.database.$executeRaw`
-      -- @tenancy: platform-wide; a user's standing belongs to no organization
+      ${skipTenantCheck({
+        // Platform-wide; a user's standing belongs to no organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       INSERT INTO "AuthzUserStanding" ("userId", "deactivatedAt", "standingChangedAt")
       VALUES (${userId}, ${deactivated ? when : null}, ${when})
       ON CONFLICT ("userId") DO UPDATE

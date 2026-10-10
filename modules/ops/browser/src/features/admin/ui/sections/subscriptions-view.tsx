@@ -1,5 +1,7 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -16,8 +18,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Temporal, toEpochMs } from "@langwatch/time";
-import { MoreVertical, Pencil } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { MoreVertical, Pencil, SearchX } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
@@ -142,7 +144,14 @@ export default function SubscriptionsView() {
         onCreate={() => setCreating(true)}
         createLabel="New subscription"
       >
-        <Table.Root variant="line" size="md" width="full">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          variant="line"
+          size="sm"
+          width="full"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Organization</Table.ColumnHeader>
@@ -158,9 +167,11 @@ export default function SubscriptionsView() {
             {list.data?.data.length === 0 && (
               <Table.Row>
                 <Table.Cell colSpan={7}>
-                  <Text color="fg.muted" textAlign="center" paddingY={6}>
-                    No subscriptions match your search.
-                  </Text>
+                  <NoDataInfoBlock
+                    icon={<SearchX />}
+                    title="No subscriptions match your search."
+                    description="Try a different search or clear the filter to see all records."
+                  />
                 </Table.Cell>
               </Table.Row>
             )}
@@ -204,7 +215,7 @@ export default function SubscriptionsView() {
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </AdminTable>
 
       <SubscriptionDrawer mode="edit" subscription={editing} onClose={() => setEditing(null)} />
@@ -431,7 +442,7 @@ function SubscriptionDrawer({
                   Subscription ID: {subscription.id}
                 </Text>
                 {subscription.lastPaymentFailedDate && (
-                  <Text fontSize="xs" color="red.500">
+                  <Text fontSize="xs" color="fg.error">
                     Last payment failed: {formatDate(subscription.lastPaymentFailedDate)}
                   </Text>
                 )}
@@ -457,14 +468,7 @@ function SubscriptionDrawer({
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <Heading
-      as="h3"
-      size="xs"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-      pt={2}
-    >
+    <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
       {children}
     </Heading>
   );
@@ -522,7 +526,7 @@ function OrganizationPicker({
     filter: debouncedQuery ? { query: debouncedQuery } : {},
   });
 
-  const options = useMemo(() => list.data?.data ?? [], [list.data]);
+  const options = list.data?.data ?? [];
 
   return (
     <Field.Root required>

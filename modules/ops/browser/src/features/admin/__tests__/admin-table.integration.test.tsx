@@ -3,7 +3,7 @@
  */
 
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AdminTable } from "../ui/blocks/admin-table.tsx";
@@ -17,7 +17,7 @@ describe("AdminTable", () => {
     cleanup();
   });
 
-  it("keeps search controlled and reports pagination changes", () => {
+  it("keeps search controlled and reports pagination changes", async () => {
     const onSearchChange = vi.fn();
     const onPageChange = vi.fn();
 
@@ -36,11 +36,11 @@ describe("AdminTable", () => {
     fireEvent.change(screen.getByPlaceholderText("Search"), {
       target: { value: "alice@example.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    fireEvent.click(screen.getByRole("button", { name: /previous page/i }));
 
     expect(onSearchChange).toHaveBeenCalledWith("alice@example.com");
-    expect(onPageChange).toHaveBeenCalledWith(1);
-    expect(screen.getByText("26–50 of 60")).not.toBeNull();
+    await waitFor(() => expect(onPageChange).toHaveBeenCalledWith(1));
+    expect(screen.getByText("60 users · showing 26–50")).not.toBeNull();
   });
 
   it("renders the app-provided error slot without rendering table children", () => {

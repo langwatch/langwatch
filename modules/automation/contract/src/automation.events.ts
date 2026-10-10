@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { NOTIFICATION_CADENCES } from "./cadences.ts";
@@ -16,7 +17,7 @@ export const TRIGGER_MATCH_COALESCE_MAX_BATCH = 200;
 export const triggerActionClassSchema = z.enum(["notify", "persist"]);
 export type TriggerActionClass = z.infer<typeof triggerActionClassSchema>;
 
-export const triggerMatchRecordedEventDataSchema = z.object({
+const triggerMatchRecordedEventDataSchemaDefinition = z.object({
   triggerId: z.string().min(1),
   traceId: z.string().min(1),
   action: triggerActionSchema,
@@ -24,5 +25,10 @@ export const triggerMatchRecordedEventDataSchema = z.object({
   traceDebounceMs: z.number().int().nonnegative(),
   notificationCadence: z.enum(NOTIFICATION_CADENCES),
 });
+export interface TriggerMatchRecordedEventDataSchema extends Named<
+  typeof triggerMatchRecordedEventDataSchemaDefinition
+> {}
+export const triggerMatchRecordedEventDataSchema: TriggerMatchRecordedEventDataSchema =
+  triggerMatchRecordedEventDataSchemaDefinition;
 
 export type TriggerMatchRecordedEventData = z.infer<typeof triggerMatchRecordedEventDataSchema>;

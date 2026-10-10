@@ -1,10 +1,10 @@
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 // @vitest-environment jsdom
 /**
  * Project's lent switcher, as main's `ProjectSelector` drew it beside Add Secret.
@@ -50,8 +50,8 @@ class TestScope extends UiScope {
 
 function renderSwitcher({ projectId, pathname }: { projectId: string | null; pathname: string }) {
   const visited: string[] = [];
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {}, pathname }),
       navigate: (to) => visited.push(to),
     }),
@@ -59,9 +59,9 @@ function renderSwitcher({ projectId, pathname }: { projectId: string | null; pat
   };
   render(
     <DesignSystemProvider forcedTheme="light">
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <ProjectSwitcher />
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </DesignSystemProvider>,
   );
   return { visited };
@@ -93,6 +93,13 @@ describe("given the secrets page with a project in scope", () => {
         .getAllByRole("menuitem")
         .map((item) => item.querySelector("p")?.textContent);
       expect(names).toEqual(["Api", "Web", "Docs"]);
+    });
+
+    it("names every project in full on hover, since long names truncate", async () => {
+      await screen.findByText("Acme - Platform");
+      for (const name of ["Api", "Web", "Docs"]) {
+        expect(screen.getAllByTitle(name).length).toBeGreaterThan(0);
+      }
     });
 
     it("links each project to its home, told to return to the secrets page", async () => {

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
   DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
@@ -29,7 +30,7 @@ const adminSortSchema = z.object({
   order: z.enum(["ASC", "DESC"]).optional(),
 });
 
-export const adminOperationParamsSchema = z
+const adminOperationParamsSchemaDefinition = z
   .object({
     pagination: adminPaginationSchema.optional(),
     sort: adminSortSchema.optional(),
@@ -39,18 +40,33 @@ export const adminOperationParamsSchema = z
     previousData: z.record(z.string(), z.unknown()).optional(),
   })
   .catchall(z.unknown());
+export interface AdminOperationParamsSchema extends Named<
+  typeof adminOperationParamsSchemaDefinition
+> {}
+export const adminOperationParamsSchema: AdminOperationParamsSchema =
+  adminOperationParamsSchemaDefinition;
 
-export const adminOperationRequestSchema = z.object({
+const adminOperationRequestSchemaDefinition = z.object({
   resource: adminResourceNameSchema,
   method: adminOperationMethodSchema,
   params: adminOperationParamsSchema,
 });
+export interface AdminOperationRequestSchema extends Named<
+  typeof adminOperationRequestSchemaDefinition
+> {}
+export const adminOperationRequestSchema: AdminOperationRequestSchema =
+  adminOperationRequestSchemaDefinition;
 
-export const adminOperationInputSchema = z.object({
+const adminOperationInputSchemaDefinition = z.object({
   ...adminOperationRequestSchema.shape,
   actorId: z.string().min(1),
   req: adminAuditRequestSchema,
 });
+export interface AdminOperationInputSchema extends Named<
+  typeof adminOperationInputSchemaDefinition
+> {}
+export const adminOperationInputSchema: AdminOperationInputSchema =
+  adminOperationInputSchemaDefinition;
 
 const BYTES_PER_MEBIBYTE = 1024 * 1024;
 
@@ -72,41 +88,87 @@ export const organizationDatasetAttachmentMaxMbSchema = z
 export const ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL = `Enter a whole number of megabytes from ${ORGANIZATION_DATASET_ATTACHMENT_MIN_MB} to ${ORGANIZATION_DATASET_ATTACHMENT_MAX_MB}, or leave it empty for the default.`;
 
 /** `POST /api/admin/impersonate`'s body: who to become, and why. */
-export const adminImpersonationRequestSchema = z.object({
+const adminImpersonationRequestSchemaDefinition = z.object({
   userIdToImpersonate: z.string().trim().min(1),
   reason: z.string().trim().min(1),
 });
+export interface AdminImpersonationRequestSchema extends Named<
+  typeof adminImpersonationRequestSchemaDefinition
+> {}
+export const adminImpersonationRequestSchema: AdminImpersonationRequestSchema =
+  adminImpersonationRequestSchemaDefinition;
 
-export const adminEmptyRequestSchema = z.object({});
-export const adminAuthSessionSchema = z.object({ id: z.string().min(1) }).nullable();
-export const adminResourceParamsSchema = z.object({ resource: z.string().min(1) });
-export const adminOperationBodySchema = z.object({
+const adminEmptyRequestSchemaDefinition = z.object({});
+export interface AdminEmptyRequestSchema extends Named<typeof adminEmptyRequestSchemaDefinition> {}
+export const adminEmptyRequestSchema: AdminEmptyRequestSchema = adminEmptyRequestSchemaDefinition;
+const adminAuthSessionSchemaDefinition = z.object({ id: z.string().min(1) }).nullable();
+export interface AdminAuthSessionSchema extends Named<typeof adminAuthSessionSchemaDefinition> {}
+export const adminAuthSessionSchema: AdminAuthSessionSchema = adminAuthSessionSchemaDefinition;
+const adminResourceParamsSchemaDefinition = z.object({ resource: z.string().min(1) });
+export interface AdminResourceParamsSchema extends Named<
+  typeof adminResourceParamsSchemaDefinition
+> {}
+export const adminResourceParamsSchema: AdminResourceParamsSchema =
+  adminResourceParamsSchemaDefinition;
+const adminOperationBodySchemaDefinition = z.object({
   method: adminOperationMethodSchema,
   params: adminOperationParamsSchema.default({}),
 });
+export interface AdminOperationBodySchema extends Named<
+  typeof adminOperationBodySchemaDefinition
+> {}
+export const adminOperationBodySchema: AdminOperationBodySchema =
+  adminOperationBodySchemaDefinition;
 
-export const adminImpersonationStartedSchema = z.object({
+const adminImpersonationStartedSchemaDefinition = z.object({
   message: z.literal("Impersonation started"),
 });
-export const adminImpersonationStoppedSchema = z.object({
+export interface AdminImpersonationStartedSchema extends Named<
+  typeof adminImpersonationStartedSchemaDefinition
+> {}
+export const adminImpersonationStartedSchema: AdminImpersonationStartedSchema =
+  adminImpersonationStartedSchemaDefinition;
+const adminImpersonationStoppedSchemaDefinition = z.object({
   message: z.literal("Impersonation ended"),
 });
+export interface AdminImpersonationStoppedSchema extends Named<
+  typeof adminImpersonationStoppedSchemaDefinition
+> {}
+export const adminImpersonationStoppedSchema: AdminImpersonationStoppedSchema =
+  adminImpersonationStoppedSchemaDefinition;
 
 export type AdminOperationInput = z.infer<typeof adminOperationInputSchema>;
 export type AdminOperationParams = z.infer<typeof adminOperationParamsSchema>;
 
-export const adminListResultSchema = z.object({
+const adminListResultSchemaDefinition = z.object({
   data: z.array(z.unknown()),
   total: z.number().int().nonnegative(),
 });
+export interface AdminListResultSchema extends Named<typeof adminListResultSchemaDefinition> {}
+export const adminListResultSchema: AdminListResultSchema = adminListResultSchemaDefinition;
 
-export const adminDataResultSchema = z.object({ data: z.unknown() });
+const adminDataResultSchemaDefinition = z.object({ data: z.unknown() });
+export interface AdminDataResultSchema extends Named<typeof adminDataResultSchemaDefinition> {}
+export const adminDataResultSchema: AdminDataResultSchema = adminDataResultSchemaDefinition;
 
-export const adminOperationResultSchema = z.union([adminListResultSchema, adminDataResultSchema]);
-export const adminOperationResponseSchema = z.object({
+const adminOperationResultSchemaDefinition = z.union([
+  adminListResultSchema,
+  adminDataResultSchema,
+]);
+export interface AdminOperationResultSchema extends Named<
+  typeof adminOperationResultSchemaDefinition
+> {}
+export const adminOperationResultSchema: AdminOperationResultSchema =
+  adminOperationResultSchemaDefinition;
+const adminOperationResponseSchemaDefinition = z.object({
   data: z.unknown(),
   total: z.number().int().nonnegative().optional(),
 });
+export interface AdminOperationResponseSchema extends Named<
+  typeof adminOperationResponseSchemaDefinition
+> {}
+export const adminOperationResponseSchema: AdminOperationResponseSchema =
+  adminOperationResponseSchemaDefinition;
 
 export type AdminListResult = z.infer<typeof adminListResultSchema>;
 export type AdminDataResult = z.infer<typeof adminDataResultSchema>;

@@ -143,7 +143,6 @@ function billingApp({
     stripeCustomerId: null,
     pricingModel: null,
     currency: null,
-    license: null,
     selfHostedCustomer: true,
     teamIds: [],
     signupData: {},

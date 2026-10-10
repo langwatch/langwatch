@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The house id scheme's kind for a dashboard. */
@@ -7,25 +8,40 @@ export const dashboardIdSchema = z.string().min(1);
 export const projectIdSchema = z.string().min(1);
 export const dashboardNameSchema = z.string().trim().min(1).max(255);
 
-export const dashboardCreateInputSchema = z
+const dashboardCreateInputSchemaDefinition = z
   .object({
     projectId: projectIdSchema,
     name: dashboardNameSchema,
   })
   .strict();
+export interface DashboardCreateInputSchema extends Named<
+  typeof dashboardCreateInputSchemaDefinition
+> {}
+export const dashboardCreateInputSchema: DashboardCreateInputSchema =
+  dashboardCreateInputSchemaDefinition;
 
-export const dashboardRenameInputSchema = z
+const dashboardRenameInputSchemaDefinition = z
   .object({ ...dashboardCreateInputSchema.shape, dashboardId: dashboardIdSchema })
   .strict();
+export interface DashboardRenameInputSchema extends Named<
+  typeof dashboardRenameInputSchemaDefinition
+> {}
+export const dashboardRenameInputSchema: DashboardRenameInputSchema =
+  dashboardRenameInputSchemaDefinition;
 
-export const dashboardReorderInputSchema = z
+const dashboardReorderInputSchemaDefinition = z
   .object({
     projectId: projectIdSchema,
     dashboardIds: z.array(dashboardIdSchema).min(1),
   })
   .strict();
+export interface DashboardReorderInputSchema extends Named<
+  typeof dashboardReorderInputSchemaDefinition
+> {}
+export const dashboardReorderInputSchema: DashboardReorderInputSchema =
+  dashboardReorderInputSchemaDefinition;
 
-export const dashboardSchema = z
+const dashboardSchemaDefinition = z
   .object({
     id: dashboardIdSchema,
     projectId: projectIdSchema,
@@ -35,21 +51,37 @@ export const dashboardSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface DashboardSchema extends Named<typeof dashboardSchemaDefinition> {}
+export const dashboardSchema: DashboardSchema = dashboardSchemaDefinition;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 
-export const dashboardSummarySchema = z
+const dashboardSummarySchemaDefinition = z
   .object({ ...dashboardSchema.shape, graphCount: z.number().int().nonnegative() })
   .strict();
+export interface DashboardSummarySchema extends Named<typeof dashboardSummarySchemaDefinition> {}
+export const dashboardSummarySchema: DashboardSummarySchema = dashboardSummarySchemaDefinition;
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 
 // -- what `/api/dashboards` accepts ------------------------------------------
 
-export const dashboardRestNameSchema = z.object({
+const dashboardRestNameSchemaDefinition = z.object({
   name: z.string().min(1, "name is required").max(255),
 });
+export interface DashboardRestNameSchema extends Named<typeof dashboardRestNameSchemaDefinition> {}
+export const dashboardRestNameSchema: DashboardRestNameSchema = dashboardRestNameSchemaDefinition;
 
-export const dashboardRestReorderSchema = z.object({
+const dashboardRestReorderSchemaDefinition = z.object({
   dashboardIds: z.array(z.string().min(1)).min(1, "dashboardIds must not be empty"),
 });
+export interface DashboardRestReorderSchema extends Named<
+  typeof dashboardRestReorderSchemaDefinition
+> {}
+export const dashboardRestReorderSchema: DashboardRestReorderSchema =
+  dashboardRestReorderSchemaDefinition;
 
-export const dashboardRestParamsSchema = z.object({ id: z.string().min(1) });
+const dashboardRestParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface DashboardRestParamsSchema extends Named<
+  typeof dashboardRestParamsSchemaDefinition
+> {}
+export const dashboardRestParamsSchema: DashboardRestParamsSchema =
+  dashboardRestParamsSchemaDefinition;

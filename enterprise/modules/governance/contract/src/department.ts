@@ -2,36 +2,54 @@ import { z } from "zod";
 
 export const UNASSIGNED_DEPARTMENT = "unassigned" as const;
 
-export const departmentSchema = z.object({
+const departmentSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   organizationId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface DepartmentSchema extends Named<typeof departmentSchemaDefinition> {}
+export const departmentSchema: DepartmentSchema = departmentSchemaDefinition;
 export type Department = z.infer<typeof departmentSchema>;
 
-export const departmentAssignableEntitySchema = z.object({
+const departmentAssignableEntitySchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   departmentId: z.string().nullable(),
 });
+export interface DepartmentAssignableEntitySchema extends Named<
+  typeof departmentAssignableEntitySchemaDefinition
+> {}
+export const departmentAssignableEntitySchema: DepartmentAssignableEntitySchema =
+  departmentAssignableEntitySchemaDefinition;
 export type DepartmentAssignableEntity = z.infer<typeof departmentAssignableEntitySchema>;
 
-export const departmentAssignableUserSchema = z.object({
+const departmentAssignableUserSchemaDefinition = z.object({
   ...departmentAssignableEntitySchema.shape,
   email: z.string().nullable(),
 });
+export interface DepartmentAssignableUserSchema extends Named<
+  typeof departmentAssignableUserSchemaDefinition
+> {}
+export const departmentAssignableUserSchema: DepartmentAssignableUserSchema =
+  departmentAssignableUserSchemaDefinition;
 export type DepartmentAssignableUser = z.infer<typeof departmentAssignableUserSchema>;
 
-export const departmentAssignmentsSchema = z.object({
+const departmentAssignmentsSchemaDefinition = z.object({
   users: z.array(departmentAssignableUserSchema),
   teams: z.array(departmentAssignableEntitySchema),
   projects: z.array(departmentAssignableEntitySchema),
 });
+export interface DepartmentAssignmentsSchema extends Named<
+  typeof departmentAssignmentsSchemaDefinition
+> {}
+export const departmentAssignmentsSchema: DepartmentAssignmentsSchema =
+  departmentAssignmentsSchemaDefinition;
 export type DepartmentAssignments = z.infer<typeof departmentAssignmentsSchema>;
 
 import { HandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 
 export class DepartmentNotFoundError extends HandledError {
   constructor() {
@@ -48,7 +66,7 @@ export class DepartmentAssignmentTargetNotFoundError extends HandledError {
     );
   }
 }
-export const traceDepartmentInputSchema = z
+const traceDepartmentInputSchemaDefinition = z
   .object({
     hasPrincipalUser: z.boolean(),
     userDepartmentId: z.string().min(1).nullable().optional(),
@@ -56,6 +74,11 @@ export const traceDepartmentInputSchema = z
     projectDepartmentId: z.string().min(1).nullable().optional(),
   })
   .strict();
+export interface TraceDepartmentInputSchema extends Named<
+  typeof traceDepartmentInputSchemaDefinition
+> {}
+export const traceDepartmentInputSchema: TraceDepartmentInputSchema =
+  traceDepartmentInputSchemaDefinition;
 export type TraceDepartmentInput = z.infer<typeof traceDepartmentInputSchema>;
 
 export function resolveTraceDepartmentId(input: TraceDepartmentInput): string {

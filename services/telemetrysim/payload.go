@@ -10,6 +10,7 @@ import (
 	"hash/fnv"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,6 +63,17 @@ type SpanShape struct {
 	OffsetMs   int64
 	DurationMs int64
 	Attrs      []Attr
+	// Error, when set, ends the span with an error status and an exception event.
+	Error string
+	// Events are extra span events, offset from the span's start.
+	Events []EventShape
+}
+
+// EventShape is one span event of a SpanShape.
+type EventShape struct {
+	Name     string
+	OffsetMs int64
+	Attrs    []Attr
 }
 
 // LogShape is one record of a logs preset.
@@ -111,7 +123,7 @@ const (
 // presets are synthesized shapes, not recordings: the coding-agent ones follow
 // the span and attribute names those agents document, and a recording replaces
 // them as the reference once one is committed.
-var presets = []Preset{
+var presets = append([]Preset{
 	{Name: "llm-trace", Signal: SignalTraces, Service: "telemetrysim-agent", Spans: []SpanShape{
 		{Name: "agent.run", Kind: internal, DurationMs: 2400, Attrs: []Attr{{"langwatch.thread.id", "$session"}, {"langwatch.user.id", "$user"}}},
 		{Name: "chat gpt-4o-mini", Parent: 1, Kind: client, OffsetMs: 20, DurationMs: 1300, Attrs: []Attr{
@@ -150,6 +162,26 @@ var presets = []Preset{
 			{"conversation.id", "$session"}, {"model", "gpt-5-codex"}, {"input_token_count", 3600}, {"output_token_count", 220},
 		}},
 	}},
+	// Claude Code's own export is events over logs; the user_prompt names the session.
+	{Name: "claude-code-events", Signal: SignalLogs, Service: "claude-code", Logs: []LogShape{
+		{Body: "claude_code.user_prompt", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, Attrs: []Attr{
+			{"event.name", "claude_code.user_prompt"}, {"session.id", "$session"}, {"user.id", "$user"},
+			{"prompt", "Fix the flaky checkout test in the payments suite"}, {"prompt_length", 49},
+		}},
+		{Body: "claude_code.api_request", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 40, Attrs: []Attr{
+			{"event.name", "claude_code.api_request"}, {"session.id", "$session"}, {"model", "claude-sonnet-4-5"},
+			{"input_tokens", 3200}, {"output_tokens", 410}, {"cost_usd", 0.0158}, {"duration_ms", 3800},
+		}},
+		{Body: "claude_code.tool_result", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 3900, Attrs: []Attr{
+			{"event.name", "claude_code.tool_result"}, {"session.id", "$session"}, {"tool_name", "Bash"}, {"success", true},
+		}},
+		// The hook's companion event: its branch has a pull request in storage-seed's demo GitHub fixture.
+		{Body: "langwatch.session_context", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 4000, Attrs: []Attr{
+			{"event.name", "langwatch.session_context"}, {"session.id", "$session"}, {"coding_agent.name", "claude_code"},
+			{"vcs.repository.host", "github.com"}, {"vcs.repository.owner", "langwatch-seed"},
+			{"vcs.repository.name", "checkout"}, {"vcs.ref.head.name", "fix/flaky-checkout-test"},
+		}},
+	}},
 	{Name: "logs", Signal: SignalLogs, Service: "telemetrysim-app", Logs: []LogShape{
 		{Body: "request handled", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, Attrs: []Attr{{"http.route", "/api/chat"}, {"session.id", "$session"}}},
 		{Body: "slow upstream", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_WARN, OffsetMs: 40, Attrs: []Attr{{"upstream.latency_ms", 1800}}},
@@ -160,7 +192,9 @@ var presets = []Preset{
 		{Name: "telemetrysim.queue.depth", Unit: "{item}", Kind: MetricGauge, Base: 12},
 		{Name: "telemetrysim.request.duration", Unit: "ms", Kind: MetricHistogram, Base: 120, Attrs: []Attr{{"http.route", "/api/chat"}}},
 	}},
-}
+}, backfillPresets...)
+
+func init() { presets = append(presets, markedPresets...) }
 
 // PresetNames lists the presets in order.
 func PresetNames() []string {
@@ -170,6 +204,9 @@ func PresetNames() []string {
 	}
 	return names
 }
+
+// PresetByName finds a preset by its name.
+func PresetByName(name string) (Preset, bool) { return presetByName(name) }
 
 func presetByName(name string) (Preset, bool) {
 	for i := range presets {
@@ -338,6 +375,15 @@ func (b *batch) traces(p Preset, res *resourcepb.Resource) *colltracepb.ExportTr
 		if shape.Parent > 0 {
 			spans[i].ParentSpanId = ids[shape.Parent-1]
 		}
+		for _, ev := range shape.Events {
+			spans[i].Events = append(spans[i].Events, &tracepb.Span_Event{Name: ev.Name,
+				TimeUnixNano: nanos(start.Add(ms(ev.OffsetMs))), Attributes: b.attributes(ev.Attrs)})
+		}
+		if shape.Error != "" {
+			spans[i].Status = &tracepb.Status{Code: tracepb.Status_STATUS_CODE_ERROR, Message: shape.Error}
+			spans[i].Events = append(spans[i].Events, &tracepb.Span_Event{Name: "exception", TimeUnixNano: spans[i].EndTimeUnixNano,
+				Attributes: b.attributes([]Attr{{"exception.message", shape.Error}})})
+		}
 	}
 	return &colltracepb.ExportTraceServiceRequest{ResourceSpans: []*tracepb.ResourceSpans{{
 		Resource: res, ScopeSpans: []*tracepb.ScopeSpans{{Scope: scope(), Spans: spans}},
@@ -422,41 +468,39 @@ func marshal(msg proto.Message, enc Encoding) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var doc any
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&doc); err != nil {
+	// Compact drops protojson's deliberately unstable whitespace, so the same message gives the
+	// same bytes; rewriting ids in place avoids decoding the whole document (seedgen's hot path).
+	var compact bytes.Buffer
+	compact.Grow(len(raw))
+	if err := json.Compact(&compact, raw); err != nil {
 		return nil, err
 	}
-	hexIDs(doc)
-	return json.Marshal(doc)
+	return hexIDs(compact.Bytes()), nil
 }
 
-func hexIDs(node any) {
-	switch n := node.(type) {
-	case map[string]any:
-		for key, v := range n {
-			if !hexID(n, key, v) {
-				hexIDs(v)
-			}
-		}
-	case []any:
-		for _, v := range n {
-			hexIDs(v)
-		}
-	}
-}
+var idKeys = [][]byte{[]byte(`"traceId`), []byte(`"spanId`), []byte(`"parentSpanId`)}
 
-// hexID rewrites an id field's base64 string as hex and reports whether key was an id.
-func hexID(n map[string]any, key string, v any) bool {
-	s, ok := v.(string)
-	if !ok || (key != "traceId" && key != "spanId" && key != "parentSpanId") {
-		return false
+// hexIDs rewrites every OTLP id field's base64 value as hex, as OTLP/JSON wants. An id inside a
+// string value has escaped quotes, so it never matches; a value that is not base64 is kept.
+func hexIDs(doc []byte) []byte {
+	marker := []byte(`Id":"`)
+	out := make([]byte, 0, len(doc)+len(doc)/8)
+	for {
+		at := bytes.Index(doc, marker)
+		if at < 0 {
+			return append(out, doc...)
+		}
+		head, start := doc[:at+2], at+len(marker)
+		end := bytes.IndexByte(doc[start:], '"')
+		isID := slices.ContainsFunc(idKeys, func(key []byte) bool { return bytes.HasSuffix(head, key) })
+		raw, err := base64.StdEncoding.DecodeString(string(doc[start : start+max(end, 0)]))
+		if end < 0 || !isID || err != nil {
+			out, doc = append(out, doc[:start]...), doc[start:]
+			continue
+		}
+		out = hex.AppendEncode(append(out, doc[:start]...), raw)
+		doc = doc[start+end:]
 	}
-	if raw, err := base64.StdEncoding.DecodeString(s); err == nil {
-		n[key] = hex.EncodeToString(raw)
-	}
-	return true
 }
 
 // fuzzCase is one batch under mutation: its message, encoded body and type.

@@ -8,7 +8,13 @@ function Crashing(): never {
 }
 
 const meta = {
-  title: "Patterns/Studio drawer",
+  title: "Overlays/Studio drawer",
+  parameters: {
+    usage: {
+      use: "A drawer over the studio canvas, pushed below its header bar.",
+      avoid: "Outside the studio: use Drawer.",
+    },
+  },
   component: Drawer.Root,
   tags: ["autodocs"],
   args: { open: true, size: "md", children: null },

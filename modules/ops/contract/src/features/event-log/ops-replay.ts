@@ -1,10 +1,11 @@
 /** Projection replay vocabulary: port could only return Promise<unknown>,
  * leaving all field reads type-unchecked on the client. */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Where a replay run is, right now. There is at most one at a time. */
-export const replayStatusSchema = z.object({
+const replayStatusSchemaDefinition = z.object({
   state: z.enum(["idle", "running", "completed", "failed", "cancelled"]),
   runId: z.string().nullable(),
   startedAt: z.string().nullable(),
@@ -21,10 +22,12 @@ export const replayStatusSchema = z.object({
   description: z.string().nullable(),
   userName: z.string().nullable(),
 });
+export interface ReplayStatusSchema extends Named<typeof replayStatusSchemaDefinition> {}
+export const replayStatusSchema: ReplayStatusSchema = replayStatusSchemaDefinition;
 export type ReplayStatus = z.infer<typeof replayStatusSchema>;
 
 /** A finished run, as the history keeps it. `idle` and `running` cannot appear. */
-export const replayHistoryEntrySchema = z.object({
+const replayHistoryEntrySchemaDefinition = z.object({
   runId: z.string(),
   projectionNames: z.array(z.string()),
   since: z.string(),
@@ -38,6 +41,11 @@ export const replayHistoryEntrySchema = z.object({
   eventsProcessed: z.number(),
   error: z.string().nullable().optional(),
 });
+export interface ReplayHistoryEntrySchema extends Named<
+  typeof replayHistoryEntrySchemaDefinition
+> {}
+export const replayHistoryEntrySchema: ReplayHistoryEntrySchema =
+  replayHistoryEntrySchemaDefinition;
 export type ReplayHistoryEntry = z.infer<typeof replayHistoryEntrySchema>;
 
 /** The answer when nothing has ever run, and the shape a lost status falls back to. */

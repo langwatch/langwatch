@@ -4,7 +4,7 @@
  * grants, plan role, and flags.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { UiHostServiceProvider } from "@langwatch/browser-host/capabilities";
 import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
@@ -127,11 +127,11 @@ export function renderWithProjectHost(
   return {
     host,
     ...render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemTestProvider>
         <UiHostServiceProvider value={GOVERNANCE_ON}>
           <ProjectHostProvider value={host}>{element}</ProjectHostProvider>
         </UiHostServiceProvider>
-      </ChakraProvider>,
+      </DesignSystemTestProvider>,
     ),
   };
 }

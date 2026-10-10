@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE =
@@ -5,7 +6,7 @@ export const ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE =
 export const ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION = "2026-10-05" as const;
 
 /** The organization's presence switch; presence ANDs it with a project's. */
-export const organizationPresenceSettingChangedEventDataSchema = z.object({
+const organizationPresenceSettingChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
@@ -15,6 +16,11 @@ export const organizationPresenceSettingChangedEventDataSchema = z.object({
   /** Set by organization's backfill: the stored value, recorded before any change was. */
   backfilled: z.boolean().optional(),
 });
+export interface OrganizationPresenceSettingChangedEventDataSchema extends Named<
+  typeof organizationPresenceSettingChangedEventDataSchemaDefinition
+> {}
+export const organizationPresenceSettingChangedEventDataSchema: OrganizationPresenceSettingChangedEventDataSchema =
+  organizationPresenceSettingChangedEventDataSchemaDefinition;
 export type OrganizationPresenceSettingChangedEventData = z.infer<
   typeof organizationPresenceSettingChangedEventDataSchema
 >;
@@ -24,7 +30,7 @@ export const ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE =
 export const ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION = "2026-10-07" as const;
 
 /** Trace sharing switched off; share revokes the links of `projectIds` on its side (§9, R7). */
-export const organizationTraceSharingDisabledEventDataSchema = z.object({
+const organizationTraceSharingDisabledEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
@@ -33,6 +39,11 @@ export const organizationTraceSharingDisabledEventDataSchema = z.object({
   /** Who saved the change; absent for an organization key with no member. */
   changedByUserId: z.string().min(1).nullish(),
 });
+export interface OrganizationTraceSharingDisabledEventDataSchema extends Named<
+  typeof organizationTraceSharingDisabledEventDataSchemaDefinition
+> {}
+export const organizationTraceSharingDisabledEventDataSchema: OrganizationTraceSharingDisabledEventDataSchema =
+  organizationTraceSharingDisabledEventDataSchemaDefinition;
 export type OrganizationTraceSharingDisabledEventData = z.infer<
   typeof organizationTraceSharingDisabledEventDataSchema
 >;

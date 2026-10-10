@@ -72,6 +72,7 @@ describe("given an organization whose allowance usage recorded as reached", () =
         tenantId: createTenantId("org_acme"),
         aggregateId: "org_acme",
         occurredAt: 1_000,
+        createdAt: 1_000,
         eventId: "evt_1",
       };
 

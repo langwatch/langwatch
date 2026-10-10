@@ -12,6 +12,7 @@ import {
   lwqlMonarch,
   lwqlVocabularyOf,
 } from "../model/lwql-language/lwql-monarch.ts";
+import { logicalLwqlSchema } from "../model/lwql-language/lwql-scope.ts";
 
 type ModelState = { schema: LangWatchQLSchema | undefined; parameters: readonly LwqlParameter[] };
 
@@ -128,8 +129,9 @@ export function setLwqlModelState({
   schema: LangWatchQLSchema | undefined;
   parameters: readonly LwqlParameter[];
 }): void {
-  stateByModelUri.set(model.uri.toString(), { schema, parameters });
-  const vocabulary = lwqlVocabularyOf(schema);
+  const logical = schema && logicalLwqlSchema(schema);
+  stateByModelUri.set(model.uri.toString(), { schema: logical, parameters });
+  const vocabulary = lwqlVocabularyOf(logical);
   const key = JSON.stringify(vocabulary);
   if (key === vocabularyKey) return;
   vocabularyKey = key;
@@ -177,9 +179,9 @@ function ensureParamStyles(): void {
   const style = document.createElement("style");
   style.id = PARAM_STYLES_ID;
   style.textContent = `
-    .lw-sql-param-reserved { color: #3182CE; font-weight: 600; }
-    .lw-sql-param-declared { color: #805AD5; font-weight: 600; }
-    .lw-sql-param-undeclared { color: #DD6B20; font-weight: 600; text-decoration: underline wavy; }
+    .lw-sql-param-reserved { color: var(--chakra-colors-blue-fg); font-weight: 600; }
+    .lw-sql-param-declared { color: var(--chakra-colors-purple-fg); font-weight: 600; }
+    .lw-sql-param-undeclared { color: var(--chakra-colors-orange-fg); font-weight: 600; text-decoration: underline wavy; }
   `;
   document.head.appendChild(style);
 }

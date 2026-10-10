@@ -5,7 +5,9 @@
  */
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
@@ -21,6 +23,11 @@ import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ORGANIZATION = "org-acme";
 const OTHER_ORGANIZATION = "org-globex";
@@ -59,6 +66,15 @@ class DirectoryStore {
 
   private key(organizationId: string, userId: string): string {
     return `${organizationId}:${userId}`;
+  }
+
+  /** Organization's member removal, over the same memberships the repository reads. */
+  members(): Pick<OrganizationApi, "deleteMember"> {
+    return {
+      deleteMember: vi.fn(async ({ organizationId, userId }) => {
+        this.memberships.delete(this.key(organizationId, userId));
+      }),
+    };
   }
 
   live(organizationId: string): ScimUserResourceRecord[] {
@@ -134,9 +150,6 @@ class DirectoryStore {
       addMembership: vi.fn(async ({ organizationId, userId }) => {
         this.memberships.add(this.key(organizationId, userId));
       }),
-      removeMembership: vi.fn(async ({ organizationId, userId }) => {
-        this.memberships.delete(this.key(organizationId, userId));
-      }),
       findOrganizationUsers: vi.fn(async ({ organizationId, userName, startIndex, count }) => {
         const matches = (value: string | null): boolean =>
           userName === void 0 || (value ?? "").toLowerCase() === userName.toLowerCase();
@@ -182,7 +195,7 @@ function departments(): ScimCostCenterFacts {
   };
 }
 
-function directory(store: DirectoryStore) {
+function directory(store: DirectoryStore, connections = HeldConnectionsFake.of()) {
   const minted: ScimUserRecord[] = [];
   const users: ScimUserProvisioning = {
     findById: vi.fn(async ({ id }) => store.accounts.get(id) ?? null),
@@ -205,7 +218,8 @@ function directory(store: DirectoryStore) {
     users,
     minted,
     service: ScimService.create({
-      connections: HeldConnectionsFake.of(),
+      members: store.members(),
+      connections,
       prisma: store.repository(),
       writer: new GrantsFake(),
       users,
@@ -215,6 +229,7 @@ function directory(store: DirectoryStore) {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }
@@ -279,8 +294,8 @@ describe("the organization's own directory resource", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    // The leaver keeps the row and holds nothing; the reactivation below restores no grant.
-    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
+    // The leaver's membership here goes; the reactivation below restores nothing.
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
     expect(store.memberships.has(`${OTHER_ORGANIZATION}:user-1`)).toBe(true);
     expect(store.accounts.get("user-1")).toEqual(
       account({ id: "user-1", email: "shared@example.test" }),
@@ -296,7 +311,7 @@ describe("the organization's own directory resource", () => {
         },
       }),
     ).resolves.toMatchObject({ active: true });
-    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
     expect(users.findByEmail).not.toHaveBeenCalled();
   });
 
@@ -463,6 +478,7 @@ describe("the organization's own directory resource", () => {
     vi.spyOn(repository, "findUserByResourceName").mockResolvedValue(null);
 
     const raced = ScimService.create({
+      members: store.members(),
       connections: HeldConnectionsFake.of(),
       prisma: repository,
       writer: new GrantsFake(),
@@ -473,6 +489,7 @@ describe("the organization's own directory resource", () => {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     });
 
     expect(
@@ -486,5 +503,61 @@ describe("the organization's own directory resource", () => {
         )
       ).response,
     ).toMatchObject({ status: "409", scimType: "uniqueness" });
+  });
+});
+
+describe("an existing account the directory pushes", () => {
+  const push = { schemas: [USER_SCHEMA], userName: "known@example.test", active: true };
+
+  /** @scenario "A pushed address on an unproven domain that already has an account is refused" */
+  it("refuses it with 409 and grants no membership", async () => {
+    const store = new DirectoryStore();
+    store.accounts.set("user-1", account({ id: "user-1", email: "known@example.test" }));
+    const { service, minted } = directory(store);
+
+    const refusal = await refusalOf(
+      service.createUser({ organizationId: ORGANIZATION, request: push }),
+    );
+
+    expect(refusal.response).toMatchObject({ status: "409", scimType: "uniqueness" });
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
+    expect(store.resources.size).toBe(0);
+    expect(minted).toEqual([]);
+  });
+
+  /** @scenario "A pushed address on a proven domain that already has an account is linked directly" */
+  it("admits it at once on a domain a held connection proved", async () => {
+    const store = new DirectoryStore();
+    store.accounts.set("user-1", account({ id: "user-1", email: "known@example.test" }));
+    const connections = HeldConnectionsFake.of();
+    connections.hold({ connectionId: "okta", verifiedDomains: ["example.test"] });
+    const { service } = directory(store, connections);
+
+    const created = await service.createUser({ organizationId: ORGANIZATION, request: push });
+
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
+    expect(created).toMatchObject({ id: "user-1", active: true });
+  });
+});
+
+describe("when two pushes of one new person arrive together", () => {
+  /** @scenario "The push that loses the mint of a new person answers 409" */
+  it("answers the loser with the duplicate's 409 and writes no resource for it", async () => {
+    const store = new DirectoryStore();
+    const { service, users } = directory(store);
+    vi.mocked(users.create).mockRejectedValueOnce(new EmailAlreadyRegisteredError());
+
+    const refusal = await refusalOf(
+      service.createUser({
+        organizationId: ORGANIZATION,
+        request: { schemas: [USER_SCHEMA], userName: "racer@example.test", active: true },
+      }),
+    );
+
+    expect(refusal.response).toMatchObject({
+      status: "409",
+      detail: "User already exists in this organization",
+    });
+    expect(store.resources.size).toBe(0);
   });
 });

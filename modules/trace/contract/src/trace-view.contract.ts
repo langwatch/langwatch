@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { spanTreeNodeSchema, type SpanTreeNode } from "./trace.ts";
@@ -11,7 +12,7 @@ const traceMediaRefSchema = z.object({
   mimeType: z.string().optional(),
 });
 
-export const traceListItemSchema = z.object({
+const traceListItemSchemaDefinition = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -63,9 +64,11 @@ export const traceListItemSchema = z.object({
     )
     .default([]),
 });
+export interface TraceListItemSchema extends Named<typeof traceListItemSchemaDefinition> {}
+export const traceListItemSchema: TraceListItemSchema = traceListItemSchemaDefinition;
 
 /** Trace drawer header and summary response. */
-export const traceHeaderSchema = z.object({
+const traceHeaderSchemaDefinition = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -108,7 +111,15 @@ export const traceHeaderSchema = z.object({
   attributes: z.record(z.string(), z.string()),
   /** Categories permanently removed by ingestion privacy policy. */
   privacy: z.object({ droppedCategories: z.array(z.string()).optional() }).nullish(),
+  /**
+   * The project that owns the trace (ADR-177 block F): on an aggregate, the
+   * member it was read from, which the drawer hands back on every later read.
+   * Absent on a shared trace, whose viewer is told nothing about the project.
+   */
+  projectId: z.string().optional(),
 });
+export interface TraceHeaderSchema extends Named<typeof traceHeaderSchemaDefinition> {}
+export const traceHeaderSchema: TraceHeaderSchema = traceHeaderSchemaDefinition;
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;
 
@@ -126,10 +137,15 @@ const langwatchSignalBucketSchema = z.enum([
 
 export type LangwatchSignalBucket = z.infer<typeof langwatchSignalBucketSchema>;
 
-export const spanLangwatchSignalsSchema = z.object({
+const spanLangwatchSignalsSchemaDefinition = z.object({
   spanId: z.string(),
   signals: z.array(langwatchSignalBucketSchema),
 });
+export interface SpanLangwatchSignalsSchema extends Named<
+  typeof spanLangwatchSignalsSchemaDefinition
+> {}
+export const spanLangwatchSignalsSchema: SpanLangwatchSignalsSchema =
+  spanLangwatchSignalsSchemaDefinition;
 
 export type SpanLangwatchSignals = z.infer<typeof spanLangwatchSignalsSchema>;
 
@@ -160,7 +176,7 @@ const restrictedAttributeSchema = z.object({
 export type RestrictedAttribute = z.infer<typeof restrictedAttributeSchema>;
 
 /** Full selected-span response for the trace drawer. */
-export const spanDetailSchema = z.object({
+const spanDetailSchemaDefinition = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
   name: z.string(),
@@ -207,6 +223,8 @@ export const spanDetailSchema = z.object({
   /** Offered only for an unpriced model with recorded token usage. */
   costSuggestion: z.object({ model: z.string() }).nullish(),
 });
+export interface SpanDetailSchema extends Named<typeof spanDetailSchemaDefinition> {}
+export const spanDetailSchema: SpanDetailSchema = spanDetailSchemaDefinition;
 
 export type SpanDetail = z.infer<typeof spanDetailSchema>;
 
@@ -228,11 +246,16 @@ const conversationTurnSchema = z.object({
 
 export type ConversationTurn = z.infer<typeof conversationTurnSchema>;
 
-export const conversationContextSchema = z.object({
+const conversationContextSchemaDefinition = z.object({
   conversationId: z.string(),
   total: z.number(),
   turns: z.array(conversationTurnSchema),
 });
+export interface ConversationContextSchema extends Named<
+  typeof conversationContextSchemaDefinition
+> {}
+export const conversationContextSchema: ConversationContextSchema =
+  conversationContextSchemaDefinition;
 
 export type ConversationContext = z.infer<typeof conversationContextSchema>;
 
@@ -253,11 +276,13 @@ const spanResourceInfoSchema = z.object({
 export type SpanResourceInfoDto = z.infer<typeof spanResourceInfoSchema>;
 
 /** Root representative resources plus per-span scope/resource divergence. */
-export const traceResourceInfoSchema = z.object({
+const traceResourceInfoSchemaDefinition = z.object({
   rootSpanId: z.string().nullable(),
   resourceAttributes: z.record(z.string(), z.string()),
   scope: instrumentationScopeSchema.nullable(),
   spans: z.array(spanResourceInfoSchema),
 });
+export interface TraceResourceInfoSchema extends Named<typeof traceResourceInfoSchemaDefinition> {}
+export const traceResourceInfoSchema: TraceResourceInfoSchema = traceResourceInfoSchemaDefinition;
 
 export type TraceResourceInfoDto = z.infer<typeof traceResourceInfoSchema>;

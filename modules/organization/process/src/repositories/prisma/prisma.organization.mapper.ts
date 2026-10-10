@@ -21,14 +21,19 @@ import type {
 import { fromDate } from "@langwatch/time";
 
 export function organizationFromRecord(record: OrganizationRecord): Organization {
-  const { connectLastSyncAt: _connectLastSyncAt, ...row } = record;
+  // Licensing owns the licence; organization only mirrors it until the columns are dropped.
+  const {
+    connectLastSyncAt: _connectLastSyncAt,
+    license: _license,
+    licenseExpiresAt: _licenseExpiresAt,
+    licenseLastValidatedAt: _licenseLastValidatedAt,
+    ...row
+  } = record;
   return {
     ...row,
     createdAt: fromDate(row.createdAt),
     updatedAt: fromDate(row.updatedAt),
     sentPlanLimitAlert: row.sentPlanLimitAlert && fromDate(row.sentPlanLimitAlert),
-    licenseExpiresAt: row.licenseExpiresAt && fromDate(row.licenseExpiresAt),
-    licenseLastValidatedAt: row.licenseLastValidatedAt && fromDate(row.licenseLastValidatedAt),
   };
 }
 

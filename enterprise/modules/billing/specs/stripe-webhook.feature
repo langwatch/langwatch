@@ -122,14 +122,15 @@ Feature: Stripe webhook handling grants and removes plans correctly
   Scenario: A paid subscription asks organization to retire the trial licence
     Given an organization holding a trial licence
     When a paid subscription activates
-    Then billing asks organization to clear that organization's licence and nothing else
+    Then billing asks licensing to remove that organization's licence and nothing else
     And organization clears the key and both dates derived from it together
 
   @unit
-  Scenario: An activation carries the organization's trial licence to the webhook
+  Scenario: A paid subscription asks licensing whether the organization still holds a trial licence
     Given a subscription activating for an organization
     When the webhook reads the activated row
-    Then it carries whether that organization still holds a trial licence
+    Then it asks licensing whether that organization still holds a licence
+    And it removes nothing when licensing reports none
 
   @unit
   Scenario: A subscription row Stripe names that is gone is not a failed delivery
@@ -145,7 +146,7 @@ Feature: Stripe webhook handling grants and removes plans correctly
 
   @unit
   Scenario: The webhook's unrenamed subscription writes reach the repository unchanged
-    Given a webhook cancelling, linking or recording a payment failure
+    Given a webhook activating, updating quantities, cancelling, linking or recording a payment failure
     When it writes through the subscription port
     Then each call reaches the repository with exactly what it was given
 

@@ -210,6 +210,7 @@ export function createCanonicalAutomationApp(): {
         traces: createApiFixture<TraceApi>({}),
         evaluations: createApiFixture<EvaluationApi>({}),
         webhooks: createApiFixture<WebhookApi>({}),
+        retention: createApiFixture({}),
       },
       infrastructure,
       config: {
@@ -219,6 +220,9 @@ export function createCanonicalAutomationApp(): {
         persistDailyCapPaid: 500,
         persistDailyCapEnterprise: 5_000,
         publicBaseUrl: undefined,
+        slackApiBase: "https://slack.com/api",
+        slackWebhookBase: "https://hooks.slack.com",
+        allowInsecureLocalUrls: false,
       },
     }),
     triggerCreate,

@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { LimitCheckResult, OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
@@ -12,7 +12,7 @@ import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { licenseEnforcementTrpcTransport } from "../license-enforcement.trpc.ts";
-import { organizationSessionPersonFact } from "../organization.trpc.ts";
+import { organizationSessionPersonContext } from "../organization.trpc.ts";
 
 type TestContext = {
   actor: { id: string };
@@ -45,7 +45,9 @@ const router = createTrpcRuntime<TestContext>({
   procedure: trpc.procedure,
   members,
 }).mount(licenseEnforcementTrpcTransport, () => app, {
-  facts: [bindTrpcFact(organizationSessionPersonFact, (ctx) => ctx.person)],
+  middlewareContext: [
+    bindTrpcMiddlewareContext(organizationSessionPersonContext, (ctx) => ctx.person),
+  ],
 });
 const caller = router.createCaller({
   actor: { id: "user_ana" },

@@ -1,17 +1,18 @@
+import { system } from "@langwatch/design-system/system";
 /**
  * The colour of a target in a comparison.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 export const TARGET_COLORS = [
-  "#3b82f6",
-  "#f97316",
-  "#10b981",
-  "#ec4899",
-  "#8b5cf6",
-  "#ef4444",
-  "#0891b2",
-  "#ca8a04",
+  system.token.var("colors.chart.2"),
+  system.token.var("colors.chart.1"),
+  system.token.var("colors.chart.3"),
+  system.token.var("colors.chart.8"),
+  system.token.var("colors.chart.5"),
+  system.token.var("colors.red.solid"),
+  system.token.var("colors.chart.6"),
+  system.token.var("colors.chart.4"),
 ] as const;
 
 /** The colour of the target at this position; the palette wraps after eight. */

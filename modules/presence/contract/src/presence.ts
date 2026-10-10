@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const presenceLensSchema = z.enum([
@@ -23,7 +24,7 @@ export const presenceVisualizationTabSchema = z.enum([
 ]);
 export const presenceDrawerTabSchema = z.enum(["summary", "llm", "span", "prompts", "annotations"]);
 
-export const presenceLocationSchema = z
+const presenceLocationSchemaDefinition = z
   .object({
     lens: presenceLensSchema,
     route: z
@@ -45,18 +46,22 @@ export const presenceLocationSchema = z
       .optional(),
   })
   .strict();
+export interface PresenceLocationSchema extends Named<typeof presenceLocationSchemaDefinition> {}
+export const presenceLocationSchema: PresenceLocationSchema = presenceLocationSchemaDefinition;
 export type PresenceLocation = z.infer<typeof presenceLocationSchema>;
 
-export const presenceUserSchema = z
+const presenceUserSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string().nullable(),
     image: z.string().nullable(),
   })
   .strict();
+export interface PresenceUserSchema extends Named<typeof presenceUserSchemaDefinition> {}
+export const presenceUserSchema: PresenceUserSchema = presenceUserSchemaDefinition;
 export type PresenceUser = z.infer<typeof presenceUserSchema>;
 
-export const presenceSessionSchema = z
+const presenceSessionSchemaDefinition = z
   .object({
     sessionId: z.string().min(1),
     projectId: z.string().min(1),
@@ -65,14 +70,18 @@ export const presenceSessionSchema = z
     updatedAt: z.number().int().nonnegative(),
   })
   .strict();
+export interface PresenceSessionSchema extends Named<typeof presenceSessionSchemaDefinition> {}
+export const presenceSessionSchema: PresenceSessionSchema = presenceSessionSchemaDefinition;
 export type PresenceSession = z.infer<typeof presenceSessionSchema>;
 
-export const presenceEventSchema = z.discriminatedUnion("kind", [
+const presenceEventSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("snapshot"), sessions: z.array(presenceSessionSchema) }).strict(),
   z.object({ kind: z.literal("join"), session: presenceSessionSchema }).strict(),
   z.object({ kind: z.literal("update"), session: presenceSessionSchema }).strict(),
   z.object({ kind: z.literal("leave"), sessionId: z.string().min(1) }).strict(),
 ]);
+export interface PresenceEventSchema extends Named<typeof presenceEventSchemaDefinition> {}
+export const presenceEventSchema: PresenceEventSchema = presenceEventSchemaDefinition;
 export type PresenceEvent = z.infer<typeof presenceEventSchema>;
 
 export const presenceCursorAnchorSchema = z
@@ -81,27 +90,42 @@ export const presenceCursorAnchorSchema = z
   .max(256)
   .regex(/^[A-Za-z0-9:_-]+$/u);
 
-export const presenceCursorPayloadSchema = z
+const presenceCursorPayloadSchemaDefinition = z
   .object({
     anchor: presenceCursorAnchorSchema,
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
   })
   .strict();
+export interface PresenceCursorPayloadSchema extends Named<
+  typeof presenceCursorPayloadSchemaDefinition
+> {}
+export const presenceCursorPayloadSchema: PresenceCursorPayloadSchema =
+  presenceCursorPayloadSchemaDefinition;
 export type PresenceCursorPayload = z.infer<typeof presenceCursorPayloadSchema>;
 
-export const presenceCursorEventSchema = presenceCursorPayloadSchema.safeExtend({
+const presenceCursorEventSchemaDefinition = presenceCursorPayloadSchema.safeExtend({
   projectId: z.string().min(1),
   sessionId: z.string().min(1),
   user: presenceUserSchema,
   emittedAt: z.number().int().nonnegative(),
 });
+export interface PresenceCursorEventSchema extends Named<
+  typeof presenceCursorEventSchemaDefinition
+> {}
+export const presenceCursorEventSchema: PresenceCursorEventSchema =
+  presenceCursorEventSchemaDefinition;
 export type PresenceCursorEvent = z.infer<typeof presenceCursorEventSchema>;
 
-export const presenceProjectInputSchema = z.object({ projectId: z.string().min(1) }).strict();
+const presenceProjectInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface PresenceProjectInputSchema extends Named<
+  typeof presenceProjectInputSchemaDefinition
+> {}
+export const presenceProjectInputSchema: PresenceProjectInputSchema =
+  presenceProjectInputSchemaDefinition;
 export type PresenceProjectInput = z.infer<typeof presenceProjectInputSchema>;
 
-export const presenceUpdateInputSchema = z
+const presenceUpdateInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
@@ -109,6 +133,11 @@ export const presenceUpdateInputSchema = z
     location: presenceLocationSchema,
   })
   .strict();
+export interface PresenceUpdateInputSchema extends Named<
+  typeof presenceUpdateInputSchemaDefinition
+> {}
+export const presenceUpdateInputSchema: PresenceUpdateInputSchema =
+  presenceUpdateInputSchemaDefinition;
 export type PresenceUpdateInput = z.infer<typeof presenceUpdateInputSchema>;
 
 /**
@@ -116,24 +145,34 @@ export type PresenceUpdateInput = z.infer<typeof presenceUpdateInputSchema>;
  * construction: it is read from the authenticated session, so a payload cannot
  * claim somebody else's name or avatar.
  */
-export const presenceUpdateRequestSchema = z
+const presenceUpdateRequestSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
     location: presenceLocationSchema,
   })
   .strict();
+export interface PresenceUpdateRequestSchema extends Named<
+  typeof presenceUpdateRequestSchemaDefinition
+> {}
+export const presenceUpdateRequestSchema: PresenceUpdateRequestSchema =
+  presenceUpdateRequestSchemaDefinition;
 export type PresenceUpdateRequest = z.infer<typeof presenceUpdateRequestSchema>;
 
-export const presenceLeaveRequestSchema = z
+const presenceLeaveRequestSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
   })
   .strict();
+export interface PresenceLeaveRequestSchema extends Named<
+  typeof presenceLeaveRequestSchemaDefinition
+> {}
+export const presenceLeaveRequestSchema: PresenceLeaveRequestSchema =
+  presenceLeaveRequestSchemaDefinition;
 export type PresenceLeaveRequest = z.infer<typeof presenceLeaveRequestSchema>;
 
-export const presenceLeaveInputSchema = z
+const presenceLeaveInputSchemaDefinition = z
   .object({
     ...presenceLeaveRequestSchema.shape,
     /**
@@ -143,9 +182,14 @@ export const presenceLeaveInputSchema = z
     userId: z.string().min(1),
   })
   .strict();
+export interface PresenceLeaveInputSchema extends Named<
+  typeof presenceLeaveInputSchemaDefinition
+> {}
+export const presenceLeaveInputSchema: PresenceLeaveInputSchema =
+  presenceLeaveInputSchemaDefinition;
 export type PresenceLeaveInput = z.infer<typeof presenceLeaveInputSchema>;
 
-export const presenceCursorInputSchema = z
+const presenceCursorInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
@@ -153,30 +197,50 @@ export const presenceCursorInputSchema = z
     payload: presenceCursorPayloadSchema,
   })
   .strict();
+export interface PresenceCursorInputSchema extends Named<
+  typeof presenceCursorInputSchemaDefinition
+> {}
+export const presenceCursorInputSchema: PresenceCursorInputSchema =
+  presenceCursorInputSchemaDefinition;
 export type PresenceCursorInput = z.infer<typeof presenceCursorInputSchema>;
 
 /** One cursor tick as a browser publishes it; the person comes from the session. */
-export const presenceCursorRequestSchema = z
+const presenceCursorRequestSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
     payload: presenceCursorPayloadSchema,
   })
   .strict();
+export interface PresenceCursorRequestSchema extends Named<
+  typeof presenceCursorRequestSchemaDefinition
+> {}
+export const presenceCursorRequestSchema: PresenceCursorRequestSchema =
+  presenceCursorRequestSchemaDefinition;
 export type PresenceCursorRequest = z.infer<typeof presenceCursorRequestSchema>;
 
 /** The cursors of one anchor, minus the subscriber's own. */
-export const presenceCursorSubscriptionSchema = z
+const presenceCursorSubscriptionSchemaDefinition = z
   .object({
     ...presenceProjectInputSchema.shape,
     anchor: presenceCursorAnchorSchema,
     sessionId: z.string().min(1),
   })
   .strict();
+export interface PresenceCursorSubscriptionSchema extends Named<
+  typeof presenceCursorSubscriptionSchemaDefinition
+> {}
+export const presenceCursorSubscriptionSchema: PresenceCursorSubscriptionSchema =
+  presenceCursorSubscriptionSchemaDefinition;
 export type PresenceCursorSubscription = z.infer<typeof presenceCursorSubscriptionSchema>;
 
 /** What the presence writes answer with: the tick was accepted. */
-export const presenceAcknowledgedSchema = z.object({ ok: z.literal(true) }).strict();
+const presenceAcknowledgedSchemaDefinition = z.object({ ok: z.literal(true) }).strict();
+export interface PresenceAcknowledgedSchema extends Named<
+  typeof presenceAcknowledgedSchemaDefinition
+> {}
+export const presenceAcknowledgedSchema: PresenceAcknowledgedSchema =
+  presenceAcknowledgedSchemaDefinition;
 export type PresenceAcknowledged = z.infer<typeof presenceAcknowledgedSchema>;
 
 export type PresenceDisabledScope = "organization" | "project" | null;

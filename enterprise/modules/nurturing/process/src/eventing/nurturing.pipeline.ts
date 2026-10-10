@@ -17,6 +17,11 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
+  USAGE_REPORT_RECEIVED_EVENT_TYPE,
+  type UsageReportReceivedEventData,
+  usageReportReceivedEventDataSchema,
+} from "@langwatch/enterprise-saas-contract";
+import {
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   EVALUATION_RAN_EVENT_TYPE,
   type EvaluationLifecycleCompletedEventData,
@@ -136,6 +141,10 @@ export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
   projectCreated: (data: ProjectCreatedEventData) => Promise<void>;
   guidedTurnFailed: (data: GuidedOnboardingTurnFailedEventData) => Promise<void>;
+  usageReportReceived: (input: {
+    data: UsageReportReceivedEventData;
+    eventId: string;
+  }) => Promise<void>;
   evaluationCompleted: (input: {
     data: EvaluationLifecycleCompletedEventData;
     aggregateId: string;
@@ -183,6 +192,11 @@ export function buildNurturingPipeline(deps: {
         eventType: GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
         data: guidedOnboardingTurnFailedEventDataSchema,
         handle: (data) => deps.guidedTurnFailed(data),
+      })
+      .withPeerSubscriber("usageReportReceived", {
+        eventType: USAGE_REPORT_RECEIVED_EVENT_TYPE,
+        data: usageReportReceivedEventDataSchema,
+        handle: (data, { eventId }) => deps.usageReportReceived({ data, eventId }),
       })
       .withPeerSubscriber("experimentRan", {
         eventType: EXPERIMENT_RAN_EVENT_TYPE,

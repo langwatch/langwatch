@@ -6,6 +6,27 @@ import { CloseButton } from "./close-button.tsx";
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
 
+let endInset = 0;
+const endInsetListeners = new Set<() => void>();
+
+/** The shell sets the room a docked side panel keeps on the right edge; every drawer yields it. */
+export function setDrawerEndInset(px: number): void {
+  if (px === endInset) return;
+  endInset = px;
+  for (const listener of endInsetListeners) listener();
+}
+
+export function useDrawerEndInset(): number {
+  return React.useSyncExternalStore(
+    (listener) => {
+      endInsetListeners.add(listener);
+      return () => endInsetListeners.delete(listener);
+    },
+    () => endInset,
+    () => 0,
+  );
+}
+
 export interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
@@ -15,6 +36,7 @@ export interface DrawerContentProps extends ChakraDrawer.ContentProps {
 export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
   function DrawerContent({ portalled = true, portalRef, offset, marginTop, ...contentProps }, ref) {
     const context = React.useContext(DrawerOffsetContext);
+    const inset = useDrawerEndInset();
     return (
       <Portal disabled={!portalled} container={portalRef}>
         <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
@@ -23,9 +45,8 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
             margin={2}
             pointerEvents="auto"
             borderRadius="lg"
-            background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
-            backdropFilter="var(--lw-backdrop-blur, blur(25px))"
-            marginTop={marginTop ?? context.marginTop}
+            marginTop={marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)}
+            marginEnd={inset > 0 ? `${inset}px` : undefined}
             {...contentProps}
           />
         </ChakraDrawer.Positioner>
@@ -39,7 +60,7 @@ export const DrawerCloseTrigger = React.forwardRef<
   ChakraDrawer.CloseTriggerProps
 >(function DrawerCloseTrigger(props, ref) {
   return (
-    <ChakraDrawer.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
+    <ChakraDrawer.CloseTrigger position="absolute" top="3" insetEnd="3" {...props} asChild>
       <CloseButton ref={ref} size="sm" />
     </ChakraDrawer.CloseTrigger>
   );

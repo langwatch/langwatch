@@ -91,13 +91,16 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       size="2xs"
       flexShrink={0}
       onClick={isGated ? undefined : onClick}
-      color="white"
+      color="purple.contrast"
       fontWeight="600"
       position="relative"
       overflow="hidden"
       bg="transparent"
-      boxShadow="0 1px 4px rgba(168,85,247,0.25), 0 0 0 1px rgba(255,95,31,0.12)"
-      _dark={{ boxShadow: "0 1px 4px rgba(237,137,38,0.16)" }}
+      boxShadow="0 1px 4px color-mix(in srgb, var(--chakra-colors-purple-fg) 25%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent)"
+      _dark={{
+        boxShadow:
+          "0 1px 4px color-mix(in srgb, var(--chakra-colors-accent-solid) 16%, transparent)",
+      }}
       // Live "AI breathing" halo — only when motion is allowed. Skipped
       // when fully gated by `disabledReason` (sample mode) — a pulsing
       // halo on an inert button reads as broken animation. Provider-

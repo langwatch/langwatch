@@ -65,6 +65,11 @@ class InMemoryAnomalyRules extends AnomalyRuleRepository {
     this.applied = changes;
     return { ...this.row, ...changes } as AnomalyRule;
   }
+
+  async updateIfUnchanged({ changes }: { changes: AnomalyRuleChanges }) {
+    this.applied = changes;
+    return true;
+  }
 }
 
 const destination = (sharedSecret: string | undefined) => ({

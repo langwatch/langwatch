@@ -23,12 +23,17 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** A process composing prometheus metrics on its own health door, scraped over HTTP. */
+/** A process composing prometheus metrics on its own pull port, scraped over HTTP. */
 async function serve(environment: Readonly<Record<string, string>>) {
   const port = await freePort();
+  const pullPort = await freePort();
   const { logger, lines } = createTestLogger();
   const server = await Server.create("default-collectors-test")
-    .withEnvironment({ OTEL_METRICS_EXPORTER: "otlp,prometheus", ...environment })
+    .withEnvironment({
+      OTEL_METRICS_EXPORTER: "otlp,prometheus",
+      OTEL_EXPORTER_PROMETHEUS_PORT: String(pullPort),
+      ...environment,
+    })
     .withConfig(processConfig([], "worker"))
     .withHealthPort(port)
     .withProcessOwnership(false)
@@ -45,19 +50,24 @@ async function serve(environment: Readonly<Record<string, string>>) {
       response.writeHead(404).end();
     },
   });
-  const scrape = () => fetch(`http://127.0.0.1:${port}/metrics`);
+  const scrape = () =>
+    fetch(`http://127.0.0.1:${pullPort}/metrics`, {
+      headers: { authorization: "Bearer scrape-me" },
+    });
   return { scrape, lines };
 }
+
+const keyed = { METRICS_API_KEY: "scrape-me" };
 
 describe("a process whose registry already carries the default collectors", () => {
   describe("when a second composition installs them again", () => {
     /** @scenario "A registry that already carries default collectors is left intact" */
     it("composes, and a scrape renders each default collector once beside the rest", async () => {
-      const first = await serve({});
+      const first = await serve(keyed);
       const before = await (await first.scrape()).text();
       expect(before).toContain("# TYPE process_cpu_user_seconds_total ");
 
-      const { scrape } = await serve({});
+      const { scrape } = await serve(keyed);
 
       const response = await scrape();
       expect(response.status).toBe(200);
@@ -69,14 +79,14 @@ describe("a process whose registry already carries the default collectors", () =
   });
 });
 
-describe("a process in production with no metrics token", () => {
+describe("a process in production with no METRICS_API_KEY", () => {
   describe("when it composes", () => {
     /** @scenario "In production an unset key is named at boot" */
     it("mounts no metrics endpoint and names the missing setting in the boot log", async () => {
       const { scrape, lines } = await serve({ NODE_ENV: "production" });
 
-      expect((await scrape()).status).toBe(404);
-      expect(lines.findLine("error", "LANGWATCH_METRICS_TOKEN")).toBeDefined();
+      await expect(scrape()).rejects.toThrow("fetch failed");
+      expect(lines.findLine("error", "METRICS_API_KEY")).toBeDefined();
     });
   });
 });

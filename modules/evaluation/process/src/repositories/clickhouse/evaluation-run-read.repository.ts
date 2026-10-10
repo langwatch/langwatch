@@ -1,31 +1,43 @@
-import { RetentionFloorService } from "@langwatch/clickhouse-client";
+import type { Authorization } from "@langwatch/authorization";
+import {
+  type AuthorizedClickHouse,
+  ownProjectIdOf,
+  RetentionFloorService,
+  singleTenantOf,
+  TenantReaderClientUnavailableError,
+  tenantScope,
+  tenantScopeKey,
+  tenantSet,
+} from "@langwatch/clickhouse-client";
 import {
   evaluationRunDataSchema,
   EvaluationNotFoundError,
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
-import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
 
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
 import type {
+  EvaluationInputsRead,
   EvaluationRunFloorLookup,
   EvaluationRetentionLookup,
 } from "../evaluation.repository.ts";
-import type {
-  EvaluationClickHouseClient,
-  EvaluationClickHouseResolver,
-} from "./clickhouse.evaluation-session.store.ts";
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const RUNS = "runs" as const;
+const inputsRowsSchema = z.array(z.object({ TenantId: z.string(), Inputs: z.string().nullable() }));
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
 
-function validateTenant(tenantId: string, operation: string): void {
-  EventUtils.validateTenantId({ tenantId }, operation);
+/** The tenant an unhinted read's retention floor is read for: the one it reads, else its own. */
+function retentionTenantOf(authorization: Authorization): string {
+  return (
+    singleTenantOf({ authorization, reads: "traces" }) ??
+    ownProjectIdOf({ authorization, reads: "traces" })
+  );
 }
 
 function toNumberOrNull(value: number | string | null): number | null {
@@ -53,7 +65,8 @@ function parseObject(value: string | null): Record<string, unknown> | null {
 /** Owns evaluation_runs reads, bounded lookup windows, and row decoding. */
 export class EvaluationRunClickHouseReadRepository {
   static create(options: {
-    resolveClient: EvaluationClickHouseResolver;
+    /** The proof-fenced reader every read goes through (ADR-177 block C; AGG-EVAL-PROOF). */
+    clickhouse: AuthorizedClickHouse;
   }): EvaluationRunClickHouseReadRepository {
     return new EvaluationRunClickHouseReadRepository(options);
   }
@@ -63,7 +76,7 @@ export class EvaluationRunClickHouseReadRepository {
 
   private constructor(
     private readonly options: {
-      resolveClient: EvaluationClickHouseResolver;
+      clickhouse: AuthorizedClickHouse;
     },
   ) {}
 
@@ -81,7 +94,6 @@ export class EvaluationRunClickHouseReadRepository {
   }
 
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.getByEvaluationId");
     let row: ClickHouseEvaluationRunRecord | undefined;
     try {
       const { scheduledAtFrom, scheduledAtTo } = await this.resolveScheduledAtRange(input);
@@ -90,8 +102,10 @@ export class EvaluationRunClickHouseReadRepository {
         (scheduledAtTo === undefined
           ? ""
           : ` AND ${column} <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})`);
-      const client = await this.options.resolveClient(input.tenantId);
-      const result = await client.query({
+      const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+      // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
+      // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
+      const result = await client.query<ClickHouseEvaluationRunRecord>({
         query: `
           SELECT
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
@@ -113,28 +127,31 @@ export class EvaluationRunClickHouseReadRepository {
           PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("ScheduledAt")}
               AND EvaluationId = {evaluationId:String}
               ${bounds("ScheduledAt")}
             GROUP BY TenantId, EvaluationId
           )
-          WHERE t.TenantId = {tenantId:String}
+          WHERE ${tenantSet()}
             AND t.EvaluationId = {evaluationId:String}
             ${bounds("t.ScheduledAt")}
           LIMIT 1
         `,
         query_params: {
-          tenantId: input.tenantId,
           evaluationId: input.evaluationId,
           scheduledAtFrom,
           ...(scheduledAtTo === undefined ? {} : { scheduledAtTo }),
         },
         format: "JSONEachRow",
       });
-      row = (await result.json<ClickHouseEvaluationRunRecord>())[0];
+      row = (await result.json())[0];
     } catch (error) {
       logger.warn(
-        { tenantId: input.tenantId, evaluationId: input.evaluationId, error },
+        {
+          evaluationId: input.evaluationId,
+          scope: tenantScopeKey({ authorization: input.authorization, reads: "traces" }),
+          error,
+        },
         "Failed to get evaluation run from ClickHouse",
       );
       throw error;
@@ -143,11 +160,13 @@ export class EvaluationRunClickHouseReadRepository {
     return this.fromClickHouseRecord(row);
   }
 
-  async findByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.findByTraceId");
+  async findByTraceId(input: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<EvaluationRunData[]> {
     try {
-      const client = await this.options.resolveClient(input.tenantId);
-      const result = await client.query({
+      const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+      const result = await client.query<ClickHouseEvaluationRunRecord>({
         query: `
           SELECT ProjectionId, TenantId, EvaluationId, Version, EvaluatorId,
             EvaluatorType, EvaluatorName, TraceId, IsGuardrail, Status, Score,
@@ -161,28 +180,30 @@ export class EvaluationRunClickHouseReadRepository {
             LastProcessedEventId,
             toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME} AS ${RUNS}
-          WHERE ${RUNS}.TenantId = {tenantId:String}
+          WHERE ${tenantSet()}
             AND ${RUNS}.ScheduledAt >= now() - INTERVAL 7 DAY
             AND ${RUNS}.TraceId = {traceId:String}
             AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= now() - INTERVAL 7 DAY
                 AND TraceId = {traceId:String}
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY ${RUNS}.UpdatedAt DESC
         `,
-        query_params: { tenantId: input.tenantId, traceId: input.traceId },
+        query_params: { traceId: input.traceId },
         format: "JSONEachRow",
       });
-      return (await result.json<ClickHouseEvaluationRunRecord>()).map((row) =>
-        this.fromClickHouseRecord(row),
-      );
+      return (await result.json()).map((row) => this.fromClickHouseRecord(row));
     } catch (error) {
       logger.warn(
-        { tenantId: input.tenantId, traceId: input.traceId, error },
+        {
+          traceId: input.traceId,
+          scope: tenantScopeKey({ authorization: input.authorization, reads: "traces" }),
+          error,
+        },
         "Failed to find evaluation runs by trace ID in ClickHouse",
       );
       throw error;
@@ -190,46 +211,38 @@ export class EvaluationRunClickHouseReadRepository {
   }
 
   async findInputs(input: {
-    tenantId: string;
+    authorization: Authorization;
     evaluationId: string;
-  }): Promise<Record<string, unknown> | null> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.findInputs");
-    let client: EvaluationClickHouseClient;
+  }): Promise<EvaluationInputsRead | null> {
     try {
-      client = await this.options.resolveClient(input.tenantId);
-    } catch (error) {
-      // Kept deliberately: `clickhouse.evaluation.repository.unit.test.ts`
-      // pins "degrades unavailable reads" against a bound scenario, so an
-      // unreachable cluster answering with no inputs is specified behaviour.
-      logger.warn(
-        { tenantId: input.tenantId, evaluationId: input.evaluationId, error },
-        "ClickHouse client unavailable for evaluation inputs",
-      );
-      return null;
-    }
-    try {
-      const result = await client.query({
+      const reader = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+      const result = await reader.query({
         query: `
-          SELECT argMax(Inputs, UpdatedAt) AS Inputs
+          SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("ScheduledAt")}
             AND EvaluationId = {evaluationId:String}
+          GROUP BY TenantId
+          ORDER BY TenantId
+          LIMIT 1
         `,
-        query_params: input,
+        query_params: { evaluationId: input.evaluationId },
         format: "JSONEachRow",
       });
-      const row = (await result.json<{ Inputs: string | null }>())[0];
-      return parseObject(row?.Inputs ?? null);
+      const row = inputsRowsSchema.parse(await result.json())[0];
+      return row ? { tenantId: row.TenantId, inputs: parseObject(row.Inputs) } : null;
     } catch (error) {
-      if (isMemoryLimitError(error)) {
+      // An unreachable cluster or the memory ceiling answers no inputs (bound scenario);
+      // any other failure throws.
+      if (error instanceof TenantReaderClientUnavailableError || isMemoryLimitError(error)) {
         logger.warn(
-          { tenantId: input.tenantId, evaluationId: input.evaluationId },
-          "Evaluation inputs read hit the ClickHouse memory limit",
+          { evaluationId: input.evaluationId, error },
+          "Evaluation inputs read degraded to none",
         );
         return null;
       }
       logger.warn(
-        { tenantId: input.tenantId, evaluationId: input.evaluationId, error },
+        { evaluationId: input.evaluationId, error },
         "Failed to fetch evaluation inputs from ClickHouse",
       );
       throw error;
@@ -250,10 +263,10 @@ export class EvaluationRunClickHouseReadRepository {
 
     const floorMs = await this.floorOver(input.retention).getFloorMs({
       table: TABLE_NAME,
-      tenantId: input.tenantId,
+      tenantId: retentionTenantOf(input.authorization),
     });
     const recent = await this.queryScheduledAtMs({
-      tenantId: input.tenantId,
+      authorization: input.authorization,
       evaluationId: input.evaluationId,
       sinceMs: nowInstant().epochMilliseconds - RESOLVER_RECENT_WINDOW_MS,
     });
@@ -261,7 +274,7 @@ export class EvaluationRunClickHouseReadRepository {
       return { scheduledAtFrom: recent - slackMs, scheduledAtTo: recent + slackMs };
     }
     const fallback = await this.queryScheduledAtMs({
-      tenantId: input.tenantId,
+      authorization: input.authorization,
       evaluationId: input.evaluationId,
       sinceMs: floorMs,
     });
@@ -271,27 +284,26 @@ export class EvaluationRunClickHouseReadRepository {
   }
 
   private async queryScheduledAtMs(input: {
-    tenantId: string;
+    authorization: Authorization;
     evaluationId: string;
     sinceMs: number;
   }): Promise<number | undefined> {
-    const client = await this.options.resolveClient(input.tenantId);
-    const result = await client.query({
+    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    const result = await client.query<{ scheduledAtMs: number | string | null }>({
       query: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("ScheduledAt")}
           AND EvaluationId = {evaluationId:String}
           AND ScheduledAt >= fromUnixTimestamp64Milli({sinceMs:Int64})
       `,
       query_params: {
-        tenantId: input.tenantId,
         evaluationId: input.evaluationId,
         sinceMs: input.sinceMs,
       },
       format: "JSONEachRow",
     });
-    const raw = (await result.json<{ scheduledAtMs: number | string | null }>())[0]?.scheduledAtMs;
+    const raw = (await result.json())[0]?.scheduledAtMs;
     if (raw === null || raw === undefined) return undefined;
     const value = Number(raw);
     return Number.isFinite(value) && value > 0 ? value : undefined;

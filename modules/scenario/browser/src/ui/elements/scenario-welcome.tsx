@@ -48,9 +48,9 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
             <Box
               p={2}
               borderRadius="md"
-              bg="blue.50"
-              color="blue.600"
-              _dark={{ bg: "blue.900", color: "blue.200" }}
+              bg="blue.subtle"
+              color="blue.fg"
+              _dark={{ bg: "blue.subtle", color: "blue.fg" }}
               flexShrink={0}
             >
               <Icon size={20} />
@@ -95,7 +95,7 @@ export function ScenarioWelcomeModal({
       placement="center"
       size="lg"
     >
-      <Dialog.Content bg="bg" maxWidth="640px">
+      <Dialog.Content maxWidth="640px">
         <Dialog.CloseTrigger />
         <Dialog.Body py={8} px={8}>
           <ScenarioWelcomeContent onProceed={onProceed} />

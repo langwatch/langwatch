@@ -45,7 +45,7 @@ export function CaseModal({
           openHistoryOnOpen={openHistoryOnOpen}
         />
 
-        <Drawer.Body paddingX={5} paddingY={4} overflowY="auto">
+        <Drawer.Body>
           <CaseModalFields editor={editor} suites={suites} />
         </Drawer.Body>
 

@@ -9,12 +9,13 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// The per-simulator nouns (`haven llm|analytics|storage|voice`) are thin
+// The per-simulator nouns (`haven sim llm|analytics|storage|voice`) are thin
 // clients over each sim's own console API. simAPI and the helpers below are
 // shared by all of them; the mail noun predates them and has its own client.
 
@@ -83,13 +84,16 @@ func needArgs(inv invocation, n int, usage string) error {
 	return nil
 }
 
-const llmUsage = "usage: haven llm <info|calls|call <id>|clear|set [--error <status>] [--seed <value>]> [--json]"
+const llmUsage = "usage: haven sim llm <status|list [--model <text>] [--failed]|get <id>|clear|fault <status|off>|config [--seed <value>]> [--json]"
 
 type llmCall struct {
 	ID           string    `json:"id"`
 	At           time.Time `json:"at"`
 	Path         string    `json:"path"`
+	Dialect      string    `json:"dialect"`
 	Model        string    `json:"model"`
+	Mode         string    `json:"mode"`
+	Stream       bool      `json:"stream"`
 	Status       int       `json:"status"`
 	InputTokens  int       `json:"inputTokens"`
 	OutputTokens int       `json:"outputTokens"`
@@ -103,7 +107,7 @@ type llmSettings struct {
 	Seed        string `json:"seed"`
 }
 
-// runLLM is `haven llm <info|calls|call|clear|set>`.
+// runLLM is `haven sim llm <status|list|get|clear|fault|config>`.
 func runLLM(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(llmUsage)
@@ -121,21 +125,15 @@ func llmCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 		return simGet(api, "/_sim/api/info", nil, asJSON, func(v struct {
 			Stack    string      `json:"stack"`
 			Models   []string    `json:"models"`
+			Capacity int         `json:"capacity"`
 			Settings llmSettings `json:"settings"`
 		}) {
-			fmt.Printf("stack: %s\nmodels: %v\nforced error: %d\nseed: %q\n", v.Stack, v.Models, v.Settings.ForcedError, v.Settings.Seed)
+			fmt.Printf("stack: %s\nmodels: %v\ncalls kept: %d\nforced error: %d\nseed: %q\n", v.Stack, v.Models, v.Capacity, v.Settings.ForcedError, v.Settings.Seed)
 		})
 	case "calls":
-		return simGet(api, "/_sim/api/calls", nil, asJSON, func(v struct{ Calls []llmCall }) {
-			if len(v.Calls) == 0 {
-				fmt.Println("no calls yet")
-			}
-			for _, c := range v.Calls {
-				fmt.Printf("%-10s %-28s %-24s %d  in=%d out=%d %.0fms %s\n", c.ID, c.Path, c.Model, c.Status, c.InputTokens, c.OutputTokens, c.LatencyMs, c.Error)
-			}
-		})
+		return llmCalls(api, inv, asJSON)
 	case "call":
-		if err := needArgs(inv, 2, "haven llm call <id>"); err != nil {
+		if err := needArgs(inv, 2, "haven sim llm get <id>"); err != nil {
 			return err
 		}
 		raw, err := api.GetRaw("/_sim/api/calls/"+url.PathEscape(inv.args[1]), nil)
@@ -151,14 +149,64 @@ func llmCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 	case "set":
 		return llmSet(api, inv, asJSON)
 	}
-	return fmt.Errorf("unknown `haven llm` subcommand %q; %s", inv.args[0], llmUsage)
+	return fmt.Errorf("unknown `haven sim llm` subcommand %q; %s", inv.args[0], llmUsage)
+}
+
+// llmCalls lists recent calls, keeping only those whose model contains --model
+// and, with --failed, those answered with a 4xx or 5xx.
+func llmCalls(api sources.SimAPI, inv invocation, asJSON bool) error {
+	var doc struct {
+		Calls []json.RawMessage `json:"calls"`
+	}
+	if err := api.Get("/_sim/api/calls", nil, &doc); err != nil {
+		return err
+	}
+	kept, calls, err := filterLlmCalls(doc.Calls, inv)
+	if err != nil {
+		return err
+	}
+	if asJSON {
+		out, err := json.Marshal(map[string][]json.RawMessage{"calls": kept})
+		if err != nil {
+			return err
+		}
+		return printSimRaw(out)
+	}
+	printLlmCalls(calls)
+	return nil
+}
+
+// filterLlmCalls keeps the calls the --model and --failed flags select, raw and decoded.
+func filterLlmCalls(raws []json.RawMessage, inv invocation) ([]json.RawMessage, []llmCall, error) {
+	kept, calls := []json.RawMessage{}, []llmCall{}
+	for _, raw := range raws {
+		var c llmCall
+		if err := json.Unmarshal(raw, &c); err != nil {
+			return nil, nil, err
+		}
+		if !strings.Contains(c.Model, inv.value("--model")) || (inv.has("--failed") && c.Status < 400) {
+			continue
+		}
+		kept, calls = append(kept, raw), append(calls, c)
+	}
+	return kept, calls, nil
+}
+
+func printLlmCalls(calls []llmCall) {
+	if len(calls) == 0 {
+		fmt.Println("no calls")
+	}
+	for i := range calls {
+		c := &calls[i]
+		fmt.Printf("%-10s %-28s %-9s %-6s %-24s %d  in=%d out=%d %.0fms %s\n", c.ID, c.Path, c.Dialect, c.Mode, c.Model, c.Status, c.InputTokens, c.OutputTokens, c.LatencyMs, c.Error)
+	}
 }
 
 // llmSet changes only the flags given: the sim replaces its settings wholesale,
 // so the current ones are read first.
 func llmSet(api sources.SimAPI, inv invocation, asJSON bool) error {
 	if !inv.has("--error") && !inv.has("--seed") {
-		return errors.New("usage: haven llm set [--error <0|4xx|5xx>] [--seed <value>]")
+		return errors.New("usage: haven sim llm fault <0|4xx|5xx|off> | config --seed <value>")
 	}
 	var next llmSettings
 	if err := api.Get("/_sim/api/settings", nil, &next); err != nil {

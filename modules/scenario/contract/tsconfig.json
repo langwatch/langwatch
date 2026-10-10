@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
+  "exclude": ["**/__tests__/**"],
   "references": [
     {
       "path": "tsconfig.build.json"

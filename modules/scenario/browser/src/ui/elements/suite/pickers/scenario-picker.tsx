@@ -173,7 +173,7 @@ export function ScenarioPicker({
   return (
     <Box
       border="1px solid"
-      borderColor={hasError ? "red.500" : "border"}
+      borderColor={hasError ? "red.fg" : "border"}
       borderRadius="md"
       width="full"
     >
@@ -270,7 +270,7 @@ export function ScenarioPicker({
           data-testid="archived-scenarios-section"
         >
           <HStack gap={2}>
-            <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
+            <AlertTriangle size={14} color="var(--chakra-colors-orange-fg)" />
             <Text fontSize="xs" color="orange.fg">
               {archivedIds.length} archived scenario
               {archivedIds.length > 1 ? "s" : ""} linked:

@@ -19,13 +19,25 @@ export {
   entitlementOperatorSchema,
   planProviderUserSchema,
   resolvePlanInputSchema,
+  type EntitlementGrantSchema,
+  type PlanProviderUserSchema,
+  type ResolvePlanInputSchema,
+  type EntitlementOperatorSchema,
 } from "./provider.ts";
-export { moneyByCurrencySchema, planSchema, planSourceSchema, PricingModel } from "./plan.ts";
+export {
+  moneyByCurrencySchema,
+  planSchema,
+  planSourceSchema,
+  PricingModel,
+  type MoneyByCurrencySchema,
+  type PlanSchema,
+} from "./plan.ts";
 export {
   isAccountManagedPlan,
   planNextStepSchema,
   type PlanCurrency,
   type PlanNextStep,
+  type PlanNextStepSchema,
 } from "./plan-next-step.ts";
 export * from "./usage.ts";
 export * from "./usage.events.ts";
@@ -36,6 +48,7 @@ export {
   organizationSpendTrpc,
   planTrpc,
   usageLimitsTrpc,
+  type AggregatedCostsInputSchema,
 } from "./entitlement.trpc.ts";
 export {
   ENTERPRISE_FEATURE_ERRORS,

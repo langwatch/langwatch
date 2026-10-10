@@ -5,7 +5,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -20,7 +20,7 @@ const logger = createLogger("langwatch:unsubscribe:one-click");
  * the raw socket address from the Node server's connection info. Headers
  * alone would drop every caller that sends none into a single bucket.
  */
-export const unsubscribeCallerAddress = defineRestMiddleware(
+export const unsubscribeCallerAddress = defineMiddlewareContext(
   "unsubscribeCallerAddress",
   z.string().nullable(),
 );
@@ -42,6 +42,7 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/unsubscribe", "confirmOneClickUnsubscribe")
+  .withAudit("emailSuppression.confirmUnsubscribe")
   .withQuery(unsubscribeQuery)
   .withAccess(publicRoute({ reason: ONE_CLICK_IS_TOKEN_AUTHORIZED }))
   .withOutput(unsubscribeRestAcknowledgedSchema)
@@ -55,7 +56,7 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
       { status: 429, description: "Too many unsubscribe attempts from this caller" },
     ],
   })
-  .withMiddleware(unsubscribeCallerAddress)
+  .withMiddlewareContext(unsubscribeCallerAddress)
   .handle(async ({ app, input }, callerAddress) => {
     await app.acceptUnsubscribe({
       token: input.token ?? "",

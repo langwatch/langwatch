@@ -12,6 +12,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import {
   KeyKindRefusedError,
   OrganizationInvalidCredentialsError,
@@ -41,7 +42,10 @@ function mount(
   router: Parameters<ReturnType<typeof createRestRuntime>["mount"]>[0],
   identity: RestIdentity,
 ) {
-  return createRestRuntime({ identity }).mount(router, {
+  return createRestRuntime({
+    authorization: authorizationPort,
+    identity,
+  }).mount(router, {
     app: () => doorsApp,
     onError: createErrorHandler(),
   });
@@ -97,6 +101,7 @@ describe("a platform route", () => {
       .withInput(z.object({ userId: z.string() }))
       .withBodyLimit({ maxBytes: 64 })
       .withOutput(z.object({ actor: z.string() }))
+      .withoutAudit("test route")
       .handle(({ actor }) => {
         ran.push(actor.id);
 
@@ -200,6 +205,7 @@ describe("a platform route", () => {
         .withInput(z.object({ userId: z.string() }))
         .withBodyLimit({ maxBytes: 64 })
         .withOutput(z.object({ actor: z.string() }))
+        .withoutAudit("test route")
         .handle(({ actor }) => {
           ran.push(actor.id);
 
@@ -296,6 +302,7 @@ describe("a platform route", () => {
         .post("/run", "run")
         .withPermission("ops:view", { at: "platform" })
         .withOutput(z.object({}))
+        .withoutAudit("test route")
         .handle(() => ({}))
         .build()
         .router();
@@ -391,10 +398,12 @@ describe("a route that reads the key its door resolved", () => {
     .withCredential("project", { key: true })
     .withPermission("traces:create")
     .withOutput(z.object({ key: z.unknown() }))
+    .withoutAudit("test route")
     .handle(({ key }) => ({ key }))
     .post("/plain", "plain")
     .withPermission("traces:create")
     .withOutput(z.object({ handed: z.boolean() }))
+    .withoutAudit("test route")
     .handle((args) => ({ handed: (args as { key?: unknown }).key !== undefined }))
     .build()
     .router();
@@ -507,6 +516,7 @@ describe("a route that admits only the key kinds it names", () => {
     .withPermission("scenarios:manage")
     .withInput(z.object({ name: z.string() }))
     .withOutput(z.object({ ran: z.boolean() }))
+    .withoutAudit("test route")
     .handle(() => ({ ran: true }))
     .build()
     .router();
@@ -602,6 +612,7 @@ describe("a permission behind the CLI token door", () => {
       .withPermission("organization:manage")
       .withInput(z.object({ name: z.string() }))
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         ran.push("keys");
 

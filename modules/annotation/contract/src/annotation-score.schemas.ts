@@ -1,13 +1,24 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const annotationScoreOptionSchema = z.object({
+const annotationScoreOptionSchemaDefinition = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
     .nullable()
     .optional(),
   reason: z.string().nullable().optional(),
 });
-export const annotationScoreOptionsSchema = z.record(z.string(), z.json());
+export interface AnnotationScoreOptionSchema extends Named<
+  typeof annotationScoreOptionSchemaDefinition
+> {}
+export const annotationScoreOptionSchema: AnnotationScoreOptionSchema =
+  annotationScoreOptionSchemaDefinition;
+const annotationScoreOptionsSchemaDefinition = z.record(z.string(), z.json());
+export interface AnnotationScoreOptionsSchema extends Named<
+  typeof annotationScoreOptionsSchemaDefinition
+> {}
+export const annotationScoreOptionsSchema: AnnotationScoreOptionsSchema =
+  annotationScoreOptionsSchemaDefinition;
 
 export const annotationScoreDataTypeSchema = z.enum([
   "OPTION",
@@ -26,7 +37,7 @@ const annotationScoreDefaultValueSchema = z.object({
   options: z.array(z.string()).nullable(),
 });
 
-export const annotationScoreSchema = z
+const annotationScoreSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -42,14 +53,21 @@ export const annotationScoreSchema = z
     global: z.boolean(),
   })
   .strict();
+export interface AnnotationScoreSchema extends Named<typeof annotationScoreSchemaDefinition> {}
+export const annotationScoreSchema: AnnotationScoreSchema = annotationScoreSchemaDefinition;
 export type AnnotationScore = z.infer<typeof annotationScoreSchema>;
 
-export const annotationScoreNameSchema = z
+const annotationScoreNameSchemaDefinition = z
   .object({ id: z.string().min(1), name: z.string() })
   .strict();
+export interface AnnotationScoreNameSchema extends Named<
+  typeof annotationScoreNameSchemaDefinition
+> {}
+export const annotationScoreNameSchema: AnnotationScoreNameSchema =
+  annotationScoreNameSchemaDefinition;
 export type AnnotationScoreName = z.infer<typeof annotationScoreNameSchema>;
 
-export const upsertAnnotationScoreInputSchema = z
+const upsertAnnotationScoreInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -60,6 +78,11 @@ export const upsertAnnotationScoreInputSchema = z
     defaultValue: annotationScoreDefaultValueSchema,
   })
   .strict();
+export interface UpsertAnnotationScoreInputSchema extends Named<
+  typeof upsertAnnotationScoreInputSchemaDefinition
+> {}
+export const upsertAnnotationScoreInputSchema: UpsertAnnotationScoreInputSchema =
+  upsertAnnotationScoreInputSchemaDefinition;
 export type UpsertAnnotationScoreInput = z.infer<typeof upsertAnnotationScoreInputSchema>;
 
 export type AnnotationMode = "annotate" | "suggest";

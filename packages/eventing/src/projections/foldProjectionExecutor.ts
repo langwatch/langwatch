@@ -93,9 +93,9 @@ function canRefold<State, E extends Event>(
 }
 
 /**
- * Carries the event's occurredAt and, when the fold declares `options.readWindow`,
- * the computed `occurredAt ± widthMs` bound. Returned unchanged when occurredAt is
- * unusable, since it cannot anchor a window — the read then stays unbounded.
+ * Names the event the read is for and carries its occurredAt and, when the fold declares
+ * `options.readWindow`, the computed `occurredAt ± widthMs` bound. Only the event id is added
+ * when occurredAt is unusable, since it cannot anchor a window — the read then stays unbounded.
  */
 function withReadHints<State, E extends Event>({
   context,
@@ -106,11 +106,12 @@ function withReadHints<State, E extends Event>({
   event: Event;
   projection: FoldProjectionDefinition<State, E>;
 }): ProjectionStoreContext {
+  const named = { ...context, eventId: event.id };
   const occurredAt = (event as Record<string, unknown>).occurredAt;
-  if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
+  if (typeof occurredAt !== "number" || occurredAt <= 0) return named;
   const widthMs = projection.options?.readWindow?.widthMs;
   return {
-    ...context,
+    ...named,
     occurredAtMs: occurredAt,
     ...(widthMs !== undefined
       ? { readWindow: readWindowAround({ anchorMs: occurredAt, widthMs }) }

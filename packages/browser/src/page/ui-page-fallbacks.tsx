@@ -3,19 +3,10 @@
  */
 
 import type { ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
-import {
-  Box,
-  Button,
-  Center,
-  Heading,
-  HStack,
-  Spinner,
-  Stack,
-  Text,
-} from "@langwatch/design-system/primitives";
-import { Lock } from "lucide-react";
-
-import { UiErrorActions } from "../ui-error-actions.tsx";
+import { AccessState } from "@langwatch/design-system/access-state";
+import { Button, Center, Heading, Spinner, Stack, Text } from "@langwatch/design-system/primitives";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
+import { ErrorActions } from "@langwatch/error-views";
 
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {
@@ -29,48 +20,24 @@ export function UiPageLoading() {
 /** When a flag a page is behind is off: the address exists, this page does not. */
 export function UiPageNotFound() {
   return (
-    <Center minHeight="60vh" padding={8}>
-      <Stack gap={3} align="center" maxWidth="480px" textAlign="center">
-        <Heading size="lg">This page is not here</Heading>
-        <Text color="fg.muted">
-          The address is wrong, or this part of LangWatch is not switched on for your organization.
-        </Text>
-      </Stack>
+    <Center minHeight="50vh" padding={{ base: 4, md: 8 }}>
+      <AccessState
+        kind="unavailable"
+        title="This page is not here"
+        description="The address may have changed, or this page isn't available for your organization. Go back to continue."
+        actions={
+          <Button size="sm" colorPalette="orange" onClick={() => window.history.back()}>
+            Go back
+          </Button>
+        }
+      />
     </Center>
   );
 }
 
 /** When the page exists and the viewer is missing the grant it needs. */
 export function UiPageForbidden({ permission }: { permission: string }) {
-  return (
-    <Center minHeight="60vh" padding={8}>
-      <Box
-        role="note"
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        backgroundColor="bg.subtle"
-        paddingX={5}
-        paddingY={4}
-        maxWidth="520px"
-      >
-        <HStack gap={3} alignItems="flex-start">
-          <Box color="fg.muted" display="flex" flexShrink={0} marginTop="2px">
-            <Lock size={16} aria-hidden />
-          </Box>
-          <Stack gap={1}>
-            <Text fontWeight="medium">Access Restricted</Text>
-            <Text fontSize="sm" color="fg.muted">
-              Ask an organization admin to grant you the permission it needs.
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              Missing permission: {permission}
-            </Text>
-          </Stack>
-        </HStack>
-      </Box>
-    </Center>
-  );
+  return <RestrictedAccess permission={permission} />;
 }
 
 /**
@@ -96,7 +63,7 @@ export function UiPageFailure({
             Try again
           </Button>
         )}
-        <UiErrorActions
+        <ErrorActions
           {...(copy.docsUrl ? { docsUrl: copy.docsUrl } : {})}
           {...(copy.traceId ? { traceId: copy.traceId } : {})}
         />

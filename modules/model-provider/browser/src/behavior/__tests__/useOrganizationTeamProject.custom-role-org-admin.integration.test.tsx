@@ -80,7 +80,7 @@ vi.mock("usehooks-ts", () => ({
   ],
 }));
 
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
 
 const USER_ID = "user-analyst";
 
@@ -122,7 +122,7 @@ function organizationWith({ organizationRole }: { organizationRole: string }) {
 }
 
 function renderResolution() {
-  return renderHook(() => useOrganizationTeamProject());
+  return renderHook(() => useModelProviderHost());
 }
 
 describe("useOrganizationTeamProject with a custom team role", () => {

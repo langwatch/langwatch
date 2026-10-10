@@ -240,6 +240,17 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
+  async updateConfigIfUnchanged(
+    input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
+  ): Promise<boolean> {
+    const written = await this.prisma.agent.updateMany({
+      where: { id: input.id, projectId: input.projectId, updatedAt: toDate(input.updatedAt) },
+      data: { config: configSchema.parse(input.config) },
+    });
+
+    return written.count === 1;
+  }
+
   async archive(input: GetAgentInput): Promise<Agent> {
     const row = await this.prisma.agent
       .update({

@@ -79,6 +79,19 @@ Feature: Shared project service
     Then the service throws a personal-workspace boundary error
     And it does not write the forbidden change
 
+  @unit
+  Scenario: A member who may only update a project cannot move it to another team
+    Given a project in team "alpha" of its organization
+    When a caller without project:manage on the project, or without project:create in team "beta", moves it to team "beta"
+    Then the service refuses with a project permission error
+    And it does not write the project
+
+  @unit
+  Scenario: A project manager who may create in the destination team moves the project
+    Given a project in team "alpha" of its organization
+    When a caller with project:manage on the project and project:create in team "beta" moves it to team "beta"
+    Then the project moves to team "beta"
+
   # Gap: no test yet proves the tRPC door and the provided ProjectApi share one service over one store.
   @unimplemented
   Scenario: Project compatibility transports share one runtime service
@@ -205,6 +218,43 @@ Feature: Shared project service
     When the backfill-project-department-assigned task runs twice
     Then each run records each project's department, team and personal flag once, marked backfilled
     And each project's fact is keyed alike on both runs, so the second run records nothing new
+
+  @unit
+  Scenario: A project fact step records every organization's projects a page at a time
+    Given three organizations, served two to a page
+    When a project fact upgrade step runs
+    Then each organization's projects are recorded once
+    And the step saves its checkpoint after each page, naming the page's last organization
+
+  @unit
+  Scenario: A project fact step resumes after the last page of organizations it saved
+    Given a project fact upgrade step whose checkpoint names the second organization
+    When the step runs again
+    Then only the organizations after the second are recorded
+
+  @unit
+  Scenario: A dry run of a project fact step records nothing and saves no checkpoint
+    Given three organizations with projects
+    When a project fact upgrade step runs as a dry run
+    Then no fact is recorded and no checkpoint is saved
+    And the report counts the projects it would record where the fact can preview them
+
+  @unit
+  Scenario: A project fact step stops between organizations when the worker stops it
+    Given a project fact upgrade step whose run has been aborted
+    When the step runs
+    Then no organization is recorded and no checkpoint is saved
+
+  @integration
+  Scenario: The project fact steps are background steps that wait for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then project:record-created-facts, project:record-department-assignments and project:record-presence-settings are background data steps
+    And each runs only once no older image serves
+
+  @integration
+  Scenario: The project created step runs after the judge spend catch-up
+    When the worker's installed modules list their upgrade steps
+    Then project:record-created-facts runs after instant-eval:copy-judge-spend
 
   @unit
   Scenario: The model-defaults scope picker offers an archived project

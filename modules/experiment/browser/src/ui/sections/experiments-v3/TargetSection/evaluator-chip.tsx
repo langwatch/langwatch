@@ -215,45 +215,45 @@ export function EvaluatorChip({
         {status !== "pending" && (
           <>
             <Box paddingX={3} paddingY={2}>
-              <Text fontSize="11px" fontWeight="semibold" color="fg.muted" marginBottom={1}>
+              <Text textStyle="xs" fontWeight="semibold" color="fg.muted" marginBottom={1}>
                 Result
               </Text>
               <VStack align="stretch" gap={1}>
                 {score !== undefined && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="fg.muted">
+                    <Text textStyle="sm" color="fg.muted">
                       Score:
                     </Text>
-                    <Text fontSize="12px" fontWeight="semibold">
+                    <Text textStyle="sm" fontWeight="semibold">
                       {score.toFixed(2)}
                     </Text>
                   </HStack>
                 )}
                 {label && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="fg.muted">
+                    <Text textStyle="sm" color="fg.muted">
                       Label:
                     </Text>
-                    <Text fontSize="12px" fontWeight="semibold">
+                    <Text textStyle="sm" fontWeight="semibold">
                       {label}
                     </Text>
                   </HStack>
                 )}
                 <HStack justify="space-between">
-                  <Text fontSize="12px" color="fg.muted">
+                  <Text textStyle="sm" color="fg.muted">
                     Status:
                   </Text>
-                  <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
+                  <Text textStyle="sm" fontWeight="semibold" color={statusColor}>
                     {getStatusLabel(status)}
                   </Text>
                 </HStack>
                 {details && (
                   <Box marginTop={1}>
-                    <Text fontSize="11px" color="fg.muted" marginBottom={0.5}>
+                    <Text textStyle="sm" color="fg.muted" marginBottom={0.5}>
                       Details:
                     </Text>
                     <Text
-                      fontSize="11px"
+                      textStyle="sm"
                       color="fg.muted"
                       whiteSpace="pre-wrap"
                       maxHeight="200px"
@@ -265,7 +265,7 @@ export function EvaluatorChip({
                 )}
               </VStack>
             </Box>
-            <Box borderTopWidth="1px" borderColor="border" />
+            <Menu.Separator />
           </>
         )}
         {/* "Run" for pending evaluators */}
@@ -323,7 +323,7 @@ export function EvaluatorChip({
             <Text>Edit Configuration</Text>
           </HStack>
         </Menu.Item>
-        <Box borderTopWidth="1px" borderColor="border" my={1} />
+        <Menu.Separator />
         <Menu.Item value="remove" onClick={onRemove}>
           <HStack gap={2} color="red.fg">
             <LuTrash2 size={14} />

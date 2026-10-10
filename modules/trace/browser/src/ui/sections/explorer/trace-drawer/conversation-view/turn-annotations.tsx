@@ -244,7 +244,7 @@ function AnnotationListRowSummary({ annotation }: { annotation: AnnotationItem }
       <PersonAvatar
         size="xs"
         background="gray.solid"
-        color="white"
+        color="gray.contrast"
         name={annotation.user?.name ?? annotation.email ?? "?"}
         image={annotation.user?.image}
       />

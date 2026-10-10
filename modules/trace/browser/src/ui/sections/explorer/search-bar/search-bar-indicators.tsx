@@ -31,7 +31,7 @@ export function statusBackgroundColor(status: SearchBarStatus): string {
   // Error uses the full red.subtle so the input row matches the error banner
   // that drops below it — together they read as one continuous error surface.
   if (status.kind === "error") return "red.subtle";
-  return "bg.surface";
+  return "bg.card";
 }
 
 /**

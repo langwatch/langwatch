@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/time",
-  "langwatch": { "group": "libraries" },
   "version": "0.0.1",
   "private": true,
   "description": "The one clock LangWatch reads: date and time arithmetic, calendar differences, relative-time wording and the date patterns the screens print, over Temporal.",
@@ -37,5 +36,8 @@
   "devDependencies": {
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "libraries"
   }
 }

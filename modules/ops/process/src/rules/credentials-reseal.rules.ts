@@ -1,3 +1,4 @@
+import type { ServingRosterEntry } from "@langwatch/upgrade";
 /**
  * Moves sealed values inside stored text from the previous key to the current one.
  * A sealed value is found by its shape wherever it sits: a whole column, a string
@@ -70,4 +71,22 @@ export function resealText({
   });
 
   return { text: moved, ...counts };
+}
+
+/**
+ * The live processes that do not state every given key, so would fail on a value sealed under one
+ * of them; the re-seal waits while any is listed (Alex, 2026-10-09).
+ */
+export function processesNotAccepting({
+  roster,
+  fingerprints,
+}: {
+  roster: readonly Pick<ServingRosterEntry, "processId" | "credentialKeys">[];
+  fingerprints: readonly string[];
+}): string[] {
+  return roster
+    .filter(
+      (row) => !fingerprints.every((fingerprint) => row.credentialKeys?.includes(fingerprint)),
+    )
+    .map((row) => row.processId);
 }

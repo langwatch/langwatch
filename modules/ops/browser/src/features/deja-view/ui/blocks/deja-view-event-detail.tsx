@@ -47,7 +47,7 @@ export function EventDetail({
         <Text textStyle="xs" fontWeight="medium" marginBottom={2}>
           Payload
           {previousEvent && (
-            <Text as="span" color="orange.400" marginLeft={2}>
+            <Text as="span" color="orange.fg" marginLeft={2}>
               (changes highlighted)
             </Text>
           )}

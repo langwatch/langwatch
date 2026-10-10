@@ -3,7 +3,7 @@ Feature: Optional Haven hooks for coding agents
   Haven installs a gate only for the agent client and worktree explicitly selected.
 
   Scenario: Codex installs its gate hook in the current worktree
-    When I run haven setup codex-gate-hook in a worktree
+    When I run haven self setup codex-gate-hook in a worktree
     Then the gate is registered in that worktree's .codex/hooks.json
     And installing it again adds no duplicate hook
     And other worktrees and Claude settings remain unchanged
@@ -15,14 +15,14 @@ Feature: Optional Haven hooks for coding agents
     And existing feature settings are unchanged
     And Codex retains control of hook review and trust
 
-  # The gate used to rewrite Codex's command through `haven run` because
+  # The gate used to rewrite Codex's command through `haven machine run` because
   # Codex's own permission system does not have the prefix-matching hazard
   # that made Claude's gate stop rewriting. The rule is simpler than that
   # exception: no hook rewrites the command it admits, full stop. Codex's
   # gate now shares Claude's own message-or-deny answer, and enforcement
   # lives in the heavy tools themselves - the compiler/lint/format/test/
   # vitest bin shims and `make go-lint`, which already take a slot through
-  # `haven slot run` on their own.
+  # `haven machine slot run` on their own.
   Scenario: Codex heavy commands use the existing Haven gate
     Given a Codex session already permits its shell command
     When a typecheck needs admission to Haven's heavy-command slot
@@ -58,14 +58,14 @@ Feature: Optional Haven hooks for coding agents
     When the developer runs "haven up"
     Then the gate is registered in that worktree's .claude/settings.local.json
     And a later "haven up" adds no duplicate hook
-    And a worktree whose registration was removed by hand with "haven setup gate-hook --off" is left alone
+    And a worktree whose registration was removed by hand with "haven self setup gate-hook --off" is left alone
 
   Scenario: The unit test worker cap is one machine-wide setting
     Given HAVEN_TEST_WORKERS is set in the shell, the way HAVEN_TYPECHECK_SLOTS is
     When the gate narrows a vitest or test:unit command in any worktree
     Then the full width it divides among the runs in flight is that setting
     And unset, the full width is derived from the machine's memory and cores
-    And "haven slot explain" prints the width and where it came from
+    And "haven machine slot explain" prints the width and where it came from
 
   @unit
   Scenario: A command that only mentions a heavy tool is not gated
@@ -75,11 +75,11 @@ Feature: Optional Haven hooks for coding agents
     But a command that genuinely runs a heavy tool, however it is wrapped in cd, env, npx, pnpm or make, is still classed heavy
 
   # A rewrite used to mask the real command from Claude Code's own permission
-  # rules: a prefix rule matches "haven run", so an allow rule over-admits and a
+  # rules: a prefix rule matches "haven machine run", so an allow rule over-admits and a
   # deny rule never gets to see the command it was written to refuse. It also
   # hid the real command from every log line and prompt. Gating now lives in
   # the heavy tools themselves - the compiler/lint/format/test bin shims and
-  # package scripts, which already take a slot through `haven slot run` on
+  # package scripts, which already take a slot through `haven machine slot run` on
   # their own - so the command the model asked for is exactly the command that
   # runs.
   @unit

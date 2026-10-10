@@ -38,6 +38,12 @@ export abstract class CodingAgentActivityHost {
 
   abstract succeeded(notice: CodingAgentNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: CodingAgentNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: CodingAgentNotice): void;
+
   abstract failed(failure: CodingAgentFailure): void;
 }
 

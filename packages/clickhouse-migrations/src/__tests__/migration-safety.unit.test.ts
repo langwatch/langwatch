@@ -1,9 +1,12 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
+  GRACEFUL_RULES,
   type MigrationSource,
   formatFindings,
   parseBaseline,
@@ -29,6 +32,54 @@ const treeFloor: string = existsSync(FLOOR_FILE)
  */
 const BASELINE_FROZEN_AT = "00099_coding_agent_sessions_usage_by_context.sql";
 
+/** The newest goose file in the newest `langwatch@v*` tag: history the graceful rules skip. */
+function newestReleasedMigration({ cwd }: { cwd: string }): string {
+  const git = (args: string[]) =>
+    execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // A release tag lists every file it holds: about 2 MB today.
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  let cause: unknown;
+  try {
+    const tag = git(["tag", "--list", "langwatch@v*", "--sort=-v:refname"])
+      .split("\n")
+      .find((name) => /^langwatch@v\d+\.\d+\.\d+$/.test(name));
+    const paths = tag ? git(["ls-tree", "-r", "--full-tree", "--name-only", tag]) : "";
+    const newest = paths
+      .split("\n")
+      .flatMap((path) => /clickhouse[^/]*\/migrations\/(\d{5}_[^/]+\.sql)$/.exec(path)?.[1] ?? [])
+      .toSorted()
+      .at(-1);
+    if (newest) return newest;
+  } catch (error) {
+    // Not a clone, or git is missing: the same answer as a clone without tags, cause kept.
+    cause = error;
+  }
+  throw new Error(
+    "No langwatch@v* release tag with goose files in this clone, so released migrations " +
+      "cannot be told from new ones. Fetch the tags: git fetch --tags origin (CI: " +
+      "git fetch --depth=1 origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*').",
+    { cause },
+  );
+}
+
+const RELEASED_THROUGH = newestReleasedMigration({ cwd: import.meta.dirname });
+
+/** The code-step ids a `-- background step:` note may name. */
+const STEPS: ReadonlySet<string> = new Set(
+  (
+    JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, "../../../upgrade/releases/image/code-steps.json"),
+        "utf8",
+      ),
+    ) as { id: string }[]
+  ).map((step) => step.id),
+);
+
 const baseline = parseBaseline(
   readFileSync(resolve(import.meta.dirname, "migration-safety.baseline.txt"), "utf8"),
 );
@@ -40,16 +91,22 @@ const migrations: MigrationSource[] = readdirSync(MIGRATIONS_DIR)
 
 const unshipped = migrations.filter((migration) => !baseline.includes(migration.name));
 
+/** What the tree scan reports for one file, with the graceful rules only above the floor. */
+function scanTree(migration: MigrationSource) {
+  return scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
+    (finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule),
+  );
+}
+
+const FIXTURE_STEPS: ReadonlySet<string> = new Set(["trace:track-index"]);
 const scanWith = (sql: string, floor: string) =>
-  scanClickHouseMigration({ name: "00999_fixture.sql", sql, floor });
+  scanClickHouseMigration({ name: "00999_fixture.sql", sql, floor, steps: FIXTURE_STEPS });
 const scan = (sql: string) => scanWith(sql, FIXTURE_FLOOR);
 const rules = (sql: string) => scan(sql).map((finding) => finding.rule);
 
 describe("ClickHouse migration safety", () => {
   it("leaves every migration newer than the baseline safe in both directions", () => {
-    const findings = unshipped.flatMap((migration) =>
-      scanClickHouseMigration({ ...migration, floor: treeFloor }),
-    );
+    const findings = unshipped.flatMap(scanTree);
     expect(findings, `\n${formatFindings(findings)}\n`).toEqual([]);
   });
 
@@ -180,7 +237,7 @@ describe("ClickHouse migration safety", () => {
         rules(
           "-- +goose Up\nCREATE TABLE IF NOT EXISTS t (a UInt8) ENGINE = Memory;\n" +
             "ALTER TABLE t ADD INDEX IF NOT EXISTS idx a TYPE minmax GRANULARITY 1;\n" +
-            "ALTER TABLE t MATERIALIZE INDEX idx;\n" +
+            "-- background step: trace:track-index\nALTER TABLE t MATERIALIZE INDEX idx;\n" +
             "CREATE OR REPLACE VIEW v AS SELECT 1;\n" +
             "CREATE MATERIALIZED VIEW IF NOT EXISTS mv TO t AS SELECT 1;\n",
         ),
@@ -238,12 +295,105 @@ describe("ClickHouse migration safety", () => {
     });
   });
 
+  describe("given the graceful rules", () => {
+    /** @scenario "A ClickHouse mutation at deploy is refused unless a background step tracks it" */
+    it("refuses UPDATE, DELETE, MATERIALIZE COLUMN and MATERIALIZE INDEX with no step note", () => {
+      const findings = scan(
+        "-- +goose Up\nALTER TABLE ${D}.spans UPDATE `Cost` = 0 WHERE `Cost` IS NULL;\n",
+      );
+      expect(findings.map((finding) => finding.rule)).toEqual(["untracked-mutation"]);
+      expect(findings[0]?.problem).toBe("runs UPDATE on ${D}.spans at deploy");
+      expect(findings[0]?.fix).toContain("-- background step: <id>");
+      for (const statement of [
+        "ALTER TABLE t DELETE WHERE a = 1;",
+        "DELETE FROM t WHERE a = 1;",
+        "ALTER TABLE t MATERIALIZE COLUMN a;",
+        "ALTER TABLE t MATERIALIZE INDEX idx;",
+      ]) {
+        expect(rules(`-- +goose Up\n${statement}\n`)).toEqual(["untracked-mutation"]);
+      }
+    });
+
+    /** @scenario "A mutation under a note naming its background step is accepted" */
+    it("accepts a mutation whose note names a known step, and refuses an unknown one", () => {
+      expect(
+        rules(
+          "-- +goose Up\n-- background step: trace:track-index\nALTER TABLE t MATERIALIZE INDEX idx;\n",
+        ),
+      ).toEqual([]);
+      const unknown = scan(
+        "-- +goose Up\n-- background step: trace:nope\nALTER TABLE t MATERIALIZE COLUMN a;\n",
+      );
+      expect(unknown.map((finding) => finding.rule)).toEqual(["unknown-background-step"]);
+      expect(unknown[0]?.problem).toContain("trace:nope");
+      expect(
+        rules(
+          "-- +goose Up\n-- background step: trace:track-index\nALTER TABLE t ADD COLUMN IF NOT EXISTS a UInt8;\n" +
+            "ALTER TABLE t MATERIALIZE COLUMN a;\n",
+        ),
+      ).toEqual(["untracked-mutation"]);
+    });
+
+    /** @scenario "MODIFY TTL is refused unless it skips materialising" */
+    it("refuses MODIFY TTL without materialize_ttl_after_modify = 0, and accepts it with", () => {
+      const findings = scan("-- +goose Up\nALTER TABLE t MODIFY TTL At + INTERVAL 30 DAY;\n");
+      expect(findings.map((finding) => finding.rule)).toEqual(["untracked-mutation"]);
+      expect(findings[0]?.fix).toContain("materialize_ttl_after_modify = 0");
+      expect(
+        rules(
+          "-- +goose Up\nALTER TABLE t MODIFY TTL At + INTERVAL 30 DAY\n" +
+            "SETTINGS materialize_ttl_after_modify = 0;\n",
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "MODIFY ORDER BY, OPTIMIZE FINAL and POPULATE are refused by name" */
+    it("refuses a sort key change, OPTIMIZE ... FINAL and a populated view, naming each", () => {
+      const order = scan(
+        "-- +goose Up\nALTER TABLE t ADD COLUMN IF NOT EXISTS b UInt8, MODIFY ORDER BY (a, b);\n",
+      );
+      expect(order.map((finding) => finding.rule)).toEqual(["modify-order-by"]);
+      expect(order[0]?.fix).toContain("new table");
+      const optimize = scan("-- +goose Up\nOPTIMIZE TABLE ${D}.spans FINAL;\n");
+      expect(optimize.map((finding) => finding.rule)).toEqual(["optimize-final"]);
+      expect(optimize[0]?.problem).toContain("${D}.spans");
+      const populate = scan(
+        "-- +goose Up\nCREATE MATERIALIZED VIEW IF NOT EXISTS mv TO t POPULATE AS SELECT 1;\n",
+      );
+      expect(populate.map((finding) => finding.rule)).toEqual(["materialized-view-populate"]);
+      expect(populate[0]?.fix).toContain("without POPULATE");
+    });
+
+    /** @scenario "ClickHouse floor history answers only to the older rules" */
+    it("skips the graceful rules up to the newest release tag's newest file, which is on disk", () => {
+      expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
+      const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
+      const graceful = history.flatMap((migration) =>
+        scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
+          (finding) => GRACEFUL_RULES.has(finding.rule),
+        ),
+      );
+      expect(graceful.length).toBeGreaterThan(0);
+      expect(
+        history.flatMap(scanTree).filter((finding) => GRACEFUL_RULES.has(finding.rule)),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A clone without release tags fails the guard with the command that fetches them" */
+    it("refuses to guess the released history where no release tag is readable", () => {
+      const bare = mkdtempSync(resolve(tmpdir(), "goose-safety-no-tags-"));
+      try {
+        expect(() => newestReleasedMigration({ cwd: bare })).toThrow(/git fetch --tags origin/);
+      } finally {
+        rmSync(bare, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("given the baseline of shipped migrations", () => {
     it("exempts history that the rules would otherwise report", () => {
       const exempted = migrations.filter(
-        (migration) =>
-          baseline.includes(migration.name) &&
-          scanClickHouseMigration({ ...migration, floor: treeFloor }).length > 0,
+        (migration) => baseline.includes(migration.name) && scanTree(migration).length > 0,
       );
       expect(exempted.length).toBeGreaterThan(0);
       expect(unshipped.map((migration) => migration.name)).not.toContain(exempted[0]?.name);

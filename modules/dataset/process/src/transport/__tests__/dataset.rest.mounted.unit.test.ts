@@ -1,11 +1,11 @@
 /** REST endpoints mounted with real requests, stubbed application. */
 
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   NotFoundError,
-  projectRestFacts,
+  projectRequestContext,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import {
@@ -18,6 +18,7 @@ import {
   type DatasetApi,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -85,6 +86,8 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     rateLimiter: { check: async () => ({ allowed: true }) },
     identity: {
       authenticate: () => {
@@ -115,8 +118,8 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",

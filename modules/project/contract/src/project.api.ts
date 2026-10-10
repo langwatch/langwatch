@@ -2,6 +2,12 @@ import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
+  AggregateMemberCandidate,
+  AggregateRule,
+  LiveAggregate,
+  StoredAggregateProject,
+} from "./project.aggregate-rule.ts";
+import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
   InternalProject,
@@ -20,8 +26,10 @@ import type {
   TraceDestinationInput,
   TraceDestinationProject,
   TraceSharingConfig,
+  SetTraceSharingInput,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
+  ProjectKind,
 } from "./project.ts";
 
 export type ProjectPath = { projectId: string; fullPath: string };
@@ -58,14 +66,40 @@ export interface ProjectOrganizationPage {
   next: string | null;
 }
 
+/** A project and its LangWatchQL key, as the key-map backfill reads them. */
+export interface ProjectLwqlKey {
+  id: string;
+  lwqlKey: string;
+}
+
+export interface ProjectLwqlKeyPage {
+  projects: ProjectLwqlKey[];
+  next: string | null;
+}
+
+/** A project and whether it names its own S3 bucket, as the storage migration reads it. */
+export interface ProjectPrivateS3 {
+  id: string;
+  privateS3: boolean;
+}
+
+export interface ProjectPrivateS3Page {
+  projects: ProjectPrivateS3[];
+  next: string | null;
+}
+
 /** The page size fleet scans pass to `listAllIds`. */
 export const PROJECT_ID_PAGE_LIMIT = 500;
 
 export interface ProjectApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
-  /** Every non-governance project with its department (main `department.service.ts:126-133`). */
+  /**
+   * Every non-governance project with its department, less `hiddenKinds` (main
+   * `department.service.ts:126-133`; callers pass `projectKindsHiddenFrom(role)`).
+   */
   findProjectsWithDepartments(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
   }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
   /**
    * Points one project at a department, or clears it; false when no such project (main
@@ -95,6 +129,8 @@ export interface ProjectApi {
     projectIds?: string[];
     /** The organization's hidden governance project is left out unless this is true. */
     includeGovernance?: boolean;
+    /** Kinds left out as well, e.g. `projectKindsHiddenFrom(role)` for a non-admin caller. */
+    hiddenKinds?: ProjectKind[];
   }): Promise<PaginatedProjects>;
   listByTeam(input: {
     organizationId: string;
@@ -122,6 +158,10 @@ export interface ProjectApi {
       name: string;
       language: string;
       framework: string;
+      /** ADR-177: `"aggregate"` reads its members through grants; organisation admins only. */
+      kind?: "application" | "aggregate" | undefined;
+      /** Only read for an aggregate; defaults to `AGGREGATE_DEFAULT_RULE`. */
+      aggregateRule?: AggregateRule | undefined;
     }>,
     by: Readonly<{ id: string }>,
   ): Promise<Project>;
@@ -148,6 +188,8 @@ export interface ProjectApi {
     input: Readonly<UpdateProjectInput & { projectId: string }>,
     by: Readonly<{ id: string }>,
   ): Promise<Project>;
+  /** Switches trace sharing; switching it off records the fact share revokes links from. */
+  setTraceSharing(input: SetTraceSharingInput): Promise<void>;
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }>;
   /** The live project a legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null>;
@@ -213,6 +255,34 @@ export interface ProjectApi {
    * migration inventory (main `migrateObjectStorage.ts` `listProjectsPage`).
    */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+  /**
+   * Every project with whether it names its own S3 bucket, paged like `listAllIds`, for the
+   * object-storage migration inventory: a global provider move leaves those projects out.
+   */
+  listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
+  /** Every project with its LangWatchQL key, paged like `listAllIds`, for the key-map backfill. */
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
+  /** ADR-177: the aggregate with this id, or nothing when no aggregate project has it. */
+  findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]>;
+  /** ADR-177: the organisation's live aggregates, ordered by id. */
+  findLiveAggregateIds(input: { organizationId: string }): Promise<string[]>;
+  /** ADR-177: every live aggregate in every organisation, ordered by id, for the sweep. */
+  findAllLiveAggregates(): Promise<LiveAggregate[]>;
+  /**
+   * ADR-177: live personal projects an aggregate may read, ordered by id; with
+   * `ownerUserIds`, only theirs (governance resolves a department to its members).
+   */
+  findPersonalProjectIds(input: {
+    organizationId: string;
+    ownerUserIds?: readonly string[];
+  }): Promise<string[]>;
+  /** ADR-177: of `projectIds`, the live ones of this organisation an aggregate may read. */
+  findReadableProjectIds(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+  }): Promise<string[]>;
+  /** ADR-177: every project an explicit rule may name, with its owner, ordered by name. */
+  findCandidateMembers(input: { organizationId: string }): Promise<AggregateMemberCandidate[]>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

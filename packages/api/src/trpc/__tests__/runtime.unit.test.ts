@@ -10,12 +10,13 @@ import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   bindTrpcHeader,
-  browserSessionFact,
-  callerAddressFact,
+  browserSessionContext,
+  callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcRuntime,
   defineTrpcRouter,
@@ -153,6 +154,7 @@ function harness() {
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           steps.push(`decide:${permission}:${scope.tier}:${scope.id}`);
 
@@ -228,7 +230,7 @@ describe("a mounted contract procedure", () => {
     });
 
     /** @scenario "A tRPC call runs one execution path" */
-    it("hands the handler input, app, actor, scope and signal, and keeps facts out of input", async () => {
+    it("hands the handler input, app, actor, scope and signal, and keeps middleware context out of input", async () => {
       const { runtime } = harness();
       const seen: Record<string, unknown>[] = [];
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
@@ -248,8 +250,20 @@ describe("a mounted contract procedure", () => {
       await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
       const args = seen[0]!;
-      expect(Object.keys(args).toSorted()).toEqual(["actor", "app", "input", "scope", "signal"]);
-      expect(args.scope).toEqual({ tier: "project", id: "project-1", organizationId: null });
+      expect(Object.keys(args).toSorted()).toEqual([
+        "actor",
+        "app",
+        "authorization",
+        "input",
+        "scope",
+        "signal",
+      ]);
+      expect(args.scope).toEqual({
+        tier: "project",
+        id: "project-1",
+        organizationId: null,
+        kind: "application",
+      });
       expect(args.actor).toEqual({ type: "user", id: "reviewer-1" });
       expect(args.input).toEqual({ projectId: "project-1", id: "annotation-1" });
       expect(Object.keys(args.input as object)).not.toContain("scope");
@@ -378,6 +392,36 @@ describe("a mounted contract procedure", () => {
         meta: { retryAfterMs: 1000 },
       });
     });
+  });
+
+  describe("given the code is ahead of a Postgres schema the worker still upgrades", () => {
+    /** @scenario "A Postgres read the schema is not ready for answers upgrade_in_progress" */
+    it.each(["P2021", "P2022", "42P01", "42703"])(
+      "fails %s as the retryable upgrade_in_progress",
+      async (code) => {
+        const { runtime } = harness();
+        const app: ReviewApi = { read: async () => ({ id: "annotation-1", comment: "" }) };
+        const declaration = reviewRouter({
+          getById: async () => {
+            throw Object.assign(new Error("The column `x` does not exist"), { code });
+          },
+        });
+
+        const call = runtime
+          .mount(declaration, () => app)
+          .createCaller({ actor: { id: "reviewer-1" } })
+          .getById({ projectId: "project-1", id: "annotation-1" });
+
+        await expect(call).rejects.toMatchObject({
+          code: "SERVICE_UNAVAILABLE",
+          cause: { code: "upgrade_in_progress", httpStatus: 503, retryable: true },
+        });
+        expect((await onTheWire(call)).data.error).toMatchObject({
+          code: "upgrade_in_progress",
+          meta: { retryAfterMs: 10_000 },
+        });
+      },
+    );
   });
 });
 
@@ -563,8 +607,8 @@ describe("the tRPC error formatter", () => {
 
 // ───────────────────────────────────────────────────────────────────────────── The four
 // capabilities the declared path grew for the surfaces that could not state themselves honestly: a
-// procedure with no caller, the facts a mount resolves, and an AND-composed permission. Spec:
-// packages/api/specs/trpc-framework.feature.
+// procedure with no caller, the middleware context a mount resolves, and an AND-composed
+// permission. Spec: packages/api/specs/trpc-framework.feature.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AccountApi {
@@ -615,6 +659,7 @@ function accountHarness({
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
 
@@ -768,19 +813,19 @@ describe("a procedure that runs with no caller", () => {
   });
 });
 
-describe("a procedure that declares a fact", () => {
+describe("a procedure that declares middleware context", () => {
   const sessionRouter = () =>
     accountRouter((builder) =>
       builder
         .procedure("register")
-        .withFacts(callerAddressFact)
+        .withMiddlewareContext(callerAddressContext)
         .withAccess(publicRoute({ reason: "signing up predates the account it creates" }))
         .handle((async (_args: never, address: string | null) => ({
           id: address ?? "none",
         })) as never)
 
         .procedure("changePassword")
-        .withFacts(browserSessionFact, callerAddressFact)
+        .withMiddlewareContext(browserSessionContext, callerAddressContext)
         .withPermission("annotations:update")
         .handle((async (_args: never, session: string | null, address: string | null) => ({
           done: session === "session-1" && address === "203.0.113.7",
@@ -792,16 +837,19 @@ describe("a procedure that declares a fact", () => {
     );
 
   describe("given the mount bound one value for each", () => {
-    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    /** @scenario "A tRPC procedure reads middleware context its mount resolved, never the request" */
     it("hands them to the handler after its arguments, in the order it declared them", async () => {
       const harness = accountHarness();
 
       const caller = harness
         .runtime(accountRoot.procedure)
         .mount(sessionRouter(), () => accountApp, {
-          facts: [
-            bindTrpcFact(browserSessionFact, (ctx: AccountContext) => ctx.sessionId ?? null),
-            bindTrpcHeader(callerAddressFact, "x-forwarded-for"),
+          middlewareContext: [
+            bindTrpcMiddlewareContext(
+              browserSessionContext,
+              (ctx: AccountContext) => ctx.sessionId ?? null,
+            ),
+            bindTrpcHeader(callerAddressContext, "x-forwarded-for"),
           ],
         })
         .createCaller({
@@ -815,16 +863,16 @@ describe("a procedure that declares a fact", () => {
       });
     });
 
-    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    /** @scenario "A tRPC procedure reads middleware context its mount resolved, never the request" */
     it("reads the address off the header the mount named, for an anonymous procedure too", async () => {
       const harness = accountHarness();
 
       const caller = harness
         .runtime(accountRoot.procedure)
         .mount(sessionRouter(), () => accountApp, {
-          facts: [
-            bindTrpcFact(browserSessionFact, () => null),
-            bindTrpcHeader(callerAddressFact, "x-forwarded-for"),
+          middlewareContext: [
+            bindTrpcMiddlewareContext(browserSessionContext, () => null),
+            bindTrpcHeader(callerAddressContext, "x-forwarded-for"),
           ],
         })
         .createCaller({ actor: null, req: { headers: { "x-forwarded-for": "198.51.100.4" } } });
@@ -836,16 +884,16 @@ describe("a procedure that declares a fact", () => {
   });
 
   describe("given the mount bound no value for one of them", () => {
-    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
-    it("refuses the mount, naming the fact and the procedure", () => {
+    /** @scenario "A tRPC procedure reads middleware context its mount resolved, never the request" */
+    it("refuses the mount, naming the middleware context and the procedure", () => {
       const harness = accountHarness();
 
       expect(() =>
         harness.runtime(accountRoot.procedure).mount(sessionRouter(), () => accountApp, {
-          facts: [bindTrpcFact(browserSessionFact, () => null)],
+          middlewareContext: [bindTrpcMiddlewareContext(browserSessionContext, () => null)],
         }),
       ).toThrow(
-        /account\.register declares the fact "callerAddress", and this mount bound no value for it/,
+        /account\.register declares the middleware context "callerAddress", and this mount bound no value for it/,
       );
     });
   });
@@ -968,6 +1016,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
       identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
       authorization: {
         forRequest: () => ({
+          ...authorizeDefaults,
           getDecision: async () => ({ permitted: true, organizationRole: null }),
           getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
           checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -1139,6 +1188,7 @@ describe("a procedure declared as minting a credential", () => {
         identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
         authorization: {
           forRequest: () => ({
+            ...authorizeDefaults,
             getDecision: async () => ({ permitted: true, organizationRole: null }),
             getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
             checkScopeLineage: async () => ({ kind: "consistent" }),

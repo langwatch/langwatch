@@ -93,7 +93,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
       borderColor="border.emphasized"
       borderRadius="8px 0 0 8px"
       borderRightWidth={0}
-      boxShadow="0 0 10px rgba(0,0,0,0.05)"
+      boxShadow="sm"
       overflowY="auto"
     >
       <ExecutionInputPanel

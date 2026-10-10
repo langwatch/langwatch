@@ -1,7 +1,7 @@
 // Package semaphore implements app.Semaphore as a machine-wide, file-lock counting
 // semaphore under the thuishaven home dir. File locks (flock) are used instead of
 // routing through the daemon so a slot is held for exactly as long as the holding
-// process lives: if `haven typecheck` is killed, the OS drops its flock and the
+// process lives: if `haven machine typecheck` is killed, the OS drops its flock and the
 // slot frees immediately — no daemon bookkeeping to leak. It works even while the
 // daemon is restarting.
 package semaphore

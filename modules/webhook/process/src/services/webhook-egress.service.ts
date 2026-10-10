@@ -80,6 +80,8 @@ export interface WebhookSendInput {
    * platform passes this, and only where the operator opted in.
    */
   allowInsecureLocal?: boolean;
+  /** The endpoint's own opt-in; the HTTP channel decides whether the deployment honours it. */
+  allowSelfSignedCertificate?: boolean;
 }
 
 /**
@@ -177,6 +179,7 @@ export class WebhookEgressService {
     attempt,
     contextLabel,
     allowInsecureLocal = false,
+    allowSelfSignedCertificate = false,
   }: WebhookSendInput): Promise<WebhookSendResult> {
     const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
     const admission = judgeWebhookUrl({ url, allowInsecureLocal });
@@ -213,6 +216,7 @@ export class WebhookEgressService {
         body,
         contextLabel: label,
         validateUrl: webhookUrlValidator(allowInsecureLocal),
+        allowSelfSignedCertificate,
       })
       .catch((error: unknown) => {
         throw withTransportFailureNamed({ error });

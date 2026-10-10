@@ -9,8 +9,8 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Entry, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useState } from "react";
-import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
+import { ArrowRight, Database, Flag, Folder, X } from "lucide-react";
+import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
@@ -75,49 +75,43 @@ export function EntryPointPropertiesPanel({
       .map((field) => [field.identifier, field.value as string]),
   );
 
-  const handleInputsChange = useCallback(
-    (newVariables: WorkflowVariable[]) => {
-      const existing = node.data.outputs ?? [];
-      const outputs: Field[] = newVariables.map((variable) => {
-        const prev = existing.find((f) => f.identifier === variable.identifier);
-        return {
-          ...prev,
-          identifier: variable.identifier,
-          type: variable.type as Field["type"],
-        };
-      });
-      // Send only the changed field; setNode merges data shallowly, so an
-      // attached dataset and other entry config survive untouched.
-      setNode({ id: node.id, data: { outputs } });
-      updateNodeInternals(node.id);
-    },
-    [node.id, node.data.outputs, setNode, updateNodeInternals],
-  );
+  const handleInputsChange = (newVariables: WorkflowVariable[]) => {
+    const existing = node.data.outputs ?? [];
+    const outputs: Field[] = newVariables.map((variable) => {
+      const prev = existing.find((f) => f.identifier === variable.identifier);
+      return {
+        ...prev,
+        identifier: variable.identifier,
+        type: variable.type as Field["type"],
+      };
+    });
+    // Send only the changed field; setNode merges data shallowly, so an
+    // attached dataset and other entry config survive untouched.
+    setNode({ id: node.id, data: { outputs } });
+    updateNodeInternals(node.id);
+  };
 
-  const handleValueChange = useCallback(
-    (identifier: string, value: string) => {
-      const outputs = (node.data.outputs ?? []).map((field) =>
-        field.identifier === identifier
-          ? { ...field, value: value === "" ? undefined : value }
-          : field,
-      );
-      setNode({ id: node.id, data: { outputs } });
-    },
-    [node.id, node.data.outputs, setNode],
-  );
+  const handleValueChange = (identifier: string, value: string) => {
+    const outputs = (node.data.outputs ?? []).map((field) =>
+      field.identifier === identifier
+        ? { ...field, value: value === "" ? undefined : value }
+        : field,
+    );
+    setNode({ id: node.id, data: { outputs } });
+  };
 
-  const detachDataset = useCallback(() => {
+  const detachDataset = () => {
     setNode({
       id: node.id,
       data: { ...node.data, dataset: undefined },
     });
-  }, [setNode, node.id, node.data]);
+  };
 
-  const goToEndNode = useCallback(() => {
+  const goToEndNode = () => {
     if (endNodeId) {
       setSelectedNode(endNodeId);
     }
-  }, [endNodeId, setSelectedNode]);
+  };
 
   return (
     <BasePropertiesPanel node={node} hideOutputs hideInputs hideParameters paddingX={4}>

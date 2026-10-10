@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { platformToolPolicySchema } from "../../platform-tool-policy.ts";
@@ -14,15 +15,17 @@ const cliToolPolicyMapSchema = z
   })
   .strict();
 
-export const cliBootstrapInputSchema = z
+const cliBootstrapInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface CliBootstrapInputSchema extends Named<typeof cliBootstrapInputSchemaDefinition> {}
+export const cliBootstrapInputSchema: CliBootstrapInputSchema = cliBootstrapInputSchemaDefinition;
 export type CliBootstrapInput = z.infer<typeof cliBootstrapInputSchema>;
 
-export const cliBootstrapResultSchema = z
+const cliBootstrapResultSchemaDefinition = z
   .object({
     tools: z.array(z.object({ slug: z.string().min(1), displayName: z.string().min(1) })),
     providers: z.array(
@@ -45,4 +48,9 @@ export const cliBootstrapResultSchema = z
     toolPolicies: cliToolPolicyMapSchema,
   })
   .strict();
+export interface CliBootstrapResultSchema extends Named<
+  typeof cliBootstrapResultSchemaDefinition
+> {}
+export const cliBootstrapResultSchema: CliBootstrapResultSchema =
+  cliBootstrapResultSchemaDefinition;
 export type CliBootstrapResult = z.infer<typeof cliBootstrapResultSchema>;

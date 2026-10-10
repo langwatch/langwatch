@@ -143,18 +143,25 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  async getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
+  /** The first dashboard, created when there is none and the project takes writes (ADR-177). */
+  async getOrCreateFirst(input: {
+    projectId: string;
+    acceptsWrites: boolean;
+  }): Promise<Dashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
     const first = await this.#repository.findFirstDashboard({ projectId });
-    if (first) return first;
+    if (first) return [first];
+    if (!input.acceptsWrites) return [];
 
-    return this.#repository.createDashboard({
+    const created = await this.#repository.createDashboard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
       projectId,
       name: "Reports",
       order: 0,
     });
+
+    return [created];
   }
 
   async listGraphs(input: { projectId: string; dashboardId?: string }): Promise<Graph[]> {

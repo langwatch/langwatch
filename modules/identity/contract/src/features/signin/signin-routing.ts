@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { extractIdentifierDomain, normalizeIdentifierValue } from "../../identifier.ts";
@@ -124,7 +125,7 @@ export const SIGNIN_ROUTING_OUTCOMES = [
 export type SignInRoutingOutcome = (typeof SIGNIN_ROUTING_OUTCOMES)[number];
 
 /** One offered method, as a transport states it. @see SignInMethod */
-export const signInMethodSchema = z.object({
+const signInMethodSchemaDefinition = z.object({
   /** What the sign-in surface dials: `password`, or the provider id. */
   id: z.string(),
   kind: z.enum(SIGNIN_METHOD_KINDS),
@@ -132,13 +133,15 @@ export const signInMethodSchema = z.object({
    *  and for the legacy env provider until D04 gives it a connection. */
   connectionId: z.string().nullable(),
 });
+export interface SignInMethodSchema extends Named<typeof signInMethodSchemaDefinition> {}
+export const signInMethodSchema: SignInMethodSchema = signInMethodSchemaDefinition;
 export type SignInMethod = z.infer<typeof signInMethodSchema>;
 
 /**
  * The decision the front door answers with. The object IS the contract: a
  * screen renders `methodSet` and keys its guidance off `reasonCode`.
  */
-export const routingDecisionSchema = z.object({
+const routingDecisionSchemaDefinition = z.object({
   outcome: z.enum(SIGNIN_ROUTING_OUTCOMES),
   /** Present only on `redirect_to_connection`. */
   connectionId: z.string().optional(),
@@ -148,6 +151,8 @@ export const routingDecisionSchema = z.object({
   /** True when an ACTIVE organization connection fell back to local methods. */
   domainManaged: z.literal(true).optional(),
 });
+export interface RoutingDecisionSchema extends Named<typeof routingDecisionSchemaDefinition> {}
+export const routingDecisionSchema: RoutingDecisionSchema = routingDecisionSchemaDefinition;
 export type RoutingDecision = z.infer<typeof routingDecisionSchema>;
 
 /**

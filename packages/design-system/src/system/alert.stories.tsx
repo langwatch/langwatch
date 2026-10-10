@@ -2,7 +2,7 @@ import { Alert, Button, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 const STATUSES = ["info", "success", "warning", "error", "neutral"] as const;
-const VARIANTS = ["subtle", "surface", "outline", "solid"] as const;
+const VARIANTS = ["solid", "surface", "subtle", "outline"] as const;
 
 const COPY: Record<(typeof STATUSES)[number], { title: string; description: string }> = {
   info: {
@@ -28,7 +28,14 @@ const COPY: Record<(typeof STATUSES)[number], { title: string; description: stri
 };
 
 const meta = {
-  title: "Primitives/Alert",
+  title: "Feedback/Alert",
+  parameters: {
+    usage: {
+      use: "Something still true about this screen, drawer or form (alerts-toasts-and-field-errors.md).",
+      avoid:
+        "Something that just happened: Toaster. One wrong field: its field error. A notice heading a page: Banner. Never restyle an alert at the call site.",
+    },
+  },
   component: Alert.Root,
   tags: ["autodocs"],
   args: { status: "info", variant: "subtle", size: "md" },
@@ -47,8 +54,12 @@ export const Default: Story = {
     <Alert.Root {...args}>
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Title>{COPY.info.title}</Alert.Title>
-        <Alert.Description>{COPY.info.description}</Alert.Description>
+        <Alert.Title>
+          {COPY[typeof args.status === "string" ? args.status : "info"].title}
+        </Alert.Title>
+        <Alert.Description>
+          {COPY[typeof args.status === "string" ? args.status : "info"].description}
+        </Alert.Description>
       </Alert.Content>
     </Alert.Root>
   ),

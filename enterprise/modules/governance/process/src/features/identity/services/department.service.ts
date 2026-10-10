@@ -5,7 +5,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { projectKindsHiddenFrom, type ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { DepartmentRepository } from "../../../repositories/department.repository.ts";
@@ -24,19 +24,30 @@ export type DepartmentProjects = Pick<
   "findProjectsWithDepartments" | "assignProjectDepartment"
 >;
 
+/** This module's own department write, fed to the aggregate reconcile (M8487-DEPT-CHANGE). */
+export type MemberDepartmentAssigned = (fact: {
+  organizationId: string;
+  userId: string;
+  occurredAt: number;
+}) => Promise<void>;
+
 export class DepartmentService {
   private constructor(
     private readonly repository: DepartmentRepository,
-    private readonly organizations: DepartmentOrganizations,
-    private readonly projects: DepartmentProjects,
+    private readonly peers: {
+      organizations: DepartmentOrganizations;
+      projects: DepartmentProjects;
+      onMemberDepartmentAssigned?: MemberDepartmentAssigned;
+    },
   ) {}
 
   static create(options: {
     repository: DepartmentRepository;
     organizations: DepartmentOrganizations;
     projects: DepartmentProjects;
+    onMemberDepartmentAssigned?: MemberDepartmentAssigned;
   }): DepartmentService {
-    return new DepartmentService(options.repository, options.organizations, options.projects);
+    return new DepartmentService(options.repository, options);
   }
 
   getAll(input: { organizationId: string }): Promise<Department[]> {
@@ -47,12 +58,22 @@ export class DepartmentService {
     return this.repository.findById(input);
   }
 
-  /** Main `department.service.ts:106-145`: a member with no display name shows their email. */
-  async getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
+  /**
+   * Main `department.service.ts:106-145`: a member with no display name shows their email; an
+   * aggregate project is listed to an organisation admin only (ADR-177 decision 5).
+   */
+  async getAssignments(input: {
+    organizationId: string;
+    callerOrganizationRole: string | null;
+  }): Promise<DepartmentAssignments> {
+    const { organizationId } = input;
     const [members, teams, projects] = await Promise.all([
-      this.organizations.findMembersWithDepartments(input),
-      this.organizations.findTeamsWithDepartments(input),
-      this.projects.findProjectsWithDepartments(input),
+      this.peers.organizations.findMembersWithDepartments({ organizationId }),
+      this.peers.organizations.findTeamsWithDepartments({ organizationId }),
+      this.peers.projects.findProjectsWithDepartments({
+        organizationId,
+        hiddenKinds: projectKindsHiddenFrom(input.callerOrganizationRole),
+      }),
     ]);
     return {
       users: members
@@ -106,10 +127,16 @@ export class DepartmentService {
     departmentId: string | null;
   }): Promise<void> {
     await this.assertDepartmentInOrganization(input);
-    if (!(await this.organizations.assignMemberDepartment(input))) {
+    if (!(await this.peers.organizations.assignMemberDepartment(input))) {
       throw new DepartmentAssignmentTargetNotFoundError("user");
     }
-    await this.repository.recordMemberDepartment({ ...input, at: nowInstant() });
+    const at = nowInstant();
+    await this.repository.recordMemberDepartment({ ...input, at });
+    await this.peers.onMemberDepartmentAssigned?.({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      occurredAt: at.epochMilliseconds,
+    });
   }
 
   findOpenUserLinks(input: {
@@ -125,7 +152,7 @@ export class DepartmentService {
     departmentId: string | null;
   }): Promise<void> {
     await this.assertDepartmentInOrganization(input);
-    if (!(await this.organizations.assignTeamDepartment(input))) {
+    if (!(await this.peers.organizations.assignTeamDepartment(input))) {
       throw new DepartmentAssignmentTargetNotFoundError("team");
     }
   }
@@ -136,7 +163,7 @@ export class DepartmentService {
     departmentId: string | null;
   }): Promise<void> {
     await this.assertDepartmentInOrganization(input);
-    if (!(await this.projects.assignProjectDepartment(input))) {
+    if (!(await this.peers.projects.assignProjectDepartment(input))) {
       throw new DepartmentAssignmentTargetNotFoundError("project");
     }
   }

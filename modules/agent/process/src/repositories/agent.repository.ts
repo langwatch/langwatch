@@ -56,6 +56,10 @@ export interface AgentRepository {
   listPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }>;
   create(input: PersistAgentInput): Promise<Agent>;
   update(input: UpdatePersistedAgentInput): Promise<Agent>;
+  /** Writes the config only if the row is unchanged since `updatedAt`; false when it moved on. */
+  updateConfigIfUnchanged(
+    input: GetAgentInput & { config: AgentConfig; updatedAt: Instant },
+  ): Promise<boolean>;
   archive(input: GetAgentInput): Promise<Agent>;
   findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]>;
   updateNameAndConfig(input: UpdateAgentCopyInput): Promise<void>;

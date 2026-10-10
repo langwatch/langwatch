@@ -8,6 +8,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { documentedResponses, flatErrorStatuses } from "../openapi.ts";
 import {
@@ -66,11 +67,13 @@ const items = defineRestRouter(ItemApi)
       ...documentedResponses({ 404: errorSchema, 409: apiErrorSchema }),
     },
   })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.update(input))
   .build();
 
 function mounted({ refuseDoor = false }: { refuseDoor?: boolean } = {}) {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         if (refuseDoor) throw new InvalidKeyError();

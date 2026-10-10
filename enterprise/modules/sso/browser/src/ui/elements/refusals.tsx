@@ -96,7 +96,7 @@ export function AvailabilityRefusalNotice({
   const copy = AVAILABILITY_REFUSAL_COPY[refusal];
 
   return (
-    <Alert.Root status="info" data-testid="sso-availability-refusal">
+    <Alert.Root status="info" variant="outline" data-testid="sso-availability-refusal">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>{copy.title}</Alert.Title>

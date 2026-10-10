@@ -51,7 +51,7 @@ export function useLicenseActions({
 
   const removeMutation = licensingApi.license.remove.useMutation({
     onSuccess: () => {
-      host.succeeded({
+      host.informed({
         title: "License removed",
         description:
           "Your organization is now running without a license. Some features may be limited.",
@@ -65,7 +65,7 @@ export function useLicenseActions({
   const refreshMutation = licensingApi.license.refresh.useMutation({
     onSuccess: (result) => {
       if (result.outcome !== "updated") {
-        host.succeeded({
+        host.informed({
           title: "Your license is up to date",
           description: "LangWatch has no newer license for this install.",
         });

@@ -3,7 +3,13 @@ import { z } from "zod";
 
 import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
-import { langevalsStagingTtlSeconds, nlpServiceUrl, publicBaseUrl } from "../deployment-facts.ts";
+import {
+  langevalsStagingTtlSeconds,
+  nlpServiceUrl,
+  publicBaseUrl,
+  slackApiBase,
+  slackWebhookBase,
+} from "../deployment-facts.ts";
 
 const github = {
   name: "github",
@@ -150,6 +156,33 @@ describe("parseProcessConfig", () => {
       expect(read({ LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " })).toBe(
         "http://nlp.langwatch.test",
       );
+    });
+  });
+
+  describe("given slack and automation holding the Slack address leaves", () => {
+    const owners = [
+      { name: "slack", config: { slackApiBase } },
+      { name: "automation", config: { slackApiBase, slackWebhookBase } },
+    ] as const;
+
+    /** @scenario "Slack's addresses default to Slack itself" */
+    it("reads unset addresses as Slack's own", () => {
+      const config = parseProcessConfig({ owners, environment: {} });
+      expect(config.slack.slackApiBase).toBe("https://slack.com/api");
+      expect(config.automation.slackApiBase).toBe("https://slack.com/api");
+      expect(config.automation.slackWebhookBase).toBe("https://hooks.slack.com");
+    });
+
+    /** @scenario "A dev stack points Slack's addresses at a stand-in" */
+    it("hands both owners the stand-in's addresses", () => {
+      const sim = "https://outbound.x.langwatch.localhost";
+      const config = parseProcessConfig({
+        owners,
+        environment: { SLACK_API_BASE: `${sim}/api`, SLACK_WEBHOOK_BASE: sim },
+      });
+      expect(config.slack.slackApiBase).toBe(`${sim}/api`);
+      expect(config.automation.slackApiBase).toBe(`${sim}/api`);
+      expect(config.automation.slackWebhookBase).toBe(sim);
     });
   });
 

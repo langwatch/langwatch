@@ -30,6 +30,7 @@ const (
 	HeaderSeed  = "X-Llmsim-Seed"
 	HeaderMode  = "X-Llmsim-Mode"
 	HeaderError = "X-Llmsim-Error"
+	HeaderTools = "X-Llmsim-Tools"
 )
 
 // maxBodyBytes caps one request body; agent transcripts run large.
@@ -155,7 +156,41 @@ func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request, path stri
 	if !ok {
 		return
 	}
+	if !holdForDelay(r, pc.rec.Model) {
+		pc.rec.Status, pc.rec.Error = statusClientClosedRequest, "caller hung up during the forced delay"
+		return
+	}
 	s.routeProvider(pc, r, body)
+}
+
+// statusClientClosedRequest is what the console records for a call whose
+// caller hung up before llmsim answered; nothing is written back.
+const statusClientClosedRequest = 499
+
+// maxForcedDelay caps a "delay-<ms>" model so a typo cannot park a call forever.
+const maxForcedDelay = 5 * time.Minute
+
+var delayInModel = regexp.MustCompile(`delay-(\d+)`)
+
+// holdForDelay waits the "delay-<ms>" a model name asks for before the first
+// byte, and reports false when the caller hung up while it waited.
+func holdForDelay(r *http.Request, model string) bool {
+	m := delayInModel.FindStringSubmatch(model)
+	if m == nil {
+		return true
+	}
+	ms, err := strconv.Atoi(m[1])
+	if err != nil {
+		return true
+	}
+	timer := time.NewTimer(min(time.Duration(ms)*time.Millisecond, maxForcedDelay))
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-r.Context().Done():
+		return false
+	}
 }
 
 // providerCall is one provider call in flight: its response, its dialect and
@@ -195,14 +230,16 @@ func (s *Server) readProviderBody(pc *providerCall, r *http.Request) (map[string
 	return body, true
 }
 
-// routeProvider answers the call by its path: chat completions, messages,
-// token counts or embeddings.
+// routeProvider answers the call by its path: chat completions, responses,
+// messages, token counts or embeddings.
 func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[string]json.RawMessage) {
 	w, path := pc.w, pc.rec.Path
 	var req request
 	switch {
 	case strings.HasSuffix(path, "/chat/completions"):
 		req = parseOpenAI(body)
+	case strings.HasSuffix(path, "/responses"):
+		req = parseResponses(body)
 	case strings.HasSuffix(path, "/messages/count_tokens"):
 		writeJSON(w, map[string]int{"input_tokens": parseAnthropic(body).promptTokens()})
 		pc.rec.Mode = "count_tokens"
@@ -219,9 +256,12 @@ func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[strin
 	}
 	rep := s.answer(r.Header, req)
 	pc.rec.Mode, pc.rec.Stream, pc.rec.InputTokens, pc.rec.OutputTokens, pc.rec.Response = rep.Mode, req.stream, rep.In, rep.Out, &rep
-	if pc.anthropic {
+	switch {
+	case pc.anthropic:
 		s.writeAnthropic(w, req, rep)
-	} else {
+	case strings.HasSuffix(path, "/responses"):
+		s.writeResponses(w, req, rep)
+	default:
 		s.writeOpenAI(w, req, rep)
 	}
 }
@@ -298,7 +338,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 // Models are what /models lists; any model name is answered regardless.
-var Models = []string{"markov-small", "markov-json", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
+var Models = []string{"markov-small", "markov-json", "markov-tools", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
 
 // canned are the fixed answers a "canned-<name>" model returns, whatever the prompt.
 var canned = map[string]string{

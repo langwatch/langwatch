@@ -30,12 +30,12 @@ const STAT_COLOR: Record<ScenarioBar["status"], string> = {
 
 const RECEIPT_DOT: Record<BriefingSeverity, string> = {
   error: "red.solid",
-  attention: "#c98a2f",
+  attention: "yellow.fg",
   steady: "green.solid",
 };
 const METRIC_COLOR: Record<"down" | "up" | "ok", string> = {
   down: "red.fg",
-  up: "#c98a2f",
+  up: "yellow.fg",
   ok: "green.fg",
 };
 
@@ -406,7 +406,7 @@ function ReceiptRow({
   return (
     <Box
       position="relative"
-      background="bg.surface"
+      background="bg.card"
       transition="background 130ms ease"
       _hover={href ? { background: "bg.muted" } : undefined}
       css={{

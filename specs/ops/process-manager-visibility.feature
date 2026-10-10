@@ -139,3 +139,9 @@ Feature: Process-manager visibility in ops
     When the operator opens the fleet
     Then the rows come from the process-manager instance and outbox tables
     And a process the registry cannot name is shown as unregistered rather than hidden
+
+  @unit
+  Scenario: The eventing hand-off outbox is named, not shown as unregistered
+    Given dead hand-off messages under the outbox eventing hosts itself
+    When the operator opens the fleet
+    Then the row names it the eventing hand-off outbox, whose redrive is live

@@ -7,6 +7,7 @@ const NAMESPACE_EXCEPTIONS = {
   auth: "auth",
   authz: "authz",
   billing: "billing",
+  connect: "connect",
   "demo-data": "demo-data",
   "data-privacy": "data-privacy",
   "data-retention": "data-retention",

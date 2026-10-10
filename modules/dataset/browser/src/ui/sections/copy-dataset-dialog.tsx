@@ -51,7 +51,8 @@ export function CopyDatasetDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(details) => !details.open && onClose()}>
-      <Dialog.Content bg="bg" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Replicate Dataset</Dialog.Title>
         </Dialog.Header>
@@ -79,11 +80,11 @@ export function CopyDatasetDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={() => void handleCopy()}
             loading={copyDataset.isPending}
             disabled={!selectedProjectId.length}

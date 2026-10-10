@@ -49,7 +49,7 @@ function buildEvaluatorExistsCondition(additionalWhere: string): FilterCondition
   return ({ values, paramId }) => ({
     sql: `EXISTS (
       SELECT 1 FROM evaluation_runs es
-      WHERE es.TenantId = ts.TenantId
+      WHERE es.TenantId = {tenantId:String}
         AND es.TraceId IS NOT NULL
         AND assumeNotNull(es.TraceId) = ts.TraceId
         AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
@@ -141,7 +141,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   "spans.type": ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = ts.TenantId
+      WHERE sp.TenantId = {tenantId:String}
         AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
         AND sp.SpanAttributes['langwatch.span.type'] IN ({${paramId}_values:Array(String)})
     )`,
@@ -186,7 +186,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = ts.TenantId
+        WHERE es.TenantId = {tenantId:String}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -214,7 +214,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = ts.TenantId
+        WHERE es.TenantId = {tenantId:String}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -234,7 +234,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = ts.TenantId
+        WHERE es.TenantId = {tenantId:String}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -252,7 +252,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
-        WHERE es.TenantId = ts.TenantId
+        WHERE es.TenantId = {tenantId:String}
           AND es.TraceId IS NOT NULL
           AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -269,7 +269,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   "events.event_type": ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = ts.TenantId
+      WHERE sp.TenantId = {tenantId:String}
         AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
         AND sp.SpanAttributes['event.type'] IN ({${paramId}_values:Array(String)})
     )`,
@@ -292,7 +292,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
-        WHERE sp.TenantId = ts.TenantId
+        WHERE sp.TenantId = {tenantId:String}
           AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND (${metricConditions.join(" OR ")})
@@ -316,7 +316,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
-        WHERE sp.TenantId = ts.TenantId
+        WHERE sp.TenantId = {tenantId:String}
           AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND toFloat64OrNull(sp.SpanAttributes[{${paramId}_attrkey:String}]) >= {${paramId}_min:Float64}
@@ -346,7 +346,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
-        WHERE sp.TenantId = ts.TenantId
+        WHERE sp.TenantId = {tenantId:String}
           AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND (${detailConditions.join(" OR ")})

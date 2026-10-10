@@ -19,9 +19,17 @@
       "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
+    "./observability-owner": {
+      "types": "./dist/observability-owner.d.ts",
+      "default": "./src/observability-owner.ts"
+    },
     "./nlp-internal-secret": {
       "types": "./dist/nlp-internal-secret.d.ts",
       "default": "./src/nlp-internal-secret.ts"
+    },
+    "./backend-host": {
+      "types": "./dist/lifecycle/backend-host.d.ts",
+      "default": "./src/lifecycle/backend-host.ts"
     },
     "./process-globals": {
       "types": "./dist/process-globals.d.ts",

@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const pinoMock = vi.hoisted(() => {
   const transport = vi.fn();
-  const multistream = vi.fn((streams: unknown) => ({ streams }));
+  const multistream = vi.fn((streams: { stream: { write(line: string): void } }[]) => ({
+    streams,
+  }));
   const pino = vi.fn((options: { level: string }, _stream?: { write(line: string): void }) => ({
     level: options.level,
   }));
@@ -40,6 +42,7 @@ describe("configured Node logger transports", () => {
     pinoMock.transport.mockImplementation(fakeTransport);
   });
 
+  /** @scenario The console honours its own level when no export is configured */
   it("uses the configured pretty console target without OTel when export is disabled", () => {
     createLoggerFactory({
       environment: "production",
@@ -57,6 +60,7 @@ describe("configured Node logger transports", () => {
         }),
       ],
     });
+    expect(pinoMock.multistream).toHaveBeenCalledWith([expect.objectContaining({ level: "warn" })]);
   });
 
   it("uses JSON console and the legacy fixed OTel logger name when export is enabled", () => {
@@ -109,7 +113,7 @@ describe("configured Node logger transports", () => {
     const printed = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     createLoggerFactory({ environment: "production" }).createLogger("transport-late-failure");
-    const [, stream] = pinoMock.pino.mock.lastCall ?? [];
+    const stream = pinoMock.multistream.mock.lastCall?.[0][0]?.stream;
     failing.fail(new Error("the worker has exited"));
     stream?.write("after the failure\n");
 
@@ -133,7 +137,7 @@ describe("configured Node logger transports", () => {
     const printed = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     createLoggerFactory({ environment: "production" }).createLogger("transport-resume");
-    const [, stream] = pinoMock.pino.mock.lastCall ?? [];
+    const stream = pinoMock.multistream.mock.lastCall?.[0][0]?.stream;
     first.fail(new Error("the worker has exited"));
     first.fail(new Error("the worker has exited"));
     stream?.write("while down\n");
@@ -147,6 +151,24 @@ describe("configured Node logger transports", () => {
     reported.mockRestore();
     printed.mockRestore();
     vi.useRealTimers();
+  });
+
+  it("hands the OTel worker epoch milliseconds, since an ISO time string ends that worker", () => {
+    const consoleTransport = fakeTransport();
+    const otelTransport = fakeTransport();
+    pinoMock.transport.mockReturnValueOnce(consoleTransport).mockReturnValueOnce(otelTransport);
+
+    createLoggerFactory({ environment: "production", otelExportEnabled: true }).createLogger(
+      "transport-otel-time",
+    );
+    const [streams] = pinoMock.multistream.mock.lastCall ?? [];
+    const line = '{"level":"info","time":"2026-10-09T17:38:32.936Z","msg":"a"}\n';
+    for (const { stream } of streams ?? []) stream.write(line);
+
+    expect(consoleTransport.write).toHaveBeenCalledWith(line);
+    expect(otelTransport.write).toHaveBeenCalledWith(
+      '{"level":"info","time":1791567512936,"msg":"a"}\n',
+    );
   });
 
   it("falls back to stdout when a configured transport cannot initialize", () => {

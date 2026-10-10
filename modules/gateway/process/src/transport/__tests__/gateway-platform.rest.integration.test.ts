@@ -6,7 +6,7 @@
 
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   type IdempotentRunner,
   type RestPermissionReach,
@@ -26,6 +26,7 @@ import {
 import { Prisma } from "@langwatch/prisma-client/generated";
 // @vitest-environment node
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -61,8 +62,8 @@ const callerOf: Pick<GatewayApi, "actorForCredential" | "getVirtualKeyCaller"> =
   }),
 };
 
-function credentialFact(credential: GatewayRequestCredential = scopedKey) {
-  return bindRestMiddleware(gatewayRestCredential, () => credential);
+function credentialContext(credential: GatewayRequestCredential = scopedKey) {
+  return bindMiddlewareContext(gatewayRestCredential, () => credential);
 }
 
 const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
@@ -133,7 +134,7 @@ function fakeKeyDoor({
       throw new PermissionDeniedError({
         permission,
         scope: { type: "organization", id: ORGANIZATION_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     },
     identify: caller,
@@ -141,9 +142,9 @@ function fakeKeyDoor({
 }
 
 /**
- * The family behind both of its doors: project-door routes see the caller's
- * project, key-door routes (virtual keys and the organization-owned rows) the
- * organization, and each fact the declaration names is bound as the process binds it.
+ * The family behind both of its doors: project-door routes see the caller's project,
+ * key-door routes (virtual keys, organization-owned rows) the organization, and each
+ * middleware context the declaration names is bound as the module provides it.
  */
 function mountFamily({
   app,
@@ -167,6 +168,7 @@ function mountFamily({
     scope: { tier: "project" as const, id: PROJECT_ID },
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: projectDoor, identify: projectDoor },
     doors: { api_key: fakeKeyDoor({ asked, keyHolds }) },
     idempotency,
@@ -175,10 +177,10 @@ function mountFamily({
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayKeyCaller, () => keyCaller),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => virtualKeyCaller),
-      credentialFact(credential),
+    middlewareContext: [
+      bindMiddlewareContext(gatewayKeyCaller, () => keyCaller),
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => virtualKeyCaller),
+      credentialContext(credential),
     ],
   });
 }
@@ -199,7 +201,7 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
     throw new PermissionDeniedError({
       permission,
       scope: { type: "organization", id: organizationId },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   };
   const app = createApiFixture<GatewayApi>({
@@ -489,7 +491,7 @@ const budgetBody = {
   limit_usd: "25.50",
 };
 
-/** Mounts the family as the doors hand a caller over: the key caller and the credential fact. */
+/** Mounts the family as the doors hand a caller over: the key caller and the credential context. */
 function mountAs({
   app,
   credential,

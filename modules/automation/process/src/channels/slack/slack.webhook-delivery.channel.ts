@@ -93,11 +93,11 @@ export function findSlackWebhookErrorExplanation(error: unknown): string[] {
   return [];
 }
 
-export interface SlackWebhookTransport {
+interface SlackWebhookTransport {
   send(payload: SlackPayload & { username?: string; icon_emoji?: string }): Promise<void>;
 }
 
-export interface SlackWebhookRequest {
+interface SlackWebhookRequest {
   triggerWebhook: string;
   triggerData: TriggerData[];
   triggerName: string;
@@ -108,7 +108,7 @@ export interface SlackWebhookRequest {
   baseHost: string;
 }
 
-export interface RenderedSlackMessageRequest {
+interface RenderedSlackMessageRequest {
   triggerWebhook: string;
   triggerName: string;
   payload: SlackPayload;

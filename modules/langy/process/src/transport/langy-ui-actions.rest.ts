@@ -82,6 +82,7 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/langy/ui/actions", "langyUiActionsDispatch")
+  .withAudit("langy.dispatchUiAction")
   .withAccess(deferredScope({ reason: AUTH_REASON }))
   .withRawBody("text")
   .withBodyLimit({ maxBytes: MAX_ACTION_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })

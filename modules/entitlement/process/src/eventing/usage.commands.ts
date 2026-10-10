@@ -2,6 +2,7 @@ import {
   USAGE_LIMIT_CLEARED_EVENT_TYPE,
   USAGE_LIMIT_REACHED_EVENT_TYPE,
   USAGE_MONTH_COUNTED_EVENT_TYPE,
+  USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
 } from "@langwatch/entitlement-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
@@ -12,6 +13,8 @@ import {
   countMonthCommandDataSchema,
   type RecordLimitDecisionCommandData,
   recordLimitDecisionCommandDataSchema,
+  type RecordUsageWarningCommandData,
+  recordUsageWarningCommandDataSchema,
   USAGE_AGGREGATE_TYPE,
   USAGE_EVENT_VERSION,
   type UsageEvent,
@@ -100,6 +103,47 @@ export class RecordLimitDecisionCommand implements CommandHandler<
     return {
       "payload.organization.id": payload.organizationId,
       "payload.usage.decision": payload.decision,
+    };
+  }
+}
+
+/** Records a crossed warning threshold; keyed by threshold and month, so it is stored once. */
+export class RecordUsageWarningCommand implements CommandHandler<
+  Command<RecordUsageWarningCommandData>,
+  UsageEvent
+> {
+  static readonly schema = defineCommandSchema(
+    "lw.entitlement.record_usage_warning",
+    recordUsageWarningCommandDataSchema,
+    "Record a crossed usage warning threshold",
+  );
+
+  async handle(command: Command<RecordUsageWarningCommandData>): Promise<UsageEvent[]> {
+    const { tenantId: _tenantId, ...data } = command.data;
+    return [
+      EventUtils.createEvent<UsageEvent>({
+        aggregateType: USAGE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
+        version: USAGE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:${data.month}:${data.crossedThreshold}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordUsageWarningCommandData): string {
+    return payload.organizationId;
+  }
+
+  static getSpanAttributes(payload: RecordUsageWarningCommandData): Record<string, string> {
+    return {
+      "payload.organization.id": payload.organizationId,
+      "payload.usage.month": payload.month,
+      "payload.usage.threshold": String(payload.crossedThreshold),
     };
   }
 }

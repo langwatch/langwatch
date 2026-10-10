@@ -125,10 +125,26 @@ export default defineConfig({
       },
     },
 
+    /* SSO journeys against idpsim: each signs up its own administrator, so no shared state */
+    {
+      name: "sso",
+      testDir: "./tests/sso",
+      timeout: 300000,
+      use: { ...devices["Desktop Chrome"], actionTimeout: 30000, navigationTimeout: 120000 },
+    },
+
+    /* Licence journeys: each spec refuses a stack in the wrong deployment mode */
+    {
+      name: "licence",
+      testDir: "./tests/licence",
+      use: { ...devices["Desktop Chrome"], storageState: AUTH_FILE },
+      dependencies: ["setup"],
+    },
+
     /* Main test project - uses authenticated state */
     {
       name: "chromium",
-      testIgnore: ["**/journey/**", "**/*.unit.test.ts"],
+      testIgnore: ["**/journey/**", "**/sso/**", "**/licence/**", "**/*.unit.test.ts"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: AUTH_FILE,

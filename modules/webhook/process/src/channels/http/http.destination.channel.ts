@@ -25,7 +25,7 @@ const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
 const RESPONSE_HEADER_VALUE_CHARS = 200;
 const RESPONSE_HEADER_MAX_COUNT = 32;
 
-export interface HttpDestinationRequest {
+interface HttpDestinationRequest {
   url: string;
   method?: "POST" | "PUT" | "PATCH";
   /** Static headers. Content-Type et al. are the caller's to set. */
@@ -200,15 +200,24 @@ export async function sendHttpDestination({
   };
 }
 
-/** The fenced sender, bound to the deployment's TLS answer once per process. */
+/** One send; an endpoint that opted in may present a self-signed certificate. */
+export type HttpWebhookRequest = Omit<HttpDestinationRequest, "tls"> & {
+  allowSelfSignedCertificate?: boolean;
+};
+
+/** The fenced sender: certificates are verified unless the deployment honours an opt-in. */
 export class HttpDestinationChannel implements HttpWebhookSender {
-  static create(input: { tls: EgressTlsPolicy }): HttpDestinationChannel {
-    return new HttpDestinationChannel(input.tls);
+  static create(input: { permitsSelfSignedOptIn: boolean }): HttpDestinationChannel {
+    return new HttpDestinationChannel(input.permitsSelfSignedOptIn);
   }
 
-  private constructor(private readonly tls: EgressTlsPolicy) {}
+  private constructor(private readonly permitsSelfSignedOptIn: boolean) {}
 
-  send(request: Omit<HttpDestinationRequest, "tls">): Promise<HttpDestinationResponse> {
-    return sendHttpDestination({ ...request, tls: this.tls });
+  send({
+    allowSelfSignedCertificate = false,
+    ...request
+  }: HttpWebhookRequest): Promise<HttpDestinationResponse> {
+    const acceptsSelfSigned = this.permitsSelfSignedOptIn && allowSelfSignedCertificate;
+    return sendHttpDestination({ ...request, tls: { rejectUnauthorized: !acceptsSelfSigned } });
   }
 }

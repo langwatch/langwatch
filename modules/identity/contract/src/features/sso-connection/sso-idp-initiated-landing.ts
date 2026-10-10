@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -12,18 +13,30 @@ const LANDING_PATH = /^\/(?!\/)[\w\-.~!$&'()*+,;=:@/?]*$/;
 
 /** Whether an administrator may list this as a landing page: a path on LangWatch itself. */
 export function isAllowableLandingTarget(target: string): boolean {
-  return target.length <= MAX_TARGET_LENGTH && LANDING_PATH.test(target);
+  const [path = ""] = target.split("?");
+  const segments = path.split("/");
+  return (
+    target.length <= MAX_TARGET_LENGTH &&
+    LANDING_PATH.test(target) &&
+    !target.includes("//") &&
+    !segments.some((segment) => segment === "." || segment === "..")
+  );
 }
 
 const landingTargetSchema = z.string().refine((target) => isAllowableLandingTarget(target));
 
-/** A SAML connection's opt-in to sign-ins its identity provider starts; older documents parse as off. */
-export const ssoSamlIdpInitiatedSchema = z
+/** A SAML connection's opt-in to sign-ins its IdP starts; older documents parse as off. */
+const ssoSamlIdpInitiatedSchemaDefinition = z
   .object({
     enabled: z.boolean().default(false),
     landingTargets: z.array(landingTargetSchema).max(20).default([]),
   })
   .default({ enabled: false, landingTargets: [] });
+export interface SsoSamlIdpInitiatedSchema extends Named<
+  typeof ssoSamlIdpInitiatedSchemaDefinition
+> {}
+export const ssoSamlIdpInitiatedSchema: SsoSamlIdpInitiatedSchema =
+  ssoSamlIdpInitiatedSchemaDefinition;
 
 /** The listed target the RelayState names, or `defaultTarget` for anything else. */
 export function idpInitiatedLanding({

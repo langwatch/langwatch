@@ -1,20 +1,21 @@
-import { Lent } from "@langwatch/browser-host/lent";
+import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Alert,
   Badge,
-  Box,
   Button,
   Card,
+  HStack,
   Spacer,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { readableDate } from "@langwatch/time";
 import {
   History,
@@ -36,6 +37,7 @@ import { WebhookDestinationCell } from "../../../features/webhooks/ui/elements/w
 import { WebhookDeliveriesDrawer } from "../../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";
 import { WebhookEndpointDrawer } from "../../../features/webhooks/ui/sections/webhook-endpoint-drawer.tsx";
 import { WebhookSecretDialog } from "../../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
@@ -53,11 +55,17 @@ function statusBadge(endpoint: EndpointView) {
   );
 }
 
-function eventsSummary(enabledEvents: string[]) {
-  if (enabledEvents.includes("*")) return "all events";
-  const shown = enabledEvents.slice(0, 2).join(", ");
+function EventsSummary({ enabledEvents }: { enabledEvents: string[] }) {
+  if (enabledEvents.includes("*")) return <>all events</>;
   const rest = enabledEvents.length - 2;
-  return rest > 0 ? `${shown} +${rest}` : shown;
+  return (
+    <HStack gap="1" flexWrap="wrap">
+      {enabledEvents.slice(0, 2).map((event) => (
+        <InlineCode key={event}>{event}</InlineCode>
+      ))}
+      {rest > 0 && <Text as="span">+{rest}</Text>}
+    </HStack>
+  );
 }
 
 /** Which endpoint each drawer and confirmation is showing, if any. */
@@ -174,20 +182,14 @@ function WebhooksUpsell() {
       </PageLayout.Header>
       <PageLayout.Container>
         <VStack gap={6} width="full" align="start">
-          <Alert.Root status="info">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>Enterprise Feature</Alert.Title>
-              <Alert.Description>
-                Webhook endpoints stream signed events (gateway billing, budgets, key lifecycle) to
-                your systems with durable retries and delivery history. Available on Enterprise
-                plans.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-          <Box width="full">
-            <Lent of={ContactSalesToken} props={{}} />
-          </Box>
+          <UpgradeRequired
+            feature="Webhooks"
+            actions={
+              <Button asChild colorPalette="orange" size="sm">
+                <Link href="/settings/plans">Compare plans</Link>
+              </Button>
+            }
+          />
         </VStack>
       </PageLayout.Container>
     </>
@@ -289,8 +291,8 @@ function WebhookRow(props: EndpointActionProps) {
     <Table.Row>
       <WebhookDestinationCell endpoint={endpoint} />
       <Table.Cell>
-        <Text fontSize="sm" color="fg.muted">
-          {eventsSummary(endpoint.enabledEvents)}
+        <Text as="div" fontSize="sm" color="fg.muted">
+          <EventsSummary enabledEvents={endpoint.enabledEvents} />
         </Text>
       </Table.Cell>
       <Table.Cell>{statusBadge(endpoint)}</Table.Cell>
@@ -309,8 +311,13 @@ function WebhookEndpointsTable({
   ...actions
 }: EndpointListActions & { endpoints: EndpointView[] }) {
   return (
-    <Card.Root width="full" overflowX="auto">
-      <Table.Root variant="line" size="md" width="full">
+    <Card.Root variant="showcase" width="full" overflowX="auto">
+      <ListTable
+        containerProps={{ overflowX: "auto", maxWidth: "full" }}
+        variant="line"
+        size="md"
+        width="full"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Destination</Table.ColumnHeader>
@@ -325,7 +332,7 @@ function WebhookEndpointsTable({
             <WebhookRow key={endpoint.id} endpoint={endpoint} {...actions} />
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Card.Root>
   );
 }
@@ -551,7 +558,8 @@ function WebhooksManager({
 }
 
 export default function WebhooksSettingsPage() {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const { webhookEndpointsEnabled, isLoading: isPlanLoading } = useActivePlan();
   const webhooksEnabled = webhookEndpointsEnabled;
 
@@ -581,7 +589,7 @@ export default function WebhooksSettingsPage() {
       <WebhooksManager
         organizationId={organization?.id ?? ""}
         enabled={!!organization}
-        canManage={hasPermission("webhookEndpoints:manage")}
+        canManage={host.hasPermission("webhookEndpoints:manage")}
       />
     </AiGatewayLayout>
   );

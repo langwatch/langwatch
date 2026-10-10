@@ -5,14 +5,15 @@
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   restRouteDocumentation,
 } from "@langwatch/api/rest";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentInitRest } from "../experiment-init.rest.ts";
@@ -77,6 +78,8 @@ function mountInit({
   const app = stubExperimentApi(stubs);
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {
         const presented = request.headers.get("Authorization");
@@ -95,8 +98,8 @@ function mountInit({
   const hono = runtime.mount(experimentInitRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: PROJECT_SLUG,
         viewerUserId: null,
         actorId: "key-1",

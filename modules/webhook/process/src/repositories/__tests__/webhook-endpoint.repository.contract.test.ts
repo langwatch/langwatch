@@ -283,4 +283,53 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
       expect(deliveries).toEqual([]);
     });
   });
+
+  describe("when a create carries an idempotency key", () => {
+    const keyed = (organizationId: string) => ({
+      organizationId,
+      url: "https://example.com/hook",
+      enabledEvents: ["governance.anomaly_alert.triggered"],
+      idempotencyKey: "anomaly-rule:rule-1:0",
+    });
+
+    /** @scenario "A create that repeats an idempotency key answers the endpoint it made" */
+    it("answers the first endpoint and its secret on a repeat", async () => {
+      const first = await repository.create(keyed(ORGANIZATION_ID));
+      const repeat = await repository.create(keyed(ORGANIZATION_ID));
+
+      expect(repeat.endpoint.id).toBe(first.endpoint.id);
+      expect(repeat.secret).toBe(first.secret);
+      expect(await repository.findAll({ organizationId: ORGANIZATION_ID })).toHaveLength(1);
+    });
+
+    /** @scenario "Concurrent creates with one idempotency key make one endpoint" */
+    it("makes one endpoint from concurrent creates", async () => {
+      const results = await Promise.all([
+        repository.create(keyed(ORGANIZATION_ID)),
+        repository.create(keyed(ORGANIZATION_ID)),
+      ]);
+
+      expect(new Set(results.map(({ endpoint }) => endpoint.id)).size).toBe(1);
+      expect(await repository.findAll({ organizationId: ORGANIZATION_ID })).toHaveLength(1);
+    });
+
+    /** @scenario "Another organization's identical idempotency key makes its own endpoint" */
+    it("keeps each organization's key independent", async () => {
+      const mine = await repository.create(keyed(ORGANIZATION_ID));
+      const theirs = await repository.create(keyed(OTHER_ORGANIZATION_ID));
+
+      expect(theirs.endpoint.id).not.toBe(mine.endpoint.id);
+      expect(theirs.endpoint.organizationId).toBe(OTHER_ORGANIZATION_ID);
+    });
+
+    /** @scenario "An archived endpoint gives its idempotency key up" */
+    it("creates a fresh endpoint once the keyed one is archived", async () => {
+      const first = await repository.create(keyed(ORGANIZATION_ID));
+      await repository.archive({ organizationId: ORGANIZATION_ID, endpointId: first.endpoint.id });
+      const again = await repository.create(keyed(ORGANIZATION_ID));
+
+      expect(again.endpoint.id).not.toBe(first.endpoint.id);
+      expect(again.endpoint.status).toBe("ACTIVE");
+    });
+  });
 });

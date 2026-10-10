@@ -19,23 +19,23 @@ export function CheckRow({ row }: { row: CheckRowData }) {
 
   return (
     <CheckupSectionRow testId={`checkup-row-${row.id}`}>
-      <VStack align="start" gap={1} width="full">
-        <HStack width="full" justify="space-between" align="start">
+      <VStack align="start" gap={1} width="full" minWidth={0} overflowWrap="anywhere">
+        <HStack width="full" justify="space-between" align="start" wrap="wrap">
           <Text fontWeight="medium">{row.name}</Text>
           <VerdictBadge outcome={verdict.outcome} />
         </HStack>
         {verdict.detail ? (
-          <Text fontSize="sm" color="fg.muted">
+          <Text textStyle="sm" color="fg.muted">
             {verdict.detail}
           </Text>
         ) : null}
         {!verdict.detail && verdict.outcome !== "verified" ? (
-          <Text fontSize="sm" color="fg.muted" data-testid={`checkup-details-withheld-${row.id}`}>
+          <Text textStyle="sm" color="fg.muted" data-testid={`checkup-details-withheld-${row.id}`}>
             An organization admin can see what this check found and how to fix it.
           </Text>
         ) : null}
         {fix ? (
-          <Text fontSize="sm" data-testid={`checkup-fix-${row.id}`}>
+          <Text textStyle="sm" data-testid={`checkup-fix-${row.id}`}>
             {fix}
           </Text>
         ) : null}
@@ -44,7 +44,7 @@ export function CheckRow({ row }: { row: CheckRowData }) {
             href={`${DOCS_BASE}${verdict.docsPath}`}
             target="_blank"
             rel="noopener noreferrer"
-            fontSize="sm"
+            textStyle="sm"
             color="orange.fg"
           >
             Read more <ExternalLink size={12} />

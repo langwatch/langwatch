@@ -669,9 +669,6 @@ test_size_overlays() {
 # "no untriaged workloads" check below — that is deliberate.
 HARDENED_WORKLOADS=(
   "templates/app/deployment.yaml"
-  # The pre-upgrade migration Job runs the app image with the app's own
-  # security contexts and never calls the Kubernetes API.
-  "templates/app/migrate-pre-roll-job.yaml"
   "templates/workers/deployment.yaml"
   "templates/langwatch_nlp/deployment.yaml"
   "templates/langevals/deployment.yaml"
@@ -709,6 +706,10 @@ HARDENED_WORKLOADS_GATED=(
   "charts/clickhouse/templates/keeper-statefulset.yaml"
   "charts/clickhouse/templates/backup-cronjobs.yaml"
   "templates/cronjobs/cronjobs.yaml"
+  # The pre-roll migration Job runs the app image with the app's own security
+  # contexts and never calls the Kubernetes API. It renders only with
+  # serializeUpgrades active.
+  "templates/app/migrate-pre-roll-job.yaml"
 )
 
 CH_FULL_FLAGS=(--set autogen.enabled=true
@@ -855,6 +856,9 @@ test_pod_security() {
   for tpl in "${HARDENED_WORKLOADS_GATED[@]}"; do
     case "$tpl" in
       templates/cronjobs/*) assert_workload_hardened "$tpl" "${CRONJOB_FLAGS[@]}" ;;
+      templates/app/migrate-pre-roll-job.yaml)
+        assert_workload_hardened "$tpl" --set autogen.enabled=true \
+          --set app.storedObjects.localFilesystem.serializeUpgrades=true ;;
       *)                    assert_workload_hardened "$tpl" "${CH_FULL_FLAGS[@]}" ;;
     esac
   done
@@ -1143,8 +1147,8 @@ test_overlay_stacking() {
 # ways, and both are default-ish configurations:
 #
 #   1. Stock install — app.telemetry.metrics.enabled is false, so
-#      LANGWATCH_METRICS_TOKEN is never emitted; with NODE_ENV=production the
-#      process mounts no scrape door and /metrics answers 404.
+#      METRICS_API_KEY is never emitted, so the process mounts no scrape door
+#      and /metrics answers 404.
 #   2. secretKeyRef install — a kubelet httpGet probe cannot read a Secret, so
 #      no rendered Authorization header can carry the key and the probe gets 401.
 #
@@ -1248,14 +1252,12 @@ test_install_minimal() {
     -f "${CHART_DIR}/tests/values-e2e.yaml"
   pass "helm install (minimal + nodeport)"
 
-  # values-e2e.yaml is passed last and sets workers.enabled=false, so this
-  # asserts the ENABLE GATE still removes the Deployment. It is not a statement
-  # about size-minimal, which enables workers — the label used to say otherwise
-  # and only stayed green by accident of the -f ordering.
+  # The chart refuses workers.enabled=false (the workers run the upgrade), so
+  # values-e2e.yaml keeps the Deployment at replicaCount 0.
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    fail "workers.enabled=false should remove the Workers Deployment"
+    pass "Workers Deployment present (replicaCount=0 via values-e2e)"
   else
-    pass "Workers Deployment absent (workers.enabled=false via values-e2e)"
+    fail "the Workers Deployment is missing"
   fi
 
   # ClickHouse should be a single pod

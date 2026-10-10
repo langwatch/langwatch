@@ -379,7 +379,7 @@ const OutputRow = ({
           width="100px"
           fontFamily="mono"
           fontSize="13px"
-          borderColor={hasError ? "red.500" : undefined}
+          borderColor={hasError ? "red.emphasized" : undefined}
           data-testid={`output-name-input-${output.identifier}`}
         />
       ) : (
@@ -514,11 +514,11 @@ const JsonSchemaDialog = ({
         }
       }}
     >
-      <Dialog.Content margin="64px" background="#272822" color="white">
+      <Dialog.Content margin="64px" background="bg.card" color="fg">
         <Dialog.Header>
           <Dialog.Title>JSON Schema</Dialog.Title>
         </Dialog.Header>
-        <Dialog.CloseTrigger color="white" _hover={{ color: "black" }} />
+        <Dialog.CloseTrigger color="fg" _hover={{ color: "fg.muted" }} />
         <Dialog.Body>
           <Box height="400px">
             {open && (
@@ -545,11 +545,11 @@ const JsonSchemaDialog = ({
               onClose();
             }}
             variant="outline"
-            color="white"
+            color="fg"
             colorPalette="white"
             size="lg"
             disabled={!!error}
-            _hover={{ color: "black" }}
+            _hover={{ color: "fg.muted" }}
           >
             Save
           </Button>

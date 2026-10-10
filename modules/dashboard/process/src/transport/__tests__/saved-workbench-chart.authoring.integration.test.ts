@@ -12,9 +12,13 @@ import {
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
-import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import { trpcTestMembers, restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -59,12 +63,13 @@ function bothDoors({
     scope: { tier: "project" as const, id: "project-1" },
   };
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   }).mount(savedWorkbenchChartRest.router(), {
     app: () => app,
-    facts: [
-      bindRestMiddleware(langWatchQLCallerProtections, () => protections),
-      bindRestMiddleware(savedWorkbenchChartUrl, () => "https://app.langwatch.test/workbench"),
+    middlewareContext: [
+      bindMiddlewareContext(langWatchQLCallerProtections, () => protections),
+      bindMiddlewareContext(savedWorkbenchChartUrl, () => "https://app.langwatch.test/workbench"),
     ],
     onError: canonicalErrorResponse,
   });

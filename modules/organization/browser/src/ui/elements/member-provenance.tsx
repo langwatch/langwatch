@@ -26,6 +26,15 @@ export function ProvenanceChip({
       />
     );
   }
+  if (provenance.source === "sso") {
+    return (
+      <IdentityChip
+        label="SSO"
+        title="Joined the first time they signed in through your single sign-on."
+        data-testid="provenance-sso"
+      />
+    );
+  }
   if (provenance.source === "domain") {
     return (
       <IdentityChip
@@ -71,6 +80,9 @@ function provenanceSentence(provenance: OrganizationMemberProvenance | undefined
       ? `${provenance.providerId} created them.`
       : "Your identity provider created them.";
     return `${creator} It decides whether they stay, and removing them here does not stop it putting them back.`;
+  }
+  if (provenance.source === "sso") {
+    return "They joined the first time they signed in through your organization's single sign-on.";
   }
   if (provenance.source === "domain") {
     return provenance.automatic

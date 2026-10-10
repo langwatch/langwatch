@@ -1,27 +1,32 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-  FoldStateRead,
+import {
+  type FoldProjectionStore,
+  type FoldReadAuthorizer,
+  type ProjectionStoreContext,
+  type FoldStateRead,
+  foldReadPurpose,
 } from "@langwatch/eventing";
 
 import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 
-/** Stores Evaluation's folded runs through the three-method run projection. */
+/** Stores Evaluation's folded runs; the read-back is fenced by an own-only proof. */
 export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData> {
   static create({
     service,
     defaultRetentionDays,
+    authorize,
   }: {
     service: EvaluationRunProjectionRepository;
     defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
   }): EvaluationRunStore {
-    return new EvaluationRunStore(service, defaultRetentionDays);
+    return new EvaluationRunStore(service, defaultRetentionDays, authorize);
   }
 
   private constructor(
     private readonly service: EvaluationRunProjectionRepository,
     private readonly defaultRetentionDays: () => number,
+    private readonly authorize: FoldReadAuthorizer,
   ) {}
 
   async store(state: EvaluationRunData, context: ProjectionStoreContext): Promise<void> {
@@ -58,7 +63,10 @@ export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData
     context: ProjectionStoreContext,
   ): Promise<FoldStateRead<EvaluationRunData>> {
     const folded = await this.service.findRunByEvaluationId({
-      tenantId: String(context.tenantId),
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({ context, entry: "EvaluationRunStore.get" }),
+      }),
       evaluationId: aggregateId,
     });
     return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };

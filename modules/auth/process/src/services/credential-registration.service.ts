@@ -15,7 +15,7 @@ import {
   normalizeIdentifierValue,
   type SignInMethod,
 } from "@langwatch/identity-contract";
-import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
+import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
 import type {
   CreatedUser,
   RegisterCredentialAccountInput,
@@ -25,7 +25,9 @@ import type {
 import { decideLocalSignUp, isSettledByRouting } from "../rules/local-sign-up.rules.ts";
 
 type AccountWrites = Pick<UserApi, "registerCredentialAccount">;
-type SignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
+type SignUpPolicy = Readonly<{
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+}>;
 type RegistrationDoors = Pick<
   AuthApi,
   | "assertSignUpOrigin"

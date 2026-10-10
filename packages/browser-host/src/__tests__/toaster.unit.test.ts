@@ -5,12 +5,18 @@ import { setUiFeedbackHost, toaster } from "../toaster.ts";
 
 function recordingHost() {
   const succeeded: UiSuccessNotice[] = [];
+  const warned: UiSuccessNotice[] = [];
+  const informed: UiSuccessNotice[] = [];
   const failed: UiFailureNotice[] = [];
   return {
     succeeded,
+    warned,
+    informed,
     failed,
     host: {
       succeeded: (notice: UiSuccessNotice) => void succeeded.push(notice),
+      warned: (notice: UiSuccessNotice) => void warned.push(notice),
+      informed: (notice: UiSuccessNotice) => void informed.push(notice),
       failed: (failure: UiFailureNotice) => void failed.push(failure),
     },
   };
@@ -48,7 +54,24 @@ describe("toaster", () => {
       expect(onClick).toHaveBeenCalled();
     });
 
-    it("reports every other toast as a success", () => {
+    /** @scenario A warning or information toast keeps its tone */
+    it("reports a warning as a warning and an info toast as information, never as a success", () => {
+      const { succeeded, warned, informed, host } = recordingHost();
+      setUiFeedbackHost(host);
+
+      toaster.create({ title: "To save, pick a delivery channel.", type: "warning" });
+      toaster.info({ title: "A run is already in progress" });
+
+      expect(warned).toEqual([
+        { title: "To save, pick a delivery channel.", description: void 0, id: void 0 },
+      ]);
+      expect(informed).toEqual([
+        { title: "A run is already in progress", description: void 0, id: void 0 },
+      ]);
+      expect(succeeded).toEqual([]);
+    });
+
+    it("reports a success toast as a success", () => {
       const { succeeded, host } = recordingHost();
       setUiFeedbackHost(host);
 

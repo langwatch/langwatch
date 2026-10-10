@@ -4,6 +4,7 @@ import {
   ProjectRequiredError,
 } from "@langwatch/api";
 import {
+  AggregateProjectHasNoCredentialError,
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
   type ApiKeyApi,
@@ -22,7 +23,9 @@ import type { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type OrganizationApi } from "@langwatch/organization-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
+import { CliDeviceSessionService } from "../features/cli-device/services/cli-device-session.service.ts";
 import {
   asked,
   extractApiKeyRequestCredentials,
@@ -33,7 +36,6 @@ import {
   ApiOrganizationCredentialsService,
   type ApiOrganizationCredential,
 } from "./api-organization-credentials.service.ts";
-import { CliDeviceSessionService } from "./cli-device-session.service.ts";
 
 export type ApiProjectCredential = Readonly<{
   project: RestProjectIdentity;
@@ -123,6 +125,12 @@ export class ApiRestCredentialsService {
       request: input.request,
       permissions: input.permissions,
     });
+    // ADR-177 decision 7: an aggregate accepts no credential, its own legacy key included.
+    if (isAggregateProjectKind(credential.project.kind)) {
+      throw new AggregateProjectHasNoCredentialError({
+        meta: { projectId: credential.project.id },
+      });
+    }
     if (input.keyKinds) {
       assertKeyKind({ key: keyCredentialOf(credential.resolved), admitted: input.keyKinds });
     }
@@ -426,7 +434,7 @@ function keyPermissionRefusal(input: {
       input.reach !== "organization" && projectId
         ? { type: "project", id: projectId }
         : { type: "organization", id: organizationId },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
 

@@ -1,14 +1,22 @@
 import { Link } from "@langwatch/browser-host/link";
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { ListPageError, ListPageSkeleton } from "@langwatch/design-system/list-page";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
-  Box,
+  Card,
+  Heading,
+  Status,
   HStack,
   SimpleGrid,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SummaryList, SummaryListItem as Detail } from "@langwatch/design-system/summary-list";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import {
@@ -21,8 +29,7 @@ import {
   USAGE_ROWS,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
-import { EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
-import { Detail, Section } from "../elements/drawer-sections.tsx";
+import { EmptyCell } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 
 export function InstanceDetailDrawer({
@@ -46,9 +53,10 @@ export function InstanceDetailDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>
-            {instance?.organizationName ?? instance?.hostname ?? "Self-hosted install"}
-          </Drawer.Title>
+          <DetailDrawerHeader
+            kind="Self-hosted instance"
+            title={instance?.organizationName ?? instance?.hostname ?? "Self-hosted install"}
+          />
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>
@@ -72,8 +80,8 @@ function DrawerContent({
   instance: SelfHostedInstance | undefined;
   reports: { id: string; receivedAt: string; version: string | null; unknownFields: number }[];
 }) {
-  if (isLoading) return <Text color="fg.muted">Loading…</Text>;
-  if (!instance) return <Text color="fg.error">Couldn't load this install.</Text>;
+  if (isLoading) return <ListPageSkeleton label="Loading instance" />;
+  if (!instance) return <ListPageError title="Couldn't load this install." />;
   return (
     <VStack align="start" gap={6} width="full">
       <InstanceDetails instance={instance} />
@@ -87,7 +95,7 @@ function DrawerContent({
 
 function InstanceDetails({ instance }: { instance: SelfHostedInstance }) {
   return (
-    <SimpleGrid columns={2} gap={4} width="full">
+    <SummaryList>
       <Detail label="Instance">
         <ShortId id={instance.instanceId} />
       </Detail>
@@ -103,9 +111,15 @@ function InstanceDetails({ instance }: { instance: SelfHostedInstance }) {
       </Detail>
       <Detail label="Hostname">{instance.hostname ?? "not reported"}</Detail>
       <Detail label="Environment">{instance.environment ?? "not reported"}</Detail>
-      <Detail label="First seen">{formatDate(instance.firstSeenAt)}</Detail>
-      <Detail label="Last report">{formatDateTime(instance.lastSeenAt)}</Detail>
-      <Detail label="Reports received">{instance.reportCount}</Detail>
+      <Detail label="First seen">
+        <FormattedDate value={instance.firstSeenAt} display="date" />
+      </Detail>
+      <Detail label="Last report">
+        <FormattedDate value={instance.lastSeenAt} />
+      </Detail>
+      <Detail label="Reports received">
+        <FormattedNumber value={instance.reportCount} />
+      </Detail>
       <Detail label="Customer">
         <CustomerValue instance={instance} />
       </Detail>
@@ -124,7 +138,7 @@ function InstanceDetails({ instance }: { instance: SelfHostedInstance }) {
       <Detail label="Optional metrics">
         {instance.optionalMetricsReported ? "on" : "switched off"}
       </Detail>
-    </SimpleGrid>
+    </SummaryList>
   );
 }
 
@@ -141,7 +155,7 @@ function CustomerValue({ instance }: { instance: SelfHostedInstance }) {
       <Text>{instance.organizationName ?? "license not linked yet"}</Text>
       <Link
         href="/ops/cloud/licenses"
-        fontSize="xs"
+        textStyle="xs"
         color="fg.muted"
         onClick={(event) => event.stopPropagation()}
       >
@@ -154,26 +168,31 @@ function CustomerValue({ instance }: { instance: SelfHostedInstance }) {
 function DomainsSection({ instance }: { instance: SelfHostedInstance }) {
   const domains = sortedDomains(instance.userEmailDomains);
   return (
-    <Section title="Who uses it">
-      {domains.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          {instance.optionalMetricsReported
-            ? "No domains reported."
-            : "The optional category is switched off on this install."}
-        </Text>
-      ) : (
-        <VStack align="start" gap={1} width="full">
-          {domains.map(({ domain, count }) => (
-            <HStack key={domain} gap={3} width="full">
-              <Text fontSize="sm">{domain}</Text>
-              <Text fontSize="sm" color="fg.muted">
-                {count} {count === 1 ? "user" : "users"}
-              </Text>
-            </HStack>
-          ))}
-        </VStack>
-      )}
-    </Section>
+    <Card.Root variant="outline" width="full">
+      <Card.Header>
+        <Heading size="sm">Who uses it</Heading>
+      </Card.Header>
+      <Card.Body>
+        {domains.length === 0 ? (
+          <Text textStyle="sm" color="fg.muted">
+            {instance.optionalMetricsReported
+              ? "No domains reported."
+              : "The optional category is switched off on this install."}
+          </Text>
+        ) : (
+          <VStack align="start" gap={1} width="full">
+            {domains.map(({ domain, count }) => (
+              <HStack key={domain} gap={3} width="full">
+                <Text textStyle="sm">{domain}</Text>
+                <Text textStyle="sm" color="fg.muted">
+                  {count} {count === 1 ? "user" : "users"}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
+        )}
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -183,29 +202,34 @@ function DomainsSection({ instance }: { instance: SelfHostedInstance }) {
  */
 function LadderSection({ instance }: { instance: SelfHostedInstance }) {
   return (
-    <Section title="Getting started">
-      <VStack align="start" gap={1} width="full">
-        {ONBOARDING_LADDER.map(({ field, label }) => {
-          const reached = reportText(instance.latestReport, field);
-          return (
-            <HStack key={field} gap={3} width="full">
-              <Box
-                width="8px"
-                height="8px"
-                borderRadius="full"
-                background={reached ? "green.500" : "border"}
-              />
-              <Text fontSize="sm" flex={1}>
-                {label}
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                {reached ? formatDate(reached) : "never reached"}
-              </Text>
-            </HStack>
-          );
-        })}
-      </VStack>
-    </Section>
+    <Card.Root variant="outline" width="full">
+      <Card.Header>
+        <Heading size="sm">Getting started</Heading>
+      </Card.Header>
+      <Card.Body>
+        <VStack align="start" gap={1} width="full">
+          {ONBOARDING_LADDER.map(({ field, label }) => {
+            const reached = reportText(instance.latestReport, field);
+            return (
+              <HStack key={field} gap={3} width="full">
+                <Status.Root
+                  colorPalette={reached ? "green" : "gray"}
+                  aria-label={reached ? "Reached" : "Not reached"}
+                >
+                  <Status.Indicator />
+                </Status.Root>
+                <Text textStyle="sm" flex={1}>
+                  {label}
+                </Text>
+                <Text textStyle="sm" color="fg.muted">
+                  {reached ? <FormattedDate value={reached} display="date" /> : "never reached"}
+                </Text>
+              </HStack>
+            );
+          })}
+        </VStack>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -216,24 +240,31 @@ function UsageSection({ instance }: { instance: SelfHostedInstance }) {
   })).filter((row) => row.value !== null);
 
   return (
-    <Section title="What they do">
-      {rows.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          No usage numbers in the last report.
-        </Text>
-      ) : (
-        <SimpleGrid columns={2} gap={2} width="full">
-          {rows.map((row) => (
-            <HStack key={row.label} gap={3}>
-              <Text fontSize="sm" color="fg.muted" flex={1}>
-                {row.label}
-              </Text>
-              <Text fontSize="sm">{(row.value ?? 0).toLocaleString()}</Text>
-            </HStack>
-          ))}
-        </SimpleGrid>
-      )}
-    </Section>
+    <Card.Root variant="outline" width="full">
+      <Card.Header>
+        <Heading size="sm">What they do</Heading>
+      </Card.Header>
+      <Card.Body>
+        {rows.length === 0 ? (
+          <Text textStyle="sm" color="fg.muted">
+            No usage numbers in the last report.
+          </Text>
+        ) : (
+          <SimpleGrid columns={{ base: 1, md: 2 }} gap={2} width="full">
+            {rows.map((row) => (
+              <HStack key={row.label} gap={3}>
+                <Text textStyle="sm" color="fg.muted" flex={1}>
+                  {row.label}
+                </Text>
+                <Text textStyle="sm">
+                  <FormattedNumber value={row.value ?? 0} />
+                </Text>
+              </HStack>
+            ))}
+          </SimpleGrid>
+        )}
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -243,31 +274,40 @@ function HistorySection({
   reports: { id: string; receivedAt: string; version: string | null; unknownFields: number }[];
 }) {
   return (
-    <Section title="Reports">
-      {reports.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          No reports stored yet.
-        </Text>
-      ) : (
-        <Table.Root variant="line" size="sm">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Received</Table.ColumnHeader>
-              <Table.ColumnHeader>Release</Table.ColumnHeader>
-              <Table.ColumnHeader>Fields we had no name for</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {reports.map((report) => (
-              <Table.Row key={report.id}>
-                <Table.Cell>{formatDateTime(report.receivedAt)}</Table.Cell>
-                <Table.Cell>{report.version ?? "not reported"}</Table.Cell>
-                <Table.Cell>{report.unknownFields}</Table.Cell>
+    <Card.Root variant="outline" width="full">
+      <Card.Header>
+        <Heading size="sm">Reports</Heading>
+      </Card.Header>
+      <Card.Body>
+        {reports.length === 0 ? (
+          <Text textStyle="sm" color="fg.muted">
+            No reports stored yet.
+          </Text>
+        ) : (
+          <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Received</Table.ColumnHeader>
+                <Table.ColumnHeader>Release</Table.ColumnHeader>
+                <Table.ColumnHeader>Fields we had no name for</Table.ColumnHeader>
               </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      )}
-    </Section>
+            </Table.Header>
+            <Table.Body>
+              {reports.map((report) => (
+                <Table.Row key={report.id}>
+                  <Table.Cell>
+                    <FormattedDate value={report.receivedAt} />
+                  </Table.Cell>
+                  <Table.Cell>{report.version ?? "not reported"}</Table.Cell>
+                  <Table.Cell>
+                    <FormattedNumber value={report.unknownFields} />
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </ListTable>
+        )}
+      </Card.Body>
+    </Card.Root>
   );
 }

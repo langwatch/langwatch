@@ -13,22 +13,17 @@ import {
   coerceToEpoch,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 
 /**
- * `/api/analytics/*`, at the dated addresses it has always answered. The type
- * is written out rather than inferred so the declaration emit stays portable.
+ * `/api/analytics/*`, at the dated addresses it has always answered.
  */
-export const analyticsRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<AnalyticsApi>;
-}> = defineRestRouter(AnalyticsApi)
+export const analyticsRest = defineRestRouter(AnalyticsApi)
   .withNamespace("analytics")
   .withVersion(MANAGEMENT_API_VERSION)
 
   .post("/timeseries", "postApiAnalyticsTimeseries")
+  .withoutAudit("read sent as a POST")
   .withInput(analyticsTimeseriesRestBodySchema)
   .withPermission("analytics:view")
   .withOutput(analyticsTimeseriesResponseSchema)

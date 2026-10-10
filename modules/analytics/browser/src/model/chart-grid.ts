@@ -84,3 +84,32 @@ export const chartGridCardHeightPx = (rowSpan: number): number =>
 export const chartGridBottomRow = (
   cards: readonly { gridRow: number; rowSpan: number }[],
 ): number => cards.reduce((bottom, card) => Math.max(bottom, card.gridRow + card.rowSpan), 0);
+
+/**
+ * New cards all land at column 0 on the bottom row, leaving the right half
+ * empty. A pure left-edge stack of half-width-or-less cards flows left to
+ * right in reading order; any other layout is deliberate and returned as is.
+ */
+export const reflowSingleColumnStack = <T extends Omit<ChartGridPlacement, "graphId">>(
+  cards: readonly T[],
+): readonly T[] => {
+  const isStack =
+    cards.length > 1 &&
+    cards.every(({ gridColumn, colSpan }) => gridColumn === 0 && colSpan * 2 <= CHART_GRID_COLUMNS);
+  if (!isStack) return cards;
+  const ordered = cards.toSorted((a, b) => a.gridRow - b.gridRow);
+  let column = 0;
+  let row = ordered[0]!.gridRow;
+  let rowBottom = row;
+  const placed = new Map<T, T>();
+  for (const card of ordered) {
+    if (!fitsChartGridWidth({ gridColumn: column, colSpan: card.colSpan })) {
+      column = 0;
+      row = rowBottom;
+    }
+    placed.set(card, { ...card, gridColumn: column, gridRow: row });
+    column += card.colSpan;
+    rowBottom = Math.max(rowBottom, row + card.rowSpan);
+  }
+  return cards.map((card) => placed.get(card) ?? card);
+};

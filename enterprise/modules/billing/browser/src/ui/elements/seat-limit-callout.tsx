@@ -1,8 +1,8 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Button } from "@langwatch/design-system/primitives";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import type { SeatLimitInfo } from "@langwatch/entitlement-contract";
-import { Users } from "lucide-react";
 
 /** What the over-seats organization can do about it, by plan. */
 function SeatLimitAction({
@@ -61,33 +61,17 @@ export function SeatLimitCallout({
   if (seatLimitInfo?.status !== "exceeded") return null;
 
   return (
-    <Box
+    <Banner
+      status="warning"
+      title="Your organization has more members than your plan includes"
       data-testid="seat-limit-callout"
-      borderWidth="1px"
-      borderColor="orange.muted"
-      backgroundColor="orange.subtle"
-      borderRadius="lg"
-      padding={5}
-      width="full"
     >
-      <HStack align="start" gap={4}>
-        <Box color="orange.fg" paddingTop={1}>
-          <Users size={20} />
-        </Box>
-        <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="medium">
-            Your organization has more members than your plan includes
-          </Text>
-          <Text color="fg.muted" fontSize="sm">
-            {seatLimitInfo.message}{" "}
-            <SeatLimitAction
-              isUpgradePlanRequired={isUpgradePlanRequired}
-              isEnterprisePlan={isEnterprisePlan}
-              onAddSeats={onAddSeats}
-            />
-          </Text>
-        </VStack>
-      </HStack>
-    </Box>
+      {seatLimitInfo.message}{" "}
+      <SeatLimitAction
+        isUpgradePlanRequired={isUpgradePlanRequired}
+        isEnterprisePlan={isEnterprisePlan}
+        onAddSeats={onAddSeats}
+      />
+    </Banner>
   );
 }

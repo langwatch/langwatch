@@ -1,18 +1,10 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 /**
  * Shell page body: content card interior. Moved from platform/app.
  * Drawer/announcements/analytics moved or removed; the saved-views strip is analytics' own.
  */
-
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  type StackProps,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, type StackProps, VStack } from "@langwatch/design-system/primitives";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import type { NavigationTeam } from "@langwatch/navigation-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -46,6 +38,12 @@ export { planManagementHref };
  * which a governed web package may not import.
  */
 const ORGANIZATION_ADMIN_ROLE = "ADMIN";
+
+/** The service variables evaluations and workflows need that this deployment has not set. */
+const missingServiceVariables = (deployment: { hasNlpService: boolean; hasLangevals: boolean }) => [
+  ...(deployment.hasNlpService ? [] : ["LANGWATCH_NLP_SERVICE"]),
+  ...(deployment.hasLangevals ? [] : ["LANGEVALS_ENDPOINT"]),
+];
 
 /**
  * Whether the page draws for this reader, or the "not part of any team"
@@ -84,14 +82,24 @@ function readerMayOpenThePage({
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
-/** Form pages read at main's Profile measure; tables and lists keep the wider one. */
-const FORM_PAGES = ["/settings", "/settings/profile", "/settings/security", "/settings/checkup"];
+/** Sparse pages (forms, a few rows, an empty state) read narrow; tables keep the wider measure. */
+const FORM_PAGES = [
+  "/settings",
+  "/settings/profile",
+  "/settings/security",
+  "/settings/checkup",
+  "/settings/data-privacy",
+  "/settings/license",
+  "/settings/connect",
+  "/settings/integrations",
+];
 const FORM_MEASURE = "820px";
+/** Your own account pages sit at the left, as on main, behind a fixed margin. */
+const LEFT_ALIGNED_PAGES = ["/settings/profile", "/settings/security"];
 const TABLE_MEASURE = "1280px";
 
-/** Authentication's section rail takes the full width; forms read narrow, tables wide. */
+/** Forms read narrow, tables wide. */
 function measureOf(pathname: string): string {
-  if (isPathUnder({ pathname, base: "/settings/authentication" })) return "100%";
   return FORM_PAGES.includes(pathname) ? FORM_MEASURE : TABLE_MEASURE;
 }
 
@@ -102,14 +110,20 @@ function measureOf(pathname: string): string {
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
   const isMeasured =
-    isPathUnder({ pathname, base: "/settings" }) ||
+    (isPathUnder({ pathname, base: "/settings" }) &&
+      !isPathUnder({ pathname, base: "/settings/authentication" })) ||
     isPathUnder({ pathname, base: "/gateway" }) ||
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
   const measure = measureOf(pathname);
+  const isLeftAligned = LEFT_ALIGNED_PAGES.includes(pathname);
+  const inset = isLeftAligned
+    ? "var(--chakra-spacing-8)"
+    : `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`;
   return (
     <Box
       data-page-measure={measure}
+      data-page-align={isLeftAligned ? "start" : "center"}
       flex={1}
       minHeight={0}
       overflowY="auto"
@@ -118,7 +132,7 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       // under it sit in one column of the measure, centred in the card.
       // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
       css={{
-        "--page-inset": `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`,
+        "--page-inset": inset,
         "& [data-page-header]": { paddingInline: "var(--page-inset)" },
         "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
           width: "calc(100% - 2 * var(--page-inset))",
@@ -222,27 +236,11 @@ export const ShellPageBody = ({
       (host.teamAccessWaiting({
         organizationName: organization?.name ?? "your organization",
       }) ?? (
-        <Alert.Root
-          status="warning"
-          width="full"
-          marginX={4}
-          marginTop={3}
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your administrator to add
-                you, or{" "}
-                <NavigationLink href="/" textDecoration="underline">
-                  go back to your home page
-                </NavigationLink>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
+        <RestrictedAccess
+          area="this organization's projects"
+          description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
+          onBack={() => host.navigate("/")}
+        />
       ))
     );
 
@@ -252,68 +250,57 @@ export const ShellPageBody = ({
           hero's bloom) cannot wash them out; `docked` stays under every portaled overlay. */}
       <VStack width="full" gap={0} position="relative" zIndex="docked" data-part="page-banners">
         {(!deployment.hasNlpService || !deployment.hasLangevals) && (
-          <Alert.Root status="warning" width="full" borderTopLeftRadius="2xl">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                Please check your environment variables, the following variables are not set which
-                are required for evaluations and workflows:
-              </Text>
-              {!deployment.hasNlpService && <Text>LANGWATCH_NLP_SERVICE</Text>}
-              {!deployment.hasLangevals && <Text>LANGEVALS_ENDPOINT</Text>}
-            </Alert.Content>
-          </Alert.Root>
+          <Banner
+            status="warning"
+            placement="top"
+            title="Evaluations and workflows are off: environment variables are missing."
+          >
+            Set {missingServiceVariables(deployment).join(" and ")}.
+          </Banner>
         )}
         {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
-          <Alert.Root
+          <Banner
             status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
-            width="full"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                {usage.data.messageLimitInfo.message}{" "}
-                <NavigationLink
-                  href={planManagementHref(deployment.isSaaS)}
-                  textDecoration="underline"
-                  _hover={{ textDecoration: "none" }}
-                >
-                  Click here
-                </NavigationLink>{" "}
-                to upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-        {usage.data?.seatLimitInfo?.status === "exceeded" && (
-          <SeatLimitBanner
-            message={usage.data.seatLimitInfo.message}
-            isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
-            planManagementHref={planManagementHref(deployment.isSaaS)}
+            placement="top"
+            title={usage.data.messageLimitInfo.message}
+            action={
+              <BannerAction asChild>
+                <NavigationLink href={planManagementHref(deployment.isSaaS)}>
+                  Compare plans
+                </NavigationLink>
+              </BannerAction>
+            }
           />
         )}
+        {/* The plan page carries its own seat note, with the actions this banner links to. */}
+        {usage.data?.seatLimitInfo?.status === "exceeded" &&
+          pathname !== planManagementHref(deployment.isSaaS) && (
+            <SeatLimitBanner
+              message={usage.data.seatLimitInfo.message}
+              isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
+              planManagementHref={planManagementHref(deployment.isSaaS)}
+            />
+          )}
         {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-          <Alert.Root status="warning" width="full">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You reached the limit of{" "}
-                {usage.data.maxMonthlyUsageLimit.toLocaleString(void 0, {
-                  style: "currency",
-                  currency: "USD",
-                })}{" "}
-                usage cost for this month, evaluations and guardrails will not be processed.{" "}
-                <NavigationLink
-                  href="/settings/usage"
-                  textDecoration="underline"
-                  _hover={{ textDecoration: "none" }}
-                >
-                  Go to settings
-                </NavigationLink>{" "}
-                to check your usage spending limit or upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
+          <Banner
+            status="warning"
+            placement="top"
+            title={`You reached the limit of ${usage.data.maxMonthlyUsageLimit.toLocaleString(
+              void 0,
+              {
+                style: "currency",
+                currency: "USD",
+              },
+            )} usage cost for this month.`}
+            action={
+              <BannerAction asChild>
+                <NavigationLink href="/settings/usage">Go to settings</NavigationLink>
+              </BannerAction>
+            }
+          >
+            Evaluations and guardrails will not be processed until you raise your spending limit or
+            upgrade your plan.
+          </Banner>
         )}
 
         {host.joinOffer({
@@ -323,48 +310,28 @@ export const ShellPageBody = ({
         {adminViewingAs && <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />}
 
         {ssoStatus?.pendingSsoSetup && (
-          <Alert.Root
+          <Banner
             status="error"
-            width="full"
-            marginX={4}
-            marginTop={3}
-            maxWidth="calc(100% - 22px)"
+            placement="top"
+            title="Sign in with your organization's single sign-on"
+            action={<BannerAction onClick={() => host.signOut()}>Sign out</BannerAction>}
           >
-            <Alert.Indicator />
-            <Alert.Content>
-              <HStack width="full" gap={4}>
-                <VStack align="start" gap={0} flex={1}>
-                  <Alert.Title>Sign in with your organization's single sign-on</Alert.Title>
-                  <Text fontSize="sm">
-                    Your organization requires single sign-on. Sign out, then sign in again by
-                    entering your work email address.
-                  </Text>
-                </VStack>
-                <Button
-                  size="sm"
-                  colorPalette="red"
-                  flexShrink={0}
-                  color="white"
-                  onClick={() => host.signOut()}
-                >
-                  Sign out
-                </Button>
-              </HStack>
-            </Alert.Content>
-          </Alert.Root>
+            Your organization requires single sign-on. Sign out, then sign in again by entering your
+            work email address.
+          </Banner>
         )}
 
         {isDemoProject && (
-          <HStack width="full" backgroundColor="orange.400" padding={1}>
-            <Spacer />
-            <Text fontSize="sm">
-              Viewing Demo Project - Go back to yours{" "}
-              <NavigationLink href="/" textDecoration="underline">
-                here
-              </NavigationLink>
-            </Text>
-            <Spacer />
-          </HStack>
+          <Banner
+            status="info"
+            placement="top"
+            title="You are viewing the demo project."
+            action={
+              <BannerAction asChild>
+                <NavigationLink href="/">Go back to yours</NavigationLink>
+              </BannerAction>
+            }
+          />
         )}
       </VStack>
 

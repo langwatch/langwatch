@@ -8,7 +8,8 @@ export async function lwqlProvision({
   connections,
   environment,
   signal,
-}: TaskInput): Promise<void> {
+  failOnError = false,
+}: TaskInput & { failOnError?: boolean }): Promise<void> {
   if (config.skipLwqlProvision) {
     createLogger("langwatch:tasks:lwql-provision").info(
       "SKIP_LWQL_PROVISION=true — skipping LangWatchQL provisioning",
@@ -19,7 +20,11 @@ export async function lwqlProvision({
   const database = connections.database;
   if (!database) throw new Error("This task needs DATABASE_URL");
 
-  await LwqlProvisionTask.create({ database: () => database.client, source: environment }).run({
+  await LwqlProvisionTask.create({
+    database: () => database.client,
+    source: environment,
+    failOnError,
+  }).run({
     args: [],
     signal,
   });

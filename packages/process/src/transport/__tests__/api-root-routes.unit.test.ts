@@ -28,10 +28,11 @@ const rootFamily = defineRestRouter(ReceiverApi)
   .withNamespace("otel")
   .withVersion("2026-09-24")
   .withAddressing("literal", { v1Twin: false })
-  .post("/v1/traces", "receiveRootTraces")
+  .post("/api/otel/v1/traces", "receiveTraces")
   .withAccess({ kind: "public", reason: "The test receiver authenticates nothing." })
   .withOutput(z.object({ received: z.literal(true) }))
   .withDocs({ hide: true })
+  .withoutAudit("test route")
   .handle(async ({ app }) => app.receive())
   .build();
 

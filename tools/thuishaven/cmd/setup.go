@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
-// `haven setup` installs OPTIONAL integrations into this checkout.
+// `haven self setup` installs OPTIONAL integrations into this checkout.
 //
 // It exists because `up` should not make these choices. Everything up
 // bootstraps — portless, the CA, the proxy — is something haven needs to work
@@ -31,7 +31,7 @@ func runSetup(_ context.Context, d deps, inv invocation) error {
 	}
 	if inv.has("--off") {
 		if len(inv.args) == 0 {
-			return fmt.Errorf("haven setup --off needs a feature name (e.g. haven setup gate-hook --off)")
+			return fmt.Errorf("haven self setup --off needs a feature name (e.g. haven self setup gate-hook --off)")
 		}
 		return offFeatures(d, inv.args)
 	}
@@ -47,7 +47,7 @@ func runSetup(_ context.Context, d deps, inv invocation) error {
 			// installing "everything" because nothing was named is exactly the kind
 			// of surprise this command was split out of `up` to avoid.
 			printFeatures(os.Stderr)
-			return fmt.Errorf("haven setup needs a feature name (or run it in a terminal to choose)")
+			return fmt.Errorf("haven self setup needs a feature name (or run it in a terminal to choose)")
 		}
 		wanted = chooseFeatures(os.Stdin, os.Stdout)
 	}
@@ -98,7 +98,7 @@ func printFeatures(w io.Writer) {
 	for _, f := range app.Features {
 		fmt.Fprintf(w, "\n    %s — %s\n    %s\n", f.Name, f.Summary, f.Detail)
 	}
-	fmt.Fprintf(w, "\nInstall with: haven setup %s\n", app.Features[0].Name)
+	fmt.Fprintf(w, "\nInstall with: haven self setup %s\n", app.Features[0].Name)
 }
 
 // chooseFeatures asks about each feature in turn. Default is NO: a developer

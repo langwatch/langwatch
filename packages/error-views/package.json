@@ -1,8 +1,5 @@
 {
   "name": "@langwatch/error-views",
-  "langwatch": {
-    "group": "browser"
-  },
   "version": "0.1.0",
   "private": true,
   "description": "The browser views for a handled error: the alert, the remediation action and the retry affordance the presentation registry describes.",
@@ -44,5 +41,8 @@
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",
     "react": "^19.2.7"
+  },
+  "langwatch": {
+    "group": "browser"
   }
 }

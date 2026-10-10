@@ -5,7 +5,6 @@ import { SlackWebApiChannel, type SlackIdentityResult } from "../slack-web-api.c
 
 const logger = createLogger("langwatch:slack:webApi");
 
-const AUTH_TEST_URL = "https://slack.com/api/auth.test";
 /** A slow endpoint must not pin a request for the life of the process. */
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -23,18 +22,28 @@ const slackAuthTestResponseSchema = z.object({
  * refused" and "we could not reach Slack" are the same next step.
  */
 export class HttpSlackWebApiChannel extends SlackWebApiChannel {
-  private constructor(private readonly fetchImpl: typeof globalThis.fetch) {
+  private constructor(
+    private readonly fetchImpl: typeof globalThis.fetch,
+    private readonly apiBase: string,
+  ) {
     super();
   }
 
-  static create({ fetch }: { fetch?: typeof globalThis.fetch } = {}): HttpSlackWebApiChannel {
-    return new HttpSlackWebApiChannel(fetch ?? globalThis.fetch);
+  static create({
+    fetch,
+    apiBase,
+  }: {
+    fetch?: typeof globalThis.fetch;
+    /** Slack's Web API, or the stand-in a dev stack names. */
+    apiBase: string;
+  }): HttpSlackWebApiChannel {
+    return new HttpSlackWebApiChannel(fetch ?? globalThis.fetch, apiBase);
   }
 
   async fetchWorkspaceIdentity({ token }: { token: string }): Promise<SlackIdentityResult> {
     let body: string;
     try {
-      const response = await this.fetchImpl(AUTH_TEST_URL, {
+      const response = await this.fetchImpl(`${this.apiBase}/auth.test`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
 
 import type { MigrationLeaseRepository } from "./lease.repository.ts";
 import {
@@ -44,6 +45,8 @@ export type SystemMigrationRunnerDeps = {
   tenants: TenantSource;
   cohort: MigrationCohort;
   migrations: readonly SystemMigration[];
+  /** The clock a held tenant's `heldSince` is read from. */
+  now: () => Instant;
   /** How long each claim grant lasts. Defaults to a minute. */
   leaseTtlMs?: number;
   /** How often a held claim renews. Must stay well inside the TTL. */
@@ -91,6 +94,27 @@ export class SystemMigrationRunnerService {
     }
     logger.info({ summary }, "system migration pass complete");
     return summary;
+  }
+
+  /**
+   * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row
+   * for `migrationName`. Read from state, never from a pass: a tenant claimed elsewhere, or by
+   * nobody while the lease store is down, counts until its row is finished.
+   */
+  async hasUnfinishedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
+    let cursor: string | null = null;
+    for (;;) {
+      const page = await this.deps.tenants.findTenantIdsAfter({ cursor, limit: TENANT_PAGE_SIZE });
+      if (page.length === 0) return false;
+      cursor = page[page.length - 1] ?? null;
+      for (const tenantId of page) {
+        if (!(await this.deps.cohort({ tenantId, migrationName }))) continue;
+        const record = await this.deps.state
+          .getRecord({ migrationName, tenantId })
+          .catch(undefinedWhenNotFound);
+        if (!isTerminalTenantStatus(record?.status)) return true;
+      }
+    }
   }
 
   /** Every cohort tenant, a page at a time, until abort. */
@@ -275,7 +299,7 @@ export class SystemMigrationRunnerService {
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
-        ...heldFields({ outcome }),
+        ...heldFields({ outcome, existing, now: this.deps.now }),
       };
       const wasWritten = await state.upsertRecordUnlessRolledBack(record);
       if (!wasWritten) {
@@ -316,13 +340,19 @@ export class SystemMigrationRunnerService {
   }
 }
 
-/** Held carries why it is held; any other status drops the reason. */
+/** Held carries why and since when (the first moment, while still held); else neither. */
 function heldFields({
   outcome,
+  existing,
+  now,
 }: {
   outcome: TenantMigrationOutcome;
-}): Pick<TenantMigrationRecord, "heldReason"> {
-  return outcome.status === "migrated" ? { heldReason: outcome.heldReason ?? "proof" } : {};
+  existing: TenantMigrationRecord | undefined;
+  now: () => Instant;
+}): Pick<TenantMigrationRecord, "heldReason" | "heldSince"> {
+  if (outcome.status !== "migrated") return {};
+  const heldSince = existing?.status === "migrated" ? existing.heldSince : undefined;
+  return { heldReason: outcome.heldReason ?? "proof", heldSince: heldSince ?? now() };
 }
 
 async function recordParkedTenant({

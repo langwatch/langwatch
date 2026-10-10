@@ -117,6 +117,7 @@ helm upgrade --install gateway-smoke ../../charts/gateway \
   --set secrets.existingSecretName=gateway-runtime-secrets \
   --set admin.existingAuthSecretName=gateway-admin-secrets \
   --set admin.addr=127.0.0.1:6060 \
+  --set metrics.enabled=true \
   --wait --timeout 3m
 ```
 
@@ -167,8 +168,10 @@ curl -sS http://localhost:5563/health | jq .
 curl -si http://localhost:5563/v1/models
 # → HTTP/1.1 401 + X-Request-Id + X-LangWatch-Gateway-Version
 
-# /metrics — Prometheus scrape
-curl -sSf http://localhost:5563/metrics | head -30
+# /metrics — Prometheus scrape, on its own port (needs --set metrics.enabled=true)
+kubectl -n langwatch port-forward deploy/gateway-smoke-langwatch-gateway 9464:9464 &
+curl -sSf http://localhost:9464/metrics \
+  -H "Authorization: Bearer ${METRICS_API_KEY}" | head -30
 
 # Admin listener via port-forward on a second tunnel
 kubectl -n langwatch port-forward deploy/gateway-smoke-langwatch-gateway 6060:6060 &

@@ -1,5 +1,5 @@
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 /**
  * Covers specs/scenarios/scenario-tab-handoff.feature — the tab-identity half.
  * @vitest-environment jsdom
@@ -69,9 +69,9 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
   }, [location.pathname, location.search, params, navigate]);
 
   return (
-    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+    <UiHostServicesContextProvider value={createUiHostServicesFromHost(host)}>
       <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 

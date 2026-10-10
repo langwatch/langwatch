@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -8,7 +9,7 @@ import {
 } from "./studio-workflow.ts";
 import type { BaseComponent, StudioWorkflow } from "./studio-workflow.ts";
 
-export const studioClientEventSchema = z.discriminatedUnion("type", [
+const studioClientEventSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),
   z.object({
     type: z.literal("execute_component"),
@@ -77,6 +78,8 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     }),
   }),
 ]);
+export interface StudioClientEventSchema extends Named<typeof studioClientEventSchemaDefinition> {}
+export const studioClientEventSchema: StudioClientEventSchema = studioClientEventSchemaDefinition;
 
 export type StudioClientEvent = z.infer<typeof studioClientEventSchema>;
 
@@ -121,30 +124,40 @@ export type StudioServerEvent =
 export const WORKFLOW_CREATED_EVENT_TYPE = "lw.workflow.created" as const;
 
 /** A workflow was created (not copied), how many the project holds counting it, and when. */
-export const workflowCreatedEventDataSchema = z.object({
+const workflowCreatedEventDataSchemaDefinition = z.object({
   workflowId: z.string(),
   projectId: z.string(),
   userId: z.string(),
   workflowCount: z.number().int().nonnegative(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface WorkflowCreatedEventDataSchema extends Named<
+  typeof workflowCreatedEventDataSchemaDefinition
+> {}
+export const workflowCreatedEventDataSchema: WorkflowCreatedEventDataSchema =
+  workflowCreatedEventDataSchemaDefinition;
 export type WorkflowCreatedEventData = z.infer<typeof workflowCreatedEventDataSchema>;
 
 /** Agent keeps a linked graph's fields from its own side on this fact (§9). */
 export const WORKFLOW_VERSION_SAVED_EVENT_TYPE = "lw.workflow.version_saved" as const;
 
 /** The input and output fields a graph's version offers to whatever maps onto it. */
-export const workflowMappingFieldsSchema = z.object({
+const workflowMappingFieldsSchemaDefinition = z.object({
   inputFields: z.array(fieldSchema),
   outputFields: z.array(fieldSchema),
   fieldsResolved: z.boolean(),
 });
+export interface WorkflowMappingFieldsSchema extends Named<
+  typeof workflowMappingFieldsSchemaDefinition
+> {}
+export const workflowMappingFieldsSchema: WorkflowMappingFieldsSchema =
+  workflowMappingFieldsSchemaDefinition;
 
 /**
  * A version of a workflow was saved, restored or recorded again, by whom and when.
  * `fields` is present only while that version is the live workflow's current one.
  */
-export const workflowVersionSavedEventDataSchema = z.object({
+const workflowVersionSavedEventDataSchemaDefinition = z.object({
   workflowId: z.string(),
   projectId: z.string(),
   versionId: z.string(),
@@ -152,15 +165,25 @@ export const workflowVersionSavedEventDataSchema = z.object({
   fields: workflowMappingFieldsSchema.optional(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface WorkflowVersionSavedEventDataSchema extends Named<
+  typeof workflowVersionSavedEventDataSchemaDefinition
+> {}
+export const workflowVersionSavedEventDataSchema: WorkflowVersionSavedEventDataSchema =
+  workflowVersionSavedEventDataSchemaDefinition;
 export type WorkflowVersionSavedEventData = z.infer<typeof workflowVersionSavedEventDataSchema>;
 
 /** Agent clears a linked graph's fields from its own side on this fact (§9). */
 export const WORKFLOW_ARCHIVED_EVENT_TYPE = "lw.workflow.archived" as const;
 
 /** A workflow was archived, and when. */
-export const workflowArchivedEventDataSchema = z.object({
+const workflowArchivedEventDataSchemaDefinition = z.object({
   workflowId: z.string(),
   projectId: z.string(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface WorkflowArchivedEventDataSchema extends Named<
+  typeof workflowArchivedEventDataSchemaDefinition
+> {}
+export const workflowArchivedEventDataSchema: WorkflowArchivedEventDataSchema =
+  workflowArchivedEventDataSchemaDefinition;
 export type WorkflowArchivedEventData = z.infer<typeof workflowArchivedEventDataSchema>;

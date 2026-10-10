@@ -196,7 +196,7 @@ export function SaveAndRunMenu({
                 _hover={{ bg: "bg.muted" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
-                color="blue.500"
+                color="blue.fg"
                 onClick={handleCreateAgent}
               >
                 <Plus size={14} />
@@ -243,7 +243,7 @@ export function SaveAndRunMenu({
                     <Text fontSize="sm" flex={1}>
                       {prompt.handle ?? prompt.id}
                     </Text>
-                    <Play size={12} color="var(--chakra-colors-blue-500)" />
+                    <Play size={12} color="var(--chakra-colors-blue-fg)" />
                   </HStack>
                 ))
               )}
@@ -255,7 +255,7 @@ export function SaveAndRunMenu({
                 _hover={{ bg: "bg.muted" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
-                color="blue.500"
+                color="blue.fg"
                 onClick={handleCreatePrompt}
               >
                 <Plus size={14} />
@@ -323,7 +323,7 @@ function AgentRow({
       <Text fontSize="sm" flex={1}>
         {agent.label}
       </Text>
-      <Play size={12} color="var(--chakra-colors-blue-500)" />
+      <Play size={12} color="var(--chakra-colors-blue-fg)" />
     </chakra.button>
   );
 

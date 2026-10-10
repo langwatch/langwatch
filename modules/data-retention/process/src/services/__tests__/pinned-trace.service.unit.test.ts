@@ -1,4 +1,4 @@
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,7 +10,10 @@ import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { RedisDataRetentionCacheRepository } from "../../repositories/redis/redis.data-retention-cache.repository.ts";
 import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
-import type { RetroactiveRetentionRepository } from "../../repositories/retroactive-retention.repository.ts";
+import type {
+  ClickHouseTarget,
+  RetroactiveRetentionRepository,
+} from "../../repositories/retroactive-retention.repository.ts";
 import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
@@ -41,10 +44,23 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
   async killMutation(): Promise<void> {
     this.calls.push("killMutation");
   }
+
+  keepForeverTargets(): readonly ClickHouseTarget[] {
+    return [];
+  }
+
+  async findKeepForeverRewrites(): Promise<never[]> {
+    return [];
+  }
+
+  async startKeepForeverRewrite(): Promise<void> {
+    this.calls.push("startKeepForeverRewrite");
+  }
 }
 
 /** No statement this suite issues ever reaches a server. */
 const noopClickHouse = new ClickHouseQueryClient({
+  tenantGuard: new TenantGuard(),
   driver: {
     execute: async () => ({ rows: [] }),
     insert: async () => {},

@@ -34,6 +34,13 @@
 		"category": "skill"
 	},
 	{
+		"id": "coding-agent-cost",
+		"label": "Coding agent cost",
+		"description": "Reads your Claude Code sessions in LangWatch and recommends the settings that cut their cost and context, each with the evidence from your own data, the exact settings.json change and the expected saving marked as measured or estimated. Covers older model versions, the auto-compact window, the prompt cache lifetime for API-key and subscription users, the model your built-in sub-agents run on, and sessions that should have been split. Use when someone asks why their coding agents cost so much, how to make a Claude Code plan last longer, or which Claude Code settings to change.",
+		"category": "skill",
+		"userPrompt": "Where can my coding agents save tokens?"
+	},
+	{
 		"id": "connect-agent",
 		"label": "Connect agent",
 		"description": "Connect the codebase's AI agent to LangWatch agent simulations, so test suites run against the real agent process. Adds a small connect function beside the service startup that calls the agent already in the codebase, which opens an outbound connection and registers the agent with its environment and its run parameters, confirms the agent is Online, and runs the first test suite. Falls back to an HTTP registration when the agent cannot import the SDK. Use when the user wants platform scenarios to test their real agent.",

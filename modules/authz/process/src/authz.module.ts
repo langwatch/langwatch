@@ -1,15 +1,17 @@
-import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
+import { organizationCredentialOfRequest } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzServerConfig } from "@langwatch/authz-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { AuthzModule } from "./app/authz.app.ts";
+import { authzAggregateReadEventing } from "./eventing/authz-aggregate-read.pipeline.ts";
 import { authzEventing } from "./eventing/authz-grant.pipeline.ts";
+import { authzMemberOffboardedEventing } from "./eventing/authz-member-offboarded.pipeline.ts";
 import { authzRepositories } from "./repositories/authz-repositories.registry.ts";
-import { authzGrantRest, grantRestFacts } from "./transport/authz-grant.rest.ts";
-import { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
+import { authzGrantRest } from "./transport/authz-grant.rest.ts";
+import { authzRoleBindingRest } from "./transport/authz-role-binding.rest.ts";
 import { authzTrpcTransport } from "./transport/authz.trpc.ts";
 
-function organizationFactsOf(credential: {
+function organizationContextOf(credential: {
   organizationId: string;
   apiKeyId: string;
   userId: string | null;
@@ -32,12 +34,12 @@ export const authzProcessModule: PublishedProcessModule<"authz", AuthzApi, Authz
     // key acts as nobody: a service key is not a person and must not be written
     // into the trail as one.
     // Escalation is bounded by the key itself, never by its owner's wider standing.
-    .withTransportFacts(() => [
-      bindRestMiddleware(roleBindingRestFacts, (context) =>
-        organizationFactsOf(organizationCredentialOfRequest(context.req.raw)),
-      ),
-      bindRestMiddleware(grantRestFacts, (context) =>
-        organizationFactsOf(organizationCredentialOfRequest(context.req.raw)),
-      ),
-    ])
-    .withEventing(authzEventing);
+    .provideMiddlewareContext({
+      roleBindingRestContext: (request) =>
+        organizationContextOf(organizationCredentialOfRequest(request)),
+      grantRestContext: (request) =>
+        organizationContextOf(organizationCredentialOfRequest(request)),
+    })
+    .withEventing(authzEventing)
+    .withEventing(authzAggregateReadEventing)
+    .withEventing(authzMemberOffboardedEventing);

@@ -53,20 +53,6 @@ describe("the toast stack", () => {
       expect(css).toMatch(/\[data-overlap\]:not\(\[data-first\]\)>\*\{[^}]*opacity:0/);
     });
   });
-
-  describe("when more toasts wait than the stack shows", () => {
-    /** @scenario "The count of waiting toasts clears the front card's edge" */
-    it("stands the count above the front card instead of across its border", async () => {
-      await raiseToasts({ count: 5 });
-
-      const chip = document.querySelector("[data-toast-more]");
-      if (!chip) throw new Error("no count chip");
-      const css = rulesFor({ element: chip });
-      expect(css).toContain("bottom:100%");
-      expect(css).not.toContain("translate:0 -50%");
-      expect(chip.closest("[data-first]")).not.toBeNull();
-    });
-  });
 });
 
 describe("the segmented control", () => {

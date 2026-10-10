@@ -10,7 +10,7 @@ import (
 // checks — a tsgo typecheck, a whole-tree lint — saturate the machine on purpose,
 // and several worktrees' worth at once is what makes a laptop unusable. The
 // queue used to live only in dev/scripts/check-queue.mjs; the decisions now
-// live here so `haven slot run` (and `haven typecheck`) gate against the same
+// live here so `haven machine slot run` (and `haven machine typecheck`) gate against the same
 // counter with the same rules, and the JS wrapper delegates to haven when the
 // binary is installed.
 

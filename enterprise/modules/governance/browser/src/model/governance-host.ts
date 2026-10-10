@@ -1,5 +1,6 @@
 /** Port providing governance screens with auth, routing, toasts, and plan context. */
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 /** One organization as the section reads it: its own row plus its teams. */
@@ -20,6 +21,8 @@ export type GovernanceProject = {
   id: string;
   name: string;
   slug: string;
+  /** An aggregate (ADR-144) is never the drill-in landing project. */
+  kind?: string | null;
 };
 
 /** The path parameters and query string the screen was opened with. */
@@ -84,10 +87,10 @@ export abstract class GovernanceHostApi {
   abstract hasPermission(permission: string): boolean;
 
   /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
+  abstract isFeatureEnabled(flag: ReleaseFlagToken): boolean;
 
   /** On, off, or `undefined` while the flag has not answered yet. */
-  abstract featureFlag(flag: string): boolean | undefined;
+  abstract featureFlag(flag: ReleaseFlagToken): boolean | undefined;
 
   /** Whether the session's grants have arrived, so a "no" is a real no. */
   abstract isSettled(): boolean;
@@ -105,6 +108,12 @@ export abstract class GovernanceHostApi {
   abstract navigate(to: string): void;
 
   abstract succeeded(notice: GovernanceSuccessNotice): void;
+
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: GovernanceSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: GovernanceSuccessNotice): void;
 
   abstract failed(failure: GovernanceFailureNotice): void;
 }

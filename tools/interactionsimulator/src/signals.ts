@@ -49,9 +49,9 @@ export const logSignatures = async ({
   for (const text of output.split("\n")) {
     try {
       const parsed = logLineSchema.safeParse(JSON.parse(text));
-      if (parsed.success) found.add(signature(parsed.data));
+      if (parsed.success && parsed.data.type === "log") found.add(signature(parsed.data));
     } catch {
-      // A line haven prints around the JSON is not a log line.
+      // A line haven prints around the NDJSON is not a log event.
     }
   }
   return [...found];

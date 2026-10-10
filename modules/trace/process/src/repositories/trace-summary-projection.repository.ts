@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 export type TraceSummaryReadWindow = {
@@ -19,8 +20,9 @@ export abstract class TraceSummaryProjectionRepository {
     throw new Error("Trace summary batch persistence is not implemented");
   }
 
+  /** The proof fences the tenants the read sees; the fold passes an own-only one. */
   abstract findByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: TraceSummaryReadWindow;
   }): Promise<TraceSummaryData | null>;

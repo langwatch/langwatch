@@ -1,4 +1,4 @@
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 /**
  * How the branch-list read names its tenants, and the list-read cost signal
  * ADR-071 step 3's deferred pruning promise leans on.
@@ -222,6 +222,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
       it("times the failure under the error outcome and still raises it", async () => {
         const metrics = new CountingReadMetrics();
         const failing = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: {
             execute: async () => {
               throw new Error("clickhouse unavailable");

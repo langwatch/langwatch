@@ -99,7 +99,13 @@ export function expandCssVars({
 
 function scaleValue(color: string): string | undefined {
   const [hueName, step] = color.split(".");
-  const hue = Object.entries(colorSystem).find(([name]) => name === hueName)?.[1];
+  const darkGray =
+    hueName === "gray" &&
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark");
+  const hue = Object.entries(colorSystem).find(
+    ([name]) => name === (darkGray ? "zinc" : hueName),
+  )?.[1];
   return Object.entries(hue ?? {}).find(([key]) => key === step)?.[1].value;
 }
 

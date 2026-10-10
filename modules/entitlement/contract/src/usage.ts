@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Organization usage against plan: where it stands, its status, and formatted
  * copy shared across UI, settings, and email.
@@ -23,7 +24,7 @@ export const USAGE_UNIT_DISPLAY_LABELS: Record<UsageUnit, string> = {
 /**
  * Copy is pre-formatted so the sidebar, settings, and email cannot render it differently.
  */
-export const messageLimitInfoSchema = z
+const messageLimitInfoSchemaDefinition = z
   .object({
     status: messageLimitStatusSchema,
     current: z.number(),
@@ -34,19 +35,23 @@ export const messageLimitInfoSchema = z
     message: z.string(),
   })
   .strict();
+export interface MessageLimitInfoSchema extends Named<typeof messageLimitInfoSchemaDefinition> {}
+export const messageLimitInfoSchema: MessageLimitInfoSchema = messageLimitInfoSchemaDefinition;
 export type MessageLimitInfo = z.infer<typeof messageLimitInfoSchema>;
 
 /** Seats used against seats the plan includes, for one seat type. */
-export const seatUsageSchema = z
+const seatUsageSchemaDefinition = z
   .object({ current: z.number(), max: z.number(), exceeded: z.boolean() })
   .strict();
+export interface SeatUsageSchema extends Named<typeof seatUsageSchemaDefinition> {}
+export const seatUsageSchema: SeatUsageSchema = seatUsageSchemaDefinition;
 export type SeatUsage = z.infer<typeof seatUsageSchema>;
 
 /**
  * Whether the organization uses more seats than its plan includes, which a plan
  * shrinking under a full organization leaves behind (specs/licensing/subscription-page.feature).
  */
-export const seatLimitInfoSchema = z
+const seatLimitInfoSchemaDefinition = z
   .object({
     status: z.enum(["ok", "exceeded"]),
     members: seatUsageSchema,
@@ -54,10 +59,12 @@ export const seatLimitInfoSchema = z
     message: z.string(),
   })
   .strict();
+export interface SeatLimitInfoSchema extends Named<typeof seatLimitInfoSchemaDefinition> {}
+export const seatLimitInfoSchema: SeatLimitInfoSchema = seatLimitInfoSchemaDefinition;
 export type SeatLimitInfo = z.infer<typeof seatLimitInfoSchema>;
 
 /** One organization's usage for the current period, and the plan it is measured against. */
-export const usageStatsSchema = z
+const usageStatsSchemaDefinition = z
   .object({
     /** Null on a legacy or unlimited response, which has no count to show. */
     currentMonthMessagesCount: z.number().nullable(),
@@ -78,4 +85,6 @@ export const usageStatsSchema = z
     usageUnit: usageUnitSchema,
   })
   .strict();
+export interface UsageStatsSchema extends Named<typeof usageStatsSchemaDefinition> {}
+export const usageStatsSchema: UsageStatsSchema = usageStatsSchemaDefinition;
 export type UsageStats = z.infer<typeof usageStatsSchema>;

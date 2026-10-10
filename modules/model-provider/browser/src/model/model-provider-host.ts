@@ -85,6 +85,12 @@ export abstract class ModelProviderHostApi {
 
   abstract succeeded(notice: ModelProviderSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: ModelProviderSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: ModelProviderSuccessNotice): void;
+
   abstract failed(failure: ModelProviderFailureNotice): void;
 
   /**

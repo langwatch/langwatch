@@ -1,5 +1,12 @@
 // The grant-head rows a decision reads, translated one way whichever backing read them.
-import type { BindingRoleKey, CollectedBinding, GrantScopeTier } from "@langwatch/authz-contract";
+import {
+  type BindingRoleKey,
+  type CollectedBinding,
+  type GrantScopeTier,
+  PROJECT_READER_ROLE_KEY,
+  STORED_PRINCIPAL_KIND,
+  type StoredPrincipalKind,
+} from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { ShareLinkRow } from "../authz-read.repository.ts";
@@ -130,4 +137,28 @@ export function shareLinkRowFrom({
       viewCount: viewCounts.get(row.id) ?? 0,
     },
   ];
+}
+
+/** The rows that are one reader project's shared reads (ADR-177): the minter's read, and
+ *  the ledger's list, revoke and attach. */
+export function sharedProjectReadsOf({
+  organizationId,
+  readerProjectId,
+}: {
+  organizationId: string;
+  readerProjectId: string;
+}): {
+  organizationId: string;
+  principalType: StoredPrincipalKind;
+  principalId: string;
+  scopeType: "PROJECT";
+  roleKey: typeof PROJECT_READER_ROLE_KEY;
+} {
+  return {
+    organizationId,
+    principalType: STORED_PRINCIPAL_KIND.project,
+    principalId: readerProjectId,
+    scopeType: "PROJECT" as const,
+    roleKey: PROJECT_READER_ROLE_KEY,
+  };
 }

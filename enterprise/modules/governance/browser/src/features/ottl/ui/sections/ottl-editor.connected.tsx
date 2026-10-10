@@ -1,5 +1,3 @@
-import { useMemo } from "react";
-
 import { api } from "../../../../behavior/governance-api.ts";
 import {
   GovernanceOttlValidationClient,
@@ -39,12 +37,15 @@ export function EnterpriseOttlEditor({
   statements,
   onChange,
   enabled,
+  refusal,
 }: {
   organizationId: string;
   sourceType: string;
   statements: string[];
   onChange: (next: string[]) => void;
   enabled: boolean;
+  /** The save's failure; a parser refusal is drawn onto its statements. */
+  refusal?: unknown;
 }) {
   const starterQuery = api.ingestionSources.ottlStarter.useQuery(
     { organizationId, sourceType },
@@ -54,10 +55,7 @@ export function EnterpriseOttlEditor({
     },
   );
   const { mutateAsync: validateOttl } = api.ingestionSources.validateOttl.useMutation();
-  const client = useMemo(
-    () => AppGovernanceOttlValidationClient.create((input) => validateOttl(input)),
-    [validateOttl],
-  );
+  const client = AppGovernanceOttlValidationClient.create((input) => validateOttl(input));
 
   return (
     <OttlEditor
@@ -68,6 +66,7 @@ export function EnterpriseOttlEditor({
       enabled={enabled}
       starterStatements={starterQuery.data?.statements}
       validationClient={client}
+      refusal={refusal}
     />
   );
 }

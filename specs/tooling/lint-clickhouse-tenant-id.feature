@@ -4,7 +4,7 @@ Feature: The clickhouse-tenant-id lint rule
   (dev/docs/best_practices/clickhouse-queries.md, "TenantId is Always Required").
   The client refuses a statement with no tenant predicate at runtime; this rule
   catches it at edit time and holds each subquery to the same bar. A statement
-  that genuinely spans tenants declares `unscoped: { reason }`, which the client
+  that genuinely spans tenants sets `SKIP_TENANT_CHECK: true` under a comment giving the reason, which the client
   audits, and a WHERE clause handed over by a builder is trusted to carry it.
 
   @unit
@@ -26,9 +26,9 @@ Feature: The clickhouse-tenant-id lint rule
     Then it reports missingTenantPredicate naming agent_spans only
 
   @unit
-  Scenario: A statement declared unscoped is left alone
-    Given a query passed with `unscoped: { reason }` inline
-    And a query passed to a method of the same class that declares `unscoped`
+  Scenario: A statement that skips the tenant check is left alone
+    Given a query passed with `SKIP_TENANT_CHECK: true` inline
+    And a query passed to a method of the same class that sets `SKIP_TENANT_CHECK`
     When the clickhouse-tenant-id rule runs over them
     Then it reports nothing
 

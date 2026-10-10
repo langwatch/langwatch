@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Gateway's spend facts: one event per committed lifecycle step of a gateway request.
  * Gateway records each on gateway_spend_processing; a delivery module subscribes to them.
@@ -43,25 +44,40 @@ const spendOutcomeSchema = z.object({
   duration_ms: count,
 });
 
-export const gatewaySpendAdmittedEventDataSchema = z.object({
+const gatewaySpendAdmittedEventDataSchemaDefinition = z.object({
   ...spendAttributionSchema.shape,
   ...spendStepSchema.shape,
   outcome_carries_attribution: z.boolean().default(false),
 });
+export interface GatewaySpendAdmittedEventDataSchema extends Named<
+  typeof gatewaySpendAdmittedEventDataSchemaDefinition
+> {}
+export const gatewaySpendAdmittedEventDataSchema: GatewaySpendAdmittedEventDataSchema =
+  gatewaySpendAdmittedEventDataSchemaDefinition;
 export const gatewaySpendConfirmedEventDataSchema = spendOutcomeSchema;
-export const gatewaySpendFailedEventDataSchema = z.object({
+const gatewaySpendFailedEventDataSchemaDefinition = z.object({
   ...spendOutcomeSchema.shape,
   error: z.object({ type: z.string(), http_status: count }),
 });
-export const gatewaySpendSettledEventDataSchema = z.object({
+export interface GatewaySpendFailedEventDataSchema extends Named<
+  typeof gatewaySpendFailedEventDataSchemaDefinition
+> {}
+export const gatewaySpendFailedEventDataSchema: GatewaySpendFailedEventDataSchema =
+  gatewaySpendFailedEventDataSchemaDefinition;
+const gatewaySpendSettledEventDataSchemaDefinition = z.object({
   ...spendAttributionSchema.shape,
   ...spendStepSchema.shape,
   admitted_at: count,
   reason: z.string(),
 });
+export interface GatewaySpendSettledEventDataSchema extends Named<
+  typeof gatewaySpendSettledEventDataSchemaDefinition
+> {}
+export const gatewaySpendSettledEventDataSchema: GatewaySpendSettledEventDataSchema =
+  gatewaySpendSettledEventDataSchemaDefinition;
 
 /** One spend fact as a delivery module takes it, typed by the lifecycle step it records. */
-export const gatewaySpendEventSchema = z.discriminatedUnion("type", [
+const gatewaySpendEventSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(GATEWAY_SPEND_ADMITTED_EVENT_TYPE),
     data: gatewaySpendAdmittedEventDataSchema,
@@ -79,4 +95,6 @@ export const gatewaySpendEventSchema = z.discriminatedUnion("type", [
     data: gatewaySpendSettledEventDataSchema,
   }),
 ]);
+export interface GatewaySpendEventSchema extends Named<typeof gatewaySpendEventSchemaDefinition> {}
+export const gatewaySpendEventSchema: GatewaySpendEventSchema = gatewaySpendEventSchemaDefinition;
 export type GatewaySpendEvent = z.infer<typeof gatewaySpendEventSchema>;

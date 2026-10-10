@@ -9,6 +9,7 @@ import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { allRegisteredRoutes } from "../../route-registry.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -29,6 +30,7 @@ const secrets = defineRestRouter(SecretApi)
 
 function mounted(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },

@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:34`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:43`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
 
-Peers call these through the token, declared at `../contract/src/billing.api.ts:37`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/billing.api.ts:35`; nothing else in this package is public.
 
 #### `getConnectedBillingOverview`
 
@@ -84,14 +84,6 @@ The plan an organization's active subscription grants on LangWatch Cloud, with t
 getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
 ```
 
-#### `sendUsageWarning`
-
-Mails the organization's admins the usage warning entitlement decided, once per threshold a month. Billing counts nothing: the threshold and per-project counts arrive decided.
-
-```typescript
-sendUsageWarning(input: UsageWarningDecision): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
-```
-
 #### `notifyResourceLimitReached`
 
 Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reached seat limit, SaaS only, at most once a day per organization and limit. Never throws.
@@ -135,8 +127,8 @@ Answers at `/api/webhooks/stripe`, `/api/v1/webhooks/stripe`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:40)
-type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:227
-// Response: billingStripeWebhookReceiptSchema, ../contract/src/billing-types.ts:225
+type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:215
+// Response: billingStripeWebhookReceiptSchema, ../contract/src/billing-types.ts:213
 interface Response {
   received: true;
 }
@@ -146,7 +138,7 @@ interface Response {
 
 ### `connectedBilling`
 
-Contract `../contract/src/connected-billing.trpc.ts:21`, router `src/transport/connected-billing.trpc.ts:39`.
+Contract `../contract/src/connected-billing.trpc.ts:21`, router `src/transport/connected-billing.trpc.ts:43`.
 
 | Procedure                               | Kind     | Gate                             | Input                             | Output                              |
 | --------------------------------------- | -------- | -------------------------------- | --------------------------------- | ----------------------------------- |
@@ -214,7 +206,7 @@ type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/c
 
 ### `currency`
 
-Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.trpc.ts:42`.
+Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.trpc.ts:46`.
 
 | Procedure                 | Kind  | Gate                                                                                                                                     | Input                       | Output                   |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------ |
@@ -233,7 +225,7 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:81`.
+Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:88`.
 
 | Procedure                            | Kind     | Gate                             | Input                     | Output                           |
 | ------------------------------------ | -------- | -------------------------------- | ------------------------- | -------------------------------- |
@@ -248,14 +240,14 @@ Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscr
 ```typescript
 // subscription.addTeamMemberOrEvents
 // Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:37)
-// Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:223
+// Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:211
 interface Output {
   success: boolean;
 }
 
 // subscription.create
 // Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:54)
-// Output: billingRedirectSchema, ../contract/src/billing-types.ts:217
+// Output: billingRedirectSchema, ../contract/src/billing-types.ts:205
 interface Output {
   url: string | null;
 }
@@ -266,7 +258,7 @@ interface Input {
   organizationId: string;
   baseUrl: string;
 }
-// Output: billingPortalSessionSchema, ../contract/src/billing-types.ts:220
+// Output: billingPortalSessionSchema, ../contract/src/billing-types.ts:208
 interface Output {
   url: string;
 }
@@ -333,49 +325,53 @@ Declared at `src/eventing/billing-lifecycle.pipeline.ts:85`. Events: `subscripti
 
 ### Pipeline `billing_reporting` (aggregate `billing_report`)
 
-Declared at `src/eventing/billing-reporting.pipeline.ts:72`.
+Declared at `src/eventing/billing-reporting.pipeline.ts:80`.
 
-| Kind            | Name                | Handles                                                                                      | Declared at                                     |
-| --------------- | ------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| command         | –                   | –                                                                                            | `src/eventing/billing-reporting.pipeline.ts:79` |
-| peer subscriber | `usageMonthCounted` | `lw.entitlement.month_counted` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:93` |
+| Kind            | Name                    | Handles                                                                                                | Declared at                                      |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| command         | –                       | –                                                                                                      | `src/eventing/billing-reporting.pipeline.ts:87`  |
+| peer subscriber | `usageMonthCounted`     | `lw.entitlement.month_counted` from [entitlement](../../../../modules/entitlement/README.md)           | `src/eventing/billing-reporting.pipeline.ts:101` |
+| peer subscriber | `usageThresholdCrossed` | `lw.entitlement.usage_threshold_crossed` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:114` |
 
-### Pipeline `connected_billing` (aggregate `global`)
+### Pipeline `connected_billing` (aggregate `connected_billing`)
 
-Declared at `src/eventing/connected-billing.pipeline.ts:52`.
+Declared at `src/eventing/connected-billing.pipeline.ts:73`. Events: `connectedCustomerOnboardedEventSchema`, `connectedTermRenewedEventSchema`.
 
-| Kind            | Name                   | Handles                                                                                   | Declared at                                     |
-| --------------- | ---------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| process manager | `connectedBillingTick` | every 5 min (`CONNECTED_BILLING_FIRST_DELAY_MS = 5 * 60 * 1000`); intents `tick` (outbox) | `src/eventing/connected-billing.pipeline.ts:57` |
-| process manager | `seatInvoicing`        | every 1 min (`SEAT_INVOICING_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)           | `src/eventing/connected-billing.pipeline.ts:74` |
+| Kind            | Name                               | Handles                                                                                   | Declared at                                     |
+| --------------- | ---------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| command         | `recordConnectedCustomerOnboarded` | –                                                                                         | `src/eventing/connected-billing.pipeline.ts:78` |
+| command         | `recordConnectedTermRenewed`       | –                                                                                         | `src/eventing/connected-billing.pipeline.ts:79` |
+| process manager | `connectedBillingTick`             | every 5 min (`CONNECTED_BILLING_FIRST_DELAY_MS = 5 * 60 * 1000`); intents `tick` (outbox) | `src/eventing/connected-billing.pipeline.ts:80` |
+| process manager | `seatInvoicing`                    | every 1 min (`SEAT_INVOICING_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)           | `src/eventing/connected-billing.pipeline.ts:97` |
 
 ### Tasks
 
 Run by the tasks process, before serve.
 
-| Task                     | Class                     | Declared at                                   |
-| ------------------------ | ------------------------- | --------------------------------------------- |
-| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:24` |
-| `stripe-prices-sync`     | `StripePricesSyncTask`    | `src/tasks/stripe-prices-sync.task.ts:467`    |
+| Task                        | Class                              | Declared at                                      |
+| --------------------------- | ---------------------------------- | ------------------------------------------------ |
+| `tiered-free-to-seat-event` | `TieredFreeToSeatEventMigrateTask` | `src/tasks/tiered-free-to-seat-event.task.ts:79` |
+| `stripe-prices-sync`        | `StripePricesSyncTask`             | `src/tasks/stripe-prices-sync.task.ts:467`       |
 
 ## Configuration
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:184`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:185`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:186`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:187`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:188`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:189`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:174`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:175`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:176`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:177`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:178`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:179`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:12` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:14` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:22` |
 | config | `hubspotFormId`                     | `HUBSPOT_FORM_ID`                              | `../contract/src/billing.config.ts:23` |
 | config | `hubspotReachedLimitFormId`         | `HUBSPOT_REACHED_LIMIT_FORM_ID`                | `../contract/src/billing.config.ts:24` |
 | config | `bankDetails`                       | `LANGWATCH_BILLING_BANK_DETAILS`               | `../contract/src/billing.config.ts:25` |
-| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:27` |
-| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:29` |
-| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:31` |
+| config | `stripeApiBase`                     | `STRIPE_API_BASE`                              | `../contract/src/billing.config.ts:27` |
+| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:29` |
+| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:31` |
+| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:33` |
 
 <!-- readme:generated:end -->

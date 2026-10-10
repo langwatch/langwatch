@@ -1,6 +1,7 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, CodeBlock, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
+import { Button, CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { Copy as LuCopy } from "lucide-react";
 import { useState } from "react";
@@ -22,10 +23,7 @@ const OUTBOX_PAGE_SIZE = 20;
 
 function InstanceDrawerTitle({ label, onCopyKey }: { label: string; onCopyKey: () => void }) {
   return (
-    <HStack width="full" gap={2} align="start">
-      <Text textStyle="sm" fontFamily="mono" wordBreak="break-all">
-        {label}
-      </Text>
+    <DetailDrawerHeader kind="Process instance" title={label}>
       <Button
         size="2xs"
         variant="ghost"
@@ -35,8 +33,7 @@ function InstanceDrawerTitle({ label, onCopyKey }: { label: string; onCopyKey: (
       >
         <LuCopy size={12} />
       </Button>
-      <Spacer />
-    </HStack>
+    </DetailDrawerHeader>
   );
 }
 
@@ -152,7 +149,7 @@ export function ProcessInstanceDrawer({
 
   return (
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <InstanceDrawerTitle label={`${processName} / ${processKey}`} onCopyKey={copyKey} />
         </Drawer.Header>

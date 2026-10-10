@@ -10,6 +10,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
 import { CodexAccountService } from "../../features/codex/services/codex-account.service.ts";
@@ -113,7 +114,7 @@ export function createModelProviderTestInfrastructure(
       projects,
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
-    ...MemoryModelProviderChannels.create(),
+    ...MemoryModelProviderChannels.create({ bound: { traces: createModelProviderTestTraces() } }),
     ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
@@ -121,9 +122,16 @@ export function createModelProviderTestInfrastructure(
     }),
     credentialProbe: UnavailableModelProviderCredentialProbeService.create(),
     codexAccounts: CodexAccountService.create({ fetchImpl: refuseFetch }),
-    spans: {},
     ...overrides,
   };
+}
+
+/** A trace module that saw no spans: the preview answers "no matches". */
+export function createModelProviderTestTraces(): TraceApi {
+  return createApiFixture<TraceApi>({
+    readModelUsageStats: async () => [],
+    readRecentSpansByModels: async () => [],
+  });
 }
 
 export function createModelProviderTestApp(

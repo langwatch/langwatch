@@ -4,6 +4,7 @@ import {
   ClickHouseQueryClient,
   type QueryDriver,
   type QueryRequest,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -47,7 +48,7 @@ function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
     insert: () => Promise.reject(new Error("the attributed rollups never insert")),
     command: () => Promise.reject(new Error("the attributed rollups never command")),
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 async function oracle<Row>(query: string, params: Record<string, unknown>): Promise<Row[]> {

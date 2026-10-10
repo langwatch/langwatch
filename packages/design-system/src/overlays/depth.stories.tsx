@@ -19,6 +19,11 @@ function DepthReadout() {
 
 const meta = {
   title: "Foundations/Overlay depth",
+  parameters: {
+    usage: {
+      use: "Read when an overlay opens inside another overlay: depth decides which sits on top.",
+    },
+  },
   component: DepthReadout,
   tags: ["autodocs"],
 } satisfies Meta<typeof DepthReadout>;

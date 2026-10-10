@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { EvaluationResults, EvaluationsV3State } from "./experiment-workbench.ts";
@@ -16,7 +17,7 @@ import {
  * Persisted results; arrays hold null for rows not yet executed. Each group
  * defaults to empty so `results: {}` clears a run from outside the editor.
  */
-export const persistedResultsSchema = z.object({
+const persistedResultsSchemaDefinition = z.object({
   runId: z.string().optional(),
   versionId: z.string().optional(),
   targetOutputs: z.record(z.string(), z.array(z.unknown())).default({}),
@@ -24,12 +25,14 @@ export const persistedResultsSchema = z.object({
   evaluatorResults: z.record(z.string(), z.record(z.string(), z.array(z.unknown()))).default({}),
   errors: z.record(z.string(), z.array(z.string().nullish())).default({}),
 });
+export interface PersistedResultsSchema extends Named<typeof persistedResultsSchemaDefinition> {}
+export const persistedResultsSchema: PersistedResultsSchema = persistedResultsSchemaDefinition;
 
 /**
  * Zod schema for persisted evaluations v3 state validation.
  * Reuses schemas from types.ts for datasets, evaluators, targets.
  */
-export const persistedEvaluationsV3StateSchema = z.object({
+const persistedEvaluationsV3StateSchemaDefinition = z.object({
   experimentId: z.string().optional(),
   experimentSlug: z.string().optional(),
   name: z.string(),
@@ -43,6 +46,11 @@ export const persistedEvaluationsV3StateSchema = z.object({
   // Concurrency setting for parallel execution
   concurrency: z.number().min(1).max(24).optional(),
 });
+export interface PersistedEvaluationsV3StateSchema extends Named<
+  typeof persistedEvaluationsV3StateSchemaDefinition
+> {}
+export const persistedEvaluationsV3StateSchema: PersistedEvaluationsV3StateSchema =
+  persistedEvaluationsV3StateSchemaDefinition;
 
 // ============================================================================
 // Derived TypeScript Types (from Zod schemas)

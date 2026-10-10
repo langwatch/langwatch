@@ -26,7 +26,7 @@ None.
 ## Calls
 
 - `withApi(navigationApi)`, tRPC contracts: `featureFlag.*`.
-- Client packages (package.json): `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/navigation-client`, `@langwatch/organization-client`, `@langwatch/prompt-client`.
+- Client packages (package.json): `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/feature-flag-client`, `@langwatch/navigation-client`, `@langwatch/organization-client`, `@langwatch/prompt-client`.
 - Lends: `SidebarToken`, `InlineCommandPaletteToken`.
 - Capabilities: `host`, `chrome`, `commandBar`.
 

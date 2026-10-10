@@ -27,6 +27,8 @@ export const apiHealthRoute: HealthRoute = {
 export type ApiStartOptions = Readonly<{
   ownsProcess?: boolean;
   ownsTelemetry?: boolean;
+  /** The launcher's port for this api, beside a generation still serving API_PORT. */
+  port?: number;
 }>;
 
 /** Boots the API and starts serving. The server it answers with drains it. */
@@ -38,6 +40,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
     .withProcessOwnership(options.ownsProcess ?? true)
+    .withHealthPort(options.port)
     .withUpgradeGate({ role: "api", gate: servingUpgradeGate });
   const server = await (
     (options.ownsTelemetry ?? true)

@@ -1,17 +1,18 @@
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+
+import { createLogger } from "@langwatch/observability";
 /**
  * The one revoke at deploy: the blocking inline DML main shipped in the identity_auth migration,
  * run as written against Session rows, ends the legacy impersonation sessions and no other.
  * @see specs/identity/mfa-and-session-shape.feature
  */
-import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-
-import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
+  type PrismaConnection,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -34,8 +35,13 @@ async function deployRevoke(): Promise<string> {
   const [block] = /DO \$\$[\s\S]*?END \$\$;/.exec(await readFile(MIGRATION, "utf8")) ?? [];
   if (!block?.includes(`DELETE FROM "Session"`)) throw new Error("the revoke block moved");
 
-  // Migrations run outside the tenancy guard; the test's client runs inside it.
-  return `-- @tenancy: a deploy migration spans every tenant\n${block}`;
+  return `${
+    skipTenantCheck({
+      // Migrations run outside the tenancy guard; the test's client runs inside it, and a deploy
+      // migration spans every tenant.
+      SKIP_TENANT_CHECK: true,
+    }).sql
+  }\n${block}`;
 }
 
 describe.skipIf(!databaseUrl)("the impersonation revoke at deploy", () => {

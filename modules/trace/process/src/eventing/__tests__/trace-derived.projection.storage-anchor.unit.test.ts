@@ -10,8 +10,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceAnalyticsProjectionRepository } from "../../repositories/trace-analytics-projection.repository.ts";
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceAnalyticsProjectionRepository } from "../../repositories/trace-analytics-projection.repository.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
@@ -163,7 +164,11 @@ describe("traceAnalytics storage anchor", () => {
             return null;
           }
         })();
-        const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
+        const store = TraceAnalyticsStore.create({
+          storage,
+          defaultRetentionDays: () => 90,
+          authorize: ownProofAuthorizer,
+        });
 
         await store.store(state, {
           aggregateId: TRACE_ID,

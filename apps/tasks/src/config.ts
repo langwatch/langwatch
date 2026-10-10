@@ -49,14 +49,14 @@ export function resolveTasksEnvironment(
 }
 
 /**
- * The opened migration database, holding the advisory lock over itself: both
+ * The opened migration database, holding the upgrade lease over itself: both
  * come from the one URL, so one object owns both and nothing remembers it.
  */
 export interface TasksDatabase {
   readonly client: PrismaClient;
   /** The same database as plain SQL, for the runner-owned upgrade ledger (packages/upgrade). */
   readonly sql: UpgradePostgres;
-  /** Runs the sequence under this database's advisory lock. */
+  /** Runs the sequence under the upgrade lease, so it never overlaps an upgrade. */
   hold(run: () => Promise<void>): Promise<void>;
   close(): Promise<void>;
 }

@@ -60,3 +60,74 @@ Feature: A system state is captured to a snapshot and restored from it unchanged
     Then every key and body is restored unchanged and the fingerprints are equal
     And a restore into a bucket not named "upgradelab-" is refused, naming the prefix
     And an object body holding an "sk-" style key is refused, naming the object key but never the value
+
+  # The S3 client (lane UPGRADELAB-S3): hand-rolled SigV4, no SDK, path-style or virtual-host addressing.
+
+  @unit
+  Scenario: Capture lists and reads every object in an S3 bucket
+    Given an S3 bucket holding more objects than one list page returns
+    When the bucket is captured through the signed S3 client
+    Then every page of the listing is followed to its end
+    And every object is read and counted in the manifest
+
+  @unit
+  Scenario: Restore into S3 refuses a bucket whose name lacks the upgradelab- prefix
+    Given an S3 bucket named "langwatch"
+    When a snapshot is restored into it through the S3 client
+    Then the restore refuses, naming the dedicated prefix
+    And no object is written to the bucket
+
+  @unit
+  Scenario: Restore into S3 refuses a bucket that is not empty
+    Given an S3 bucket named "upgradelab-objects" that already holds an object
+    When a snapshot is restored into it through the S3 client
+    Then the restore refuses, naming the bucket as not empty
+    And no object is written to the bucket
+
+  @unit
+  Scenario: A signing failure or a refused request names the bucket and key, never the credentials
+    When the S3 client has no secret key to sign with
+    Then the request is not sent
+    And the error names the bucket and the key
+    When the S3 server answers 403 with a body that echoes the request signature
+    Then the error names the bucket, the key and the status code
+    And the error contains neither the access key, the secret key nor the signature
+
+  @unit
+  Scenario: A cell runs built code on both sides and never spawns a dev command
+    When a cell plans how to build and start the release it upgrades from and the release it upgrades to
+    Then the old release builds once and runs platform/app runtime:app and runtime:workers
+    And the new release builds as the release image does and runs apps/api and apps/worker start
+    And every process gets NODE_ENV=production
+    And no argv holds tsx, vite dev, a watch flag or a script ending in :dev
+
+  @unit
+  Scenario: A build is skipped when its stamp records the same commit and the output exists
+    Given a checkout whose build stamp records its HEAD commit and whose build output exists
+    When the cell asks for a build
+    Then the build command does not run
+    When the stamp records another commit or the output is missing
+    Then the build command runs and the stamp records HEAD
+
+  @e2e @unimplemented
+  Scenario: produce writes a snapshot and its cache entry
+    When "upgradelab produce -deployment cloud -tier S" runs on a quiet host
+    Then main is built, booted, seeded and driven with traffic, and its worker paused so jobs queue
+    And the snapshot directory and the seed context land under the cache key for main's commit, deployment, tier, shape, seed and recipe
+    And the cell's stores are dropped afterwards
+
+  @unit
+  Scenario: produce skips a cached key unless forced
+    Given a cache entry for the key produce would write
+    When produce runs without -force
+    Then it reports the cached snapshot and starts nothing
+    When produce runs with -force
+    Then it replaces the entry
+
+  @e2e @unimplemented
+  Scenario: Two cells from one snapshot start from the same fingerprint
+    Given a snapshot produced once for cloud S
+    When two cells run with -from-snapshot on that snapshot
+    Then each restores it into fresh upgradelab_<cell> stores instead of seeding
+    And both write the same restored fingerprint before main boots
+    And the jobs queued at the snapshot's cut are in Redis again

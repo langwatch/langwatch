@@ -20,7 +20,8 @@ export class ClickHouseClickHouseHealthRepository extends ClickHouseHealthReposi
     await this.clickhouse.query({
       tenantId: "",
       sql: "SELECT 1",
-      unscoped: { reason: "the checkup asks whether the server answers, which no tenant owns" },
+      // The checkup asks whether the server answers, which no tenant owns.
+      SKIP_TENANT_CHECK: true,
     });
   }
 }

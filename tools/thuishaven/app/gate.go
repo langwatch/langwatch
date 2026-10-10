@@ -141,7 +141,7 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 // and GateCodex both call it, and it NEVER rewrites tool_input.
 //
 // A rewrite used to mask the real command from three things at once: Claude
-// Code's own permission rules (a prefix rule matching "haven run" over-admits
+// Code's own permission rules (a prefix rule matching "haven machine run" over-admits
 // an allow and a deny never gets to fire on the command it was written for),
 // every log line, and every prompt the agent or a human reads back. Codex's
 // gate used to keep rewriting anyway, on the theory that its own permission
@@ -149,7 +149,7 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 // than that exception: no hook rewrites the command it admits. Gating now
 // lives in the heavy tools themselves - the compiler/lint/format/test/vitest
 // bin shims and `make go-lint`, which already take a slot through
-// `haven slot run` on their own - so the command either agent asked for is
+// `haven machine slot run` on their own - so the command either agent asked for is
 // exactly the command that runs, and this only classifies and reports.
 //
 // The only permission decision left is a deny under red memory pressure with
@@ -215,7 +215,7 @@ type predictionRequest struct {
 // This is a PREDICTION, not an instruction, because nothing here rewrites the
 // command any more. It agrees with the enforcement for every heavy command
 // the gate classifies: the compiler, linter, formatter and vitest bin shims
-// all take a slot through `haven slot run` on their own, and `make go-lint`
+// all take a slot through `haven machine slot run` on their own, and `make go-lint`
 // does the same for golangci-lint - the gap this comment used to flag is closed.
 func predictiveMessage(r predictionRequest) string {
 	switch r.decision {
@@ -234,7 +234,7 @@ func predictiveMessage(r predictionRequest) string {
 // specs/setup/haven-agent-hooks.feature, "Codex heavy commands use the
 // existing Haven gate" - enforcement lives in the heavy tools themselves
 // (the compiler/lint/format/test/vitest bin shims and `make go-lint`, which
-// already take a slot through `haven slot run` on their own), so the command
+// already take a slot through `haven machine slot run` on their own), so the command
 // Codex actually runs is exactly the command it asked to run.
 func (o *Orchestrator) GateCodex(stdin io.Reader, stdout io.Writer) {
 	o.runGated(stdout, func() hookReply {

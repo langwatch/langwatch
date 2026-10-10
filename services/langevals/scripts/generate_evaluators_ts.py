@@ -174,15 +174,26 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
     return evaluator_info
 
 
+def named(name: str, expression: str) -> str:
+    """One exported schema in the named form `langwatch/contract-schema-named` asks for (ADR-178)."""
+    interface = name[0].upper() + name[1:]
+    return (
+        f"const {name}Definition = {expression};\n"
+        f"export interface {interface} extends Named<typeof {name}Definition> {{}}\n"
+        f"export const {name}: {interface} = {name}Definition;\n"
+    )
+
+
 # Fixed result schemas mirroring langevals_core.base_evaluator. These shapes are
 # stable, so they are emitted verbatim rather than reflected. Pydantic sends an
 # unset Optional field as null, so those fields are nullish, not optional.
-RESULT_SCHEMAS = """export const moneySchema = z.object({
+RESULT_SCHEMAS = "\n".join(
+    [
+        named('moneySchema', """z.object({
   currency: z.string(),
   amount: z.number(),
-});
-
-export const evaluationResultSchema = z.object({
+})"""),
+        named('evaluationResultSchema', """z.object({
   status: z.literal("processed"),
   score: z.number().nullish(),
   passed: z.boolean().nullish(),
@@ -190,29 +201,26 @@ export const evaluationResultSchema = z.object({
   details: z.string().nullish(),
   cost: moneySchema.nullish(),
   raw_response: z.any().optional(),
-});
-
-export const evaluationResultSkippedSchema = z.object({
+})"""),
+        named('evaluationResultSkippedSchema', """z.object({
   status: z.literal("skipped"),
   details: z.string().nullish(),
   cost: moneySchema.nullish(),
-});
-
-export const evaluationResultErrorSchema = z.object({
+})"""),
+        named('evaluationResultErrorSchema', """z.object({
   status: z.literal("error"),
   error_type: z.string(),
   details: z.string(),
   traceback: z.array(z.string()),
-});
-
-export const singleEvaluationResultSchema = z.union([
+})"""),
+        named('singleEvaluationResultSchema', """z.union([
   evaluationResultSchema,
   evaluationResultSkippedSchema,
   evaluationResultErrorSchema,
-]);
-
-export const batchEvaluationResultSchema = z.array(singleEvaluationResultSchema);
-"""
+])"""),
+        named('batchEvaluationResultSchema', """z.array(singleEvaluationResultSchema)"""),
+    ]
+)
 
 INFERRED_TYPES = """export type Money = z.infer<typeof moneySchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
@@ -263,7 +271,8 @@ def generate_definitions(evaluators_info: Dict[str, Dict[str, Any]]) -> str:
         "// Generated from langevals (see services/langevals/scripts/generate_evaluators_ts.py).\n"
         "// Zod-first: the schemas below are the source of truth and the TypeScript types\n"
         "// are inferred with z.infer. Do not edit by hand.\n"
-        'import { z } from "zod";\n\n'
+        'import { z } from "zod";\n'
+        'import type { Named } from "@langwatch/module";\n\n'
     )
 
     # evaluatorTypesSchema: a string identifier. Catalog keys and `custom/*` keys
@@ -272,10 +281,11 @@ def generate_definitions(evaluators_info: Dict[str, Dict[str, Any]]) -> str:
 
     out += RESULT_SCHEMAS + "\n"
 
-    out += "export const evaluatorsSchema = z.object({\n"
-    for evaluator_name, evaluator_info in evaluators_info.items():
-        out += f"  {json.dumps(evaluator_name)}: z.object({{ settings: {evaluator_info['zodSettings']} }}),\n"
-    out += "});\n\n"
+    evaluator_entries = "".join(
+        f"  {json.dumps(evaluator_name)}: z.object({{ settings: {evaluator_info['zodSettings']} }}),\n"
+        for evaluator_name, evaluator_info in evaluators_info.items()
+    )
+    out += named("evaluatorsSchema", "z.object({\n" + evaluator_entries + "})") + "\n"
 
     out += INFERRED_TYPES + "\n"
 

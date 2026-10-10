@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * One reference document for both of LangWatch's query languages: a question
  * belongs to the SQL or to the filter, and `GET /api/v1/query/reference` is the
@@ -38,17 +39,22 @@ export const queryLanguageSchema = z.enum(["lwql", "trace-filter"]);
 export type QueryLanguage = z.infer<typeof queryLanguageSchema>;
 
 /** One HTTP door, so a reader never has to guess the path or the verb. */
-export const queryReferenceEndpointSchema = z
+const queryReferenceEndpointSchemaDefinition = z
   .object({
     method: z.enum(["GET", "POST"]),
     path: z.string(),
     description: z.string(),
   })
   .strict();
+export interface QueryReferenceEndpointSchema extends Named<
+  typeof queryReferenceEndpointSchemaDefinition
+> {}
+export const queryReferenceEndpointSchema: QueryReferenceEndpointSchema =
+  queryReferenceEndpointSchemaDefinition;
 export type QueryReferenceEndpoint = z.infer<typeof queryReferenceEndpointSchema>;
 
 /** One trace filter field, as the reference publishes it. */
-export const queryReferenceFilterFieldSchema = z
+const queryReferenceFilterFieldSchemaDefinition = z
   .object({
     /** The name a caller writes before the colon. */
     name: z.string(),
@@ -70,10 +76,15 @@ export const queryReferenceFilterFieldSchema = z
     knownValues: z.array(z.string()).readonly(),
   })
   .strict();
+export interface QueryReferenceFilterFieldSchema extends Named<
+  typeof queryReferenceFilterFieldSchemaDefinition
+> {}
+export const queryReferenceFilterFieldSchema: QueryReferenceFilterFieldSchema =
+  queryReferenceFilterFieldSchemaDefinition;
 export type QueryReferenceFilterField = z.infer<typeof queryReferenceFilterFieldSchema>;
 
 /** One open-ended attribute namespace. */
-export const queryReferenceDynamicPrefixSchema = z
+const queryReferenceDynamicPrefixSchemaDefinition = z
   .object({
     prefix: z.string(),
     label: z.string(),
@@ -82,20 +93,30 @@ export const queryReferenceDynamicPrefixSchema = z
     aliases: z.array(z.string()).readonly(),
   })
   .strict();
+export interface QueryReferenceDynamicPrefixSchema extends Named<
+  typeof queryReferenceDynamicPrefixSchemaDefinition
+> {}
+export const queryReferenceDynamicPrefixSchema: QueryReferenceDynamicPrefixSchema =
+  queryReferenceDynamicPrefixSchemaDefinition;
 export type QueryReferenceDynamicPrefix = z.infer<typeof queryReferenceDynamicPrefixSchema>;
 
 /** One bound parameter a published statement declares. */
-export const queryReferenceParameterSchema = z
+const queryReferenceParameterSchemaDefinition = z
   .object({
     name: z.string(),
     type: z.string(),
     description: z.string(),
   })
   .strict();
+export interface QueryReferenceParameterSchema extends Named<
+  typeof queryReferenceParameterSchemaDefinition
+> {}
+export const queryReferenceParameterSchema: QueryReferenceParameterSchema =
+  queryReferenceParameterSchemaDefinition;
 export type QueryReferenceParameter = z.infer<typeof queryReferenceParameterSchema>;
 
 /** One worked query, in either language. */
-export const queryReferenceExampleSchema = z
+const queryReferenceExampleSchemaDefinition = z
   .object({
     id: z.string(),
     title: z.string(),
@@ -120,10 +141,15 @@ export const queryReferenceExampleSchema = z
     notes: z.string().optional(),
   })
   .strict();
+export interface QueryReferenceExampleSchema extends Named<
+  typeof queryReferenceExampleSchemaDefinition
+> {}
+export const queryReferenceExampleSchema: QueryReferenceExampleSchema =
+  queryReferenceExampleSchemaDefinition;
 export type QueryReferenceExample = z.infer<typeof queryReferenceExampleSchema>;
 
 /** One row of the "which language answers this" table. */
-export const queryReferenceDecisionSchema = z
+const queryReferenceDecisionSchemaDefinition = z
   .object({
     /** The kind of question, in the reader's words. */
     when: z.string(),
@@ -133,10 +159,15 @@ export const queryReferenceDecisionSchema = z
     why: z.string(),
   })
   .strict();
+export interface QueryReferenceDecisionSchema extends Named<
+  typeof queryReferenceDecisionSchemaDefinition
+> {}
+export const queryReferenceDecisionSchema: QueryReferenceDecisionSchema =
+  queryReferenceDecisionSchemaDefinition;
 export type QueryReferenceDecision = z.infer<typeof queryReferenceDecisionSchema>;
 
 /** What the LangWatchQL half publishes. */
-export const queryReferenceLangWatchQLSchema = z
+const queryReferenceLangWatchQLSchemaDefinition = z
   .object({
     /**
      * Whether this caller can use the LangWatchQL half here — one flag for both
@@ -159,10 +190,15 @@ export const queryReferenceLangWatchQLSchema = z
     endpoints: z.array(queryReferenceEndpointSchema).readonly(),
   })
   .strict();
+export interface QueryReferenceLangWatchQLSchema extends Named<
+  typeof queryReferenceLangWatchQLSchemaDefinition
+> {}
+export const queryReferenceLangWatchQLSchema: QueryReferenceLangWatchQLSchema =
+  queryReferenceLangWatchQLSchemaDefinition;
 export type QueryReferenceLangWatchQL = z.infer<typeof queryReferenceLangWatchQLSchema>;
 
 /** What the trace filter half publishes. */
-export const queryReferenceTraceFilterSchema = z
+const queryReferenceTraceFilterSchemaDefinition = z
   .object({
     /** The language's syntax, as markdown. */
     syntax: z.string(),
@@ -171,10 +207,15 @@ export const queryReferenceTraceFilterSchema = z
     endpoints: z.array(queryReferenceEndpointSchema).readonly(),
   })
   .strict();
+export interface QueryReferenceTraceFilterSchema extends Named<
+  typeof queryReferenceTraceFilterSchemaDefinition
+> {}
+export const queryReferenceTraceFilterSchema: QueryReferenceTraceFilterSchema =
+  queryReferenceTraceFilterSchemaDefinition;
 export type QueryReferenceTraceFilter = z.infer<typeof queryReferenceTraceFilterSchema>;
 
 /** The whole document. */
-export const queryReferenceSchema = z
+const queryReferenceSchemaDefinition = z
   .object({
     version: z.string(),
     lwql: queryReferenceLangWatchQLSchema,
@@ -183,6 +224,8 @@ export const queryReferenceSchema = z
     decisionTable: z.array(queryReferenceDecisionSchema).readonly(),
   })
   .strict();
+export interface QueryReferenceSchema extends Named<typeof queryReferenceSchemaDefinition> {}
+export const queryReferenceSchema: QueryReferenceSchema = queryReferenceSchemaDefinition;
 export type QueryReference = z.infer<typeof queryReferenceSchema>;
 
 /**
@@ -190,5 +233,7 @@ export type QueryReference = z.infer<typeof queryReferenceSchema>;
  * handler: whether it may run LangWatchQL at all decides which half of the
  * document is published, and the answer is the KEY's, never the request's.
  */
-export const langWatchQLReachSchema = z.object({ canRunLangWatchQL: z.boolean() }).strict();
+const langWatchQLReachSchemaDefinition = z.object({ canRunLangWatchQL: z.boolean() }).strict();
+export interface LangWatchQLReachSchema extends Named<typeof langWatchQLReachSchemaDefinition> {}
+export const langWatchQLReachSchema: LangWatchQLReachSchema = langWatchQLReachSchemaDefinition;
 export type LangWatchQLReach = z.infer<typeof langWatchQLReachSchema>;

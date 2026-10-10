@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { organizationGroupGrantInputSchema } from "./group.ts";
@@ -9,55 +10,90 @@ import { organizationGroupGrantInputSchema } from "./group.ts";
 
 export const groupApiNameSchema = z.string().trim().min(1, "Group name is required").max(100);
 
-export const groupApiGroupScopeSchema = z.object({
+const groupApiGroupScopeSchemaDefinition = z.object({
   organizationId: z.string(),
   groupId: z.string(),
 });
+export interface GroupApiGroupScopeSchema extends Named<
+  typeof groupApiGroupScopeSchemaDefinition
+> {}
+export const groupApiGroupScopeSchema: GroupApiGroupScopeSchema =
+  groupApiGroupScopeSchemaDefinition;
 export type GroupApiGroupScope = z.infer<typeof groupApiGroupScopeSchema>;
 
-export const groupApiCreateInputSchema = z.object({
+const groupApiCreateInputSchemaDefinition = z.object({
   organizationId: z.string(),
   name: groupApiNameSchema,
   grants: z.array(organizationGroupGrantInputSchema).optional(),
   memberIds: z.array(z.string()).optional(),
 });
+export interface GroupApiCreateInputSchema extends Named<
+  typeof groupApiCreateInputSchemaDefinition
+> {}
+export const groupApiCreateInputSchema: GroupApiCreateInputSchema =
+  groupApiCreateInputSchemaDefinition;
 export type GroupApiCreateInput = z.infer<typeof groupApiCreateInputSchema>;
 
-export const groupApiAddGrantInputSchema = z.object({
+const groupApiAddGrantInputSchemaDefinition = z.object({
   organizationId: z.string(),
   groupId: z.string(),
   ...organizationGroupGrantInputSchema.shape,
 });
+export interface GroupApiAddGrantInputSchema extends Named<
+  typeof groupApiAddGrantInputSchemaDefinition
+> {}
+export const groupApiAddGrantInputSchema: GroupApiAddGrantInputSchema =
+  groupApiAddGrantInputSchemaDefinition;
 export type GroupApiAddGrantInput = z.infer<typeof groupApiAddGrantInputSchema>;
 
-export const groupApiRemoveGrantInputSchema = z.object({
+const groupApiRemoveGrantInputSchemaDefinition = z.object({
   organizationId: z.string(),
   grantId: z.string(),
 });
+export interface GroupApiRemoveGrantInputSchema extends Named<
+  typeof groupApiRemoveGrantInputSchemaDefinition
+> {}
+export const groupApiRemoveGrantInputSchema: GroupApiRemoveGrantInputSchema =
+  groupApiRemoveGrantInputSchemaDefinition;
 export type GroupApiRemoveGrantInput = z.infer<typeof groupApiRemoveGrantInputSchema>;
 
-export const groupApiMemberInputSchema = z.object({
+const groupApiMemberInputSchemaDefinition = z.object({
   organizationId: z.string(),
   groupId: z.string(),
   userId: z.string(),
 });
+export interface GroupApiMemberInputSchema extends Named<
+  typeof groupApiMemberInputSchemaDefinition
+> {}
+export const groupApiMemberInputSchema: GroupApiMemberInputSchema =
+  groupApiMemberInputSchemaDefinition;
 export type GroupApiMemberInput = z.infer<typeof groupApiMemberInputSchema>;
 
-export const groupApiRenameInputSchema = z.object({
+const groupApiRenameInputSchemaDefinition = z.object({
   organizationId: z.string(),
   groupId: z.string(),
   name: groupApiNameSchema,
 });
+export interface GroupApiRenameInputSchema extends Named<
+  typeof groupApiRenameInputSchemaDefinition
+> {}
+export const groupApiRenameInputSchema: GroupApiRenameInputSchema =
+  groupApiRenameInputSchemaDefinition;
 export type GroupApiRenameInput = z.infer<typeof groupApiRenameInputSchema>;
 
 /** One member of one organization, for the groups-they-are-in read. */
-export const groupApiMemberScopeSchema = z.object({
+const groupApiMemberScopeSchemaDefinition = z.object({
   organizationId: z.string(),
   userId: z.string(),
 });
+export interface GroupApiMemberScopeSchema extends Named<
+  typeof groupApiMemberScopeSchemaDefinition
+> {}
+export const groupApiMemberScopeSchema: GroupApiMemberScopeSchema =
+  groupApiMemberScopeSchemaDefinition;
 export type GroupApiMemberScope = z.infer<typeof groupApiMemberScopeSchema>;
 
-export const groupApiApplyEditsInputSchema = z.object({
+const groupApiApplyEditsInputSchemaDefinition = z.object({
   organizationId: z.string(),
   groupId: z.string(),
   rename: z.object({ name: groupApiNameSchema }).nullable().optional(),
@@ -66,6 +102,11 @@ export const groupApiApplyEditsInputSchema = z.object({
   memberUserIdsToAdd: z.array(z.string()),
   memberUserIdsToRemove: z.array(z.string()),
 });
+export interface GroupApiApplyEditsInputSchema extends Named<
+  typeof groupApiApplyEditsInputSchemaDefinition
+> {}
+export const groupApiApplyEditsInputSchema: GroupApiApplyEditsInputSchema =
+  groupApiApplyEditsInputSchemaDefinition;
 export type GroupApiApplyEditsInput = z.infer<typeof groupApiApplyEditsInputSchema>;
 
 const groupGrantRoleSchema = z.object({

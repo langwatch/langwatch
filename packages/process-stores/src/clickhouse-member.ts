@@ -86,6 +86,22 @@ function clickHouseWindowedReadMetrics(): WindowedReadMetrics {
   return { record: ({ table, outcome }) => total.inc({ table, outcome }) };
 }
 
+/** Every statement or batch that skipped the tenant check, counted by table and logged at debug. */
+function skippedTenantChecks(): TenantGuard {
+  const skipped = counter({
+    name: "clickhouse_tenant_check_skipped_total",
+    description: "ClickHouse statements and batches that set SKIP_TENANT_CHECK",
+  });
+  const logger = createLogger("langwatch:clickhouse:tenant-guard");
+
+  return new TenantGuard({
+    onUnscoped: ({ operation, table, tenantId }) => {
+      skipped.inc({ operation, table });
+      logger.debug({ operation, table, tenantId }, "tenant check skipped");
+    },
+  });
+}
+
 /** The statement bound fronts every endpoint the routed client reaches, so it reports as one. */
 const STATEMENT_BOUND_INSTANCE = "routed";
 
@@ -247,7 +263,7 @@ export function buildClickHouse(options: {
 
   const client = new ClickHouseQueryClient({
     driver: routingDriver(connection),
-    tenantGuard: new TenantGuard(),
+    tenantGuard: skippedTenantChecks(),
     retries: new RetryPolicy({
       transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
       onRetry: ({ request, attempt, maxAttempts, delayMs, error, level }) =>

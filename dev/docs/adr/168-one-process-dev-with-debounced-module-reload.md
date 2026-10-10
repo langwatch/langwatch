@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 
-**Status:** Proposed
+**Status:** Accepted (2026-10-09; amended 2026-10-10: Vite runs only under `--hmr`, as its own lane)
 
 **Related:** [ADR-004](004-docker-dev-environment.md) (amendments 2026-09-07: the `backend` lane
 and debounced restart), [ADR-111](111-physical-application-workspaces.md) (`tools/dev-runtime`),
@@ -134,7 +134,7 @@ The shape decides reload cost; the trigger decides how often it is paid.
 - **Skip what is not loaded.** Under B1 the runner's module graph is the filter: a file outside
   it (docs, specs, browser packages, JSON the backend never imports) triggers nothing.
 
-## Decision (proposed)
+## Decision
 
 Adopt the trigger policy first, then B1 as the dev shape: one Node process per stack, hosted by
 `tools/dev-runtime`, running the UI's Vite server, the api and the worker, reloading the backend
@@ -200,8 +200,9 @@ In `dev/scripts/dev-supervisor.mjs` (proof: `dev/scripts/reload-burst.mjs`, run 
 The split stack's api lane (`pnpm --filter @langwatch/dev-runtime dev`) runs the B1 host
 without the UI: `app.entrypoint.ts --backend-only` under `dev-supervisor.mjs --watch` with
 `LANGWATCH_DEV_RELOAD=module`. The host re-links what an edit reaches in-process, so the pid
-survives a source edit. The supervisor restarts the process only for a `package.json`, a file
-in the host's own `src/`, or a non-zero exit after `backend ready`; a bad edit never exits the
+survives a source edit. The supervisor restarts the process only for a non-zero exit after
+`backend ready`; an edit to the host's own `src/` logs that it applies on the next restart
+(amended 2026-10-09: restarting for it dropped the whole stack). A bad edit never exits the
 host. `LANGWATCH_DEV_RELOAD=process` is the escape hatch: the whole-process restart per change.
 The mail preview runs inside the ui dev process (`apps/ui/vite/mail-preview.ts`), started on first
 visit and closed after idle; `LANGWATCH_MAIL_PREVIEW_SPAWN=1` runs it apart. Storybook is still spawned.
@@ -218,6 +219,16 @@ the max wait (30 s), and the Vite plugin's burst coalescing (300 ms gap, 500 ms 
 ## Amendment 2026-10-09: step 5, as shipped
 
 Each reload disposes the old generation (`disposeGeneration`: drain worker then api, then take off process listeners it attached while serving) before the new one boots; link still precedes drop. Past `LANGWATCH_DEV_RECYCLE_GENERATIONS` (50) generations, `LANGWATCH_DEV_RECYCLE_RSS_MIB` (4096), or a failed drain, the api lane logs `backend recycling` and exits 75 so the supervisor's restart-after-ready starts a fresh process; recycling is armed only under `LANGWATCH_DEV_RELOAD=module`.
+
+## Amendment 2026-10-09: one process is the default
+
+Alex, 2026-10-09 (ruling DEV-ONE-PROCESS): local dev runs ui, api and worker as one Node
+process by default. `pnpm dev` and `haven up` start the `app` lane; `LANGWATCH_DEV_ONE_PROCESS=0`
+keeps the split `ui` and backend lanes, and `dev:api` / `dev:worker` stay. `dev:one` now runs
+under the same `dev-supervisor.mjs --watch` and `LANGWATCH_DEV_RELOAD=module` as the split
+backend lane, so recycling and restart-after-crash apply to it too. The host watches before
+its first boot and runs that boot through the trigger, so an edit landing during any boot is
+answered by one follow-up reload.
 
 ## Risks
 
@@ -259,8 +270,45 @@ most 5 s for B1, peak RSS at most today's Node total plus 15%, flat connection c
 ## Open questions for Alex
 
 1. Is B1's one-process shape wanted even though the RSS saving is small (wrappers only) unless
-   api and worker share stores, which ADR-004 (2026-09-07) refused?
+   api and worker share stores, which ADR-004 (2026-09-07) refused? Answered 2026-10-09: yes,
+   and it is the default (see the amendment).
 2. May haven install `PostToolUse` and `Stop` hooks per worktree by default, as it does the gate? Moot: the hold was retired on 2026-10-09.
 3. Should the npx CLI (`apps/server`) also run api and worker in one process, without watch?
+   Answered 2026-10-10 (Alex): yes. `npx @langwatch/server` spawns `apps/backend`
+   (`@langwatch/backend`) once: one Node process that boots `startApi` and `startWorker` through the
+   same seam the dev host uses (`startBackend`, `drainBackend`, in `@langwatch/process/backend-host`), with the worker owning telemetry and
+   the api serving the prebuilt UI. No watch, no reload; a signal drains the worker, then the api.
+   Unlike the dev host, a worker that refuses boot is fatal (nothing retries it; an api without its
+   worker runs no jobs and no upgrade). The CLI waits on one health door and gives the worker half
+   its own port slot. Images and the chart keep running each app's own `main.ts`. nlpgo and the
+   ai-gateway run as one `service combined` process when the release binary has it.
 4. Does "dev-env" mean the compose quickstart? If so, retire `make quickstart` and ADR-004's
    compose presets separately.
+
+## Amendment 2026-10-10: the supervisor is gone
+
+`dev/scripts/dev-supervisor.mjs`, its tests and `reload-burst.mjs` are deleted; the host reloads
+in-process, so its restart-on-change was redundant. Where its duties went: reload and recycle stay
+in `tools/dev-runtime` (the `dev` scripts loop while the host exits 75); lane restart and teardown
+belong to haven; crash collapsing is haven's logfmt, and the crash log, split-mode reload
+(`apps/api` and `apps/worker` run `main.ts` once) and launcher-death teardown for bare `pnpm dev`
+(Ctrl-C ends the foreground run) are dropped. `haven up --watch=false` holds a stack (sticky;
+`LANGWATCH_DEV_WATCH=0`, UI HMR kept) and `haven reload` sends the host SIGUSR2 to re-link the
+backend on demand. `LANGWATCH_DEV_RELOAD`, `_SUPERVISOR`, `_READY_PATTERN`, `_RAW_CRASH` and
+`_CRASH_LOG` no longer exist.
+
+## Amendment 2026-10-10: Vite only under --hmr, as its own lane
+
+Alex, 2026-10-10, superseding "one process is the default" for the UI:
+
+- **A.** Vite exists in dev only under `--hmr`, as its own lane (`@langwatch/ui dev`) beside the
+  backend. The in-process Vite UI host is deleted: `dev:one`, `startUi` and `bootApp`'s `withUi`.
+  `tools/dev-runtime` hosts api and worker only; its Vite module runner stays, as the relink
+  mechanism. Still and `--watch` are unchanged: the api serves the built `apps/ui/dist/client`.
+  `pnpm dev` matches them (UI built once with `build:local`, the backend reloading, the go lane);
+  `pnpm dev:hmr` adds the Vite `ui` lane. `dev:app` (no worker), `dev:concurrent` and `dev:one`
+  are deleted. In haven `LANGWATCH_DEV_ONE_PROCESS` no longer touches the Node lanes; it still
+  folds (or, `=0`, splits) the simulators into the `go` lane.
+- **C.** `npx @langwatch/server` runs api and worker as one process, `apps/backend`; the seam
+  (`startBackend`, `drainBackend`) moves to `packages/process` out of `tools/dev-runtime/src/backend.process.ts`,
+  which keeps only the reload generation. Open question 3 holds the full answer.

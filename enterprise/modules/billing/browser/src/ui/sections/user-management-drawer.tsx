@@ -9,7 +9,6 @@ import {
   Button,
   Collapsible,
   Flex,
-  Heading,
   HStack,
   Input,
   Separator,
@@ -180,7 +179,7 @@ export function UserManagementDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Manage Seats</Heading>
+          <Drawer.Title>Manage Seats</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
 

@@ -6,6 +6,7 @@
 
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
+  Alert,
   Box,
   Button,
   chakra,
@@ -91,16 +92,8 @@ export function CaseModalHeader({
   openHistoryOnOpen?: boolean;
 }) {
   return (
-    <Drawer.Header
-      borderBottomWidth="1px"
-      borderColor="border"
-      paddingX={5}
-      paddingY={3.5}
-      display="block"
-    >
-      <Drawer.Title fontSize="14px" fontWeight="semibold">
-        {isEditing ? "Edit scenario" : "New scenario"}
-      </Drawer.Title>
+    <Drawer.Header>
+      <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
@@ -740,27 +733,20 @@ function StaleVersionNotice({
   onReload: () => void;
 }) {
   return (
-    <VStack
-      align="start"
-      gap={2}
-      borderWidth="1px"
-      borderColor="orange.solid"
-      borderRadius="lg"
-      padding={3}
-      data-testid="scenario-stale-version"
-    >
-      <Text fontSize="13px" fontWeight="medium">
-        This scenario changed since it was opened
-      </Text>
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        Somebody else saved {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
-        while this one was open. Nothing was written, so your edits are still here. Reloading
-        replaces them with the newer version, so copy anything you want to keep first.
-      </Text>
-      <Button size="xs" variant="outline" onClick={onReload}>
-        Discard my edits and reload
-      </Button>
-    </VStack>
+    <Alert.Root status="warning" size="sm" data-testid="scenario-stale-version">
+      <Alert.Indicator />
+      <Alert.Content gap={2}>
+        <Alert.Title>This scenario changed since it was opened</Alert.Title>
+        <Alert.Description>
+          Somebody else saved {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
+          while this one was open. Nothing was written, so your edits are still here. Reloading
+          replaces them with the newer version, so copy anything you want to keep first.
+        </Alert.Description>
+        <Button size="xs" variant="outline" alignSelf="start" onClick={onReload}>
+          Discard my edits and reload
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

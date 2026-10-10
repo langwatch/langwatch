@@ -12,6 +12,7 @@ import {
   OrganizationNotFoundError,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
+  type InviteLanding,
   type OrganizationCaller,
   type OrganizationInvite,
   type OrganizationInviteAccepted,
@@ -21,6 +22,7 @@ import {
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
   type OrganizationUserRole,
+  type PendingInvitationsByEmail,
   type PendingInvitationsForCaller,
   type OrganizationApiSeatCheckoutInput,
   type OrganizationSeatCheckoutRedirect,
@@ -83,6 +85,11 @@ export class OrganizationInvitationDoorService {
     return this.deps.invitations.findPendingForAddresses({
       addresses: await this.deps.directory.findProvenAddresses(input),
     });
+  }
+
+  /** Every pending invitation on one address, in any organization: the operator's lookup. */
+  findPendingByEmail(input: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail> {
+    return this.deps.invitations.findPendingByEmail(input);
   }
 
   /**
@@ -238,6 +245,28 @@ export class OrganizationInvitationDoorService {
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied> {
     return this.deps.invitations.applyPending(input);
+  }
+
+  /**
+   * What the link may say to whoever holds it. Revoked reads like missing, so a guessed
+   * code learns nothing; expired is its own refusal, recoverable by asking for a fresh one.
+   */
+  async landing(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
+    const invite = await this.deps.invitations.findLandingByCode(input);
+
+    if (!invite || invite.status === "REVOKED") throw new InviteNotFoundError();
+    const status = this.deps.invitations.displayStatus(invite);
+    if (status === "EXPIRED") throw new InviteExpiredError();
+
+    return {
+      organizationName: invite.organization.name,
+      inviterName: invite.inviterName,
+      alreadyAccepted: status === "ACCEPTED",
+    };
+  }
+
+  requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    return this.deps.invitations.requestFresh(input);
   }
 
   /**

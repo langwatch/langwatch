@@ -50,6 +50,8 @@ export type StubNavigationReadings = {
   opsAccess?: Partial<NavigationOpsAccess>;
   commandBar?: NavigationCommandBar | null;
   langy?: NavigationLangy | null;
+  /** Room the docked assistant holds beside the content card; 0 when it is closed. */
+  langyDockInset?: number;
   supportChat?: NavigationSupportChat | null;
   accountMenu?: NavigationAccountMenu | null;
 };
@@ -203,6 +205,10 @@ export class StubNavigationHost extends NavigationHost {
 
   langy(): NavigationLangy | null {
     return this.readings.langy ?? null;
+  }
+
+  override langyDockRoom({ render }: { render: (inset: number) => ReactNode }): ReactNode {
+    return render(this.readings.langyDockInset ?? 0);
   }
 
   supportChat(): NavigationSupportChat | null {

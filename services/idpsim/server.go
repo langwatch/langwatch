@@ -110,6 +110,8 @@ func (s *Server) routeProtocols(mux *http.ServeMux) {
 	mux.HandleFunc("GET /t/{tenant}/oauth/authorize", s.handleAuthorize)
 	mux.HandleFunc("POST /t/{tenant}/oauth/token", s.handleToken)
 	mux.HandleFunc("GET /t/{tenant}/oauth/userinfo", s.handleUserinfo)
+	// Social sign-in providers, per tenant (social.go).
+	s.routeSocial(mux)
 	// Legacy provider providers (legacy.go): discovery under each issuer shape.
 	mux.HandleFunc("GET /t/{tenant}/oauth2/default/.well-known/openid-configuration", s.handleLegacyDiscovery)
 	mux.HandleFunc("GET /t/{tenant}/oidc/2/.well-known/openid-configuration", s.handleLegacyDiscovery)
@@ -143,6 +145,7 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	mux.HandleFunc("POST /control/t/{tenant}/tamper", s.handleControlTamper)
 	mux.HandleFunc("POST /control/t/{tenant}/user-active", s.handleControlUserActive)
 	mux.HandleFunc("POST /control/t/{tenant}/saml/unsolicited", s.handleControlSAMLUnsolicited)
+	mux.HandleFunc("POST /control/t/{tenant}/rotate-key", s.handleControlRotateKey)
 	mux.HandleFunc("GET /control/t/{tenant}/legacy-env", s.handleControlLegacyEnv)
 	mux.HandleFunc("POST /control/t/{tenant}/auth0-webhook", s.handleControlAuth0Webhook)
 	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)

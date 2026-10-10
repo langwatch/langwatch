@@ -3,6 +3,7 @@
   "apps/server/dist/",
   "apps/server/src/",
   "apps/api/",
+  "apps/backend/",
   "apps/ui/",
   "apps/worker/",
   "apps/tasks/",
@@ -23,6 +24,7 @@
   "LICENSE.md",
   "pnpm-workspace.yaml",
   "pnpm-lock.yaml",
+  "patches/",
   "vendor/",
   "tsconfig.base.json",
   "tsconfig.shared.json",
@@ -42,6 +44,11 @@
   "apps/llmsim-web/package.json",
   "apps/storagesim-web/package.json",
   "apps/voicesim-web/package.json",
+  "apps/outboundsim-web/package.json",
+  "apps/paymentsim-web/package.json",
+  "apps/telemetrysim-web/package.json",
+  "apps/lambdasim-web/package.json",
   "tools/fuzz/runner/package.json",
-  "tools/interactionsimulator/package.json"
+  "tools/interactionsimulator/package.json",
+  "tools/seedgen/runner/package.json"
 ]

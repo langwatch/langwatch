@@ -7,12 +7,13 @@ import {
   publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
  * AWS account for per-project NLP Lambda functions; refuses invalid config to ensure correct fleet.
  */
-export const nlpLambdaFleetSchema = z.object({
+const nlpLambdaFleetSchemaDefinition = z.object({
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
@@ -22,6 +23,8 @@ export const nlpLambdaFleetSchema = z.object({
   subnet_ids: z.array(z.string().min(1)),
   security_group_ids: z.array(z.string().min(1)),
 });
+export interface NlpLambdaFleetSchema extends Named<typeof nlpLambdaFleetSchemaDefinition> {}
+export const nlpLambdaFleetSchema: NlpLambdaFleetSchema = nlpLambdaFleetSchemaDefinition;
 
 export type NlpLambdaFleetFields = z.infer<typeof nlpLambdaFleetSchema>;
 
@@ -91,6 +94,8 @@ export const workflowConfig = Config.define(() => ({
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;
 
 /** All a browser learns: whether this deployment can execute a workflow. */
-export const workflowWebConfigSchema = z.strictObject({ nlp: z.boolean() });
+const workflowWebConfigSchemaDefinition = z.strictObject({ nlp: z.boolean() });
+export interface WorkflowWebConfigSchema extends Named<typeof workflowWebConfigSchemaDefinition> {}
+export const workflowWebConfigSchema: WorkflowWebConfigSchema = workflowWebConfigSchemaDefinition;
 
 export type WorkflowWebConfig = z.infer<typeof workflowWebConfigSchema>;

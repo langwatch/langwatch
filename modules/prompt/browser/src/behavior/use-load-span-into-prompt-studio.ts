@@ -20,35 +20,108 @@ import { promptApi } from "./prompt-api.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
+const QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID = "promptPlaygroundTraceId";
+const QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID = "promptPlaygroundTenantId";
+const QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS = "promptPlaygroundOccurredAtMs";
 const QUERY_PARAM_ACTION = "action";
 
 export type PlaygroundAction = "open-existing" | "create-new";
 
 /**
- * Hook to read and clear URL query parameters for span ID and action.
- * Single Responsibility: Extract span ID and action from URL and clean up the URL.
- * @returns Object with spanId, action, and clearParamsFromUrl function
+ * The trace a link's span belongs to: named, the span is read through the
+ * trace's own proof, so a link opened under an aggregate loads the member's
+ * span (ADR-177 block F). `tenantId` is the member, set only under an aggregate.
  */
+export type PlaygroundSpanTrace = {
+  traceId: string;
+  tenantId?: string | null;
+  occurredAtMs?: number | null;
+};
+
+/** The URL that opens a span in a project's prompt studio; old links name only the span. */
+export function buildPlaygroundSpanUrl({
+  projectSlug,
+  origin,
+  spanId,
+  action,
+  trace,
+}: {
+  projectSlug: string;
+  origin: string;
+  spanId: string;
+  action?: PlaygroundAction;
+  trace?: PlaygroundSpanTrace;
+}): URL {
+  const url = new URL(`/${projectSlug}/prompts`, origin);
+  url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID, spanId);
+  if (trace) {
+    url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID, trace.traceId);
+    if (trace.tenantId)
+      url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID, trace.tenantId);
+    if (trace.occurredAtMs != null) {
+      url.searchParams.set(
+        QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS,
+        String(trace.occurredAtMs),
+      );
+    }
+  }
+  if (action) url.searchParams.set(QUERY_PARAM_ACTION, action);
+  return url;
+}
+
+/**
+ * The span read a link asks for: the span, and its trace when the link names
+ * one. A malformed time hint is dropped, so the read falls back to an unhinted one.
+ */
+export function readPlaygroundSpanParams(
+  searchParams: { get: (name: string) => string | null | undefined } | null | undefined,
+): {
+  spanId: string | null;
+  action: PlaygroundAction | null;
+  trace: { traceId: string; tenantId?: string; occurredAtMs?: number } | null;
+} {
+  const spanId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID) ?? null;
+  const rawAction = searchParams?.get(QUERY_PARAM_ACTION);
+  const action: PlaygroundAction | null =
+    rawAction === "open-existing" || rawAction === "create-new" ? rawAction : null;
+  const traceId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID);
+  if (!traceId) return { spanId, action, trace: null };
+
+  const tenantId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID);
+  const rawOccurredAtMs = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS);
+  const occurredAtMs =
+    rawOccurredAtMs != null && /^\d+$/.test(rawOccurredAtMs) ? Number(rawOccurredAtMs) : undefined;
+  return {
+    spanId,
+    action,
+    trace: {
+      traceId,
+      ...(tenantId ? { tenantId } : {}),
+      ...(occurredAtMs !== undefined && Number.isSafeInteger(occurredAtMs) ? { occurredAtMs } : {}),
+    },
+  };
+}
+
+/** Reads the span link from the address and clears its keys, leaving every other one alone. */
 function useSpanIdFromUrl() {
   const host = usePromptHost();
   const query = host.route().query;
-  const spanId = query[QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID] ?? null;
-  const rawAction = query[QUERY_PARAM_ACTION];
-  const action: PlaygroundAction | null =
-    rawAction === "open-existing" || rawAction === "create-new" ? rawAction : null;
+  const { spanId, action, trace } = readPlaygroundSpanParams({ get: (name) => query[name] });
 
-  /** Removes the two hand-off keys, leaving every other one alone. */
   const clearParamsFromUrl = () => {
     host.setQuery(
       {
         [QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID]: void 0,
+        [QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID]: void 0,
+        [QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID]: void 0,
+        [QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS]: void 0,
         [QUERY_PARAM_ACTION]: void 0,
       },
       { replace: true },
     );
   };
 
-  return { spanId, action, clearParamsFromUrl };
+  return { spanId, action, trace, clearParamsFromUrl };
 }
 
 /**
@@ -330,7 +403,7 @@ export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const host = usePromptHost();
   const { project } = usePromptProject();
-  const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
+  const { spanId, action, trace, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = promptApi.useUtils();
   const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
   const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
@@ -355,6 +428,7 @@ export function useLoadSpanIntoPromptPlayground() {
         const spanData = await trpc.spans.getForPromptStudio.fetch({
           projectId: project.id,
           spanId: spanId,
+          ...trace,
         });
 
         if (!spanData) {
@@ -420,6 +494,7 @@ export function useLoadSpanIntoPromptPlayground() {
   }, [
     spanId,
     action,
+    trace,
     project?.id,
     trpc,
     host,

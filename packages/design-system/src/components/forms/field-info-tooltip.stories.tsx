@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FieldInfoTooltip } from "./field-info-tooltip.tsx";
 
 const meta = {
-  title: "Components/Field info tooltip",
+  title: "Inputs and forms/Field info tooltip",
+  parameters: {
+    usage: {
+      use: "An (i) beside a field label that explains a term the label cannot.",
+      avoid:
+        "Information every reader needs: write it as the field's helper text. Inside a clickable row: use Info without selecting.",
+    },
+  },
   component: FieldInfoTooltip,
   tags: ["autodocs"],
   args: {

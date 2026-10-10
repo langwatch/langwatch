@@ -1,11 +1,11 @@
 /**
  * Authz's answer to the port its screens declare: each method projects a
- * `@langwatch/browser-host` capability or the plan it reads itself, so the
+ * `@langwatch/browser-host` host service or the plan it reads itself, so the
  * module mounts it, not the application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiSession,
@@ -24,7 +24,7 @@ import {
 } from "../model/authz-host.ts";
 import { authzApi } from "./authz-api.ts";
 
-class CapabilityAuthzHost extends AuthzHostApi {
+class HostServiceAuthzHost extends AuthzHostApi {
   constructor(
     private readonly deps: {
       organizationId: string | undefined;
@@ -81,7 +81,7 @@ class CapabilityAuthzHost extends AuthzHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, route } = useUiCapabilities();
+  const { session, feedback, route } = useUiHostServices();
   const { query } = route.reading();
   const { organizationId } = useUiScope().activeScope();
   // The plan tier only: the session-cached read, not the monthly usage count.
@@ -112,7 +112,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   }, [organizations.data, organizationId]);
   const host = useMemo(
     () =>
-      new CapabilityAuthzHost({
+      new HostServiceAuthzHost({
         organizationId: organizationId ?? void 0,
         session,
         feedback,

@@ -23,7 +23,7 @@ function IntegrationCheckItem({
   return (
     <List.Item className="group" display="block" asChild>
       <Link href={href} isExternal={isExternal}>
-        <List.Indicator asChild color={done ? "green.500" : "gray.500"}>
+        <List.Indicator asChild color={done ? "green.fg" : "fg.subtle"}>
           {done ? <CheckCircle /> : <Circle />}
         </List.Indicator>
         <Text
@@ -77,7 +77,7 @@ export const IntegrationChecks = () => {
       <List.Root gap={4}>
         <List.Item className="group" display="block" asChild>
           <Link href={`/settings/teams`}>
-            <List.Indicator asChild color="green.500">
+            <List.Indicator asChild color="green.fg">
               <CheckCircle />
             </List.Indicator>
             Create first project

@@ -127,6 +127,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
 
   // §4.1 — resolve a raw virtual key to a signed JWT and its current revision.
   .post("/api/internal/gateway/resolve-key", "gatewayInternalResolveKey")
+  .withoutAudit("read sent as a POST")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
@@ -138,6 +139,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
   )
 
   .post("/api/internal/gateway/codex/refresh", "gatewayInternalCodexRefresh")
+  .withoutAudit("internal gateway token refresh, not a change")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
@@ -163,6 +165,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
   .handle(({ app, input }) => app.answerInternalChanges({ query: input }))
 
   .post("/api/internal/gateway/guardrail/check", "gatewayInternalGuardrailCheck")
+  .withoutAudit("read sent as a POST")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
@@ -178,6 +181,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
   .handle(({ app, input }) => app.answerInternalBudgetBucketSpend({ query: input }))
 
   .post("/api/internal/gateway/spend-commands", "gatewayInternalSpendCommands")
+  .withoutAudit("ingestion")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
@@ -187,6 +191,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
 
   // ── realtime voice sessions (ADR-097) ─────────────────────────────────
   .post("/api/internal/gateway/realtime-sessions", "gatewayInternalReserveRealtimeSession")
+  .withoutAudit("ingestion")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
@@ -198,6 +203,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
     "/api/internal/gateway/realtime-sessions/:session_id",
     "gatewayInternalPatchRealtimeSession",
   )
+  .withoutAudit("ingestion")
   .withParams(gatewayInternalSessionParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -212,6 +218,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
     "/api/internal/gateway/realtime-sessions/:session_id/usage",
     "gatewayInternalReportRealtimeSessionUsage",
   )
+  .withoutAudit("ingestion")
   .withParams(gatewayInternalSessionParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })

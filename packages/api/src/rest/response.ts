@@ -18,7 +18,7 @@ import { resolver, type DescribeRouteOptions, type ResponsesWithResolver } from 
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z, type ZodType } from "zod";
 
-import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
+import { promoteStoreFailure, retryAfterOf } from "../errors.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request-context keys every layer of the transport reads off.
@@ -572,21 +572,19 @@ export function requestTraceIds(c: Context): {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A family's `onError`, handed a busy database as the handled 503, with a handled refusal's
+ * A family's `onError`, handed a busy or upgrading database as its handled 503, with a refusal's
  * `meta.retryAfterMs` rendered as `Retry-After` in whole seconds (ARCHITECTURE.md §8). One
  * the answer already carries, the rate limiter's too, is kept.
  */
 export function withRetryAfter(onError: ErrorHandler): ErrorHandler {
   return async (raised, c) => {
-    const error = isDatabaseBusy(raised) ? new DatabaseBusyError() : raised;
+    const error = promoteStoreFailure(raised);
     const answer = await onError(error, c);
-    const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
-
-    const isWait = typeof waitMs === "number" && Number.isFinite(waitMs) && waitMs >= 0;
-    if (!isWait || answer.headers.has("Retry-After")) return answer;
+    const retryAfter = retryAfterOf(error);
+    if (retryAfter === undefined || answer.headers.has("Retry-After")) return answer;
 
     const rendered = new Response(answer.body, answer);
-    rendered.headers.set("Retry-After", String(Math.ceil(waitMs / 1000)));
+    rendered.headers.set("Retry-After", retryAfter);
 
     return rendered;
   };
@@ -760,10 +758,11 @@ function isUniqueViolation(error: unknown): boolean {
  * family answers through it, so one code can never mean two statuses across families.
  */
 export function canonicalErrorFor(
-  error: unknown,
+  thrown: unknown,
   trace?: { traceId?: string; spanId?: string },
 ): { status: ContentfulStatusCode; body: ApiErrorBody } {
   const traceIds = { traceId: trace?.traceId, spanId: trace?.spanId };
+  const error = promoteStoreFailure(thrown);
 
   if (HandledError.isHandled(error)) return handledErrorEnvelope(error, traceIds);
   if (isZodLikeError(error))
@@ -775,8 +774,6 @@ export function canonicalErrorFor(
       traceIds,
     );
   }
-
-  if (isDatabaseBusy(error)) return handledErrorEnvelope(new DatabaseBusyError(), traceIds);
 
   if (isUniqueViolation(error)) {
     return {
@@ -934,7 +931,7 @@ export function createCanonicalFamilyErrorHandler(options: {
   return async (error, c) => {
     const { status, body } = mapError(error, c);
 
-    logger.error(
+    logger[body.code === "upgrade_in_progress" ? "warn" : "error"](
       {
         path: c.req.path,
         method: c.req.method,

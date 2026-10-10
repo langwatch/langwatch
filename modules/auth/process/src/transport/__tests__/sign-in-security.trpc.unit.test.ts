@@ -7,6 +7,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
  * @see specs/identity/org-account-lockout.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,6 +32,7 @@ function mounted(api: AuthApi, permitted = true) {
       ...members,
       authorization: {
         forRequest: () => ({
+          ...testAuthorizeDefaults,
           getDecision: async () => ({ permitted, organizationRole: null }),
           getProjectAnyDecision: async () => ({ permitted, organizationRole: null }),
           checkScopeLineage: async () => ({ kind: "consistent" }),

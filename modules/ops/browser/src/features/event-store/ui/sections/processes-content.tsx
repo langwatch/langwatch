@@ -1,4 +1,6 @@
-import { Center, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
+import { VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant } from "@langwatch/time";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -18,17 +20,23 @@ export function ProcessesContent() {
   const fleet = api.ops.listProcessFleet.useQuery(undefined, {});
 
   if (fleet.isPending) {
-    return (
-      <Center paddingY={20}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <ListPageSkeleton label="Loading processes" />;
+  }
+
+  if (fleet.isError && !fleet.data) {
+    return <HandledErrorAlert error={fleet.error} fallbackTitle="The processes could not load" />;
   }
 
   const rows = fleet.data ?? [];
 
   return (
     <VStack align="stretch" gap={4}>
+      {fleet.isError && (
+        <HandledErrorAlert
+          error={fleet.error}
+          fallbackTitle="Processes could not refresh; showing the last snapshot"
+        />
+      )}
       <ProcessFleetStrip rows={rows} />
       <ProcessFleetCard
         rows={rows}

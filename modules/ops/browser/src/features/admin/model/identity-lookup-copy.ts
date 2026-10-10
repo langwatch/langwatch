@@ -1,3 +1,5 @@
+import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
+
 /**
  * The words and derivations the operator identity lookup renders.
  * Spec: specs/identity/platform-ops-identity-lookup.feature.
@@ -87,4 +89,52 @@ export function repairConfirmationTitle({
   organizationName: string;
 }): string {
   return `${verb} for ${personName} at ${organizationName}?`;
+}
+
+const OPERATOR_ACTIVITY_LABEL: Record<string, string> = {
+  claimQueue: "reviewed domain claims",
+  recentActivity: "viewed operator activity",
+  endSessions: "ended sessions",
+  resolve: "looked up an address",
+  person: "viewed a person",
+  detachMethod: "removed a sign-in method",
+  confirmProposedSignIn: "confirmed a proposed sign-in",
+  rejectProposedSignIn: "rejected a proposed sign-in",
+  resendInvitation: "resent an invitation",
+  extendInvitation: "extended an invitation",
+};
+
+export function operatorActivityLabel(act: string): string {
+  const operation = act.split(".").at(-1) ?? act;
+  return (
+    OPERATOR_ACTIVITY_LABEL[operation] ??
+    operation
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[_-]/g, " ")
+      .toLowerCase()
+  );
+}
+
+/** Repeated reads share a row and count; distinct repair records remain visible. */
+export function summarizeOperatorActivity(activities: readonly LookupOperatorActivityRow[]) {
+  const seenIds = new Set<string>();
+  const reads = new Set(["claimQueue", "recentActivity", "resolve", "person"]);
+  const groups = new Map<string, { activity: LookupOperatorActivityRow; count: number }>();
+  for (const activity of activities.toSorted((left, right) => right.atMs - left.atMs)) {
+    if (seenIds.has(activity.auditId)) continue;
+    seenIds.add(activity.auditId);
+    const operation = activity.act.split(".").at(-1) ?? activity.act;
+    const key = reads.has(operation)
+      ? JSON.stringify([
+          activity.operatorUserId,
+          activity.act,
+          activity.address,
+          Math.floor(activity.atMs / 60_000),
+        ])
+      : activity.auditId;
+    const group = groups.get(key);
+    if (group) group.count += 1;
+    else groups.set(key, { activity, count: 1 });
+  }
+  return [...groups.values()];
 }

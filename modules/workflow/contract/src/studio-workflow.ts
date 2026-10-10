@@ -24,6 +24,7 @@ import {
 } from "@langwatch/agent-contract";
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { workflowDslSchema, type WorkflowDsl } from "./workflow.ts";
@@ -91,12 +92,14 @@ const localPromptOutputSchema = z.object({
   json_schema: z.unknown().optional(),
 });
 
-export const localPromptConfigSchema = z.object({
+const localPromptConfigSchemaDefinition = z.object({
   llm: localPromptLlmConfigSchema,
   messages: z.array(localPromptMessageSchema),
   inputs: z.array(localPromptInputSchema),
   outputs: z.array(localPromptOutputSchema),
 });
+export interface LocalPromptConfigSchema extends Named<typeof localPromptConfigSchemaDefinition> {}
+export const localPromptConfigSchema: LocalPromptConfigSchema = localPromptConfigSchemaDefinition;
 
 export type LocalPromptMessage = z.infer<typeof localPromptMessageSchema>;
 export type LocalPromptLlmConfig = z.infer<typeof localPromptLlmConfigSchema>;
@@ -174,6 +177,7 @@ export type ExecutionState = {
     status_text?: string;
     response_headers?: Record<string, string>;
     rendered_body?: string;
+    response_body?: string;
     warnings?: string[];
   };
   timestamps?: {
@@ -298,7 +302,7 @@ export type Retriever = BaseComponent;
 
 export type PromptingTechnique = BaseComponent;
 
-export const nodeDatasetSchema = z.object({
+const nodeDatasetSchemaDefinition = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
   inline: z
@@ -314,6 +318,8 @@ export const nodeDatasetSchema = z.object({
     })
     .optional(),
 });
+export interface NodeDatasetSchema extends Named<typeof nodeDatasetSchemaDefinition> {}
+export const nodeDatasetSchema: NodeDatasetSchema = nodeDatasetSchemaDefinition;
 
 export type NodeDataset = z.infer<typeof nodeDatasetSchema>;
 
@@ -454,7 +460,7 @@ const studioEdgeSchema = z.looseObject({
  * typed refinement, keeping the same permissive node/edge payload while
  * requiring the fields the canvas materialises. Not a second wire format.
  */
-export const studioWorkflowWireSchema = workflowDslSchema
+const studioWorkflowWireSchemaDefinition = workflowDslSchema
   .safeExtend({
     workflow_id: z.string().optional(),
     experiment_id: z.string().optional(),
@@ -536,6 +542,11 @@ export const studioWorkflowWireSchema = workflowDslSchema
       .default({}),
   })
   .passthrough();
+export interface StudioWorkflowWireSchema extends Named<
+  typeof studioWorkflowWireSchemaDefinition
+> {}
+export const studioWorkflowWireSchema: StudioWorkflowWireSchema =
+  studioWorkflowWireSchemaDefinition;
 
 export const LATEST_SPEC_VERSION = "1.5" as const;
 
@@ -637,7 +648,7 @@ const toStudioState = (state: StudioWorkflowWire["state"]): StudioWorkflow["stat
   optimization: state.optimization,
 });
 
-export const studioWorkflowSchema = studioWorkflowWireSchema.transform<StudioWorkflow>(
+const studioWorkflowSchemaDefinition = studioWorkflowWireSchema.transform<StudioWorkflow>(
   (workflow) => ({
     ...workflow,
     nodes: workflow.nodes.map(toStudioNode),
@@ -645,6 +656,8 @@ export const studioWorkflowSchema = studioWorkflowWireSchema.transform<StudioWor
     state: toStudioState(workflow.state),
   }),
 );
+export interface StudioWorkflowSchema extends Named<typeof studioWorkflowSchemaDefinition> {}
+export const studioWorkflowSchema: StudioWorkflowSchema = studioWorkflowSchemaDefinition;
 
 /** Parses untrusted persisted/API DSL into the typed Studio refinement. */
 export const parseStudioWorkflow = (value: unknown): StudioWorkflow =>
@@ -689,7 +702,7 @@ export const studioOptimizerIds = [
 
 export const studioOptimizerIdSchema = z.enum(studioOptimizerIds);
 
-export const studioOptimizerParamsSchema = z.object({
+const studioOptimizerParamsSchemaDefinition = z.object({
   llm: llmConfigSchema.optional().nullable(),
   num_candidates: z.number().optional(),
   max_bootstrapped_demos: z.number().optional(),
@@ -697,6 +710,11 @@ export const studioOptimizerParamsSchema = z.object({
   max_rounds: z.number().optional(),
   num_candidate_programs: z.number().optional(),
 });
+export interface StudioOptimizerParamsSchema extends Named<
+  typeof studioOptimizerParamsSchemaDefinition
+> {}
+export const studioOptimizerParamsSchema: StudioOptimizerParamsSchema =
+  studioOptimizerParamsSchemaDefinition;
 
 export type StudioOptimizerId = z.infer<typeof studioOptimizerIdSchema>;
 export type StudioOptimizerParams = z.infer<typeof studioOptimizerParamsSchema>;

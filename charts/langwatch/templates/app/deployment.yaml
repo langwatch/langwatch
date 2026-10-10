@@ -70,7 +70,7 @@ spec:
         {{- end }}
         {{- if .Values.app.telemetry.metrics.enabled }}
         prometheus.io/scrape: "true"
-        prometheus.io/port: "{{ .Values.app.service.port }}"
+        prometheus.io/port: {{ include "langwatch.metricsPort" . | quote }}
         {{- end }}
     spec:
       {{- with (include "langwatch.serviceAccountName" .) }}
@@ -81,13 +81,14 @@ spec:
       # webhook injects its own projected token volume, which the chart
       # deliberately does not hand-roll.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      # The app runs the same shutdown budget as the workers. It no longer hosts
-      # the worker stack — apps/api and apps/worker are separate processes and
-      # separate Deployments — but its drain is the same kind of clock: the
-      # listener stops accepting and PROCESS_SHUTDOWN_DEADLINE_MS bounds the
-      # rest. The API drains in well under this;
-      # the grace period is a ceiling, not a wait.
-      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app") }}
+      # The API drains in well under its grace period; it is a ceiling, not a
+      # wait. With workers.enabled false the worker sidecar drains in this pod
+      # too, so the pod takes the longer of the two.
+      {{- $grace := int (include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app")) }}
+      {{- if not .Values.workers.enabled }}
+      {{- $grace = max $grace (int (include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers"))) }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ $grace }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
@@ -230,10 +231,18 @@ spec:
             - name: stored-objects-data
               mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
             {{- end }}
+        {{- if not .Values.workers.enabled }}
+        {{- include "langwatch.workersContainer" . | nindent 8 }}
+        {{- end }}
 
       volumes:
         {{- with .Values.app.extraVolumes}}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if not .Values.workers.enabled }}
+        {{- with .Values.workers.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- end }}
         - name: tmp-dir
           emptyDir:

@@ -60,7 +60,7 @@ describe("given the operator lookup and the organization identity surface", () =
           expect(GUARDED.has(mutation), `${name} calls ${mutation}`).toBe(true);
         }
         expect(source, `${name} reaches a generic write`).not.toMatch(
-          /\.(update|delete|remove|set|upsert|create|edit)\w*\.useMutation|useUtils\(\)\.client|fetch\(/,
+          /\.(update|delete|remove|set|upsert|create|edit)\w*\.useMutation|useUtils\(\)\.client|\bfetch\(/,
         );
         expect(source, `${name} sends an actor of its own`).not.toMatch(
           /\.mutate(Async)?\(\s*\{[^}]*\b(operator|actor)\w*\s*[:,}]/,

@@ -182,9 +182,9 @@ function CompactSpanNode({
         rounded="sm"
         cursor="pointer"
         fontSize="xs"
-        bg={isSelected ? "orange.500/10" : "transparent"}
-        color={isSelected ? "orange.400" : "fg.default"}
-        _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
+        bg={isSelected ? "orange.subtle" : "transparent"}
+        color={isSelected ? "orange.fg" : "fg.default"}
+        _hover={{ bg: isSelected ? "orange.subtle" : "bg.subtle" }}
         onClick={() => onSelect(span.id)}
       >
         <Text flexShrink={0}>{SPAN_TYPE_ICONS[span.type]}</Text>
@@ -282,20 +282,20 @@ function SentTraceNotice({ traceId }: { traceId: string }) {
       mt={2}
       w="full"
       rounded="md"
-      bg={copied ? "green.950/30" : "bg.emphasized"}
+      bg={copied ? "green.muted" : "bg.emphasized"}
       px={3}
       py={2}
       cursor="pointer"
       transition="background 0.15s"
-      _hover={{ bg: copied ? "green.950/30" : "bg.muted" }}
-      _active={{ bg: "green.950/40" }}
+      _hover={{ bg: copied ? "green.muted" : "bg.muted" }}
+      _active={{ bg: "green.muted" }}
       onClick={() => {
         void navigator.clipboard.writeText(traceId);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
     >
-      <Text fontSize="xs" color={copied ? "green.400" : "fg.default"} fontWeight="medium" mb={0.5}>
+      <Text fontSize="xs" color={copied ? "green.fg" : "fg.default"} fontWeight="medium" mb={0.5}>
         {copied ? "Trace ID copied!" : "Trace sent: click to copy ID"}
       </Text>
       <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>

@@ -28,6 +28,7 @@
     "@langwatch/enterprise-scim-client": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/error-views": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-client": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-client": "workspace:*",

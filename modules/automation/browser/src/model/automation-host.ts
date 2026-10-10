@@ -30,6 +30,8 @@ export type AutomationProject = {
   id: string;
   name: string;
   slug: string;
+  /** The project's kind (`application`, `aggregate`, ...), once the shell has read it. */
+  kind?: string;
 };
 
 /** The path parameters and query string the screen was opened with. */
@@ -85,9 +87,6 @@ export abstract class AutomationHost {
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;
 
-  /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
-
   abstract route(): AutomationRouteReading;
 
   /** Replaces the whole query string; a key left out is a key removed. */
@@ -132,6 +131,12 @@ export abstract class AutomationHost {
   abstract hasEmailProvider(): boolean;
 
   abstract succeeded(notice: AutomationSuccessNotice): void;
+
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: AutomationSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: AutomationSuccessNotice): void;
 
   abstract failed(failure: AutomationFailureNotice): void;
 

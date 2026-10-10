@@ -4,13 +4,11 @@ import { describe, expect, it } from "vitest";
 import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 
-const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
   traceQueryTranslation.translateFilter({
     queryText: query,
-    tenantId: TENANT,
     timeRange: TIME_RANGE,
   });
 

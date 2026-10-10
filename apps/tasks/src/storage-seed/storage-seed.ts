@@ -7,6 +7,7 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { allowLoopbackVoiceProviders, Config, parseProcessConfig } from "@langwatch/config";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
@@ -14,6 +15,7 @@ import {
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
 import {
+  type CustomModelEntry,
   elevenLabsLoopbackKeysSchema,
   getSchemaShape,
   modelProviders,
@@ -26,15 +28,18 @@ import { SecretsResolver } from "@langwatch/secrets";
 import { hash as hashPassword } from "bcrypt";
 
 import type { TaskInput } from "../config.ts";
+import { withTasksApp } from "../module-task.ts";
 import { resolveApiKeyPepper } from "./api-key-pepper.ts";
 import {
-  adminGrantBindings,
-  privateTokenGrantBinding,
-  publicTokenGrantBinding,
-  seedGrantBinding,
-  seedRoleProjection,
+  adminGrants,
+  attachSeedGrants,
+  privateTokenGrant,
+  publicTokenGrant,
+  type SeedGrant,
+  type SeedRole,
 } from "./seed-authz.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
+import { seedGithubFixture } from "./seed-github-fixture.ts";
 import {
   buildAdminUserUpsertArgs,
   resolveSeedEmailDomain,
@@ -43,6 +48,25 @@ import {
 import { chooseSeedLicense, type SeedLicenseChoice } from "./seed-license.ts";
 
 const logger = createLogger("langwatch:tasks:storage-seed");
+
+/** llmsim answers a model named "error-<status>" with that status (`llmsim` skill). */
+const LLMSIM_ERROR_MODELS: CustomModelEntry[] = [429, 500].map((status) => ({
+  modelId: `error-${status}`,
+  displayName: `llmsim error ${status}`,
+  mode: "chat",
+}));
+
+/** The OpenAI row's custom models when haven routes OpenAI at llmsim (HAVEN_SEED_LLMSIM_MODELS). */
+export function llmsimCustomModels({
+  provider,
+  environment,
+}: {
+  provider: string;
+  environment: Readonly<Record<string, string | undefined>>;
+}): CustomModelEntry[] | undefined {
+  if (provider !== "openai" || environment.HAVEN_SEED_LLMSIM_MODELS !== "1") return undefined;
+  return LLMSIM_ERROR_MODELS;
+}
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -124,7 +148,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
 
   // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding, so
   // the UI opens on the real product instead of the "waiting for your first
-  // message" journey (`haven seed --preset demo` sets this and ingests sample
+  // message" journey (`haven db seed demo` sets this and ingests sample
   // traces). HAVEN_SEED_FIRST_MESSAGE=1|0 overrides the flag independently.
   const firstMessageOverride = environment.HAVEN_SEED_FIRST_MESSAGE;
   const hasFirstMessageOverride = firstMessageOverride !== undefined;
@@ -134,9 +158,9 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
 
   // The licence must be valid under the key this stack boots with. No licence is committed:
   // the seed signs one with the private key from secrets (seed-license.ts has the order).
-  const existingOrganization = await prisma.organization.findUnique({
-    where: { id: ORG_ID },
-    select: { license: true },
+  const existingLicense = await prisma.organizationLicense.findUnique({
+    where: { organizationId: ORG_ID },
+    select: { licenseKey: true },
   });
   const { licensing } = parseProcessConfig({
     owners: [{ name: "licensing", config: licensingConfig }],
@@ -147,7 +171,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
   ]);
   const licenseChoice = await secrets.into(licensingSecrets.licensePrivateKey, (privateKey) =>
     chooseSeedLicense({
-      stored: existingOrganization?.license ?? null,
+      stored: existingLicense?.licenseKey ?? null,
       publicKey: licensing.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY,
       privateKey,
       organization: { id: ORG_ID, name: ORG_NAME, email: adminEmail },
@@ -164,6 +188,12 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       license,
     },
     update: { license },
+  });
+  // Licensing reads its own row first (round 37 D6); organization's column goes with its contract.
+  await prisma.organizationLicense.upsert({
+    where: { organizationId: ORG_ID },
+    create: { organizationId: ORG_ID, licenseKey: license },
+    update: { licenseKey: license },
   });
 
   // Prompt tags are org-defined, and `production` is the one
@@ -210,7 +240,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       integrated: isPastOnboarding,
     },
     // An explicit override must also be able to CLEAR the flags
-    // (`haven seed --no-first-message`); without one, an existing true is kept.
+    // (`haven db seed --no-first-message`); without one, an existing true is kept.
     update:
       hasFirstMessageOverride || isPastOnboarding
         ? {
@@ -273,37 +303,39 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
     update: { role: "ADMIN" },
   });
 
-  await prisma.roleBinding.deleteMany({
-    where: { organizationId: organization.id, userId: user.id },
-  });
-  for (const binding of adminGrantBindings({
-    organizationId: organization.id,
-    teamId: team.id,
-    userId: user.id,
-  })) {
-    await seedGrantBinding({ prisma, binding });
-  }
-
-  await seedToolUsers({
-    prisma,
-    environment,
-    hashedPassword,
-    organizationId: organization.id,
-    teamId: team.id,
-  });
+  const grants = adminGrants({ organizationId: organization.id, teamId: team.id, userId: user.id });
+  grants.push(
+    ...(await seedToolUsers({
+      prisma,
+      environment,
+      hashedPassword,
+      organizationId: organization.id,
+      teamId: team.id,
+    })),
+  );
 
   // The two ApiKey rows are the only seeded state that needs the pepper, so a
   // checkout without one still gets its organization, team, project and admin
   // login — it just cannot write a hash the applications would verify.
-  if (apiKeyPepper !== undefined) {
-    await seedAccessTokens({
-      prisma,
-      apiKeyPepper,
-      organizationId: organization.id,
-      projectId: project.id,
-      userId: user.id,
-    });
-  }
+  const tokens =
+    apiKeyPepper === undefined
+      ? { grants: [], roles: [] }
+      : await seedAccessTokens({
+          prisma,
+          apiKeyPepper,
+          organizationId: organization.id,
+          projectId: project.id,
+          userId: user.id,
+        });
+  await withTasksApp({
+    use: (app) =>
+      attachSeedGrants({
+        authz: app.service(AuthzApi),
+        organizationId: organization.id,
+        roles: tokens.roles,
+        grants: [...grants, ...tokens.grants],
+      }),
+  });
 
   // Default-model config at the organization scope so prompt-create +
   // workflow runs in e2e tests resolve a model without requiring CI to also
@@ -366,7 +398,9 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       projectId: project.id,
       organizationId: organization.id,
       userId: user.id,
+      environment,
     });
+    await seedGithubFixture({ prisma, organizationId: organization.id });
   }
 
   // Only the non-secret default ingestion key is shown in full; anything else is redacted.
@@ -391,7 +425,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
  * An organization-wide SCIM token under the pepper-free sha256 digest main's
  * older rows use, so it verifies whichever pepper the stack resolves.
  */
-/** Seeds each tool's own login, membership and admin grants beside the admin's. */
+/** Seeds each tool's own login and membership beside the admin's; answers their admin grants. */
 async function seedToolUsers({
   prisma,
   environment,
@@ -404,7 +438,8 @@ async function seedToolUsers({
   hashedPassword: string;
   organizationId: string;
   teamId: string;
-}): Promise<void> {
+}): Promise<SeedGrant[]> {
+  const grants: SeedGrant[] = [];
   for (const toolUser of TOOL_USERS) {
     const seeded = await prisma.user.upsert(
       buildAdminUserUpsertArgs({
@@ -440,21 +475,9 @@ async function seedToolUsers({
       create: { userId: seeded.id, teamId, role: "ADMIN" },
       update: { role: "ADMIN" },
     });
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId, userId: seeded.id },
-    });
-    for (const binding of adminGrantBindings({
-      organizationId,
-      teamId,
-      userId: seeded.id,
-      ids: {
-        organization: `${toolUser.id}-organization-binding`,
-        team: `${toolUser.id}-team-binding`,
-      },
-    })) {
-      await seedGrantBinding({ prisma, binding });
-    }
+    grants.push(...adminGrants({ organizationId, teamId, userId: seeded.id }));
   }
+  return grants;
 }
 
 async function seedScimToken({
@@ -496,7 +519,7 @@ async function seedAccessTokens({
   organizationId: string;
   projectId: string;
   userId: string;
-}) {
+}): Promise<{ grants: SeedGrant[]; roles: SeedRole[] }> {
   // Private access token: sk-lw- full-access personal access token, owned by
   // the admin user, ORGANIZATION-scope ADMIN — the ApiKey-table equivalent of
   // a GitHub PAT.
@@ -519,13 +542,6 @@ async function seedAccessTokens({
       revokedAt: null,
     },
   });
-  await prisma.roleBinding.deleteMany({
-    where: { apiKeyId: privateApiKey.id },
-  });
-  await seedGrantBinding({
-    prisma,
-    binding: privateTokenGrantBinding({ organizationId, apiKeyId: privateApiKey.id }),
-  });
 
   // Public access token: ik-lw- ingestion-only token, PROJECT-scoped, CUSTOM
   // role restricted to traces:create — mirrors what ApiKeyService.create()
@@ -547,17 +563,6 @@ async function seedAccessTokens({
     },
     update: { permissions: ["traces:create"] },
   });
-  const roleProjected = await seedRoleProjection({
-    prisma,
-    role: {
-      id: ingestionRole.id,
-      organizationId,
-      name: PUBLIC_TOKEN_ROLE_NAME,
-      description: PUBLIC_TOKEN_ROLE_DESCRIPTION,
-      permissions: ["traces:create"],
-      kind: ROLE_KIND.SYSTEM_API_KEY,
-    },
-  });
   const publicApiKey = await prisma.apiKey.upsert({
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
     create: {
@@ -575,18 +580,21 @@ async function seedAccessTokens({
       revokedAt: null,
     },
   });
-  await prisma.roleBinding.deleteMany({ where: { apiKeyId: publicApiKey.id } });
-  if (roleProjected) {
-    await seedGrantBinding({
-      prisma,
-      binding: publicTokenGrantBinding({
-        organizationId,
-        projectId,
-        apiKeyId: publicApiKey.id,
+  return {
+    roles: [
+      {
         roleId: ingestionRole.id,
-      }),
-    });
-  }
+        name: PUBLIC_TOKEN_ROLE_NAME,
+        description: PUBLIC_TOKEN_ROLE_DESCRIPTION,
+        permissions: ["traces:create"],
+        kind: ROLE_KIND.SYSTEM_API_KEY,
+      },
+    ],
+    grants: [
+      privateTokenGrant({ organizationId, apiKeyId: privateApiKey.id }),
+      publicTokenGrant({ projectId, apiKeyId: publicApiKey.id, roleId: ingestionRole.id }),
+    ],
+  };
 }
 
 // Model providers from the environment: for every registry provider whose
@@ -692,6 +700,7 @@ async function seedModelProviderFromEnv({
 
   const id = MODEL_PROVIDER_ID_PREFIX + provider;
   const customKeys = encryption.encrypt(JSON.stringify(keys));
+  const customModels = llmsimCustomModels({ provider, environment: envMap });
   const row = await prisma.modelProvider.upsert({
     where: { id },
     create: {
@@ -700,6 +709,7 @@ async function seedModelProviderFromEnv({
       provider,
       enabled: true,
       customKeys,
+      ...(customModels ? { customModels } : {}),
       organizationId,
     },
     update: { customKeys, enabled: true, disabledAt: null },

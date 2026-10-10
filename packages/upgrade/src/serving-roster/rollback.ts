@@ -1,7 +1,7 @@
 import type { ServingRosterEntry, UpgradeRun, UpgradeStep } from "../ledger.ts";
 import { compareReleases } from "../manifest/manifest.ts";
 
-export type RollbackLedgerStep = Pick<UpgradeStep, "id" | "mode" | "status" | "release">;
+export type RollbackLedgerStep = Pick<UpgradeStep, "id" | "kind" | "mode" | "status" | "release">;
 export type RollbackLedgerRun = Pick<UpgradeRun, "id" | "kind" | "outcome" | "finishedAt">;
 export type RollbackRosterEntry = Pick<
   ServingRosterEntry,
@@ -50,7 +50,11 @@ export function detectRollbacks({
   const last = lastFinishedUpgrade({ runs });
   if (!last?.finishedAt) return [];
   const finishedAt = last.finishedAt.getTime();
-  const done = steps.filter((step) => step.mode === "background" && step.status === "done");
+  // No roster row declares an upcast (the image's list is its code steps), and each upgrade run
+  // recounts one from the stored events, so a sighting never reopens it.
+  const done = steps.filter(
+    (step) => step.mode === "background" && step.status === "done" && step.kind !== "event-upcast",
+  );
   return live.flatMap((row) => {
     if (row.startedAt.getTime() <= finishedAt) return [];
     const declared = new Set(row.steps);

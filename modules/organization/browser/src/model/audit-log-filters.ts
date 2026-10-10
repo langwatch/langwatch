@@ -114,3 +114,12 @@ export function matchMemberId(
       (member.user.email?.toLowerCase().includes(needle) ?? false),
   )?.userId;
 }
+
+/** A typed search naming no member matches no row, not every row. */
+export function searchMatchesNobody(
+  members: Parameters<typeof matchMemberId>[0] | undefined,
+  search: string,
+): boolean {
+  if (!members || !search.trim()) return false;
+  return matchMemberId(members, search) === undefined;
+}

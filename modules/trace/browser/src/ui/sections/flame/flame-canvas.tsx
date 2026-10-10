@@ -241,7 +241,7 @@ export function FlameCanvas({
                   paddingX={2}
                   paddingY={0.5}
                   bg="blue.solid"
-                  color="white"
+                  color="blue.contrast"
                   borderRadius="sm"
                   boxShadow="md"
                   whiteSpace="nowrap"

@@ -5,10 +5,26 @@
  * chosen integration method, ids only; nurturing reacts from its own side (ARCHITECTURE §9).
  * @see specs/features/customer-io-nurturing-integration.feature
  */
-import { createTenantId } from "@langwatch/eventing";
-import { ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE } from "@langwatch/organization-contract";
+import {
+  AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+  authzMemberOffboardedEventDataSchema,
+} from "@langwatch/authz-contract";
+import {
+  createTenantId,
+  defineAggregate,
+  definePipeline,
+  EventSchema,
+  EventSourcing,
+} from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
+import {
+  ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  OrganizationNotFoundError,
+} from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import {
   RecordIntegrationMethodChosenCommand,
@@ -20,6 +36,7 @@ import {
 import {
   type BillingFactsApplier,
   type LicensingFactsApplier,
+  type MemberFactsApplier,
   buildOrganizationLifecyclePipeline,
 } from "../organization-lifecycle.pipeline.ts";
 
@@ -98,8 +115,10 @@ describe("organization's lifecycle pipeline", () => {
   it("declares no subscriber of its own: its peers react from their side", () => {
     const billingFacts = createApiFixture<BillingFactsApplier>({}, "BillingFactsApplier");
     const licensingFacts = createApiFixture<LicensingFactsApplier>({}, "LicensingFactsApplier");
+    const memberFacts = createApiFixture<MemberFactsApplier>({}, "MemberFactsApplier");
     expect(
-      buildOrganizationLifecyclePipeline({ billingFacts, licensingFacts }).eventSubscribers.size,
+      buildOrganizationLifecyclePipeline({ billingFacts, licensingFacts, memberFacts })
+        .eventSubscribers.size,
     ).toBe(0);
   });
 
@@ -136,5 +155,168 @@ describe("organization's lifecycle pipeline", () => {
       expect(first.idempotencyKey).toBe("org_acme:presence_setting:backfilled");
       expect(rerun.idempotencyKey).toBe(first.idempotencyKey);
     });
+  });
+});
+
+/** Authz's and user's pipelines as their contracts name the facts; organization reads the data. */
+function peerStandIn() {
+  return definePipeline({
+    name: "member_peer",
+    aggregate: defineAggregate({ type: "member_peer" }),
+  })
+    .withEvents([
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE),
+        data: authzMemberOffboardedEventDataSchema,
+      }),
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(USER_ERASED_EVENT_TYPE),
+        data: userErasedEventDataSchema,
+      }),
+    ])
+    .build();
+}
+
+describe("given a peer's member fact reaches organization", () => {
+  const HEARD_LATER = AT + 60_000;
+  const tenantId = createTenantId("user_gone");
+  const stamp = {
+    aggregateId: "user_gone",
+    aggregateType: "member_peer",
+    tenantId,
+    version: "2026-10-09",
+  };
+
+  function hearing() {
+    const memberFacts = {
+      recordMemberOffboarded: vi.fn<MemberFactsApplier["recordMemberOffboarded"]>(async () => {}),
+      recordMemberErased: vi.fn<MemberFactsApplier["recordMemberErased"]>(async () => {}),
+    };
+    const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+    eventing.register(
+      buildOrganizationLifecyclePipeline({
+        billingFacts: createApiFixture<BillingFactsApplier>({}, "BillingFactsApplier"),
+        licensingFacts: createApiFixture<LicensingFactsApplier>({}, "LicensingFactsApplier"),
+        memberFacts,
+      }),
+    );
+    return { eventing, memberFacts, peer: eventing.register(peerStandIn()) };
+  }
+
+  /** @scenario "A peer's member fact reaches organization with the fact's own moment" */
+  it("passes a proven offboarding's own moment through, not the moment it was heard", async () => {
+    const { eventing, memberFacts, peer } = hearing();
+    await peer.service.storeEvents(
+      [
+        {
+          ...stamp,
+          id: "event-offboarded",
+          type: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+          createdAt: HEARD_LATER,
+          occurredAt: HEARD_LATER,
+          data: {
+            tenantId: "user_gone",
+            organizationId: "org_acme",
+            userId: "user_gone",
+            offboardedByUserId: "user_admin",
+            occurredAt: AT,
+          },
+        },
+      ],
+      { tenantId },
+    );
+
+    await vi.waitFor(() =>
+      expect(memberFacts.recordMemberOffboarded).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        userId: "user_gone",
+        offboardedByUserId: "user_admin",
+        occurredAt: AT,
+      }),
+    );
+    await eventing.close();
+  });
+
+  /** @scenario "A peer's member fact reaches organization with the fact's own moment" */
+  it("hands each of an erasure's organisations over with its moment, and none for a fact naming none", async () => {
+    const { eventing, memberFacts, peer } = hearing();
+    const erased = (id: string, organizationIds?: string[]) => ({
+      ...stamp,
+      id,
+      type: USER_ERASED_EVENT_TYPE,
+      createdAt: HEARD_LATER,
+      occurredAt: HEARD_LATER,
+      data: { tenantId: "user_gone", userId: "user_gone", occurredAt: AT, organizationIds },
+    });
+    await peer.service.storeEvents([erased("event-erased", ["org_acme", "org_beta"])], {
+      tenantId,
+    });
+    await peer.service.storeEvents([erased("event-erased-before-names")], { tenantId });
+
+    await vi.waitFor(() => {
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        userId: "user_gone",
+        occurredAt: AT,
+      });
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith({
+        organizationId: "org_beta",
+        userId: "user_gone",
+        occurredAt: AT,
+      });
+    });
+    expect(memberFacts.recordMemberErased).toHaveBeenCalledTimes(2);
+    await eventing.close();
+  });
+
+  /** @scenario "A member fact for a deleted organisation records nothing" */
+  it("records nothing for a deleted organisation and still records the live ones", async () => {
+    const { eventing, memberFacts, peer } = hearing();
+    const recorded: string[] = [];
+    const recordUnlessGone = async ({ organizationId }: { organizationId: string }) => {
+      if (organizationId === "org_deleted") throw new OrganizationNotFoundError();
+      recorded.push(organizationId);
+    };
+    memberFacts.recordMemberOffboarded.mockImplementation(recordUnlessGone);
+    memberFacts.recordMemberErased.mockImplementation(recordUnlessGone);
+    await peer.service.storeEvents(
+      [
+        {
+          ...stamp,
+          id: "event-offboarded-deleted",
+          type: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+          createdAt: HEARD_LATER,
+          occurredAt: HEARD_LATER,
+          data: {
+            tenantId: "user_gone",
+            organizationId: "org_deleted",
+            userId: "user_gone",
+            offboardedByUserId: null,
+            occurredAt: AT,
+          },
+        },
+        {
+          ...stamp,
+          id: "event-erased-deleted",
+          type: USER_ERASED_EVENT_TYPE,
+          createdAt: HEARD_LATER,
+          occurredAt: HEARD_LATER,
+          data: {
+            tenantId: "user_gone",
+            userId: "user_gone",
+            occurredAt: AT,
+            organizationIds: ["org_deleted", "org_live"],
+          },
+        },
+      ],
+      { tenantId },
+    );
+
+    await vi.waitFor(() => expect(recorded).toEqual(["org_live"]));
+    expect(memberFacts.recordMemberOffboarded).toHaveBeenCalledTimes(1);
+    expect(memberFacts.recordMemberErased).toHaveBeenCalledTimes(2);
+    await eventing.close();
   });
 });

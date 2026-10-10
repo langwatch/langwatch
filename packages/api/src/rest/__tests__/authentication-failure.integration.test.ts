@@ -9,6 +9,7 @@ import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createCanonicalFamilyErrorHandler } from "../response.ts";
@@ -39,7 +40,11 @@ function mounted({ onError, reached }: { onError: ErrorHandler; reached: string[
     },
     authorize: () => ({ permitted: true, organizationRole: null }),
   };
-  const runtime = createRestRuntime({ identity: door, doors: { organization: door } });
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: door,
+    doors: { organization: door },
+  });
 
   return runtime.mount(organizationRoutes.router(), {
     app: () => ({

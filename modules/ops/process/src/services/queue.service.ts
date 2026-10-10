@@ -183,12 +183,21 @@ export class QueueService {
     return allGroups;
   }
 
+  /** The Ops UI shows `event-sourcing/jobs`; the keys carry `{event-sourcing/jobs}`. */
+  private async toRegisteredQueueName(queueName: string): Promise<string> {
+    const registered = await this.repository.discoverQueueNames();
+    if (registered.includes(queueName)) return queueName;
+    const braced = `{${queueName}}`;
+    return registered.includes(braced) ? braced : queueName;
+  }
+
   async unblockGroup(params: {
     queueName: string;
     groupId: string;
     requestedBy: string;
   }): Promise<{ wasBlocked: boolean }> {
     const { requestedBy, ...rest } = params;
+    rest.queueName = await this.toRegisteredQueueName(rest.queueName);
     const result = await this.repository.unblockGroup(rest);
     // Only when it changed something. A no-op unblock on a group that was not
     // blocked is a misread of the dashboard, not an act, and auditing it would
@@ -210,6 +219,7 @@ export class QueueService {
     requestedBy: string;
   }): Promise<{ unblockedCount: number }> {
     const { requestedBy, ...rest } = params;
+    rest.queueName = await this.toRegisteredQueueName(rest.queueName);
     const result = await this.repository.unblockAll(rest);
     if (result.unblockedCount > 0) {
       await this.audit?.append({

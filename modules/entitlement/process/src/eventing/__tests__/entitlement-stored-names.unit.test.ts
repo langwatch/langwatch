@@ -268,7 +268,11 @@ describe("entitlement's stored names for the usage facts", () => {
     it("the refused-organizations process and billing's subscriber each handle it once", async () => {
       const seen = vi.fn();
       const recordLimitDecision = vi.fn(async () => undefined);
-      const eventing = runtime(seen, () => ({ recordLimitDecision, countMonth: vi.fn() }));
+      const eventing = runtime(seen, () => ({
+        recordLimitDecision,
+        countMonth: vi.fn(),
+        recordUsageWarning: vi.fn(),
+      }));
       const reached = { ...counted, billableEvents: 1_000 };
       const stored = { ...storedAsUsage({ id: "stored-2", type: "lw.usage.month_counted" }) };
 
@@ -310,7 +314,7 @@ describe("entitlement's stored names for the usage facts", () => {
         "upcast:entitlement:lw.usage.limit_reached",
         "upcast:entitlement:lw.usage.limit_cleared",
       ]);
-      expect(upcasts?.drain).toEqual({ pipeline: "usage" });
+      expect(upcasts?.drain).toEqual({ pipeline: "usage", removeAfter: "3.21.0" });
     });
   });
 });

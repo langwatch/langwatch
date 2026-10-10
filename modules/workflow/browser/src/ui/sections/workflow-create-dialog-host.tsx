@@ -67,7 +67,7 @@ function WorkflowTemplateCard({ testId, dragging, children, ...props }: Workflow
     <WorkflowListCard
       {...props}
       data-testid={testId}
-      {...(dragging ? { borderStyle: "dashed", borderColor: "blue.500" } : {})}
+      {...(dragging ? { borderStyle: "dashed", borderColor: "blue.fg" } : {})}
     >
       {children}
     </WorkflowListCard>

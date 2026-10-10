@@ -3,6 +3,7 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  * The legacy `X-Auth-Token` check: the project a token names, counted per caller first.
  * @see specs/auth/auth-rest-family-mounted.feature
  */
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +19,7 @@ const ACME: ResolvedApiKeyCredential = {
     organizationId: "org-1",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   },
 };
 
@@ -64,6 +66,21 @@ describe("ProjectAuthTokenService", () => {
         service.validateProjectAuthToken({ token: undefined, forwardedFor: undefined }),
       ).rejects.toMatchObject({ code: "missing_credentials", httpStatus: 401 });
       expect(counted).toEqual([]);
+    });
+  });
+
+  /** ADR-177 decision 7: an aggregate accepts no key, its own stored one included. */
+  describe("when the token names an aggregate project", () => {
+    /** @scenario "The aggregate project cannot receive traces" */
+    it("refuses with the aggregate's code and no slug", async () => {
+      const { service } = tokenCheck({
+        ...ACME,
+        project: { ...ACME.project, kind: PROJECT_KIND.AGGREGATE },
+      });
+
+      await expect(
+        service.validateProjectAuthToken({ token: "tok", forwardedFor: undefined }),
+      ).rejects.toMatchObject({ code: "aggregate_project_has_no_credential", httpStatus: 403 });
     });
   });
 

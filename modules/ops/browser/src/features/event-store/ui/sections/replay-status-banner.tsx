@@ -21,7 +21,7 @@ export function ReplayStatusBanner() {
   const activeProjectionNames = parseActiveProjections(status.currentProjection);
 
   return (
-    <Card.Root borderColor="blue.200" borderWidth="1px">
+    <Card.Root borderColor="blue.muted" borderWidth="1px">
       <Card.Body padding={4}>
         <HStack justify="space-between">
           <HStack gap={2}>
@@ -42,7 +42,7 @@ export function ReplayStatusBanner() {
           <HStack gap={2}>
             {status.runId && (
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 onClick={() => router.push(`/ops/projections/${status.runId}`)}
               >
@@ -51,7 +51,7 @@ export function ReplayStatusBanner() {
             )}
             {hasAccess && (
               <Button
-                size="xs"
+                size="sm"
                 colorPalette="red"
                 variant="outline"
                 loading={cancelMutation.isPending}

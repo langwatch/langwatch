@@ -11,6 +11,7 @@ import { authzProcessModule } from "@langwatch/authz-process";
 import { automationProcessModule } from "@langwatch/automation-process";
 import { billingProcessModule } from "@langwatch/enterprise-billing-process";
 import { codingAgentProcessModule } from "@langwatch/coding-agent-process";
+import { connectProcessModule } from "@langwatch/enterprise-connect-process";
 import { dashboardProcessModule } from "@langwatch/dashboard-process";
 import { dataPrivacyProcessModule } from "@langwatch/data-privacy-process";
 import { dataRetentionProcessModule } from "@langwatch/data-retention-process";
@@ -76,6 +77,7 @@ export const processModules = [
   automationProcessModule,
   billingProcessModule,
   codingAgentProcessModule,
+  connectProcessModule,
   dashboardProcessModule,
   dataPrivacyProcessModule,
   dataRetentionProcessModule,

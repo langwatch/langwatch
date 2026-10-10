@@ -1,25 +1,41 @@
+import type { Named } from "@langwatch/module";
 /** Wire shapes for `/api/monitors`, distinct from domain schemas. */
 import { z } from "zod";
 
 import { monitorExecutionModeSchema, monitorMappingStateSchema } from "./monitor.ts";
 
-export const monitorRestIdParamsSchema = z.object({
+const monitorRestIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The monitor id."),
 });
+export interface MonitorRestIdParamsSchema extends Named<
+  typeof monitorRestIdParamsSchemaDefinition
+> {}
+export const monitorRestIdParamsSchema: MonitorRestIdParamsSchema =
+  monitorRestIdParamsSchemaDefinition;
 
 /** Optional and nullable as on main; a legacy `{}` reads as an empty mapping. */
-export const monitorRestMappingsSchema = z
+const monitorRestMappingsSchemaDefinition = z
   .object({
     mapping: monitorMappingStateSchema.shape.mapping.optional(),
     expansions: monitorMappingStateSchema.shape.expansions.optional(),
   })
   .nullable()
   .optional();
+export interface MonitorRestMappingsSchema extends Named<
+  typeof monitorRestMappingsSchemaDefinition
+> {}
+export const monitorRestMappingsSchema: MonitorRestMappingsSchema =
+  monitorRestMappingsSchemaDefinition;
 
 /** Any JSON list, as main accepted and stored. */
-export const monitorRestPreconditionsSchema = z.array(z.unknown());
+const monitorRestPreconditionsSchemaDefinition = z.array(z.unknown());
+export interface MonitorRestPreconditionsSchema extends Named<
+  typeof monitorRestPreconditionsSchemaDefinition
+> {}
+export const monitorRestPreconditionsSchema: MonitorRestPreconditionsSchema =
+  monitorRestPreconditionsSchemaDefinition;
 
-export const monitorRestResponseSchema = z.object({
+const monitorRestResponseSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
@@ -37,9 +53,14 @@ export const monitorRestResponseSchema = z.object({
   updatedAt: z.string(),
   platformUrl: z.string().url(),
 });
+export interface MonitorRestResponseSchema extends Named<
+  typeof monitorRestResponseSchemaDefinition
+> {}
+export const monitorRestResponseSchema: MonitorRestResponseSchema =
+  monitorRestResponseSchemaDefinition;
 export type MonitorRestResponse = z.infer<typeof monitorRestResponseSchema>;
 
-export const monitorRestCreateInputSchema = z.object({
+const monitorRestCreateInputSchemaDefinition = z.object({
   name: z.string().min(1, "name is required"),
   checkType: z.string().min(1, "checkType is required"),
   executionMode: monitorExecutionModeSchema.default("ON_MESSAGE"),
@@ -51,8 +72,13 @@ export const monitorRestCreateInputSchema = z.object({
   level: z.enum(["trace", "thread"]).default("trace"),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
 });
+export interface MonitorRestCreateInputSchema extends Named<
+  typeof monitorRestCreateInputSchemaDefinition
+> {}
+export const monitorRestCreateInputSchema: MonitorRestCreateInputSchema =
+  monitorRestCreateInputSchemaDefinition;
 
-export const monitorRestUpdateInputSchema = z.object({
+const monitorRestUpdateInputSchemaDefinition = z.object({
   name: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
   checkType: z.string().optional(),
@@ -65,7 +91,27 @@ export const monitorRestUpdateInputSchema = z.object({
   level: z.enum(["trace", "thread"]).optional(),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
 });
+export interface MonitorRestUpdateInputSchema extends Named<
+  typeof monitorRestUpdateInputSchemaDefinition
+> {}
+export const monitorRestUpdateInputSchema: MonitorRestUpdateInputSchema =
+  monitorRestUpdateInputSchemaDefinition;
 
-export const monitorRestToggleInputSchema = z.object({ enabled: z.boolean() });
-export const monitorRestToggledSchema = z.object({ id: z.string(), enabled: z.boolean() });
-export const monitorRestDeletedSchema = z.object({ id: z.string(), deleted: z.boolean() });
+const monitorRestToggleInputSchemaDefinition = z.object({ enabled: z.boolean() });
+export interface MonitorRestToggleInputSchema extends Named<
+  typeof monitorRestToggleInputSchemaDefinition
+> {}
+export const monitorRestToggleInputSchema: MonitorRestToggleInputSchema =
+  monitorRestToggleInputSchemaDefinition;
+const monitorRestToggledSchemaDefinition = z.object({ id: z.string(), enabled: z.boolean() });
+export interface MonitorRestToggledSchema extends Named<
+  typeof monitorRestToggledSchemaDefinition
+> {}
+export const monitorRestToggledSchema: MonitorRestToggledSchema =
+  monitorRestToggledSchemaDefinition;
+const monitorRestDeletedSchemaDefinition = z.object({ id: z.string(), deleted: z.boolean() });
+export interface MonitorRestDeletedSchema extends Named<
+  typeof monitorRestDeletedSchemaDefinition
+> {}
+export const monitorRestDeletedSchema: MonitorRestDeletedSchema =
+  monitorRestDeletedSchemaDefinition;

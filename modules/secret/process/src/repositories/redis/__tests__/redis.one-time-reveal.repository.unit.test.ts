@@ -33,9 +33,14 @@ describe("RedisOneTimeRevealRepository", () => {
     it("stores the secret sealed and serves it opened", async () => {
       const { values, repository } = storeOfOneKey();
 
-      await repository.put({ organizationId: "org_acme", revealId: "rvl_1", reveal, ttlMs: 1000 });
+      const address = {
+        organizationId: "org_acme",
+        recipientUserId: "user_jane",
+        revealId: "rvl_1",
+      };
+      await repository.put({ ...address, reveal, ttlMs: 1000 });
 
-      expect(values.get("secret_reveal:org_acme:rvl_1")).toBe(
+      expect(values.get("secret_reveal:org_acme:user_jane:rvl_1")).toBe(
         JSON.stringify({
           kind: "virtual_key",
           keyId: "vk_1",
@@ -43,9 +48,7 @@ describe("RedisOneTimeRevealRepository", () => {
           sealed: "encrypted(sk)",
         }),
       );
-      await expect(
-        repository.take({ organizationId: "org_acme", revealId: "rvl_1" }),
-      ).resolves.toEqual({ taken: true, reveal });
+      await expect(repository.take(address)).resolves.toEqual({ taken: true, reveal });
     });
   });
 });

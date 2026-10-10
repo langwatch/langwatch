@@ -7,7 +7,7 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryLicenseEmailChannel } from "../../channels/memory/memory.license-email.channel.ts";
+import { MemoryLicenseEmailChannel } from "../../channels/memory/memory.billing.channels.ts";
 import { LicensePurchaseDeliveryService } from "../../features/license-purchase/services/license-purchase-delivery.service.ts";
 import { LicensingLicenseGeneratorService } from "../../features/license-purchase/services/licensing-license-generator.service.ts";
 

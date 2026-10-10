@@ -3,7 +3,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
 
 const meta = {
-  title: "Components/Provider scope chips",
+  title: "Data display/Provider scope chips",
+  parameters: {
+    usage: {
+      use: "Where a provider or key is available, as read-only chips.",
+      avoid: "Choosing scopes: use Scope chip picker.",
+    },
+  },
   component: ProviderScopeChips,
   tags: ["autodocs"],
   args: {

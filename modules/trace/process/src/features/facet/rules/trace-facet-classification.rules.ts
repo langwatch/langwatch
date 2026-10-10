@@ -1,4 +1,7 @@
-import type { ExpressionCategoricalDef, FacetDefinition } from "#features/facet/rules/trace-facet-registry.rules";
+import type {
+  ExpressionCategoricalDef,
+  FacetDefinition,
+} from "#features/facet/rules/trace-facet-registry.rules";
 
 /** Whether a categorical facet definition is computed from an expression rather than a bare key. */
 export function isExpressionCategorical(def: FacetDefinition): def is ExpressionCategoricalDef {

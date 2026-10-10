@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * The two project-scoped families: their addresses, their door, the permission
- * each route asks and the facts each names.
+ * each route asks and the middleware context each names.
  */
 import { describe, expect, it } from "vitest";
 

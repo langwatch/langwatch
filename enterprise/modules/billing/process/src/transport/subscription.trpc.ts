@@ -3,7 +3,11 @@
  * anything that changes what the organization pays takes `organization:manage`.
  * Nothing catches: every refusal below is a handled error the shared path maps.
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import {
   subscriptionTrpc,
   billingCallerEmailSchema,
@@ -69,11 +73,14 @@ export interface BillingSubscriptionApi {
 export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billing");
 
 /**
- * The signed-in customer's address, as the PROCESS resolved it. A fact rather
- * than part of the actor: the provider records the address on the customer it
+ * The signed-in customer's address, as the PROCESS resolved it. Middleware
+ * context rather than part of the actor: the provider records the address on the customer it
  * creates, and an actor id alone cannot open an account.
  */
-export const billingCallerEmailFact = defineTrpcFact("callerEmail", billingCallerEmailSchema);
+export const billingCallerEmailContext = defineMiddlewareContext(
+  "callerEmail",
+  billingCallerEmailSchema,
+);
 
 export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   BillingSubscriptionApi,
@@ -96,7 +103,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("create")
-  .withFacts(billingCallerEmailFact)
+  .withMiddlewareContext(billingCallerEmailContext)
   .withPermission("organization:manage")
   // Starts a checkout for an organization that has no subscription.
   .handle(async ({ app, input }, email) => {
@@ -118,7 +125,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("manage")
-  .withFacts(billingCallerEmailFact)
+  .withMiddlewareContext(billingCallerEmailContext)
   .withPermission("organization:manage")
   // A billing-portal session for card, address and cancellation.
   .handle(async ({ app, input }, email) => {
@@ -152,7 +159,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("prospective")
-  .withFacts(billingCallerEmailFact)
+  .withMiddlewareContext(billingCallerEmailContext)
   .withPermission("organization:manage")
   // Tells sales an organization asked about a plan that is not self-serve.
   .handle(({ app, input }, email) =>

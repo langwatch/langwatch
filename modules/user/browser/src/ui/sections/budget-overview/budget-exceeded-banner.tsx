@@ -1,7 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, HStack, Text } from "@langwatch/design-system/primitives";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
-import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
+import { ExternalLink, TrendingUp } from "lucide-react";
 
 /**
  * Mirrors the gateway's 402 response and CLI's budget-exceeded rendering.
@@ -99,69 +99,47 @@ export function BudgetExceededBanner({
   const scopeLabel = SCOPE_LABEL[scope.toLowerCase()] ?? scope;
 
   return (
-    <Box
-      role="alert"
-      aria-live="assertive"
-      borderWidth="1px"
-      borderColor="red.300"
-      backgroundColor="red.50"
-      borderRadius="md"
-      padding={4}
-      _dark={{ borderColor: "red.700", backgroundColor: "red.900" }}
-    >
-      <HStack gap={3} alignItems="start">
-        <Box color="red.600" paddingTop="2px" _dark={{ color: "red.300" }}>
-          <AlertTriangle size={20} aria-hidden="true" />
-        </Box>
-        <VStack align="start" gap={2} flex={1}>
-          <Text fontWeight="semibold" color="red.700" _dark={{ color: "red.200" }}>
-            Budget limit reached
-          </Text>
-          <Text fontSize="sm" color="red.700" _dark={{ color: "red.200" }}>
-            You&rsquo;ve used <strong>{fmtUsd(spentUsd)}</strong> of your{" "}
-            <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel} budget. New requests are
-            being blocked until the limit resets or your admin raises it.
-          </Text>
-          {(requestIncreaseUrl || adminEmail) && (
-            <HStack gap={4} fontSize="sm" wrap="wrap">
-              {requestIncreaseUrl && (
-                <Link
-                  href={requestIncreaseUrl}
-                  color="red.700"
-                  fontWeight="medium"
-                  _dark={{ color: "red.200" }}
-                >
-                  <HStack gap={1}>
-                    <TrendingUp size={14} aria-hidden="true" />
-                    <Text>Request increase</Text>
-                    <ExternalLink size={12} aria-hidden="true" />
-                  </HStack>
-                </Link>
-              )}
-              {adminEmail && (
-                <Text color="red.700" _dark={{ color: "red.200" }}>
-                  Admin:{" "}
-                  {isUrlContact(adminEmail) || isEmailContact(adminEmail) ? (
-                    <Link
-                      href={contactHref(adminEmail)}
-                      color="red.700"
-                      _dark={{ color: "red.200" }}
-                      {...(isUrlContact(adminEmail) && {
-                        target: "_blank",
-                        rel: "noreferrer",
-                      })}
-                    >
-                      {adminEmail}
-                    </Link>
-                  ) : (
-                    <Text as="span">{adminEmail}</Text>
-                  )}
-                </Text>
-              )}
-            </HStack>
-          )}
-        </VStack>
-      </HStack>
-    </Box>
+    <Alert.Root status="error" role="alert" aria-live="assertive">
+      <Alert.Indicator />
+      <Alert.Content gap={2}>
+        <Alert.Title>Budget limit reached</Alert.Title>
+        <Alert.Description>
+          You&rsquo;ve used <strong>{fmtUsd(spentUsd)}</strong> of your{" "}
+          <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel} budget. New requests are
+          being blocked until the limit resets or your admin raises it.
+        </Alert.Description>
+        {(requestIncreaseUrl || adminEmail) && (
+          <HStack gap={4} fontSize="sm" wrap="wrap">
+            {requestIncreaseUrl && (
+              <Link href={requestIncreaseUrl} fontWeight="medium">
+                <HStack gap={1}>
+                  <TrendingUp size={14} aria-hidden="true" />
+                  <Text>Request increase</Text>
+                  <ExternalLink size={12} aria-hidden="true" />
+                </HStack>
+              </Link>
+            )}
+            {adminEmail && (
+              <Text>
+                Admin:{" "}
+                {isUrlContact(adminEmail) || isEmailContact(adminEmail) ? (
+                  <Link
+                    href={contactHref(adminEmail)}
+                    {...(isUrlContact(adminEmail) && {
+                      target: "_blank",
+                      rel: "noreferrer",
+                    })}
+                  >
+                    {adminEmail}
+                  </Link>
+                ) : (
+                  <Text as="span">{adminEmail}</Text>
+                )}
+              </Text>
+            )}
+          </HStack>
+        )}
+      </Alert.Content>
+    </Alert.Root>
   );
 }

@@ -149,6 +149,22 @@ export class MemoryAgentRepository implements AgentRepository {
     });
   }
 
+  updateConfigIfUnchanged(
+    input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
+  ): Promise<boolean> {
+    const agent = this.#agents.get(input.id);
+    if (
+      !agent ||
+      agent.projectId !== input.projectId ||
+      agent.updatedAt.getTime() !== input.updatedAt.epochMilliseconds
+    ) {
+      return Promise.resolve(false);
+    }
+    this.#save({ ...agent, config: input.config });
+
+    return Promise.resolve(true);
+  }
+
   async archive(input: GetAgentInput): Promise<Agent> {
     const agent = await this.getById(input);
 

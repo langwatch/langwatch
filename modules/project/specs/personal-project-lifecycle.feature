@@ -40,7 +40,7 @@ Feature: A personal project follows its personal team
     Given organization recorded "lw.organization.personal_team_created" for a user's personal team
     When project handles the fact
     Then project creates the personal project in that team under the fact's id and slug, owned by the user
-    And project mints its ingestion key in the "pkey_" format
+    And project stores a legacy key value that never authenticates
     And project records "lw.project.created" for it, which a waiting screen reads as ready
 
   @unit

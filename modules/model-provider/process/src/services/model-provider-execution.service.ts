@@ -42,6 +42,35 @@ export class ModelProviderExecutionService {
     const model = expandLatestAlias(parsed.model);
     this.assertCodexCanNotExecute(model, null);
     const provider = await this.resolveProvider({ ...parsed, model });
+    return this.prepareFor({ provider, model, projectId: parsed.projectId });
+  }
+
+  /**
+   * The parameters for one stored row, addressed by its id rather than through the
+   * `mp_` wire prefix, which seeded and KSUID-minted rows (`provider_…`) never carry.
+   */
+  async prepareRow(input: {
+    id: string;
+    model: string;
+    projectId: string;
+  }): Promise<ModelProviderExecutionParameters> {
+    const provider = await this.options.query.getByIdForProject({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    const model = expandLatestAlias(`${provider.provider}/${input.model}`);
+    return this.prepareFor({ provider, model, projectId: input.projectId });
+  }
+
+  private async prepareFor({
+    provider,
+    model,
+    projectId,
+  }: {
+    provider: ModelProvider | ModelProviderExecution;
+    model: string;
+    projectId: string;
+  }): Promise<ModelProviderExecutionParameters> {
     this.assertCodexCanNotExecute(model, provider.provider);
 
     const parameters = this.baseParameters(model, provider.provider);
@@ -53,7 +82,7 @@ export class ModelProviderExecutionService {
 
     const resolved = await this.options.catalog.prepareExecution({
       parameters,
-      projectId: parsed.projectId,
+      projectId,
       model,
       provider: provider.provider,
     });

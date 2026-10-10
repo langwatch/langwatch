@@ -77,6 +77,15 @@ describe("given a connect host that refuses", () => {
     await expect(sync()).rejects.toMatchObject({ code: "connect_wrong_instance" });
   });
 
+  it("keeps the pending code of a managed key still being set up, though it is a 503", async () => {
+    host.answers(503, hostRefusal("connect_credential_pending"));
+
+    await expect(sync()).rejects.toMatchObject({
+      code: "connect_credential_pending",
+      httpStatus: 503,
+    });
+  });
+
   it("keeps the too-many-requests code", async () => {
     host.answers(429, hostRefusal("rate_limited"));
 

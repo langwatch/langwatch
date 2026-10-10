@@ -45,7 +45,8 @@ function loadWithSh({ envFile }) {
     return { out: (e.stdout ?? "").trim(), status: e.status ?? 1 };
   }
 }
-// make service builds the sim consoles (pnpm) and pipes logs through node; stubs keep this about env loading.
+// make service builds the sim consoles (pnpm) and pipes logs through node; stubs keep this
+// about env loading.
 fs.writeFileSync(path.join(fakeBin, "pnpm"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
 fs.writeFileSync(path.join(fakeBin, "node"), "#!/bin/sh\ncat\n", { mode: 0o755 });
 

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { RestIdentity } from "@langwatch/api/hosting";
 /**
  * The SCIM feature's application: what its six doors call.
  *
@@ -19,7 +18,6 @@ import type { RestIdentity } from "@langwatch/api/hosting";
  * is returned once and never again — and a rule about which tenant a push
  * provisions have one place to live rather than six.
  */
-import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -39,6 +37,8 @@ import {
   type ConnectionReconciliation,
   type OrganizationReconciliation,
   type ScimDirectoryActivityEntry,
+  type ScimDirectoryMember,
+  type ScimDirectoryMembersInput,
   type ScimGroup,
   type ScimListResponse,
   type ScimConnectionRequestsInput,
@@ -75,15 +75,12 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
 
+import type { ScimChannels } from "../channels/scim-channels.registry.ts";
 import type { RequestDirectoryMoveCommandData } from "../eventing/scim-directory-move.intent.ts";
 import {
   buildScimDirectoryPipeline,
   type ScimDirectoryDefinition,
 } from "../eventing/scim-directory.pipeline.ts";
-import {
-  EventingScimSyncActivityRepository,
-  type ScimSyncEventReads,
-} from "../repositories/eventing/eventing.scim-sync-activity.repository.ts";
 import { scimOperatorReads } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { newScimSyncCommandId } from "../rules/scim-sync-id.rules.ts";
@@ -110,7 +107,12 @@ import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 import type { ScimService } from "../services/scim.service.ts";
 
-type ScimSetup = FeatureSetup<typeof ScimModule.dependencies, ScimServerConfig, ScimRepositories>;
+type ScimSetup = FeatureSetup<
+  typeof ScimModule.dependencies,
+  ScimServerConfig,
+  ScimRepositories,
+  ScimChannels
+>;
 
 const CONNECTION_NOT_WRITABLE =
   "This directory token can no longer write through its single sign-on connection";
@@ -204,14 +206,6 @@ function readJson(body: string): unknown {
 }
 
 /** The bearer a request presented, or nothing where it presented none. */
-function findBearer(authorization: string | null): string | null {
-  if (!authorization?.startsWith("Bearer ")) return null;
-
-  const token = authorization.slice(7).trim();
-
-  return token.length > 0 ? token : null;
-}
-
 type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
 
 type ScimAppOptions = {
@@ -240,7 +234,7 @@ export class ScimModule implements ScimApiContract {
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
-  static readonly operatorReads = scimOperatorReads;
+  static readonly operatorReads: Readonly<Record<string, unknown>> = scimOperatorReads;
 
   readonly #scim: Pick<ScimService, keyof ScimService>;
   readonly #connections: ScimConnectionsService;
@@ -257,7 +251,6 @@ export class ScimModule implements ScimApiContract {
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
   #costCenterFacts: ScimCostCenterFactsService | undefined;
-  #syncReads: ScimSyncReadsService | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -281,7 +274,7 @@ export class ScimModule implements ScimApiContract {
   }
 
   static async create(setup: ScimSetup): Promise<ScimModule> {
-    const { dependencies, config, secrets, repositories } = setup;
+    const { dependencies, config, secrets, repositories, channels } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
     const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
       secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
@@ -296,8 +289,10 @@ export class ScimModule implements ScimApiContract {
       ledger: scimSyncLedger,
       newCommandId: newScimSyncCommandId,
     });
-    // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
-    const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
+    const syncs = ScimSyncReadsService.create({
+      syncs: repositories.scimSyncs,
+      activity: repositories.scimSyncActivity,
+    });
     const connections = ScimConnectionsService.create(repositories.scimSsoConnections);
     const costCenterFacts = ScimCostCenterFactsService.create();
     const scim = PostgresScimService.create({
@@ -306,6 +301,8 @@ export class ScimModule implements ScimApiContract {
       users: dependencies.users,
       costCenterFacts,
       organization: dependencies.authorization,
+      seats: repositories.seats,
+      members: channels.members,
       entitlements: dependencies.entitlements,
       lifecycle,
       provenOffboarding: config.provenOffboarding,
@@ -351,7 +348,6 @@ export class ScimModule implements ScimApiContract {
     });
     app.#scimSyncLedger = scimSyncLedger;
     app.#costCenterFacts = costCenterFacts;
-    app.#syncReads = syncs;
     return app;
   }
 
@@ -377,11 +373,6 @@ export class ScimModule implements ScimApiContract {
   /** scim-sync's senders: the directory-sync history stages each fact through them. */
   connectScimSync(commands: ScimSyncSenders): void {
     this.#scimSyncLedger?.connect(commands);
-  }
-
-  /** scim_sync's own event store: a connection's directory activity is read from it. */
-  readScimSyncFrom(eventStore: ScimSyncEventReads): void {
-    this.#syncReads?.readActivityFrom(EventingScimSyncActivityRepository.create({ eventStore }));
   }
 
   moveToConnection: ScimApiContract["moveToConnection"] = async (input) => {
@@ -469,35 +460,12 @@ export class ScimModule implements ScimApiContract {
 
   // ── The directory credential ─────────────────────────────────────────────
 
-  /** The `scimToken` door, bound to this module's own families (ARCHITECTURE.md §4). */
-  get directoryDoor(): RestIdentity {
-    return {
-      authenticate: () => {
-        throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
-      },
-      identify: async ({ request }) => {
-        const directory = await this.authenticateDirectory({
-          authorization: request.headers.get("authorization"),
-          method: request.method,
-          path: new URL(request.url).pathname,
-        });
-
-        recordScimCredential(request, directory);
-
-        return {
-          actor: { type: "api_key", id: directory.id },
-          scope: { tier: "organization", id: directory.organizationId },
-        };
-      },
-    };
-  }
-
   async authenticateDirectory(input: {
-    authorization: string | null;
+    bearer: string | null;
     method?: string | undefined;
     path?: string | undefined;
   }): Promise<ScimDirectoryScope> {
-    const token = findBearer(input.authorization);
+    const token = input.bearer;
 
     // Unattributable by construction — there is no organization to file it
     // under, and a table unauthenticated traffic can write is a table anybody
@@ -569,6 +537,10 @@ export class ScimModule implements ScimApiContract {
 
   findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]> {
     return this.#reconciliation.findActivity(input);
+  }
+
+  findDirectoryMembers(input: ScimDirectoryMembersInput): Promise<ScimDirectoryMember[]> {
+    return this.#reconciliation.findDirectoryMembers(input);
   }
 
   async findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]> {

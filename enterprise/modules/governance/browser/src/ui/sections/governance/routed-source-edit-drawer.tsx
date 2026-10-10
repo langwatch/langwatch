@@ -39,6 +39,7 @@ export function RoutedSourceEditDrawer({ sourceId }: { sourceId?: string }) {
       onClose={closeDrawer}
       onSubmit={(input) => update.mutate(input)}
       isPending={update.isPending}
+      refusal={update.error}
     />
   );
 }

@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/fixtures/license-keys.fixture.d.ts",
+      "default": "./src/__tests__/fixtures/license-keys.fixture.ts"
     }
   },
   "scripts": {
@@ -39,8 +43,6 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/instant-eval-contract": "workspace:*",
-    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/internal-slack": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",

@@ -158,8 +158,8 @@ function EvaluatorTypeCard({
       borderRadius="lg"
       border="1px solid"
       borderColor="border"
-      bg={disabled ? "gray.50" : "bg.panel"}
-      color={disabled ? "gray.400" : undefined}
+      bg={disabled ? "bg.subtle" : "bg.panel"}
+      color={disabled ? "fg.subtle" : undefined}
       cursor={disabled ? "default" : "pointer"}
       textAlign="left"
       width="full"
@@ -172,7 +172,7 @@ function EvaluatorTypeCard({
         <Text fontWeight="500" fontSize="sm">
           {name}
         </Text>
-        <Text fontSize="xs" color={disabled ? "gray.400" : "fg.muted"} lineClamp={2}>
+        <Text fontSize="xs" color={disabled ? "fg.subtle" : "fg.muted"} lineClamp={2}>
           {description}
         </Text>
         {disabledCta && (
@@ -181,7 +181,7 @@ function EvaluatorTypeCard({
             size="xs"
             height="auto"
             padding={0}
-            color="orange.600"
+            color="orange.fg"
             fontSize="xs"
             fontWeight="500"
             onClick={(event) => {

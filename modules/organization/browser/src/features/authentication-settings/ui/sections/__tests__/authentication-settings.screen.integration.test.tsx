@@ -135,16 +135,16 @@ describe("given an administrator on the Authentication page", () => {
   });
 
   describe("when the page renders its title", () => {
-    it("sits above the rail, as on the Identity provider and Connectors pages", () => {
+    it("sits in the content column beside the rail, not inside it", () => {
       renderWithOrganizationHost(
         <AuthenticationSettingsScreen />,
         hostWith({ grants: ["sso:view", "organization:manage"] }),
       );
 
-      const title = screen.getByRole("heading", { level: 1, name: "Authentication" });
+      const title = screen.getByRole("heading", { level: 1, name: "Overview" });
       const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
       expect(rail.contains(title)).toBe(false);
-      expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     });
   });
 
@@ -152,7 +152,7 @@ describe("given an administrator on the Authentication page", () => {
     it("says which permission the page needs rather than drawing it", () => {
       renderWithOrganizationHost(<AuthenticationSettingsScreen />, hostWith({ grants: [] }));
 
-      expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+      expect(screen.getByText(/You don't have access to/)).toBeInTheDocument();
       expect(screen.queryByTestId("organization-policy")).toBeNull();
     });
   });

@@ -1,4 +1,11 @@
-import { queryWindowed } from "@langwatch/clickhouse-client";
+import type { Authorization } from "@langwatch/authorization";
+import {
+  type AuthorizedClickHouse,
+  queryWindowed,
+  type TenantScopedReader,
+  tenantScope,
+  tenantScopeKey,
+} from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
@@ -91,9 +98,11 @@ interface ClickHouseTraceAnalyticsWriteRecord {
 }
 
 export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionRepository {
+  /** Writes resolve the tenant's own client; reads go through the proof's fence (ADR-177). */
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
+      clickhouse: AuthorizedClickHouse;
     },
   ) {
     super();
@@ -101,8 +110,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
+    clickhouse: AuthorizedClickHouse;
   }): TraceAnalyticsClickHouseRepository {
     return new TraceAnalyticsClickHouseRepository(options);
+  }
+
+  private reader(authorization: Authorization): TenantScopedReader {
+    return this.options.clickhouse.as(authorization, { reads: "traces" });
   }
 
   async upsert({
@@ -198,19 +212,17 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   /**
    * The trace's last committed slim row plus its applied-event-id watermark
    * (ADR-066), the CH-fallthrough behind a Redis miss. `fallback: "none"`:
-   * the fold executor owns the miss retry, so a second ladder is wasted.
+   * the fold executor owns the miss retry; its own-only proof reads the row it wrote.
    */
   async findByTraceId({
-    tenantId,
+    authorization,
     traceId,
     window,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<TraceAnalyticsProjectionRead | null> {
-    EventUtils.validateTenantId({ tenantId }, "TraceAnalyticsClickHouseRepository.findByTraceId");
-
     try {
       return await queryWindowed<{
         row: TraceAnalyticsRow;
@@ -223,7 +235,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         isEmpty: (result) => result === null,
         run: async (fragment) =>
           this.queryLatestVersion({
-            tenantId,
+            authorization,
             traceId,
             window: fragment ? { fromMs: fragment.fromMs, toMs: fragment.toMs } : undefined,
           }),
@@ -234,7 +246,10 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       // the row, so without this the deploy window ADR-066 documents — workers
       // rolling ahead of migration 00056, every read throwing
       // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
-      logger.warn({ tenantId, traceId, error }, "Failed to read back trace analytics row");
+      logger.warn(
+        { traceId, scope: tenantScopeKey({ authorization, reads: "traces" }), error },
+        "Failed to read back trace analytics row",
+      );
       throw error;
     }
   }
@@ -246,6 +261,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
    */
   private static readonly LATEST_VERSION_ORDER = `
         ORDER BY
+          TenantId ASC,
           LastEventOccurredAt DESC,
           SpanCount DESC,
           length(AppliedEventIds) DESC,
@@ -258,15 +274,15 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
    * the inner dedup stays unwindowed per clickhouse-queries.md (ADR-071).
    */
   private async queryLatestVersion({
-    tenantId,
+    authorization,
     traceId,
     window,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
-    const client = await this.options.resolveClient(tenantId);
+    const client = this.reader(authorization);
 
     const partitionFilter =
       window !== undefined
@@ -277,13 +293,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       query: `
         SELECT *
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND TraceId = {traceId:String}
           ${partitionFilter}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("OccurredAt")}
               AND TraceId = {traceId:String}
             GROUP BY TenantId, TraceId
           )
@@ -291,7 +307,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         LIMIT 1
       `,
       query_params: {
-        tenantId,
         traceId,
         ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
       },

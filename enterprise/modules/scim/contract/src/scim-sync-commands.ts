@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Directory sync commands: issue token, record pushes and failures, revoke sync. Each carries a
  * caller-minted commandId for deduplication. No PII; persons are userId + externalId. See D08.
@@ -67,27 +68,42 @@ function commandDataSchema<Shape extends z.ZodRawShape>(
   );
 }
 
-export const issueScimTokenCommandDataSchema = commandDataSchema({
+const issueScimTokenCommandDataSchemaDefinition = commandDataSchema({
   tokenId: z.string().min(1),
 });
+export interface IssueScimTokenCommandDataSchema extends Named<
+  typeof issueScimTokenCommandDataSchemaDefinition
+> {}
+export const issueScimTokenCommandDataSchema: IssueScimTokenCommandDataSchema =
+  issueScimTokenCommandDataSchemaDefinition;
 export type IssueScimTokenCommandData = z.infer<typeof issueScimTokenCommandDataSchema>;
 
-export const recordScimUserPushCommandDataSchema = commandDataSchema({
+const recordScimUserPushCommandDataSchemaDefinition = commandDataSchema({
   userId: z.string().min(1),
   externalId: z.string().min(1),
   op: scimUserOpSchema,
 });
+export interface RecordScimUserPushCommandDataSchema extends Named<
+  typeof recordScimUserPushCommandDataSchemaDefinition
+> {}
+export const recordScimUserPushCommandDataSchema: RecordScimUserPushCommandDataSchema =
+  recordScimUserPushCommandDataSchemaDefinition;
 export type RecordScimUserPushCommandData = z.infer<typeof recordScimUserPushCommandDataSchema>;
 
-export const recordScimGroupMappingCommandDataSchema = commandDataSchema({
+const recordScimGroupMappingCommandDataSchemaDefinition = commandDataSchema({
   groupId: z.string().min(1),
   externalId: z.string().min(1).nullable(),
 });
+export interface RecordScimGroupMappingCommandDataSchema extends Named<
+  typeof recordScimGroupMappingCommandDataSchemaDefinition
+> {}
+export const recordScimGroupMappingCommandDataSchema: RecordScimGroupMappingCommandDataSchema =
+  recordScimGroupMappingCommandDataSchemaDefinition;
 export type RecordScimGroupMappingCommandData = z.infer<
   typeof recordScimGroupMappingCommandDataSchema
 >;
 
-export const recordScimApplyFailureCommandDataSchema = commandDataSchema({
+const recordScimApplyFailureCommandDataSchemaDefinition = commandDataSchema({
   op: scimApplyOpSchema,
   /** A stable slug, never a provider's prose: this reaches a customer's
    *  failure surface, and prose is where a hostname arrives from. */
@@ -95,6 +111,11 @@ export const recordScimApplyFailureCommandDataSchema = commandDataSchema({
   retryable: z.boolean(),
   userId: z.string().min(1).nullable(),
 });
+export interface RecordScimApplyFailureCommandDataSchema extends Named<
+  typeof recordScimApplyFailureCommandDataSchemaDefinition
+> {}
+export const recordScimApplyFailureCommandDataSchema: RecordScimApplyFailureCommandDataSchema =
+  recordScimApplyFailureCommandDataSchemaDefinition;
 export type RecordScimApplyFailureCommandData = z.infer<
   typeof recordScimApplyFailureCommandDataSchema
 >;
@@ -103,15 +124,25 @@ export type RecordScimApplyFailureCommandData = z.infer<
  * Send a retired apply through again (ADR-122): the one verb an operator
  * issues rather than a directory. `retiredAtMs` names which dead letter.
  */
-export const redriveScimApplyCommandDataSchema = commandDataSchema({
+const redriveScimApplyCommandDataSchemaDefinition = commandDataSchema({
   retiredAtMs: z.number().int().nonnegative(),
 });
+export interface RedriveScimApplyCommandDataSchema extends Named<
+  typeof redriveScimApplyCommandDataSchemaDefinition
+> {}
+export const redriveScimApplyCommandDataSchema: RedriveScimApplyCommandDataSchema =
+  redriveScimApplyCommandDataSchemaDefinition;
 export type RedriveScimApplyCommandData = z.infer<typeof redriveScimApplyCommandDataSchema>;
 
-export const revokeScimSyncCommandDataSchema = commandDataSchema({
+const revokeScimSyncCommandDataSchemaDefinition = commandDataSchema({
   tokenId: z.string().min(1).nullable(),
   cause: scimRevokeCauseSchema,
 });
+export interface RevokeScimSyncCommandDataSchema extends Named<
+  typeof revokeScimSyncCommandDataSchemaDefinition
+> {}
+export const revokeScimSyncCommandDataSchema: RevokeScimSyncCommandDataSchema =
+  revokeScimSyncCommandDataSchemaDefinition;
 export type RevokeScimSyncCommandData = z.infer<typeof revokeScimSyncCommandDataSchema>;
 
 export type ScimSyncCommand =

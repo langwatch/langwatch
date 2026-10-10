@@ -1,13 +1,14 @@
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
-  Button,
+  IconButton,
   Circle,
   HStack,
   Spacer,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { system } from "@langwatch/design-system/system";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {
   Component,
@@ -25,9 +26,9 @@ import {
   Position,
   useUpdateNodeInternals,
 } from "@xyflow/react";
-import React, { forwardRef, type Ref, useEffect, useMemo } from "react";
+import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
+import React, { forwardRef, type Ref, useEffect } from "react";
 import { useDragLayer } from "react-dnd";
-import { Copy, MoreHorizontal, Trash2 } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
@@ -92,8 +93,8 @@ function NodeInputs({
               height: "8px",
               background: "var(--chakra-colors-bg)",
               borderRadius: "100%",
-              border: `1px solid #FF8309`,
-              boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #FF8309`,
+              border: `1px solid var(--chakra-colors-accent-solid)`,
+              boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px var(--chakra-colors-accent-solid)`,
             }}
           />
           <Text>{input.identifier}</Text>
@@ -109,7 +110,7 @@ function NodeInputs({
           gap={1}
           paddingX={2}
           paddingY={1}
-          background="green.50"
+          background="green.subtle"
           borderRadius="8px"
           width="full"
           position="relative"
@@ -125,8 +126,8 @@ function NodeInputs({
               height: "9px",
               background: "var(--chakra-colors-bg)",
               borderRadius: "100%",
-              border: "1px solid #22C55E",
-              boxShadow: "0px 0px 4px 0px #22C55E",
+              border: "1px solid var(--chakra-colors-green-solid)",
+              boxShadow: "0px 0px 4px 0px var(--chakra-colors-green-solid)",
             }}
           />
           <Text color="green.fg">{GATE_FIELD}</Text>
@@ -173,8 +174,8 @@ function NodeOutputs({
                 height: "8px",
                 background: "var(--chakra-colors-bg)",
                 borderRadius: "100%",
-                border: `1px solid #2B6CB0`,
-                boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #2B6CB0`,
+                border: `1px solid var(--chakra-colors-blue-fg)`,
+                boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px var(--chakra-colors-blue-fg)`,
               }}
             />
           )}
@@ -203,19 +204,13 @@ export function NodeSectionTitle({
   children: React.ReactNode;
 }) {
   return (
-    <Text
-      fontSize={fontSize ?? "9px"}
-      textTransform="uppercase"
-      color="fg.muted"
-      fontWeight="bold"
-      paddingTop={1}
-    >
+    <Text textStyle="xs" fontSize={fontSize} color="fg.muted" fontWeight="medium" paddingTop={1}>
       {children}
     </Text>
   );
 }
 
-export const selectionColor = "#2F8FFB";
+export const selectionColor = system.token.var("colors.blue.focusRing");
 
 export const isExecutableComponent = (node: Pick<Node<Component>, "type">) => {
   return node.type !== "entry" && node.type !== "prompting_technique";
@@ -235,7 +230,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
   },
   ref: Ref<HTMLDivElement>,
 ) {
-  const { ComponentIcon, LLMModelDisplay, useColorModeValue } = useWorkflowNodeHost();
+  const { ComponentIcon, LLMModelDisplay } = useWorkflowNodeHost();
   const {
     node,
     hoveredNodeId,
@@ -296,17 +291,12 @@ export const ComponentNode = forwardRef(function ComponentNode(
     item: { node?: Node } | undefined;
   };
 
-  const isNotDroppable = useMemo(
-    () => isDragging && item?.node?.type === "prompting_technique" && props.type !== "signature",
-    [isDragging, item, props.type],
-  );
+  const isNotDroppable =
+    isDragging && item?.node?.type === "prompting_technique" && props.type !== "signature";
 
   const llmParams = props.data.parameters?.filter((p) => p.type === "llm") ?? [];
 
-  const nodeShadow = useColorModeValue(
-    `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`,
-    `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.5" : "0.3"})`,
-  );
+  const nodeShadow = isHovered ? "md" : "sm";
 
   const hoveredOutlineColor = isHovered ? "gray.emphasized" : "none";
 
@@ -323,7 +313,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       gap={2}
       align="start"
       color="fg.muted"
-      fontSize="11px"
+      textStyle="xs"
       minWidth={140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"}
       boxShadow={nodeShadow}
       border="1px solid"
@@ -342,7 +332,10 @@ export const ComponentNode = forwardRef(function ComponentNode(
       {props.selected && !["entry", "end"].includes(props.type) && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
-            <Button
+            <IconButton
+              aria-label="Node actions"
+              variant="ghost"
+              size="xs"
               background="bg"
               position="absolute"
               top="-28px"
@@ -357,7 +350,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
               height="auto"
             >
               <MoreHorizontal size={11} />
-            </Button>
+            </IconButton>
           </Menu.Trigger>
           <NodeToolbar>
             <Menu.Content>
@@ -381,8 +374,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
           size="md"
         />
         <Text
-          fontSize="12px"
-          fontWeight={500}
+          textStyle="sm"
+          fontWeight="medium"
           minWidth="0"
           flexShrink={1}
           lineClamp={1}
@@ -420,7 +413,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <React.Fragment key={llmParam.identifier}>
             <NodeSectionTitle>LLM</NodeSectionTitle>
             <HStack width="full">
-              <LLMModelDisplay model={(llmParam.value as LLMConfig).model} fontSize="11px" />
+              <LLMModelDisplay model={(llmParam.value as LLMConfig).model} fontSize="xs" />
             </HStack>
           </React.Fragment>
         ))}

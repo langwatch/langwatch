@@ -73,10 +73,10 @@ Haiku remain for really simple work, to save usage:
 | Agent type           | Effort | Use for                                                                                                     |
 | -------------------- | ------ | ----------------------------------------------------------------------------------------------------------- |
 | `lane-opus-xhigh`    | xhigh  | The hardest lanes: peer-cycle and architecture cuts, security, authz and tenancy, cross-module integration. |
-| `lane-opus`          | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.      |
+| `lane-opus`          | medium | The default Opus lane. Pass `effort: high` only for security-bearing ports or truly difficult debugging.    |
 | `lane-opus-medium`   | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps.     |
 | `lane-opus-low`      | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                         |
-| `lane-sonnet`        | high   | Sonnet 5.5: big scoped implementation lanes with a clear acceptance test.                                   |
+| `lane-sonnet`        | medium | Sonnet 5.5: big scoped implementation lanes with a clear acceptance test (medium default since 2026-10-09). |
 | `lane-sonnet-medium` | medium | Sonnet 5.5: well-scoped fixes, pattern-following UI, test-id sweeps, probe cases, first drafts of docs.     |
 | `lane-sonnet-low`    | low    | Sonnet 5.5: renames, one-line wiring, formatting-only work.                                                 |
 | `lane-haiku`         | medium | Haiku 5.5: well-defined mechanical edits with a clear check: inventories, codemod follow-ups, sweeps.       |

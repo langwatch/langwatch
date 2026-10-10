@@ -1,7 +1,7 @@
 /**
  * One organization's spend, rolled up per project and narrowed to the projects
- * the caller can reach: their own teams' projects, or every project when they
- * administer the organization.
+ * the caller can reach: their own teams' projects except aggregates, or every
+ * project when they administer the organization.
  */
 import type {
   ListOrganizationSpendInput,
@@ -25,6 +25,8 @@ export class PrismaOrganizationSpendRepository implements OrganizationSpendRepos
         kind: { not: "internal_governance" },
         OR: [
           {
+            // An aggregate is listed to organisation admins only (ADR-177 decision 5).
+            kind: { not: "aggregate" },
             team: {
               organizationId: input.organizationId,
               members: { some: { userId: input.userId } },

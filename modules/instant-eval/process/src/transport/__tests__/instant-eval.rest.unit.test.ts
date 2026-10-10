@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   ForbiddenError,
@@ -20,6 +20,7 @@ import { InstantEvalFreeBudgetExhaustedError } from "@langwatch/instant-eval-jud
  * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { instantEvalRest } from "../instant-eval.rest.ts";
@@ -78,6 +79,8 @@ function judgment(overrides: Partial<InstantEvalJudgmentWire> = {}): InstantEval
 function mount(api: Partial<InstantEvalApi>, holds: (permission: string) => boolean = () => true) {
   const stub = createApiFixture<InstantEvalApi>(api);
   const hono = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }) => {
         if (!holds(permission)) throw new ForbiddenError();
@@ -92,8 +95,10 @@ function mount(api: Partial<InstantEvalApi>, holds: (permission: string) => bool
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(instantEvalRestCredential, () => ({ kind: "legacyProjectKey" as const })),
+    middlewareContext: [
+      bindMiddlewareContext(instantEvalRestCredential, () => ({
+        kind: "legacyProjectKey" as const,
+      })),
     ],
   });
 

@@ -6,14 +6,15 @@ import {
 } from "@langwatch/agent-contract";
 import type { RestCaller } from "@langwatch/api/hosting";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  defineRestMiddleware,
-  projectRestFacts,
+  defineMiddlewareContext,
+  projectRequestContext,
   canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -25,8 +26,8 @@ import { z } from "zod";
 import { createAgentRest } from "../agent.rest.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
-// fact - a mount binds a declared fact by name, not by object identity.
-const traceparent = defineRestMiddleware("traceparent", z.string().nullable());
+// context - a mount binds a declared context by name, not by object identity.
+const traceparent = defineMiddlewareContext("traceparent", z.string().nullable());
 
 class ForbiddenTestError extends HandledError {
   constructor() {
@@ -47,6 +48,8 @@ function buildApi(
   const call = vi.fn(options.call ?? (async () => outcome));
   const app = createApiFixture<AgentApi>({ call });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }): RestCaller => {
         if (options.authorizeRefuses && permission === "scenarios:create") {
@@ -65,13 +68,13 @@ function buildApi(
     runtime.mount(createAgentRest(options.relayMaxPayloadMb).router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [
-        bindRestMiddleware(projectRestFacts, () => ({
+      middlewareContext: [
+        bindMiddlewareContext(projectRequestContext, () => ({
           projectSlug: "project-one",
           viewerUserId: options.apiKeyUserId ?? null,
           actorId: options.apiKeyUserId ?? "u_2",
         })),
-        bindRestMiddleware(traceparent, (context) => context.req.header("traceparent") ?? null),
+        bindMiddlewareContext(traceparent, (request) => request.headers.get("traceparent") ?? null),
       ],
     }),
   );

@@ -41,6 +41,7 @@ function endpoint(over: Partial<WebhookEndpointView> = {}): WebhookEndpointView 
     maxBatchSize: 3,
     maxBatchDelayMs: 0,
     maxInFlight: 2,
+    allowSelfSignedCertificate: false,
     createdAt: new Date(NOW),
     updatedAt: new Date(NOW),
     ...over,

@@ -5,14 +5,17 @@
 import {
   NOTIFICATION_TYPES,
   type BillingUsageLimitOrganization,
-  type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
+import type { UsageThresholdCrossedEventData } from "@langwatch/entitlement-contract";
 import type { Notification } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { UsageLimitEmailData } from "./billing-usage-notice.service.ts";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
+
+/** The threshold entitlement recorded; billing reads neither the month nor when it was crossed. */
+type UsageWarningDecision = Omit<UsageThresholdCrossedEventData, "month" | "occurredAt">;
 
 /**
  * Most calls find the warning already sent this month, or nobody to send it

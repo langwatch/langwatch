@@ -4,8 +4,6 @@
  * retired alerts path renders the automations tab, so that tab is highlighted.
  */
 
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -27,7 +25,7 @@ export const AUTOMATION_SECTIONS: readonly {
   icon: LucideIcon;
 }[] = [
   { section: "overview", label: "Overview", suffix: "", icon: Eye },
-  { section: "automations", label: "Automations", suffix: "/automations", icon: Zap },
+  { section: "automations", label: "Rules", suffix: "/automations", icon: Zap },
   { section: "reports", label: "Reports", suffix: "/schedules", icon: Calendar },
 ];
 
@@ -35,6 +33,7 @@ export function AutomationsLayout({
   title,
   basePath,
   section = "overview",
+  actions,
   children,
 }: {
   /** The page heading, rendered in the content column beside the rail. */
@@ -42,6 +41,8 @@ export function AutomationsLayout({
   basePath: string;
   /** The tab this page is. */
   section?: AutomationSection;
+  /** The page's own buttons, at the header's end. */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   const host = useAutomationHost();
@@ -53,18 +54,15 @@ export function AutomationsLayout({
   const active = AUTOMATION_SECTIONS.find((item) => item.section === section);
 
   return (
-    <Box width="full" paddingX={4} paddingBottom={16} data-testid="section-navigation-layout">
-      <SectionNavigationFrame
-        label="Automations"
-        links={links}
-        activeHref={`${basePath}${active?.suffix ?? ""}`}
-        onNavigate={(href) => host.navigate(href)}
-      >
-        <PageLayout.Header height="auto" paddingX={0} paddingBottom={3} marginBottom={4}>
-          <PageLayout.Heading>{title}</PageLayout.Heading>
-        </PageLayout.Header>
-        <Box data-testid="section-navigation-content">{children}</Box>
-      </SectionNavigationFrame>
-    </Box>
+    <SectionNavigationFrame
+      label="Automations"
+      pageTitle={title === "Automations" ? "Rules" : title}
+      headerActions={actions}
+      links={links}
+      activeHref={`${basePath}${active?.suffix ?? ""}`}
+      onNavigate={(href) => host.navigate(href)}
+    >
+      {children}
+    </SectionNavigationFrame>
   );
 }

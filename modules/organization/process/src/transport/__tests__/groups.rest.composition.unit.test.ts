@@ -5,17 +5,18 @@
  * @see specs/groups/groups-rest-api.feature
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
 } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { organizationModuleSetup } from "../../app/__tests__/support/organization-module-setup.ts";
 import { OrganizationModule } from "../../app/organization.app.ts";
 import { groupsRest } from "../group.rest.ts";
-import { organizationKeyFacts } from "../organization-management.rest.ts";
+import { organizationKeyContext } from "../organization-management.rest.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
 
 const ORGANIZATION_ID = "organization-1";
@@ -64,6 +65,8 @@ async function application({ foreignTeamId }: { foreignTeamId?: string } = {}) {
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request }) => admit(request),
@@ -74,7 +77,9 @@ async function application({ foreignTeamId }: { foreignTeamId?: string } = {}) {
   const hono = runtime.mount(groupsRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: "key-1" })),
+    ],
   });
   const send = (path: string, init: { method?: string; body?: unknown } = {}) =>
     hono.fetch(

@@ -1,11 +1,11 @@
 /**
  * Langy's answer to the port its dock declares: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -29,7 +29,7 @@ import {
   type LangySuccessNotice,
 } from "../model/langy-host.ts";
 
-class CapabilityLangyHost extends LangyHostApi {
+class HostServiceLangyHost extends LangyHostApi {
   private readonly session: UiSession;
   private readonly navigationCapability: UiNavigation;
   private readonly routeCapability: UiRoute;
@@ -95,8 +95,12 @@ class CapabilityLangyHost extends LangyHostApi {
     return this.session.hasPermission(permission);
   }
 
+  hasOrganizationPermission(permission: string): boolean {
+    return this.session.hasOrganizationPermission(permission);
+  }
+
   isLoading(): boolean {
-    return this.session.snapshot().scope.status === "loading";
+    return !this.session.isSettled();
   }
 
   isDemoProject(): boolean {
@@ -141,7 +145,7 @@ class CapabilityLangyHost extends LangyHostApi {
  * has no `defineBrowserModule` to hang `.withHosts()` off — see the handoff.
  */
 export default function LangyHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const deployment = useUiDeployment();
   const organizationRole = useUiScope().scopeHost()?.organizationRole();
   const projectSlug = session.snapshot().scope.project?.slug;
@@ -152,7 +156,7 @@ export default function LangyHostMount({ children }: { children?: ReactNode }) {
 
   const host = useMemo(
     () =>
-      new CapabilityLangyHost({
+      new HostServiceLangyHost({
         session,
         navigation,
         route,

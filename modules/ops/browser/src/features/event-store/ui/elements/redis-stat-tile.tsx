@@ -1,5 +1,5 @@
-import { Stat } from "@chakra-ui/react";
 import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { CompactStat } from "@langwatch/design-system/stat-tile";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 import { formatBytes } from "../../../../model/ops-formatters.ts";
@@ -41,14 +41,7 @@ export function RedisStatTile({ data }: { data: RedisData }) {
       : `${Math.round(memoryPercentRaw * 10) / 10}% of ${formatBytes(data.redisMemoryMaxBytes)}`;
 
   return (
-    <Stat.Root
-      borderRadius="md"
-      flexShrink={0}
-      padding={2}
-      data-testid="redis-stat-tile"
-      data-warning={memoryWarning || cpuWarning ? "true" : "false"}
-    >
-      <Stat.Label whiteSpace="nowrap">Redis</Stat.Label>
+    <CompactStat label="Redis" testId="redis-stat-tile" warning={memoryWarning || cpuWarning}>
       <HStack gap={4} align="baseline">
         <RedisFigure
           value={formatBytes(data.redisMemoryUsedBytes)}
@@ -68,7 +61,7 @@ export function RedisStatTile({ data }: { data: RedisData }) {
           testId="redis-clients-stat"
         />
       </HStack>
-    </Stat.Root>
+    </CompactStat>
   );
 }
 
@@ -88,7 +81,7 @@ function RedisFigure({
       <Text
         textStyle="lg"
         fontWeight="semibold"
-        color={warning ? "red.500" : undefined}
+        color={warning ? "fg.error" : undefined}
         whiteSpace="nowrap"
         data-testid={testId}
       >

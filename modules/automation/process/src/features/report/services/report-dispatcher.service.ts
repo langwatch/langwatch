@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
@@ -18,6 +19,7 @@ export class ReportDispatcherService implements ReportDispatcher {
     projects: AutomationProjectDirectory;
     analytics: Pick<AnalyticsApi, "getTimeseries">;
     traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">;
+    authz: Pick<AuthzApi, "authorizeInternal">;
     delivery: AutomationNotificationDelivery;
     slackDestinations: SlackDestinationService;
     suppression: { filterSuppressed: ReportDispatchDeps["filterSuppressedRecipients"] };
@@ -33,6 +35,7 @@ export class ReportDispatcherService implements ReportDispatcher {
     });
     const traceList = ReportTraceListService.create({
       traces: input.traces,
+      authz: input.authz,
       baseHost: input.baseHost,
     });
     return new ReportDispatcherService(

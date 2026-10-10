@@ -5,7 +5,9 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -65,6 +67,7 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
+    clickhouse: authorizedClickHouseFor(ch),
   });
 
   await ch.insert({
@@ -106,6 +109,7 @@ function recordingRepo(): {
   return {
     repo: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => recordingClient,
+      clickhouse: authorizedClickHouseFor(recordingClient),
     }),
     queries,
   };
@@ -115,7 +119,10 @@ describe.skipIf(!clickHouseConfigured)(
   "TraceSummaryClickHouseRepository.findByTraceId (integration)",
   () => {
     it("returns the trace when no occurredAtMs hint is passed", async () => {
-      const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
+      const result = await repo.findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId: presentTraceId,
+      });
 
       expect(result).not.toBeNull();
       expect(result?.traceId).toBe(presentTraceId);
@@ -124,7 +131,10 @@ describe.skipIf(!clickHouseConfigured)(
     it("resolves OccurredAt and bounds the heavy read for a hint-less call", async () => {
       const { repo: rec, queries } = recordingRepo();
 
-      const result = await rec.findByTraceId({ tenantId, traceId: presentTraceId });
+      const result = await rec.findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId: presentTraceId,
+      });
 
       expect(result?.traceId).toBe(presentTraceId);
       // One cheap resolve (min(OccurredAt)) + the heavy read, and the heavy read
@@ -139,7 +149,10 @@ describe.skipIf(!clickHouseConfigured)(
     it("skips the heavy read entirely for a trace that does not exist", async () => {
       const { repo: rec, queries } = recordingRepo();
 
-      const result = await rec.findByTraceId({ tenantId, traceId: `missing-${nanoid()}` });
+      const result = await rec.findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId: `missing-${nanoid()}`,
+      });
 
       expect(result).toBeNull();
       // The light resolve confirms absence; the heavy unbounded read is never

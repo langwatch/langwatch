@@ -8,7 +8,6 @@ import {
   canonicalConflictResponses,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   InstantEvalApi,
@@ -58,51 +57,45 @@ const RUN_NOT_FOUND = {
   description: "This project holds no run with that id (instant_eval_not_found)",
 };
 
-/**
- * The type is written out rather than inferred so the declaration emit stays
- * portable.
- */
-export const instantEvalRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<InstantEvalApi>;
-}> = defineRestRouter(InstantEvalApi)
+export const instantEvalRest = defineRestRouter(InstantEvalApi)
   .withNamespace("instant-evals")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("v1-only")
 
   .post("/", "createInstantEvalRun")
+  .withoutAudit("run, not a change")
   .withPermission("analytics:manage")
   .withInput(instantEvalRunInputSchema)
-  .withMiddleware(instantEvalRestCredential)
+  .withMiddlewareContext(instantEvalRestCredential)
   .withOutput(instantEvalRunSchema)
   .withStatus(202)
   .withDocs({
     tags: INSTANT_EVAL_TAGS,
     description: CREATE_RUN_DESCRIPTION,
   })
-  .handle(({ app, input, scope }, credential) =>
+  .handle(({ app, input, scope, actor }, credential) =>
     app.createRun({
       projectId: scope.id,
-      actor: { kind: "credential", credential },
+      actor: { kind: "credential", credential, actor },
       input: instantEvalRunInputOf(input),
     }),
   )
 
   .post("/estimate", "estimateInstantEvalRun")
+  .withoutAudit("read sent as a POST")
   .withPermission("analytics:manage")
   .withInput(instantEvalRunInputSchema)
-  .withMiddleware(instantEvalRestCredential)
+  .withMiddlewareContext(instantEvalRestCredential)
   .withOutput(instantEvalEstimateSchema)
   .withDocs({
     summary: "Estimate a run",
     tags: INSTANT_EVAL_TAGS,
     description: ESTIMATE_RUN_DESCRIPTION,
   })
-  .handle(({ app, input, scope }, credential) =>
+  .handle(({ app, input, scope, actor }, credential) =>
     app.estimateRun({
       projectId: scope.id,
-      actor: { kind: "credential", credential },
+      actor: { kind: "credential", credential, actor },
       input: instantEvalRunInputOf(input),
     }),
   )
@@ -136,6 +129,7 @@ export const instantEvalRest: Readonly<{
   .handle(({ app, input, scope }) => app.getRun({ projectId: scope.id, runId: input.id }))
 
   .post("/:id/cancel", "cancelInstantEvalRun")
+  .withAudit("instantEval.cancel")
   .withPermission("analytics:manage")
   .withParams(instantEvalIdParamsSchema)
   .withInput(cancelInstantEvalRunBodySchema)
@@ -184,7 +178,7 @@ export const instantEvalRest: Readonly<{
   .withPermission("analytics:view")
   .withParams(instantEvalIdParamsSchema)
   .withQuery(instantEvalSampleQuerySchema)
-  .withMiddleware(instantEvalRestCredential)
+  .withMiddlewareContext(instantEvalRestCredential)
   .withOutput(instantEvalSampleSchema)
   .withDocs({
     summary: "Sample a run",
@@ -192,10 +186,10 @@ export const instantEvalRest: Readonly<{
     description: SAMPLE_DESCRIPTION,
     errors: [RUN_NOT_FOUND],
   })
-  .handle(({ app, input, scope }, credential) =>
+  .handle(({ app, input, scope, actor }, credential) =>
     app.getSample({
       projectId: scope.id,
-      actor: { kind: "credential", credential },
+      actor: { kind: "credential", credential, actor },
       runId: input.id,
       rows: input.n,
     }),

@@ -1,19 +1,13 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { EventingParticipation, OwnEventStore } from "@langwatch/eventing";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import type {
-  EnsuredPersonalWorkspace,
-  FindPersonalWorkspaceInput,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
-} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { fromDate, nowInstant, Temporal, type Instant } from "@langwatch/time";
 import type {
   AdoptUnconfirmedAccountOutcome,
   CreatePasskeyUserInput,
@@ -73,6 +67,7 @@ import {
 import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
 import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
 import type { UserChannels } from "../channels/user.channels.ts";
+import { EventingUserStandingRepository } from "../repositories/eventing/eventing.user-standing.repository.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
@@ -91,6 +86,11 @@ import {
 import { UserOrganizationDirectoryService } from "../services/user-organization-directory.service.ts";
 import { type UserPasswordHasher, UserPasswordService } from "../services/user-password.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
+import {
+  UserStandingFactBackfillService,
+  type UserStandingFactBackfillReport,
+  type UserStandingFactBackfillRun,
+} from "../services/user-standing-fact-backfill.service.ts";
 import { UserService } from "../services/user.service.ts";
 
 const logger = createLogger("langwatch:user-app");
@@ -101,6 +101,9 @@ const logger = createLogger("langwatch:user-app");
  * on signup day is asked again once they have something worth protecting.
  */
 const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
+
+/** A session started this soon after the account was created is the sign-up's own. */
+const SIGN_UP_SESSION_WINDOW_MS = 60_000;
 
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
@@ -114,7 +117,6 @@ const CREDENTIAL_ISSUER = "local:credential";
 /** The peer capabilities this module calls, resolved by the kernel at boot. */
 interface UserAppDependencies {
   authz: AuthzApi;
-  organizations: OrganizationApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
@@ -149,12 +151,10 @@ export class UserModule implements UserApi {
   static readonly dependencies: {
     authz: typeof AuthzApi;
     notifications: typeof NotificationService;
-    organizations: typeof OrganizationApi;
     storedObjects: typeof StoredObjectApi;
   } = {
     authz: AuthzApi,
     notifications: NotificationService,
-    organizations: OrganizationApi,
     storedObjects: StoredObjectApi,
   };
 
@@ -197,6 +197,7 @@ export class UserModule implements UserApi {
     now = nowInstant,
   }: UserTestSetup): UserModule {
     const lifecycle = UserLifecycleNoticeService.create();
+    const lifecycleLog = EventingUserStandingRepository.create();
     const avatarObjects = UserAvatarObjectService.create({
       storedObjects: dependencies.storedObjects,
     });
@@ -204,7 +205,7 @@ export class UserModule implements UserApi {
     return new UserModule({
       users: UserService.create({
         repository: repositories.users,
-        organizations: dependencies.organizations,
+        personalProjects: repositories.organizationDirectory,
         auth: { getSsoSetupStatus: (input) => channels.authReads.getSsoSetupStatus(input) },
         avatarStorage: avatarObjects,
         credentialIssuer: CREDENTIAL_ISSUER,
@@ -215,6 +216,12 @@ export class UserModule implements UserApi {
       lifecycle,
       createdFactBackfill: UserCreatedFactBackfillService.create({
         users: repositories.users,
+        lifecycle,
+      }),
+      lifecycleLog,
+      standingFactBackfill: UserStandingFactBackfillService.create({
+        users: repositories.users,
+        standings: lifecycleLog,
         lifecycle,
       }),
       credentials: UserCredentialService.create({
@@ -238,6 +245,8 @@ export class UserModule implements UserApi {
   readonly #users: UserService;
   readonly #lifecycle: UserLifecycleNoticeService;
   readonly #createdFactBackfill: UserCreatedFactBackfillService;
+  readonly #lifecycleLog: EventingUserStandingRepository;
+  readonly #standingFactBackfill: UserStandingFactBackfillService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -254,6 +263,8 @@ export class UserModule implements UserApi {
     users: UserService;
     lifecycle: UserLifecycleNoticeService;
     createdFactBackfill: UserCreatedFactBackfillService;
+    lifecycleLog: EventingUserStandingRepository;
+    standingFactBackfill: UserStandingFactBackfillService;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -268,8 +279,10 @@ export class UserModule implements UserApi {
     this.#users = input.users;
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
+    this.#lifecycleLog = input.lifecycleLog;
+    this.#standingFactBackfill = input.standingFactBackfill;
     this.#credentials = input.credentials;
-    this.#account = UserAccountService.create(input.dependencies);
+    this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
     this.#authReads = input.channels.authReads;
     this.#directory = input.directory;
@@ -444,12 +457,37 @@ export class UserModule implements UserApi {
     const passkey = this.#facts.passkeysEnabled && !nudge.hasPasskey;
     const twoStep = this.#facts.mfaEnrollmentOpen && !nudge.twoStepEnabled;
     if (!passkey && !twoStep) return { offer: false, passkey, twoStep, signedInWith };
+    // A brand-new account is onboarding: the offer waits for its next sign-in.
+    const accountCreatedAt = fromDate(nudge.accountCreatedAt);
+    if (await this.#isSignUpSession({ ...input, accountCreatedAt })) {
+      return { offer: false, passkey, twoStep, signedInWith };
+    }
 
     const askAgainAfter = nudge.dismissedAt
       ? nudge.dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000
       : 0;
 
     return { offer: this.#nowMs() >= askAgainAfter, passkey, twoStep, signedInWith };
+  }
+
+  async #isSignUpSession({
+    id,
+    sessionId,
+    accountCreatedAt,
+  }: UserIdInput & { sessionId: string | null; accountCreatedAt: Instant }): Promise<boolean> {
+    if (!sessionId) return false;
+    const sessions = await this.#authReads.listBrowserSessions({
+      userId: id,
+      currentSessionId: sessionId,
+    });
+    const current = sessions.find((session) => session.sessionId === sessionId);
+    if (!current) return false;
+
+    const signedInAt = Temporal.Instant.from(current.signedInAt);
+
+    return (
+      signedInAt.epochMilliseconds - accountCreatedAt.epochMilliseconds < SIGN_UP_SESSION_WINDOW_MS
+    );
   }
 
   /** "Not now" to the whole offer, dated rather than flagged: it comes back. */
@@ -513,6 +551,21 @@ export class UserModule implements UserApi {
     return this.#createdFactBackfill.recordExisting(input);
   }
 
+  /** Keeps user_lifecycle's own event store as the process builds it; a listing keeps none. */
+  keepLifecycleEventStore(input: {
+    participation: EventingParticipation;
+    eventStore: Pick<OwnEventStore, "read"> | undefined;
+  }): void {
+    this.#lifecycleLog.keep(input);
+  }
+
+  /** The `user:record-standing-facts` step's body: each account's standing re-stated. */
+  recordExistingStandingFacts(
+    input: UserStandingFactBackfillRun,
+  ): Promise<UserStandingFactBackfillReport> {
+    return this.#standingFactBackfill.recordExisting(input);
+  }
+
   /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */
   recordLifecycleFact(intent: UserFactIntent): Promise<void> {
     return this.#lifecycle.record(intent);
@@ -554,11 +607,7 @@ export class UserModule implements UserApi {
     return this.#users.setAvatar(input);
   }
 
-  /**
-   * The caller's own photo. The display name and address come from this
-   * directory's own row rather than from the door, so both avatar entrypoints
-   * name the personal workspace the same way.
-   */
+  /** The caller's own photo, rate limited, stored under their personal workspace. */
   async setOwnAvatar(input: SetOwnAvatarInput): Promise<UserAvatarResult> {
     const allowance = await this.#rateLimits.check({
       key: `user.setAvatar:${input.userId}`,
@@ -567,15 +616,7 @@ export class UserModule implements UserApi {
 
     if (!allowance.allowed) throw new UserAvatarRateLimitedError();
 
-    const profile = await this.#users.findById({ id: input.userId });
-
-    return this.#users.setAvatar({
-      userId: input.userId,
-      organizationId: input.organizationId,
-      imageDataUrl: input.imageDataUrl,
-      displayName: profile?.name ?? null,
-      displayEmail: profile?.email ?? null,
-    });
+    return this.#users.setAvatar(input);
   }
 
   /** Clears the uploaded avatar so the fallbacks apply again. */
@@ -584,16 +625,6 @@ export class UserModule implements UserApi {
   }
 
   // -- the /me dashboard -----------------------------------------------------
-
-  /** The user's personal workspace in one organization, creating it if absent. */
-  ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {
-    return this.#account.ensurePersonalWorkspace(input);
-  }
-
-  /** The user's personal workspace in one organization, or null if none yet. */
-  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.#account.findPersonalWorkspace(input);
-  }
 
   /** The path this user pinned as their home, or null if they pinned none. */
   findLastHomePath(input: UserIdInput): Promise<string | null> {

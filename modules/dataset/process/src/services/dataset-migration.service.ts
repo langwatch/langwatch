@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
+import type { MigrationStepReport, MigrationStepRun } from "@langwatch/upgrade/step";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type {
@@ -49,11 +50,41 @@ export class DatasetMigrationService {
 
   async run(input: MigrationRunInput = {}): Promise<DatasetMigrationRunResult> {
     try {
-      return { status: "completed", summary: await this.migrateAll(input) };
+      const summary = await this.migrateAll(input);
+      return { status: remaining(summary) > 0 ? "incomplete" : "completed", summary };
     } catch (error) {
       if (this.repository.isSchemaPending(error)) return { status: "schema-pending" };
       throw error;
     }
+  }
+
+  /**
+   * The background step's run. The framework records a normal return done, so work left
+   * behind (a failed or concurrently changed dataset) throws: the step retries from its checkpoint.
+   */
+  async runStep({
+    checkpoint,
+    dryRun,
+    signal,
+  }: Parameters<MigrationStepRun>[0]): Promise<MigrationStepReport> {
+    const resumed = checkpoint.resumeFrom?.afterProjectId;
+    const result = await this.run({
+      dryRun,
+      signal,
+      afterProjectId: typeof resumed === "string" ? resumed : undefined,
+      onProjectDone: (progress) =>
+        dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
+    });
+    if (result.status === "schema-pending") {
+      throw new Error("Dataset chunk-layout columns are not applied yet; the step retries");
+    }
+    if (result.status === "incomplete") {
+      const { failed, skippedConcurrentWrite } = result.summary;
+      throw new Error(
+        `${failed} datasets failed and ${skippedConcurrentWrite} changed while moving; the step retries`,
+      );
+    }
+    return { ...result.summary, dryRun };
   }
 
   async migrateDataset(
@@ -106,7 +137,8 @@ export class DatasetMigrationService {
         if (input.signal?.aborted) return summary;
         await this.migrateProject({ projectId, input, summary });
         if (input.signal?.aborted) return summary;
-        await input.onProjectDone?.({ afterProjectId: projectId });
+        // Once any dataset is left behind, the cursor stays before it for the retry.
+        if (remaining(summary) === 0) await input.onProjectDone?.({ afterProjectId: projectId });
       }
       after = projects.next ?? undefined;
     } while (after !== undefined);
@@ -136,7 +168,7 @@ export class DatasetMigrationService {
     } while (page.length > 0 && !input.signal?.aborted);
   }
 
-  /** Migrates one page of datasets, counting each outcome; a failed one waits for a later run. */
+  /** Migrates one page of datasets, counting each outcome; a failed one is left for the retry. */
   private async migratePage({
     projectId,
     page,
@@ -156,11 +188,16 @@ export class DatasetMigrationService {
         summary.failed += 1;
         logger.warn(
           { error, datasetId, projectId },
-          "Dataset migration failed; a later run can retry it",
+          "Dataset migration failed; the run ends incomplete and retries it",
         );
       }
     }
   }
+}
+
+/** Datasets this run left on the postgres layout: failed or changed while moving. */
+function remaining(summary: DatasetMigrationSummary): number {
+  return summary.failed + summary.skippedConcurrentWrite;
 }
 
 function increment(summary: DatasetMigrationSummary, outcome: DatasetMigrationOutcome): void {

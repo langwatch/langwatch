@@ -24,7 +24,7 @@ export function FrontDoorValuePanel({
     <Box
       className="lw-front-door-panel"
       position="relative"
-      width={{ base: "full", md: "50%" }}
+      width={{ base: "full", md: "56%" }}
       flexShrink={0}
       display="flex"
       alignItems={{ base: "flex-start", md: "center" }}
@@ -40,7 +40,7 @@ export function FrontDoorValuePanel({
         textAlign={{ base: "center", md: "start" }}
         gap={{ base: 3, md: 6 }}
         maxWidth="640px"
-        marginInlineStart={{ base: 0, md: "min(6vw, 72px)" }}
+        marginInlineStart={{ base: 0, md: "min(4vw, 48px)" }}
       >
         {/* The wordmark belongs to the PAGE, not to the card. Sitting in the
             card's header it read as a label on a form; above the headline it

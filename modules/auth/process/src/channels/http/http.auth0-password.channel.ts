@@ -1,9 +1,12 @@
+import type { AuthServerConfig } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import { signInProviderSecrets, type ScopedSecrets } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
   Auth0PasswordChannel,
+  auth0ManagementSecret,
   type Auth0PasswordChangeOutcome,
   type Auth0PasswordChangeRequest,
 } from "../auth0-password.channel.ts";
@@ -436,8 +439,25 @@ function auth0Refusal(error: Auth0ApiError): Auth0PasswordChangeOutcome {
  * so an unconfigured tenant answers `not_configured` rather than failing boot.
  */
 export class HttpAuth0PasswordChannel extends Auth0PasswordChannel {
-  static create(credentials: Auth0ManagementCredentials): HttpAuth0PasswordChannel {
-    return new HttpAuth0PasswordChannel(credentials);
+  /** The Management app's id and secret; absent, the login app's stand in, as main's did. */
+  static async create({
+    config,
+    secrets,
+  }: {
+    config: Pick<AuthServerConfig, "auth0ManagementClientId" | "signInProviders">;
+    secrets: ScopedSecrets;
+  }): Promise<HttpAuth0PasswordChannel> {
+    return secrets.into(auth0ManagementSecret, (managementSecret) =>
+      secrets.into(
+        signInProviderSecrets.auth0ClientSecret,
+        (loginClientSecret) =>
+          new HttpAuth0PasswordChannel({
+            issuer: config.signInProviders.auth0Issuer,
+            mgmtClientId: config.auth0ManagementClientId ?? config.signInProviders.auth0ClientId,
+            mgmtClientSecret: managementSecret ?? loginClientSecret,
+          }),
+      ),
+    );
   }
 
   private constructor(private readonly credentials: Auth0ManagementCredentials) {

@@ -1,12 +1,12 @@
 /**
- * The server half of the Upgrades pages' six reads and the ten system-migration operator
- * procedures, each asking its permission on the platform at the door.
+ * The Upgrades pages' reads, Retry and the system-migration procedures. Each serves while the
+ * installation upgrades (API-UP) and asks its permission on the platform at the door.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsUpgradeTrpc } from "@langwatch/ops-contract";
 
-import { opsOperatorFact } from "#transport/ops-operator.trpc";
+import { opsOperatorContext } from "#transport/ops-operator.trpc";
 
 export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUpgradeTrpc> =
   defineTrpcRouter(OpsApi, opsUpgradeTrpc)
@@ -34,6 +34,14 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.getUpgradeRun({ id: input.id }))
 
+    .procedure("preview")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.previewUpgrade({ to: input.to }))
+
+    .procedure("listTargets")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.listUpgradeTargets())
+
     .procedure("retryStep")
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }) => app.retryUpgradeStep({ id: input.id }))
@@ -41,6 +49,10 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .procedure("listSystemMigrations")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.listSystemMigrations())
+
+    .procedure("listTenants")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listUpgradeTenants(input))
 
     .procedure("listMigrationEnrollments")
     .withPermission("ops:view", { at: "platform" })
@@ -51,7 +63,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .handle(({ app, input }) => app.searchMigrationOrganizations({ query: input.query }))
 
     .procedure("enrollMigrationTenant")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(async ({ app, input }, operator) => {
       await app.enrollMigrationTenant({
@@ -65,7 +77,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     })
 
     .procedure("enrollMigrationCohort")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }, operator) =>
       app.enrollMigrationCohort({
@@ -91,7 +103,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     })
 
     .procedure("runSystemMigrationForOrganization")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }, operator) =>
       app.runSystemMigrationForOrganization({
@@ -103,7 +115,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     )
 
     .procedure("runSystemMigrationPass")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(async ({ app }, operator) => {
       await app.runSystemMigrationPass({ operator });
@@ -112,7 +124,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     })
 
     .procedure("assertSystemMigrationLegacyWritersDrained")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(async ({ app, input }, operator) => {
       await app.assertSystemMigrationLegacyWritersDrained({
@@ -127,7 +139,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     })
 
     .procedure("rollBackSystemMigrationTenant")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(async ({ app, input }, operator) => {
       await app.rollBackSystemMigrationTenant({

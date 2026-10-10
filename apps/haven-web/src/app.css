@@ -28,3 +28,9 @@
   font-size: var(--text-sm);
   pointer-events: none;
 }
+
+.haven-lane-screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
+}

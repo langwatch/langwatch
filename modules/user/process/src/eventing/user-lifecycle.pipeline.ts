@@ -108,12 +108,19 @@ export function buildUserLifecyclePipeline(deps: {
 
 export const userLifecycleEventing = defineEventingModule({
   pipeline: USER_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<UserRepositories, UserModule>) =>
-    buildUserLifecyclePipeline({
+  build: ({
+    app,
+    processStore,
+    participation,
+    eventStore,
+  }: EventingSetup<UserRepositories, UserModule>) => {
+    app.keepLifecycleEventStore({ participation, eventStore });
+    return buildUserLifecyclePipeline({
       facts: {
         record: (intent) => app.recordLifecycleFact(intent),
         retention: processStore,
       },
-    }),
+    });
+  },
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });

@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { RateLimitedError } from "../../errors.ts";
 import {
   createTrpcRuntime,
@@ -72,6 +73,7 @@ function harness({ policies }: { policies: Readonly<Record<string, TrpcThrottleP
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

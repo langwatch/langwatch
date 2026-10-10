@@ -1,5 +1,5 @@
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiRpc,
   UiScope,
   UiSession,
@@ -26,9 +26,6 @@ class StubSession extends UiSession {
   }
   isSettled(): boolean {
     return true;
-  }
-  featureFlag(): boolean | undefined {
-    return false;
   }
 }
 
@@ -77,7 +74,7 @@ function wrapper({ children, rpc }: { children: ReactNode; rpc: UiRpc }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={client}>
-      <UiCapabilityContextProvider
+      <UiHostServicesContextProvider
         value={{
           documentTitle: { set: () => () => {} },
           feedback: { notify: vi.fn(), reportFailure: vi.fn() } as never,
@@ -89,7 +86,7 @@ function wrapper({ children, rpc }: { children: ReactNode; rpc: UiRpc }) {
         }}
       >
         {children}
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </QueryClientProvider>
   );
 }

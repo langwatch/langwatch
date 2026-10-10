@@ -15,14 +15,17 @@ export type GovernanceToast = {
 
 export type GovernanceToaster = { create: (toast: GovernanceToast) => void };
 
-/** Routes one toast to the host: an error to `failed`, anything else to `succeeded`. */
+/** Routes one toast to the host by its type: error, warning, info, else success. */
 function raise({ host, toast }: { host: GovernanceHostApi; toast: GovernanceToast }): void {
   const { title, description, id } = toast;
   if (toast.type === "error") {
     host.failed({ error: void 0, fallbackTitle: title, description, id });
     return;
   }
-  host.succeeded({ title, description, id });
+  const notice = { title, description, id };
+  if (toast.type === "warning") host.warned(notice);
+  else if (toast.type === "info") host.informed(notice);
+  else host.succeeded(notice);
 }
 
 export function useGovernanceToaster(): GovernanceToaster {

@@ -5,6 +5,7 @@
  */
 import { createServer } from "node:net";
 
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -119,7 +120,11 @@ async function bootWorkerBeside(environment: Readonly<Record<string, string>>) {
     .withProcessOwnership(false)
     .withSecrets((_config, secrets) => secrets.withEnv())
     .start();
-  await server.run(await server.container("worker").boot());
+  await server.run(
+    await server
+      .container("worker")
+      .boot({ classifyEventLogRetention: classifyEventLogRowRetention }),
+  );
 
   return server;
 }

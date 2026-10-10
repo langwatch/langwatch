@@ -4,22 +4,13 @@
     "rootDir": ".",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": [
-      "es2023",
-      "dom"
-    ],
+    "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
-    "types": [
-      "vitest/globals"
-    ]
+    "types": ["vitest/globals"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "vitest.setup.ts"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "references": [
     {
       "path": "tsconfig.build.json"

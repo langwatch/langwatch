@@ -43,6 +43,10 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     return this.prisma.account.count({ where: { userId } });
   }
 
+  async countPasskeysForUser({ userId }: { userId: string }): Promise<number> {
+    return this.prisma.passkey.count({ where: { userId } });
+  }
+
   async findFederatedAccountsForUser({
     userId,
   }: {

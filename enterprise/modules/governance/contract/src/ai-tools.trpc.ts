@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every `aiTools.*` procedure, declared once, at main's wire names (main `ee/governance/routers/aiTools.ts`). */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -32,7 +32,7 @@ const iconAssetSchema = z
   .nullable()
   .optional();
 
-export const aiToolCreateSchema = z.object({
+const aiToolCreateSchemaDefinition = z.object({
   ...organizationScope.shape,
   departmentIds: z.array(z.string()).default([]),
   type: aiToolTypeSchema,
@@ -41,8 +41,10 @@ export const aiToolCreateSchema = z.object({
   order: z.number().int().min(0).optional(),
   config: z.record(z.string(), z.unknown()),
 });
+export interface AiToolCreateSchema extends Named<typeof aiToolCreateSchemaDefinition> {}
+export const aiToolCreateSchema: AiToolCreateSchema = aiToolCreateSchemaDefinition;
 
-export const aiToolUpdateSchema = z.object({
+const aiToolUpdateSchemaDefinition = z.object({
   ...entryInOrganization.shape,
   displayName: z.string().min(1).max(128).optional(),
   iconAsset: iconAssetSchema,
@@ -52,6 +54,8 @@ export const aiToolUpdateSchema = z.object({
   type: aiToolTypeSchema.optional(),
   config: z.record(z.string(), z.unknown()).optional(),
 });
+export interface AiToolUpdateSchema extends Named<typeof aiToolUpdateSchemaDefinition> {}
+export const aiToolUpdateSchema: AiToolUpdateSchema = aiToolUpdateSchemaDefinition;
 
 export const aiToolsTrpc = defineTrpcContract("aiTools")
   .query("list")

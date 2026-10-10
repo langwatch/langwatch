@@ -28,11 +28,11 @@ import {
   type S3ClientResolver,
   S3TraceLegacySpoolChannel,
 } from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
+import { TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
+import { IO_PREVIEW_BYTES } from "../../../features/projection/rules/trace-projection-lean.rules.ts";
 import { EventingTraceEventPayloadRepository } from "../../../repositories/eventing/eventing.trace-event-payload.repository.ts";
 import { TraceEventPayloadFieldNotFoundError } from "../../../repositories/trace-payload-reader.repository.ts";
-import { IO_PREVIEW_BYTES } from "../../../features/projection/rules/trace-projection-lean.rules.ts";
-import { TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
-import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
 import {
   TraceOffloadResolutionService,
   type WarnLogger,
@@ -48,7 +48,7 @@ const FULL_VALUE = "x".repeat(100 * 1024);
 type SeatRead = Parameters<EventReadSeat["getEvent"]>[0];
 
 /** A seat holding events per tenant and keeping every read it was asked; others are not found. */
-class RecordingSeat implements EventReadSeat {
+class RecordingSeat implements Pick<EventReadSeat, "getEvent"> {
   readonly reads: SeatRead[] = [];
   private readonly events = new Map<string, unknown>();
 

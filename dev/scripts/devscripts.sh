@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs the Go dev scripts (cmd/devscripts): generate-modules, sync-references,
-# ensure-built. From source with `go run` when Go is installed, otherwise the
+# Runs the Go dev scripts (cmd/devscripts): generate-modules and
+# sync-references. From source with `go run` when Go is installed, otherwise the
 # prebuilt .bin/devscripts/devscripts (the Docker image ships only that).
 set -euo pipefail
 

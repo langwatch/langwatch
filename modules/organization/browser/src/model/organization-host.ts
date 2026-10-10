@@ -1,6 +1,6 @@
 /** Host port for organization screens: sealed imports (ui, router, session) routed here. */
 
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import type { AuthenticationOverviewCardProps } from "@langwatch/organization-client";
 import { createContext, useContext } from "react";
@@ -130,7 +130,7 @@ export abstract class OrganizationHostApi {
   abstract hasEmailProvider(): boolean;
 
   /** Whether a feature flag is on. Fail-closed while it is still arriving. */
-  abstract isFeatureEnabled(flag: string): boolean;
+  abstract isFeatureEnabled(flag: ReleaseFlagToken): boolean;
 
   /** Opens an overlay by its owner's token; the address carries the token's wire name. */
   abstract openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;

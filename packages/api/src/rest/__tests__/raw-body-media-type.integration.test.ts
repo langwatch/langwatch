@@ -11,7 +11,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import {
   createErrorHandler,
@@ -61,12 +61,14 @@ const notes = defineRestRouter(NoteApi)
   .withRawBody("text", { mediaType: JSON_TYPE })
   .withPermission("organization:manage")
   .withOutput(answer)
+  .withoutAudit("test route")
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/legacy", "recordLegacyNote")
   .withRawBody("text", { mediaType: JSON_TYPE, mismatch: "malformed_request" })
   .withPermission("organization:manage")
   .withOutput(answer)
+  .withoutAudit("test route")
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/protocol", "recordProtocolNote")
@@ -77,6 +79,7 @@ const notes = defineRestRouter(NoteApi)
     because: PROTOCOL_REASON,
     refusal: legacyRefusal,
   })
+  .withoutAudit("test route")
   .handle(async ({ app, raw, response }) =>
     response.write({
       status: 200,
@@ -89,24 +92,28 @@ const notes = defineRestRouter(NoteApi)
   .withRawBody("text", { mediaType: JSON_TYPE, mismatch: "accepted" })
   .withPermission("organization:manage")
   .withOutput(answer)
+  .withoutAudit("test route")
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/signed", "recordSignedNote")
   .withRawBody("text", { mediaType: JSON_TYPE })
   .withAccess(anyAuthenticated({ reason: "the body's signature is the whole gate" }))
   .withOutput(answer)
+  .withoutAudit("test route")
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/unchecked", "recordUncheckedNote")
   .withRawBody("text")
   .withPermission("organization:manage")
   .withOutput(answer)
+  .withoutAudit("test route")
   .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/refusing", "recordRefusingNote")
   .withRawBody("text", { refuses: ["application/grpc"] })
   .withPermission("organization:manage")
   .withOutput(answer)
+  .withoutAudit("test route")
   .handle(async ({ app, raw }) => app.record({ raw }))
   .build();
 
@@ -137,6 +144,7 @@ function notesApp() {
   });
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: ({ request }) => keyDoor(request),
       identify,

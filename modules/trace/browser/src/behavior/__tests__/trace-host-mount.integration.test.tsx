@@ -51,14 +51,15 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
     }),
     currentUser: () => reading.actor,
     hasPermission: () => true,
+    isSettled: () => true,
   };
   return {
     ...original,
-    useUiCapabilities: () => ({
+    useUiHostServices: () => ({
       session,
       navigation: { navigate: vi.fn(), replace: vi.fn() },
       route: { reading: () => ({ params: {}, query: {} }), setQuery: vi.fn() },
-      feedback: { succeeded: vi.fn(), failed: vi.fn() },
+      feedback: { succeeded: vi.fn(), warned: vi.fn(), informed: vi.fn(), failed: vi.fn() },
     }),
   };
 });

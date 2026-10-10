@@ -3,7 +3,7 @@ export type Route =
   | { kind: "hub"; page: "overview" }
   | { kind: "hub"; page: "logs"; stack: string; lane: string }
   | { kind: "hub"; page: "settings" }
-  | { kind: "home"; slug: string };
+  | { kind: "home"; slug: string; tab: string; sub: string };
 
 type Where = { hostname: string; pathname: string };
 
@@ -33,12 +33,13 @@ const decode = ({ segment }: { segment: string }) => {
 };
 
 export const readRoute = ({ hostname, pathname }: Where): Route => {
-  const slug = stackSlugOf({ hostname });
-  if (slug !== undefined) return { kind: "home", slug };
-  const [page, stack = "", lane = ""] = pathname
+  const [page = "", second = "", lane = ""] = pathname
     .split("/")
     .filter((segment) => segment.length > 0)
     .map((segment) => decode({ segment }));
+  const slug = stackSlugOf({ hostname });
+  if (slug !== undefined) return { kind: "home", slug, tab: page, sub: second };
+  const stack = second;
   if (page === "logs") return { kind: "hub", page: "logs", stack, lane };
   if (page === "settings") return { kind: "hub", page: "settings" };
   return { kind: "hub", page: "overview" };
@@ -52,3 +53,9 @@ export const logsPath = ({ stack = "", lane = "" }: { stack?: string; lane?: str
     .filter((part) => part.length > 0)
     .map((part, index) => (index === 0 ? part : encodeURIComponent(part)))
     .join("/");
+
+/** A stack console tab's path: `/` for the overview, `/<tab>[/<sub>]` otherwise. */
+export const tabPath = ({ tab, sub = "" }: { tab: string; sub?: string }) =>
+  tab === "overview"
+    ? "/"
+    : `/${encodeURIComponent(tab)}${sub === "" ? "" : `/${encodeURIComponent(sub)}`}`;

@@ -121,8 +121,8 @@ describe("defineProjectionReplayStep with a since instant", () => {
       await report;
 
       expect(saved).toEqual([
-        { lane: LANE, replayedThrough: CUT_OVER, batchesDone: 1, totalBatches: 2 },
-        { lane: LANE, replayedThrough: CUT_OVER, batchesDone: 2, totalBatches: 2 },
+        { lane: LANE, replayedThrough: CUT_OVER, done: 1, total: 2 },
+        { lane: LANE, replayedThrough: CUT_OVER, done: 2, total: 2 },
       ]);
     });
   });

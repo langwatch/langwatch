@@ -2,12 +2,17 @@
  * @vitest-environment node
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import {
   GuidedOnboardingPathUnknownError,
   type OnboardingApi,
 } from "@langwatch/onboarding-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { onboardingRest, onboardingRestCredential } from "../onboarding.rest.ts";
@@ -24,6 +29,8 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
       : options.credential;
   const app = createApiFixture<OnboardingApi>(options.onboarding ?? {});
   const hono = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: credential.userId ? { type: "user", id: credential.userId } : null,
@@ -34,7 +41,7 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(onboardingRestCredential, () => credential)],
+    middlewareContext: [bindMiddlewareContext(onboardingRestCredential, () => credential)],
   });
 
   const send = (method: string, path: string) =>

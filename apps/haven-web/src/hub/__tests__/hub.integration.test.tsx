@@ -132,6 +132,20 @@ describe("the hub", () => {
     });
   });
 
+  describe("when the service list draws", () => {
+    /** @scenario "The one-process lane's logs are captured per application" */
+    it("offers the ui, api and worker apart, with no app lane hosting them", async () => {
+      await openAt({ path: "/logs/feat-x" });
+      await screen.findByRole("checkbox", { name: /^error/ });
+
+      const service = screen.getByRole("combobox", { name: "Service" });
+      const names = within(service)
+        .getAllByRole("option")
+        .map((option) => option.textContent);
+      expect(names).toEqual(["All services", "api", "gateway", "ui", "worker"]);
+    });
+  });
+
   describe("when a lane's log link is followed", () => {
     it("reads only that lane of that stack", async () => {
       const daemon = serveHub();

@@ -63,6 +63,7 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import { endPasskeyCeremony } from "../../../behavior/passkey-ceremony.store.ts";
+import { PASSKEY_ON_THIS_DEVICE_STORAGE_KEY } from "../../../model/passkey-on-this-device.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 
@@ -108,6 +109,7 @@ describe("the passkey ceremony's waiting state", () => {
     routeMock.mockResolvedValue(pickerWithPasskey);
     passkeySignInMock.mockImplementation(neverAnswers);
     window.localStorage.clear();
+    window.localStorage.setItem(PASSKEY_ON_THIS_DEVICE_STORAGE_KEY, "1");
     _resetTwoStepChallengeForTests();
   });
 

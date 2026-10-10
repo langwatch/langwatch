@@ -95,7 +95,9 @@ export const IconCheckboxCardGroup = <T extends string = string>({
                 transition="all 0.15s ease"
                 flexShrink={0}
               >
-                {isSelected && <Check size={10} color="white" strokeWidth={3} />}
+                {isSelected && (
+                  <Check size={10} color="var(--chakra-colors-orange-contrast)" strokeWidth={3} />
+                )}
               </HStack>
             </HStack>
           </CheckboxCard.Root>

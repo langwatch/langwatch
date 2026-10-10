@@ -8,6 +8,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
@@ -33,6 +34,7 @@ function stepsApp() {
     .withInput(z.array(z.object({ index: z.number(), label: z.string() })), { as: "steps" })
     .withPermission("experiments:manage")
     .withOutput(z.object({ logged: z.number() }))
+    .withoutAudit("test route")
     .handle(({ input }) => {
       handed.push(input);
 
@@ -42,6 +44,7 @@ function stepsApp() {
     .router();
 
   const app = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "key-1" },

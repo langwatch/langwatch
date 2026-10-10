@@ -8,9 +8,10 @@ import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
-  PrismaQueryGuard,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
+  PrismaQueryGuard,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -161,14 +162,20 @@ describe.skipIf(!databaseUrl)("The stored test suite vocabulary", () => {
     /** @scenario "The scenario column names the test suite it is filed in" */
     it("names the column testSuiteId and the index after it", async () => {
       const columns = await database().$queryRaw<{ column_name: string }[]>`
-        -- @tenancy: reads the catalog, which holds no project row
+        ${skipTenantCheck({
+          // Reads the catalog, which holds no project row.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'Scenario' AND column_name IN ('folderId', 'testSuiteId')
       `;
       expect(columns.map((row) => row.column_name)).toEqual(["testSuiteId"]);
 
       const indexes = await database().$queryRaw<{ indexname: string }[]>`
-        -- @tenancy: reads the catalog, which holds no project row
+        ${skipTenantCheck({
+          // Reads the catalog, which holds no project row.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT indexname FROM pg_indexes
         WHERE tablename = 'Scenario'
           AND indexname IN ('Scenario_projectId_folderId_idx', 'Scenario_projectId_testSuiteId_idx')
@@ -196,7 +203,10 @@ describe.skipIf(!databaseUrl)("The stored test suite vocabulary", () => {
       expect(kindOf.get(plan.id)).toBe("run_plan");
 
       const [column] = await database().$queryRaw<{ column_default: string }[]>`
-        -- @tenancy: reads the catalog, which holds no project row
+        ${skipTenantCheck({
+          // Reads the catalog, which holds no project row.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT column_default FROM information_schema.columns
         WHERE table_name = 'SimulationSuite' AND column_name = 'kind'
       `;

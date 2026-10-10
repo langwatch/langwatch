@@ -16,6 +16,7 @@ import {
   automationApiCreateInputSchema,
   automationApiFireHistoryTrpcInputSchema,
   automationApiListSlackChannelsInputSchema,
+  automationApiPreviewEmailInputSchema,
   automationApiProjectScopeSchema,
   automationApiRecentActivityInputSchema,
   automationApiRecentFiresInputSchema,
@@ -25,6 +26,7 @@ import {
   automationApiUpdateTriggerFiltersInputSchema,
   automationApiUpsertInputSchema,
   automationApiWebhookDeliveriesInputSchema,
+  automationEmailPreviewSchema,
   nextFiringSchema,
   triggerFirePageSchema,
   triggerLatestEvaluationSchema,
@@ -124,6 +126,11 @@ export const automationTrpc = defineTrpcContract("automation")
   .mutation("testFireTemplate")
   .withInput(automationApiTestFireInputSchema)
   .withOutput(testFireResultSchema)
+
+  /** The email an authoring draft would send, rendered on the server. */
+  .query("previewTriggerEmail")
+  .withInput(automationApiPreviewEmailInputSchema)
+  .withOutput(automationEmailPreviewSchema)
 
   .mutation("upsert")
   .withInput(automationApiUpsertInputSchema)

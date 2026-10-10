@@ -1,6 +1,6 @@
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EventingParticipation } from "@langwatch/eventing";
+import type { EventingParticipation, FoldReadAuthorizer } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -8,15 +8,15 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
-import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import { TraceIoExtractionAdapterService } from "../features/derivation/services/trace-io-extraction-adapter.service.ts";
+import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
+import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
 import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
-import { TraceIoExtractionAdapterService } from "../features/derivation/services/trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
-import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
-import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
+import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import {
   createProjectMetadataHandler,
@@ -71,6 +71,8 @@ export interface TraceProcessingPipelineInput {
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
   /** Where a project's first and later traces are recorded as trace's own events. */
   milestones: ProjectMetadataSubscriberDeps["milestones"];
+  /** Mints the own-only proof the summary and analytics fold stores read back through. */
+  authorizeFoldRead: FoldReadAuthorizer;
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
@@ -91,7 +93,7 @@ export class TraceProcessingRuntimeAdapter {
   }
 
   #projections(): ReturnType<EventingTracePipelineAdapter["build"]> {
-    const { peers, repositories, canonicalisation } = this.input;
+    const { peers, repositories, canonicalisation, authorizeFoldRead } = this.input;
     const defaultRetentionDays = (): number =>
       peers.dataRetention.getPlatformDefaultRetentionDays();
     return EventingTracePipelineAdapter.create({
@@ -100,12 +102,17 @@ export class TraceProcessingRuntimeAdapter {
         defaultRetentionDays,
       }),
       summaryStore: repositories.summaryFoldCache.cached(
-        TraceSummaryStore.create({ storage: repositories.summaryProjection, defaultRetentionDays }),
+        TraceSummaryStore.create({
+          storage: repositories.summaryProjection,
+          defaultRetentionDays,
+          authorize: authorizeFoldRead,
+        }),
       ),
       derivedStore: repositories.analyticsFoldCache.cached(
         TraceAnalyticsStore.create({
           storage: repositories.analyticsProjection,
           defaultRetentionDays,
+          authorize: authorizeFoldRead,
         }),
       ),
       rollupStore: TraceAnalyticsRollupStore.create({

@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace, Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceLegacyRead } from "../../trace-viewer.service.ts";
 import { TraceViewerReadService } from "../../trace-viewer.service.ts";
 
@@ -27,7 +28,9 @@ describe("TraceViewerReadService", () => {
     const getTracesWithSpans = vi.fn(async () => [trace]);
     const read = createApiFixture<TraceLegacyRead>({ getTracesWithSpans });
     const resolve = vi.fn(async () => protections);
-    const service = TraceViewerReadService.create({ read, protections: { resolve } });
+    const proof = ownProof({ projectId: "project-1" });
+    const authorize = vi.fn(async () => proof);
+    const service = TraceViewerReadService.create({ read, protections: { resolve }, authorize });
 
     await expect(
       service.readForViewer({
@@ -42,7 +45,9 @@ describe("TraceViewerReadService", () => {
       userId: "user-1",
       publiclyShared: false,
     });
+    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project-1" }));
     expect(getTracesWithSpans).toHaveBeenCalledWith({
+      authorization: proof,
       projectId: "project-1",
       traceIds: ["trace-1"],
       protections,

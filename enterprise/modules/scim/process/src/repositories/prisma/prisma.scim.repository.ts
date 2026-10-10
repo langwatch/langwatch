@@ -120,7 +120,7 @@ export class PrismaScimRepository extends ScimRepository {
   }
 
   // Arrow instance properties, not prototype methods, from here through
-  // `removeMembership`: the base class declares these members as properties
+  // `addMembership`: the base class declares these members as properties
   // of function type (so tests can reference a mock repository's methods
   // unbound without tripping `typescript/unbound-method`), and TypeScript
   // requires a subclass to match that declaration shape exactly (TS2425).
@@ -338,14 +338,15 @@ export class PrismaScimRepository extends ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    pending?: boolean;
   }): Promise<void> => {
     await this.prisma.organizationUser.create({
-      data: { ...input, role: organizationUserRole(input.role) },
-    });
-  };
-  removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
-    await this.prisma.organizationUser.delete({
-      where: { userId_organizationId: input },
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: organizationUserRole(input.role),
+        disabledAt: input.pending ? new Date() : null,
+      },
     });
   };
   async findDirectoryGroupIds(input: {
@@ -364,7 +365,7 @@ export class PrismaScimRepository extends ScimRepository {
   }
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     const row = await this.prisma.group.findFirst({
-      where: { id: input.id, organizationId: input.organizationId },
+      where: { id: input.id, organizationId: input.organizationId, scimSource: { not: null } },
     });
 
     return row ? scimGroupRecordOf(row) : null;
@@ -764,14 +765,26 @@ export class PrismaScimRepository extends ScimRepository {
     if (input.connectionIds.length === 0) return [];
 
     const where = { connectionId: { in: input.connectionIds } };
-    const select = { connectionId: true, userId: true } as const;
+    const select = { connectionId: true, userId: true, organizationId: true } as const;
     const [owned, identified] = await Promise.all([
       this.prisma.scimDirectoryUser.findMany({ where, select }),
       this.prisma.scimExternalId.findMany({ where, select }),
     ]);
+    const claims = [...owned, ...identified];
+    // Somebody the directory deactivated is no longer one it manages here.
+    const deactivated = await this.prisma.scimUserResource.findMany({
+      where: {
+        active: false,
+        organizationId: { in: [...new Set(claims.map((row) => row.organizationId))] },
+        userId: { in: [...new Set(claims.map((row) => row.userId))] },
+      },
+      select: { organizationId: true, userId: true },
+    });
+    const inactive = new Set(deactivated.map((row) => `${row.organizationId}\u0000${row.userId}`));
     const ownership = new Map<string, ScimDirectoryOwnership>();
-    for (const row of [...owned, ...identified]) {
-      ownership.set(`${row.connectionId}\u0000${row.userId}`, row);
+    for (const { connectionId, userId, organizationId } of claims) {
+      if (inactive.has(`${organizationId}\u0000${userId}`)) continue;
+      ownership.set(`${connectionId}\u0000${userId}`, { connectionId, userId });
     }
     return [...ownership.values()];
   }

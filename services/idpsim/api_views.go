@@ -69,6 +69,7 @@ type tenantView struct {
 	Provisioning     provisioningView     `json:"provisioning"`
 	LastProvisioning *ProvisioningOutcome `json:"lastProvisioning"`
 	Scale            scaleView            `json:"scale"`
+	Signing          signingView          `json:"signing"`
 }
 
 func (s *Server) handleAPITenant(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +93,7 @@ func (s *Server) handleAPITenant(w http.ResponseWriter, r *http.Request) {
 		},
 		LastProvisioning: t.LastProvisioning(),
 		Scale:            scaleViewOf(t),
+		Signing:          signingViewOf(t),
 	})
 }
 
@@ -110,6 +112,10 @@ type signInView struct {
 	Domain   string         `json:"domain"`
 	Refusal  *refusalNotice `json:"refusal"`
 	Users    []signInUser   `json:"users"`
+	// Provider is the social provider being played, empty for the tenant's own OIDC.
+	Provider string `json:"provider,omitempty"`
+	// CancelHref declines the sign-in: the client gets access_denied back.
+	CancelHref string `json:"cancelHref,omitempty"`
 }
 
 // handleAPISignIn reads the authorize request the picker was served for (the
@@ -122,6 +128,11 @@ func (s *Server) handleAPISignIn(w http.ResponseWriter, r *http.Request) {
 	}
 	query := r.URL.Query()
 	view := signInView{TenantID: t.ID, Domain: t.Domain, Users: []signInUser{}}
+	authorizePath := "/t/" + strconv.Itoa(t.ID) + "/oauth/authorize"
+	if path, social := t.socialAuthorizePath(query.Get("social")); social {
+		authorizePath, view.Provider = path, query.Get("social")
+	}
+	query.Del("social")
 	if notice, _, refused := unregisteredRedirect(t, parseAuthorizeRequest(query)); refused {
 		view.Refusal = &notice
 		writeJSON(w, http.StatusOK, view)
@@ -135,9 +146,12 @@ func (s *Server) handleAPISignIn(w http.ResponseWriter, r *http.Request) {
 		hinted.Set("login_hint", u.ID)
 		view.Users = append(view.Users, signInUser{
 			Name: u.DisplayName(), Email: u.Email,
-			Href: "/t/" + strconv.Itoa(t.ID) + "/oauth/authorize?" + hinted.Encode(),
+			Href: authorizePath + "?" + hinted.Encode(),
 		})
 	}
+	cancelled := maps.Clone(query)
+	cancelled.Set("cancel", "1")
+	view.CancelHref = authorizePath + "?" + cancelled.Encode()
 	writeJSON(w, http.StatusOK, view)
 }
 

@@ -20,18 +20,23 @@ export type TriggerAction = triggerModule.TriggerAction;
 export {
   annotationQueueActionParamsSchema,
   type AnnotationQueueActionParams,
+  type AnnotationQueueActionParamsSchema,
 } from "./providers/annotation-queue.ts";
 export {
   datasetActionParamsSchema,
   datasetMappingSchema,
   traceMappingEntrySchema,
   type DatasetActionParams,
+  type DatasetMappingSchema,
+  type TraceMappingEntrySchema,
+  type DatasetActionParamsSchema,
 } from "./providers/dataset.ts";
 export {
   EMAIL_RX,
   emailActionParamsSchema,
   type EmailActionParams,
   type EmailPreview,
+  type EmailActionParamsSchema,
 } from "./providers/email.ts";
 export {
   SLACK_BOT_TOKEN_KEPT,
@@ -47,14 +52,17 @@ export {
   type SlackPreview,
   type SlackPreviewPayload,
   type SlackTemplateType,
+  type SlackActionParamsSchema,
 } from "./providers/slack.ts";
 export {
   DEFAULT_WEBHOOK_CONTENT_TYPE,
   isJsonWebhookContentType,
   isWebhookContentType,
   webhookActionParamsSchema,
+  webhookUrlSchema,
   type WebhookActionParams,
   type WebhookPreview,
+  type WebhookActionParamsSchema,
 } from "./providers/webhook.ts";
 
 export const providerActionValues = [

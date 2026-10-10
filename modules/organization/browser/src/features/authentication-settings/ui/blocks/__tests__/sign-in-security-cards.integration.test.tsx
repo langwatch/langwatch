@@ -4,6 +4,7 @@
  * whole settings object back on save.
  * @see specs/identity/org-session-lifetime.feature
  */
+import "@testing-library/jest-dom/vitest";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -26,7 +27,9 @@ describe("the account lockout card", () => {
         <SignInLockoutCard settings={SIGN_IN_SECURITY_OFF} saving={false} onSave={onSave} />,
       );
 
-      expect(screen.queryByTestId("sign-in-lockout-save")).toBeNull();
+      expect(screen.getByTestId("sign-in-lockout-save")).toBeDisabled();
+      await userEvent.click(screen.getByTestId("sign-in-lockout-save"));
+      expect(onSave).not.toHaveBeenCalled();
       // userEvent, not fireEvent: Chakra's radio group only hears a real click.
       await userEvent.click(screen.getByText("Temporary lockout"));
       expect((screen.getByTestId("sign-in-lockout-attempts") as HTMLInputElement).value).toBe("5");
@@ -64,19 +67,22 @@ describe("the session limits card", () => {
   });
 
   describe("given a maximum shorter than the idle timeout", () => {
-    it("warns that it would never be reached and offers no save", () => {
+    it("warns that it would never be reached and prevents saving", async () => {
+      const onSave = vi.fn();
       renderCard(
         <SessionLimitCard
           settings={{ ...SIGN_IN_SECURITY_OFF, sessionIdleTimeoutMinutes: 60 }}
           saving={false}
-          onSave={vi.fn()}
+          onSave={onSave}
         />,
       );
 
       fireEvent.change(screen.getByTestId("session-limit-maximum"), { target: { value: "30" } });
 
       expect(screen.getByTestId("session-limit-unreachable")).toBeTruthy();
-      expect(screen.queryByTestId("session-limit-save")).toBeNull();
+      expect(screen.getByTestId("session-limit-save")).toBeDisabled();
+      await userEvent.click(screen.getByTestId("session-limit-save"));
+      expect(onSave).not.toHaveBeenCalled();
     });
   });
 

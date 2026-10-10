@@ -226,6 +226,14 @@ export abstract class NavigationHost {
   abstract notFound(): ReactNode;
 
   /**
+   * The content row, drawn with the room the docked assistant takes beside the
+   * content card. The application claims the dock for the shell while it is mounted.
+   */
+  langyDockRoom({ render }: { render: (inset: number) => ReactNode }): ReactNode {
+    return render(0);
+  }
+
+  /**
    * The post-login join offer drawn over the page body; the shell answers it
    * from organization's `joinOffer` capability. Nothing where none is wired.
    * The id is `undefined` while the organization read is out, `null` for none.

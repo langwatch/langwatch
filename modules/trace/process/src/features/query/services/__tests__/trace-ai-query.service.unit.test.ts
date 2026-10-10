@@ -2,7 +2,10 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { AiQueryProviderError, type TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceAiQueryService } from "../trace-ai-query.service.ts";
+
+const PROOF = ownProof({ projectId: "p1" });
 
 const RANGE = { from: 1_000, to: 2_000 };
 const KNOWN = { evaluators: [], events: [] };
@@ -28,6 +31,7 @@ describe("TraceAiQueryService", () => {
       await expect(
         service.generateTraceQueryFromPrompt({
           projectId: "p1",
+          authorization: PROOF,
           prompt: "errors",
           timeRange: RANGE,
         }),
@@ -41,6 +45,7 @@ describe("TraceAiQueryService", () => {
       const { service, generateText } = compose();
       const result = await service.generateTraceQueryFromPrompt({
         projectId: "p1",
+        authorization: PROOF,
         prompt: "good ones",
         timeRange: RANGE,
       });
@@ -58,7 +63,12 @@ describe("TraceAiQueryService", () => {
         query: "status:error",
       });
       await expect(
-        service.generateTraceAction({ projectId: "p1", prompt: "save errors", timeRange: RANGE }),
+        service.generateTraceAction({
+          projectId: "p1",
+          authorization: PROOF,
+          prompt: "save errors",
+          timeRange: RANGE,
+        }),
       ).resolves.toEqual({ ok: true, kind: "create_lens", name: "Errors", query: "status:error" });
       expect(generateStructured).toHaveBeenCalledWith(
         expect.objectContaining({ timeoutMs: 30_000, maxRetries: 1 }),
@@ -70,7 +80,12 @@ describe("TraceAiQueryService", () => {
       generateStructured
         .mockResolvedValueOnce({ kind: "apply_query", query: "" })
         .mockResolvedValueOnce({ kind: "apply_query", query: "status:error" });
-      await service.generateTraceAction({ projectId: "p1", prompt: "x", timeRange: RANGE });
+      await service.generateTraceAction({
+        projectId: "p1",
+        authorization: PROOF,
+        prompt: "x",
+        timeRange: RANGE,
+      });
       const [, second] = generateStructured.mock.calls.map(([call]) => call);
       expect(JSON.stringify(second)).toContain("failed to parse: Empty query.");
     });
@@ -82,7 +97,12 @@ describe("TraceAiQueryService", () => {
       });
       generateStructured.mockRejectedValue(failure);
       const error = await service
-        .generateTraceAction({ projectId: "p1", prompt: "x", timeRange: RANGE })
+        .generateTraceAction({
+          projectId: "p1",
+          authorization: PROOF,
+          prompt: "x",
+          timeRange: RANGE,
+        })
         .catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(AiQueryProviderError);
       expect(error).toMatchObject({ meta: { httpStatus: 401 } });
@@ -93,7 +113,12 @@ describe("TraceAiQueryService", () => {
       const { service, generateStructured } = compose();
       generateStructured.mockResolvedValue({ kind: "apply_query", query: "" });
       await expect(
-        service.generateTraceAction({ projectId: "p1", prompt: "x", timeRange: RANGE }),
+        service.generateTraceAction({
+          projectId: "p1",
+          authorization: PROOF,
+          prompt: "x",
+          timeRange: RANGE,
+        }),
       ).rejects.toMatchObject({ meta: { reason: "Empty query.", lastQuery: "" } });
     });
   });
@@ -125,6 +150,7 @@ describe("TraceAiQueryService", () => {
   describe("when generateSearchRoute routes without the classifier", () => {
     const routeInput = {
       projectId: "p1",
+      authorization: PROOF,
       text: "why did errors spike",
       timeRange: RANGE,
       target: "traces" as const,

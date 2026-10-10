@@ -110,3 +110,19 @@ function hasLoneSurrogate(value: string): boolean {
   }
   return false;
 }
+
+describe("avatar depth", () => {
+  it("lifts a person with a shadow and leaves a project avatar flat", () => {
+    const { container } = render(
+      <ChakraProvider value={defaultSystem}>
+        <UserAvatar name="Ada Lovelace" background="cyan.400" />
+        <Avatar.Root background="purple.500">
+          <Avatar.Fallback>L</Avatar.Fallback>
+        </Avatar.Root>
+      </ChakraProvider>,
+    );
+    const [person, project] = Array.from(container.querySelectorAll(".chakra-avatar__root"));
+    expect(person?.hasAttribute("data-lifted")).toBe(true);
+    expect(project?.hasAttribute("data-lifted")).toBe(false);
+  });
+});

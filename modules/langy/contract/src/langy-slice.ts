@@ -189,7 +189,18 @@ export interface LangySliceSurface {
   attachedContext: LangyAttachedContext[];
   attachContext: (item: LangyAttachedContext) => void;
   detachContext: (id: string) => void;
+  /** The docked panel is open and wants its room beside the app shell's content card. */
+  dockShifted: boolean;
+  /** An app shell is mounted: the dock starts below its header as a second content card. */
+  claimDockShell: () => void;
+  releaseDockShell: () => void;
 }
+
+/**
+ * The room a claiming app shell keeps right of its content card while the dock is open:
+ * the docked panel's width plus the strip of page ground between the two cards.
+ */
+export const LANGY_SHELL_DOCK_INSET = 392 + 12;
 
 /**
  * The precise context the current page declares for Langy (a dataset with its name), which the
@@ -221,6 +232,9 @@ export const LANGY_ABSENT_SURFACE: LangySliceSurface = {
   attachedContext: [],
   attachContext: nothing,
   detachContext: nothing,
+  dockShifted: false,
+  claimDockShell: nothing,
+  releaseDockShell: nothing,
 };
 
 /** What a reader sees where Langy is not installed: nothing on the page is a target. */

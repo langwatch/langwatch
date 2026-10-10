@@ -123,7 +123,7 @@ describe("EventingClickHouseEventExplorer.searchAggregates", () => {
 
         const { statement } = capturedQuery(statements);
         expect(statement.tenantId).toBe("");
-        expect(statement.unscoped?.reason).toMatch(/searches across tenants/);
+        expect(statement.SKIP_TENANT_CHECK).toBe(true);
       });
     });
   });
@@ -214,7 +214,7 @@ describe("EventingClickHouseEventExplorer.findEventsByAggregate", () => {
         });
 
         expect(capturedQuery(statements).statement.tenantId).toBe("project_test");
-        expect(capturedQuery(statements).statement.unscoped).toBeUndefined();
+        expect(capturedQuery(statements).statement.SKIP_TENANT_CHECK).toBeUndefined();
       });
     });
   });

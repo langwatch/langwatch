@@ -17,10 +17,13 @@ import {
   type OrganizationWithMembersAndTheirTeams,
   type TeamUserRole,
   type User,
+  type OrganizationAdmission,
+  auditImpersonationMetadataSchema,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../../rules/admission-audit.rules.ts";
+import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
   isActiveAdmin,
@@ -397,6 +400,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   > {
@@ -407,6 +411,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         return {
           userId: row.userId,
           departmentId: row.departmentId ?? null,
+          disabledAt: row.disabledAt ?? null,
           user: { name, email },
         };
       });
@@ -527,36 +532,48 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       });
   }
 
+  async readJoinerSeat({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<"MEMBER" | "DEVELOPER"> {
+    return readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
+  }
+
   async createMembership(input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
-    const { organizationId, userId, pendingAdmissionId } = input;
+  }): Promise<OrganizationAdmission> {
+    const { organizationId, userId, pendingAdmissionId, seat, pending } = input;
     const existing = this.membershipRow({ organizationId, userId });
     if (existing) {
-      const seat = existing.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER";
-      return { outcome: "already-present", seat };
+      if (existing.role === OrganizationUserRole.DEVELOPER) {
+        return { outcome: "already-present", seat: "DEVELOPER", pending: false };
+      }
+      if (existing.role === OrganizationUserRole.EXTERNAL) {
+        const held = existing.disabledAt !== null;
+        return { outcome: "already-present", seat: "EXTERNAL", pending: held };
+      }
+      return { outcome: "already-present", seat: "MEMBER", pending: false };
     }
 
-    const seat =
-      input.seat ?? readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
     const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
       role: seat,
-      disabledAt: null,
+      disabledAt: pending ? now : null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: seat === "MEMBER" ? pendingAdmissionId : null,
+      pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : pendingAdmissionId,
     });
-    return { outcome: "created", seat };
+    return { outcome: "created", seat, pending };
   }
 
   async createSsoDomainMembership({
@@ -598,11 +615,17 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
           !(candidate.organizationId === organizationId && candidate.userId === userId),
       ),
     );
+    const teamIds = new Set(this.teamsOf(organizationId).map((team) => team.id));
     this.memory.teamUsers.splice(
       0,
       this.memory.teamUsers.length,
-      ...this.memory.teamUsers.filter((candidate) => candidate.userId !== userId),
+      ...this.memory.teamUsers.filter(
+        (candidate) => candidate.userId !== userId || !teamIds.has(candidate.teamId),
+      ),
     );
+    for (const group of this.memory.groups.values()) {
+      if (group.organizationId === organizationId) group.memberIds.delete(userId);
+    }
 
     const archivedAt = nowInstant();
     const archivedTeamIds: string[] = [];
@@ -777,6 +800,11 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const isGateway = row.action.startsWith("gateway.");
     const user = row.userId ? this.memory.users.get(row.userId) : undefined;
     const project = row.projectId ? this.memory.projects.get(row.projectId) : undefined;
+    const actorUserId =
+      row.actorUserId ??
+      auditImpersonationMetadataSchema.safeParse(row.metadata).data?.impersonatorId ??
+      null;
+    const actor = actorUserId ? this.memory.users.get(actorUserId) : undefined;
     return {
       id: row.id,
       createdAt: row.createdAt,
@@ -796,6 +824,14 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       targetId: row.targetId,
       before: row.before,
       after: row.after,
+      actorUserId,
+      actorUser: actor ? { id: actor.id, name: actor.name, email: actor.email } : null,
+      ...auditOriginOf({
+        metadata: row.metadata,
+        action: row.action,
+        args: row.args,
+        userId: row.userId,
+      }),
     };
   }
 

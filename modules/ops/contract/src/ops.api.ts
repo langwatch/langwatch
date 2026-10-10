@@ -64,12 +64,17 @@ import type {
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
+  OpsUpgradeListTenantsInput,
+  OpsUpgradePreview,
+  OpsUpgradePreviewInput,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
   OpsUpgradeRunPage,
   OpsUpgradeStatus,
   OpsUpgradeStepDetail,
   OpsUpgradeStepPage,
+  OpsUpgradeTargetSummary,
+  OpsUpgradeTenantPage,
 } from "./features/migrations/ops-upgrade.ts";
 import type {
   AggregateProcessManager,
@@ -509,6 +514,8 @@ export interface OpsApi {
   /** This deployment's product-analytics target; empty where it configured none. */
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   listSystemMigrations(): Promise<OpsMigrationOverview[]>;
+  /** Tenant rows across the tenant steps, newest movement first; `cursor` pages them. */
+  listUpgradeTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage>;
   listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
   searchMigrationOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
   enrollMigrationTenant(input: {
@@ -567,14 +574,14 @@ export interface OpsApi {
   submitBugReport(input: {
     report: SubmitBugReport;
     callerKey: string;
-    apiToken?: string | undefined;
-    projectIdHint?: string | null;
+    /** The project the intake door verified the reporter's key for; null files unlinked. */
+    linkedProjectId?: string | null;
   }): Promise<{ id: string }>;
   /** One report as the intake door received it, answered in the bodies released builds read. */
   receiveBugReport(input: {
     report: SubmitBugReport;
     forwardedFor: string | null;
-    credential: Readonly<{ token: string; projectId: string | null }> | null;
+    linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
   badgeCounts(): OpsApiGetBadgeCountsOutput;
@@ -692,6 +699,9 @@ export interface OpsApi {
   listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
+  /** The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired. */
+  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
+  listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
 }

@@ -170,6 +170,26 @@ export class PlatformOperatorsService {
   }
 
   /**
+   * The `ops:seed-platform-operators` upgrade step: while nobody holds the grant, grants the
+   * verified active users a still-set ADMIN_EMAILS names, and answers how many. Anything else (no
+   * named user yet, no ADMIN_EMAILS, the hosted service) stays with the seed process's wait.
+   */
+  async seedFromAdminEmails({
+    settings,
+    dryRun,
+  }: {
+    settings: PlatformOperatorSeedSettings;
+    dryRun: boolean;
+  }): Promise<number> {
+    if (settings.cloud || settings.adminEmails.length === 0) return 0;
+    if ((await this.options.authz.listPlatformOperators()).length > 0) return 0;
+    const named = await this.#verifiedUsersNamed(settings.adminEmails);
+    if (!dryRun && named.length > 0)
+      await this.grantSeeded({ via: "admin-emails", userIds: named });
+    return named.length;
+  }
+
+  /**
    * Cloud never seeds; no user waits; existing holders decide nobody. A set ADMIN_EMAILS takes its
    * verified active users or waits, never an org admin. An empty one takes the only organization's
    * oldest active admin, waits with no organization, and decides nobody with several.

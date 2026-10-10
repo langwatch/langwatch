@@ -4,7 +4,7 @@ The browser half of [github](../README.md). What a browser installs when it inst
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/github.web.ts:8` (`defineBrowserModule("github")`), exported as `githubWeb` at `./declaration`.
+Declared in `src/github.web.ts:11` (`defineBrowserModule("github")`), exported as `githubWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -18,6 +18,7 @@ None.
 
 ## Calls
 
-None: no `withApi`, client package, lend, host or capability.
+- Client packages (package.json): `@langwatch/github-client`.
+- Lends: `GithubConnectPopupToken`.
 
 <!-- readme:generated:end -->

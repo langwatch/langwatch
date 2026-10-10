@@ -1,11 +1,11 @@
 /**
  * Secret's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiSession,
@@ -22,7 +22,7 @@ import {
   type SecretHostScope,
 } from "../model/secret-host.ts";
 
-class CapabilitySecretHost extends SecretHostApi {
+class HostServiceSecretHost extends SecretHostApi {
   private readonly projectId: string | undefined;
   private readonly session: UiSession;
   private readonly feedback: UiFeedback;
@@ -71,11 +71,12 @@ class CapabilitySecretHost extends SecretHostApi {
  * is what `mounts.load` resolves.
  */
 export default function SecretHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
   const Switcher = useLent(ProjectSwitcherToken);
   const host = useMemo(
-    () => new CapabilitySecretHost({ projectId: projectId ?? void 0, session, feedback, Switcher }),
+    () =>
+      new HostServiceSecretHost({ projectId: projectId ?? void 0, session, feedback, Switcher }),
     [projectId, session, feedback, Switcher],
   );
   return <SecretHostProvider value={host}>{children}</SecretHostProvider>;

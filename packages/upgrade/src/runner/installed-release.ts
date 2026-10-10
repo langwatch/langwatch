@@ -8,8 +8,8 @@ export type InstalledRelease =
 
 /**
  * The release the database is on (rethink 6.4): the last succeeded upgrade's release, else the
- * newest manifest whose schema, and every older manifest's, the ledger records settled. Settled
- * schema matching no manifest predates them all. Nothing settled is a fresh install.
+ * newest manifest settled, as every older one is: schema done, no blocking step failed or running.
+ * Settled schema matching no manifest predates them all; nothing settled is a fresh install.
  */
 export function inferInstalledRelease({
   runs,
@@ -31,6 +31,9 @@ export function inferInstalledRelease({
       .map((step) => step.id),
   );
   if (settled.size === 0) return { known: true, installed: null, origin: "none" };
+  const cut = new Set(
+    steps.filter((step) => step.status === "failed" || step.status === "running").map((s) => s.id),
+  );
 
   let installed: string | null = null;
   const ordered = manifests.toSorted((left, right) =>
@@ -39,6 +42,7 @@ export function inferInstalledRelease({
   for (const manifest of ordered) {
     const schema = manifest.steps.filter((step) => SCHEMA_STEP_KINDS.has(step.kind));
     if (!schema.every((step) => settled.has(step.id))) break;
+    if (manifest.steps.some((step) => step.mode === "blocking" && cut.has(step.id))) break;
     installed = manifest.release;
   }
   if (installed) return { known: true, installed, origin: "inferred" };

@@ -33,11 +33,13 @@ export default function AnalyticsLayout({
   children,
   title,
   railEntry,
+  activeDashboardId,
   analyticsHeaderProps,
   extraHeaderButtons,
 }: PropsWithChildren<{
   title: string;
   railEntry?: AnalyticsRailEntry;
+  activeDashboardId?: string;
   analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
   extraHeaderButtons?: React.ReactNode;
 }>) {
@@ -64,7 +66,9 @@ export default function AnalyticsLayout({
     {
       label: "Custom",
       links: [],
-      extra: project?.slug ? <CustomDashboardsSection projectSlug={project.slug} /> : null,
+      extra: project?.slug ? (
+        <CustomDashboardsSection projectSlug={project.slug} activeDashboardId={activeDashboardId} />
+      ) : null,
     },
   ];
   const activeHref =
@@ -72,24 +76,24 @@ export default function AnalyticsLayout({
 
   return (
     <SavedViewsScope>
-      <AnalyticsHeader
-        title={title}
-        {...analyticsHeaderProps}
-        extraHeaderButtons={extraHeaderButtons}
-      />
-      <Box width="full" padding={4} paddingBottom={16}>
-        <SectionNavigationFrame
-          label="Analytics"
-          links={[entries.overview]}
-          groups={groups}
-          activeHref={activeHref}
-          onNavigate={(href) => host.navigate(href)}
-        >
-          <Box maxWidth={showFilters ? "1612px" : "1200px"} marginX="auto">
-            {children}
-          </Box>
-        </SectionNavigationFrame>
-      </Box>
+      <SectionNavigationFrame
+        label="Analytics"
+        header={
+          <AnalyticsHeader
+            title={title}
+            {...analyticsHeaderProps}
+            extraHeaderButtons={extraHeaderButtons}
+          />
+        }
+        links={[entries.overview]}
+        groups={groups}
+        activeHref={activeHref}
+        onNavigate={(href) => host.navigate(href)}
+      >
+        <Box maxWidth={showFilters ? "1612px" : "1200px"} marginX="auto">
+          {children}
+        </Box>
+      </SectionNavigationFrame>
     </SavedViewsScope>
   );
 }

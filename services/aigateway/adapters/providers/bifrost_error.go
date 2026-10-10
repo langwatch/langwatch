@@ -323,7 +323,6 @@ var bfMessageRules = []bfMessageRule{
 const (
 	bfNetworkErrorMessage = "network error occurred while connecting to provider API"
 	bfDoRequestMessage    = "failed to execute HTTP request to provider API"
-	//nolint:misspell // Bifrost's own wording, matched verbatim against its output.
 	bfRequestCancelledMessage      = "request cancelled by caller"
 	bfRequestMarshalMessage        = "failed to marshal request body to JSON"
 	bfRequestBodyConversionMessage = "failed to convert bifrost request to the expected provider request body"

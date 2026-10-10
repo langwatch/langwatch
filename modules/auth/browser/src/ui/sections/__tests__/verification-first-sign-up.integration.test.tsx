@@ -202,7 +202,9 @@ describe("given the sign-up screen", () => {
     it("offers a credential for the confirmed address and signs nobody in yet", async () => {
       const { container } = renderScreen();
 
-      expect((await screen.findByTestId("verified-address")).textContent).toContain("sam@acme.com");
+      expect((await screen.findByTestId("signup-identifier")).textContent).toContain(
+        "sam@acme.com",
+      );
       expect(container.querySelector('input[type="password"]')).not.toBeNull();
       expect(registerMock).not.toHaveBeenCalled();
       expect(signInMock).not.toHaveBeenCalled();
@@ -245,6 +247,43 @@ describe("given the sign-up screen", () => {
       expect(sendConfirmationMock).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Creating an account shows progress until the next page has loaded" */
+    it("keeps Create account busy after signing in, while the browser leaves for the next page", async () => {
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ ok: true });
+
+      const { container } = renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalled();
+      });
+      expect(
+        (screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+
+    /** @scenario "Creating an account shows progress until the next page has loaded" */
+    it("frees Create account again when signing in fails", async () => {
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin", status: 401 });
+
+      const { container } = renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(
+          (screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement).disabled,
+        ).toBe(false);
+      });
+    });
+
     /** @scenario "Mismatched passwords say so" */
     it("says the two passwords differ and creates nothing", async () => {
       renderScreen();
@@ -256,6 +295,31 @@ describe("given the sign-up screen", () => {
 
       expect(await screen.findByText(/the two passwords are not the same/i)).toBeTruthy();
       expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a password is being typed", () => {
+    beforeEach(() => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof-1",
+      });
+    });
+
+    /** @scenario "A sign-up form does not judge a field while it is being typed in" */
+    it("shows no error until the field is left", async () => {
+      renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await userEvent.type(screen.getByLabelText(/^password$/i), "short");
+      expect(screen.queryByText(/use at least 8 characters/i)).toBeNull();
+      expect(screen.queryByText(/the two passwords are not the same/i)).toBeNull();
+
+      await userEvent.tab();
+      expect(await screen.findByText(/use at least 8 characters/i)).toBeTruthy();
     });
   });
 
@@ -348,6 +412,9 @@ describe("given the sign-up screen", () => {
           /LangWatch is set up for a different web address than the one you are using/,
         ),
       ).toBeTruthy();
+      const alert = screen.getByRole("alert");
+      expect(alert.parentElement?.firstElementChild).toBe(alert);
+      expect(alert.querySelector("svg")).not.toBeNull();
       expect(signInMock).not.toHaveBeenCalled();
     });
 
@@ -426,6 +493,8 @@ describe("given the sign-up screen", () => {
       const { container } = renderScreen();
 
       expect(await screen.findByText("That confirmation link no longer works")).toBeTruthy();
+      expect(screen.getByText(/already opened once/i)).toBeTruthy();
+      expect(screen.queryByText(/we've been notified/i)).toBeNull();
       expect(screen.getByRole("button", { name: /send a new link/i })).toBeTruthy();
       expect(screen.queryByTestId("verified-address")).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
@@ -452,7 +521,7 @@ describe("given the sign-up screen", () => {
 
       const { container } = renderScreen();
 
-      expect(await screen.findByTestId("verified-address")).toHaveTextContent(/sam@acme\.com/);
+      expect(await screen.findByTestId("signup-identifier")).toHaveTextContent(/sam@acme\.com/);
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
       await waitFor(() => {
         expect(container.querySelector('input[type="password"]')).not.toBeNull();
@@ -530,6 +599,10 @@ describe("given the sign-up screen", () => {
       const { container } = renderScreen();
 
       expect(await screen.findByText(/that verification link has expired/i)).toBeTruthy();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Request a new verification email and use the newest link.",
+      );
+      expect(screen.queryByText(/we've been notified/i)).toBeNull();
       expect(screen.getByRole("button", { name: /send a new link/i })).toBeTruthy();
 
       // Nothing was confirmed: no address is held, no method is offered, and
@@ -538,6 +611,25 @@ describe("given the sign-up screen", () => {
       expect(screen.queryByTestId("method-picker")).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
       expect(completeVerificationMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the expired link's refusal carries the same sentence as a tip", () => {
+    /** @scenario An expired verification link offers a resend, nothing else */
+    it("says it once", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=stale-token");
+      completeVerificationMock.mockRejectedValue({
+        code: "identity_verification_expired",
+        status: 410,
+        tips: ["Request a new verification email and use the newest link."],
+      });
+
+      renderScreen();
+
+      expect(await screen.findByText(/that verification link has expired/i)).toBeTruthy();
+      expect(
+        screen.getAllByText("Request a new verification email and use the newest link."),
+      ).toHaveLength(1);
     });
   });
 
@@ -649,6 +741,45 @@ describe("given the sign-up screen", () => {
       const link = await screen.findByTestId("go-to-sign-in");
       expect(link).toHaveTextContent("Or log in instead");
       expect(link.getAttribute("href")).toBe("/auth/signin?callbackUrl=%2Fsettings");
+    });
+  });
+
+  describe("when account creation or its following log-in is refused", () => {
+    /** @scenario "Sign-up failures read the same way" */
+    it.each(["form validation", "log-in"])("shows %s at the top of the form", async (failure) => {
+      requestVerificationMock.mockResolvedValue({ sent: false, addressProof: "proof" });
+      const formMessage = "Please check your account details.";
+      if (failure === "form validation") {
+        registerMock.mockRejectedValue({
+          data: {
+            error: {
+              code: "validation_error",
+              httpStatus: 422,
+              meta: { formErrors: [formMessage] },
+            },
+          },
+        });
+      } else {
+        registerMock.mockResolvedValue({});
+        signInMock.mockResolvedValue({ error: "INVALID_EMAIL_OR_PASSWORD", status: 401 });
+      }
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findByTestId("unconfirmed-address");
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+      const alert = await screen.findByRole("alert");
+      expect(alert.parentElement?.firstElementChild).toBe(alert);
+      expect(alert.querySelector("svg")).not.toBeNull();
+      expect(alert).toHaveTextContent(
+        failure === "form validation" ? "Check your details" : "Your account was created",
+      );
+      expect(alert).toHaveTextContent(
+        failure === "form validation" ? formMessage : "Invalid email or password.",
+      );
     });
   });
 

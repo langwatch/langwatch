@@ -29,8 +29,8 @@ langwatch/
 └── dev/            these docs, the scripts, the compose files
 ```
 
-Three Node applications run all the time: `ui`, `api` and `worker` — locally the
-last two share one process (the `backend` lane), and in production each is its
+Three Node applications run all the time: `ui`, `api` and `worker` — locally all
+three share one process by default (the `app` lane), and in production each is its
 own deployment. There is no in-process worker MODE and no process-role switch,
 on purpose. A stack missing the worker serves pages and quietly processes no
 jobs, which looks
@@ -86,9 +86,10 @@ stays as free to print, log and paste into an issue as it is today.
 Each application resolves the classified keys through an ordered chain before
 its Zod parse: shell environment and `.env` first, then 1Password if you opted
 in, then a refusal naming exactly what is missing. Do nothing and nothing
-changes. To keep credentials off your disk, set `LANGWATCH_SECRETS_VAULT` to a
-vault name and write `op://vault/item/field` where the value used to be.
-Resolution is never attempted when `NODE_ENV=production`, so a pod reads the
+changes. To keep credentials off your disk, set `LANGWATCH_OP_ACCOUNT`, put
+each one in your `Private` vault's `LangWatch` item as a field named after its
+id, and delete its `.env` line ([LOCAL_STACK.md](LOCAL_STACK.md#keeping-a-credential-in-1password)).
+`NODE_ENV=production` refuses the account by name, so a pod reads the
 environment Kubernetes gave it and holds no vault client.
 
 One rule, and it is not negotiable: never read `.env` to find a value, and never
@@ -101,7 +102,8 @@ one you do not paste anywhere, and module code never reads `process.env` at all
 Plain `pnpm dev` is the default for TypeScript work.
 
 ```bash
-pnpm dev            # ui + backend + go (+ langy when selected)
+pnpm dev            # built UI served by the backend (api + worker, one process) + go (+ langy when selected)
+pnpm dev:hmr        # the same with the Vite ui lane (HMR)
 pnpm dev:ui         # the browser application alone
 pnpm dev:backend    # the api and the worker in one process
 pnpm dev:go         # aigateway + nlpgo in one process
@@ -109,12 +111,13 @@ pnpm dev:api        # the API alone, its own process
 pnpm dev:worker     # the background worker alone, its own process
 ```
 
-Locally the api and the worker share ONE process — the `backend` lane — and the
-Go data-plane services share another (`go`). It is a launcher, not a process
+Locally the api and the worker share ONE process and the Go data-plane services
+share another (`go`). `LANGWATCH_DEV_ONE_PROCESS=0` splits the Go lane into `go` and `sims`. It is a launcher, not a process
 role: each application still parses its own config and composes its own graph,
 and `dev:api` + `dev:worker` still run them apart when you need the production
-process shape. Both lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (2 s, at most 30 s after the first change), one restart at a time.
+process shape. A backend change reloads the api and the worker in-process and the
+ui hot-reloads through Vite, debounced by `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (2 s,
+at most 30 s after the first change), one reload at a time (ADR-168).
 
 Every port derives from `PORT` (default 5560): the ui lane binds it, the api
 `PORT + 1000`, the worker's metrics listener `PORT - 2561`, the gateway
@@ -128,7 +131,7 @@ Hostname routing is the alternative, and it is opt-in.
 ```bash
 make haven up          # start this worktree's stack
 make haven status      # every stack, service health, shared servers
-haven logs backend -t  # tail one lane from any terminal
+haven logs backend -f  # tail one lane from any terminal
 ```
 
 haven gives every worktree's services a stable hostname through the portless
@@ -171,12 +174,12 @@ package: each application and each feature package owns its own
 
 All of those go through a machine-wide queue, and it is worth knowing why. One
 typecheck holds a 2.3 to 3.5 GiB working set and uses every core, which is fine
-once and ruinous four times over. haven's machine-wide slot (`haven slot`,
+once and ruinous four times over. haven's machine-wide slot (`haven machine slot`,
 `tools/thuishaven/README.md`) counts the runs live across every worktree,
 terminal and agent on the machine, and a run past the limit waits its turn
 instead of piling on. With a slot free it prints nothing. Queued, it says so on
 stderr, which is the thing that tells you a slow run was waiting rather than
-hung. `haven slot explain` shows the limit and who holds a slot.
+hung. `haven machine slot explain` shows the limit and who holds a slot.
 Never set `CHECK_SLOTS` yourself.
 
 ## How work starts here

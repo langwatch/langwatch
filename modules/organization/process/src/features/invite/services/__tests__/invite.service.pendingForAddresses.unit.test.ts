@@ -10,7 +10,7 @@ import { OrganizationInvitationsService } from "../organization-invitations.serv
 function harness(answers: Record<string, { inviteCode: string; role: "MEMBER" | "DEVELOPER" }>) {
   const findOldestPendingInviteForAddress = vi.fn(async ({ address }: { address: string }) => {
     const hit = answers[address];
-    return hit ? { ...hit, organizationName: "Acme" } : null;
+    return hit ? { ...hit, organizationName: "Acme", inviterName: "Dana" } : null;
   });
   // Partial double: the lookup reads only the repository's one member.
   const service = OrganizationInvitationsService.create({
@@ -29,8 +29,19 @@ describe("OrganizationInvitationsService.findPendingForAddresses()", () => {
 
       await expect(
         service.findPendingForAddresses({ addresses: ["Sam@Acme.com"] }),
-      ).resolves.toEqual([{ inviteCode: "code_1", organizationName: "Acme", role: "DEVELOPER" }]);
+      ).resolves.toEqual([
+        { inviteCode: "code_1", organizationName: "Acme", inviterName: "Dana", role: "DEVELOPER" },
+      ]);
       expect(findOldestPendingInviteForAddress).toHaveBeenCalledWith({ address: "sam@acme.com" });
+    });
+
+    /** @scenario A signed-in invitation names who invited the person */
+    it("carries the inviter's name for the offer to show", async () => {
+      const { service } = harness({ "sam@acme.com": { inviteCode: "code_1", role: "MEMBER" } });
+
+      const [pending] = await service.findPendingForAddresses({ addresses: ["sam@acme.com"] });
+
+      expect(pending?.inviterName).toBe("Dana");
     });
 
     /** @scenario A pending invitation is offered before asking to join */
@@ -44,7 +55,9 @@ describe("OrganizationInvitationsService.findPendingForAddresses()", () => {
       });
 
       expect(findOldestPendingInviteForAddress).toHaveBeenCalledTimes(2);
-      expect(pending).toEqual([{ inviteCode: "code_2", organizationName: "Acme", role: "MEMBER" }]);
+      expect(pending).toEqual([
+        { inviteCode: "code_2", organizationName: "Acme", inviterName: "Dana", role: "MEMBER" },
+      ]);
     });
   });
 

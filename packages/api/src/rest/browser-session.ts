@@ -72,13 +72,13 @@ export class BrowserSessionIdentity implements RestIdentity {
     const writes = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     if (writes && !this.#isFromOwnPages(request)) throw new BrowserOriginRefusedError();
 
-    recordBrowserCaller(request, { userId: caller.userId });
+    recordBrowserCaller(request, { userId: caller.userId, sessionId: caller.sessionId ?? null });
 
     const impersonatorId = caller.impersonator?.id;
     const actor = impersonatorId
       ? { type: "user" as const, id: caller.userId, impersonatorId }
       : { type: "user" as const, id: caller.userId };
-    return { actor, scope: null };
+    return { actor, scope: null, browserSession: { id: caller.sessionId ?? null } };
   }
 
   #isFromOwnPages(request: Request): boolean {
@@ -109,12 +109,6 @@ export class BrowserSessionIdentity implements RestIdentity {
     caller: RestCaller;
     permission: PlatformTierPermission;
   }): Promise<PlatformDecision> {
-    if (!this.#authz.getPlatformDecision) {
-      throw new Error(
-        `"${permission}" is asked at the platform, and authz answers no platform question`,
-      );
-    }
-
     const userId = platformPrincipalOf(caller.actor);
     if (!userId) return { permitted: false };
 

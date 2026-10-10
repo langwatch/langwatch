@@ -35,6 +35,9 @@ const APPLICATION_CONFIG = /^apps\/[^/]+\/src\/config\.ts$/;
 /** A module's contract holds its config slice in `<id>.config.ts` (ARCHITECTURE.md §6). */
 const MODULE_CONTRACT_CONFIG = /^(?:enterprise\/)?modules\/([^/]+)\/contract\/src\/\1\.config\.ts$/;
 
+/** Files the release build rewrites in place: their size is the stamp's, not the author's. */
+const BUILD_STAMPED = new Set(["packages/config/src/release-build.ts"]);
+
 export const SOURCE_FOLDER_SHAPE_KINDS = ["crowded-folder", "fragment-file"] as const;
 
 export type SourceFolderShapeKind = (typeof SOURCE_FOLDER_SHAPE_KINDS)[number];
@@ -197,6 +200,7 @@ function fragmentFindingOf({
 }): SourceFolderShapeFinding | null {
   const path = relative(root, file);
   if (basename(file).startsWith("index.")) return null;
+  if (BUILD_STAMPED.has(path)) return null;
   if (APPLICATION_CONFIG.test(path) || MODULE_CONTRACT_CONFIG.test(path)) return null;
 
   const grammarRequired = GRAMMAR_REQUIRED_SUFFIXES.some((suffix) => file.endsWith(suffix));

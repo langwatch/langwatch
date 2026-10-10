@@ -25,7 +25,7 @@ vi.mock("../../trace-drawer/index.ts", () => ({
 }));
 
 import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
-import { drawerChrome } from "../../../../../behavior/drawer-chrome.store.ts";
+import { useDrawerChrome } from "../../../../../behavior/drawer-chrome.store.ts";
 import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
 import { useTraceEditStore } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { useOpenTraceDrawer } from "../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts";
@@ -54,7 +54,7 @@ async function renderPageWithDrawerHost({ trace }: { trace?: TraceListItem } = {
 const drawerParam = (key: string) => new URLSearchParams(window.location.search).get(key);
 
 beforeEach(() => {
-  drawerChrome.setState(drawerChrome.getInitialState(), true);
+  useDrawerChrome.setState(useDrawerChrome.getInitialState(), true);
   useTraceEditStore.getState().discard();
   setWindowAddress({ url: PAGE });
 });

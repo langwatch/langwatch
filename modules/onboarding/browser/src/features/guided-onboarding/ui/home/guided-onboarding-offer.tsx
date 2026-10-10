@@ -99,18 +99,18 @@ function GuidedOnboardingOfferInner({ space, spaceInUse }: GuidedOnboardingOffer
         borderRadius="full"
         borderWidth="1px"
         borderStyle="solid"
-        borderColor="#f8b577"
-        background="#fff3e5"
+        borderColor="orange.emphasized"
+        background="orange.subtle"
         paddingX={4}
         paddingY={2}
         fontSize="12.5px"
         fontWeight="medium"
-        color="gray.900"
+        color="orange.fg"
         opacity={busy ? 0.7 : 1}
         transition="border-color 120ms ease"
-        _hover={busy ? undefined : { borderColor: "#ea580c" }}
+        _hover={busy ? undefined : { borderColor: "orange.fg" }}
       >
-        <Sparkles size={14} color="#ea580c" aria-hidden="true" />
+        <Sparkles size={14} color="var(--chakra-colors-orange-fg)" aria-hidden="true" />
         Start guided onboarding
       </chakra.button>
     </HStack>

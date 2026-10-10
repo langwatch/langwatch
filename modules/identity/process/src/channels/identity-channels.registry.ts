@@ -1,9 +1,10 @@
 import { defineChannels } from "@langwatch/process";
 
-import { BoundIdentityChannels } from "./identity.channels.ts";
+import { HttpIdentityChannels } from "./http/http.identity.channels.ts";
+import { MemoryIdentityChannels } from "./memory/memory.identity.channels.ts";
 
 /** The container builds the tier the stores state and hands it to the module class (§5). */
 export const identityChannels = defineChannels({
-  live: BoundIdentityChannels,
-  memory: BoundIdentityChannels,
+  live: HttpIdentityChannels,
+  memory: MemoryIdentityChannels,
 });

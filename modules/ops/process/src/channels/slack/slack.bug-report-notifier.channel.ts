@@ -15,7 +15,7 @@ export interface OpsSlackAlertTransport {
   }): Promise<void>;
 }
 
-export interface SlackBugReportNotifierConfig {
+interface SlackBugReportNotifierConfig {
   /** Bot token. Blank or absent makes the notifier a no-op. */
   botToken?: string | undefined;
   /** Destination channel; defaults to `#dev` the way the application did. */

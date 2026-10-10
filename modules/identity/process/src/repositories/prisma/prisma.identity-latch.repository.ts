@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
@@ -52,7 +53,10 @@ export class PrismaIdentityLatchRepository extends IdentityLatchRepository {
     const occurredAt = new Date();
     const reportJson = report == null ? null : JSON.stringify(report);
     const updated = await this.database.$executeRaw`
-      -- @tenancy: keyed by (migrationName, tenantId); the tenant is the key itself.
+      ${skipTenantCheck({
+        // Keyed by (migrationName, tenantId); the tenant is the key itself.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "SystemMigrationTenantState"
          SET "status" = 'finalized',
              "report" = ${reportJson}::jsonb,

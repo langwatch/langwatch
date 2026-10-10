@@ -247,7 +247,7 @@ func (t *Tempo) exploreURL(query string) string {
 	return t.grafana + "/explore?schemaVersion=1&panes=" + url.QueryEscape(pane) + "&orgId=1"
 }
 
-// TraceFilter narrows the trace search `haven traces` runs. A zero field asks
+// TraceFilter narrows the trace search `haven obs traces` runs. A zero field asks
 // for nothing, and a zero Since looks back as far as the tab does.
 type TraceFilter struct {
 	Service     string

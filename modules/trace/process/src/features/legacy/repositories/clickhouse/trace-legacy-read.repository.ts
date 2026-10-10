@@ -1,37 +1,32 @@
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import type { Authorization } from "@langwatch/authorization";
 import {
+  type AuthorizedClickHouse,
   DEFAULT_PARTITION_WINDOW_MS,
+  expandFragment,
+  fenceFor,
   queryWindowed,
   RetentionFloorService,
   type RetentionDaysProvider,
+  type TenantScopedReader,
+  tenantScope,
 } from "@langwatch/clickhouse-client";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import {
-  LLM_PARAMETER_MAP,
-  parsePromptTraceReference,
-  findPromptReferenceInAncestors,
-} from "@langwatch/prompt-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   Protections,
-  TraceCanonicalisationService,
   TraceSummaryData,
   NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
   Event,
-  Span,
-  Trace,
-  ProjectableTrace,
   ProjectedAnnotation,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   PromptStudioSpanResult,
   TopicCountsResult,
-  TracesForProjectResult,
-  TraceWithGuardrail,
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
@@ -44,41 +39,6 @@ import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
-import type { ExtractedIO } from "#features/conversation/rules/trace-io-text.rules";
-import {
-  isTraceSpansBatchResolverContractError,
-  traceSpansBatchResolverCardinalityError,
-  traceSpansBatchResolverMisalignedError,
-} from "#rules/trace-spans-batch-resolver-contract-error.rules";
-
-import {
-  mapClickHouseEvaluationToTraceEvaluation,
-  mapTraceEvaluationsToLegacyEvaluations,
-  type ClickHouseEvaluationRunRow,
-  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-} from "../../../../rules/trace-evaluation-mapping.rules.ts";
-import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
-import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
-import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
-import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
-import {
-  parseLLMSpanMessages,
-  systemPromptFieldOfLlmSpan,
-} from "../../../conversation/rules/trace-llm-span-messages.rules.ts";
-import {
-  applyEventProtections,
-  applyTraceProtections,
-  extractRedactionsForObject,
-} from "../../../../rules/trace-read-redaction.rules.ts";
-import type { ResolvedTraceSpans } from "../../../../services/trace-offload-resolution.service.ts";
-import type { TraceAnnotationScoresReadRepository } from "../../../../repositories/trace-annotation-scores.repository.ts";
-import type { TraceAnnotationsReadRepository } from "../../../../repositories/trace-annotations.repository.ts";
-import {
-  TraceLegacyReadRepository,
-  type ResolveTraceSpansBatchFn,
-  type ResolveTraceSpansFn,
-} from "../trace-legacy-read.repository.ts";
 import type { TraceClickHouseClient } from "../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import {
   chBoolean,
@@ -88,6 +48,25 @@ import {
   deserializeAttributes,
   ensureStringRecord,
 } from "../../../../repositories/clickhouse/stored-span-row.mapper.ts";
+import type { TraceAnnotationScoresReadRepository } from "../../../../repositories/trace-annotation-scores.repository.ts";
+import type { TraceAnnotationsReadRepository } from "../../../../repositories/trace-annotations.repository.ts";
+import {
+  type ClickHouseEvaluationRunRow,
+  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
+} from "../../../../rules/trace-evaluation-mapping.rules.ts";
+import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
+import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
+import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
+import {
+  type PromptStudioSpanRow,
+  derivePromptStudioSpan,
+} from "../../rules/trace-legacy-prompt-studio-span.rules.ts";
+import { traceStartedAt } from "../../rules/trace-legacy-summary-mapping.rules.ts";
+import {
+  TraceLegacyReadRepository,
+  type TraceLegacyPage,
+  type TraceLegacyRow,
+} from "../trace-legacy-read.repository.ts";
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
@@ -103,7 +82,7 @@ const evaluatorNameRowsSchema = z.array(z.looseObject({ id: chString, name: chSt
 const occurredAtRangeRowsSchema = z.array(
   z.looseObject({ fromMs: chNumber.nullable(), toMs: chNumber.nullable() }),
 );
-const promptStudioSpanRowsSchema = z.array(
+const promptStudioSpanRowsSchema: z.ZodType<PromptStudioSpanRow[]> = z.array(
   z.looseObject({
     SpanId: chString,
     TraceId: chString,
@@ -344,20 +323,12 @@ class ClickHouseClientUnavailableError extends Error {
   }
 }
 
-const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
-
-/** What a composition root gives the legacy trace read over ClickHouse. */
-export interface ClickHouseTraceLegacyReadOptions {
-  traceCanonicalisation: TraceCanonicalisationService;
+/** The registry's store under the legacy trace read. */
+export type ClickHouseTraceLegacyReadOptions = {
   /** The process's tenant-keyed connection; absent, every read refuses. */
   resolveClickHouseClient?: ((tenantId: string) => Promise<TraceClickHouseClient>) | undefined;
-  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
-  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
-  /**
-   * The tenant's retention policy, which widens the span read's floor. Absent, the floor stays
-   * at the platform default, which still bounds every read.
-   */
-  retentionDays?: RetentionDaysProvider | undefined;
+  /** The proof-checked reader the fenced reads go through (ADR-177); absent, they refuse. */
+  clickhouse?: AuthorizedClickHouse | undefined;
   /** Annotation's rows and score names via its shared tables (R40), for the projection join. */
   annotations?:
     | {
@@ -365,6 +336,25 @@ export interface ClickHouseTraceLegacyReadOptions {
         scores: Pick<TraceAnnotationScoresReadRepository, "findScoreNames">;
       }
     | undefined;
+};
+
+/** The compiled filter, its tenant markers expanded into the proof's fence (ADR-177 block C). */
+function fenceFilterWhere({
+  filterWhere,
+  authorization,
+}: {
+  filterWhere: GetAllTracesForProjectOptions["filterWhere"];
+  authorization: Authorization | undefined;
+}): GetAllTracesForProjectOptions["filterWhere"] {
+  if (!filterWhere) return undefined;
+  if (!authorization) {
+    throw new Error("A compiled trace filter needs the proof its tenant markers expand into");
+  }
+  return expandFragment({
+    fragment: filterWhere.sql,
+    queryParams: filterWhere.params,
+    fence: fenceFor({ authorization, reads: "traces" }),
+  });
 }
 
 function mergeFilterWhere({
@@ -438,11 +428,11 @@ function buildSearchFilter({
 
   // Non-root span names live in `stored_spans`, probed with the same
   // correlated EXISTS shape the span filters in `filter-conditions.ts`
-  // use. The StartTime bound keeps it partition-pruned instead of
-  // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
+  // use, bound to the tenant itself so the tenant guard sees its own read scoped.
+  // The StartTime bound keeps it partition-pruned, matching `buildSpanTimeBound`.
   const spanNameSearch = `EXISTS (
                     SELECT 1 FROM stored_spans sp
-                    WHERE sp.TenantId = ts.TenantId
+                    WHERE sp.TenantId = {tenantId:String}
                       AND sp.TraceId = ts.TraceId
                       AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                       AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
@@ -516,13 +506,12 @@ function listFailureLogFields({ projectId, error }: { projectId: string; error: 
 }
 
 /** The list page's last trace as the cursor seeks it: its time on the paged axis, and its id. */
-function traceSortKey({ trace, dateField }: { trace: Trace; dateField: TraceDateField }): {
+function sortKeyOf({ last, dateField }: { last: TraceSummaryData; dateField: TraceDateField }): {
   timestamp: number;
   traceId: string;
 } {
-  const timestamp =
-    dateField === "updated" ? trace.timestamps.updated_at : trace.timestamps.started_at;
-  return { timestamp, traceId: trace.trace_id };
+  const timestamp = dateField === "updated" ? last.updatedAt : traceStartedAt(last);
+  return { timestamp, traceId: last.traceId };
 }
 
 /** The page's id and count statements over `trace_summaries`, shared by both list reads. */
@@ -764,73 +753,59 @@ function deriveSpanRange({
   return hasSummaryWindow ? effectiveOccurredAt : undefined;
 }
 
-function groupEvaluationsByTrace({
-  traceIds,
-  evalRows,
-}: {
-  traceIds: string[];
-  evalRows: Parameters<typeof mapClickHouseEvaluationToTraceEvaluation>[0][];
-}): Record<string, ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]> {
-  const grouped: Record<string, ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]> = {};
-  for (const id of traceIds) {
-    grouped[id] = [];
-  }
-  for (const row of evalRows) {
-    if (row.TraceId && grouped[row.TraceId]) {
-      grouped[row.TraceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
-    }
-  }
-
-  return grouped;
-}
+const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
 
 export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
 
-  /**
-   * Optional callback that resolves offloaded blob refs for a single trace's normalized spans
-   * before they map to legacy Span objects. Owns blob-resolution deps at a single composition
-   * point. When absent, spans are mapped as-is (preview values remain).
-   */
-  private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
-
-  /**
-   * Optional bulk resolver for whole result sets. Preferred over {@link resolveTraceSpans} on
-   * bulk read paths so a large export/thread resolves its blobs in one bounded-concurrency pass.
-   * Falls back to the per-trace resolver when absent.
-   */
-  private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
-
-  private readonly resolveClickHouseClient:
-    | ((tenantId: string) => Promise<TraceClickHouseClient>)
-    | undefined;
+  private readonly store: ClickHouseTraceLegacyReadOptions;
+  private readonly resolveClickHouseClient: ClickHouseTraceLegacyReadOptions["resolveClickHouseClient"];
   private readonly annotations: ClickHouseTraceLegacyReadOptions["annotations"];
-  private readonly traceCanonicalisation: TraceCanonicalisationService;
-
-  private readonly retentionFloor: RetentionFloorService;
 
   constructor(options: ClickHouseTraceLegacyReadOptions) {
     super();
-    this.resolveClickHouseClient = options.resolveClickHouseClient;
-    this.annotations = options.annotations;
-    this.traceCanonicalisation = options.traceCanonicalisation;
-    this.resolveTraceSpans = options.resolveTraceSpans;
-    this.resolveTraceSpansBatch = options.resolveTraceSpansBatch;
-    this.retentionFloor = new RetentionFloorService({
-      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-      provider: options.retentionDays,
-      logger: retentionFloorLogger,
-    });
+    const { resolveClickHouseClient, clickhouse, annotations } = options;
+    this.store = { resolveClickHouseClient, clickhouse, annotations };
+    this.resolveClickHouseClient = resolveClickHouseClient;
+    this.annotations = annotations;
   }
 
   static create(options: ClickHouseTraceLegacyReadOptions): TraceLegacyReadClickHouseRepository {
     return new TraceLegacyReadClickHouseRepository(options);
   }
 
-  /**
-   * Resolve the ClickHouse client for a given project.
-   */
+  /** One floor per tenant policy the caller passes, so its cache outlives a read. */
+  private readonly floors = new WeakMap<RetentionDaysProvider, RetentionFloorService>();
+  private readonly defaultFloor = this.newFloor(undefined);
+
+  private floorOver(retentionDays: RetentionDaysProvider | undefined): RetentionFloorService {
+    if (!retentionDays) return this.defaultFloor;
+    const floor = this.floors.get(retentionDays) ?? this.newFloor(retentionDays);
+    this.floors.set(retentionDays, floor);
+    return floor;
+  }
+
+  private newFloor(provider: RetentionDaysProvider | undefined): RetentionFloorService {
+    return new RetentionFloorService({
+      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      provider,
+      logger: retentionFloorLogger,
+    });
+  }
+
+  /** The fenced reader for one proof; refuses by name where no ClickHouse was composed. */
+  private reader({
+    authorization,
+    projectId,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+  }) {
+    if (!this.store.clickhouse) throw new ClickHouseClientUnavailableError(projectId);
+    return this.store.clickhouse.as(authorization, { reads: "traces" });
+  }
+
   /** Translates the caller's filter selection into a ClickHouse predicate. */
   private translateFilters(
     filters: Record<string, unknown>,
@@ -850,33 +825,29 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return resolve(projectId);
   }
 
-  /**
-   * @param occurredAt approximate time range bounding the partition scan.
-   * @param opts.resolveBlobs resolves offloaded IO.
-   */
+  /** @param occurredAt approximate time range bounding the partition scan. */
   async findTracesWithSpans({
+    authorization,
     projectId,
     traceIds,
-    protections,
     occurredAt,
-    opts,
+    retentionDays,
   }: {
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
-    protections: Protections;
-    occurredAt?: OccurredAtRange;
-    opts?: { resolveBlobs?: boolean };
-  }): Promise<Trace[]> {
+    occurredAt?: OccurredAtRange | undefined;
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<TraceLegacyRow[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId },
       },
       async () => {
-        // Resolved up front (and discarded) so a configuration problem
-        // surfaces as ClickHouseClientUnavailableError rather than the
-        // generic fetch failure from the try/catch below.
-        await this.resolveClient(projectId);
+        // Up front so a missing store or a refused proof surfaces by name,
+        // not as the generic fetch failure from the try/catch below.
+        const reader = this.reader({ authorization, projectId });
 
         if (traceIds.length === 0) {
           return [];
@@ -889,21 +860,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
         try {
           // Fetch trace summaries with spans using JOIN
-          const tracesWithSpans = await this.fetchTracesWithSpansJoined(
+          const tracesWithSpans = await this.fetchTracesWithSpansJoined({
+            reader,
             projectId,
             traceIds,
             occurredAt,
-          );
-
-          // Map to legacy Trace format and apply protections. Blob resolution
-          // (when opted in) runs as a single bounded pass over the whole set so
-          // a large multi-trace read streams its event_log reads (#4991 AC6).
-          const traces = await this.resolveAndMergeMany({
-            projectId,
-            entries: [...tracesWithSpans.values()],
-            protections,
-            resolveBlobs: opts?.resolveBlobs,
+            retentionDays,
           });
+          const traces = [...tracesWithSpans.values()];
 
           this.logger.debug(
             { projectId, traceCount: traces.length },
@@ -912,10 +876,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           return traces;
         } catch (error) {
-          // A resolver-contract violation is a code bug, not a fetch failure —
-          // surface it verbatim rather than flattening it into the generic
-          // message and losing the mismatch.
-          if (isTraceSpansBatchResolverContractError(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -997,40 +957,39 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   async findTracesByThreadId({
+    authorization,
     projectId,
     threadId,
-    protections,
-    opts,
+    retentionDays,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadId: string;
-    protections: Protections;
-    opts?: { resolveBlobs?: boolean };
-  }): Promise<Trace[]> {
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<TraceLegacyRow[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesByThreadId",
       {
         attributes: { "tenant.id": projectId, "thread.id": threadId },
       },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
+        const reader = this.reader({ authorization, projectId });
 
         this.logger.debug({ projectId, threadId }, "Fetching traces by thread ID from ClickHouse");
 
         try {
           // Query trace_summaries for traces with matching thread_id
           // Thread ID can be stored under different attribute keys
-          const result = await clickHouseClient.query({
+          const result = await reader.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("OccurredAt")}
                 AND Attributes['gen_ai.conversation.id'] = {threadId:String}
               ORDER BY CreatedAt ASC
               LIMIT 1000
             `,
             query_params: {
-              tenantId: projectId,
               threadId,
             },
             format: "JSONEachRow",
@@ -1043,24 +1002,13 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             return [];
           }
 
-          // Fetch full traces with spans. Forward resolveBlobs so the
-          // thread-detail read can resolve full IO (#4991); customer thread
-          // views with no resolver wired stay on the preview.
-          const traces = await this.findTracesWithSpans({
+          return await this.findTracesWithSpans({
+            authorization,
             projectId,
             traceIds,
-            protections,
-            opts: { resolveBlobs: opts?.resolveBlobs },
+            retentionDays,
           });
-
-          // Re-sort by timestamp — getTracesWithSpans returns in TraceId
-          // order which doesn't match the chronological order we need.
-          traces.sort((a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0));
-          return traces;
         } catch (error) {
-          // See getTracesWithSpans: a resolver-contract violation is a code bug,
-          // not a fetch failure — surface it verbatim.
-          if (isTraceSpansBatchResolverContractError(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1076,21 +1024,22 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * @param opts.resolveBlobs forwarded to the per-trace fetch.
-   * @param opts.maxTraces traces the read may return across every thread asked
+   * @param maxTraces traces the read may return across every thread asked
    *   for; a ceiling below what they hold drops the rest without a word.
    */
   async findTracesWithSpansByThreadIds({
+    authorization,
     projectId,
     threadIds,
-    protections,
-    opts,
+    maxTraces,
+    retentionDays,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadIds: string[];
-    protections: Protections;
-    opts?: { resolveBlobs?: boolean; maxTraces?: number };
-  }): Promise<Trace[]> {
+    maxTraces?: number | undefined;
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<TraceLegacyRow[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpansByThreadIds",
       {
@@ -1100,7 +1049,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         },
       },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
+        const reader = this.reader({ authorization, projectId });
 
         if (threadIds.length === 0) {
           return [];
@@ -1114,19 +1063,18 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         try {
           // Query trace_summaries for traces with matching thread_ids
           // Thread ID can be stored under different attribute keys
-          const result = await clickHouseClient.query({
+          const result = await reader.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("OccurredAt")}
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
               ORDER BY CreatedAt ASC
               LIMIT {maxTraces:UInt32}
             `,
             query_params: {
-              tenantId: projectId,
               threadIds,
-              maxTraces: opts?.maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
+              maxTraces: maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
             },
             format: "JSONEachRow",
           });
@@ -1138,22 +1086,13 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             return [];
           }
 
-          // Forward resolveBlobs so the eval path reads full thread IO; customer thread
-          // views pass nothing and stay on the preview.
-          const traces = await this.findTracesWithSpans({
+          return await this.findTracesWithSpans({
+            authorization,
             projectId,
             traceIds,
-            protections,
-            opts: { resolveBlobs: opts?.resolveBlobs },
+            retentionDays,
           });
-
-          // Re-sort by timestamp — getTracesWithSpans returns in TraceId
-          // order which doesn't match the chronological order we need.
-          traces.sort((a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0));
-          return traces;
         } catch (error) {
-          // Never flatten a resolver contract violation re-thrown by getTracesWithSpans.
-          if (isTraceSpansBatchResolverContractError(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1317,93 +1256,78 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return newScrollId;
   }
 
-  private async attachRequestedSpans({
-    traces,
+  /** The page's evaluations, and the child collections its projection asked for. */
+  private async readPageCollections({
+    reader,
     projectId,
-    protections,
-    includeSpans,
-    resolveBlobs,
-  }: {
-    traces: Trace[];
-    projectId: string;
-    protections: Protections;
-    includeSpans: boolean;
-    resolveBlobs: boolean;
-  }): Promise<Trace[]> {
-    // Spans are fetched when the caller wants them OR wants full IO — not the same thing.
-    // trace_summaries holds only the 64 KB preview, so recovering the full value means
-    // de-offloading spans and recomputing trace IO even for a spans-less summary read.
-    if ((!includeSpans && !resolveBlobs) || traces.length === 0) return traces;
-    const enriched = await this.enrichTracesWithSpans({
-      traces,
-      projectId,
-      protections,
-      resolveBlobs,
-    });
-    // A summary caller keeps the recomputed trace-level IO but not the
-    // spans it never asked for — the payload shape stays exactly as it
-    // was before this branch could run for them.
-    return includeSpans ? enriched : enriched.map((trace) => ({ ...trace, spans: [] }));
-  }
-
-  /**
-   * Projection JOINs: attach child collections the legacy read does not carry, scoped to
-   * this page.
-   */
-  private async attachProjectionCollections({
+    summaries,
     projection,
-    groups,
-    clickHouseClient,
-    projectId,
-    protections,
   }: {
+    reader: TenantScopedReader;
+    projectId: string;
+    summaries: TraceSummaryData[];
     projection: GetAllTracesForProjectOptions["projection"];
-    groups: TracesForProjectResult["groups"];
-    clickHouseClient: TraceClickHouseClient;
-    projectId: string;
-    protections: Protections;
-  }): Promise<void> {
-    if (!projection?.needsEvents && !projection?.needsAnnotations) return;
-    const pageTraces: ProjectableTrace[] = groups.flat();
-    if (projection.needsEvents) {
-      await this.enrichTracesWithEventsForProjection({
-        clickHouseClient,
-        projectId,
-        traces: pageTraces,
-        protections,
-      });
-    }
-    if (projection.needsAnnotations) {
-      await this.enrichTracesWithAnnotationsForProjection({
-        projectId,
-        traces: pageTraces,
-      });
-    }
+  }): Promise<Pick<TraceLegacyPage, "evaluations" | "events" | "annotations">> {
+    if (summaries.length === 0) return { evaluations: [] };
+    const traceIds = summaries.map((summary) => summary.traceId);
+    const evaluations = await this.fetchEvaluationRows({ reader, traceIds });
+    // Scoped to this page, never table-wide.
+    const events = projection?.needsEvents
+      ? await this.findEventsForProjection({ reader, projectId, summaries })
+      : undefined;
+    const annotations = projection?.needsAnnotations
+      ? await this.findAnnotationsForProjection({ projectId, traceIds })
+      : undefined;
+    return { evaluations, events, annotations };
   }
 
-  private async getTraceChecks({
-    clickHouseClient,
+  /** The page's spans, read only where the caller wants spans or full IO. */
+  private async readRequestedSpans({
+    reader,
+    summaries,
     projectId,
-    traceIds,
+    wanted,
+    retentionDays,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    reader: TenantScopedReader;
+    summaries: TraceSummaryData[];
     projectId: string;
-    traceIds: string[];
-  }): Promise<TracesForProjectResult["traceChecks"]> {
-    if (traceIds.length === 0) return {};
-    const evalRows = await this.fetchEvaluationRows({ clickHouseClient, projectId, traceIds });
-    return mapTraceEvaluationsToLegacyEvaluations(groupEvaluationsByTrace({ traceIds, evalRows }));
+    wanted: boolean;
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<Map<string, TraceLegacyRow>> {
+    if (!wanted || summaries.length === 0) return new Map();
+    // The summaries carry their own timestamps, so the partition window costs nothing.
+    const startedAts = summaries.map(traceStartedAt).filter((t) => t > 0);
+    const occurredAt =
+      startedAts.length > 0
+        ? { from: Math.min(...startedAts), to: Math.max(...startedAts) }
+        : undefined;
+    return this.fetchTracesWithSpansJoined({
+      reader,
+      projectId,
+      traceIds: summaries.map((s) => s.traceId),
+      occurredAt,
+      retentionDays,
+    });
   }
 
-  async listAllTracesForProject(
-    input: GetAllTracesForProjectInput,
-    protections: Protections,
-    options: GetAllTracesForProjectOptions = {},
-  ): Promise<TracesForProjectResult> {
+  async listAllTracesForProject({
+    input,
+    protections,
+    options,
+    retentionDays,
+    ownRead,
+  }: {
+    input: GetAllTracesForProjectInput;
+    protections: Protections;
+    options: GetAllTracesForProjectOptions;
+    retentionDays: RetentionDaysProvider | undefined;
+    ownRead: Authorization;
+  }): Promise<TraceLegacyPage> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getAllTracesForProject",
       async (_span) => {
-        const clickHouseClient = await this.resolveClient(input.projectId);
+        const reader = this.reader({ authorization: ownRead, projectId: input.projectId });
 
         try {
           const pageSize = input.pageSize ?? 25;
@@ -1453,7 +1377,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const { filterConditions, filterParams } = mergeFilterWhere({
             conditions: legacyFilterConditions,
             params: legacyFilterParams,
-            filterWhere: options.filterWhere,
+            filterWhere: fenceFilterWhere({
+              filterWhere: options.filterWhere,
+              authorization: options.authorization,
+            }),
           });
 
           // Pinned once on the first page and carried by the cursor so every later page
@@ -1467,11 +1394,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           });
 
           // Build the query with keyset pagination
-          const {
-            traces: fetchedTraces,
-            totalHits,
-            lastTrace,
-          } = await this.fetchTracesWithPagination({
+          const { summaries, totalHits } = await this.fetchTracesWithPagination({
             projectId: input.projectId,
             pageSize,
             sortDirection,
@@ -1488,71 +1411,39 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             dateField,
             scrollStart,
           });
-          const traces = await this.attachRequestedSpans({
-            traces: fetchedTraces,
+          const spans = await this.readRequestedSpans({
+            reader,
+            summaries,
             projectId: input.projectId,
-            protections,
-            includeSpans: options.includeSpans === true,
-            resolveBlobs: options.resolveBlobs === true,
+            wanted: options.includeSpans === true || options.resolveBlobs === true,
+            retentionDays,
           });
 
-          // Generate new scrollId from last trace. The cursor seeks on the
-          // axis we paged by: OccurredAt (started_at) or, for the updated axis,
-          // the latest-version UpdatedAt — and records the axis so the next
-          // page rejects a cursor from a different axis.
+          const last = summaries.at(-1);
+          // The cursor seeks on the axis paged by and records it, so the next page rejects
+          // a cursor from a different axis.
           const newScrollId = this.buildNextScrollId({
-            last: lastTrace === null ? null : traceSortKey({ trace: lastTrace, dateField }),
-            traceCount: traces.length,
+            last: last ? sortKeyOf({ last, dateField }) : null,
+            traceCount: summaries.length,
             pageSize,
             sortDirection,
             dateField,
             scrollStart,
           });
-
-          // Group traces (for now, single-trace groups unless groupBy is specified)
-          const rawGroups = this.groupTraces(traces, input.groupBy);
-
-          // Transform traces to include guardrail information
-          const groups = rawGroups.map((group) => transformTracesWithGuardrails(group));
-
-          this.logger.debug(
-            {
-              tracesReturned: traces.length,
-              totalHits,
-              hasScrollId: !!newScrollId,
-              firstTraceId: traces[0]?.trace_id,
-              firstTraceTimestamp: traces[0]?.timestamps.started_at,
-              lastTraceId: traces[traces.length - 1]?.trace_id,
-              lastTraceTimestamp: traces[traces.length - 1]?.timestamps.started_at,
-            },
-            "Returning traces result",
-          );
-
-          // Direct ClickHouse query, no extra isClickHouseEnabled roundtrip.
-          const traceIds = groups.flat().map((t) => t.trace_id);
-          const traceChecks = await this.getTraceChecks({
-            clickHouseClient,
+          const { evaluations, events, annotations } = await this.readPageCollections({
+            reader,
             projectId: input.projectId,
-            traceIds,
-          });
-
-          // Projection JOINs — attach child collections the legacy read path
-          // does not carry, scoped to this page's traces (never table-wide).
-          // Evaluations already flow through traceChecks; events and annotations
-          // are fetched here on demand. The compiled projector reads
-          // trace.events / trace.projectedAnnotations off these same objects.
-          await this.attachProjectionCollections({
+            summaries,
             projection,
-            groups,
-            clickHouseClient,
-            projectId: input.projectId,
-            protections,
           });
 
           return {
-            groups,
+            summaries,
+            spans,
+            evaluations,
+            events,
+            annotations,
             totalHits,
-            traceChecks,
             scrollId: newScrollId,
             ...(effectiveEndDate !== undefined && scrollStart !== undefined
               ? { updatedThrough: effectiveEndDate }
@@ -1823,7 +1714,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   async findSpanForPromptStudio({
     projectId,
     spanId,
-    protections,
   }: {
     projectId: string;
     spanId: string;
@@ -1868,40 +1758,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const allRows = promptStudioSpanRowsSchema.parse(await queryResult.json());
-
-          const requestedRow = allRows.find((r) => r.SpanId === spanId);
-          if (!requestedRow) {
-            return null;
-          }
-
-          // If the caller pointed at a non-llm span, resolve to the nearest llm span the
-          // operator most likely meant: a descendant first, then a later sibling. The
-          // playground form needs an llm span's messages + config.
-          const requestedType = requestedRow.SpanAttributes["langwatch.span.type"] as
-            | string
-            | undefined;
-          const row =
-            requestedType === "llm"
-              ? requestedRow
-              : (findNearestLlm(allRows, requestedRow) ?? null);
-          if (!row) {
-            return null;
-          }
-
-          // Extract span data from attributes
-          const result = this.extractPromptStudioDataFromClickHouse(row, protections);
-
-          // If the LLM span itself doesn't have a prompt reference,
-          // search ancestors and their siblings to find it (SDK sets it on
-          // sibling spans like Prompt.compile or PromptApiService.get)
-          applyAncestorPromptReference({
-            result,
-            rows: allRows,
-            targetSpanId: row.SpanId,
-          });
-
-          return result;
+          const rows = promptStudioSpanRowsSchema.parse(await queryResult.json());
+          return derivePromptStudioSpan({ rows, spanId }) ?? null;
         } catch (error) {
           this.logger.warn(
             {
@@ -1915,109 +1773,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         }
       },
     );
-  }
-
-  /**
-   * Extract prompt studio data from ClickHouse span row.
-   * @internal
-   */
-  private extractPromptStudioDataFromClickHouse(
-    row: {
-      SpanId: string;
-      TraceId: string;
-      SpanName: string;
-      SpanAttributes: Record<string, unknown>;
-      StartTime: number;
-      EndTime: number;
-      DurationMs: number;
-      StatusCode: number | null;
-      StatusMessage: string | null;
-    },
-    _protections: Protections,
-  ): PromptStudioSpanResult {
-    const attrs = row.SpanAttributes;
-    // Pure extraction of input + output messages from the span's
-    // attributes. Lives in parseLLMSpanMessages so the wire-shape
-    // contract — including the single-message-object form nlpgo emits
-    // for langwatch.output — is unit-testable without standing up the
-    // full service. See that file's docstring for the shape catalog.
-    const messages: PromptStudioSpanResult["messages"] = parseLLMSpanMessages(attrs);
-
-    // Extract LLM config
-    const model =
-      (attrs["gen_ai.response.model"] as string) ??
-      (attrs["gen_ai.request.model"] as string) ??
-      (attrs["llm.model"] as string) ??
-      null;
-    const vendor = (attrs["gen_ai.system"] as string) ?? null;
-
-    // Build llmConfig dynamically from the parameter map
-    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
-      model,
-      ...systemPromptFieldOfLlmSpan({ attrs, messages }),
-      temperature: null,
-      maxTokens: null,
-      topP: null,
-      frequencyPenalty: null,
-      presencePenalty: null,
-      seed: null,
-      topK: null,
-      minP: null,
-      repetitionPenalty: null,
-      reasoning: null,
-      verbosity: null,
-      litellmParams: {},
-    };
-
-    for (const param of LLM_PARAMETER_MAP) {
-      if (param.otelAttr === null) continue;
-      const raw = attrs[param.otelAttr];
-      if (raw != null) {
-        (llmConfig as Record<string, unknown>)[param.formField] = raw;
-      }
-    }
-
-    // Extract metrics
-    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as number | undefined;
-    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as number | undefined;
-
-    // Build error if present
-    let error: Span["error"] | null = null;
-    if (row.StatusCode === 2) {
-      error = {
-        has_error: true,
-        message: row.StatusMessage ?? "Unknown error",
-        stacktrace: [],
-      };
-    }
-
-    // Extract prompt reference from attributes
-    const promptRef = parsePromptTraceReference(attrs);
-
-    return {
-      spanId: row.SpanId,
-      traceId: row.TraceId,
-      spanName: row.SpanName ?? null,
-      messages,
-      llmConfig,
-      vendor,
-      error,
-      timestamps: {
-        started_at: row.StartTime,
-        finished_at: row.EndTime,
-      },
-      metrics:
-        promptTokens !== undefined || completionTokens !== undefined
-          ? {
-              prompt_tokens: promptTokens,
-              completion_tokens: completionTokens,
-            }
-          : null,
-      promptHandle: promptRef.promptHandle,
-      promptVersionNumber: promptRef.promptVersionNumber,
-      promptTag: promptRef.promptTag,
-      promptVariables: promptRef.promptVariables,
-    };
   }
 
   /**
@@ -2181,7 +1936,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
      * occurred axis, and on updated-axis cursors minted before it existed.
      */
     scrollStart?: number;
-  }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
+  }): Promise<{ summaries: TraceSummaryData[]; totalHits: number }> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.fetchTracesWithPagination",
       {
@@ -2205,7 +1960,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           protections.canSeeCapturedInput === false &&
           protections.canSeeCapturedOutput === false
         ) {
-          return { traces: [], totalHits: 0, lastTrace: null };
+          return { summaries: [], totalHits: 0 };
         }
 
         const searchFilter = buildSearchFilter({ effectiveQuery, protections });
@@ -2251,7 +2006,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         const pageTraceIds = idRows.map((r) => r.TraceId);
 
         if (pageTraceIds.length === 0) {
-          return { traces: [], totalHits, lastTrace: null };
+          return { summaries: [], totalHits };
         }
 
         // Step 2: Fetch full data for just the page's trace IDs.
@@ -2270,20 +2025,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           scrollStart,
         });
 
-        const traces: Trace[] = summaryRows.map((row) => {
-          const summary = this.rowToTraceSummaryData(row);
-          const trace = mapTraceSummaryToTrace({
-            summary,
-            spans: [],
-            projectId,
-            traceCanonicalisation: this.traceCanonicalisation,
-          });
-          return applyTraceProtections(trace, protections);
-        });
-
-        const lastTrace = traces.at(-1) ?? null;
-
-        return { traces, totalHits, lastTrace };
+        return {
+          summaries: summaryRows.map((row) => this.rowToTraceSummaryData(row)),
+          totalHits,
+        };
       },
     );
   }
@@ -2469,34 +2214,29 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   /**
    * Projection JOIN: attach events to a page of traces.
    */
-  private async enrichTracesWithEventsForProjection({
-    clickHouseClient,
+  private async findEventsForProjection({
+    reader,
     projectId,
-    traces,
-    protections,
+    summaries,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    reader: TenantScopedReader;
     projectId: string;
-    traces: ProjectableTrace[];
-    protections: Protections;
-  }): Promise<void> {
-    const traceIds = traces.map((t) => t.trace_id);
-    if (traceIds.length === 0) return;
+    summaries: TraceSummaryData[];
+  }): Promise<Map<string, Event[]>> {
+    const traceIds = summaries.map((s) => s.traceId);
+    if (traceIds.length === 0) return new Map();
 
     // Occurrence anchor per trace: started_at, falling back to updated_at for
     // legacy/corrupt rows missing it — the scan must NEVER run time-unbounded
     // (that is the exact blowup the windowing prevents). Traces with no usable
     // timestamp at all get an empty events[] rather than an unbounded scan.
-    const occurredAts = traces
-      .map((t) => t.timestamps?.started_at || t.timestamps?.updated_at)
-      .filter((t): t is number => typeof t === "number" && t > 0);
+    const occurredAts = summaries.map((s) => traceStartedAt(s) || s.updatedAt).filter((t) => t > 0);
     if (occurredAts.length === 0) {
       this.logger.warn(
-        { projectId, traceCount: traces.length },
+        { projectId, traceCount: summaries.length },
         "No usable timestamps on page traces; skipping events projection rather than scanning unbounded",
       );
-      for (const trace of traces) trace.events = [];
-      return;
+      return new Map();
     }
     // Cluster the occurrence times so the stored_spans scan is bounded to the
     // partitions the page's traces ACTUALLY occurred in. The updated axis can
@@ -2509,7 +2249,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       params: spanTimeParams,
     } = buildEventOccurrenceWindows(occurredAts);
 
-    const result = await clickHouseClient.query({
+    const result = await reader.query({
       query: `
         SELECT
           t.TraceId AS TraceId,
@@ -2518,14 +2258,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           toUnixTimestamp64Milli(t.EndTime) AS EndTimeMs,
           mapFilter((k, v) -> startsWith(k, 'event.'), t.SpanAttributes) AS EventAttrs
         FROM stored_spans AS t
-        WHERE t.TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND t.TraceId IN ({traceIds:Array(String)})
           ${spanTimeFilterOuter}
           AND mapContains(t.SpanAttributes, 'event.type')
           AND (t.TenantId, t.TraceId, t.SpanId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
             FROM stored_spans
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("StartTime")}
               AND TraceId IN ({traceIds:Array(String)})
               ${spanTimeFilterInner}
               AND mapContains(SpanAttributes, 'event.type')
@@ -2535,7 +2275,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         LIMIT {maxEvents:UInt32} BY t.TraceId
       `,
       query_params: {
-        tenantId: projectId,
         traceIds,
         maxEvents: MAX_EVENTS_PER_TRACE,
         ...spanTimeParams,
@@ -2564,36 +2303,18 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         `Projected events[] hit the per-trace cap (${MAX_EVENTS_PER_TRACE}); some events were not returned`,
       );
     }
-    // RBAC parity with the legacy read path: events attach AFTER
-    // applyTraceProtections ran, so they must get the same treatment —
-    // event_details are blanked when captured input is not visible, and
-    // otherwise scrubbed of any substring mirroring the trace's redacted io.
-    for (const trace of traces) {
-      const rawEvents = byTrace.get(trace.trace_id) ?? [];
-      const redactions = new Set<string>([
-        ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(trace.input?.value) : []),
-        ...(!protections.canSeeCapturedOutput
-          ? extractRedactionsForObject(trace.output?.value)
-          : []),
-      ]);
-      trace.events = rawEvents.map((event) =>
-        applyEventProtections(event, protections, redactions),
-      );
-    }
+    return byTrace;
   }
 
-  /**
-   * Projection JOIN: attach annotations to a page of traces.
-   */
-  private async enrichTracesWithAnnotationsForProjection({
+  /** Projection JOIN: a page's annotations by trace id. */
+  private async findAnnotationsForProjection({
     projectId,
-    traces,
+    traceIds,
   }: {
     projectId: string;
-    traces: ProjectableTrace[];
-  }): Promise<void> {
-    const traceIds = traces.map((t) => t.trace_id);
-    if (traceIds.length === 0) return;
+    traceIds: string[];
+  }): Promise<Map<string, ProjectedAnnotation[]>> {
+    if (traceIds.length === 0) return new Map();
 
     // scoreOptions is keyed by AnnotationScore id, but the public contract is
     // name-addressable (annotations.scores.<name>), so fetch the score
@@ -2625,9 +2346,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       });
       byTrace.set(row.traceId, list);
     }
-    for (const trace of traces) {
-      trace.projectedAnnotations = byTrace.get(trace.trace_id) ?? [];
-    }
+    return byTrace;
   }
 
   /**
@@ -2635,31 +2354,28 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * Same OOM-resilient pattern as fetchTraceSummaryRows.
    */
   private async fetchEvaluationRows({
-    clickHouseClient,
-    projectId,
+    reader,
     traceIds,
   }: {
-    clickHouseClient: TraceClickHouseClient;
-    projectId: string;
+    reader: TenantScopedReader;
     traceIds: string[];
   }): Promise<ClickHouseEvaluationRunRow[]> {
     const runQuery = async (ids: string[]) => {
-      const result = await clickHouseClient.query({
+      const result = await reader.query({
         query: `
           SELECT ${EVALUATION_RUN_COLUMNS_WITH_INPUTS}
           FROM evaluation_runs
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("ScheduledAt")}
             AND TraceId IN ({traceIds:Array(String)})
             AND (TenantId, EvaluationId, UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM evaluation_runs
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND TraceId IN ({traceIds:Array(String)})
               GROUP BY TenantId, EvaluationId
             )
         `,
         query_params: {
-          tenantId: projectId,
           traceIds: ids,
         },
         format: "JSONEachRow",
@@ -2744,290 +2460,31 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Group traces by the specified field.
-   * @internal
-   */
-  private groupTraces(traces: Trace[], groupBy?: string): Trace[][] {
-    if (!groupBy || groupBy === "none") {
-      return traces.map((trace) => [trace]);
-    }
-
-    const groups: Map<string, Trace[]> = new Map();
-
-    for (const trace of traces) {
-      let key: string | null = null;
-
-      if (groupBy === "user_id") {
-        key = trace.metadata.user_id ?? null;
-      } else if (groupBy === "thread_id") {
-        key = trace.metadata.thread_id ?? null;
-      }
-
-      if (key) {
-        const group = groups.get(key) ?? [];
-        group.push(trace);
-        groups.set(key, group);
-      } else {
-        // No grouping key - each trace is its own group
-        groups.set(trace.trace_id, [trace]);
-      }
-    }
-
-    return Array.from(groups.values());
-  }
-
-  /** Resolves offloaded blob refs, maps spans to legacy Trace objects, and applies protections. */
-  private async resolveAndMergeMany({
-    projectId,
-    entries,
-    protections,
-    resolveBlobs,
-  }: {
-    projectId: string;
-    entries: { summary: TraceSummaryData; spans: NormalizedSpan[] }[];
-    protections: Protections;
-    /**
-     * Per-call gate: resolves offloaded eventref pointers from event_log only when true, so
-     * list/search/collapsed reads keep the preview and issue zero event_log SELECTs. Defaults
-     * to false.
-     */
-    resolveBlobs?: boolean;
-  }): Promise<Trace[]> {
-    const resolutions = await this.resolveSpansBatch({
-      projectId,
-      spansPerTrace: entries.map((e) => e.spans),
-      resolveBlobs,
-    });
-
-    return entries.map((entry, i) =>
-      this.mergeResolvedTrace({
-        projectId,
-        summary: entry.summary,
-        resolution: resolutions[i]!,
-        protections,
-      }),
-    );
-  }
-
-  /** Resolves offloaded blob refs for a set of traces' spans, in one pass. */
-  private async resolveSpansBatch({
-    projectId,
-    spansPerTrace,
-    resolveBlobs,
-  }: {
-    projectId: string;
-    spansPerTrace: NormalizedSpan[][];
-    resolveBlobs?: boolean;
-  }): Promise<ResolvedTraceSpans[]> {
-    if (resolveBlobs === true && this.resolveTraceSpansBatch) {
-      return this.resolveSpansWithBatchResolver({
-        projectId,
-        spansPerTrace,
-        resolver: this.resolveTraceSpansBatch,
-      });
-    }
-
-    if (resolveBlobs === true && this.resolveTraceSpans) {
-      const resolutions: ResolvedTraceSpans[] = [];
-      for (const spans of spansPerTrace) {
-        resolutions.push(await this.resolveTraceSpans(projectId, spans));
-      }
-      return resolutions;
-    }
-
-    // No resolution opted in (or no resolver wired): keep the preview.
-    return spansPerTrace.map((spans) => ({
-      resolvedSpans: spans,
-      recomputedInput: null,
-      recomputedOutput: null,
-      anyResolved: false,
-    }));
-  }
-
-  private async resolveSpansWithBatchResolver({
-    projectId,
-    spansPerTrace,
-    resolver,
-  }: {
-    projectId: string;
-    spansPerTrace: NormalizedSpan[][];
-    resolver: ResolveTraceSpansBatchFn;
-  }): Promise<ResolvedTraceSpans[]> {
-    const resolutions = await resolver(projectId, spansPerTrace);
-
-    // "One resolution per input trace, in input order" is a convention the injected fn's type
-    // cannot enforce. Fail loudly at this boundary, where the offending resolver is still
-    // nameable, rather than silently pairing the wrong spans with the wrong trace downstream.
-    if (resolutions.length !== spansPerTrace.length) {
-      throw traceSpansBatchResolverCardinalityError({
-        got: resolutions.length,
-        expected: spansPerTrace.length,
-      });
-    }
-
-    // Cardinality alone misses the wrong-order case: same count, swapped positions, IO scattered
-    // onto the wrong trace. Check both span count and trace identity per entry — a span-less
-    // trace has no identity to compare, but its zero count still catches a swap with a
-    // spans-ful one. Two span-less traces transposed stay invisible, and are harmless.
-    for (const [index, spans] of spansPerTrace.entries()) {
-      const resolution = resolutions[index];
-
-      if (resolution?.resolvedSpans.length !== spans.length) {
-        throw traceSpansBatchResolverMisalignedError({
-          index,
-          expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
-          got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
-        });
-      }
-
-      const expected = spans[0]?.traceId;
-      const got = resolution.resolvedSpans[0]?.traceId;
-      if (expected !== undefined && got !== undefined && expected !== got) {
-        throw traceSpansBatchResolverMisalignedError({
-          index,
-          expected: `trace "${expected}"`,
-          got: `trace "${got}"`,
-        });
-      }
-    }
-
-    return resolutions;
-  }
-
-  /**
-   * Map one trace's resolved spans to the legacy Trace, patch recomputed I/O
-   * (when blobs were resolved), and apply field-redaction protections.
-   * @internal
-   */
-  private mergeResolvedTrace({
-    projectId,
-    summary,
-    resolution,
-    protections,
-  }: {
-    projectId: string;
-    summary: TraceSummaryData;
-    resolution: ResolvedTraceSpans;
-    protections: Protections;
-  }): Trace {
-    const recomputedInput: ExtractedIO | null = resolution.anyResolved
-      ? resolution.recomputedInput
-      : null;
-    const recomputedOutput: ExtractedIO | null = resolution.anyResolved
-      ? resolution.recomputedOutput
-      : null;
-
-    const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
-    let trace = mapTraceSummaryToTrace({
-      summary,
-      spans: mappedSpans,
-      projectId,
-      traceCanonicalisation: this.traceCanonicalisation,
-    });
-
-    // When blobs were resolved, patch trace.input / trace.output with
-    // the recomputed full values (overwriting the preview from trace_summaries).
-    if (recomputedInput !== null || recomputedOutput !== null) {
-      trace = {
-        ...trace,
-        ...(recomputedInput !== null ? { input: { value: recomputedInput.text } } : {}),
-        ...(recomputedOutput !== null ? { output: { value: recomputedOutput.text } } : {}),
-      };
-    }
-
-    return applyTraceProtections(trace, protections);
-  }
-
-  /**
-   * Enrich traces (which have empty spans) with actual span data from ClickHouse.
-   * @internal
-   */
-  private async enrichTracesWithSpans({
-    traces,
-    projectId,
-    protections,
-    resolveBlobs = false,
-  }: {
-    traces: Trace[];
-    projectId: string;
-    protections: Protections;
-    resolveBlobs?: boolean;
-  }): Promise<Trace[]> {
-    const traceIds = traces.map((t) => t.trace_id);
-    // The traces already carry their own timestamps, so derive the partition
-    // window for free: this bounds the trace_summaries summary read to the
-    // weeks these traces occurred in instead of scanning every partition.
-    const startedAts = traces
-      .map((t) => t.timestamps.started_at)
-      .filter((t): t is number => typeof t === "number" && t > 0);
-    const occurredAt =
-      startedAts.length > 0
-        ? { from: Math.min(...startedAts), to: Math.max(...startedAts) }
-        : undefined;
-    const tracesWithSpans = await this.fetchTracesWithSpansJoined(projectId, traceIds, occurredAt);
-
-    // Collect traces that have spans, resolve+merge them as one bounded batch, then splice the
-    // results back in order; traces with no spans pass through unchanged. resolveBlobs is gated
-    // by the caller — list/search leaves it false; only download/export opts in.
-    const enrichable = traces
-      .map((trace, index) => ({
-        index,
-        data: tracesWithSpans.get(trace.trace_id),
-      }))
-      .filter(
-        (
-          e,
-        ): e is {
-          index: number;
-          data: { summary: TraceSummaryData; spans: NormalizedSpan[] };
-        } => !!e.data && e.data.spans.length > 0,
-      );
-
-    const merged = await this.resolveAndMergeMany({
-      projectId,
-      entries: enrichable.map((e) => ({
-        summary: e.data.summary,
-        spans: e.data.spans,
-      })),
-      protections,
-      resolveBlobs,
-    });
-
-    const result = [...traces];
-    enrichable.forEach((e, i) => {
-      result[e.index] = merged[i]!;
-    });
-    return result;
-  }
-
-  /**
    * Resolve the OccurredAt span of a set of traces from a cheap sort-key seek.
    * Pre-anchor sentinel rows (`OccurredAt = 0`, ADR-087) are excluded in SQL
    * @internal
    */
   private async resolveOccurredAtRange({
-    client,
-    projectId,
+    reader,
     traceIds,
   }: {
-    client: TraceClickHouseClient;
-    projectId: string;
+    reader: TenantScopedReader;
     traceIds: string[];
   }): Promise<OccurredAtRange | undefined> {
     if (traceIds.length === 0) {
       return undefined;
     }
-    const result = await client.query({
+    const result = await reader.query({
       query: `
         SELECT
           toUnixTimestamp64Milli(min(OccurredAt)) AS fromMs,
           toUnixTimestamp64Milli(max(OccurredAt)) AS toMs
         FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND TraceId IN ({traceIds:Array(String)})
           AND OccurredAt > fromUnixTimestamp64Milli(0)
       `,
-      query_params: { tenantId: projectId, traceIds },
+      query_params: { traceIds },
       format: "JSONEachRow",
     });
     const rows = occurredAtRangeRowsSchema.parse(await result.json());
@@ -3043,22 +2500,28 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * efficient than two separate queries.
    * @internal
    */
-  private async fetchTracesWithSpansJoined(
-    projectId: string,
-    traceIds: string[],
-    occurredAt?: OccurredAtRange,
-  ): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> {
+  private async fetchTracesWithSpansJoined({
+    reader,
+    projectId,
+    traceIds,
+    occurredAt,
+    retentionDays,
+  }: {
+    reader: TenantScopedReader;
+    projectId: string;
+    traceIds: string[];
+    occurredAt: OccurredAtRange | undefined;
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<Map<string, TraceLegacyRow>> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.fetchTracesWithSpansJoined",
       {
         attributes: { "tenant.id": projectId },
       },
       async (_span) => {
-        const clickHouseClient = await this.resolveClient(projectId);
         const effectiveOccurredAt =
-          occurredAt ??
-          (await this.resolveOccurredAtOrNone({ clickHouseClient, projectId, traceIds }));
-        const batchRead = { clickHouseClient, projectId, effectiveOccurredAt };
+          occurredAt ?? (await this.resolveOccurredAtOrNone({ reader, projectId, traceIds }));
+        const batchRead = { reader, projectId, effectiveOccurredAt, retentionDays };
 
         try {
           return await this.readJoinedTraceBatch({ ...batchRead, batchTraceIds: traceIds });
@@ -3073,22 +2536,18 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async resolveOccurredAtOrNone({
-    clickHouseClient,
+    reader,
     projectId,
     traceIds,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    reader: TenantScopedReader;
     projectId: string;
     traceIds: string[];
   }): Promise<OccurredAtRange | undefined> {
     // Callers that already know the traces' time pass `occurredAt`; thread-view paths only
     // have trace ids. Without a window the summary read below filters on TraceId alone, which
     // cannot prune partitions, so resolve the OccurredAt span from a cheap sort-key seek first.
-    return this.resolveOccurredAtRange({
-      client: clickHouseClient,
-      projectId,
-      traceIds,
-    }).catch((error) => {
+    return this.resolveOccurredAtRange({ reader, traceIds }).catch((error) => {
       // Fail open: the resolve is a pure optimization, so a transient
       // failure must not break a read that previously succeeded. Fall
       // back to the unbounded (slower but correct) summary read.
@@ -3108,23 +2567,25 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * {@link MAX_SPANS_PER_JOINED_FALLBACK}.
    */
   private async readJoinedTracesInBatches({
-    clickHouseClient,
+    reader,
     projectId,
     effectiveOccurredAt,
+    retentionDays,
     traceIds,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    reader: TenantScopedReader;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
+    retentionDays: RetentionDaysProvider | undefined;
     traceIds: string[];
-  }): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> {
-    const batchRead = { clickHouseClient, projectId, effectiveOccurredAt };
+  }): Promise<Map<string, TraceLegacyRow>> {
+    const batchRead = { reader, projectId, effectiveOccurredAt, retentionDays };
 
     this.logger.warn(
       `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
     );
 
-    const merged = new Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>();
+    const merged = new Map<string, TraceLegacyRow>();
     let mergedSpanCount = 0;
     for (
       let i = 0;
@@ -3138,7 +2599,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       // ClickHouse instead of arriving in this process first. See
       // {@link MAX_SPANS_PER_JOINED_FALLBACK}.
       const remainingSpanBudget = MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
-      let batchMap: Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>;
+      let batchMap: Map<string, TraceLegacyRow>;
       try {
         batchMap = await this.readJoinedTraceBatch({
           ...batchRead,
@@ -3177,22 +2638,23 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async readJoinedTraceBatch({
-    clickHouseClient,
+    reader,
     projectId,
     effectiveOccurredAt,
+    retentionDays,
     batchTraceIds,
     maxSpanRows,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    reader: TenantScopedReader;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
+    retentionDays: RetentionDaysProvider | undefined;
     batchTraceIds: string[];
     /** Rows the span read may return before ClickHouse refuses it. */
     maxSpanRows?: number;
-  }): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> {
+  }): Promise<Map<string, TraceLegacyRow>> {
     const { summaryRows, hasSummaryWindow } = await this.readJoinedSummaryRows({
-      clickHouseClient,
-      projectId,
+      reader,
       effectiveOccurredAt,
       batchTraceIds,
     });
@@ -3205,11 +2667,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     }
 
     const spanRows = await this.readJoinedSpanRows({
-      clickHouseClient,
+      reader,
       projectId,
       batchTraceIds,
       spanRange: deriveSpanRange({ summaryRows, hasSummaryWindow, effectiveOccurredAt }),
       maxSpanRows,
+      retentionDays,
     });
 
     // Group spans by TraceId
@@ -3237,7 +2700,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     }
 
     // Build the tracesMap by combining summaries + spans
-    const tracesMap = new Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>();
+    const tracesMap = new Map<string, TraceLegacyRow>();
 
     for (const row of summaryRows) {
       const traceId = row.ts_TraceId;
@@ -3252,13 +2715,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async readJoinedSummaryRows({
-    clickHouseClient,
-    projectId,
+    reader,
     effectiveOccurredAt,
     batchTraceIds,
   }: {
-    clickHouseClient: TraceClickHouseClient;
-    projectId: string;
+    reader: TenantScopedReader;
     effectiveOccurredAt: OccurredAtRange | undefined;
     batchTraceIds: string[];
   }): Promise<{ summaryRows: TraceSummaryRow[]; hasSummaryWindow: boolean }> {
@@ -3291,7 +2752,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       run: async (window) => {
         const summaryTimeFilterOuter = window ? window.sqlFor("t.OccurredAt") : "";
         const summaryTimeFilterInner = window ? window.sqlFor("OccurredAt") : "";
-        const summaryResult = await clickHouseClient.query({
+        const summaryResult = await reader.query({
           query: `
         SELECT
           TraceId AS ts_TraceId,
@@ -3324,13 +2785,13 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
         FROM trace_summaries AS t
-        WHERE t.TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND t.TraceId IN ({traceIds:Array(String)})
           ${summaryTimeFilterOuter}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("OccurredAt")}
               AND TraceId IN ({traceIds:Array(String)})
               ${summaryTimeFilterInner}
             GROUP BY TenantId, TraceId
@@ -3338,7 +2799,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         ORDER BY t.TraceId
       `,
           query_params: {
-            tenantId: projectId,
             traceIds: batchTraceIds,
             ...window?.params,
           },
@@ -3351,14 +2811,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async readJoinedSpanRows({
-    clickHouseClient,
+    reader,
     projectId,
     batchTraceIds,
     spanRange,
     maxSpanRows,
+    retentionDays,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    reader: TenantScopedReader;
     projectId: string;
+    retentionDays: RetentionDaysProvider | undefined;
     batchTraceIds: string[];
     spanRange: { from: number; to: number } | undefined;
     maxSpanRows: number | undefined;
@@ -3392,7 +2854,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             // got 90 days here and simply could not see its own older
             // spans; one on a short policy no longer pays for a reach it
             // has no rows in. See {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
-            lookbackMs: await this.retentionFloor.getLookbackMs({
+            lookbackMs: await this.floorOver(retentionDays).getLookbackMs({
               table: "stored_spans",
               tenantId: projectId,
               minLookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS,
@@ -3405,7 +2867,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         // arm is kept only because the shared contract permits it.
         const spanTimeFilterOuter = window ? window.sqlFor("t.StartTime") : "";
         const spanTimeFilterInner = window ? window.sqlFor("StartTime") : "";
-        const spansResult = await clickHouseClient.query({
+        const spansResult = await reader.query({
           query: `
         SELECT
           SpanId,
@@ -3433,13 +2895,13 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           \`Links.SpanId\` AS Links_SpanId,
           \`Links.Attributes\` AS Links_Attributes
         FROM stored_spans AS t
-        WHERE t.TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND t.TraceId IN ({traceIds:Array(String)})
           ${spanTimeFilterOuter}
           AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
             SELECT TenantId, TraceId, SpanId, max(StartTime)
             FROM stored_spans
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("StartTime")}
               AND TraceId IN ({traceIds:Array(String)})
               ${spanTimeFilterInner}
             GROUP BY TenantId, TraceId, SpanId
@@ -3448,7 +2910,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
           query_params: {
-            tenantId: projectId,
             traceIds: batchTraceIds,
             ...window?.params,
           },
@@ -3754,138 +3215,4 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
   ss_DroppedAttributesCount: number | null;
   ss_DroppedEventsCount: number | null;
   ss_DroppedLinksCount: number | null;
-}
-
-interface PromptStudioCandidateRow {
-  SpanId: string;
-  ParentSpanId: string | null;
-  SpanAttributes: Record<string, unknown>;
-  StartTime: number;
-}
-
-function applyAncestorPromptReference({
-  result,
-  rows,
-  targetSpanId,
-}: {
-  result: PromptStudioSpanResult;
-  rows: PromptStudioCandidateRow[];
-  targetSpanId: string;
-}): void {
-  if (result.promptHandle) {
-    return;
-  }
-
-  const ancestorSpans = rows.map((row) => {
-    const attributes: Record<string, unknown> = {};
-    const promptId = row.SpanAttributes["langwatch.prompt.id"];
-    if (promptId) attributes["langwatch.prompt.id"] = promptId;
-    const promptVars = row.SpanAttributes["langwatch.prompt.variables"];
-    if (promptVars) attributes["langwatch.prompt.variables"] = promptVars;
-    const promptHandle = row.SpanAttributes["langwatch.prompt.handle"];
-    if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
-    const promptVersion = row.SpanAttributes["langwatch.prompt.version.number"];
-    if (promptVersion) attributes["langwatch.prompt.version.number"] = promptVersion;
-    return {
-      spanId: row.SpanId,
-      parentSpanId: row.ParentSpanId ?? null,
-      startTime: row.StartTime,
-      attributes,
-    };
-  });
-
-  const ancestorRef = findPromptReferenceInAncestors({
-    targetSpanId,
-    spans: ancestorSpans,
-  });
-  if (!ancestorRef?.promptHandle) {
-    return;
-  }
-
-  result.promptHandle = ancestorRef.promptHandle;
-  result.promptVersionNumber = ancestorRef.promptVersionNumber;
-  result.promptTag = ancestorRef.promptTag;
-  result.promptVariables = ancestorRef.promptVariables;
-}
-
-/**
- * Given a non-llm span, finds the nearest llm span in the same trace to load into the
- * playground instead. Preference order: closest descendant, then next sibling by start time,
- * then the trace's first llm span. Returns null when the trace has no llm spans.
- */
-function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested: T): T | null {
-  const isLlm = (r: T) => (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
-
-  const llmRows = rows.filter(isLlm);
-  if (llmRows.length === 0) return null;
-
-  // 1. Descendant llm closest to the requested span (smallest depth diff).
-  const childrenByParent = new Map<string, T[]>();
-  for (const r of rows) {
-    if (!r.ParentSpanId) continue;
-    const list = childrenByParent.get(r.ParentSpanId);
-    if (list) list.push(r);
-    else childrenByParent.set(r.ParentSpanId, [r]);
-  }
-  const closestDescendant = findClosestDescendantLlm({
-    childrenByParent,
-    requested,
-    isLlm,
-  });
-  if (closestDescendant) return closestDescendant;
-
-  // 2. Sibling llm under the same parent that started at/after the requested span. Earliest
-  // qualifying sibling wins, landing on the next call rather than one further down the chain.
-  // Earlier siblings belong to a prior turn and fall through to step 3 instead.
-  const siblingPool =
-    requested.ParentSpanId == null
-      ? rows.filter((r) => r.ParentSpanId == null)
-      : (childrenByParent.get(requested.ParentSpanId) ?? []);
-  const siblings = siblingPool
-    .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
-    .toSorted((a, b) => a.StartTime - b.StartTime);
-  const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
-  if (nextOrSame) return nextOrSame;
-
-  // 3. Earliest llm in the trace.
-  return llmRows.toSorted((a, b) => a.StartTime - b.StartTime)[0] ?? null;
-}
-
-function findClosestDescendantLlm<T extends PromptStudioCandidateRow>({
-  childrenByParent,
-  requested,
-  isLlm,
-}: {
-  childrenByParent: Map<string, T[]>;
-  requested: T;
-  isLlm: (row: T) => boolean;
-}): T | null {
-  const visited = new Set<string>();
-  const queue: T[] = [requested];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current.SpanId)) continue;
-    visited.add(current.SpanId);
-    const children = childrenByParent.get(current.SpanId) ?? [];
-    for (const child of children) {
-      if (isLlm(child)) return child;
-      queue.push(child);
-    }
-  }
-
-  return null;
-}
-
-/**
- * Transform traces to include guardrail information
- */
-function transformTracesWithGuardrails(traces: Trace[]): TraceWithGuardrail[] {
-  return traces.map((trace) => {
-    return {
-      ...trace,
-      lastGuardrail: void 0,
-      annotations: void 0,
-    };
-  });
 }

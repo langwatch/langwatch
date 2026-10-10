@@ -22,13 +22,13 @@
     {
       "id": 4,
       "prompt": "Rename the column Monitor.name to Monitor.displayName. Prisma generated RENAME COLUMN, so just commit that.",
-      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy (inline UPDATE ... WHERE \"displayName\" IS NULL for a small table, a background step for a large one), readers switch or read coalesce(new, old); contract: drop \"name\" only when the floor is at or above A, with `-- contract: retired in <release>`.",
+      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy with a background .withMigrations step (never an inline UPDATE on an existing table), readers switch or read coalesce(new, old); contract: drop \"name\" only when the floor is at or above A, with `-- contract: retired in <release>`.",
       "files": []
     },
     {
       "id": 5,
       "prompt": "Deploy failed: upgrade exited 1 with rerunnable_migration_failed on my new migration. Should I run prisma migrate resolve --rolled-back?",
-      "expected_output": "No: a folder newer than RERUNNABLE_PRISMA_FROM is re-runnable, and upgrade already marks it rolled back and retries (3 attempts, 2 s then 4 s). Fix the cause (often a lock another session holds past lock_timeout 10 s) and run upgrade again. prisma migrate resolve is only for failed_prisma_migration, a folder at or below the marker. Also checks every statement survives a second run (IF NOT EXISTS, ON CONFLICT, DO $$ guards), which pnpm lint:architecture --policies rerunnable-migrations enforces.",
+      "expected_output": "No: a folder newer than RERUNNABLE_PRISMA_FROM is re-runnable, and upgrade already marks it rolled back and retries (3 attempts, 2 s then 4 s). Fix the cause (often a lock another session holds past lock_timeout 2 s) and run upgrade again. prisma migrate resolve is only for failed_prisma_migration, a folder at or below the marker. Also checks every statement survives a second run (IF NOT EXISTS, ON CONFLICT, DO $$ guards), which pnpm lint:architecture --policies rerunnable-migrations enforces.",
       "files": []
     }
   ]

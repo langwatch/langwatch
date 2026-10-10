@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/beevik/etree"
@@ -31,39 +30,32 @@ const (
 
 func isSAMLTamper(m TamperMode) bool { return strings.HasPrefix(string(m), "saml-") }
 
-// tenantFaults is per-tenant fault state the Tenant struct does not carry.
-// shortcut: kept beside tenants.go (another lane's file) and not persisted; move onto Tenant when free.
-type tenantFaults struct {
-	skew            time.Duration
-	lastAssertionID string
-}
-
-var faultTable = struct {
-	mu       sync.Mutex
-	byTenant map[*Tenant]*tenantFaults
-}{byTenant: map[*Tenant]*tenantFaults{}}
-
-func (t *Tenant) withFaults(fn func(f *tenantFaults)) {
-	faultTable.mu.Lock()
-	defer faultTable.mu.Unlock()
-	f, ok := faultTable.byTenant[t]
-	if !ok {
-		f = &tenantFaults{}
-		faultTable.byTenant[t] = f
-	}
-	fn(f)
-}
-
 // Skew is how far the tenant's clock runs from the real one, applied to every token and assertion.
 func (t *Tenant) Skew() time.Duration {
-	var d time.Duration
-	t.withFaults(func(f *tenantFaults) { d = f.skew })
-	return d
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.skew
 }
 
 // SetSkew sets the tenant's clock skew; negative runs the clock behind.
 func (t *Tenant) SetSkew(d time.Duration) {
-	t.withFaults(func(f *tenantFaults) { f.skew = d })
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.skew = d
+}
+
+// setLastAssertion records id as the tenant's last signed assertion.
+func (t *Tenant) setLastAssertion(id string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.lastAssertionID = id
+}
+
+// lastAssertion is the id of the tenant's last signed assertion, for the replay tamper.
+func (t *Tenant) lastAssertion() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.lastAssertionID
 }
 
 // takeSAMLTamper disarms and returns an armed SAML mode, leaving an OIDC one armed.
@@ -95,10 +87,8 @@ func issueSAML(in samlIssue) (TamperMode, error) {
 	skew, mode := t.Skew(), t.takeSAMLTamper()
 	shiftAssertion(req.Assertion, skew)
 	req.Now = req.Now.Add(skew)
-	var previous string
-	t.withFaults(func(f *tenantFaults) { previous = f.lastAssertionID })
-	breakAssertion(req, assertionBreak{Mode: mode, PreviousID: previous})
-	t.withFaults(func(f *tenantFaults) { f.lastAssertionID = req.Assertion.ID })
+	breakAssertion(req, assertionBreak{Mode: mode, PreviousID: t.lastAssertion()})
+	t.setLastAssertion(req.Assertion.ID)
 	return mode, signResponse(req, mode)
 }
 

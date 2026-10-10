@@ -484,7 +484,7 @@ const ResultsPane: React.FC = React.memo(() => {
           "Network" inversion). Dark mode keeps the legacy muted dark
           background that operators already approved.
         */}
-        <Box height="full" overflow="auto" bg={{ base: "bg.surface", _dark: "bg.muted" }}>
+        <Box height="full" overflow="auto" bg="bg.card">
           <TraceTable />
         </Box>
         <InstantEvalProgressBanner />

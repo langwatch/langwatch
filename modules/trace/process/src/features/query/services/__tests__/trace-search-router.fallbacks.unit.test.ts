@@ -8,7 +8,14 @@ import {
   TraceSearchRouterService,
   type TraceSearchRouterDeps,
 } from "../trace-search-router.service.ts";
-import { deps, input, NoModel, ProviderDisabled, RANGE } from "./trace-search-router.harness.ts";
+import {
+  deps,
+  input,
+  NoModel,
+  PROOF,
+  ProviderDisabled,
+  RANGE,
+} from "./trace-search-router.harness.ts";
 
 const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(deps);
 
@@ -34,6 +41,7 @@ describe("given no classification", () => {
       });
       expect(d.routeWithModel).toHaveBeenCalledWith({
         projectId: "project-1",
+        authorization: PROOF,
         text: "failing calls",
         timeRange: RANGE,
         target: "traces",

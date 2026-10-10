@@ -1,22 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, Heading, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Card, Box, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { type ReactNode } from "react";
 
 import { SampleMark } from "./sample-mark.tsx";
 
-/**
- * Card shell for every panel on the Costs page: a title, the panel, and
- * nothing else. The page deliberately carries no explanatory prose — a
- * heading and the figures beneath it have to do the work.
- *
- * `sample` marks a panel drawn from `sampleSeries` rather than from a real
- * read. It is a badge rather than a sentence so it stays out of the way, and
- * it is never optional on a placeholder panel the reader could mistake for a
- * measured one: unlabelled invented money is indistinguishable from the
- * organization's own. `SampleMark` decides when that mistake is possible —
- * while the page-wide banner is up it is not, and the mark stands down.
- */
+/** Showcase panel; invented figures keep their sample mark unless the page banner covers them. */
 export function CostPanel({
   title,
   sample = false,
@@ -32,16 +21,12 @@ export function CostPanel({
   children: ReactNode;
 }) {
   return (
-    <VStack
+    <Card.Root
+      variant="showcase"
       data-testid="cost-panel"
       data-tour={tourId}
-      align="stretch"
+      alignItems="stretch"
       gap={3}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="xl"
-      backgroundColor="bg.panel"
-      boxShadow="md"
       padding={4}
     >
       <HStack gap={2}>
@@ -51,6 +36,6 @@ export function CostPanel({
         {action}
       </HStack>
       <Box>{children}</Box>
-    </VStack>
+    </Card.Root>
   );
 }

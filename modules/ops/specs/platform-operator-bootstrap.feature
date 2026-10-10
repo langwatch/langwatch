@@ -72,6 +72,20 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Then only the named user is decided
 
   @unit @operator-seed
+  Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names
+    Given no platform operator holds the grant
+    And ADMIN_EMAILS names a verified active user and an unverified one
+    When the ops:seed-platform-operators upgrade step runs
+    Then only the verified user is granted, by the system, with source migration
+    And a dry run of the step grants nobody and counts the one user it would grant
+
+  @unit @operator-seed
+  Scenario: The upgrade step leaves every other case to the seed's wait
+    Given one of: a holder exists, ADMIN_EMAILS is empty, it names no verified user, or the deployment is the hosted service
+    When the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and the step finishes
+
+  @unit @operator-seed
   Scenario: With ADMIN_EMAILS empty the oldest active admin of the only organization is seeded
     Given ADMIN_EMAILS is empty
     And the installation has exactly one organization

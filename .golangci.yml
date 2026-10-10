@@ -102,6 +102,8 @@ linters:
       # The repository writes British English; "catalogue" is the domain word (modules/catalogue.json).
       ignore-rules:
         - catalogue
+        - licence
+        - cancelled
 
     spancheck:
       checks:

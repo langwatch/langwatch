@@ -65,6 +65,7 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       },
     }),
     organization: {
+      getAll: { useQuery: () => ({ data: [] }) },
       getScopeGraph: { useQuery: () => ({ data: [{ id: "org-1", teams: mockTeams.current }] }) },
     },
     project: {
@@ -244,7 +245,8 @@ describe("given the create-project drawer", () => {
         new FakeOrganizationHost(),
       );
 
-      expect(await screen.findByText("Couldn't save this project")).toBeInTheDocument();
+      // A registered code's own headline beats the form's fallback title.
+      expect(await screen.findByText("Check your input")).toBeInTheDocument();
       expect(host.failures).toEqual([]);
     });
 

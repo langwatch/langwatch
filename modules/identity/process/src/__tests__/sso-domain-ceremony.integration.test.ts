@@ -74,6 +74,9 @@ class LocalConnections implements SsoConnectionReadRepository, SsoConnectionRegi
     return candidate;
   }
 
+  /** Nothing was held, so there is nothing to free. */
+  async release(): Promise<void> {}
+
   private readonly states = new Map<string, SsoConnectionState>();
 
   async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {

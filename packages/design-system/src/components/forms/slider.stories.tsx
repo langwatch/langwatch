@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SimpleSlider } from "./slider.tsx";
 
 const meta = {
-  title: "Primitives/Slider",
+  title: "Inputs and forms/Slider",
+  parameters: {
+    usage: {
+      use: "A bounded number where the rough value matters more than the exact figure, such as a temperature or a threshold.",
+      avoid: "An exact figure: use Input from primitives with a number type.",
+    },
+  },
   component: SimpleSlider,
   tags: ["autodocs"],
   args: {

@@ -5,6 +5,8 @@ import {
 import {
   monthCountedEventDataSchema,
   USAGE_MONTH_COUNTED_EVENT_TYPE,
+  USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
+  usageThresholdCrossedEventDataSchema,
 } from "@langwatch/entitlement-contract";
 import {
   defineAggregate,
@@ -18,6 +20,7 @@ import {
 
 import type { BillingModule } from "../app/billing.app.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import type { UsageWarningService } from "../services/usage-warning.service.ts";
 import {
   ReportUsageForMonthCommandHandler,
   type ReportUsageForMonthCommandDeps,
@@ -33,22 +36,26 @@ export type BillingReportingDefinition = StaticPipelineDefinition<
 /** The peer subscriber that reports each month usage counts. */
 export const BILLING_MONTH_COUNTED_SUBSCRIBER_NAME = "usageMonthCounted";
 
+/** The peer subscriber that mails each usage threshold entitlement records. */
+export const BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME = "usageThresholdCrossed";
+
+type BillingReportingDeps = Omit<ReportUsageForMonthCommandDeps, "selfDispatch"> & {
+  /** Skips a threshold already mailed this month, so a redelivered event mails nobody twice. */
+  usageWarnings: Pick<UsageWarningService, "send">;
+};
+
 /**
  * The monthly roll-up's pipeline. The self-dispatch loop closes at registration,
  * not at first dispatch; usage's month_counted starts each month's report.
  */
 export class BillingReportingPipeline {
-  static create(
-    deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
-  ): BillingReportingPipeline {
+  static create(deps: BillingReportingDeps): BillingReportingPipeline {
     return new BillingReportingPipeline(deps);
   }
 
   private send: ((data: ReportUsageForMonthCommandData) => Promise<void>) | undefined;
 
-  private constructor(
-    private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
-  ) {}
+  private constructor(private readonly deps: BillingReportingDeps) {}
 
   private dispatch(data: ReportUsageForMonthCommandData): Promise<void> {
     if (!this.send) {
@@ -63,9 +70,10 @@ export class BillingReportingPipeline {
   }: {
     participation: EventingParticipation;
   }): BillingReportingDefinition {
-    if (participation === "consume") this.deps.getUsageReportingService();
+    const { usageWarnings, ...report } = this.deps;
+    if (participation === "consume") report.getUsageReportingService();
     const reportUsageForMonthCommand = ReportUsageForMonthCommandHandler.create({
-      ...this.deps,
+      ...report,
       selfDispatch: (data) => this.dispatch(data),
     });
 
@@ -102,6 +110,13 @@ export class BillingReportingPipeline {
             billableEvents: data.billableEvents,
             countedEventId: eventId,
           }),
+      })
+      .withPeerSubscriber(BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME, {
+        eventType: USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
+        data: usageThresholdCrossedEventDataSchema,
+        handle: async (data) => {
+          await usageWarnings.send(data);
+        },
       })
       .build();
   }

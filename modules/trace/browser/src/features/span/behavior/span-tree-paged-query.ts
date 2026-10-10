@@ -20,6 +20,7 @@ interface SpanTreeQueryInput {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
+  tenantId?: string;
 }
 
 type TrpcUtils = { client: Pick<ReturnType<typeof api.useUtils>["client"], "traces"> };

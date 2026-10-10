@@ -22,11 +22,12 @@ import {
 } from "../idempotency.ts";
 import type {
   IdempotencyReceiptCreateInput,
+  IdempotencyReceiptFence,
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
+  IdempotencyReceiptUpdate,
 } from "../repositories/prisma/prisma.idempotency-receipt.ts";
 import { bodyLimit, validator as zValidator } from "../request.ts";
-import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request validator, end to end through a real Hono app.
@@ -602,17 +603,22 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
 
       return { count: 1 };
     },
-  };
 
-  readonly $executeRaw = async (sql: TemplateStringsArray, ...values: unknown[]) => {
-    const write = readFencedReceiptWrite(sql, values);
-    const row = this.byId(write.id);
-    if (!row || row.claimId !== write.claimId) return 0;
-    if (write.pendingOnly && row.responseStatus !== null) return 0;
+    updateMany: async ({
+      where,
+      data,
+    }: {
+      where: IdempotencyReceiptFence;
+      data: IdempotencyReceiptUpdate;
+    }) => {
+      const row = this.byId(where.id);
+      if (!row || row.claimId !== where.claimId) return { count: 0 };
+      if (where.responseStatus === null && row.responseStatus !== null) return { count: 0 };
 
-    Object.assign(row, write.data);
+      Object.assign(row, data);
 
-    return 1;
+      return { count: 1 };
+    },
   };
 
   private byId(id: unknown) {

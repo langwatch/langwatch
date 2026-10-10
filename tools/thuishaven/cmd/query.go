@@ -18,7 +18,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// queryLang is the backend language a raw `haven query` is written in.
+// queryLang is the backend language a raw `haven obs query` is written in.
 type queryLang string
 
 const (
@@ -33,7 +33,7 @@ const (
 	queryTimeout       = 10 * time.Second
 )
 
-// rawQuery is one `haven query` read with the worktree filter already forced in.
+// rawQuery is one `haven obs query` read with the worktree filter already forced in.
 type rawQuery struct {
 	lang   queryLang
 	scoped string
@@ -61,7 +61,7 @@ func querySpec() commandSpec {
 
 func runQuery(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) != 2 {
-		return errors.New("haven query wants a language and one quoted query: haven query traceql|logql|promql '<query>'")
+		return errors.New("haven obs query wants a language and one quoted query: haven obs query traceql|logql|promql '<query>'")
 	}
 	slug, err := tabSlug(d, inv)
 	if err != nil {
@@ -81,7 +81,7 @@ func rawQueryFrom(inv invocation, slug string) (rawQuery, error) {
 	switch lang {
 	case langTraceQL, langLogQL, langPromQL:
 	default:
-		return rawQuery{}, fmt.Errorf("haven query wants traceql, logql or promql, got %q", inv.args[0])
+		return rawQuery{}, fmt.Errorf("haven obs query wants traceql, logql or promql, got %q", inv.args[0])
 	}
 	q := rawQuery{lang: lang, scoped: scopeQuery(lang, inv.args[1], slug), window: queryDefaultWindow, limit: queryDefaultLimit}
 	window, err := parseDurationFlag(inv, "--since")

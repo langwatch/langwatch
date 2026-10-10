@@ -64,6 +64,10 @@ export class GrantsFake extends AuthzGrantsService {
   );
   readonly attachResourceGrant = vi.fn();
   readonly revokeResourceGrants = vi.fn();
+  readonly findLiveSharedProjectGrants = vi.fn();
+  readonly attachSharedProjectGrant = vi.fn();
+  readonly awaitSharedProjectGrants = vi.fn();
+  readonly revokeSharedProjectGrants = vi.fn();
   readonly changeBindingRole = vi.fn();
   readonly revokeBindings = vi.fn(async (): Promise<void> => void 0);
   readonly revokeBindingsWhere = vi.fn();

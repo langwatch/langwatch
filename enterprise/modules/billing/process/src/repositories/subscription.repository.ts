@@ -14,7 +14,7 @@ export type BillingSubscriptionRecord = {
   lastPaymentFailedDate: Instant | null;
 };
 
-export type BillingOrganizationRecord = {
+type BillingOrganizationRecord = {
   id: string;
   name: string;
   stripeCustomerId: string | null;

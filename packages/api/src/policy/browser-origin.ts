@@ -12,12 +12,12 @@ export type OriginBearingRequest = Readonly<{
 export class BrowserOriginGuard {
   /**
    * `Sec-Fetch-Site` is the primary signal — set by every modern browser from the real request
-   * initiator and unaffected by reverse proxies. `cross-site` is exactly the forgery vector;
-   * `same-origin`, `same-site` and `none` (a direct navigation) are all legitimate.
+   * initiator and unaffected by reverse proxies. Only `same-origin` and `none` (a direct
+   * navigation) are our own pages; a sibling subdomain is `same-site`, not ours.
    */
   static isFromOwnOrigin(request: OriginBearingRequest): boolean {
     const secFetchSite = request.req.header("sec-fetch-site");
-    if (secFetchSite) return secFetchSite !== "cross-site";
+    if (secFetchSite) return secFetchSite === "same-origin" || secFetchSite === "none";
 
     const origin = request.req.header("origin");
     // Fail CLOSED: with neither `Sec-Fetch-Site` nor `Origin` there is no

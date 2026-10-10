@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Which tier an organization gets when it sets single sign-on up itself
@@ -7,7 +8,7 @@ import { z } from "zod";
 
 export const SSO_SELF_SERVE_DEPLOYMENTS = ["hosted", "self-hosted"] as const;
 
-export const ssoSelfServeContextSchema = z.object({
+const ssoSelfServeContextSchemaDefinition = z.object({
   deployment: z.enum(SSO_SELF_SERVE_DEPLOYMENTS),
   /** The licence gate, and only where a licence can speak at all. */
   licensed: z.boolean(),
@@ -25,6 +26,11 @@ export const ssoSelfServeContextSchema = z.object({
    *  where it changes the answer. */
   actorIsPlatformOperator: z.boolean(),
 });
+export interface SsoSelfServeContextSchema extends Named<
+  typeof ssoSelfServeContextSchemaDefinition
+> {}
+export const ssoSelfServeContextSchema: SsoSelfServeContextSchema =
+  ssoSelfServeContextSchemaDefinition;
 
 export type SsoSelfServeContext = z.infer<typeof ssoSelfServeContextSchema>;
 
@@ -38,9 +44,14 @@ export const SSO_SELF_SERVE_REFUSALS = [
 export const SSO_SELF_SERVE_PROOFS = ["license-token", "dns-txt"] as const;
 
 /** Whether setup is open to this organization, or the one thing that would change that. */
-export const ssoSelfServeAvailabilitySchema = z.discriminatedUnion("available", [
+const ssoSelfServeAvailabilitySchemaDefinition = z.discriminatedUnion("available", [
   z.object({ available: z.literal(true), proof: z.enum(SSO_SELF_SERVE_PROOFS) }).strict(),
   z.object({ available: z.literal(false), refusal: z.enum(SSO_SELF_SERVE_REFUSALS) }).strict(),
 ]);
+export interface SsoSelfServeAvailabilitySchema extends Named<
+  typeof ssoSelfServeAvailabilitySchemaDefinition
+> {}
+export const ssoSelfServeAvailabilitySchema: SsoSelfServeAvailabilitySchema =
+  ssoSelfServeAvailabilitySchemaDefinition;
 
 export type SsoSelfServeAvailability = z.infer<typeof ssoSelfServeAvailabilitySchema>;

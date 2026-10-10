@@ -4,19 +4,20 @@
  * @see packages/api/specs/read-hints.feature
  */
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import type { AuthzScopeLineageResult } from "@langwatch/authorization";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
   createPresenceTestApp,
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
-import { presenceSessionPersonFact, presenceTrpcTransport } from "../presence.trpc.ts";
+import { presenceSessionPersonContext, presenceTrpcTransport } from "../presence.trpc.ts";
 
 type DoorContext = { actor: { id: string } | null };
 
@@ -35,6 +36,7 @@ function members(): TrpcRuntimeMembers<DoorContext> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ userId, scope }) => ({
           permitted:
             userId === "u1" &&
@@ -87,7 +89,7 @@ async function mountedDoors() {
     procedure: root.procedure,
     members: members(),
   }).mount(presenceTrpcTransport, () => app, {
-    facts: [bindTrpcFact(presenceSessionPersonFact, () => null)],
+    middlewareContext: [bindTrpcMiddlewareContext(presenceSessionPersonContext, () => null)],
   });
 
   return { router, emitters };

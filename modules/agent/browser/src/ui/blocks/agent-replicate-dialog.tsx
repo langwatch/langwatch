@@ -49,7 +49,8 @@ export function AgentReplicateDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content bg="bg" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Replicate Agent</Dialog.Title>
         </Dialog.Header>
@@ -93,11 +94,11 @@ export function AgentReplicateDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={() => void handleCopy()}
             loading={isLoading}
             disabled={selectedProjectId.length === 0 || !hasPermission}

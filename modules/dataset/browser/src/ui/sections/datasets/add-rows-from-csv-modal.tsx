@@ -210,7 +210,7 @@ export function AddRowsFromCSVModal({
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Add rows from CSV</Dialog.Title>
           <Dialog.CloseTrigger />
@@ -224,16 +224,16 @@ export function AddRowsFromCSVModal({
             {renderMapping}
           </CSVReaderComponent>
           {hasErrors.length > 0 && (
-            <Text color="red">Please check columns have valid formatting</Text>
+            <Text color="red.fg">Please check columns have valid formatting</Text>
           )}
         </Dialog.Body>
 
         <Dialog.Footer>
-          <Button variant="ghost" mr={3} onClick={onClose}>
+          <Button variant="outline" mr={3} onClick={onClose}>
             Close
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             disabled={recordEntries.length === 0 || !canUpload || hasErrors.length > 0}
             onClick={uploadCSVData}
             loading={uploadRecords.isPending}

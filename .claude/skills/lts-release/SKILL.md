@@ -40,7 +40,7 @@ October 2027.
 3. **Update the public table** in `docs/self-hosting/releases.mdx`: the new LTS's row (release,
    month) and the floor column, plus the worked example if its months are now in the past.
 4. **Update the literal floor** where teaching surfaces name it: `git grep -n "<old floor>" --
-   .claude/skills dev/docs/runbooks docs/self-hosting` (today: `migration`, `postgres-migration`,
+.claude/skills dev/docs/runbooks docs/self-hosting` (today: `migration`, `postgres-migration`,
    `clickhouse-migration` skills, `dev/docs/runbooks/upgrade-on-deploy.md`). ADRs and plans stay as
    written. The scanner tests read `lts-floor.json` themselves.
 5. **List what became eligible** (below) in the handoff for the coordinator to schedule.
@@ -59,13 +59,13 @@ October 2027.
 
 ## Checks
 
-| Check | Command |
-| --- | --- |
-| Floor parses, plan and refusal | `VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/upgrade test` |
-| Scanners against the new floor | `VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/prisma-client test src/__tests__/migration-safety.unit.test.ts`, the same for `@langwatch/clickhouse-migrations` |
-| The floor image boots on head's schema | dispatch `.github/workflows/migration-compat.yml` (its `lts-floor` job reads `lts-floor.json`) |
-| An installation on the old floor is refused by name | `pnpm task upgrade plan` against a store on the old floor: refusal naming the new floor |
-| Docs build and links | the docs site checks on the PR |
+| Check                                               | Command                                                                                                                                                         |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Floor parses, plan and refusal                      | `VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/upgrade test`                                                                                                    |
+| Scanners against the new floor                      | `VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/prisma-client test src/__tests__/migration-safety.unit.test.ts`, the same for `@langwatch/clickhouse-migrations` |
+| The floor image boots on head's schema              | dispatch `.github/workflows/migration-compat.yml` (its `lts-floor` job reads `lts-floor.json`)                                                                  |
+| An installation on the old floor is refused by name | `pnpm task upgrade plan` against a store on the old floor: refusal naming the new floor                                                                         |
+| Docs build and links                                | the docs site checks on the PR                                                                                                                                  |
 
 ## Never
 

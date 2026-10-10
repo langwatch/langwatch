@@ -35,6 +35,7 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
   .withAddressing("literal")
 
   .post("/api/webhooks/stripe", "receiveStripeWebhook")
+  .withoutAudit("Stripe webhook")
   // The signature is computed over these bytes: a parse-then-reserialise
   // verifies nothing.
   .withRawBody("bytes")

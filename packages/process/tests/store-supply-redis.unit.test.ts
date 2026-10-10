@@ -74,7 +74,7 @@ describe("given an installed module that keeps its state in Redis", () => {
         .withSecrets((_, secrets) => secrets.withEnv())
         .start();
       try {
-        const boot = server.container("worker").boot();
+        const boot = server.container("worker").boot({ classifyEventLogRetention: () => "traces" });
 
         await expect(boot).rejects.toMatchObject({
           name: "MissingMemberError",

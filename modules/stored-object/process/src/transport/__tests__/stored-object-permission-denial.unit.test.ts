@@ -32,7 +32,7 @@ describe("isPermissionDenial", () => {
           new PermissionDeniedError({
             permission: "traces:view",
             scope: { type: "project", id: "proj-1" },
-            denialReason: "no-binding",
+            denialReason: "no-grant",
           }),
         ),
       ).toBe(true);

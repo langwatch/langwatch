@@ -41,8 +41,8 @@ type RouterDeps struct {
 	App    *app.App
 	Logger *zap.Logger
 	Health *health.Registry
-	// Metrics serves /metrics and backs the request middleware. Optional;
-	// when nil no metrics are recorded and /metrics is not mounted.
+	// Metrics backs the request middleware. Optional; when nil no metrics
+	// are recorded.
 	Metrics               *gatewaymetrics.Recorder
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
@@ -148,15 +148,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/health", statusRoute)
 	r.Head("/health", statusRoute)
 
-	// Unauthenticated like the probes: the cluster's scraper has no
-	// virtual key, and the endpoint is kept off the public ingress by the
-	// chart rather than by a credential.
-	if deps.Metrics != nil {
-		r.Handle("/metrics", deps.Metrics.Handler())
-	}
+	// /metrics is not served here: the scrape has its own listener (ADR-175).
 
 	// Unauthenticated and kept off the public ingress the same way as the
-	// probes and /metrics above (charts/gateway/templates/ingress.yaml
+	// probes above (charts/gateway/templates/ingress.yaml
 	// allowlists only /v1 and the exact /health path). Reveals nothing but
 	// a URL: dev tooling polls it to verify an already-running gateway
 	// before trusting it on a reused port.
@@ -1927,6 +1922,11 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	}
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
+		// The stored trace is the customer one; the ops ids set earlier name another.
+		if parts := strings.Split(meta.CustomerTraceparent, "-"); len(parts) == 4 {
+			h.Set(gatewaytracer.HeaderTraceID, parts[1])
+			h.Set(gatewaytracer.HeaderSpanID, parts[2])
+		}
 	}
 	if meta.GuardrailsNotApplied != "" {
 		h.Set("X-LangWatch-Guardrails-Not-Applied", meta.GuardrailsNotApplied)
@@ -2203,6 +2203,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrConnectLicenseRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectLicenseExpired, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectWrongInstance, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrConnectCredentialPending, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrConnectServiceNotEntitled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrHostedServiceUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)

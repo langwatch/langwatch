@@ -20,6 +20,13 @@ const TWO_FACTOR_PATHS = new Set([
   "/two-factor/verify-backup-code",
   "/two-factor/verify-otp",
 ]);
+/** Paths whose proof already selected the user: a passkey, or an emailed reset or sign-up link. */
+const USER_SELECTED_PATHS = new Set([
+  "/passkey/verify-authentication",
+  "/passkey/verify-registration",
+  "/reset-password",
+  "/sign-up/confirm-address",
+]);
 const ceremonyIdentifier = (challengeId: string): string => `sso-credential:${challengeId}`;
 
 /**
@@ -41,7 +48,7 @@ export class CredentialSessionGuard {
     userId: string;
     context: GenericEndpointContext | null;
   }): Promise<void> {
-    if (await this.authorizePasskeySession({ userId, context })) return;
+    if (await this.authorizeSelectedUserSession({ userId, context })) return;
     if (context?.path === "/sign-in/email") {
       const { email } = addressSchema.parse(context.body);
       await this.authorize({ userId, email });
@@ -104,19 +111,14 @@ export class CredentialSessionGuard {
     });
   }
 
-  private async authorizePasskeySession({
+  private async authorizeSelectedUserSession({
     userId,
     context,
   }: {
     userId: string;
     context: GenericEndpointContext | null;
   }): Promise<boolean> {
-    if (
-      context?.path !== "/passkey/verify-authentication" &&
-      context?.path !== "/passkey/verify-registration"
-    ) {
-      return false;
-    }
+    if (!context?.path || !USER_SELECTED_PATHS.has(context.path)) return false;
     const user = await context.context.internalAdapter.findUserById(userId);
     if (!user) throw this.refusal();
     await this.authorize({ userId, email: user.email });

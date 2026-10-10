@@ -107,7 +107,7 @@ const statements = {
     'createApp({ role: "api" }).withClock(clock).withClock(42).withModules([clockModule]).boot();',
   all: 'createApp({ role: "api" }).withModules([clockModule, configModule, facilityModule, peerModule]).boot();',
   callback:
-    'createApp({ role: "api" }).withModules([clockModule]).withObservability((o) => o.withMetrics(facilities.metrics)).boot();',
+    'createApp({ role: "api" }).withModules([clockModule]).withObservability((o) => o.withMetrics(facilities.telemetry)).boot();',
   bootArgs: 'createApp({ role: "api" }).boot({});',
   surfaceWithoutServe: 'createApp({ role: "api" }).expose(() => ({ hosts: {} }));',
   surfaceWithoutHosts: 'createApp({ role: "api" }).expose(() => ({ serve: () => void 0 }));',
@@ -253,11 +253,11 @@ describe("compiler checked process supply", () => {
     const refusal = diagnostics.get("all")?.join("\n");
     const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
     for (const name of [
-      "relational",
-      "keyvalue",
+      "prisma",
+      "redis",
       "clock",
-      "logging",
-      "metrics",
+      "logger",
+      "telemetry",
       "tracing",
       "secrets",
       "encryption",

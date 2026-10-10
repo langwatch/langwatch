@@ -1,6 +1,7 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const cliClientInfoSchema = z
+const cliClientInfoSchemaDefinition = z
   .object({
     device_label: z.string().optional(),
     hostname: z.string().optional(),
@@ -9,8 +10,10 @@ export const cliClientInfoSchema = z
     session_started_at: z.number().int().nonnegative().optional(),
   })
   .strict();
+export interface CliClientInfoSchema extends Named<typeof cliClientInfoSchemaDefinition> {}
+export const cliClientInfoSchema: CliClientInfoSchema = cliClientInfoSchemaDefinition;
 
-export const cliTokenRecordSchema = z
+const cliTokenRecordSchemaDefinition = z
   .object({
     user_id: z.string().min(1),
     organization_id: z.string().min(1),
@@ -19,9 +22,11 @@ export const cliTokenRecordSchema = z
     client_info: cliClientInfoSchema.optional(),
   })
   .passthrough();
+export interface CliTokenRecordSchema extends Named<typeof cliTokenRecordSchemaDefinition> {}
+export const cliTokenRecordSchema: CliTokenRecordSchema = cliTokenRecordSchemaDefinition;
 export type CliTokenRecord = z.infer<typeof cliTokenRecordSchema>;
 
-export const cliSessionSchema = z
+const cliSessionSchemaDefinition = z
   .object({
     sessionStartedAtMs: z.number().int().nonnegative(),
     deviceLabel: z.string(),
@@ -35,6 +40,8 @@ export const cliSessionSchema = z
     tokenKeys: z.array(z.string().min(1)),
   })
   .strict();
+export interface CliSessionSchema extends Named<typeof cliSessionSchemaDefinition> {}
+export const cliSessionSchema: CliSessionSchema = cliSessionSchemaDefinition;
 export type CliSession = z.infer<typeof cliSessionSchema>;
 
 /**
@@ -42,26 +49,40 @@ export type CliSession = z.infer<typeof cliSessionSchema>;
  * except the token keys, which identify live credentials and belong to the
  * revocation path rather than to a card on a screen.
  */
-export const cliSessionCardSchema = cliSessionSchema.omit({
+const cliSessionCardSchemaDefinition = cliSessionSchema.omit({
   tokenKeys: true,
   organizationId: true,
 });
+export interface CliSessionCardSchema extends Named<typeof cliSessionCardSchemaDefinition> {}
+export const cliSessionCardSchema: CliSessionCardSchema = cliSessionCardSchemaDefinition;
 export type CliSessionCard = z.infer<typeof cliSessionCardSchema>;
 
 /** What a revocation answers: that it happened, and how many tokens it took. */
-export const cliSessionRevocationSchema = z
+const cliSessionRevocationSchemaDefinition = z
   .object({
     ok: z.boolean(),
     revokedTokens: z.number().int().nonnegative(),
     revokedKeys: z.number().int().nonnegative(),
   })
   .strict();
+export interface CliSessionRevocationSchema extends Named<
+  typeof cliSessionRevocationSchemaDefinition
+> {}
+export const cliSessionRevocationSchema: CliSessionRevocationSchema =
+  cliSessionRevocationSchemaDefinition;
 export type CliSessionRevocation = z.infer<typeof cliSessionRevocationSchema>;
 
-export const cliUserInputSchema = z.object({ userId: z.string().min(1) }).strict();
+const cliUserInputSchemaDefinition = z.object({ userId: z.string().min(1) }).strict();
+export interface CliUserInputSchema extends Named<typeof cliUserInputSchemaDefinition> {}
+export const cliUserInputSchema: CliUserInputSchema = cliUserInputSchemaDefinition;
 export type CliUserInput = z.infer<typeof cliUserInputSchema>;
 
-export const revokeCliSessionInputSchema = cliUserInputSchema
+const revokeCliSessionInputSchemaDefinition = cliUserInputSchema
   .safeExtend({ sessionStartedAtMs: z.number().int().nonnegative() })
   .strict();
+export interface RevokeCliSessionInputSchema extends Named<
+  typeof revokeCliSessionInputSchemaDefinition
+> {}
+export const revokeCliSessionInputSchema: RevokeCliSessionInputSchema =
+  revokeCliSessionInputSchemaDefinition;
 export type RevokeCliSessionInput = z.infer<typeof revokeCliSessionInputSchema>;

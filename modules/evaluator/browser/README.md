@@ -37,7 +37,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(evaluatorApi)`, tRPC contracts: `evaluators.*`.
-- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/api-key-client`, `@langwatch/evaluator-client`, `@langwatch/experiment-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/api-key-client`, `@langwatch/evaluator-client`, `@langwatch/experiment-client`, `@langwatch/feature-flag-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
 - Lends: `StudioEvaluatorEditorToken`, `EvaluatorSettingsFormToken`.
 - Host APIs it requires: `EvaluatorHostApi`.
 - Config slices: `evaluation`.

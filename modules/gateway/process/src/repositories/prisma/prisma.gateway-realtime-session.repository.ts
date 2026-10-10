@@ -3,6 +3,7 @@ import type {
   GatewayRealtimeSession as GatewayRealtimeSessionRow,
   GatewayRealtimeSessionReport as GatewayRealtimeSessionReportRow,
 } from "@langwatch/gateway-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type GatewayRealtimeSession,
   type GatewayRealtimeSessionReport,
@@ -64,7 +65,10 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
       // together, so two projects never contend and one key's mints serialize
       // against each other, which is what makes the count below a cap.
       const lockKey = `${session.projectId}:${session.virtualKeyId}`;
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) -- @tenancy: a lock, not a read; the lock key is itself scoped to one project and key`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) ${skipTenantCheck({
+        // A lock, not a read; the lock key is itself scoped to one project and key.
+        SKIP_TENANT_CHECK: true,
+      })}`;
 
       const key = await tx.virtualKey.findUnique({
         where: { id: session.virtualKeyId },
@@ -460,7 +464,11 @@ function expireOpenSessions(
   const keyFilter = virtualKeyId ? Prisma.sql`AND "virtualKeyId" = ${virtualKeyId}` : Prisma.empty;
 
   return database.$executeRaw`
-    -- @tenancy: a fleet sweep over open sessions; the mint path narrows it to one key under the cap's advisory lock
+    ${skipTenantCheck({
+      // A fleet sweep over open sessions; the mint path narrows it to one key under the cap's
+      // advisory lock.
+      SKIP_TENANT_CHECK: true,
+    })}
     UPDATE "GatewayRealtimeSession"
        SET "status" = 'EXPIRED',
            "closedAt" = ${closedAt},

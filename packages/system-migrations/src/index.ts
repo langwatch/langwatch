@@ -12,8 +12,10 @@ export {
 export type { SystemMigration } from "./system-migration.ts";
 export type { TenantSource } from "./tenant-source.ts";
 export {
+  HELD_FAILED_AFTER,
   HELD_REASONS,
   type HeldReason,
+  isHeldTenantFailed,
   isTerminalTenantStatus,
   type MigrationPassSummary,
   TENANT_MIGRATION_STATUSES,

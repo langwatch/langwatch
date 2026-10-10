@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  * Row menu actions against reader's membership. Lite members get no write
- * actions.
+ * actions; an aggregate project (ADR-177) offers no way to create a dataset.
+ * @see specs/governance/aggregate-project.feature
  */
 
 import type { DatasetSummary } from "@langwatch/dataset-contract";
@@ -109,6 +110,19 @@ describe("Datasets row-menu visibility", () => {
       // Replication is a read of this project and a create in another, so it
       // stays: it is not one of the writes the role is barred from here.
       expect(screen.getByText("Replicate to another project")).toBeTruthy();
+    });
+  });
+
+  describe("given the open project is an aggregate", () => {
+    /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+    it("says data can't be added and offers no way to create a dataset", () => {
+      renderWithDatasetHost(<DatasetsScreen />, {
+        project: { id: "proj-aggregate", slug: "company-traces", kind: "aggregate" },
+      });
+
+      expect(screen.getByText("Data can't be added to this project")).toBeTruthy();
+      expect(screen.queryByTestId("upload-or-create-dataset")).toBeNull();
+      expect(screen.queryByTestId("no-data-info-block")).toBeNull();
     });
   });
 });

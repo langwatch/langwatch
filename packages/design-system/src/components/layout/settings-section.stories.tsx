@@ -5,7 +5,13 @@ import { UserRound } from "lucide-react";
 import { SettingsSection } from "./settings-section.tsx";
 
 const meta = {
-  title: "Components/Settings section",
+  title: "Navigation and layout/Settings section",
+  parameters: {
+    usage: {
+      use: "One band of a settings page: icon, title, purpose, optional action, then the body.",
+      avoid: "A section inside a properties panel: use Property section title.",
+    },
+  },
   component: SettingsSection,
   tags: ["autodocs"],
   args: {

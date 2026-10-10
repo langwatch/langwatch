@@ -63,7 +63,7 @@ func (JobScratch) Jobs(root string) ([]domain.JobRecord, error) {
 //
 // The full tree walk is only needed to answer the age rule, and the age rule is
 // only consulted for a job that has NOT finished. Walking a terminal job's tree
-// anyway is what turned `haven clean --agent` into a six-minute command on a
+// anyway is what turned `haven machine clean --agent` into a six-minute command on a
 // machine holding twenty gigabytes of scratch, for timestamps nothing then
 // reads — so a finished job is dated from its own record files instead.
 func readJob(root, id string) domain.JobRecord {

@@ -291,6 +291,30 @@ describe("given a route whose own chain declares a producer", () => {
   });
 });
 
+describe("given a route that declares its permission target", () => {
+  it("accepts target when withPermission names where the target is", () => {
+    expect(
+      located(
+        '  .post("/widgets/run", "runWidget")',
+        "  .withInput(runSchema)",
+        '  .withPermission("widget:view", { at: "header", param: "projectId", header: "x-project-id" })',
+        "  .handle(async ({ app, input, target }) => app.runWidget({ input, target }))",
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports target when the route's permission declares no target", () => {
+    expect(
+      located(
+        '  .post("/widgets/run", "runWidget")',
+        "  .withInput(runSchema)",
+        '  .withPermission("widget:view")',
+        "  .handle(async ({ app, input, target }) => app.runWidget({ input, target }))",
+      ),
+    ).toEqual([["rawContextField", "target", 6, 31]]);
+  });
+});
+
 describe("given a door credential that declares a session", () => {
   it("accepts session from a router-level or a route-level withCredential", () => {
     expect(
@@ -322,6 +346,21 @@ describe("given a door credential that declares a session", () => {
       ["rawContextField", "session", 9, 24],
       ["rawContextField", "session", 6, 24],
     ]);
+  });
+});
+
+describe("given a key door route that declares it reads the key", () => {
+  it("accepts key from withCredential(door, { key: true }) and reports it otherwise", () => {
+    expect(
+      located(
+        '  .post("/widgets/run", "runWidget")',
+        '  .withCredential("project", { key: true })',
+        "  .handle(async ({ app, key }) => app.runWidget(key))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withCredential("project")',
+        "  .handle(async ({ app, key }) => app.ownWidget(key))",
+      ),
+    ).toEqual([["rawContextField", "key", 8, 24]]);
   });
 });
 
@@ -661,13 +700,13 @@ describe("given a transport or server file that re-checks the request itself", (
   /** @scenario "A transport or middleware binding that re-checks the request's media type or body is refused" */
   it("reports a middleware binding that decides on the media type or reads the body", () => {
     const code = [
-      'import { bindRestMiddleware } from "@langwatch/api/rest";',
-      "export const facts = [",
-      "  bindRestMiddleware(bodyIsJson, (context) =>",
-      '    Boolean(context.req.header("content-type")?.includes("application/json")),',
+      'import { bindMiddlewareContext } from "@langwatch/api/rest";',
+      "export const middlewareContext = [",
+      "  bindMiddlewareContext(bodyIsJson, (request) =>",
+      '    Boolean(request.headers.get("content-type")?.includes("application/json")),',
       "  ),",
-      "  bindRestMiddleware(payload, async (context) => context.req.json()),",
-      '  bindRestMiddleware(caller, (context) => context.req.header("authorization")),',
+      "  bindMiddlewareContext(payload, async (request) => request.json()),",
+      '  bindMiddlewareContext(caller, (request) => request.headers.get("authorization")),',
       "];",
     ].join("\n");
 
@@ -716,5 +755,31 @@ describe("given files the rule does not read", () => {
     const code = 'group.register("create", "2026-08-28", async () => new WidgetService());';
 
     expect(report(code, filename)).toEqual([]);
+  });
+});
+
+describe("given a handler handed the door's proof", () => {
+  /** @scenario "A handler passes the door's authorization through to its one operation" */
+  it("accepts the proof passed through and still reports a branch on it", () => {
+    const head = [
+      'import { defineTrpcRouter } from "@langwatch/api/trpc";',
+      'export const router = defineTrpcRouter().query("x", (p) =>',
+    ];
+    const passed = [
+      ...head,
+      '  p.withPermission("traces:view").handle(({ input, app, authorization }) => app.x.list({ input, authorization })),',
+      ");",
+    ].join("\n");
+    const branched = [
+      ...head,
+      '  p.withPermission("traces:view").handle(({ input, app, authorization }) => {',
+      "    if (authorization === null) return app.x.empty();",
+      "    return app.x.list({ input, authorization });",
+      "  }),",
+      ");",
+    ].join("\n");
+
+    expect(report(passed)).toEqual([]);
+    expect(found(branched)).toEqual([["handlerControlFlow", 4]]);
   });
 });

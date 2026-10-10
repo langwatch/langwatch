@@ -14,8 +14,8 @@ import (
 // credentials, accepts unauthenticated delivery too, accepts any recipient,
 // and never opens an outbound connection — there is no relay code path here
 // at all.
-func newSMTPServer(addr string, store *Store, maxMessageBytes int64) *smtp.Server {
-	srv := smtp.NewServer(&backend{store: store, maxMessageBytes: maxMessageBytes})
+func newSMTPServer(addr string, store *Store, maxMessageBytes int64, fault *forcedError) *smtp.Server {
+	srv := smtp.NewServer(&backend{store: store, maxMessageBytes: maxMessageBytes, fault: fault})
 	srv.Addr = addr
 	srv.Domain = "mailsim.local"
 	// The sink never speaks TLS — it is a loopback dev tool — so AUTH must be
@@ -31,10 +31,11 @@ func newSMTPServer(addr string, store *Store, maxMessageBytes int64) *smtp.Serve
 type backend struct {
 	store           *Store
 	maxMessageBytes int64
+	fault           *forcedError
 }
 
 func (b *backend) NewSession(_ *smtp.Conn) (smtp.Session, error) {
-	return &session{store: b.store, maxMessageBytes: b.maxMessageBytes}, nil
+	return &session{store: b.store, maxMessageBytes: b.maxMessageBytes, fault: b.fault}, nil
 }
 
 // session is one SMTP conversation: an optional AUTH, one MAIL FROM, one or
@@ -42,6 +43,7 @@ func (b *backend) NewSession(_ *smtp.Conn) (smtp.Session, error) {
 type session struct {
 	store           *Store
 	maxMessageBytes int64
+	fault           *forcedError
 	from            string
 	to              []string
 }
@@ -67,6 +69,9 @@ func (s *session) Auth(mech string) (sasl.Server, error) {
 }
 
 func (s *session) Mail(from string, _ *smtp.MailOptions) error {
+	if err := s.fault.refusal(); err != nil {
+		return err
+	}
 	s.from = from
 	return nil
 }

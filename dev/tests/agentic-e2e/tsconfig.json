@@ -11,5 +11,10 @@
     "esModuleInterop": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
-  "include": ["tests/**/*.ts", "playwright.config.ts"]
+  "include": ["tests/**/*.ts", "playwright.config.ts"],
+  "references": [
+    {
+      "path": "../../../enterprise/modules/licensing/process/tsconfig.build.json"
+    }
+  ]
 }

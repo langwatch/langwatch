@@ -33,8 +33,13 @@ function findActiveProject(
 export function useOrganizationGraph(input: {
   organizationId: string | undefined;
   projectId: string | undefined;
+  /** Mounted above every route, so a signed-out page must not ask (a 401). */
+  signedIn: boolean;
 }): OrganizationGraph {
-  const graphQuery = organizationApi.organization.getScopeGraph.useQuery({});
+  const graphQuery = organizationApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: input.signedIn },
+  );
 
   return useMemo(() => {
     const organization = graphQuery.data?.find(

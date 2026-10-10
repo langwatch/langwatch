@@ -3,11 +3,19 @@
  * results table
  */
 
-import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
-import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
+import { LuCheck, LuCopy, LuListTree } from "react-icons/lu";
 
 import {
   COLLAPSED_CELL_HEIGHT_PX,
@@ -135,29 +143,23 @@ const CellFailure = ({
   onExpand: () => void;
 }) => {
   const errorBox = (
-    <HStack
-      gap={2}
-      p={2}
-      bg="red.subtle"
-      borderRadius="md"
-      color="red.fg"
-      fontSize="13px"
+    <Alert.Root
+      status="error"
+      size="sm"
       cursor={expanded ? undefined : "pointer"}
       onClick={expanded ? undefined : onExpand}
       data-testid={`error-output-${targetId}`}
     >
-      <Box flexShrink={0}>
-        <LuCircleAlert size={16} />
-      </Box>
-      <VStack align="start" gap={0.5}>
-        <Text lineClamp={expanded ? undefined : 2}>{failure.title}</Text>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title lineClamp={expanded ? undefined : 2}>{failure.title}</Alert.Title>
         {failure.description && (
-          <Text fontSize="12px" color="fg.muted" lineClamp={expanded ? undefined : 2}>
+          <Alert.Description lineClamp={expanded ? undefined : 2}>
             {failure.description}
-          </Text>
+          </Alert.Description>
         )}
-      </VStack>
-    </HStack>
+      </Alert.Content>
+    </Alert.Root>
   );
   if (expanded) return errorBox;
 
@@ -547,7 +549,7 @@ export function BatchTargetCell({
             bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), var(--chakra-shadows-md)"
             zIndex={1001}
             display="flex"
             flexDirection="column"

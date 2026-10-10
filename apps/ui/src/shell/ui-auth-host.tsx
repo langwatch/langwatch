@@ -1,7 +1,7 @@
 /**
  * The shell's answer to auth's host port: the deployment's public shape, its
  * own address, and somewhere to report a failure, over auth's loaded host
- * capability. Auth may reach none of these for itself.
+ * service. Auth may reach none of these for itself.
  */
 
 import type {
@@ -9,13 +9,13 @@ import type {
   AuthPublicEnvironment,
   AuthRouteReading,
 } from "@langwatch/auth-contract";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { useMemo, type ComponentType } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 
 import type { UiFeatureConfig } from "../ui-feature-config";
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 
 /** Auth restates the public shape to break a cycle, so the projection lives here. */
 function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
@@ -44,7 +44,7 @@ export function uiAuthHost({
   auth,
   config,
 }: {
-  auth: UiRootCapabilities["authHost"];
+  auth: UiRootHostServices["authHost"];
   config: UiFeatureConfig;
 }): ComponentType {
   class ShellAuthHost extends auth.AuthHostApi {
@@ -70,7 +70,7 @@ export function uiAuthHost({
   }
 
   return function UiAuthHost() {
-    const capabilities = useOptionalUiCapabilities();
+    const hostServices = useOptionalUiHostServices();
     const location = useLocation();
     const params = useParams();
     const [search] = useSearchParams();
@@ -82,9 +82,9 @@ export function uiAuthHost({
         query: Object.fromEntries(search.entries()),
       };
       return new ShellAuthHost(config, reading, (failure) =>
-        capabilities?.feedback?.failed(failure),
+        hostServices?.feedback?.failed(failure),
       );
-    }, [location.pathname, params, search, capabilities]);
+    }, [location.pathname, params, search, hostServices]);
 
     return (
       <auth.AuthHostProvider value={host}>

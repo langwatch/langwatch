@@ -1,5 +1,6 @@
 import { LangySessionKeyScopeError, stripGithubCredentials } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import { AggregateProjectIsReadOnlyError } from "@langwatch/project-contract";
 
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
 import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service.ts";
@@ -37,6 +38,12 @@ export class LangyTurnWarmService {
         logger.debug(
           { error, projectId, conversationId: progress.conversationId },
           "langy warm skipped because its session key lacks scope",
+        );
+      } else if (error instanceof AggregateProjectIsReadOnlyError) {
+        // Expected on every panel open on an aggregate; the first message carries the refusal.
+        logger.debug(
+          { projectId, code: error.code },
+          "langy warm skipped, aggregate project refuses turns",
         );
       } else {
         logger.warn(

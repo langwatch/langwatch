@@ -255,3 +255,12 @@ describe("model provider handled errors", () => {
     }).not.toThrow();
   });
 });
+
+describe("ModelProviderInvalidError", () => {
+  /** @scenario "A refused endpoint on save says why" */
+  it("carries the reason for a refused endpoint in meta", () => {
+    const error = new ModelProviderInvalidError("blocked", "endpoint_not_allowed");
+
+    expect(error.meta).toEqual({ reason: "endpoint_not_allowed" });
+  });
+});

@@ -45,11 +45,6 @@ export const onboardingWeb = defineBrowserModule("onboarding")
       path: "/onboarding/:team/project",
       load: () => import("./ui/sections/onboarding/project.screen.tsx"),
     },
-    /** The in-project setup guide; the application's table owns the address. */
-    "pages/[project]/setup": {
-      requires: "project:view",
-      load: () => import("./ui/sections/onboarding/setup.screen.tsx"),
-    },
   })
   .lends(GuidedTourToken, { value: onboardingGuidedTourHooks })
   /** The tour's state for Langy's tour card, the guided path, and attribution for the shell. */

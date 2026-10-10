@@ -3,6 +3,7 @@ import { useMemo } from "react";
 
 import { useIsReadOnlyTrace } from "../../../behavior/explorer/context/trace-viewer-context.tsx";
 import { api } from "../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import type { ConversationTurn } from "../../../model/explorer/conversation-turn.ts";
 import { isPreviewTraceId } from "../../../model/preview-trace-id.ts";
 import { useDrawerProjectId } from "../../trace-drawer/behavior/use-drawer-project-id.ts";
@@ -37,6 +38,8 @@ export function useConversationContext(
   traceId: string | null | undefined,
 ): ConversationContextResult {
   const projectId = useDrawerProjectId();
+  const storeTenantId = useTraceDrawer((s) => s.tenantId);
+  const tenantId = storeTenantId !== null && storeTenantId !== projectId ? storeTenantId : null;
   const isReadOnly = useIsReadOnlyTrace();
 
   // Conversation context for preview-mode traces is seeded directly into the cache by
@@ -48,6 +51,8 @@ export function useConversationContext(
     {
       projectId,
       conversationId: conversationId ?? "",
+      // On an aggregate two members may share a conversation id: read the drawer's member.
+      ...(tenantId !== null ? { tenantId } : {}),
     },
     {
       enabled: fetchEnabled,

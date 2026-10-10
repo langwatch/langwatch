@@ -39,6 +39,9 @@
       "path": "../../dashboard/contract/tsconfig.build.json"
     },
     {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
@@ -115,6 +118,9 @@
     },
     {
       "path": "../../webhook/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

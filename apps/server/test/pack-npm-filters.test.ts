@@ -121,6 +121,12 @@ function buildFixture(trackedPaths: string[]): string {
   ]) {
     write({ root, relPath });
   }
+  // The build stamp the packer flips to a release build; it refuses without it.
+  write({
+    root,
+    relPath: "packages/config/src/release-build.ts",
+    content: "export const isReleaseBuild: boolean = false;\n",
+  });
 
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["add", "-A"], { cwd: root });

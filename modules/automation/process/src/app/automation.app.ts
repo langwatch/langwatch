@@ -16,7 +16,9 @@ import {
   type AutomationApi,
   type AutomationApiCreateInput,
   type AutomationApiListSlackChannelsInput,
+  type AutomationApiPreviewEmailInput,
   type AutomationApiTestFireInput,
+  type AutomationEmailPreview,
   type AutomationApiToggleTriggerInput,
   type AutomationApiUpdateTriggerFiltersInput,
   type AutomationApiUpsertInput,
@@ -52,11 +54,12 @@ import {
   type WebhookDeliveryRow,
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
+import type { EventingCommands, ProcessStore, RetentionPolicyResolver } from "@langwatch/eventing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { ResolvedTokens } from "@langwatch/module";
 import {
@@ -70,7 +73,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import { SlackApi } from "@langwatch/slack-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
@@ -167,7 +169,6 @@ import {
 const logger = createLogger("langwatch:automation");
 
 export type { AutomationWebhookStoredParams };
-export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
 // The technical ports the process supplies: an HTTP client, a
@@ -179,7 +180,7 @@ export type { AutomationProjectIdentity };
  * the schema comes from the process's provider registry, which is compiled
  * against its own copy of zod.
  */
-export type AutomationActionParamsParse =
+type AutomationActionParamsParse =
   | Readonly<{ success: true; data: unknown }>
   | Readonly<{
       success: false;
@@ -187,7 +188,7 @@ export type AutomationActionParamsParse =
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
-export interface AutomationActionParamsSchema {
+interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
@@ -292,6 +293,8 @@ type AutomationInfrastructureInput = Readonly<{
     "triggers" | "suppressions" | "persistCaps" | "callCounter" | "emailCaps"
   >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
+  /** The dev switch that lets a webhook automation use http or a port. */
+  allowInsecureLocalUrls: boolean;
 }>;
 
 /** What settlement sends through: the SAME delivery and ceilings graph alerts spend. */
@@ -335,6 +338,7 @@ type AutomationDependencies = Readonly<{
   slack: typeof SlackApi;
   /** Where a webhook action's attempt is sent and logged; webhook owns the log (ADR-167). */
   webhooks: typeof WebhookApi;
+  retention: typeof DataRetentionApi;
 }>;
 
 /** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
@@ -398,6 +402,8 @@ export class AutomationModule implements AutomationApi {
     slack: SlackApi,
     /** Sends and logs each webhook action attempt (ADR-167). */
     webhooks: WebhookApi,
+    /** Each tenant's retention, which the trigger event rows are stamped with. */
+    retention: DataRetentionApi,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
@@ -430,6 +436,7 @@ export class AutomationModule implements AutomationApi {
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
         unsubscribeSigningSecret,
         repositories: setup.repositories,
+        allowInsecureLocalUrls: setup.config.allowInsecureLocalUrls,
         caps: {
           emailHourlyCap: setup.config.emailHourlyCap,
           tenantDailyCap: setup.config.tenantDailyCap,
@@ -446,11 +453,16 @@ export class AutomationModule implements AutomationApi {
         infrastructure,
         automation,
       );
+      automation.#tenantRetention = {
+        resolve: (tenantId) =>
+          setup.dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      };
       automation.#reportDispatcher = ReportDispatcherService.create({
         repositories: setup.repositories,
         projects: setup.dependencies.projects,
         analytics: setup.dependencies.analytics,
         traces: setup.dependencies.traces,
+        authz: setup.dependencies.authorization,
         delivery: infrastructure.delivery,
         slackDestinations: infrastructure.slackDestinations,
         suppression: automation.#automation,
@@ -478,7 +490,9 @@ export class AutomationModule implements AutomationApi {
     input: AutomationInfrastructureInput,
   ): AutomationComposedInfrastructure {
     const { publicBaseUrl } = input;
-    const providers = AutomationProviderRegistryService.create(input.repositories.triggers);
+    const providers = AutomationProviderRegistryService.create(input.repositories.triggers, {
+      allowInsecureLocalUrls: input.allowInsecureLocalUrls,
+    });
     const clock: AutomationClock = { now: () => nowInstant() };
     // No public origin, no delivery: a digest would link back to nowhere.
     const delivery: AutomationNotificationDelivery = publicBaseUrl
@@ -800,6 +814,7 @@ export class AutomationModule implements AutomationApi {
   #slackClaims: AutomationSlackClaimReconcileService | undefined;
   #settlement: AutomationSettlement | undefined;
   #reportDispatcher: ReportDispatcher | undefined;
+  #tenantRetention: RetentionPolicyResolver | undefined;
   #reportInstances: Pick<ProcessStore, "findByRef"> | undefined;
 
   private constructor(collaborators: AutomationAppCollaborators) {
@@ -834,6 +849,7 @@ export class AutomationModule implements AutomationApi {
       reports: this.#reportDispatcher,
       reportRuns: this.#reportSchedules,
       peerReactions: this.#evaluations,
+      tenantRetention: this.#tenantRetention,
     });
   }
 
@@ -982,14 +998,15 @@ export class AutomationModule implements AutomationApi {
     return this.#automation.getReportSchedules(input);
   }
 
-  registeredMigrations(): readonly SystemMigration[] {
+  /** The Slack connection move, which the module declares as its tenant step. */
+  slackConnectionMigration(): SlackConnectionMigration {
     if (!this.#migration) {
       throw new Error(
         "This AutomationModule was composed from already-built services, so it holds no migration: " +
-          "compose it through AutomationModule.create to answer its registered migrations.",
+          "compose it through AutomationModule.create to declare its tenant step.",
       );
     }
-    return [this.#migration];
+    return this.#migration;
   }
 
   /** The Slack conversations a bot token can see, for the channel picker. */
@@ -1201,6 +1218,11 @@ export class AutomationModule implements AutomationApi {
     author: AutomationTestFireAuthor,
   ): Promise<TestFireResult> {
     return this.#authoring.testFire({ input, author });
+  }
+
+  /** The email an authoring draft would send, rendered without delivery. */
+  previewTriggerEmail(input: AutomationApiPreviewEmailInput): Promise<AutomationEmailPreview> {
+    return this.#authoring.previewEmail(input);
   }
 
   // -- email suppression (ADR-031) -------------------------------------------

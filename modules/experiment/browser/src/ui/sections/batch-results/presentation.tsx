@@ -178,16 +178,16 @@ export const useInteractiveTooltip = (closeDelay = 150) => {
 };
 
 export const getPassRateGradientColor = (passRate: number | null): string => {
-  if (passRate === null) return "gray.400";
+  if (passRate === null) return "fg.subtle";
 
   const rate = Math.max(0, Math.min(100, passRate));
   if (rate <= 50) {
     const ratio = rate / 50;
-    return `rgb(${Math.round(239 + 6 * ratio)}, ${Math.round(68 + 90 * ratio)}, ${Math.round(68 - 57 * ratio)})`;
+    return `color-mix(in srgb, var(--chakra-colors-yellow-solid) ${ratio * 100}%, var(--chakra-colors-red-solid))`;
   }
 
   const ratio = (rate - 50) / 50;
-  return `rgb(${Math.round(245 - 211 * ratio)}, ${Math.round(158 + 39 * ratio)}, ${Math.round(11 + 83 * ratio)})`;
+  return `color-mix(in srgb, var(--chakra-colors-green-solid) ${ratio * 100}%, var(--chakra-colors-yellow-solid))`;
 };
 
 export const PassRateCircle = ({

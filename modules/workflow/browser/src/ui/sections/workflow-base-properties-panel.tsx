@@ -5,6 +5,7 @@ import {
   Field,
   HStack,
   Input,
+  IconButton,
   Spacer,
   type StackProps,
   Text,
@@ -25,9 +26,9 @@ import {
   validateNodeName,
 } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import { Columns, Info, Plus, Trash2, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Columns, Info, Plus, Trash2, X } from "react-feather";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
@@ -49,7 +50,7 @@ export function WorkflowPropertySectionTitle({
 }: WorkflowPropertySectionTitleProps) {
   return (
     <HStack paddingLeft={2} {...props}>
-      <Text fontSize="12px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+      <Text textStyle="sm" fontWeight="medium" color="fg.muted">
         {children}
       </Text>
       {tooltip && (
@@ -100,7 +101,7 @@ function WorkflowFieldTypeSelect({
 
   if (readOnly) {
     return (
-      <Text fontSize="13px" color="fg.muted" data-testid={testId}>
+      <Text textStyle="sm" color="fg.muted" data-testid={testId}>
         {label}
       </Text>
     );
@@ -110,7 +111,7 @@ function WorkflowFieldTypeSelect({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           colorPalette="gray"
           flexShrink={0}
@@ -119,7 +120,7 @@ function WorkflowFieldTypeSelect({
           fontWeight="normal"
           data-testid={testId}
         >
-          <Text fontSize="13px">{label}</Text>
+          <Text textStyle="sm">{label}</Text>
         </Button>
       </Menu.Trigger>
       <Menu.Positioner>
@@ -231,7 +232,7 @@ export function FieldsDefinition({
   // dataset attach, or the evaluator toggle). Keyed on a content signature, not
   // the array reference, so a fresh reference each render can't loop; guarded
   // against an already-matching form so the user's own edits never replace mid-typing.
-  const currentFields = useMemo(() => node.data[field] ?? [], [node.data, field]);
+  const currentFields = node.data[field] ?? [];
   const fieldsSignature = JSON.stringify(
     currentFields.map((f) => [f.identifier, f.type, f.optional ?? false]),
   );
@@ -240,13 +241,13 @@ export function FieldsDefinition({
       getValues("fields").map((f) => [f.identifier, f.type, f.optional ?? false]),
     );
     if (formSignature === fieldsSignature) return;
-    replace(currentFields);
+    replace(node.data[field] ?? []);
 
     const updateInternalsTimeout = setTimeout(() => {
       updateNodeInternals(node.id);
     }, 0);
     return () => clearTimeout(updateInternalsTimeout);
-  }, [currentFields, fieldsSignature, getValues, node.id, replace, updateNodeInternals]);
+  }, [field, fieldsSignature, getValues, node.data, node.id, replace, updateNodeInternals]);
 
   const watchedFields = watch("fields");
 
@@ -267,14 +268,15 @@ export function FieldsDefinition({
         <WorkflowPropertySectionTitle>{title}</WorkflowPropertySectionTitle>
         <Spacer />
         {!readOnly ? (
-          <Button
-            size="xs"
+          <IconButton
+            aria-label={`Add ${title.toLowerCase()} field`}
+            size="sm"
             variant="ghost"
             data-testid={`add-${field}-field-button`}
             onClick={() => append({ identifier: "", type: "str" })}
           >
             <Plus size={16} />
-          </Button>
+          </IconButton>
         ) : null}
       </HStack>
       {fields.map((field_, index) => {
@@ -299,6 +301,8 @@ export function FieldsDefinition({
               <HStack background="bg.muted" paddingRight={2} borderRadius="8px" width="full">
                 {!readOnly ? (
                   <Input
+                    size="sm"
+                    aria-label={`${title} field name`}
                     {...identifierField}
                     onChange={(e) => {
                       e.target.value = e.target.value.replace(/ /g, "_").toLowerCase();
@@ -306,7 +310,7 @@ export function FieldsDefinition({
                     }}
                     width="full"
                     fontFamily="monospace"
-                    fontSize="13px"
+                    textStyle="sm"
                     border="none"
                     background="transparent"
                     padding="6px 0px 6px 12px"
@@ -314,7 +318,7 @@ export function FieldsDefinition({
                 ) : (
                   <Text
                     fontFamily="monospace"
-                    fontSize="13px"
+                    textStyle="sm"
                     width="full"
                     padding="8px 0px 8px 12px"
                   >
@@ -337,10 +341,10 @@ export function FieldsDefinition({
                 </HStack>
               </HStack>
               {!readOnly ? (
-                <Button
-                  colorPalette="gray"
+                <IconButton
+                  aria-label={`Remove ${field_.identifier || title.toLowerCase()} field`}
+                  variant="ghost"
                   size="sm"
-                  height="40px"
                   data-testid={`remove-${field}-${index}-field`}
                   onClick={() => {
                     remove(index);
@@ -348,8 +352,8 @@ export function FieldsDefinition({
                   }}
                   disabled={fields.length === 1}
                 >
-                  <Trash2 size={18} />
-                </Button>
+                  <Trash2 size={16} />
+                </IconButton>
               ) : null}
             </HStack>
             <Field.ErrorText>{errors.fields?.[index]?.identifier?.message}</Field.ErrorText>
@@ -409,21 +413,18 @@ export function FieldsForm({
    * onSubmit - Updates the node with form data
    * Called automatically when form values change (via watch subscription)
    */
-  const onSubmit = useCallback(
-    (data: WorkflowFieldArrayForm) => {
-      setNode({
-        id: node.id,
-        data: { [field]: data.fields },
-      });
-      updateNodeInternals(node.id);
-    },
-    [node.id, field, setNode, updateNodeInternals],
-  );
+  const onSubmit = (data: WorkflowFieldArrayForm) => {
+    setNode({
+      id: node.id,
+      data: { [field]: data.fields },
+    });
+    updateNodeInternals(node.id);
+  };
 
   // Wrapper to handle async form submission
-  const handleSubmit_ = useCallback(() => {
+  const handleSubmit_ = () => {
     void handleSubmit(onSubmit)();
-  }, [handleSubmit, onSubmit]);
+  };
 
   /** Debounced submit: fires immediately, not again until 100ms of quiet. */
   const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100, {

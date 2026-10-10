@@ -1,15 +1,16 @@
 import type { Agent, AgentApi, AgentType } from "@langwatch/agent-contract";
 import type { RestCaller } from "@langwatch/api/hosting";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  defineRestMiddleware,
-  projectRestFacts,
+  defineMiddlewareContext,
+  projectRequestContext,
   canonicalErrorResponse,
   recordProjectCredential,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
 /**
@@ -23,11 +24,14 @@ import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
 import { createAgentRest } from "../agent.rest.ts";
-import { CONNECT_TEST_CREDENTIAL, connectCredentialsFact } from "./agent-connect-door.fixture.ts";
+import {
+  CONNECT_TEST_CREDENTIAL,
+  connectCredentialsContext,
+} from "./agent-connect-door.fixture.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
-// fact - a mount binds a declared fact by name, not by object identity.
-const traceparent = defineRestMiddleware("traceparent", z.string().nullable());
+// context - a mount binds a declared context by name, not by object identity.
+const traceparent = defineMiddlewareContext("traceparent", z.string().nullable());
 
 export const PROJECT_ID = "project_agents";
 const PROJECT_SLUG = "agents-project";
@@ -76,6 +80,8 @@ export async function buildAgentApps(
   // Every request authenticates as the same project and person; a route's
   // declared permission is granted unless `denyPermission` names it.
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission, request }): RestCaller => {
         if (options.denyPermission === permission) {
@@ -89,7 +95,7 @@ export async function buildAgentApps(
       },
     },
   });
-  const projectFacts = bindRestMiddleware(projectRestFacts, () => ({
+  const projectContext = bindMiddlewareContext(projectRequestContext, () => ({
     projectSlug: PROJECT_SLUG,
     viewerUserId: options.viewerUserId ?? null,
     actorId: "user_test",
@@ -101,9 +107,9 @@ export async function buildAgentApps(
     runtime.mount(createAgentRest(options.relayMaxPayloadMb).router(), {
       app: agents,
       onError,
-      facts: [
-        projectFacts,
-        bindRestMiddleware(traceparent, (context) => context.req.header("traceparent") ?? null),
+      middlewareContext: [
+        projectContext,
+        bindMiddlewareContext(traceparent, (request) => request.headers.get("traceparent") ?? null),
       ],
     }),
   );
@@ -112,12 +118,16 @@ export async function buildAgentApps(
     runtime.mount(createAgentConnectRest(options.relayMaxPayloadMb).router(), {
       app: agents,
       onError,
-      facts: [connectCredentialsFact],
+      middlewareContext: [connectCredentialsContext],
     }),
   );
   hono.route(
     "/",
-    runtime.mount(agentLegacyRest.router(), { app: agents, onError, facts: [projectFacts] }),
+    runtime.mount(agentLegacyRest.router(), {
+      app: agents,
+      onError,
+      middlewareContext: [projectContext],
+    }),
   );
 
   const send = (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init);

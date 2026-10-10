@@ -84,7 +84,7 @@ describe("TopicService", () => {
   it("validates inputs and exposes the projected topic read surface", async () => {
     await expect(service.getAll({ projectId: "project-1" })).resolves.toHaveLength(1);
     await expect(
-      service.getNamesByIds({ projectId: "project-1", ids: ["topic-1"] }),
+      service.getNamesByIds({ projectIds: ["project-1"], ids: ["topic-1"] }),
     ).resolves.toEqual(new Map([["topic-1", "Payments"]]));
     expect(() => service.getAll({ projectId: "" })).toThrow(ZodError);
   });

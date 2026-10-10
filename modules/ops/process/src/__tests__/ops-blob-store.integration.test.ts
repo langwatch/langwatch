@@ -10,6 +10,7 @@ import {
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import type { UserApi } from "@langwatch/user-contract";
@@ -91,7 +92,8 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       sessions: createApiFixture<AuthApi>(),
       accounts: createApiFixture<AuthApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
-      users: {} as UserApi,
+      users: createApiFixture<UserApi>(),
+      shares: createApiFixture<ShareApi>(),
       scheduler: {
         schedules,
         projects,

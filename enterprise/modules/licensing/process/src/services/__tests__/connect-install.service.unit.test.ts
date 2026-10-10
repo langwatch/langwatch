@@ -23,7 +23,7 @@ import { MemoryConnectGatewayChannel } from "../../channels/memory/memory.connec
 import type { ConnectOrganizationRecord } from "../../repositories/connect-organization.repository.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
-import type { ConnectUpstreamSlot } from "../connect-install.service.ts";
+import { licenseVerifyingKeyOf } from "../../rules/license-verifying-key.rules.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
@@ -59,17 +59,9 @@ function licenseNaming(services: string[]): string {
   );
 }
 
-/** The install gateway's hosted provider slot, as licensing last left it. */
-class RecordingUpstreamSlot implements ConnectUpstreamSlot {
-  current: Parameters<ConnectUpstreamSlot["set"]>[0] | null = null;
-
-  async set(slot: Parameters<ConnectUpstreamSlot["set"]>[0]): Promise<void> {
-    this.current = slot;
-  }
-
-  async clear(): Promise<void> {
-    this.current = null;
-  }
+/** The install gateway's hosted provider slot, as licensing's last upstream fact left it. */
+class RecordingUpstreamFacts {
+  last: "set" | "cleared" | null = null;
 }
 
 function install({
@@ -77,14 +69,17 @@ function install({
   servicesDisabled = [],
   permitted = true,
   gateway = MemoryConnectGatewayChannel.create(),
-  upstream = new RecordingUpstreamSlot(),
+  upstream = new RecordingUpstreamFacts(),
+  instanceLicense,
   override = true,
 }: {
   license: string | null;
   servicesDisabled?: string[];
   permitted?: boolean;
   gateway?: MemoryConnectGatewayChannel;
-  upstream?: RecordingUpstreamSlot;
+  upstream?: RecordingUpstreamFacts;
+  /** The instance-wide LANGWATCH_LICENSE_KEY, where the deployment sets one. */
+  instanceLicense?: string;
   /** Whether LANGWATCH_LICENSE_PUBLIC_KEY names the test key. */
   override?: boolean;
 }) {
@@ -103,7 +98,15 @@ function install({
   const organizations = MemoryConnectOrganizationRepository.create({ rows });
   const service = ConnectInstallService.create({
     organizations,
-    facts: appliedConnectFacts(rows),
+    facts: {
+      ...appliedConnectFacts(rows),
+      connectUpstreamSet: async () => {
+        upstream.last = "set";
+      },
+      connectUpstreamCleared: async () => {
+        upstream.last = "cleared";
+      },
+    },
     identity: InstanceIdentityService.create({
       repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
       newInstanceId: () => "instance-1",
@@ -115,9 +118,8 @@ function install({
       licenseEndpoint: "https://connect.langwatch.ai",
     },
     ...(permitted ? { gateway } : {}),
-    instanceLicenseKey: () => void 0,
+    instanceLicenseKey: () => instanceLicense,
     ...(override ? { publicKey: TEST_PUBLIC_KEY } : {}),
-    upstream,
   });
   return { service, organizations, rows, gateway, upstream };
 }
@@ -383,23 +385,26 @@ describe("whether the install as a whole is connected", () => {
 
 describe("the hosted provider slot of the install's own gateway", () => {
   /** @scenario "The install adds the LangWatch provider only when Connect and the service are on" */
-  it("carries the license token, the instance id and the gateway endpoint while managed models is on", async () => {
+  it("records the slot set while managed models is on, and serves the token only on licensing's read", async () => {
     const { service, upstream } = install({ license: licenseNaming(["managed_models"]) });
 
     await service.publishUpstream(ORGANIZATION);
 
-    expect(upstream.current).toEqual({
-      organizationId: ORGANIZATION,
-      baseUrl: "https://gateway.langwatch.ai",
-      token: cryptography.getLicenseToken(licenseNaming(["managed_models"])),
-      instanceId: "instance-1",
-    });
+    expect(upstream.last).toBe("set");
+    expect(await service.findUpstream(ORGANIZATION)).toEqual([
+      {
+        baseUrl: "https://gateway.langwatch.ai",
+        token: cryptography.getLicenseToken(licenseNaming(["managed_models"])),
+        instanceId: "instance-1",
+      },
+    ]);
   });
 
-  it("clears the slot once an administrator switches managed models off", async () => {
+  /** @scenario "Licensing records the install's hosted provider slot set and cleared as facts" */
+  it("records the slot cleared once an administrator switches managed models off", async () => {
     const { service, upstream } = install({ license: licenseNaming(["managed_models"]) });
     await service.publishUpstream(ORGANIZATION);
-    expect(upstream.current).not.toBeNull();
+    expect(upstream.last).toBe("set");
 
     await service.setService({
       organizationId: ORGANIZATION,
@@ -407,25 +412,44 @@ describe("the hosted provider slot of the install's own gateway", () => {
       enabled: false,
     });
 
-    expect(upstream.current).toBeNull();
+    expect(upstream.last).toBe("cleared");
   });
 
-  it("adds nothing where Connect is off, the service is not named, or no license is held", async () => {
+  it("records the slot cleared where Connect is off, the service is not named, or no license is held", async () => {
     for (const setup of [
       install({ license: licenseNaming(["managed_models"]), permitted: false }),
       install({ license: licenseNaming(["instant_evals"]) }),
       install({ license: null }),
     ]) {
-      setup.upstream.current = {
-        organizationId: ORGANIZATION,
-        baseUrl: "https://stale.example",
-        token: "lwl_stale",
-        instanceId: "instance-stale",
-      };
-
       await setup.service.publishUpstream(ORGANIZATION);
 
-      expect(setup.upstream.current).toBeNull();
+      expect(setup.upstream.last).toBe("cleared");
+    }
+  });
+
+  /** @scenario "The install's hosted provider slot falls back to the instance-wide licence" */
+  it("derives the upstream from the instance-wide licence where the organization holds none", async () => {
+    const instanceLicense = licenseNaming(["managed_models"]);
+    const { service, upstream } = install({ license: null, instanceLicense });
+
+    await service.publishUpstream(ORGANIZATION);
+
+    expect(upstream.last).toBe("set");
+    expect(await service.findUpstream(ORGANIZATION)).toEqual([
+      {
+        baseUrl: "https://gateway.langwatch.ai",
+        token: cryptography.getLicenseToken(instanceLicense),
+        instanceId: "instance-1",
+      },
+    ]);
+  });
+
+  it("serves no upstream where Connect is off or no licence is held", async () => {
+    for (const setup of [
+      install({ license: licenseNaming(["managed_models"]), permitted: false }),
+      install({ license: null }),
+    ]) {
+      expect(await setup.service.findUpstream(ORGANIZATION)).toEqual([]);
     }
   });
 });
@@ -445,6 +469,22 @@ function forgedLicense(): string {
     signature: genuine.signature,
   });
 }
+
+describe("the key a release build reports", () => {
+  /** @scenario "A release build reports the embedded key in its usage report" */
+  it("reports the embedded key and its fingerprint though the override is set", async () => {
+    const { publicKey } = licenseVerifyingKeyOf({
+      override: TEST_PUBLIC_KEY,
+      isReleaseBuild: true,
+    });
+    const { service } = install({ license: null, override: publicKey !== undefined });
+
+    expect(await service.getDeployment()).toMatchObject({
+      licenseKeySource: "embedded",
+      licenseKeyFingerprint: fingerprintOf(DEFAULT_LICENSE_PUBLIC_KEY),
+    });
+  });
+});
 
 describe("the license key the usage report names", () => {
   /** @scenario "The report says whether licenses verify against the embedded key or an override" */

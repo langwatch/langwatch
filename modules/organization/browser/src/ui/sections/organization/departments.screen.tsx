@@ -5,6 +5,7 @@ import { Link } from "@langwatch/browser-host/link";
  * Spec: specs/ai-gateway/governance/departments.feature
  */
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Building2 } from "lucide-react";
 
 import { api } from "../../../behavior/organization-api.ts";
@@ -20,7 +21,7 @@ export default function DepartmentsScreen({ organizationId }: { organizationId: 
   const host = useOrganizationHost();
   const department = useDepartmentColumn(
     organizationId,
-    host.isFeatureEnabled("release_ui_ai_governance_enabled"),
+    host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled),
   );
   // The People tab's own read, so one request serves both.
   const members = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(

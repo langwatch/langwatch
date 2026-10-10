@@ -9,6 +9,8 @@ import { evaluationSchema } from "./trace-format.schemas.ts";
  */
 export const SHARE_MAX_FULL_SPANS = 500;
 
+import type { Named } from "@langwatch/module";
+
 import {
   spanDetailSchema,
   spanLangwatchSignalsSchema,
@@ -184,7 +186,7 @@ const sharedEvaluationSchema = z.object({
     .nullable(),
 });
 
-export const sharedTraceDtoSchema = z.object({
+const sharedTraceDtoSchemaDefinition = z.object({
   project: z.object({
     id: z.string(),
     name: z.string(),
@@ -206,5 +208,7 @@ export const sharedTraceDtoSchema = z.object({
    */
   isSpanDetailTruncated: z.boolean(),
 });
+export interface SharedTraceDtoSchema extends Named<typeof sharedTraceDtoSchemaDefinition> {}
+export const sharedTraceDtoSchema: SharedTraceDtoSchema = sharedTraceDtoSchemaDefinition;
 
 export type SharedTraceDto = z.infer<typeof sharedTraceDtoSchema>;

@@ -4,7 +4,7 @@ description: A PromQL ruleset for the LangWatch AI Gateway, covering reliability
 sidebarTitle: Prometheus alerts
 ---
 
-The gateway serves `/metrics` on its own port for any Prometheus setup to scrape. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
+The gateway serves `/metrics` on its own metrics port (`9464` by default) for any Prometheus setup to scrape. Send the bearer `METRICS_API_KEY` as `Authorization: Bearer <key>` in the scrape job's `authorization` block. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
 
 Every metric name and label here comes from the gateway's registry. See [Observability](/ai-gateway/observability#metrics-prometheus) for the full list.
 

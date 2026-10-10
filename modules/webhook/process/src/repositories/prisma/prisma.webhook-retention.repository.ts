@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -37,7 +38,10 @@ export class PrismaWebhookRetentionRepository implements WebhookRetentionReposit
     return this.prisma.$executeRaw`
       DELETE FROM "WebhookEndpointDelivery"
       WHERE "firedAt" < ${before}
-      -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
+      ${skipTenantCheck({
+        // Webhook delivery-log retention sweep (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
   }
 
@@ -53,7 +57,10 @@ export class PrismaWebhookRetentionRepository implements WebhookRetentionReposit
     return this.prisma.$executeRaw`
       DELETE FROM "IdempotencyReceipt"
       WHERE "expiresAt" < ${cutoff}
-      -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)
+      ${skipTenantCheck({
+        // Idempotency receipt expiry sweep (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
   }
 }

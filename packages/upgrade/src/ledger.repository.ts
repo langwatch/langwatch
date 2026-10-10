@@ -80,6 +80,7 @@ const LEASE_COLUMNS = [
 
 const ROSTER_COLUMNS = [
   `"process_id" AS "processId"`,
+  `"credential_keys" AS "credentialKeys"`,
   `"role"`,
   `"image"`,
   `"release"`,
@@ -183,7 +184,8 @@ export class UpgradeLedgerRepository {
 
   /**
    * Records each declared upcast as an `event-upcast` background step, its status read from the
-   * stored events it still covers. A step a rewrite holds `running` keeps that status.
+   * stored events it still covers; a recount clears a stale error. A step a rewrite holds
+   * `running` keeps its status and error.
    */
   async recordUpcastSteps({
     runId,
@@ -201,6 +203,7 @@ export class UpgradeLedgerRepository {
          FROM unnest($1::text[], $2::text[], $3::jsonb[]) AS source(id, status, report)
        ON CONFLICT ("id") DO UPDATE
           SET "status" = CASE WHEN step."status" = 'running' THEN step."status" ELSE EXCLUDED."status" END,
+              "last_error" = CASE WHEN step."status" = 'running' THEN step."last_error" END,
               "report" = EXCLUDED."report",
               "run_id" = EXCLUDED."run_id",
               "updated_at" = EXCLUDED."updated_at"
@@ -357,25 +360,28 @@ export class UpgradeLedgerRepository {
     image,
     release,
     steps,
+    credentialKeys = [],
   }: {
     processId: string;
     role: string;
     image: string;
     release: string | null;
     steps: readonly string[];
+    credentialKeys?: readonly string[];
   }): Promise<ServingRosterEntry> {
     const { rows } = await this.query<object>(
       (t) => `INSERT INTO ${t.roster}
-              ("process_id", "role", "image", "release", "steps", "started_at", "heartbeat_at")
-       VALUES ($1, $2, $3, $4, $5::jsonb, ${NOW_UTC}, ${NOW_UTC})
+              ("process_id", "role", "image", "release", "steps", "credential_keys", "started_at", "heartbeat_at")
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, ${NOW_UTC}, ${NOW_UTC})
        ON CONFLICT ("process_id") DO UPDATE
           SET "role" = EXCLUDED."role",
               "image" = EXCLUDED."image",
               "release" = EXCLUDED."release",
               "steps" = EXCLUDED."steps",
+              "credential_keys" = EXCLUDED."credential_keys",
               "heartbeat_at" = EXCLUDED."heartbeat_at"
        RETURNING ${ROSTER_COLUMNS}`,
-      [processId, role, image, release, JSON.stringify(steps)],
+      [processId, role, image, release, JSON.stringify(steps), JSON.stringify(credentialKeys)],
     );
     return servingRosterEntrySchema.parse(rows[0]);
   }

@@ -1,5 +1,8 @@
-import { RawDrawer as ChakraDrawer } from "@langwatch/design-system/drawer";
-import { Portal } from "@langwatch/design-system/primitives";
+import {
+  Drawer as BaseDrawer,
+  type DrawerContentProps as BaseDrawerContentProps,
+} from "@langwatch/design-system/drawer";
+export type { AppDrawerSize, DrawerRootProps } from "@langwatch/design-system/drawer";
 import * as React from "react";
 
 import { useLangyStore } from "../../behavior/langy/langy.store.ts";
@@ -9,7 +12,6 @@ import {
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
 } from "../../model/langy/langy-panel-layout.ts";
-import { CloseButton } from "../elements/close-button.tsx";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 
 /**
@@ -20,10 +22,10 @@ import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
 
-interface DrawerContentProps extends ChakraDrawer.ContentProps {
+interface DrawerContentProps extends BaseDrawerContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
-  offset?: ChakraDrawer.ContentProps["padding"];
+  offset?: BaseDrawerContentProps["padding"];
   /**
    * Set to `false` to disable the inline error boundary that wraps children. By
    * default, a render-time crash inside a drawer body shows an inline error panel — it
@@ -80,69 +82,34 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     );
 
     return (
-      <Portal disabled={!portalled} container={portalRef}>
-        <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
-          <ChakraDrawer.Content
-            ref={ref}
-            margin={2}
-            pointerEvents="auto"
-            borderRadius="lg"
-            background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
-            backdropFilter="var(--lw-backdrop-blur, blur(25px))"
-            {...rest}
-            marginTop={marginTopProp}
-            marginEnd={langyYieldMarginEnd}
-            transition={`margin ${LANGY_TRANSITION}`}
-            {...(langyStaggerEnter ? { _open: langyStaggerEnter } : {})}
-            asChild={false}
-          >
-            {safeChildren}
-          </ChakraDrawer.Content>
-        </ChakraDrawer.Positioner>
-      </Portal>
+      <BaseDrawer.Content
+        portalled={portalled}
+        portalRef={portalRef}
+        offset={offset}
+        ref={ref}
+        {...rest}
+        marginTop={marginTopProp}
+        marginEnd={langyYieldMarginEnd}
+        transition={`margin ${LANGY_TRANSITION}`}
+        {...(langyStaggerEnter ? { _open: langyStaggerEnter } : {})}
+        asChild={false}
+      >
+        {safeChildren}
+      </BaseDrawer.Content>
     );
   },
 );
 
-export const DrawerCloseTrigger = React.forwardRef<
-  HTMLButtonElement,
-  ChakraDrawer.CloseTriggerProps
->(function DrawerCloseTrigger(props, ref) {
-  return (
-    <ChakraDrawer.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
-      <CloseButton size="sm" ref={ref} />
-    </ChakraDrawer.CloseTrigger>
-  );
-});
+export const DrawerCloseTrigger = BaseDrawer.CloseTrigger;
+export const DrawerRoot = BaseDrawer.Root;
 
-/**
- * Wrapper around Chakra's Drawer.Root with safe defaults for nested drawers.
- */
-export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
-
-export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
-  size?: AppDrawerSize;
-}
-
-export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
-  return (
-    <ChakraDrawer.Root
-      modal={false}
-      closeOnInteractOutside={false}
-      preventScroll={false}
-      size={size as ChakraDrawer.RootProps["size"]}
-      {...props}
-    />
-  );
-};
-
-export const DrawerTrigger = ChakraDrawer.Trigger;
-export const DrawerFooter = ChakraDrawer.Footer;
-export const DrawerHeader = ChakraDrawer.Header;
-export const DrawerBody = ChakraDrawer.Body;
-export const DrawerDescription = ChakraDrawer.Description;
-export const DrawerTitle = ChakraDrawer.Title;
-export const DrawerActionTrigger = ChakraDrawer.ActionTrigger;
+export const DrawerTrigger = BaseDrawer.Trigger;
+export const DrawerFooter = BaseDrawer.Footer;
+export const DrawerHeader = BaseDrawer.Header;
+export const DrawerBody = BaseDrawer.Body;
+export const DrawerDescription = BaseDrawer.Description;
+export const DrawerTitle = BaseDrawer.Title;
+export const DrawerActionTrigger = BaseDrawer.ActionTrigger;
 
 export const Drawer = {
   Root: DrawerRoot,

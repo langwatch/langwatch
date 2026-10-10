@@ -1,6 +1,6 @@
+import { system } from "@langwatch/design-system/system";
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
 
-import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { selectionColor } from "./workflow-nodes.tsx";
 
 /**
@@ -9,11 +9,10 @@ import { selectionColor } from "./workflow-nodes.tsx";
  * with the Workflow browser surface.
  */
 export function WorkflowEdge(props: EdgeProps) {
-  const { useColorModeValue } = useWorkflowNodeHost();
   const highlighted = props.selected;
 
   const [edgePath] = getBezierPath(props);
-  const edgeColor = useColorModeValue("#DDDDDD", "#3d3d4d");
+  const edgeColor = system.token.var("colors.border");
 
   return (
     <BaseEdge

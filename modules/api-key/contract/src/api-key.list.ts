@@ -4,6 +4,7 @@
  * token leaves the server exactly once, in `apiKey.create` at minting.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { apiKeyBindingSchema, type ApiKeyBinding } from "./api-key.ts";
@@ -13,7 +14,7 @@ import { apiKeyBindingSchema, type ApiKeyBinding } from "./api-key.ts";
  * identified. The answer of `apiKey.myBindings`, which the drawers and the CLI
  * authorize screen read to work out the ceiling a new key may be given.
  */
-export const namedApiKeyBindingSchema = z
+const namedApiKeyBindingSchemaDefinition = z
   .object({
     ...apiKeyBindingSchema.shape,
     customRoleId: z.string().nullable(),
@@ -21,10 +22,15 @@ export const namedApiKeyBindingSchema = z
     customRoleName: z.string().nullable(),
   })
   .strict();
+export interface NamedApiKeyBindingSchema extends Named<
+  typeof namedApiKeyBindingSchemaDefinition
+> {}
+export const namedApiKeyBindingSchema: NamedApiKeyBindingSchema =
+  namedApiKeyBindingSchemaDefinition;
 export type NamedApiKeyBinding = ApiKeyBinding & z.infer<typeof namedApiKeyBindingSchema>;
 
 /** One role binding on a key, with the names its row renders. */
-export const apiKeyListGrantSchema = z
+const apiKeyListGrantSchemaDefinition = z
   .object({
     id: z.string(),
     role: z.string(),
@@ -39,6 +45,8 @@ export const apiKeyListGrantSchema = z
     scopeName: z.string().nullable(),
   })
   .strict();
+export interface ApiKeyListGrantSchema extends Named<typeof apiKeyListGrantSchemaDefinition> {}
+export const apiKeyListGrantSchema: ApiKeyListGrantSchema = apiKeyListGrantSchemaDefinition;
 export type ApiKeyListGrant = z.infer<typeof apiKeyListGrantSchema>;
 
 /**
@@ -46,7 +54,7 @@ export type ApiKeyListGrant = z.infer<typeof apiKeyListGrantSchema>;
  * `z.date()` because tRPC serialises this shape: the browser gets ISO
  * strings via `WireOf<ApiKeyListEntry>`, built as real dates at the Prisma seam.
  */
-export const apiKeyListEntrySchema = z
+const apiKeyListEntrySchemaDefinition = z
   .object({
     id: z.string(),
     /** Five characters of the PUBLIC lookup id. Never any part of the secret. */
@@ -81,4 +89,6 @@ export const apiKeyListEntrySchema = z
     grants: z.array(apiKeyListGrantSchema),
   })
   .strict();
+export interface ApiKeyListEntrySchema extends Named<typeof apiKeyListEntrySchemaDefinition> {}
+export const apiKeyListEntrySchema: ApiKeyListEntrySchema = apiKeyListEntrySchemaDefinition;
 export type ApiKeyListEntry = z.infer<typeof apiKeyListEntrySchema>;

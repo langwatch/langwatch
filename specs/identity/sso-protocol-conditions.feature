@@ -18,20 +18,20 @@ Feature: Single sign-on believes an assertion or ID token only inside its own co
   Background:
     Given a single sign-on connection whose identity provider signs with a known key
 
-  Rule: A SAML assertion is believed only inside the validity window its identity provider wrote
+  Rule: A SAML assertion is believed only within 120 seconds of the validity window its identity provider wrote
 
     @integration
-    Scenario Outline: A SAML assertion from an identity provider whose clock is <offset> <direction> is <outcome>
-      Given the identity provider's clock runs <offset> <direction> of ours
-      When it answers a service-provider-initiated sign-in with a signed assertion
+    Scenario Outline: A SAML assertion whose <boundary> is <gap> <side> our clock is <outcome>
+      Given a signed assertion whose <boundary> is <gap> <side> our clock
+      When it is posted to the assertion consumer address
       Then the assertion is <outcome>
 
       Examples:
-        | offset     | direction | outcome  |
-        | 30 seconds | ahead     | admitted |
-        | 4 minutes  | behind    | admitted |
-        | 10 minutes | ahead     | refused  |
-        | 10 minutes | behind    | refused  |
+        | boundary     | gap         | side     | outcome  |
+        | NotBefore    | 90 seconds  | ahead of | admitted |
+        | NotBefore    | 180 seconds | ahead of | refused  |
+        | NotOnOrAfter | 90 seconds  | behind   | admitted |
+        | NotOnOrAfter | 180 seconds | behind   | refused  |
 
     @integration
     Scenario: An expired SAML assertion is refused before identity policy
@@ -89,7 +89,7 @@ Feature: Single sign-on believes an assertion or ID token only inside its own co
       Then the new sign-in is refused as a replay
       And the sign-in still has exactly one session
 
-  Rule: An OpenID Connect ID token is believed only inside its validity window
+  Rule: An OpenID Connect ID token is believed only within 120 seconds of its validity window
 
     @integration
     Scenario Outline: An ID token from an identity provider whose clock is <offset> <direction> is <outcome>
@@ -117,9 +117,27 @@ Feature: Single sign-on believes an assertion or ID token only inside its own co
       Then the sign-in is refused as unverifiable
       And no account or session is written
 
-    @integration @unimplemented
+    @integration
+    Scenario: An ID token issued up to 120 seconds in the future is admitted
+      Given an ID token whose issued-at time is one minute from now
+      When the callback exchanges the code for it
+      Then the sign-in succeeds
+
+    @integration
     Scenario: An ID token issued in the future beyond the clock skew allowance is refused
-      Given an ID token whose issued-at time is ten minutes from now
+      Given an ID token whose issued-at time is three minutes from now
       When the callback exchanges the code for it
       Then the sign-in is refused as unverifiable
       And no account or session is written
+
+    @integration
+    Scenario: An ID token that expired up to 120 seconds ago is admitted
+      Given an ID token whose expiry passed one minute ago
+      When the callback exchanges the code for it
+      Then the sign-in succeeds
+
+    @integration
+    Scenario: An ID token whose not-before time is up to 120 seconds away is admitted
+      Given an ID token whose not-before time is one minute from now
+      When the callback exchanges the code for it
+      Then the sign-in succeeds

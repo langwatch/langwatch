@@ -19,7 +19,12 @@ export {
   spawnFirstInstallUpgrade,
   TASKS_APP_DIRECTORY,
 } from "./first-install-upgrade.ts";
-export { IMAGE_MIGRATION_DIRECTORIES, imageGateSteps, readImageTree } from "./image-tree.ts";
+export {
+  IMAGE_MIGRATION_DIRECTORIES,
+  imageGateSteps,
+  imageRelease,
+  readImageTree,
+} from "./image-tree.ts";
 export {
   IMAGE_CODE_STEPS_COMMAND,
   IMAGE_CODE_STEPS_FILE,
@@ -27,8 +32,8 @@ export {
   parseImageCodeSteps,
   readImageCodeSteps,
 } from "./image-code-steps.ts";
+export { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
 export {
-  SERVING_ROSTER_TIMING,
   type ServingGateWarn,
   servingImageTree,
   servingUpgradeGate,

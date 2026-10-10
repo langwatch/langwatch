@@ -41,6 +41,7 @@
     "@langwatch/data-retention-process": "workspace:*",
     "@langwatch/dataset-process": "workspace:*",
     "@langwatch/enterprise-billing-process": "workspace:*",
+    "@langwatch/enterprise-connect-process": "workspace:*",
     "@langwatch/enterprise-demo-data-process": "workspace:*",
     "@langwatch/enterprise-gateway-process": "workspace:*",
     "@langwatch/enterprise-governance-process": "workspace:*",
@@ -110,6 +111,7 @@
   },
   "devDependencies": {
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/seedgen-runner": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

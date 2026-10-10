@@ -10,6 +10,8 @@ export type GrantProjectionWrite =
       /** The membership lifetime the insert is fenced to, when it has one. */
       membershipStamp?: string;
       membershipBootstrap?: boolean;
+      /** Lands nothing when an identical live grant (principal, role, scope) is held. */
+      onDuplicate?: "skip";
     }
   | {
       kind: "grant.setRole";

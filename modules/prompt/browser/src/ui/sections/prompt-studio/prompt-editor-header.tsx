@@ -1,5 +1,6 @@
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
 import { Box, Button, HStack, useDisclosure } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 
@@ -33,9 +34,9 @@ export type PromptEditorHeaderProps = {
 };
 
 /**
- * Shared header for prompt editing, used in both the playground and the
- * editor drawer: model selector, version history, API snippet button, and
- * a save button with "Update to vX" logic.
+ * Shared header for prompt editing (playground and editor drawer): model selector, version
+ * history, API snippet button and a save button with "Update to vX" logic. On an aggregate
+ * (ADR-177), which refuses every write, a carried-over tab offers neither Save nor Deploy.
  */
 export function PromptEditorHeader({
   onSave,
@@ -51,6 +52,7 @@ export function PromptEditorHeader({
   const handle = formMethods.watch("handle");
   const configId = formMethods.watch("configId");
   const deployDialog = useDisclosure();
+  const acceptsWrites = !isAggregateProjectKind(project?.kind);
 
   return (
     <Box
@@ -74,7 +76,7 @@ export function PromptEditorHeader({
               initialOpen={openHistoryOnLoad}
             />
           )}
-          {configId && handle && project?.id && (
+          {acceptsWrites && configId && handle && project?.id && (
             <>
               <Button
                 variant="outline"
@@ -101,12 +103,14 @@ export function PromptEditorHeader({
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
-          <SavePromptButton
-            onSave={onSave}
-            hasUnsavedChanges={hasUnsavedChanges}
-            isValid={isValid}
-            isSaving={isSaving}
-          />
+          {acceptsWrites && (
+            <SavePromptButton
+              onSave={onSave}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isValid={isValid}
+              isSaving={isSaving}
+            />
+          )}
         </HStack>
       )}
     </Box>

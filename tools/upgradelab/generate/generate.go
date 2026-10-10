@@ -63,8 +63,8 @@ func Build(request Request) (Plan, error) {
 	}
 	cloud := request.Shape == "saas" || request.Shape == "hybrid"
 	switch {
-	case request.Volume != "S":
-		return Plan{}, fmt.Errorf("volume %q: only S here; L and XL land with the scale generator (lane L4)", request.Volume)
+	case request.Volume != "S" && request.Volume != "M":
+		return Plan{}, fmt.Errorf("volume %q: only S and M here; L and XL land with the scale generator (lane L4)", request.Volume)
 	case cloud && !mainRelease.MatchString(request.Release):
 		return Plan{}, fmt.Errorf("release %q: cloud shapes come from main@<sha>, cloud never runs a release tag", request.Release)
 	case !cloud && !tagRelease.MatchString(request.Release):

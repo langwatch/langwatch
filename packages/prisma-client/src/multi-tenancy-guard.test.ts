@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { parsePrismaDatamodel } from "./datamodel.ts";
+import { Prisma } from "./generated/client.ts";
 import type { GuardParams } from "./guard-middleware.ts";
 import {
   guardProjectId,
   PROJECT_TENANCY_REGIMES,
+  projectGuard,
   SCOPED_MODEL_NAMES,
+  skipTenantCheck,
 } from "./multi-tenancy-guard.ts";
 import { guardOrganizationId, ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
@@ -938,29 +941,55 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
 });
 
 describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
-  describe("when a raw query carries a tenancy predicate", () => {
-    it("does NOT throw — projectId in the SQL is the tenancy proof", async () => {
+  describe("when a raw query compares a tenant column with a bound parameter", () => {
+    it.each([
+      ["a positional parameter", `SELECT id FROM "Trace" WHERE "projectId" = $1`],
+      ["an ANY over a bound array", `SELECT id FROM "Trace" WHERE "projectId" = ANY($1)`],
+      ["an IN list of bound values", `DELETE FROM "Trace" WHERE "organizationId" IN ($1, $2)`],
+      ["a qualified column", `SELECT t.id FROM "Trace" t WHERE t."tenantId" = $1`],
+    ])("does NOT throw for %s", async (_shape, query) => {
       await expect(
-        runGuard({
-          model: undefined,
-          action: "queryRaw",
-          args: {
-            query: `SELECT id FROM "Trace" WHERE "projectId" = $1`,
-          },
-        }),
+        runGuard({ model: undefined, action: "queryRaw", args: { query } }),
       ).resolves.toBe("ok");
     });
 
-    it("does NOT throw — TemplateStringsArray shape (strings) is also recognised", async () => {
+    it("does NOT throw for a template's Sql (its holes join as `?`)", async () => {
       await expect(
         runGuard({
           model: undefined,
           action: "executeRaw",
-          args: {
-            strings: [`UPDATE "Trace" SET "deletedAt" = now() WHERE "tenantId" = `, ``],
-          },
+          args: Prisma.sql`UPDATE "Trace" SET "deletedAt" = now() WHERE "tenantId" = ${"t1"}`,
         }),
       ).resolves.toBe("ok");
+    });
+
+    it("does NOT throw for an INSERT ... VALUES that writes its tenant column", async () => {
+      await expect(
+        runGuard({
+          model: undefined,
+          action: "executeRaw",
+          args: Prisma.sql`INSERT INTO "GrantUsage" ("organizationId", "viewCount") VALUES (${"o1"}, ${1})`,
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a raw query only mentions a tenant column", () => {
+    it.each([
+      ["in an ORDER BY", `SELECT * FROM "ProcessManagerInstance" ORDER BY "projectId" ASC`],
+      ["in a comment", `-- projectId\nSELECT id FROM "Trace"`],
+      [
+        "against another column",
+        `SELECT 1 FROM "Identifier" i JOIN s ON s."tenantId" = i."userId"`,
+      ],
+      [
+        "behind the retired opt-out comment",
+        `-- ${"@"}tenancy: global sweep\nSELECT id FROM "Outbox"`,
+      ],
+    ])("THROWS %s", async (_shape, query) => {
+      await expect(
+        runGuard({ model: undefined, action: "queryRaw", args: { query } }),
+      ).rejects.toThrow(/compares no tenant column/);
     });
   });
 
@@ -972,7 +1001,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
           action: "queryRaw",
           args: { query: `SELECT id FROM "Trace" WHERE "deletedAt" IS NULL` },
         }),
-      ).rejects.toThrow(/missing a tenancy predicate/);
+      ).rejects.toThrow(/compares no tenant column/);
     });
 
     it("THROWS on executeRaw too — writes are guarded the same way", async () => {
@@ -982,20 +1011,61 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
           action: "executeRaw",
           args: { query: `DELETE FROM "Trace"` },
         }),
-      ).rejects.toThrow(/missing a tenancy predicate/);
+      ).rejects.toThrow(/compares no tenant column/);
     });
   });
 
-  describe("when a raw query opts out via the -- @tenancy: marker", () => {
-    it("does NOT throw — explicit grep-able marker bypasses the predicate check", async () => {
+  describe("when a raw query sets SKIP_TENANT_CHECK", () => {
+    const skip = skipTenantCheck({
+      // A test sweep that reads every tenant's outbox rows on purpose.
+      SKIP_TENANT_CHECK: true,
+    });
+
+    it("does NOT throw, and reports the skip with the table it names", async () => {
+      const onSkippedTenantCheck = vi.fn();
+      const guard = projectGuard({ onSkippedTenantCheck });
+
+      await expect(
+        guard(
+          {
+            action: "queryRaw",
+            args: Prisma.sql`${skip}SELECT id FROM "Outbox" WHERE "status" = ${"stuck"}`,
+          },
+          async () => "ok",
+        ),
+      ).resolves.toBe("ok");
+      expect(onSkippedTenantCheck).toHaveBeenCalledWith({ table: "Outbox" });
+    });
+
+    it("does NOT throw for an Unsafe statement carrying the marker text", async () => {
+      await expect(
+        runGuard({
+          model: undefined,
+          action: "executeRaw",
+          args: [`${skip.sql}VACUUM (ANALYZE) "Outbox"`],
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("THROWS for a hand-written marker the process did not mint", async () => {
       await expect(
         runGuard({
           model: undefined,
           action: "queryRaw",
-          args: {
-            query: `-- @tenancy: global recovery sweep\nSELECT id FROM "Outbox" WHERE "status" = 'stuck'`,
-          },
+          args: { query: `/* SKIP_TENANT_CHECK forged */ SELECT id FROM "Outbox"` },
         }),
+      ).rejects.toThrow(/compares no tenant column/);
+    });
+
+    it("still allows the statement when the skip reporter throws", async () => {
+      const guard = projectGuard({
+        onSkippedTenantCheck: () => {
+          throw new Error("metrics are down");
+        },
+      });
+
+      await expect(
+        guard({ action: "queryRaw", args: Prisma.sql`${skip}SELECT 1` }, async () => "ok"),
       ).resolves.toBe("ok");
     });
   });
@@ -1017,6 +1087,59 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
           model: undefined,
           action: "executeRaw",
           args: undefined,
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
+describe("guardProjectId — licence-counted project models", () => {
+  describe("when licence counting reads one across an organization's projects", () => {
+    it("does NOT throw for a read without a projectId", async () => {
+      await expect(
+        runGuard({
+          model: "Workflow",
+          action: "count",
+          args: { where: { project: { team: { organizationId: "org_1" } } } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when one is written", () => {
+    it.each([
+      ["an update by id alone", "update", { where: { id: "wf_1" }, data: {} }],
+      ["a deleteMany by a user", "deleteMany", { where: { publishedById: "u_1" } }],
+      ["an upsert by id alone", "upsert", { where: { id: "ev_1" }, create: {}, update: {} }],
+    ])("THROWS for %s", async (_shape, action, args) => {
+      await expect(runGuard({ model: "Workflow", action, args })).rejects.toThrow(/projectId/);
+    });
+
+    it("THROWS for a create without a projectId", async () => {
+      await expect(
+        runGuard({ model: "Evaluator", action: "create", args: { data: { name: "e" } } }),
+      ).rejects.toThrow(/projectId/);
+    });
+
+    it("does NOT throw for an update that names its project", async () => {
+      await expect(
+        runGuard({
+          model: "Scenario",
+          action: "update",
+          args: { where: { id: "sc_1", projectId: "p_1" }, data: {} },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("does NOT throw for a compound unique led by projectId", async () => {
+      await expect(
+        runGuard({
+          model: "Agent",
+          action: "update",
+          args: {
+            where: { projectId_identityKey: { projectId: "p_1", identityKey: "k" } },
+            data: {},
+          },
         }),
       ).resolves.toBe("ok");
     });

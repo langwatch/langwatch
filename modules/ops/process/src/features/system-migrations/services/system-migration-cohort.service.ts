@@ -4,7 +4,7 @@ import type { OrganizationDataplane, OrganizationDataplaneResolver } from "../..
 import { organizationMigrates } from "../../../rules/ops-system-migration-cohort.rules.ts";
 
 /** One organization's place in one migration's cohort, and where it lives. */
-export type OrganizationCohortAdmission = Readonly<{
+type OrganizationCohortAdmission = Readonly<{
   admitted: boolean;
   /**
    * Named on every admission, not only the private ones: an operator reading a

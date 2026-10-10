@@ -57,7 +57,13 @@ function MappedVariables(props: {
 }
 
 const meta = {
-  title: "Components/Variable mapping",
+  title: "Inputs and forms/Variable mapping",
+  parameters: {
+    usage: {
+      use: "Mapping a prompt's or evaluator's variables to the fields that feed them.",
+      avoid: "Arbitrary key and value editing: compose Input rows.",
+    },
+  },
   component: MappedVariables,
   tags: ["autodocs"],
   args: { variables: VARIABLES },

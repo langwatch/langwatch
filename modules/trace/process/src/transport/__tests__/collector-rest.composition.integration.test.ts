@@ -15,6 +15,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -36,6 +37,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 const TOKEN = "sk-lw-a-project-key";
 const API_KEY_ID = "api-key-1";
@@ -175,6 +177,7 @@ function deployment(access: CollectorAccess = {}) {
   apis.ready();
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the ingestion doors resolve their own credential");
@@ -192,7 +195,7 @@ function deployment(access: CollectorAccess = {}) {
     ? [
         runtime.mount(collectorRest.router(), {
           app: () => apis.reference(CollectorApi),
-          // The collector binds NO transport fact: it is declared public and
+          // The collector binds NO middleware context: it is declared public and
           // resolves the project credential inside its handler.
           credential: "public",
           onError: canonicalErrorResponse,

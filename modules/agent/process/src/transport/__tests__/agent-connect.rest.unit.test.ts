@@ -12,6 +12,7 @@ import {
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -20,7 +21,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgentConnectRest } from "../agent-connect.rest.ts";
-import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
+import { connectCredentialsContext, connectDoor } from "./agent-connect-door.fixture.ts";
 
 function buildApi({
   relayMaxPayloadMb,
@@ -30,6 +31,8 @@ function buildApi({
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = application ?? createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: connectDoor(refusal ? { refusal } : {}),
   } as never);
   const hono = new Hono();
@@ -38,7 +41,7 @@ function buildApi({
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [connectCredentialsFact],
+      middlewareContext: [connectCredentialsContext],
     }),
   );
   return {
@@ -235,8 +238,8 @@ describe("registerConnectedAgentInstance", () => {
     expect(await response.json()).toEqual(answer);
   });
 
-  /** @scenario "A connected protocol forwards only its declared credential facts" */
-  it("passes only parsed protocol input and declared credential facts", async () => {
+  /** @scenario "A connected protocol forwards only its declared middleware context" */
+  it("passes only parsed protocol input and declared middleware context", async () => {
     const connectFrames = vi.fn(async () => ({ accepted: 1 }));
     const { hono } = buildApi({ application: createApiFixture<AgentApi>({ connectFrames }) });
     const frame = { type: "ack", protocol: 1, callId: "call_one" };

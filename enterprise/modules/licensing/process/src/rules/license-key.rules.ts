@@ -18,3 +18,8 @@ function derOf(publicKey: string): Buffer | string {
     return publicKey.trim();
   }
 }
+
+/** The sha256 hex a licence-stored fact names the key by, so the key never rides an event. */
+export function fingerprintOfLicenseKey(licenseKey: string): string {
+  return createHash("sha256").update(licenseKey).digest("hex");
+}

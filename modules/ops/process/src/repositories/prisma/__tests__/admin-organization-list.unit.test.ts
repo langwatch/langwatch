@@ -72,7 +72,7 @@ describe("the instance admin organization read", () => {
       expect(JSON.stringify(result)).not.toContain(LICENSE_KEY);
     });
 
-    it("still carries the term the license runs to", async () => {
+    it("leaves the license dates to licensing", async () => {
       const repository = InstanceAdminRepository.create(organizationDelegate());
 
       const result = await repository.execute(LIST_ORGANIZATIONS);
@@ -80,7 +80,7 @@ describe("the instance admin organization read", () => {
       expect(result.data).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: "org_1" })]),
       );
-      expect((result.data as Record<string, unknown>[])[0]).toHaveProperty("licenseExpiresAt");
+      expect(JSON.stringify(result)).not.toMatch(/licenseExpiresAt|licenseLastValidatedAt/);
     });
   });
 });

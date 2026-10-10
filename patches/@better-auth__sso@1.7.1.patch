@@ -1,5 +1,5 @@
 diff --git a/dist/index-CZytzKv6.d.mts b/dist/index-CZytzKv6.d.mts
-index 3ed18ca..cb351a8 100644
+index 3ed18ca..03a9ebc 100644
 --- a/dist/index-CZytzKv6.d.mts
 +++ b/dist/index-CZytzKv6.d.mts
 @@ -156,6 +156,13 @@ interface SAMLConfig {
@@ -16,7 +16,22 @@ index 3ed18ca..cb351a8 100644
    idpMetadata: SAMLIdentityProviderMetadata;
    /**
     * SP metadata configuration. All fields are optional; when omitted,
-@@ -584,6 +591,17 @@ interface SSOOptions {
+@@ -318,6 +325,14 @@ interface SSOProviderMutationGuardContext {
+   database: DBTransactionAdapter;
+ }
+ interface SSOOptions {
++  /**
++   * OIDC ID-token verification: the clock drift allowed on exp, nbf and iat,
++   * and the oldest iat accepted (jose's `clockTolerance` and `maxTokenAge`).
++   */
++  oidc?: {
++    clockTolerance?: number | string;
++    maxTokenAge?: number | string;
++  } | undefined;
+   /**
+    * Resolve a verified provider identity to a Better Auth user.
+    *
+@@ -584,6 +599,17 @@ interface SSOOptions {
       * @default false
       */
      allowIdpInitiated?: boolean;
@@ -35,10 +50,21 @@ index 3ed18ca..cb351a8 100644
       * TTL for AuthnRequest records in milliseconds.
       * Requests older than this will be rejected.
 diff --git a/dist/index.mjs b/dist/index.mjs
-index a97a99f..c275241 100644
+index a97a99f..c033aea 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -2850,11 +2850,11 @@ async function processSAMLResponse(ctx, params, options) {
+@@ -578,7 +578,9 @@ function assertOIDCAuthorizedParty(payload, clientId) {
+ async function validateOIDCIdToken(token, jwksEndpoint, options, isTrustedOrigin) {
+ 	const verified = await jwtVerify(token, createRemoteJWKSet(new URL(jwksEndpoint), { [customFetch]: (url, init) => fetchOIDCEndpointResponse("jwksEndpoint", url, init, isTrustedOrigin) }), {
+ 		audience: options.audience,
+-		issuer: options.issuer
++		issuer: options.issuer,
++		clockTolerance: options.clockTolerance,
++		maxTokenAge: options.maxTokenAge
+ 	});
+ 	if (typeof options.audience === "string") assertOIDCAuthorizedParty(verified.payload, options.audience);
+ 	return verified;
+@@ -2850,11 +2852,11 @@ async function processSAMLResponse(ctx, params, options) {
  	if (!parsedSamlConfig) throw new APIError("BAD_REQUEST", { message: "Invalid SAML configuration" });
  	const sp = createSP(parsedSamlConfig, ctx.context.baseURL, providerId, { clockSkew: options?.saml?.clockSkew });
  	const idp = createIdP(parsedSamlConfig);
@@ -53,7 +79,7 @@ index a97a99f..c275241 100644
  	validateSingleAssertion(SAMLResponse);
  	let parsedResponse;
  	try {
-@@ -2912,10 +2912,22 @@ async function processSAMLResponse(ctx, params, options) {
+@@ -2912,10 +2914,24 @@ async function processSAMLResponse(ctx, params, options) {
  		providerId,
  		options: {
  			enableInResponseToValidation: options?.saml?.enableInResponseToValidation,
@@ -62,7 +88,9 @@ index a97a99f..c275241 100644
  		},
  		redirectUrl: samlErrorRedirectUrl
  	}))?.providerReference;
++	let sessionAtUnsolicitedResponse = null;
 +	if (options?.saml?.enableInResponseToValidation !== false && !extract.response?.inResponseTo) {
++		sessionAtUnsolicitedResponse = await getSessionFromCtx(ctx);
 +		relayState = null;
 +		relayStateValidationFailed = false;
 +		stateProviderReference = void 0;
@@ -77,3 +105,28 @@ index a97a99f..c275241 100644
  	if (relayStateValidationFailed) throw ctx.redirect(buildSAMLRedirectUrl(samlErrorRedirectUrl, {
  		error: "invalid_state",
  		error_description: "invalid_or_expired_relay_state"
+@@ -3063,6 +3079,13 @@ async function processSAMLResponse(ctx, params, options) {
+ 				deferNonDatabaseWrites: !!options?.resolveUser,
+ 				requireExactAccountBinding: !!options?.resolveUser
+ 			});
++			if (sessionAtUnsolicitedResponse && authentication.data?.user && authentication.data.user.id !== sessionAtUnsolicitedResponse.user.id) {
++				ctx.context.logger.warn("SAML IdP-initiated SSO refused: the browser holds a session for another user", { providerId });
++				throw new APIError("FORBIDDEN", {
++					code: "signed_in_as_another_user",
++					message: "Sign out before signing in as another user"
++				});
++			}
+ 			return options?.resolveUser ? requireSuccessfulSSOAuthentication(authentication) : authentication;
+ 		}, { onAfterCommitHookError() {
+ 			ctx.context.logger.error("Committed SSO authentication after-hook failed");
+@@ -3897,7 +3920,9 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
+ 		if (!jwksEndpoint) redirectOIDCError("invalid_provider", "jwks_endpoint_not_found");
+ 		const verified = await validateOIDCIdToken(tokenResponse.idToken, jwksEndpoint, {
+ 			audience: config.clientId,
+-			issuer: provider.issuer
++			issuer: provider.issuer,
++			clockTolerance: options?.oidc?.clockTolerance,
++			maxTokenAge: options?.oidc?.maxTokenAge
+ 		}, (url) => ctx.context.isTrustedOrigin(url)).catch((error) => {
+ 			if (error instanceof DiscoveryError) redirectOIDCError("invalid_provider", error.message);
+ 			ctx.context.logger.error(error);

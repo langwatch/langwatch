@@ -115,6 +115,7 @@ describe("given an expanded conversation with two turns", () => {
       ];
       const group = mapSessionGroupToConversationGroup({
         conversationId: "conv-1",
+        projectId: "project-1",
         traceCount: 2,
         totalCost: 0.5,
         totalTokens: 900,

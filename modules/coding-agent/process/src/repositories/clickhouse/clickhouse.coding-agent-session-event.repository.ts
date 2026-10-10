@@ -8,12 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
-import {
-  clickHouseMomentOf,
-  routingTenantOf,
-  CROSS_TENANT_ROLLUP,
-  type ClickHouseMoment,
-} from "./clickhouse.mapper.ts";
+import { clickHouseMomentOf, routingTenantOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 
@@ -337,7 +332,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       tenantId: routingTenantOf(tenantIds),
       table: TABLE_NAME,
       kind: "read",
-      unscoped: CROSS_TENANT_ROLLUP,
+      tenantIds,
       sql: `
         SELECT
           TenantId,
@@ -367,7 +362,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
             CacheCreationTokens,
             CostUsd
           FROM ${TABLE_NAME}
-          WHERE TenantId IN {tenantIds:Array(String)}
+          WHERE TenantId IN ({tenantIds:Array(String)})
             AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND SessionId IN {sessionIds:Array(String)}
             AND EventKind = {eventKind:String}
@@ -538,11 +533,11 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       tenantId: routingTenantOf(tenantIds),
       table: TABLE_NAME,
       kind: "read",
-      unscoped: CROSS_TENANT_ROLLUP,
+      tenantIds,
       sql: `
           SELECT DISTINCT TenantId, SessionId
           FROM ${TABLE_NAME}
-          WHERE TenantId IN {tenantIds:Array(String)}
+          WHERE TenantId IN ({tenantIds:Array(String)})
             AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND lower(RepositoryHost) = {repositoryHost:String}
             AND lower(RepositoryOwner) = {repositoryOwner:String}

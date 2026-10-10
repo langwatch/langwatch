@@ -1129,6 +1129,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Language: { source: "language", content: "output" },
       Framework: { source: "framework", content: "output" },
       Kind: { source: "kind" },
+      aggregateRule: "omit",
       FirstMessage: { source: "firstMessage" },
       Integrated: { source: "integrated" },
       CreatedAt: { source: "createdAt" },
@@ -1559,6 +1560,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       licenseTokenHash: "omit", // secret
       LicenseInstanceId: { source: "licenseInstanceId" },
       LicenseExpiresAt: { source: "licenseExpiresAt" },
+      licenseId: "omit",
     },
   }),
   webhook_endpoint_deliveries: defineTableCatalogue({

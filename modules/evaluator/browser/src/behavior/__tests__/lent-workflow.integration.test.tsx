@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /** Evaluator draws workflow's lent text and redaction marker by token (lent-tokens-wave-2). */
 import {
-  UiCapabilityContextProvider,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { HoverableBigTextToken } from "@langwatch/workflow-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -37,17 +37,17 @@ function renderWith({
   declarations: UiDeclarations;
   children: ReactNode;
 }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
     declarations,
   };
   return render(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <div data-testid="screen">{children}</div>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

@@ -8,7 +8,12 @@ import {
 export type WebhookUrlProblemCode = "invalid_url" | "scheme" | "host" | "port" | "credentials";
 
 export type WebhookDestinationConfig =
-  | { kind: "http"; url: string; signatureScheme?: WebhookSignatureScheme }
+  | {
+      kind: "http";
+      url: string;
+      signatureScheme?: WebhookSignatureScheme;
+      allowSelfSignedCertificate?: boolean;
+    }
   | {
       kind: "sqs";
       queueUrl: string;
@@ -33,14 +38,19 @@ export function endpointMaxBatchSize({
 export function httpDestinationConfig({
   url,
   signatureScheme,
+  allowSelfSignedCertificate,
 }: {
   url: string;
   signatureScheme: string | null | undefined;
+  allowSelfSignedCertificate: boolean;
 }): WebhookDestinationConfig {
   const scheme = webhookSignatureSchemeSchema.safeParse(signatureScheme);
-  return scheme.success
-    ? { kind: "http", url, signatureScheme: scheme.data }
-    : { kind: "http", url };
+  return {
+    kind: "http",
+    url,
+    ...(scheme.success ? { signatureScheme: scheme.data } : {}),
+    ...(allowSelfSignedCertificate ? { allowSelfSignedCertificate } : {}),
+  };
 }
 
 export function findUrlProblem(

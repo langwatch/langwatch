@@ -189,7 +189,8 @@ export class BillingSubscriptionService {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
 
-      return this.seatEventService.createSeatEventCheckout({
+      // The route answers with the checkout URL alone; the pending subscription id stays here.
+      const { url } = await this.seatEventService.createSeatEventCheckout({
         organizationId,
         customerId,
         baseUrl,
@@ -198,6 +199,7 @@ export class BillingSubscriptionService {
         membersToAdd,
         isUpgradeFromTiered: pricingModel === "TIERED",
       });
+      return { url };
     }
 
     const lastSubscription = await this.repository.findLastNonCancelled(organizationId);

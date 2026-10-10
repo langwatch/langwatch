@@ -146,11 +146,12 @@ export function organizationCredentialPrincipalOf(c: Context): RestOrganizationC
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What the process's doors resolved for one request, as a module reads it back when binding
-// a fact. Keyed by request (not context) so a door remains unable to touch handler variables.
+// middleware context. Keyed by request (not context) so a door remains unable to touch handler
+// variables.
 // The answer is the door's: resolving twice would ask the key store a second time per request.
 
-/** Who a browser cookie was verified as, for a family that binds it as a fact. */
-export type RestBrowserCaller = Readonly<{ userId: string | null }>;
+/** Who a browser cookie was verified as, for a family that binds it as middleware context. */
+export type RestBrowserCaller = Readonly<{ userId: string | null; sessionId?: string | null }>;
 
 /**
  * What the SCIM door resolved: the token's own id (the actor), the
@@ -212,11 +213,64 @@ export function projectCredentialOfRequest(request: Request): RestResolvedProjec
 
   if (!credential) {
     throw new Error(
-      "A module bound a fact from the project credential, and this request's door resolved none",
+      "A module read its middleware context off the project credential, and this request's door resolved none",
     );
   }
 
   return credential;
+}
+
+/** The value of `projectRequestContext`, which each module whose routes name it provides. */
+export function projectRequestContextOf(request: Request): {
+  projectSlug: string;
+  viewerUserId: string | null;
+  actorId: string;
+} {
+  const credential = projectCredentialOfRequest(request);
+
+  return {
+    projectSlug: credential.project.slug,
+    viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId,
+    actorId: actorIdOf(credential),
+  };
+}
+
+/** The value of `browserSessionContext`: the session the browser door already resolved. */
+export function browserSessionOfRequest(request: Request): { id: string } | null {
+  const sessionId = browserCallers.get(request)?.sessionId;
+
+  return sessionId ? { id: sessionId } : null;
+}
+
+function actorIdOf(credential: RestResolvedProjectCredential): string {
+  if (credential.type === "legacyProjectKey") return credential.project.id;
+  if (credential.type === "cliAccessToken") return credential.userId;
+
+  return credential.userId ?? credential.apiKeyId;
+}
+
+/** The code path a project key that stands for nobody proves its own project's trace read under. */
+export const OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH = "api.rest.ownerless-project-key";
+
+/**
+ * Whether the project door admitted, for `projectId`, a key that stands for nobody: a legacy
+ * project key, or an API key with no owner. A run key minted for an unattended run acts as the
+ * system instead, so it is not one.
+ */
+export function admittedOwnerlessProjectKeyFor({
+  request,
+  projectId,
+}: {
+  request: Request;
+  projectId: string;
+}): boolean {
+  const credential = projectCredentials.get(request);
+  if (!credential || credential.project.id !== projectId) return false;
+  if (credential.type === "legacyProjectKey") return true;
+
+  return (
+    credential.type === "apiKey" && credential.userId === null && !credential.isUnattendedRunKey
+  );
 }
 
 /** The same, for the organization door. */
@@ -227,11 +281,29 @@ export function organizationCredentialOfRequest(
 
   if (!credential) {
     throw new Error(
-      "A module bound a fact from the organization credential, and this request's door resolved none",
+      "A module bound middleware context from the organization credential, and this request's door resolved none",
     );
   }
 
   return credential;
+}
+
+/** What a key-bearing door recorded for this request, or nothing where it recorded none. */
+export function recordedKeyCredentialOf({
+  door,
+  request,
+}: {
+  door: "project" | "organization" | "api_key";
+  request: Request;
+}):
+  | RestResolvedProjectCredential
+  | RestResolvedOrganizationCredential
+  | RestKeyDoorPrincipal
+  | undefined {
+  if (door === "project") return projectCredentials.get(request);
+  if (door === "organization") return organizationCredentials.get(request);
+
+  return keyCredentials.get(request);
 }
 
 /** The same, for the key door, with a project-bound access token let through as its person. */
@@ -240,7 +312,7 @@ export function keyDoorPrincipalOfRequest(request: Request): RestKeyDoorPrincipa
 
   if (!credential) {
     throw new Error(
-      "A module bound a fact from the key credential, and this request's door resolved none",
+      "A module bound middleware context from the key credential, and this request's door resolved none",
     );
   }
 
@@ -261,7 +333,7 @@ export function scimCredentialOfRequest(request: Request): RestResolvedScimCrede
 
   if (!credential) {
     throw new Error(
-      "A module bound a fact from the SCIM credential, and this request's door resolved none",
+      "A module bound middleware context from the SCIM credential, and this request's door resolved none",
     );
   }
 

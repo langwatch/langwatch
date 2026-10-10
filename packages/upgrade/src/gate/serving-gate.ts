@@ -19,6 +19,9 @@ export type ServingImage = z.infer<typeof servingImageSchema>;
 
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed"]);
 
+/** How often a waiting worker or an upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
+export const UPGRADE_RE_ASK_MS = 10_000;
+
 /** A failed `upgrade` run, for the api's console: the failed steps and the run's last lines. */
 export type UpgradeFailedRun = Readonly<{
   failedSteps: readonly Readonly<{ id: string; error: string | null }>[];
@@ -33,6 +36,13 @@ export type ServingVerdict =
       outstanding: readonly string[];
       command: typeof UPGRADE_COMMAND;
       refusal: string;
+    }>
+  | Readonly<{
+      admitted: false;
+      outcome: "upgrading";
+      outstanding: readonly string[];
+      refusal: string;
+      /** An api whose first install failed shows the token console: nobody can sign in yet. */
       failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{
@@ -47,7 +57,6 @@ export type ServingVerdict =
       outcome: "first-install";
       command: typeof UPGRADE_COMMAND;
       refusal: string;
-      failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{ admitted: false; outcome: "no-clickhouse"; refusal: string }>;
 
@@ -108,7 +117,7 @@ export function assertCurrent({
   };
 }
 
-/** Q10: a Helm first install is an empty ledger on an empty schema; the api runs `upgrade` once. */
+/** Q10: a first install is an empty ledger on an empty schema; the worker runs `upgrade` once. */
 export function firstInstallVerdict(): ServingVerdict {
   return {
     admitted: false,
@@ -116,4 +125,17 @@ export function firstInstallVerdict(): ServingVerdict {
     command: UPGRADE_COMMAND,
     refusal: `this is a first install (empty ledger, empty schema): run \`${UPGRADE_COMMAND}\` once.`,
   };
+}
+
+/**
+ * The api never runs a step (UIW-1) and holds for none (NO-HOLDS, Alex 2026-10-09): it serves
+ * while upgrading, a Postgres read ahead of the schema answers upgrade_in_progress.
+ */
+export function apiPhaseVerdict({
+  outstanding,
+}: {
+  outstanding: readonly string[];
+}): ServingVerdict {
+  const refusal = `the worker's \`${UPGRADE_COMMAND}\` has not finished: ${outstanding.join(", ")}`;
+  return { admitted: false, outcome: "upgrading", outstanding, refusal };
 }

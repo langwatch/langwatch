@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { type Instant, toDate } from "@langwatch/time";
@@ -87,7 +88,10 @@ export class PrismaDatasetContentRepository implements DatasetContentRepository 
         // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock returns void,
         // which $queryRaw cannot deserialize. The lock is held for the whole
         // transaction, which is what serializes the mutation.
-        await client.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+        await client.$executeRaw` ${skipTenantCheck({
+          // Advisory-lock helper, key is dataset-bounded.
+          SKIP_TENANT_CHECK: true,
+        })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
         return mutate(new PrismaDatasetContentRepository(client, null));
       },

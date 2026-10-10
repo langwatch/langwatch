@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { traceSchema } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -19,27 +20,47 @@ import type {
 
 export type AnnotationWithFullUser = z.infer<typeof annotationWithFullUserSchema>;
 export type AnnotationWithUserSummary = z.infer<typeof annotationWithUserSummarySchema>;
-export const annotationQueueItemWithTraceSchema = z.object({
+const annotationQueueItemWithTraceSchemaDefinition = z.object({
   ...annotationQueueListedItemSchema.shape,
   trace: traceSchema.nullable(),
 });
-export const annotationReviewQueueItemSchema = z.object({
+export interface AnnotationQueueItemWithTraceSchema extends Named<
+  typeof annotationQueueItemWithTraceSchemaDefinition
+> {}
+export const annotationQueueItemWithTraceSchema: AnnotationQueueItemWithTraceSchema =
+  annotationQueueItemWithTraceSchemaDefinition;
+const annotationReviewQueueItemSchemaDefinition = z.object({
   ...annotationQueuePageItemSchema.shape,
   trace: traceSchema.nullable(),
   annotations: annotationWithFullUserSchema.array(),
   scoreOptions: z.array(z.string()),
 });
-export const annotationReviewQueueSchema = z.object({
+export interface AnnotationReviewQueueItemSchema extends Named<
+  typeof annotationReviewQueueItemSchemaDefinition
+> {}
+export const annotationReviewQueueItemSchema: AnnotationReviewQueueItemSchema =
+  annotationReviewQueueItemSchemaDefinition;
+const annotationReviewQueueSchemaDefinition = z.object({
   ...annotationQueueDetailSchema.shape,
   AnnotationQueueItems: annotationReviewQueueItemSchema.array(),
 });
-export const annotationOptimizedQueuesSchema = z.object({
+export interface AnnotationReviewQueueSchema extends Named<
+  typeof annotationReviewQueueSchemaDefinition
+> {}
+export const annotationReviewQueueSchema: AnnotationReviewQueueSchema =
+  annotationReviewQueueSchemaDefinition;
+const annotationOptimizedQueuesSchemaDefinition = z.object({
   assignedQueueItems: annotationReviewQueueItemSchema.array(),
   queues: annotationReviewQueueSchema.array(),
   totalCount: z.number(),
 });
+export interface AnnotationOptimizedQueuesSchema extends Named<
+  typeof annotationOptimizedQueuesSchemaDefinition
+> {}
+export const annotationOptimizedQueuesSchema: AnnotationOptimizedQueuesSchema =
+  annotationOptimizedQueuesSchemaDefinition;
 /** One step of the reviewer's pending queue: the item, where it sits, and its neighbours. */
-export const annotationQueueWalkStepSchema = z.object({
+const annotationQueueWalkStepSchemaDefinition = z.object({
   item: annotationReviewQueueItemSchema.nullable(),
   position: z.number(),
   total: z.number(),
@@ -47,6 +68,11 @@ export const annotationQueueWalkStepSchema = z.object({
   nextItemId: z.string().nullable(),
   queueFinished: z.boolean(),
 });
+export interface AnnotationQueueWalkStepSchema extends Named<
+  typeof annotationQueueWalkStepSchemaDefinition
+> {}
+export const annotationQueueWalkStepSchema: AnnotationQueueWalkStepSchema =
+  annotationQueueWalkStepSchemaDefinition;
 export type AnnotationQueueItemWithTrace = z.infer<typeof annotationQueueItemWithTraceSchema>;
 export type AnnotationReviewQueueItem = z.infer<typeof annotationReviewQueueItemSchema>;
 export type AnnotationReviewQueue = z.infer<typeof annotationReviewQueueSchema>;

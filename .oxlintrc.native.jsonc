@@ -112,6 +112,25 @@
       "rules": { "typescript/no-explicit-any": "off" },
     },
     {
+      // Only the design system imports Chakra or Emotion; everything else takes it from there
+      // (Alex, 2026-10-10). Later overrides that set no-restricted-imports restate this entry.
+      "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.mjs"],
+      "excludeFiles": ["packages/design-system/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@chakra-ui/*", "@emotion/*"],
+                "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       // Process source logs through `createLogger`, and a REST handler throws a
       // HandledError rather than building its own error response.
       "files": [
@@ -156,6 +175,12 @@
                 "message": "Mark the route heading: \"account\" in the route table; the shell sizes the title.",
               },
             ],
+            "patterns": [
+              {
+                "group": ["@chakra-ui/*", "@emotion/*"],
+                "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
+              },
+            ],
           },
         ],
       },
@@ -171,6 +196,12 @@
               {
                 "name": "@langwatch/internal-slack",
                 "message": "Internal Slack is for messages LangWatch sends itself; customer Slack stays in automation's channels.",
+              },
+            ],
+            "patterns": [
+              {
+                "group": ["@chakra-ui/*", "@emotion/*"],
+                "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
               },
             ],
           },
@@ -194,6 +225,12 @@
               {
                 "name": "@langwatch/internal-slack",
                 "message": "Internal Slack is for messages LangWatch sends itself; customer Slack stays in automation's channels.",
+              },
+            ],
+            "patterns": [
+              {
+                "group": ["@chakra-ui/*", "@emotion/*"],
+                "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
               },
             ],
           },

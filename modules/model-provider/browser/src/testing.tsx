@@ -28,6 +28,8 @@ export class FakeModelProviderHost extends ModelProviderHostApi {
   readonly queryWrites: Readonly<Record<string, string | undefined>>[] = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];
   readonly successes: ModelProviderSuccessNotice[] = [];
+  readonly warnings: ModelProviderSuccessNotice[] = [];
+  readonly infos: ModelProviderSuccessNotice[] = [];
   readonly failures: ModelProviderFailureNotice[] = [];
 
   constructor(
@@ -79,6 +81,14 @@ export class FakeModelProviderHost extends ModelProviderHostApi {
 
   succeeded(notice: ModelProviderSuccessNotice): void {
     this.successes.push(notice);
+  }
+
+  warned(notice: ModelProviderSuccessNotice): void {
+    this.warnings.push(notice);
+  }
+
+  informed(notice: ModelProviderSuccessNotice): void {
+    this.infos.push(notice);
   }
 
   failed(failure: ModelProviderFailureNotice): void {

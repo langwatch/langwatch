@@ -299,7 +299,7 @@ export function Pagination({
       paddingY={1.5}
       borderTopWidth="1px"
       borderColor="border.muted"
-      bg="bg.surface"
+      bg="bg.card"
       flexShrink={0}
       data-testid="pagination"
     >

@@ -1,3 +1,5 @@
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -9,6 +11,7 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
+import { Workflow } from "lucide-react";
 
 import { hasFleetTrouble } from "../../model/process-presentation.ts";
 
@@ -66,11 +69,11 @@ function FleetRow({
         </Text>
       </Table.Cell>
       <CountCell value={row.instances} />
-      <CountCell value={row.overdueWakes} color="orange.500" />
+      <CountCell value={row.overdueWakes} color="fg.warning" />
       <CountCell value={row.pendingMessages} />
-      <CountCell value={row.overduePending} color="orange.500" />
-      <CountCell value={row.lapsedLeases} color="orange.500" />
-      <CountCell value={row.deadMessages} color="red.500" />
+      <CountCell value={row.overduePending} color="fg.warning" />
+      <CountCell value={row.lapsedLeases} color="fg.warning" />
+      <CountCell value={row.deadMessages} color="fg.error" />
     </Table.Row>
   );
 }
@@ -89,28 +92,36 @@ export function ProcessFleetCard({
   onOpenAll?: () => void;
 }) {
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
-            Process Managers
+            Process managers
           </Text>
           <Spacer />
           {onOpenAll && (
-            <Button size="2xs" variant="outline" onClick={onOpenAll}>
+            <Button size="sm" variant="outline" onClick={onOpenAll}>
               All instances
             </Button>
           )}
         </HStack>
         {rows.length === 0 ? (
-          <Box padding={4}>
-            <Text textStyle="xs" color="fg.muted">
-              No process managers registered.
-            </Text>
-          </Box>
+          <NoDataInfoBlock
+            icon={<Workflow />}
+            title="No process managers registered."
+            description="Registered processes and their health appear here."
+          />
         ) : (
           <Box overflowX="auto">
-            <Table.Root size="sm" variant="line" width="full" minWidth="720px">
+            <ListTable
+              density="compact"
+              columnRules={false}
+              containerProps={{ overflowX: "auto" }}
+              size="sm"
+              variant="line"
+              width="full"
+              minWidth="720px"
+            >
               <Table.Header whiteSpace="nowrap">
                 <Table.Row>
                   <Table.ColumnHeader>Process</Table.ColumnHeader>
@@ -128,7 +139,7 @@ export function ProcessFleetCard({
                   <FleetRow key={row.processName} row={row} onSelect={onSelect} />
                 ))}
               </Table.Body>
-            </Table.Root>
+            </ListTable>
           </Box>
         )}
       </Card.Body>

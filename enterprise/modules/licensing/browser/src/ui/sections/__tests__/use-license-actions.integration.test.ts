@@ -104,6 +104,14 @@ class TestLicensingHost extends LicensingHostApi {
     toaster.create({ ...notice, type: "success" });
   }
 
+  warned(notice: LicensingSuccessNotice): void {
+    toaster.create({ ...notice, type: "warning" });
+  }
+
+  informed(notice: LicensingSuccessNotice): void {
+    toaster.create({ ...notice, type: "info" });
+  }
+
   failed(failure: LicensingFailureNotice): void {
     toaster.create({ title: failure.fallbackTitle, type: "error" });
   }
@@ -188,7 +196,7 @@ describe("useLicenseActions", () => {
       refreshMutationOptions.current?.onSuccess({ outcome: "unchanged" });
 
       expect(toaster.create).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "Your license is up to date" }),
+        expect.objectContaining({ title: "Your license is up to date", type: "info" }),
       );
       expect(invalidateMock).not.toHaveBeenCalled();
     });
@@ -281,7 +289,7 @@ describe("useLicenseActions", () => {
       removeMutationOptions.current?.onSuccess();
 
       expect(toaster.create).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "License removed" }),
+        expect.objectContaining({ title: "License removed", type: "info" }),
       );
       expect(reloadPage).not.toHaveBeenCalled();
       expect(invalidateMock).toHaveBeenCalled();

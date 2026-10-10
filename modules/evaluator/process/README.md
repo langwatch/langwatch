@@ -6,7 +6,7 @@ The server half of [evaluator](../README.md). Evaluators: their definitions, and
 
 ## Installation
 
-`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).withEventing(evaluatorLifecycleEventing).withEventing(evaluatorWorkflowArchiveCascadeEventing)`, `src/evaluator.module.ts:15`.
+`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).provideMiddlewareContext(…).withEventing(evaluatorLifecycleEventing).withEventing(evaluatorWorkflowArchiveCascadeEventing)`, `src/evaluator.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -260,7 +260,7 @@ findTraceIdsPassingPreconditions(input: { evaluatorType: string; preconditions: 
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/evaluator.rest.ts:168`        |
+| Declared at | `src/transport/evaluator.rest.ts:170`        |
 | Base URL    | `/api/evaluators`, twin `/api/v1/evaluators` |
 | Addressing  | dated                                        |
 | Credential  | project                                      |
@@ -270,19 +270,19 @@ findTraceIdsPassingPreconditions(input: { evaluatorType: string; preconditions: 
 
 Get all evaluators for a project
 
-Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:172`.
+Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:174`.
 
 Answers at `/api/evaluators`, `/api/v1/evaluators`; also, undocumented, `/api/evaluators/2026-08-07`, `/api/v1/evaluators/2026-08-07`, `/api/evaluators/latest`, `/api/v1/evaluators/latest`.
 
 ```typescript
-// Response: z.array(evaluatorWireSchema) (inline, src/transport/evaluator.rest.ts:174)
+// Response: z.array(evaluatorWireSchema) (inline, src/transport/evaluator.rest.ts:176)
 ```
 
 #### `GET /:idOrSlug` · `getApiEvaluatorsByIdOrSlug`
 
 Get a specific evaluator by ID or slug
 
-Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:186`.
+Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:188`.
 
 Answers at `/api/evaluators/:idOrSlug`, `/api/v1/evaluators/:idOrSlug`; also, undocumented, `/api/evaluators/2026-08-07/:idOrSlug`, `/api/v1/evaluators/2026-08-07/:idOrSlug`, `/api/evaluators/latest/:idOrSlug`, `/api/v1/evaluators/latest/:idOrSlug`.
 
@@ -298,7 +298,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Create a new evaluator
 
-Permission `evaluations:create`. Declared at `src/transport/evaluator.rest.ts:207`.
+Permission `evaluations:create`. Declared at `src/transport/evaluator.rest.ts:209`.
 
 Answers at `/api/evaluators`, `/api/v1/evaluators`; also, undocumented, `/api/evaluators/2026-08-07`, `/api/v1/evaluators/2026-08-07`, `/api/evaluators/latest`, `/api/v1/evaluators/latest`.
 
@@ -315,7 +315,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Update an existing evaluator
 
-Permission `evaluations:update`. Declared at `src/transport/evaluator.rest.ts:217`.
+Permission `evaluations:update`. Declared at `src/transport/evaluator.rest.ts:219`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
@@ -336,7 +336,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Archive (soft-delete) an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluator.rest.ts:232`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluator.rest.ts:234`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 

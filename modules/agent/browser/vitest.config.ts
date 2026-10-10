@@ -1,21 +1,10 @@
 import { fileURLToPath } from "node:url";
 
-import { moduleVitestTestOptions } from "@langwatch/vitest-config";
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
+import { mergeConfig } from "vitest/config";
 
-export default defineConfig({
-  resolve: {
-    // Anchored, so the package root keeps its alias while the contract's
-    // subpath exports (`/code-config`, `/http-test`) resolve through its own
-    // exports map rather than being rewritten into `index.ts/<subpath>`.
-    alias: [
-      {
-        find: /^@langwatch\/agent-contract$/,
-        replacement: fileURLToPath(new URL("../contract/src/index.ts", import.meta.url)),
-      },
-    ],
-  },
-  test: moduleVitestTestOptions({
+export default mergeConfig(
+  defineModuleVitestConfig({
     kind: "jsdom",
     // Ten suites replace modules with vi.mock, so each file needs its own registry.
     isolate: true,
@@ -28,4 +17,17 @@ export default defineConfig({
       testTimeout: 30_000,
     },
   }),
-});
+  {
+    resolve: {
+      // Anchored, so the package root keeps its alias while the contract's
+      // subpath exports (`/code-config`, `/http-test`) resolve through its own
+      // exports map rather than being rewritten into `index.ts/<subpath>`.
+      alias: [
+        {
+          find: /^@langwatch\/agent-contract$/,
+          replacement: fileURLToPath(new URL("../contract/src/index.ts", import.meta.url)),
+        },
+      ],
+    },
+  },
+);

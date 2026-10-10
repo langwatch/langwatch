@@ -2,7 +2,7 @@
 /**
  * The organization's read of its own directory sync (ADR-122, ADR-126).
  *
- * `sso:view` throughout, and deliberately not plan-gated: the headline case
+ * `sso:view` for the sync itself (member provenance asks `organization:manage`), and deliberately not plan-gated: the headline case
  * for reading the requests is a plan that lapsed, so gating the reader on the
  * plan means the one organization that needs those rows is the one refused
  * them.
@@ -13,6 +13,8 @@ import {
   connectionReconciliationSchema,
   organizationReconciliationSchema,
   scimDirectoryActivityEntrySchema,
+  scimDirectoryMemberSchema,
+  scimDirectoryMembersInputSchema,
   scimReconciliationScopeSchema,
 } from "./scim-reconciliation.ts";
 import { scimConnectionRequestsInputSchema, scimRequestEntrySchema } from "./scim-request-log.ts";
@@ -47,4 +49,8 @@ export const scimReconciliationTrpc = defineTrpcContract("scimReconciliation")
   .query("getById")
   .withInput(scimConnectionRequestsInputSchema)
   .withOutput(connectionReconciliationSchema.nullable())
+  /** Which of these members a directory created, for member provenance; `organization:manage`. */
+  .query("directoryMembers")
+  .withInput(scimDirectoryMembersInputSchema)
+  .withOutput(scimDirectoryMemberSchema.array())
   .build();

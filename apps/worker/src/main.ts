@@ -1,4 +1,5 @@
 import "@langwatch/time/polyfill";
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process";
 import { servingUpgradeGate } from "@langwatch/upgrade/gate";
@@ -33,7 +34,9 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
       : preamble
   ).start();
 
-  const app = await server.container("worker").boot();
+  const app = await server
+    .container("worker")
+    .boot({ classifyEventLogRetention: classifyEventLogRowRetention });
 
   await server.run(app);
 

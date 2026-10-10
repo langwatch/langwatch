@@ -121,6 +121,17 @@ describe("given a migration sequence", () => {
     );
   });
 
+  describe("when `upgrade` is named beside a leased task", () => {
+    /** @scenario "Upgrade named beside legacy tasks is refused before anything runs" */
+    it("refuses before taking the lease, since upgrade takes it itself", async () => {
+      await expect(runTasks(["prisma-migrate", "upgrade"], input())).rejects.toThrow(
+        "Run `upgrade` on its own",
+      );
+      expect(calls.lock).not.toHaveBeenCalled();
+      expect(calls.prisma).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when only system migrations are requested", () => {
     it("leaves locking to the system migration leases", async () => {
       await runTasks(["system-migrations-pass"], input());

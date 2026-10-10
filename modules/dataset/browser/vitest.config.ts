@@ -1,17 +1,10 @@
 import { fileURLToPath } from "node:url";
 
-import { moduleVitestTestOptions } from "@langwatch/vitest-config";
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
+import { mergeConfig } from "vitest/config";
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      "@langwatch/dataset-contract": fileURLToPath(
-        new URL("../contract/src/index.ts", import.meta.url),
-      ),
-    },
-  },
-  test: moduleVitestTestOptions({
+export default mergeConfig(
+  defineModuleVitestConfig({
     kind: "jsdom",
     isolate: true,
     test: {
@@ -23,4 +16,13 @@ export default defineConfig({
       testTimeout: 30_000,
     },
   }),
-});
+  {
+    resolve: {
+      alias: {
+        "@langwatch/dataset-contract": fileURLToPath(
+          new URL("../contract/src/index.ts", import.meta.url),
+        ),
+      },
+    },
+  },
+);

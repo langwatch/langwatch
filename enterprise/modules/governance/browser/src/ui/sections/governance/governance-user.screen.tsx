@@ -3,7 +3,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
-  Heading,
+  Card,
   HStack,
   SimpleGrid,
   Spinner,
@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import { Wallet } from "lucide-react";
@@ -109,7 +110,7 @@ function GovernanceUserDetailPage() {
           {showSpinner && <Spinner />}
           {showNoData && (
             <>
-              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+              <Card.Root variant="showcase" padding={4}>
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
@@ -125,7 +126,7 @@ function GovernanceUserDetailPage() {
                 {personalProject && (
                   <Link
                     href={`/${personalProject.projectSlug}/traces`}
-                    color="blue.600"
+                    color="accent.fg"
                     fontSize="sm"
                     display="inline-block"
                     marginTop={2}
@@ -133,18 +134,18 @@ function GovernanceUserDetailPage() {
                     View {personalProject.displayName}'s personal workspace →
                   </Link>
                 )}
-              </Box>
-              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md">
+              </Card.Root>
+              <Card.Root variant="showcase">
                 <NoDataInfoBlock
                   icon={<Wallet />}
                   title="No spend yet"
                   description="Spend appears here once this person uses a governed AI tool or virtual key."
                 >
-                  <Link href="/governance/people" color="blue.600" fontWeight="medium">
+                  <Link href="/governance/people" color="accent.fg" fontWeight="medium">
                     View all people
                   </Link>
                 </NoDataInfoBlock>
-              </Box>
+              </Card.Root>
             </>
           )}
           {isSettled && user && (
@@ -156,7 +157,7 @@ function GovernanceUserDetailPage() {
                 <Stat label="Most used" value={user.mostUsedTarget ?? "—"} />
               </SimpleGrid>
 
-              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+              <Card.Root variant="showcase" padding={4}>
                 <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                   Detail metrics
                 </Text>
@@ -167,7 +168,7 @@ function GovernanceUserDetailPage() {
                   <>
                     <Link
                       href={`/${personalProject.projectSlug}/traces`}
-                      color="blue.600"
+                      color="accent.fg"
                       fontSize="sm"
                       fontWeight="medium"
                     >
@@ -179,14 +180,14 @@ function GovernanceUserDetailPage() {
                     </Text>
                   </>
                 )}
-                <Link href="/governance" color="blue.600" fontSize="sm" fontWeight="medium">
+                <Link href="/governance" color="accent.fg" fontSize="sm" fontWeight="medium">
                   See this user in the bird's-eye chart →
                 </Link>
                 <Text fontSize="xs" color="fg.subtle" marginTop={1}>
                   The chart's {`'By User'`} toggle exercises the same data through one orthogonal
                   lens until the dedicated drilldown ships.
                 </Text>
-              </Box>
+              </Card.Root>
             </>
           )}
         </VStack>
@@ -197,20 +198,9 @@ function GovernanceUserDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
-      >
-        {label}
-      </Text>
-      <Heading as="span" size="sm" marginTop={1}>
-        {value}
-      </Heading>
-    </Box>
+    <StatTile variant="showcase" label={label}>
+      <StatTileFigure>{value}</StatTileFigure>
+    </StatTile>
   );
 }
 

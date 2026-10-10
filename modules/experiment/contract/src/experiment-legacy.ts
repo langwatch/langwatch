@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { experimentRunWorkflowVersionSchema } from "./experiment-run.ts";
@@ -21,17 +22,19 @@ const dSPyTraceSchema = z.object({
   pred: anyJSONDumpedClassSchema,
 });
 
-export const dSPyExampleSchema = z.object({
+const dSPyExampleSchemaDefinition = z.object({
   hash: z.string(),
   example: anyJSONDumpedClassSchema,
   pred: anyJSONDumpedClassSchema,
   score: z.number(),
   trace: z.array(dSPyTraceSchema).optional().nullable(),
 });
+export interface DSPyExampleSchema extends Named<typeof dSPyExampleSchemaDefinition> {}
+export const dSPyExampleSchema: DSPyExampleSchema = dSPyExampleSchemaDefinition;
 
 export type DSPyExample = z.infer<typeof dSPyExampleSchema>;
 
-export const dSPyLLMCallSchema = z.object({
+const dSPyLLMCallSchemaDefinition = z.object({
   hash: z.string(),
   __class__: z.string(),
   response: anyJSONDumpedClassSchema,
@@ -40,24 +43,30 @@ export const dSPyLLMCallSchema = z.object({
   completion_tokens: z.number().optional().nullable(),
   cost: z.number().optional().nullable(),
 });
+export interface DSPyLLMCallSchema extends Named<typeof dSPyLLMCallSchemaDefinition> {}
+export const dSPyLLMCallSchema: DSPyLLMCallSchema = dSPyLLMCallSchemaDefinition;
 
 export type DSPyLLMCall = z.infer<typeof dSPyLLMCallSchema>;
 
-export const dSPyOptimizerSchema = z.object({
+const dSPyOptimizerSchemaDefinition = z.object({
   name: z.string(),
   parameters: z.record(z.string(), z.unknown()),
 });
+export interface DSPyOptimizerSchema extends Named<typeof dSPyOptimizerSchemaDefinition> {}
+export const dSPyOptimizerSchema: DSPyOptimizerSchema = dSPyOptimizerSchemaDefinition;
 
 export type DSPyOptimizer = z.infer<typeof dSPyOptimizerSchema>;
 
-export const dSPyPredictorSchema = z.object({
+const dSPyPredictorSchemaDefinition = z.object({
   name: z.string(),
   predictor: anyJSONDumpedClassSchema,
 });
+export interface DSPyPredictorSchema extends Named<typeof dSPyPredictorSchemaDefinition> {}
+export const dSPyPredictorSchema: DSPyPredictorSchema = dSPyPredictorSchemaDefinition;
 
 export type DSPyPredictor = z.infer<typeof dSPyPredictorSchema>;
 
-export const dSPyStepSchema = z.object({
+const dSPyStepSchemaDefinition = z.object({
   project_id: z.string(),
   run_id: z.string(),
   workflow_version_id: z.string().optional().nullable(),
@@ -75,10 +84,12 @@ export const dSPyStepSchema = z.object({
     updated_at: z.number(),
   }),
 });
+export interface DSPyStepSchema extends Named<typeof dSPyStepSchemaDefinition> {}
+export const dSPyStepSchema: DSPyStepSchema = dSPyStepSchemaDefinition;
 
 export type DSPyStep = z.infer<typeof dSPyStepSchema>;
 
-export const dSPyStepRESTParamsSchema = z.object({
+const dSPyStepRESTParamsSchemaDefinition = z.object({
   ...dSPyStepSchema.omit({
     timestamps: true,
     project_id: true,
@@ -94,17 +105,29 @@ export const dSPyStepRESTParamsSchema = z.object({
   examples: z.array(dSPyExampleSchema.omit({ hash: true })),
   llm_calls: z.array(dSPyLLMCallSchema.omit({ hash: true })),
 });
+export interface DSPyStepRESTParamsSchema extends Named<
+  typeof dSPyStepRESTParamsSchemaDefinition
+> {}
+export const dSPyStepRESTParamsSchema: DSPyStepRESTParamsSchema =
+  dSPyStepRESTParamsSchemaDefinition;
 
 export type DSPyStepRESTParams = z.infer<typeof dSPyStepRESTParamsSchema>;
 
 /** `POST /api/dspy/log_steps`'s body: the optimizer's steps, in the order they ran. */
-export const dSPyLogStepsBodySchema = z.array(dSPyStepRESTParamsSchema);
+const dSPyLogStepsBodySchemaDefinition = z.array(dSPyStepRESTParamsSchema);
+export interface DSPyLogStepsBodySchema extends Named<typeof dSPyLogStepsBodySchemaDefinition> {}
+export const dSPyLogStepsBodySchema: DSPyLogStepsBodySchema = dSPyLogStepsBodySchemaDefinition;
 
-export const dSPyLogStepsResponseSchema = z.object({
+const dSPyLogStepsResponseSchemaDefinition = z.object({
   message: z.string().describe("Human-readable confirmation"),
 });
+export interface DSPyLogStepsResponseSchema extends Named<
+  typeof dSPyLogStepsResponseSchemaDefinition
+> {}
+export const dSPyLogStepsResponseSchema: DSPyLogStepsResponseSchema =
+  dSPyLogStepsResponseSchemaDefinition;
 
-export const dSPyStepSummarySchema = z.object({
+const dSPyStepSummarySchemaDefinition = z.object({
   run_id: z.string(),
   index: z.string(),
   score: z.number(),
@@ -121,6 +144,8 @@ export const dSPyStepSummarySchema = z.object({
     created_at: z.number(),
   }),
 });
+export interface DSPyStepSummarySchema extends Named<typeof dSPyStepSummarySchemaDefinition> {}
+export const dSPyStepSummarySchema: DSPyStepSummarySchema = dSPyStepSummarySchemaDefinition;
 
 export type DSPyStepSummary = z.infer<typeof dSPyStepSummarySchema>;
 
@@ -129,13 +154,18 @@ export type DSPyStepSummary = z.infer<typeof dSPyStepSummarySchema>;
  * `evaluator` (an evaluator run as a target, for testing evaluators), and
  * `custom` (an external target from the API, e.g. the Python SDK).
  */
-export const eSBatchEvaluationTargetTypeSchema = z.union([
+const eSBatchEvaluationTargetTypeSchemaDefinition = z.union([
   z.literal("prompt"),
   z.literal("agent"),
   z.literal("evaluator"),
   z.literal("workflow"),
   z.literal("custom"),
 ]);
+export interface ESBatchEvaluationTargetTypeSchema extends Named<
+  typeof eSBatchEvaluationTargetTypeSchemaDefinition
+> {}
+export const eSBatchEvaluationTargetTypeSchema: ESBatchEvaluationTargetTypeSchema =
+  eSBatchEvaluationTargetTypeSchemaDefinition;
 
 export type ESBatchEvaluationTargetType = z.infer<typeof eSBatchEvaluationTargetTypeSchema>;
 
@@ -144,7 +174,7 @@ export type ESBatchEvaluationTargetType = z.infer<typeof eSBatchEvaluationTarget
  * Captures the state of targets at execution time so we can display
  * results even after targets are modified or deleted.
  */
-export const eSBatchEvaluationTargetSchema = z.object({
+const eSBatchEvaluationTargetSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: eSBatchEvaluationTargetTypeSchema,
@@ -164,6 +194,11 @@ export const eSBatchEvaluationTargetSchema = z.object({
     .optional()
     .nullable(),
 });
+export interface ESBatchEvaluationTargetSchema extends Named<
+  typeof eSBatchEvaluationTargetSchemaDefinition
+> {}
+export const eSBatchEvaluationTargetSchema: ESBatchEvaluationTargetSchema =
+  eSBatchEvaluationTargetSchemaDefinition;
 
 export type ESBatchEvaluationTarget = z.infer<typeof eSBatchEvaluationTargetSchema>;
 
@@ -182,7 +217,7 @@ export const mapLegacyExperimentTargets = (
     metadata: target.metadata,
   }));
 
-export const eSBatchEvaluationSchema = z.object({
+const eSBatchEvaluationSchemaDefinition = z.object({
   project_id: z.string(),
   experiment_id: z.string(),
   run_id: z.string(),
@@ -229,6 +264,8 @@ export const eSBatchEvaluationSchema = z.object({
     finished_at: z.number().optional().nullable(),
   }),
 });
+export interface ESBatchEvaluationSchema extends Named<typeof eSBatchEvaluationSchemaDefinition> {}
+export const eSBatchEvaluationSchema: ESBatchEvaluationSchema = eSBatchEvaluationSchemaDefinition;
 
 export type ESBatchEvaluation = z.infer<typeof eSBatchEvaluationSchema>;
 
@@ -236,10 +273,15 @@ export type ESBatchEvaluation = z.infer<typeof eSBatchEvaluationSchema>;
  * Target in REST API params - type is optional as it can be
  * extracted from metadata or defaulted to "custom"
  */
-export const eSBatchEvaluationTargetRESTSchema = z.object({
+const eSBatchEvaluationTargetRESTSchemaDefinition = z.object({
   ...eSBatchEvaluationTargetSchema.omit({ type: true }).shape,
   type: eSBatchEvaluationTargetTypeSchema.optional(),
 });
+export interface ESBatchEvaluationTargetRESTSchema extends Named<
+  typeof eSBatchEvaluationTargetRESTSchemaDefinition
+> {}
+export const eSBatchEvaluationTargetRESTSchema: ESBatchEvaluationTargetRESTSchema =
+  eSBatchEvaluationTargetRESTSchemaDefinition;
 
 export type ESBatchEvaluationTargetREST = z.infer<typeof eSBatchEvaluationTargetRESTSchema>;
 
@@ -250,7 +292,7 @@ const batchEvaluationExpectedCountsSchema = z.object({
 });
 
 // Duplicate in evaluation-contract (evaluation-rest.schemas.ts); keep in step.
-export const eSBatchEvaluationRESTParamsSchema = z.object({
+const eSBatchEvaluationRESTParamsSchemaDefinition = z.object({
   ...eSBatchEvaluationSchema.partial().omit({
     project_id: true,
     experiment_id: true,
@@ -272,6 +314,11 @@ export const eSBatchEvaluationRESTParamsSchema = z.object({
     .optional(),
   expected: batchEvaluationExpectedCountsSchema.optional().nullable(),
 });
+export interface ESBatchEvaluationRESTParamsSchema extends Named<
+  typeof eSBatchEvaluationRESTParamsSchemaDefinition
+> {}
+export const eSBatchEvaluationRESTParamsSchema: ESBatchEvaluationRESTParamsSchema =
+  eSBatchEvaluationRESTParamsSchemaDefinition;
 
 export type ESBatchEvaluationRESTParams = z.infer<typeof eSBatchEvaluationRESTParamsSchema>;
 
@@ -281,30 +328,42 @@ export type LogBatchEvaluationInput = Readonly<{
   params: ESBatchEvaluationRESTParams;
 }>;
 
-export const appliedOptimizationFieldSchema = z.object({
+const appliedOptimizationFieldSchemaDefinition = z.object({
   identifier: z.string(),
   field_type: z.union([z.literal("input"), z.literal("output")]),
   prefix: z.string().optional(),
   desc: z.string().optional(),
 });
+export interface AppliedOptimizationFieldSchema extends Named<
+  typeof appliedOptimizationFieldSchemaDefinition
+> {}
+export const appliedOptimizationFieldSchema: AppliedOptimizationFieldSchema =
+  appliedOptimizationFieldSchemaDefinition;
 
 export type AppliedOptimizationField = z.infer<typeof appliedOptimizationFieldSchema>;
 
-export const dSPyRunsSummarySchema = z.object({
+const dSPyRunsSummarySchemaDefinition = z.object({
   runId: z.string(),
   workflow_version: experimentRunWorkflowVersionSchema.optional(),
   steps: z.array(dSPyStepSummarySchema),
   created_at: z.number(),
 });
+export interface DSPyRunsSummarySchema extends Named<typeof dSPyRunsSummarySchemaDefinition> {}
+export const dSPyRunsSummarySchema: DSPyRunsSummarySchema = dSPyRunsSummarySchemaDefinition;
 
 export type DSPyRunsSummary = z.infer<typeof dSPyRunsSummarySchema>;
 
-export const appliedOptimizationSchema = z.object({
+const appliedOptimizationSchemaDefinition = z.object({
   id: z.string(),
   instructions: z.string().optional(),
   fields: z.array(appliedOptimizationFieldSchema).optional(),
   demonstrations: z.array(z.record(z.string(), z.unknown())).optional(),
 });
+export interface AppliedOptimizationSchema extends Named<
+  typeof appliedOptimizationSchemaDefinition
+> {}
+export const appliedOptimizationSchema: AppliedOptimizationSchema =
+  appliedOptimizationSchemaDefinition;
 
 export type AppliedOptimization = z.infer<typeof appliedOptimizationSchema>;
 

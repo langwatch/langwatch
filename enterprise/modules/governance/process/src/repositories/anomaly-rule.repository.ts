@@ -29,4 +29,10 @@ export abstract class AnomalyRuleRepository {
   abstract findById(id: string): Promise<AnomalyRule | null>;
   abstract create(input: NewAnomalyRule): Promise<AnomalyRule>;
   abstract update(id: string, changes: AnomalyRuleChanges): Promise<AnomalyRule>;
+  /** Writes only while the rule still carries `updatedAt`; false when another write came first. */
+  abstract updateIfUnchanged(input: {
+    id: string;
+    updatedAt: AnomalyRule["updatedAt"];
+    changes: AnomalyRuleChanges;
+  }): Promise<boolean>;
 }

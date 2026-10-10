@@ -7,11 +7,12 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import type * as Observability from "@langwatch/observability";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { OtlpIngestCredential, TraceApi } from "@langwatch/trace-contract";
 import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const doorLog = vi.hoisted(() => ({
   loggerName: "langwatch:otel:v1:traces",
@@ -75,6 +76,8 @@ function mount() {
     otlpUsageLimit: async () => {},
   });
   const hono = createRestRuntime({
+    doors: { otlp_ingest: otlpIngestDoor.open(app) },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the receiver resolves its own credential");
@@ -82,7 +85,7 @@ function mount() {
     },
   }).mount(otlpIngestRest.router(), {
     app: () => app,
-    credential: "public",
+    credential: "otlp_ingest",
     onError: (error) => {
       throw error;
     },

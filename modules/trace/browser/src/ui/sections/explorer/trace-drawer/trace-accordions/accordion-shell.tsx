@@ -108,18 +108,18 @@ export function Section({
         paddingY={tokens.sectionTriggerY + 0.5}
         // Solid bg under sticky so content scrolling underneath is
         // occluded — without it the title would overlap the content
-        // beneath when pinned. `bg.surface` matches the drawer body.
-        bg="bg.surface"
+        // beneath when pinned. `bg.card` matches the drawer body.
+        bg="bg.card"
         color="fg.muted"
         borderTopWidth={isFirst ? "0" : "1px"}
-        borderColor={{ base: "gray.200", _dark: "border.muted" }}
+        borderColor={{ base: "border", _dark: "border.muted" }}
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
         // Open state keeps the same bg and `fg.muted` title color as closed — promoting the title
         // color on expand made section labels look heavier than their collapsed siblings.
         _open={{
           borderBottomWidth: "1px",
-          borderBottomColor: { base: "gray.200", _dark: "border.muted" },
+          borderBottomColor: { base: "border", _dark: "border.muted" },
         }}
         cursor="pointer"
         // Each trigger pins flush with the SpanTabBar (no per-section offset).

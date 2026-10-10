@@ -1,6 +1,6 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, Heading, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useModelProvidersSettings } from "@langwatch/model-provider-client";
 import { modelProviders } from "@langwatch/model-provider-contract";
@@ -80,7 +80,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
                 {modelProviderIcons[provider.provider as keyof typeof modelProviderIcons]}
               </Box>
             )}
-            <Heading as="h2">{title}</Heading>
+            <Drawer.Title>{title}</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

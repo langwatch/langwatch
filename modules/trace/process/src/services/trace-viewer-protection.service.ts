@@ -1,4 +1,4 @@
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   describeAudience,
@@ -14,6 +14,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Protections } from "@langwatch/trace-contract";
 
+import { policyProjectIdsOf } from "../rules/policy-project-ids.rules.ts";
 import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 export type TraceViewerProtectionOptions = Readonly<{
@@ -96,20 +97,32 @@ export class TraceViewerProtectionService {
   }
 
   async resolve(
-    input: Readonly<{ projectId: string; userId: string | undefined; publiclyShared: boolean }>,
+    input: Readonly<{
+      projectId: string;
+      userId: string | undefined;
+      publiclyShared: boolean;
+      /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
+      authorization?: Authorization;
+    }>,
   ): Promise<Protections> {
-    const [canSeeCosts, isMember, isAdmin, isProjectOwner, { visibilityCutoffMs }] =
+    const [canSeeCosts, isMember, isAdmin, canWriteTraces, isProjectOwner, { visibilityCutoffMs }] =
       await Promise.all([
         this.permitted(input, "cost:view"),
         this.permitted(input, "traces:view"),
-        this.permitted(input, "project:update"),
+        this.permitted(input, "project:manage"),
+        this.permitted(input, "traces:update"),
         this.isProjectOwner(input),
         this.getVisibilityWindow(input.projectId),
       ]);
 
     let policy: ResolvedDataPrivacy;
     try {
-      policy = await this.options.dataPrivacy.getResolvedForProject({ projectId: input.projectId });
+      policy = await this.options.dataPrivacy.getResolvedForProjects({
+        projectIds: policyProjectIdsOf({
+          projectId: input.projectId,
+          authorization: input.authorization,
+        }),
+      });
     } catch (error) {
       this.logger.error(
         { error, projectId: input.projectId },
@@ -128,31 +141,16 @@ export class TraceViewerProtectionService {
     }
 
     const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
-    const anonymous = input.publiclyShared || input.userId === undefined;
-    const groupIds = anonymous
-      ? []
-      : await this.groupIdsFor({ policy, projectId: input.projectId, userId: input.userId });
-    const categories = Object.fromEntries(
-      CONTENT_CATEGORIES.map((category) => {
-        const resolved = policy.categories[category];
-        return [
-          category,
-          {
-            canSee: anonymous
-              ? isContentVisibleToPublic(resolved)
-              : isContentVisible(resolved, {
-                  isAdmin,
-                  isMember,
-                  isMemberRole: isMember,
-                  isViewer: isMember && !isAdmin,
-                  isProjectOwner,
-                  groupIds,
-                }),
-            restrictVisibleTo: formatRestrictLabel(resolved),
-          },
-        ];
-      }),
-    ) as Protections["contentCategories"];
+    const categories = await this.categoriesFor({
+      policy,
+      projectId: input.projectId,
+      userId: input.userId,
+      anonymous: input.publiclyShared || input.userId === undefined,
+      isAdmin,
+      isMember,
+      isMemberRole: canWriteTraces && !isAdmin,
+      isProjectOwner,
+    });
 
     return {
       canSeeCosts,
@@ -172,6 +170,50 @@ export class TraceViewerProtectionService {
       })),
       visibilityCutoffMs,
     };
+  }
+
+  private async categoriesFor({
+    policy,
+    projectId,
+    userId,
+    anonymous,
+    isAdmin,
+    isMember,
+    isMemberRole,
+    isProjectOwner,
+  }: {
+    policy: ResolvedDataPrivacy;
+    projectId: string;
+    userId: string | undefined;
+    anonymous: boolean;
+    isAdmin: boolean;
+    isMember: boolean;
+    isMemberRole: boolean;
+    isProjectOwner: boolean;
+  }): Promise<Protections["contentCategories"]> {
+    const groupIds = anonymous ? [] : await this.groupIdsFor({ policy, projectId, userId });
+
+    return Object.fromEntries(
+      CONTENT_CATEGORIES.map((category) => {
+        const resolved = policy.categories[category];
+        return [
+          category,
+          {
+            canSee: anonymous
+              ? isContentVisibleToPublic(resolved)
+              : isContentVisible(resolved, {
+                  isAdmin,
+                  isMember,
+                  isMemberRole,
+                  isViewer: isMember && !isAdmin && !isMemberRole,
+                  isProjectOwner,
+                  groupIds,
+                }),
+            restrictVisibleTo: formatRestrictLabel(resolved),
+          },
+        ];
+      }),
+    ) as Protections["contentCategories"];
   }
 
   /** Whether the viewer owns the project; unknown ownership is not ownership. */
@@ -230,7 +272,7 @@ export class TraceViewerProtectionService {
 
   private permitted(
     input: Readonly<{ projectId: string; userId: string | undefined }>,
-    permission: "cost:view" | "traces:view" | "project:update",
+    permission: "cost:view" | "traces:view" | "traces:update" | "project:manage",
   ): Promise<boolean> {
     if (input.userId === undefined) return Promise.resolve(false);
     return this.options.authz.hasPermission({

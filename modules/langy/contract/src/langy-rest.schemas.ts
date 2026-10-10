@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { cliToolResultSchema, type CliToolResult } from "./cards/tool-result.ts";
@@ -19,7 +20,7 @@ import { langyMessagePartSchema } from "./json.ts";
  * A tool call the agent ran, as posted with a completed turn. `output` doubles
  * as the error text when `isError` (a single wire field).
  */
-export const langyTurnResultToolCallSchema = z.object({
+const langyTurnResultToolCallSchemaDefinition = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   input: z.unknown().optional(),
@@ -33,8 +34,13 @@ export const langyTurnResultToolCallSchema = z.object({
     )
     .optional(),
 });
+export interface LangyTurnResultToolCallSchema extends Named<
+  typeof langyTurnResultToolCallSchemaDefinition
+> {}
+export const langyTurnResultToolCallSchema: LangyTurnResultToolCallSchema =
+  langyTurnResultToolCallSchemaDefinition;
 
-export const langyTurnResultSchema = z.object({
+const langyTurnResultSchemaDefinition = z.object({
   projectId: z.string().min(1),
   conversationId: z.string().min(1),
   status: z.enum(["completed", "failed"]),
@@ -48,73 +54,145 @@ export const langyTurnResultSchema = z.object({
    */
   errorCode: z.string().optional(),
 });
+export interface LangyTurnResultSchema extends Named<typeof langyTurnResultSchemaDefinition> {}
+export const langyTurnResultSchema: LangyTurnResultSchema = langyTurnResultSchemaDefinition;
 
 /** The turn one durable ingest names in its path. */
-export const langyInternalTurnParamsSchema = z.object({ turnId: z.string().min(1) });
+const langyInternalTurnParamsSchemaDefinition = z.object({ turnId: z.string().min(1) });
+export interface LangyInternalTurnParamsSchema extends Named<
+  typeof langyInternalTurnParamsSchemaDefinition
+> {}
+export const langyInternalTurnParamsSchema: LangyInternalTurnParamsSchema =
+  langyInternalTurnParamsSchemaDefinition;
 
 /** What a durable turn result answers once it is recorded. */
-export const langyInternalAcceptedSchema = z.object({ status: z.literal("accepted") });
+const langyInternalAcceptedSchemaDefinition = z.object({ status: z.literal("accepted") });
+export interface LangyInternalAcceptedSchema extends Named<
+  typeof langyInternalAcceptedSchemaDefinition
+> {}
+export const langyInternalAcceptedSchema: LangyInternalAcceptedSchema =
+  langyInternalAcceptedSchemaDefinition;
 
 /** What a revoke answers: the state the key is now in, however it got there. */
-export const langyInternalRevokedSchema = z.object({
+const langyInternalRevokedSchemaDefinition = z.object({
   outcome: z.enum(["revoked", "already_revoked", "not_found"]),
 });
+export interface LangyInternalRevokedSchema extends Named<
+  typeof langyInternalRevokedSchemaDefinition
+> {}
+export const langyInternalRevokedSchema: LangyInternalRevokedSchema =
+  langyInternalRevokedSchemaDefinition;
 
 /** The bare `{ error }` body this control plane's refusals have always carried. */
-export const langyInternalRefusalSchema = z.object({ error: z.string() });
+const langyInternalRefusalSchemaDefinition = z.object({ error: z.string() });
+export interface LangyInternalRefusalSchema extends Named<
+  typeof langyInternalRefusalSchemaDefinition
+> {}
+export const langyInternalRefusalSchema: LangyInternalRefusalSchema =
+  langyInternalRefusalSchemaDefinition;
 
-export const langyRevokeCredentialsSchema = z.object({
+const langyRevokeCredentialsSchemaDefinition = z.object({
   apiKeyId: z.string().min(1).max(128),
   // The tenant the key belongs to. Required so the revoke is scoped to one
   // project - without it a bearer-secret holder could revoke any tenant's live
   // session key by id alone.
   projectId: z.string().min(1).max(128),
 });
+export interface LangyRevokeCredentialsSchema extends Named<
+  typeof langyRevokeCredentialsSchemaDefinition
+> {}
+export const langyRevokeCredentialsSchema: LangyRevokeCredentialsSchema =
+  langyRevokeCredentialsSchemaDefinition;
 
 // ── the worker's local-control door ─────────────────────────────────────────
 
-export const langyLocalConversationBodySchema = z.object({
+const langyLocalConversationBodySchemaDefinition = z.object({
   conversationId: z.string().min(1),
   turnId: z.string().min(1),
   /** The worker's own tool call, so the card renders where the work is. */
   toolCallId: z.string().min(1).optional(),
 });
+export interface LangyLocalConversationBodySchema extends Named<
+  typeof langyLocalConversationBodySchemaDefinition
+> {}
+export const langyLocalConversationBodySchema: LangyLocalConversationBodySchema =
+  langyLocalConversationBodySchemaDefinition;
 
 /** The call a poll and a cancel name in the path. */
-export const langyLocalCallIdParamsSchema = z.object({ callId: z.string().min(1) });
+const langyLocalCallIdParamsSchemaDefinition = z.object({ callId: z.string().min(1) });
+export interface LangyLocalCallIdParamsSchema extends Named<
+  typeof langyLocalCallIdParamsSchemaDefinition
+> {}
+export const langyLocalCallIdParamsSchema: LangyLocalCallIdParamsSchema =
+  langyLocalCallIdParamsSchemaDefinition;
 
 /** The wait a poll names in the path. */
-export const langyLocalWaitIdParamsSchema = z.object({ waitId: z.string().min(1) });
+const langyLocalWaitIdParamsSchemaDefinition = z.object({ waitId: z.string().min(1) });
+export interface LangyLocalWaitIdParamsSchema extends Named<
+  typeof langyLocalWaitIdParamsSchemaDefinition
+> {}
+export const langyLocalWaitIdParamsSchema: LangyLocalWaitIdParamsSchema =
+  langyLocalWaitIdParamsSchemaDefinition;
 
 /** The conversation a code-access status read optionally narrows to. */
-export const langyLocalWorkspaceQuerySchema = z.object({
+const langyLocalWorkspaceQuerySchemaDefinition = z.object({
   conversationId: z.string().optional(),
 });
+export interface LangyLocalWorkspaceQuerySchema extends Named<
+  typeof langyLocalWorkspaceQuerySchemaDefinition
+> {}
+export const langyLocalWorkspaceQuerySchema: LangyLocalWorkspaceQuerySchema =
+  langyLocalWorkspaceQuerySchemaDefinition;
 
 /** The conversation a code-access request is raised against. */
-export const langyLocalCreateRequestBodySchema = z.object({
+const langyLocalCreateRequestBodySchemaDefinition = z.object({
   conversationId: z.string().min(1),
 });
+export interface LangyLocalCreateRequestBodySchema extends Named<
+  typeof langyLocalCreateRequestBodySchemaDefinition
+> {}
+export const langyLocalCreateRequestBodySchema: LangyLocalCreateRequestBodySchema =
+  langyLocalCreateRequestBodySchemaDefinition;
 
-export const langyLocalStartCallRequestSchema =
+const langyLocalStartCallRequestSchemaDefinition =
   langyLocalConversationBodySchema.and(startCallBodySchema);
-export const langyLocalStartWaitRequestSchema = z.object({
+export interface LangyLocalStartCallRequestSchema extends Named<
+  typeof langyLocalStartCallRequestSchemaDefinition
+> {}
+export const langyLocalStartCallRequestSchema: LangyLocalStartCallRequestSchema =
+  langyLocalStartCallRequestSchemaDefinition;
+const langyLocalStartWaitRequestSchemaDefinition = z.object({
   ...langyLocalConversationBodySchema.shape,
   ...startWaitBodySchema.shape,
 });
+export interface LangyLocalStartWaitRequestSchema extends Named<
+  typeof langyLocalStartWaitRequestSchemaDefinition
+> {}
+export const langyLocalStartWaitRequestSchema: LangyLocalStartWaitRequestSchema =
+  langyLocalStartWaitRequestSchemaDefinition;
 
 // ── the local-control REST family, `/api/langy/control` ────────────────────
 
-export const langyControlIdParamsSchema = z.object({
+const langyControlIdParamsSchemaDefinition = z.object({
   requestId: z.string().min(1).describe("The control request id."),
 });
+export interface LangyControlIdParamsSchema extends Named<
+  typeof langyControlIdParamsSchemaDefinition
+> {}
+export const langyControlIdParamsSchema: LangyControlIdParamsSchema =
+  langyControlIdParamsSchemaDefinition;
 
-export const langyControlCancelResultSchema = z.object({
+const langyControlCancelResultSchemaDefinition = z.object({
   id: z.string().describe("The request that was cancelled."),
   cancelled: z.literal(true).describe("Always true once the request is gone."),
 });
+export interface LangyControlCancelResultSchema extends Named<
+  typeof langyControlCancelResultSchemaDefinition
+> {}
+export const langyControlCancelResultSchema: LangyControlCancelResultSchema =
+  langyControlCancelResultSchemaDefinition;
 
-export const langyControlRegisterAnswerSchema = z.object({
+const langyControlRegisterAnswerSchemaDefinition = z.object({
   frame: z
     .union([registeredFrameSchema, refusedFrameSchema])
     .describe("The registered frame, or the refused frame with its reason."),
@@ -126,28 +204,53 @@ export const langyControlRegisterAnswerSchema = z.object({
         "X-Agent-Instance-Token header. Present when the register was accepted.",
     ),
 });
+export interface LangyControlRegisterAnswerSchema extends Named<
+  typeof langyControlRegisterAnswerSchemaDefinition
+> {}
+export const langyControlRegisterAnswerSchema: LangyControlRegisterAnswerSchema =
+  langyControlRegisterAnswerSchemaDefinition;
 
-export const langyControlPollAnswerSchema = z.object({
+const langyControlPollAnswerSchemaDefinition = z.object({
   frames: z
     .array(platformFrameSchema)
     .describe("The frames waiting for the folder; empty once the poll wait passes with none."),
 });
+export interface LangyControlPollAnswerSchema extends Named<
+  typeof langyControlPollAnswerSchemaDefinition
+> {}
+export const langyControlPollAnswerSchema: LangyControlPollAnswerSchema =
+  langyControlPollAnswerSchemaDefinition;
 
-export const langyControlFramesBodySchema = z.object({
+const langyControlFramesBodySchemaDefinition = z.object({
   frames: z
     .array(cliFrameSchema)
     .min(1)
     .max(100)
     .describe("Ack, result, permission_required and deregister frames, in order."),
 });
+export interface LangyControlFramesBodySchema extends Named<
+  typeof langyControlFramesBodySchemaDefinition
+> {}
+export const langyControlFramesBodySchema: LangyControlFramesBodySchema =
+  langyControlFramesBodySchemaDefinition;
 
-export const langyControlFramesAnswerSchema = z.object({
+const langyControlFramesAnswerSchemaDefinition = z.object({
   accepted: z.number().int().describe("How many frames were taken."),
 });
+export interface LangyControlFramesAnswerSchema extends Named<
+  typeof langyControlFramesAnswerSchemaDefinition
+> {}
+export const langyControlFramesAnswerSchema: LangyControlFramesAnswerSchema =
+  langyControlFramesAnswerSchemaDefinition;
 
-export const langyControlPollQuerySchema = z.object({
+const langyControlPollQuerySchemaDefinition = z.object({
   inFlight: z.string().optional().describe("Comma-separated call ids this folder still holds."),
 });
+export interface LangyControlPollQuerySchema extends Named<
+  typeof langyControlPollQuerySchemaDefinition
+> {}
+export const langyControlPollQuerySchema: LangyControlPollQuerySchema =
+  langyControlPollQuerySchemaDefinition;
 
 // ── the public project-API-key turn surface ─────────────────────────────────
 
@@ -156,7 +259,7 @@ export const langyControlPollQuerySchema = z.object({
  * plain-text shorthand a generic HTTP client (a script, a scenario HTTP agent's body template)
  * can produce without restructuring its own message shape; it normalizes to a single text part.
  */
-export const langyRestTurnMessageSchema = z
+const langyRestTurnMessageSchemaDefinition = z
   .object({
     role: z.enum(["user", "assistant", "system"]),
     parts: z.array(langyMessagePartSchema).optional(),
@@ -166,13 +269,23 @@ export const langyRestTurnMessageSchema = z
     role,
     parts: parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
   }));
+export interface LangyRestTurnMessageSchema extends Named<
+  typeof langyRestTurnMessageSchemaDefinition
+> {}
+export const langyRestTurnMessageSchema: LangyRestTurnMessageSchema =
+  langyRestTurnMessageSchemaDefinition;
 
 /** The conversation a turn route addresses, off the path. */
-export const langyRestConversationParamsSchema = z.object({
+const langyRestConversationParamsSchemaDefinition = z.object({
   conversationId: z.string().min(1),
 });
+export interface LangyRestConversationParamsSchema extends Named<
+  typeof langyRestConversationParamsSchemaDefinition
+> {}
+export const langyRestConversationParamsSchema: LangyRestConversationParamsSchema =
+  langyRestConversationParamsSchemaDefinition;
 
-export const langyRestTurnBodySchema = z.object({
+const langyRestTurnBodySchemaDefinition = z.object({
   messages: z.array(langyRestTurnMessageSchema).min(1),
   idempotencyKey: z.string().min(1),
   modelOverride: z.string().min(1).optional(),
@@ -182,10 +295,12 @@ export const langyRestTurnBodySchema = z.object({
    */
   adoptConversationId: z.boolean().optional(),
 });
+export interface LangyRestTurnBodySchema extends Named<typeof langyRestTurnBodySchemaDefinition> {}
+export const langyRestTurnBodySchema: LangyRestTurnBodySchema = langyRestTurnBodySchemaDefinition;
 
 // ── the agent-to-page UI-action dispatch surface ────────────────────────────
 
-export const langyUiActionDispatchBodySchema = z.object({
+const langyUiActionDispatchBodySchemaDefinition = z.object({
   conversationId: z.string().min(1),
   kind: z.string().min(1),
   payload: z.unknown().optional(),
@@ -196,11 +311,18 @@ export const langyUiActionDispatchBodySchema = z.object({
    */
   experimentSlug: z.string().min(1).optional(),
 });
+export interface LangyUiActionDispatchBodySchema extends Named<
+  typeof langyUiActionDispatchBodySchemaDefinition
+> {}
+export const langyUiActionDispatchBodySchema: LangyUiActionDispatchBodySchema =
+  langyUiActionDispatchBodySchemaDefinition;
 
-export const langyRelayTallySchema = z.object({
+const langyRelayTallySchemaDefinition = z.object({
   applied: z.number().int().nonnegative(),
   duplicate: z.number().int().nonnegative(),
   rejected: z.number().int().nonnegative(),
   terminal: z.boolean(),
 });
+export interface LangyRelayTallySchema extends Named<typeof langyRelayTallySchemaDefinition> {}
+export const langyRelayTallySchema: LangyRelayTallySchema = langyRelayTallySchemaDefinition;
 export type RelayTally = z.infer<typeof langyRelayTallySchema>;

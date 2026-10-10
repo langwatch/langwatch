@@ -8,8 +8,8 @@ import {
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
 
-import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
 import type { TraceMediaReferenceResolver } from "../../media/services/trace-media-reference.service.ts";
+import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
 
 // Transitional: the summary projection still imports it from here.
 export { OUTPUT_SOURCE } from "@langwatch/trace-contract";

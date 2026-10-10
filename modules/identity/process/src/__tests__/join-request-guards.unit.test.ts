@@ -55,6 +55,7 @@ const command = {
   occurredAtMs: 1_699_000_000_000,
   notifyAdmins: true,
   origin: "web" as const,
+  connectionId: null,
   actor: { type: "user" as const, id: "user_ana" },
 };
 

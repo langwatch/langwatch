@@ -12,8 +12,8 @@ import {
   CODING_AGENT_ORIGIN,
   type TraceLogRecordReader,
 } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
-import { redactPatchForViewer } from "../../edit-overlay/rules/trace-edit-overlay-redaction.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../../claude-code/services/claude-code-log-enrichment.service.ts";
+import { redactPatchForViewer } from "../../edit-overlay/rules/trace-edit-overlay-redaction.rules.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
 
 export class TraceReadEnrichmentService {

@@ -1,11 +1,27 @@
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import type { UpgradePostgres } from "../ports.ts";
+import { SERVING_ROSTER_TIMING } from "../gate/serving-roster-timing.ts";
+import {
+  upgradeRunKindSchema,
+  upgradeRunOutcomeSchema,
+  upgradeStepStatusSchema,
+} from "../ledger.ts";
+import { planInstallation, type UpgradePlanning } from "../plan/plan-installation.ts";
+import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
+import {
+  gooseSteps,
+  prismaSteps,
+  readGooseVersions,
+  readPrismaMigrations,
+} from "../seed-sources.ts";
 import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
+import { previewUpgradeTo, type UpgradePreview } from "./preview.ts";
 import {
   type LedgerLeaseRow,
+  type LedgerRosterRow,
+  type LedgerRunFact,
   type LedgerRunRow,
   type LedgerStepRow,
   type LedgerStepFact,
@@ -29,10 +45,18 @@ import type {
   UpgradeStepDetail,
   UpgradeStepPage,
   UpgradeStepView,
+  UpgradeTargetSummary,
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst, pickHighestRelease } from "./release.ts";
 import { parseRunPhases } from "./run-phase-view.ts";
-import { filterSteps, mergeSteps, viewDeclaredStep, viewRecordedStep } from "./step-view.ts";
+import {
+  filterSteps,
+  imageReleaseRow,
+  mergeSteps,
+  UNRELEASED_IMAGE,
+  viewDeclaredStep,
+  viewRecordedStep,
+} from "./step-view.ts";
 
 const DEFAULT_RUN_PAGE = 25;
 const MAX_RUN_PAGE = 100;
@@ -103,8 +127,12 @@ function pickLiveLease({ leases }: { leases: readonly LedgerLeaseRow[] }): Ledge
   return newest[0] ?? null;
 }
 
-/** The installed release: the newest succeeded run's, else the highest a settled step carries. */
-function pickInstalled({
+/**
+ * The installed release: the newest succeeded run's, else the highest a settled step carries. An
+ * upgrade by an unreleased image installed past every release, so it reads unreleased, never a
+ * stale release below the floor (as the gate's `assertCurrent` treats an unreleased build).
+ */
+export function pickInstalled({
   succeededRun,
   stepFacts,
 }: {
@@ -117,6 +145,7 @@ function pickInstalled({
       origin: succeededRun.kind === "seed" ? "inferred" : "recorded",
     };
   }
+  if (succeededRun) return { installed: UNRELEASED_IMAGE, origin: "recorded" };
   const settled = stepFacts
     .filter((step) => step.status === "done" || step.status === "not-needed")
     .flatMap((step) => (step.release === null ? [] : [step.release]));
@@ -129,14 +158,20 @@ function pickStepView({
   declared,
   imageRelease,
   id,
+  roster,
+  needsOldWritersGone,
 }: {
   row: LedgerStepRow | undefined;
   declared: UpgradeImageStep | undefined;
   imageRelease: string;
   id: string;
+  roster: readonly LedgerRosterRow[];
+  needsOldWritersGone: ReadonlySet<string>;
 }): UpgradeStepView {
-  if (row) return viewRecordedStep({ row, declared });
-  if (declared) return viewDeclaredStep({ step: declared, imageRelease });
+  if (row) return viewRecordedStep({ row, declared, roster, needsOldWritersGone });
+  if (declared) {
+    return viewDeclaredStep({ step: declared, imageRelease, roster, needsOldWritersGone });
+  }
   throw new UpgradeReadError("upgrade_not_found", `No upgrade step "${id}" in the ledger.`);
 }
 
@@ -163,34 +198,87 @@ function summariseReleases({
   const byRelease = new Map<string | null, UpgradeStepView[]>();
   for (const step of steps)
     byRelease.set(step.release, [...(byRelease.get(step.release) ?? []), step]);
-  if (!byRelease.has(image.release)) byRelease.set(image.release, []);
+  const imageRow = imageReleaseRow({ release: image.release });
+  if (!byRelease.has(imageRow)) byRelease.set(imageRow, []);
   return [...byRelease.entries()]
     .toSorted(([left], [right]) => compareReleasesNewestFirst({ left, right }))
     .map(([release, members]) => ({
       release,
-      installed: release !== null && release === installed,
-      image: release === image.release,
+      installed: installed !== null && release === imageReleaseRow({ release: installed }),
+      image: release === imageRow,
       stepCount: members.length,
       counts: countBy({ items: members, key: (step) => step.status }),
     }));
 }
 
+/** Ledger facts in the planner's words; a status or kind a newer runner wrote is left out. */
+function planFactsFrom({
+  stepRows,
+  runRows,
+}: {
+  stepRows: readonly LedgerStepFact[];
+  runRows: readonly LedgerRunFact[];
+}) {
+  const steps = stepRows.flatMap(({ id, status }) => {
+    const known = upgradeStepStatusSchema.safeParse(status);
+    return known.success ? [{ id, status: known.data }] : [];
+  });
+  const runs = runRows.flatMap((run) => {
+    const kind = upgradeRunKindSchema.safeParse(run.kind);
+    const outcome = upgradeRunOutcomeSchema.nullable().safeParse(run.outcome);
+    if (!kind.success || !outcome.success) return [];
+    const { release, floor, plan, started_at: startedAt } = run;
+    return [{ kind: kind.data, outcome: outcome.data, release, floor, plan, startedAt }];
+  });
+  return { steps, runs };
+}
+
+/** As the runner: the ledger once a seed run succeeded, else the tools' records. */
+async function readPlanFacts({
+  repository,
+  tables,
+  postgres,
+  clickhouse,
+}: {
+  repository: UpgradeReaderRepository;
+  tables: LedgerTables;
+  postgres: UpgradePostgres;
+  clickhouse?: UpgradeClickHouse;
+}) {
+  const [stepRows, runRows] = await Promise.all([
+    repository.findStepFacts({ tables }),
+    repository.findRunFacts({ tables }),
+  ]);
+  const seeded = runRows.some((run) => run.kind === "seed" && run.outcome === "succeeded");
+  if (seeded) return planFactsFrom({ stepRows, runRows });
+  const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
+  const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
+  return { steps: [...prisma, ...goose], runs: [] };
+}
+
 /**
  * The read model of the Upgrades page and `upgrade status` (dev/docs/plans/upgrade-ui-2026-10-06.md
  * section 8). It touches only the ledger tables, tolerates unknown kinds and statuses, and is
- * handed the image's own release and declared steps and the floor, so it reads no manifest.
+ * handed the image's release, declared steps, floor and old-writer code steps; reads no manifest.
  */
 export function createUpgradeReader({
   postgres,
   image,
   floor,
+  needsOldWritersGone = new Set(),
+  planning,
 }: {
   postgres: UpgradePostgres;
   image: UpgradeImage;
   floor: UpgradeFloor | null;
+  needsOldWritersGone?: ReadonlySet<string>;
+  /** The manifests `preview` plans with; ClickHouse seeds goose history into an empty ledger. */
+  planning?: UpgradePlanning & { clickhouse?: UpgradeClickHouse };
 }) {
   const repository = UpgradeReaderRepository.create({ postgres });
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
+  const findRoster = ({ tables }: { tables: LedgerTables }) =>
+    repository.findLiveRoster({ tables, staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs });
 
   async function readStatusFacts({ tables }: { tables: LedgerTables }) {
     const [stepFacts, latestRun, succeededRun, floors, leases, unfinishedRun, anyRun, failed] =
@@ -231,6 +319,7 @@ export function createUpgradeReader({
       steps: facts.stepFacts,
       failedTargets: facts.failedTargets,
       holdsLease: facts.holdsLease,
+      lastRunFailed: facts.latestRun?.outcome === "failed",
     });
     return {
       ...verdict,
@@ -249,7 +338,11 @@ export function createUpgradeReader({
   }
 
   async function listAllSteps({ tables }: { tables: LedgerTables }): Promise<UpgradeStepView[]> {
-    return mergeSteps({ rows: await repository.findSteps({ tables }), image });
+    const [rows, roster] = await Promise.all([
+      repository.findSteps({ tables }),
+      findRoster({ tables }),
+    ]);
+    return mergeSteps({ rows, image, roster, needsOldWritersGone });
   }
 
   async function listSteps(filter: ListStepsFilter = {}): Promise<UpgradeStepPage> {
@@ -269,9 +362,19 @@ export function createUpgradeReader({
 
   async function getStep({ id }: { id: string }): Promise<UpgradeStepDetail> {
     const tables = await repository.findTables();
-    const [row] = await repository.findStepById({ tables, id });
+    const [[row], roster] = await Promise.all([
+      repository.findStepById({ tables, id }),
+      findRoster({ tables }),
+    ]);
     const declared = declaredById.get(id);
-    const view = pickStepView({ row, declared, imageRelease: image.release, id });
+    const view = pickStepView({
+      row,
+      declared,
+      imageRelease: image.release,
+      id,
+      roster,
+      needsOldWritersGone,
+    });
     const targets = await repository.findTargets({ tables, stepId: id });
     return {
       ...view,
@@ -302,13 +405,23 @@ export function createUpgradeReader({
     if (!run) {
       throw new UpgradeReadError("upgrade_not_found", `No upgrade run "${id}" in the ledger.`);
     }
-    const rows = await repository.findSteps({ tables, runId: id });
+    const [rows, roster] = await Promise.all([
+      repository.findSteps({ tables, runId: id }),
+      findRoster({ tables }),
+    ]);
     return {
       ...summariseRun(run),
       plan: run.plan,
       report: run.report,
       phases: parseRunPhases({ report: run.report }),
-      steps: rows.map((row) => viewRecordedStep({ row, declared: declaredById.get(row.id) })),
+      steps: rows.map((row) =>
+        viewRecordedStep({
+          row,
+          declared: declaredById.get(row.id),
+          roster,
+          needsOldWritersGone,
+        }),
+      ),
     };
   }
 
@@ -317,16 +430,62 @@ export function createUpgradeReader({
     return preflightFrom({ status: await status() });
   }
 
-  return { status, listReleases, listSteps, getStep, listRuns, getRun, preflight };
+  /** `upgrade plan --to` as the preview page shows it, beside the preflight (U6-U9-READER). */
+  async function preview({ to }: { to: string }): Promise<UpgradePreview> {
+    if (!planning) {
+      throw new UpgradeReadError(
+        "upgrade_plan_unavailable",
+        "this upgrade reader was created without the planning a preview needs",
+      );
+    }
+    const tables = await repository.findTables();
+    const { installed, plan } = planInstallation({
+      ...planning,
+      ...(await readPlanFacts({ repository, tables, postgres, clickhouse: planning.clickhouse })),
+    });
+    return {
+      installed,
+      plan: previewUpgradeTo({ plan, image: planning.image, to }),
+      preflight: await preflight(),
+    };
+  }
+
+  /** Every ledger target rolled up from one summed query (U6-U9-READER). */
+  async function listTargets(): Promise<UpgradeTargetSummary[]> {
+    const tables = await repository.findTables();
+    const rows = await repository.findTargetSummaries({ tables });
+    return rows.map((row) => ({
+      target: row.target,
+      version: row.version,
+      outstanding: row.outstanding,
+      lastError: row.last_error,
+    }));
+  }
+
+  return {
+    status,
+    listReleases,
+    listSteps,
+    getStep,
+    listRuns,
+    getRun,
+    preflight,
+    preview,
+    listTargets,
+  };
 }
 
 export type UpgradeReader = ReturnType<typeof createUpgradeReader>;
 
-export type UpgradeReadErrorCode = "upgrade_not_found" | "upgrade_invalid_cursor";
+export type UpgradeReadErrorCode =
+  | "upgrade_not_found"
+  | "upgrade_invalid_cursor"
+  | "upgrade_plan_unavailable";
 
 const HTTP_STATUS: Record<UpgradeReadErrorCode, number> = {
   upgrade_not_found: 404,
   upgrade_invalid_cursor: 400,
+  upgrade_plan_unavailable: 503,
 };
 
 /** A read the ledger cannot answer. Consumers branch on `code`, never on the message. */
@@ -334,7 +493,10 @@ export class UpgradeReadError extends HandledError {
   declare readonly code: UpgradeReadErrorCode;
 
   constructor(code: UpgradeReadErrorCode, message: string) {
-    super(code, message, { httpStatus: HTTP_STATUS[code], fault: "customer" });
+    super(code, message, {
+      httpStatus: HTTP_STATUS[code],
+      fault: code === "upgrade_plan_unavailable" ? "platform" : "customer",
+    });
     this.name = "UpgradeReadError";
   }
 }

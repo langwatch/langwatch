@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -140,12 +140,14 @@ export function SignUpCredentialForm({
 
     setIsSigningIn(true);
     let message: string | null = null;
+    let leaving = false;
     try {
       const response = await signIn("credentials", {
         email,
         password: values.password,
         callbackUrl,
       });
+      leaving = response?.ok === true;
       message =
         credentialSignInFailure({
           response,
@@ -154,7 +156,8 @@ export function SignUpCredentialForm({
     } catch {
       message = authFailureMessage({ fallback: ACCOUNT_CREATED_FALLBACK });
     } finally {
-      setIsSigningIn(false);
+      // A signed-in account is loading its next page; the button stays busy until it has (WEB-708).
+      if (!leaving) setIsSigningIn(false);
     }
 
     if (message) {
@@ -166,7 +169,13 @@ export function SignUpCredentialForm({
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-      <VStack width="full" align="stretch" gap="13px">
+      <VStack width="full" align="stretch" gap="10px">
+        <FormServerError form={form} />
+        <HandledErrorAlert
+          description={submitError}
+          title="Your account was created, but we couldn't log you in"
+        />
+        <HandledErrorAlert error={registerError} fallbackTitle="Couldn't create your account" />
         {/* Every failure shows in one place, at the top. The marker below is a
             false positive, not an exemption: `onSubmit`'s local assigned from
             `?.message` taints a literal title, which the raw-message scanner
@@ -174,7 +183,6 @@ export function SignUpCredentialForm({
         <HandledErrorAlert
           error={passkeyError}
           fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok
-          className="lw-front-door-alert"
         />
         {/* The address this is for, and the way back to change it. It is the
             last chance to notice a typo before it becomes an account. */}
@@ -222,7 +230,10 @@ export function SignUpCredentialForm({
                 // starts using the first. A manager that fills both fields at
                 // once fires this too, so an autofilled sign-up never has to
                 // wait for a focus that never happens.
-                onChange: () => setIsChoosingPassword(true),
+                onChange: () => {
+                  setIsChoosingPassword(true);
+                  form.clearErrors("password");
+                },
               })}
               onFocus={() => setIsChoosingPassword(true)}
             />
@@ -239,26 +250,13 @@ export function SignUpCredentialForm({
               <PasswordInput
                 id={id}
                 autoComplete="new-password"
-                registration={form.register("confirmPassword", blurJudged("confirmPassword"))}
+                registration={form.register("confirmPassword", {
+                  ...blurJudged("confirmPassword"),
+                  onChange: () => form.clearErrors("confirmPassword"),
+                })}
               />
             )}
           </FrontDoorField>
-        ) : null}
-        <FormServerError form={form} />
-        {submitError ? (
-          <Alert.Root
-            status="error"
-            variant="outline"
-            borderStartWidth="4px"
-            borderStartColor={"frontDoor.danger"}
-          >
-            <Alert.Content>
-              <Alert.Description color={"frontDoor.danger"}>{submitError}</Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-        ) : null}
-        {registerError ? (
-          <HandledErrorAlert error={registerError} fallbackTitle="Couldn't create your account" />
         ) : null}
         {/* Arrives with the confirmation. Before that the passkey button IS
             the call to action, and a second primary button under an empty

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { lwqlCompletions } from "../lwql-completion.ts";
 import { lwqlHoverAt } from "../lwql-hover.ts";
+import { logicalLwqlSchema } from "../lwql-scope.ts";
 import { SCHEMA } from "./lwql-fixture.fixture.ts";
 
 function complete({
@@ -24,16 +25,42 @@ describe("LangWatchQL completion", () => {
     describe("when the cursor sits after FROM", () => {
       /** @scenario "Dataset names complete after FROM in the schema's order" */
       /** @scenario "Schema documentation and completion use the live response" */
-      it("offers every dataset as analytics.<name>, in the schema's order", () => {
+      it("offers every dataset by the bare name a statement writes, in the schema's order", () => {
         const { items } = complete({ text: "SELECT 1 FROM |" });
         const ordered = items.toSorted((a, b) => a.sortText.localeCompare(b.sortText));
-        expect(ordered.map((i) => i.insertText)).toEqual(["analytics.traces", "analytics.spans"]);
+        expect(ordered.map((i) => i.insertText)).toEqual(["traces", "spans"]);
         expect(items.every((i) => i.kind === "table")).toBe(true);
       });
 
-      it("offers bare names once analytics. is typed", () => {
+      it("offers the bare names after a typed qualifier too", () => {
         const { items } = complete({ text: "SELECT 1 FROM analytics.|" });
         expect(items.map((i) => i.insertText)).toEqual(["traces", "spans"]);
+      });
+
+      it("replaces only the word being typed, so accepting leaves the statement whole", () => {
+        const text = "SELECT * FROM tr";
+        const { items, replaceFrom } = complete({ text: `${text}|` });
+        const accepted = `${text.slice(0, replaceFrom)}${items[0]?.insertText}`;
+        expect(accepted).toBe("SELECT * FROM traces");
+      });
+    });
+
+    describe("when the server qualifies each dataset with the deployment's database", () => {
+      /** @scenario "Dataset names complete after FROM in the schema's order" */
+      it("never shows or inserts the database name", () => {
+        const database = "lw_feat_stack_analytics";
+        const served = {
+          ...SCHEMA,
+          database,
+          views: SCHEMA.views.map((view) => ({ ...view, name: `${database}.${view.name}` })),
+        };
+        const { items } = lwqlCompletions({
+          schema: logicalLwqlSchema(served),
+          text: "SELECT 1 FROM ",
+          offset: "SELECT 1 FROM ".length,
+        });
+        expect(items.map((i) => i.label)).toEqual(["traces", "spans"]);
+        expect(JSON.stringify(items)).not.toContain(database);
       });
     });
   });
@@ -134,6 +161,12 @@ describe("LangWatchQL hover", () => {
           "**DurationMs** · `UInt64` (ms)",
           "How long the trace took.",
         ]);
+      });
+
+      it("names a bare dataset after FROM", () => {
+        const text = "SELECT 1 FROM traces";
+        const hover = lwqlHoverAt({ schema: SCHEMA, text, offset: text.length - 2 });
+        expect(hover?.contents[0]).toBe("**traces** · trace");
       });
 
       it("has nothing to say about an unknown word", () => {

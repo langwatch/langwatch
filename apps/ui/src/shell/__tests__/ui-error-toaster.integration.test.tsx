@@ -42,7 +42,7 @@ describe("given the application renders its error toaster", () => {
     renderWithDesignSystem(<UiErrorToaster />);
   });
 
-  describe("when a failure is reported through the feedback capability", () => {
+  describe("when a failure is reported through the feedback host service", () => {
     /** @scenario "An error toast keeps its close button and error actions" */
     it("shows the close button, the docs link and the copyable error id", async () => {
       BrowserUiFeedback.create().failed({

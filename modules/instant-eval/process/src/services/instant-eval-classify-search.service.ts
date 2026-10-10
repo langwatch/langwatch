@@ -5,6 +5,7 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
+import type { Actor } from "@langwatch/authorization";
 import type {
   ExplorerSearchClassification,
   ExplorerSearchClassificationInput,
@@ -24,6 +25,7 @@ import {
   routeAnswerOf,
 } from "../rules/instant-eval-search-route.rules.ts";
 import type { InstantEvalClassifyService } from "./instant-eval-classify.service.ts";
+import type { InstantEvalTraceProofService } from "./instant-eval-trace-proof.service.ts";
 
 const logger = createLogger("langwatch:instant-eval:classify-search");
 
@@ -33,6 +35,8 @@ interface InstantEvalClassifySearchPeers {
   isReleased(input: { projectId: string }): Promise<boolean>;
   /** The trace facets the known evaluator and event names are read from. */
   traces: Pick<TraceApi, "readFacetValues">;
+  /** The asker's traces:view proof the facet reads carry (ruling TRACE-PROOF-EVAL-PERM). */
+  proofs: Pick<InstantEvalTraceProofService, "mint">;
 }
 
 export class InstantEvalClassifySearchService {
@@ -52,7 +56,7 @@ export class InstantEvalClassifySearchService {
   }
 
   async classifySearch(
-    input: ExplorerSearchClassificationInput,
+    input: ExplorerSearchClassificationInput & { actor: Actor },
   ): Promise<ExplorerSearchClassification> {
     const { sentence, explicitQuery } = splitBareWords(input.text);
     const isInstantEvalAvailable = await this.#isReleased(input);
@@ -107,11 +111,14 @@ export class InstantEvalClassifySearchService {
   async #knownSignals({
     projectId,
     timeRange,
-  }: ExplorerSearchClassificationInput): Promise<KnownProjectSignals> {
+    actor,
+  }: ExplorerSearchClassificationInput & { actor: Actor }): Promise<KnownProjectSignals> {
+    // A refused proof settles both reads as failed, so the sentence still classifies.
+    const proof = this.peers.proofs.mint({ projectId, actor, route: "instantEval.classifySearch" });
     const [evaluators, events] = await Promise.allSettled(
-      ["evaluator", "event"].map((facetKey) =>
+      ["evaluator", "event"].map(async (facetKey) =>
         this.peers.traces.readFacetValues({
-          tenantId: projectId,
+          authorization: await proof,
           timeRange,
           facetKey,
           limit: KNOWN_SIGNALS_LIMIT,

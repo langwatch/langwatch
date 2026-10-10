@@ -52,6 +52,9 @@ export type UserDeactivationOutcome =
 /** An account as the created-fact seed reads it: its id and when its row was written. */
 export type UserCreatedRow = Readonly<{ id: string; createdAt: Instant }>;
 
+/** An account as the standing-fact step reads it: its id and when it was deactivated, if it is. */
+export type UserStandingRow = Readonly<{ id: string; deactivatedAt: Instant | null }>;
+
 /**
  * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
  * created fact (and a self-registration its registered fact) to the fact outbox with the row.
@@ -118,4 +121,6 @@ export interface UserRepository {
   hasAnyAccount(): Promise<boolean>;
   /** One page of every account, in id order after `afterId`, for user's created-fact seed. */
   findCreatedPage(input: { afterId: string | null; limit: number }): Promise<UserCreatedRow[]>;
+  /** One page of every account, in id order after `afterId`, for user's standing-fact step. */
+  findStandingPage(input: { afterId: string | null; limit: number }): Promise<UserStandingRow[]>;
 }

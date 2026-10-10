@@ -1,12 +1,16 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { type AuthzPermission } from "@langwatch/authorization";
+import { type AuthzPermission, type PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DataPrivacyApi,
   type DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type OrganizationRestMemberSummary,
+  type OrganizationRestMemberTeamBinding,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
   ProjectApi,
@@ -26,16 +30,25 @@ import {
   type TraceDestinationInput,
   type TraceDestinationProject,
   type TraceSharingConfig,
+  type SetTraceSharingInput,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
   type ProjectUsageCount,
   type ProjectPath,
   type SearchProjectsResult,
+  type AggregateMemberCandidate,
+  type AggregateRule,
+  type AggregateRuleMembers,
+  type LiveAggregate,
+  type StoredAggregateProject,
+  type ProjectKind,
 } from "@langwatch/project-contract";
 import type * as projectContractModule from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
+import type { ProjectRepository } from "../repositories/project.repository.ts";
+import { AggregateProjectService } from "../services/aggregate-project.service.ts";
 import { PersonalProjectService } from "../services/personal-project.service.ts";
 import {
   ProjectCreatedNoticeService,
@@ -78,6 +91,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   findProjectsWithDepartments(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
     return this.#projectService.findProjectsWithDepartments(input);
   }
@@ -103,7 +117,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #lifecycle: ProjectCreatedNoticeService;
   readonly #authorization: AuthzApi;
   readonly #dataPrivacy: DataPrivacyApi;
+  readonly #organizations: Pick<OrganizationApi, "isMember" | "getMember">;
   readonly #personalProjects: PersonalProjectService;
+  readonly #aggregates: AggregateProjectService;
+  /** Governance's aggregate reads (M8487-RULE-OWNER); held as `auth.app.ts` holds its own. */
+  readonly #aggregateReads: ProjectRepository;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
@@ -114,21 +132,30 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     lifecycle,
     authorization,
     dataPrivacy,
+    organizations,
     personalProjects,
+    aggregates,
+    aggregateReads,
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
     authorization: AuthzApi;
     dataPrivacy: DataPrivacyApi;
+    organizations: Pick<OrganizationApi, "isMember" | "getMember">;
     personalProjects: PersonalProjectService;
+    aggregates: AggregateProjectService;
+    aggregateReads: ProjectRepository;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
     this.#lifecycle = lifecycle;
     this.#authorization = authorization;
     this.#dataPrivacy = dataPrivacy;
+    this.#organizations = organizations;
     this.#personalProjects = personalProjects;
+    this.#aggregates = aggregates;
+    this.#aggregateReads = aggregateReads;
   }
 
   static create({
@@ -140,10 +167,12 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       logger,
       projects: repositories.projects,
     });
+    const credentials = ProjectCredentialsService.create();
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
-      credentials: ProjectCredentialsService.create(),
+      credentials,
       organizations: dependencies.organizations,
+      authorization: dependencies.authorization,
       created: lifecycle,
     });
     const operations = ProjectOperationsService.create({
@@ -159,7 +188,18 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       lifecycle,
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,
-      personalProjects: PersonalProjectService.create({ projects: repositories.projects }),
+      organizations: dependencies.organizations,
+      personalProjects: PersonalProjectService.create({
+        projects: repositories.projects,
+        credentials,
+        lifecycle,
+      }),
+      aggregates: AggregateProjectService.create({
+        repository: repositories.projects,
+        organizations: dependencies.organizations,
+        lifecycle,
+      }),
+      aggregateReads: repositories.projects,
     });
   }
 
@@ -282,12 +322,18 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   }
 
   updateInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      data: UpdateProjectInput;
+      by: PrincipalRef;
+    }>,
   ): Promise<Project> {
     return this.#projectService.update({
       id: input.projectId,
       organizationId: input.organizationId,
       data: input.data,
+      by: input.by,
     });
   }
 
@@ -298,6 +344,17 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       id: input.projectId,
       organizationId: input.organizationId,
     });
+  }
+
+  isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean> {
+    return this.#organizations.isMember(input);
+  }
+
+  getMember(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }> {
+    return this.#organizations.getMember(input);
   }
 
   getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel> {
@@ -353,6 +410,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    hiddenKinds?: ProjectKind[];
   }): Promise<PaginatedProjects> {
     return this.#projectService.listByOrganization(input);
   }
@@ -392,6 +450,18 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#projectService.listAllWithOrganization(input);
   }
 
+  listAllWithPrivateS3(
+    input?: projectContractModule.ProjectIdPageInput,
+  ): Promise<projectContractModule.ProjectPrivateS3Page> {
+    return this.#projectService.listAllWithPrivateS3(input);
+  }
+
+  listLwqlKeys(
+    input?: projectContractModule.ProjectIdPageInput,
+  ): Promise<projectContractModule.ProjectLwqlKeyPage> {
+    return this.#projectService.listLwqlKeys(input);
+  }
+
   findSharedProjectSlugs(input: {
     organizationId: string;
     memberUserId?: string;
@@ -424,7 +494,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#projectService.findLiveByRef(input);
   }
 
-  create(
+  async create(
     input: Readonly<{
       organizationId: string;
       teamId?: string | undefined;
@@ -432,10 +502,75 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       name: string;
       language: string;
       framework: string;
+      kind?: "application" | "aggregate" | undefined;
+      aggregateRule?: AggregateRule | undefined;
     }>,
     by: Readonly<{ id: string }>,
   ): Promise<Project> {
-    return this.#operations.create(input, by);
+    // Checked before the team is created, so a refused aggregate writes nothing.
+    const kindFields = await this.#aggregates.createFields({
+      organizationId: input.organizationId,
+      kind: input.kind,
+      aggregateRule: input.aggregateRule,
+      by,
+    });
+    return this.#operations.create(
+      {
+        organizationId: input.organizationId,
+        teamId: input.teamId,
+        newTeamName: input.newTeamName,
+        name: input.name,
+        language: input.language,
+        framework: input.framework,
+        ...kindFields,
+      },
+      by,
+    );
+  }
+
+  updateAggregateRule(input: {
+    projectId: string;
+    aggregateRule: AggregateRule;
+    by: Readonly<{ id: string }>;
+  }): Promise<AggregateRuleMembers> {
+    return this.#aggregates.updateRule(input);
+  }
+
+  aggregateMemberCandidates(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<AggregateMemberCandidate[]> {
+    return this.#aggregates.candidateMembers(input);
+  }
+
+  findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]> {
+    return this.#aggregateReads.findAggregate(input);
+  }
+
+  findLiveAggregateIds(input: { organizationId: string }): Promise<string[]> {
+    return this.#aggregateReads.findLiveAggregateIds(input);
+  }
+
+  findAllLiveAggregates(): Promise<LiveAggregate[]> {
+    return this.#aggregateReads.findAllLiveAggregates();
+  }
+
+  findPersonalProjectIds(input: {
+    organizationId: string;
+    ownerUserIds?: readonly string[];
+  }): Promise<string[]> {
+    return this.#aggregateReads.findPersonalProjectIds(input);
+  }
+
+  findReadableProjectIds(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#aggregateReads.findReadableProjectIds(input);
+  }
+
+  findCandidateMembers(input: { organizationId: string }): Promise<AggregateMemberCandidate[]> {
+    return this.#aggregateReads.findCandidateMembers(input);
   }
 
   updateSettings(
@@ -443,6 +578,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     by: Readonly<{ id: string }>,
   ): Promise<Project> {
     return this.#operations.updateSettings(input, by);
+  }
+
+  setTraceSharing(input: SetTraceSharingInput): Promise<void> {
+    return this.#operations.setTraceSharing(input);
   }
 
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }> {

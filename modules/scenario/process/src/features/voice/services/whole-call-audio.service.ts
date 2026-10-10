@@ -1,6 +1,8 @@
 // Resolve the handle the whole-call audio player streams a run's recording by.
 // Reads run's traces, scans spans for vendor handle (Twilio or ElevenLabs); unavailable if missing.
 
+import { internalActor } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   VoiceRecordingUnavailableError,
   type SimulationService,
@@ -58,6 +60,8 @@ interface WholeCallAudioCollaborators {
   simulations: Pick<SimulationService, "findScenarioRunData">;
   /** One trace's normalized spans, read for the attributes they carry. */
   traces: Pick<TraceApi, "findNormalizedSpansByTraceId">;
+  /** Mints the own-only proof the span read is fenced by. */
+  authz: Pick<AuthzApi, "authorizeInternal">;
 }
 
 /** Compose the production infrastructure from the two reads it needs. */
@@ -91,8 +95,16 @@ function createWholeCallAudioInfrastructure(
      *  `voice.elevenlabs.conversation_id`), so the normalized spans' own
      *  attribute records are handed straight to the scan. */
     async readSpanAttributes({ projectId, traceId }) {
+      // The run-audio route admitted the caller on the scenario; the span read is fenced to
+      // its project.
+      const authorization = await collaborators.authz.authorizeInternal({
+        actor: internalActor("scenario.whole-call-audio"),
+        projectId,
+        permission: "traces:view",
+        purpose: { kind: "operator", entry: "WholeCallAudioService.readSpanAttributes" },
+      });
       const spans = await collaborators.traces.findNormalizedSpansByTraceId({
-        tenantId: projectId,
+        authorization,
         traceId,
       });
       return spans.map((span) => span.spanAttributes);

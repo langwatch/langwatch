@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Onboarding and the Langy gate save a first provider in one write through the guided form.
+ * A first provider saves in one write, from the settings form and from onboarding's guided panel.
  * @see specs/model-providers/onboarding-flow.feature
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
@@ -91,14 +91,14 @@ const BASE_URL = "https://llm.acme.test/v1";
 /** The write count at each moment the form reported the provider saved. */
 let savedAfterWrites: number[] = [];
 
-function guidedForm(providerKey: string) {
+function guidedForm(providerKey: string, guided = true) {
   return (
     <EditModelProviderForm
       projectId="proj-1"
       organizationId="org-1"
       modelProviderId="new"
       providerKey={providerKey}
-      guided
+      guided={guided}
       onSaved={() => savedAfterWrites.push(updateProvider.mock.calls.length)}
       onFailed={vi.fn()}
     />
@@ -107,12 +107,14 @@ function guidedForm(providerKey: string) {
 
 const host = () => new FakeModelProviderHost({ grants: new Set(["organization:manage"]) });
 
-async function connectWith(fields: Record<string, string>) {
+/** The settings form names fields by their key; the guided panel by its own labels. */
+async function connectWith(fields: Record<string, string>, button = "Connect") {
   const user = userEvent.setup();
   for (const [label, value] of Object.entries(fields)) {
-    await user.type(inputFor(label), value);
+    const input = button === "Connect" ? screen.getByLabelText(label) : inputFor(label);
+    await user.type(input, value);
   }
-  await user.click(screen.getByRole("button", { name: "Connect" }));
+  await user.click(screen.getByRole("button", { name: button }));
   await waitFor(() => expect(savedAfterWrites.length).toBeGreaterThan(0));
 }
 
@@ -135,9 +137,9 @@ describe("saving a first provider from onboarding or the Langy gate", () => {
     describe("when an API key and a base URL are entered and saved", () => {
       /** @scenario "The first save stores the credentials that were entered" */
       it("creates the provider in one write that carries the credentials", async () => {
-        renderWithModelProviderHost(guidedForm("openai"), host());
+        renderWithModelProviderHost(guidedForm("openai", false), host());
 
-        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL });
+        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL }, "Save");
 
         expect(writes()).toHaveLength(1);
         expect(writes()[0]).toMatchObject({
@@ -150,18 +152,18 @@ describe("saving a first provider from onboarding or the Langy gate", () => {
 
       /** @scenario "No enabled provider is ever stored without its credentials" */
       it("never writes an enabled provider that has no credentials", async () => {
-        renderWithModelProviderHost(guidedForm("openai"), host());
+        renderWithModelProviderHost(guidedForm("openai", false), host());
 
-        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL });
+        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL }, "Save");
 
         expect(writes().filter((write) => write.enabled === true && !write.customKeys)).toEqual([]);
       });
 
       /** @scenario "The step completes only after the credentials are stored" */
       it("reports the provider saved once, after the write that carries the key", async () => {
-        renderWithModelProviderHost(guidedForm("openai"), host());
+        renderWithModelProviderHost(guidedForm("openai", false), host());
 
-        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL });
+        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL }, "Save");
 
         expect(savedAfterWrites).toEqual([1]);
         expect(writes()[0]?.customKeys).toMatchObject({ OPENAI_API_KEY: TYPED_KEY });
@@ -180,7 +182,7 @@ describe("saving a first provider from onboarding or the Langy gate", () => {
         if (!picked) throw new Error("no default chat model pills rendered");
         await userEvent.click(picked);
 
-        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL });
+        await connectWith({ "API key": TYPED_KEY });
 
         expect(writes()).toHaveLength(1);
         const defaults = assignRole.mock.calls
@@ -191,9 +193,9 @@ describe("saving a first provider from onboarding or the Langy gate", () => {
       });
 
       it("probes the same credentials it then saves", async () => {
-        renderWithModelProviderHost(guidedForm("openai"), host());
+        renderWithModelProviderHost(guidedForm("openai", false), host());
 
-        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL });
+        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL }, "Save");
 
         expect(probes()).toHaveLength(1);
         expect(probes()[0]?.customKeys).toMatchObject({
@@ -214,11 +216,11 @@ describe("saving a first provider from onboarding or the Langy gate", () => {
         </ModelProviderHostProvider>
       );
       const view = renderWithModelProviderHost(guidedForm("custom"), fake);
-      await userEvent.setup().type(inputFor("CUSTOM_BASE_URL"), "https://stale.acme.test/v1");
+      await userEvent.setup().type(screen.getByLabelText("Base URL"), "https://stale.acme.test/v1");
       view.rerender(hosted("openai_codex"));
       view.rerender(hosted("openai"));
 
-      await connectWith({ OPENAI_API_KEY: TYPED_KEY });
+      await connectWith({ "API key": TYPED_KEY });
 
       expect(writes()).toHaveLength(1);
       expect(writes()[0]).toMatchObject({

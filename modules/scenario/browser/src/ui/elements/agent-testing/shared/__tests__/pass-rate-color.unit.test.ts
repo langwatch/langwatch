@@ -37,7 +37,7 @@ describe("the colour of a pass rate", () => {
       );
       expect(passRateColor(0)).toBe(SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor);
       expect(passRateColor(60)).toBe(PASS_RATE_AMBER_COLOR);
-      expect(PASS_RATE_AMBER_COLOR).toBe("orange.500");
+      expect(PASS_RATE_AMBER_COLOR).toBe("orange.fg");
     });
 
     /** @scenario "A pass rate reads in the product's own status colours" */

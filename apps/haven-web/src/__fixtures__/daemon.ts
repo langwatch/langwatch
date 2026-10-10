@@ -22,7 +22,11 @@ const GB = 1024 ** 3;
 const ago = ({ now, seconds }: { now: number; seconds: number }) =>
   isoOf({ ms: now - seconds * 1000 });
 
-type SurfaceSeed = Pick<Surface, "name" | "role" | "status"> & { port?: number; hint?: string };
+type SurfaceSeed = Pick<Surface, "name" | "role" | "status"> & {
+  port?: number;
+  hint?: string;
+  reason?: string;
+};
 
 const surface = ({ slug, seed }: { slug: string; seed: SurfaceSeed }): Surface => {
   const routed = seed.name !== "worker";
@@ -39,13 +43,17 @@ const surface = ({ slug, seed }: { slug: string; seed: SurfaceSeed }): Surface =
     status: seed.status,
     hint: seed.hint ?? "",
     fallback: false,
+    reason: seed.reason ?? (seed.hint ? `not part of this stack; start it with ${seed.hint}` : ""),
+    detail: "",
+    restart: "",
+    start: seed.status === "not-selected" ? (seed.hint ?? "").replace("haven up +", "") : "",
   };
 };
 
 const LIVE_SEEDS: SurfaceSeed[] = [
   { name: "app", role: "Browser app", status: "live", port: 5560 },
   { name: "api", role: "API", status: "live", port: 6560 },
-  { name: "worker", role: "Worker: queues, projections, subscribers", status: "starting", port: 9464 },
+  { name: "worker", role: "Worker: queues, projections, subscribers", status: "starting", port: 9464, reason: "waiting for :9464 to answer" },
   { name: "gateway", role: "AI gateway", status: "live", port: 7560 },
   { name: "nlp", role: "NLP service", status: "down", port: 7561 },
   { name: "langyagent", role: "Langy agent", status: "not-selected", hint: "haven up +langy" },
@@ -127,7 +135,21 @@ export const liveHome = ({ now, surfaces }: { now: number; surfaces?: Surface[] 
     idpTenants: [{ id: "acme", domain: "acme.test", url: `https://idp.feat-x.${DOMAIN}/acme` }],
     apiKey: { masked: "sk-lw-••••••••9f3a", revealPath: "/api/stacks/feat-x/api-key" },
   },
-  actions: { canRestart: true, canStart: false, startDir: factsFor({ slug: "feat-x", live: true, now }).worktreeDir },
+  actions: {
+    canRestart: true,
+    canStart: false,
+    startDir: factsFor({ slug: "feat-x", live: true, now }).worktreeDir,
+    canStartService: true,
+    canResetDatabases: true,
+  },
+  belowFloor: "",
+  seed: {
+    canSeed: true,
+    sizes: ["tiny", "small", "medium", "large"],
+    personas: ["all", "startup", "enterprise", "gateway", "agent-eval"],
+    status: "seed: done in 42s (exit 0) [--size tiny --persona all]",
+    log: [],
+  },
 });
 
 export const stoppedHome = ({ now }: { now: number }): StackHome => {
@@ -147,7 +169,15 @@ export const stoppedHome = ({ now }: { now: number }): StackHome => {
       idpTenants: [],
       apiKey: null,
     },
-    actions: { canRestart: false, canStart: true, startDir: facts.worktreeDir },
+    actions: {
+      canRestart: false,
+      canStart: true,
+      startDir: facts.worktreeDir,
+      canStartService: false,
+      canResetDatabases: true,
+    },
+    belowFloor: "",
+    seed: { canSeed: false, sizes: ["tiny"], personas: ["all"], status: "", log: [] },
   };
 };
 
@@ -177,7 +207,13 @@ export const hub = ({ now }: { now: number }): Hub => {
     live: false,
     homeUrl: `https://issue4821-a-rather-long-worktree-name.${DOMAIN}`,
     surfaces: surfacesFor({ slug: "issue4821-a-rather-long-worktree-name", status: "down" }),
-    actions: { canRestart: false, canStart: false, startDir: "" },
+    actions: {
+      canRestart: false,
+      canStart: false,
+      startDir: "",
+      canStartService: false,
+      canResetDatabases: false,
+    },
   };
   return {
     shared: {
@@ -218,7 +254,7 @@ export const hub = ({ now }: { now: number }): Hub => {
 
 const LOG_TEXTS: [string, string, string][] = [
   ["api", "info", 'msg="GET /api/health" status=200 duration_ms=3'],
-  ["app", "info", "vite ready in 812 ms"],
+  ["ui", "info", "vite ready in 812 ms"],
   ["worker", "debug", 'msg="drained queue" queue=evaluations jobs=0'],
   ["api", "warn", 'msg="slow query" elapsed_ms=1840 table=traces'],
   ["worker", "info", 'msg="projection caught up" projection=trace-summary'],
@@ -226,7 +262,7 @@ const LOG_TEXTS: [string, string, string][] = [
   ["gateway", "info", 'msg="provider warmed" provider=openai'],
   ["api", "info", 'msg="<script>alert(1)</script> echoed in a query string"'],
   ["worker", "fatal", 'msg="lost the redis connection" attempts=5'],
-  ["app", "", "  ➜  Local:   http://localhost:5560/"],
+  ["ui", "", "  ➜  Local:   http://localhost:5560/"],
 ];
 
 export const logs = ({ now, lane = "" }: { now: number; lane?: string }): Logs => {
@@ -237,5 +273,5 @@ export const logs = ({ now, lane = "" }: { now: number; lane?: string }): Logs =
       lines.push({ at: ago({ now, seconds: (60 - index) * 7 }), service, level, text });
     }
   }
-  return { lines, services: ["api", "app", "gateway", "worker"], limit: 1000 };
+  return { lines, services: ["api", "gateway", "ui", "worker"], limit: 1000 };
 };

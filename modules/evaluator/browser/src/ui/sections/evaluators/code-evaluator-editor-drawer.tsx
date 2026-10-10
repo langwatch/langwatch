@@ -321,7 +321,7 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
             />
           )}
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <HStack width="full" justify="space-between" gap={3}>
             {props.onRemove && (
               <Button

@@ -243,11 +243,11 @@ func havenUp(ctx context.Context, request upRequest) error {
 func havenDestroy(root, slug string, stderr io.Writer) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	fmt.Fprintf(stderr, "diffsuite: haven destroy %s\n", slug)
+	fmt.Fprintf(stderr, "diffsuite: haven down --destroy --stack %s\n", slug)
 	command := exec.CommandContext(ctx, havenrun.Command, havenrun.DestroyArgs(slug)...) // #nosec G204 -- fixed haven args.
 	command.Dir, command.Env = root, havenrun.Env(os.Environ(), slug, havenrun.EnvOptions{})
 	command.Stdout, command.Stderr = stderr, stderr
 	if err := command.Run(); err != nil {
-		fmt.Fprintf(stderr, "diffsuite: haven destroy %s: %v\n", slug, err)
+		fmt.Fprintf(stderr, "diffsuite: haven down --destroy --stack %s: %v\n", slug, err)
 	}
 }

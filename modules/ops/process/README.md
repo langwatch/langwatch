@@ -6,13 +6,13 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…)`, `src/ops.module.ts:30`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:38`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:419`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:424`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -430,6 +430,14 @@ findProductAnalyticsTargets(): ProductAnalyticsTarget[];
 listSystemMigrations(): Promise<OpsMigrationOverview[]>;
 ```
 
+#### `listUpgradeTenants`
+
+Tenant rows across the tenant steps, newest movement first; `cursor` pages them.
+
+```typescript
+listUpgradeTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage>;
+```
+
 #### `listMigrationEnrollments`
 
 ```typescript
@@ -507,7 +515,7 @@ getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport>;
 File one report from a customer's coding agent. Unauthenticated on purpose: the reporter may be struggling because setup failed, so a report must never require a working login.
 
 ```typescript
-submitBugReport(input: { report: SubmitBugReport; callerKey: string; apiToken?: string | undefined; projectIdHint?: string | null; }): Promise<{ id: string }>;
+submitBugReport(input: { report: SubmitBugReport; callerKey: string; /** The project the intake door verified the reporter's key for; null files unlinked. */ linkedProjectId?: string | null; }): Promise<{ id: string }>;
 ```
 
 #### `receiveBugReport`
@@ -515,7 +523,7 @@ submitBugReport(input: { report: SubmitBugReport; callerKey: string; apiToken?: 
 One report as the intake door received it, answered in the bodies released builds read.
 
 ```typescript
-receiveBugReport(input: { report: SubmitBugReport; forwardedFor: string | null; credential: Readonly<{ token: string; projectId: string | null }> | null; }): Promise<OpsDoorAnswer>;
+receiveBugReport(input: { report: SubmitBugReport; forwardedFor: string | null; linkedProjectId: string | null; }): Promise<OpsDoorAnswer>;
 ```
 
 #### `findDashboardData`
@@ -866,20 +874,42 @@ Refuses with `upgrade_not_found` when the ledger holds no such run.
 getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
 ```
 
+#### `previewUpgrade`
+
+The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired.
+
+```typescript
+previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
+```
+
+#### `listUpgradeTargets`
+
+```typescript
+listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
+```
+
+#### `retryUpgradeStep`
+
+Reopens a failed step for the worker; refuses a step not failed or not in the ledger.
+
+```typescript
+retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+```
+
 ## REST transport
 
 ### `adminRest`
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/admin.rest.ts:30`       |
+| Declared at | `src/transport/admin.rest.ts:32`       |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/admin/impersonate` · `startAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:35`.
+Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:37`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -897,7 +927,7 @@ interface Response {
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:45`.
+Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:47`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -912,7 +942,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:55`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:57`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
@@ -967,7 +997,7 @@ type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/ops-bug-report.rest.ts:54` |
+| Declared at | `src/transport/ops-bug-report.rest.ts:43` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | project                                   |
@@ -976,7 +1006,7 @@ type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features
 
 File an issue report from a coding agent
 
-Public: the reporter may be struggling precisely because setup failed, so filing a report must never require a working login; a project credential only enriches the report. Declared at `src/transport/ops-bug-report.rest.ts:59`.
+Optional credential: the reporter may be struggling precisely because setup failed, so filing a report must never require a working login; a project credential only enriches the report. Declared at `src/transport/ops-bug-report.rest.ts:48`.
 
 Answers at `/api/bug-reports`, `/api/v1/bug-reports`.
 
@@ -995,7 +1025,7 @@ interface Body {
   metadata?: Record<string, string | number | boolean>;
 }
 type Headers = z.infer<typeof bugReportIntakeHeadersSchema>; // ../contract/src/ops-bug-report.ts:104
-// Response: inline, src/transport/ops-bug-report.rest.ts:75
+// Response: inline, src/transport/ops-bug-report.rest.ts:65
 type Response = unknown;
 ```
 
@@ -2147,7 +2177,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/transport/ops-upgrade.trpc.ts:12`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:272`, router `src/transport/ops-upgrade.trpc.ts:12`.
 
 | Procedure                                               | Kind     | Gate                             | Input                                             | Output                                |
 | ------------------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
@@ -2157,7 +2187,11 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/t
 | `ops.upgrade.getStep`                                   | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
 | `ops.upgrade.listRuns`                                  | query    | Platform permission `ops:view`   | `opsUpgradeListRunsInputSchema`                   | `opsUpgradeRunPageSchema`             |
 | `ops.upgrade.getRun`                                    | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeRunSchema`                 |
+| `ops.upgrade.preview`                                   | query    | Platform permission `ops:view`   | `opsUpgradePreviewInputSchema`                    | `opsUpgradePreviewSchema`             |
+| `ops.upgrade.listTargets`                               | query    | Platform permission `ops:view`   | inline                                            | inline                                |
+| `ops.upgrade.retryStep`                                 | mutation | Platform permission `ops:manage` | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
 | `ops.upgrade.listSystemMigrations`                      | query    | Platform permission `ops:view`   | inline                                            | inline                                |
+| `ops.upgrade.listTenants`                               | query    | Platform permission `ops:view`   | `opsUpgradeListTenantsInputSchema`                | `opsUpgradeTenantPageSchema`          |
 | `ops.upgrade.listMigrationEnrollments`                  | query    | Platform permission `ops:view`   | inline                                            | `opsMigrationEnrollmentListingSchema` |
 | `ops.upgrade.searchMigrationOrganizations`              | query    | Platform permission `ops:view`   | `opsSearchMigrationOrganizationsInputSchema`      | inline                                |
 | `ops.upgrade.enrollMigrationTenant`                     | mutation | Platform permission `ops:manage` | `opsEnrollMigrationTenantInputSchema`             | `opsMigrationEnrolledSchema`          |
@@ -2170,14 +2204,14 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:173
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:275
 type Input = unknown;
-type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:62
+type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:75
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:178
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:280
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:145
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:179
 interface Output {
   items: {
     release: string | null;
@@ -2190,28 +2224,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:153
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:187
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:147
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:181
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:167
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:212
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:120
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:154
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:160
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:194
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:149
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:183
 interface Output {
   items: {
     id: string;
@@ -2226,18 +2260,60 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:167
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:136
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:212
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:170
+
+// ops.upgrade.preview
+// Input: opsUpgradePreviewInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:260
+interface Input {
+  to: string;
+}
+type Output = z.infer<typeof opsUpgradePreviewSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:253
+
+// ops.upgrade.listTargets
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:309
+type Input = unknown;
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:310
+type Output = {
+  target: string;
+  version: string | null;
+  outstanding: number;
+  lastError: string | null;
+}[];
+
+// ops.upgrade.retryStep
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:212
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:154
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:206
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:323
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:207)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:324)
+
+// ops.upgrade.listTenants
+// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:201
+interface Input {
+  step?: string;
+  state?: "migrated" | "finalized" | "parked" | "rolled_back";
+  cursor?: string | null;
+  limit?: number;
+}
+// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:208
+interface Output {
+  items: {
+    migrationName: string;
+    tenantId: string;
+    status: "migrated" | "finalized" | "parked" | "rolled_back";
+    report: unknown;
+    updatedAt: unknown;
+  }[];
+  cursor: string | null;
+}
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:215
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:337
 type Input = unknown;
-// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:101
+// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:107
 interface Output {
   isSaaS: boolean;
   enrollments: {
@@ -2255,7 +2331,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:224
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:346
 type Output = {
   id: string;
   name: string;
@@ -2282,7 +2358,7 @@ interface Input {
   includePrivateDataplane?: boolean;
   confirm?: "ENROLL";
 }
-// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:150
+// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:156
 interface Output {
   enrolled: {
     id: string;
@@ -2309,15 +2385,15 @@ interface Input {
   migrationName: string;
   confirm?: "RUN";
 }
-// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:161
+// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:167
 interface Output {
   status: "migrated" | "finalized" | "parked" | "rolled_back" | null;
   waiting: boolean;
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:267
-type Input = unknown;
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:389
+type Input = Record<string, unknown>;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:259
 interface Output {
   started: true;
@@ -2426,39 +2502,39 @@ Declared at `src/features/upgrades/eventing/ops-upgrade-alerts.pipeline.ts:33`.
 
 Run by the tasks process, before serve.
 
-| Task                      | Class                       | Declared at                                    |
-| ------------------------- | --------------------------- | ---------------------------------------------- |
-| `process-manager-purge`   | `ProcessManagerPurgeTask`   | `src/tasks/process-manager-purge.task.ts:135`  |
-| `credentials-reseal`      | `CredentialsResealTask`     | `src/tasks/credentials-reseal.task.ts:257`     |
-| `grant-platform-operator` | `GrantPlatformOperatorTask` | `src/tasks/grant-platform-operator.task.ts:13` |
-| `system-migrations-pass`  | `SystemMigrationsPassTask`  | `src/tasks/system-migrations-pass.task.ts:15`  |
+| Task                             | Class                             | Declared at                                          |
+| -------------------------------- | --------------------------------- | ---------------------------------------------------- |
+| `process-manager-purge`          | `ProcessManagerPurgeTask`         | `src/tasks/process-manager-purge.task.ts:135`        |
+| `credentials-reseal`             | `CredentialsResealTask`           | `src/tasks/credentials-reseal.task.ts:273`           |
+| `grant-platform-operator`        | `GrantPlatformOperatorTask`       | `src/tasks/grant-platform-operator.task.ts:13`       |
+| `system-migrations-pass`         | `SystemMigrationsPassTask`        | `src/tasks/system-migrations-pass.task.ts:15`        |
+| `request-system-migrations-pass` | `SystemMigrationsPassRequestTask` | `src/tasks/system-migrations-pass-request.task.ts:8` |
 
 ## Configuration
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:772`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:773`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:775`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:776`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:777`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:788`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:789`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:791`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:792`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:793`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:28` |
-| config | `metricsApiKey`                  | `METRICS_API_KEY`                   | `../contract/src/ops.config.ts:30` |
-| config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
-| config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |
-| config | `usageStats.installMethod`       | `INSTALL_METHOD`                    | `../contract/src/ops.config.ts:35` |
-| config | `usageStats.chartVersion`        | `LANGWATCH_CHART_VERSION`           | `../contract/src/ops.config.ts:37` |
-| config | `collectClickHouseBackupMetrics` | `CLICKHOUSE_BACKUP_METRICS_ENABLED` | `../contract/src/ops.config.ts:39` |
-| config | `productAnalytics.key`           | `POSTHOG_KEY`                       | `../contract/src/ops.config.ts:46` |
-| config | `productAnalytics.host`          | `POSTHOG_HOST`                      | `../contract/src/ops.config.ts:46` |
-| config | `grafana`                        | `GRAFANA_BASE_URL`                  | `../contract/src/ops.config.ts:48` |
-| config | `bugReportSlackChannel`          | `SLACK_BUG_REPORTS_CHANNEL`         | `../contract/src/ops.config.ts:50` |
-| config | `cloudOps`                       | `LANGWATCH_CLOUD_OPS`               | `../contract/src/ops.config.ts:52` |
-| config | `adminEmails`                    | `ADMIN_EMAILS`                      | `../contract/src/ops.config.ts:54` |
-| config | `nodeEnvironment`                | `NODE_ENV`                          | `../contract/src/ops.config.ts:56` |
-| config | `isSaas`                         | `IS_SAAS`                           | `../contract/src/ops.config.ts:57` |
-| config | `publicBaseUrl`                  | `BASE_HOST`                         | `../contract/src/ops.config.ts:58` |
-| config | `serviceVersion`                 | `SERVICE_VERSION`                   | `../contract/src/ops.config.ts:60` |
-| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`          | `../contract/src/ops.config.ts:61` |
+| config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:30` |
+| config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:32` |
+| config | `usageStats.installMethod`       | `INSTALL_METHOD`                    | `../contract/src/ops.config.ts:33` |
+| config | `usageStats.chartVersion`        | `LANGWATCH_CHART_VERSION`           | `../contract/src/ops.config.ts:35` |
+| config | `collectClickHouseBackupMetrics` | `CLICKHOUSE_BACKUP_METRICS_ENABLED` | `../contract/src/ops.config.ts:37` |
+| config | `productAnalytics.key`           | `POSTHOG_KEY`                       | `../contract/src/ops.config.ts:44` |
+| config | `productAnalytics.host`          | `POSTHOG_HOST`                      | `../contract/src/ops.config.ts:44` |
+| config | `grafana`                        | `GRAFANA_BASE_URL`                  | `../contract/src/ops.config.ts:46` |
+| config | `bugReportSlackChannel`          | `SLACK_BUG_REPORTS_CHANNEL`         | `../contract/src/ops.config.ts:48` |
+| config | `cloudOps`                       | `LANGWATCH_CLOUD_OPS`               | `../contract/src/ops.config.ts:50` |
+| config | `adminEmails`                    | `ADMIN_EMAILS`                      | `../contract/src/ops.config.ts:52` |
+| config | `nodeEnvironment`                | `NODE_ENV`                          | `../contract/src/ops.config.ts:54` |
+| config | `isSaas`                         | `IS_SAAS`                           | `../contract/src/ops.config.ts:55` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                         | `../contract/src/ops.config.ts:56` |
+| config | `serviceVersion`                 | `SERVICE_VERSION`                   | `../contract/src/ops.config.ts:58` |
+| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`          | `../contract/src/ops.config.ts:59` |
 
 <!-- readme:generated:end -->

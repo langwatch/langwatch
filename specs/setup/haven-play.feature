@@ -1,5 +1,5 @@
-Feature: haven play, a throwaway PR sandbox
-  `haven play [pr]` runs a GitHub PR in a fully isolated, ephemeral
+Feature: haven pr --throwaway, a throwaway PR sandbox
+  `haven pr --throwaway [pr]` runs a GitHub PR in a fully isolated, ephemeral
   environment: its own checkout, its own Postgres, ClickHouse, and Redis
   containers and volumes, its own hostnames through the proxy. Quitting the
   attached log view destroys all of it, every time, the opposite contract to
@@ -17,14 +17,14 @@ Feature: haven play, a throwaway PR sandbox
 
   @unit
   Scenario: A play ref is a PR number or URL
-    When the developer runs "haven play 4913" or "haven play" with the PR's GitHub URL
+    When the developer runs "haven pr --throwaway 4913" or "haven pr --throwaway" with the PR's GitHub URL
     Then the PR is resolved
     And anything that is neither a PR number nor a PR URL is rejected before anything is created
 
   @e2e @unimplemented
   Scenario: No argument opens a picker of open PRs
     Given a terminal
-    When the developer runs "haven play" with no argument
+    When the developer runs "haven pr --throwaway" with no argument
     Then the repository's open PRs are listed to pick from
     And in agent mode the command fails asking for an explicit PR instead
 
@@ -134,7 +134,7 @@ Feature: haven play, a throwaway PR sandbox
 
   @unit
   Scenario: A working PR checkout still gets the env files it has always had
-    Given the developer runs "haven pr" rather than "haven play"
+    Given the developer runs "haven pr" rather than "haven pr --throwaway"
     When the worktree is created
     Then the repo's checkout hooks run as normal
 
@@ -176,7 +176,7 @@ Feature: haven play, a throwaway PR sandbox
     Given play died without tearing down
     Then the sandbox was recorded before anything was created
     And only sandboxes whose owner process is gone are offered for reaping
-    And "haven clean" finishes the teardown
+    And "haven machine clean" finishes the teardown
 
   # --- Seeding the sandbox ---
   # A sandbox's databases are born empty, so the PR opens on the onboarding
@@ -187,13 +187,13 @@ Feature: haven play, a throwaway PR sandbox
   # sandbox seeds the stable identity only, as it always has.
   @unit
   Scenario: A sandbox can be seeded with a data preset
-    When the developer runs "haven play 4913 --seed demo"
+    When the developer runs "haven pr --throwaway 4913 --seed demo"
     Then the sandbox's seed carries that preset
     And the presets offered are the ones "haven db seed" takes
 
   @unit
   Scenario: An unknown preset is rejected before anything is created
-    When the developer runs "haven play 4913 --seed nosuch"
+    When the developer runs "haven pr --throwaway 4913 --seed nosuch"
     Then the command fails listing the presets it can pick from
     And it fails before the PR is resolved, so nothing is checked out
 
@@ -241,13 +241,13 @@ Feature: haven play, a throwaway PR sandbox
   @e2e @unimplemented
   Scenario: A PR runs end to end in the sandbox
     Given a terminal
-    When the developer runs "haven play 4913" and passes the trust gate
+    When the developer runs "haven pr --throwaway 4913" and passes the trust gate
     Then the PR serves at its own play hostname with its own databases
     And quitting the view tears all of it down
 
   @e2e @unimplemented
   Scenario: A seeded sandbox lands end to end
     Given a terminal
-    When the developer runs "haven play 4913 --seed demo"
+    When the developer runs "haven pr --throwaway 4913 --seed demo"
     Then the sandbox comes up past onboarding with the demo preset's content
     And quitting the view tears the seeded databases down with everything else

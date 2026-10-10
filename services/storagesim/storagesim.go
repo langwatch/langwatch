@@ -1,5 +1,5 @@
 // Package storagesim is haven's local S3: the path-style calls the product
-// makes (PUT, GET, HEAD, DELETE object; HEAD/PUT bucket), answered as S3
+// makes (PUT, GET, HEAD, DELETE object; HEAD/PUT bucket; ListObjectsV2), answered as S3
 // answers them, SigV4 (header or presigned query) checked against one dev key.
 // Objects are content-addressed 0600 files in one 0700 data directory, served
 // nosniff and sandboxed. See README.md for what it leaves out.
@@ -102,6 +102,7 @@ type Server struct {
 	console  http.Handler
 	log      *requestLog
 	requests atomic.Uint64
+	fault    forcedError
 }
 
 // meta is what S3 answers about an object beyond its bytes.
@@ -175,7 +176,10 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	s.serveS3(rec, r)
 	bucket, key, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	if bucket != "healthz" || key != "" {
-		s.log.add(requestEntry{Method: r.Method, Bucket: bucket, Key: key, Status: rec.status, At: time.Now()})
+		s.log.add(requestEntry{
+			Method: r.Method, Bucket: bucket, Key: key, Status: rec.status, At: time.Now(),
+			Auth: authKind(r), RequestID: rec.Header().Get("x-amz-request-id"),
+		})
 	}
 }
 
@@ -223,6 +227,10 @@ func (s *Server) serveObject(x exchange, obj object) {
 		return
 	}
 	var e *s3Error
+	if status := int(s.fault.status.Load()); status != 0 && (r.Method == http.MethodPut || r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		x.fail(obj.fail(status, "InternalError", "storagesim: forced error"))
+		return
+	}
 	switch r.Method {
 	case http.MethodPut:
 		e = s.putObject(w, r, obj)
@@ -265,7 +273,7 @@ func (s *Server) bucketExists(bucket string) bool {
 	return s.buckets == nil || s.buckets[bucket]
 }
 
-// serveBucket answers HeadBucket and CreateBucket.
+// serveBucket answers HeadBucket, CreateBucket and ListObjectsV2.
 func (s *Server) serveBucket(x exchange, obj object) {
 	w := x.w
 	switch x.r.Method {
@@ -283,8 +291,14 @@ func (s *Server) serveBucket(x exchange, obj object) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	case http.MethodGet:
+		if x.r.URL.Query().Get("list-type") != "2" {
+			x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim lists with ListObjectsV2 (list-type=2) only"))
+			return
+		}
+		s.listObjectsV2(x, obj)
 	default:
-		x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim does not list or configure buckets"))
+		x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim does not configure buckets"))
 	}
 }
 

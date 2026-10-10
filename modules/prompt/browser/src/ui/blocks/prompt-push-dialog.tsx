@@ -43,7 +43,8 @@ export function PromptPushDialog({
 }: PromptPushDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content bg="bg" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Push to Replicas</Dialog.Title>
         </Dialog.Header>
@@ -82,11 +83,11 @@ export function PromptPushDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={() => void onPush()}
             loading={isPushing}
             disabled={selectedCopyIds.size === 0 || isLoading}

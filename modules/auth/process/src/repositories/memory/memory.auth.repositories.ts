@@ -16,7 +16,7 @@ import { MemorySignInAttemptLockRepository } from "./memory.sign-in-attempt-lock
 import { MemorySignUpVerificationTokenRepository } from "./memory.signup-verification-token.repository.ts";
 
 /** The memory twin of the person a device grant names. */
-export class MemoryAuthDirectoryRepository implements AuthDirectoryRepository {
+class MemoryAuthDirectoryRepository implements AuthDirectoryRepository {
   static create({ memory }: { memory: MemoryAuthDatabase }): MemoryAuthDirectoryRepository {
     return new MemoryAuthDirectoryRepository(memory);
   }
@@ -35,7 +35,7 @@ export class MemoryAuthDirectoryRepository implements AuthDirectoryRepository {
 /** Better Auth's own memory adapter over auth's memory database, so the memory
  *  tier signs in against the rows its twins read. It has no transactions, so
  *  the "transaction" runs the work over the same engine. */
-export class MemoryBetterAuthStorageRepository extends BetterAuthStorageRepository {
+class MemoryBetterAuthStorageRepository extends BetterAuthStorageRepository {
   static create({ memory }: { memory: MemoryAuthDatabase }): MemoryBetterAuthStorageRepository {
     return new MemoryBetterAuthStorageRepository(memory);
   }

@@ -2,6 +2,7 @@ import { AgentNotFoundError, agentOverviewSchema, type AgentApi } from "@langwat
 import type { MintRunKeyInput } from "@langwatch/api-key-contract";
 import {
   LlmModelNotSetError,
+  WorkflowModelProviderUnavailableError,
   studioClientEventSchema,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
@@ -332,13 +333,26 @@ describe("StudioWorkflowEventEnricherService", () => {
     ).rejects.toThrow('LLM node "LLM Call" has no model selected');
   });
 
-  it("preserves provider configuration failures", async () => {
+  it("refuses a provider the project has not set up as a fixable problem naming it", async () => {
+    const enriching = createEnricher({ configured: false }).enrich({
+      event: event([llmNode({ model: "openai/gpt-5-mini" })]),
+      projectId,
+    });
+    await expect(enriching).rejects.toThrow(WorkflowModelProviderUnavailableError);
+    await expect(enriching).rejects.toThrow("Model provider not configured: openai");
+  });
+
+  it("refuses a switched-off provider as a fixable problem naming it", async () => {
     await expect(
-      createEnricher({ configured: false }).enrich({
+      createEnricher({ enabled: false }).enrich({
         event: event([llmNode({ model: "openai/gpt-5-mini" })]),
         projectId,
       }),
-    ).rejects.toThrow("Model provider not configured: openai");
+    ).rejects.toMatchObject({
+      code: "workflow_model_provider_unavailable",
+      httpStatus: 422,
+      message: "openai model provider is disabled, go to settings to enable it",
+    });
   });
 
   /** @scenario A run fills a saved HTTP agent's blank credentials from the agent */

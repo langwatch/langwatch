@@ -23,8 +23,8 @@ import {
   type SignInSecurityPolicy,
   type OrganizationCurrency,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
-import { PROJECT_KIND } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -257,7 +257,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     // The condition sits on the table, as in billing's Stripe customer claim: a second
     // click parked on the row lock re-checks it and keeps the first record.
     await this.database.$executeRaw`
-      -- @tenancy: an organization is addressed by its own primary key.
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "Organization"
          SET "instantEvalsEnabledAt" = ${toDate(input.at)},
              "instantEvalsEnabledByUserId" = ${input.userId},
@@ -535,6 +538,14 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     if (count === 0) throw new OrganizationNotFoundError();
   }
 
+  async findLicensingLicenseKeys(input: { organizationId: string }): Promise<string[]> {
+    const row = await this.database.organizationLicense.findUnique({
+      where: { organizationId: input.organizationId },
+      select: { licenseKey: true },
+    });
+    return row?.licenseKey ? [row.licenseKey] : [];
+  }
+
   async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
     const administrator = await this.database.organizationUser.findFirst({
       where: { organizationId, role: "ADMIN", disabledAt: null },
@@ -635,13 +646,14 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
 
   async findProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]> {
     return this.database.project.findMany({
       where: {
         archivedAt: null,
-        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        kind: { notIn: [...input.hiddenKinds] },
         team: { organizationId: input.organizationId },
         ...(input.teamId ? { teamId: input.teamId } : {}),
       },

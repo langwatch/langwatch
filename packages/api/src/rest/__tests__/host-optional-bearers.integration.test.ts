@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
@@ -25,11 +26,11 @@ function hostWithoutBearers() {
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
 
   return RestHost.create({
+    authz: authorizationPort.forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -38,18 +39,14 @@ function hostWithoutBearers() {
 }
 
 describe("a RestHost with no bearers option", () => {
-  /** @scenario "A host given no deployment bearers leaves an unbound internal family closed" */
-  it("refuses every call to an internal family that binds no door of its own", async () => {
+  /** @scenario "A host given no deployment bearers refuses to mount an unbound internal family" */
+  it("refuses to mount an internal family that binds no door of its own", () => {
     const read = vi.fn(() => ({ ok: true }));
     const server = hostWithoutBearers();
 
-    server.mount(declaration.router(), () => ({ read }));
-
-    const response = await server.app.request("/internal/read", {
-      headers: { authorization: "Bearer any-secret" },
-    });
-
-    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(() => server.mount(declaration.router(), () => ({ read }))).toThrow(
+      /"internal_secret", which nothing binds/,
+    );
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -57,7 +54,7 @@ describe("a RestHost with no bearers option", () => {
     const server = hostWithoutBearers();
 
     server.mount(declaration.router(), () => ({ read: () => ({ ok: true }) }), {
-      facts: [
+      middlewareBindings: [
         bindRestCredential("internal_secret", () =>
           BearerIdentity.create({ name: "internal", token: "internal-marker" }),
         ),

@@ -46,6 +46,14 @@ revokeById(input: RevokeShareInput): Promise<void>;
 unshare(input: ShareResourceInput): Promise<void>;
 ```
 
+#### `countTraceShares`
+
+How many trace links the project holds, asked before sharing is switched off.
+
+```typescript
+countTraceShares(input: ShareProjectScope): Promise<number>;
+```
+
 #### `revokeAllTraceShares`
 
 ```typescript
@@ -172,6 +180,7 @@ Contract `../contract/src/share.trpc.ts:35`, router `src/transport/share.trpc.ts
 | `share.listForResource`      | query    | Permission `traces:share`   | `shareListForResourceInputSchema` | inline            |
 | `share.createShare`          | mutation | Permission `traces:share`   | `shareCreateInputSchema`          | `shareLinkSchema` |
 | `share.revoke`               | mutation | Permission `traces:share`   | `shareRevokeInputSchema`          | inline            |
+| `share.countTraceShares`     | query    | Permission `project:manage` | `shareProjectInputSchema`         | inline            |
 | `share.revokeAllTraceShares` | mutation | Permission `project:update` | `shareProjectInputSchema`         | inline            |
 
 ```typescript
@@ -205,12 +214,17 @@ interface Input {
 // Output: inline, ../contract/src/share.trpc.ts:52
 type Output = unknown;
 
-// share.revokeAllTraceShares
+// share.countTraceShares
 // Input: shareProjectInputSchema, ../contract/src/share.trpc.ts:33
 interface Input {
   projectId: string;
 }
 // Output: inline, ../contract/src/share.trpc.ts:56
+type Output = number;
+
+// share.revokeAllTraceShares
+type Input = z.infer<typeof shareProjectInputSchema>; // ../contract/src/share.trpc.ts:33
+// Output: inline, ../contract/src/share.trpc.ts:60
 type Output = unknown;
 ```
 
@@ -227,7 +241,7 @@ Declared at `src/eventing/share-trace-sharing-revocation.pipeline.ts:40`.
 | Kind            | Name                                    | Handles                                                                                    | Declared at                                                  |
 | --------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
 | peer subscriber | `shareProjectTraceSharingDisabled`      | `lw.project.trace_sharing_disabled` from [project](../../project/README.md)                | `src/eventing/share-trace-sharing-revocation.pipeline.ts:47` |
-| peer subscriber | `shareOrganizationTraceSharingDisabled` | `lw.organization.trace_sharing_disabled` from [organization](../../organization/README.md) | `src/eventing/share-trace-sharing-revocation.pipeline.ts:60` |
+| peer subscriber | `shareOrganizationTraceSharingDisabled` | `lw.organization.trace_sharing_disabled` from [organization](../../organization/README.md) | `src/eventing/share-trace-sharing-revocation.pipeline.ts:64` |
 
 ## Configuration
 

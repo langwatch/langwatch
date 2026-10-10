@@ -24,7 +24,16 @@ export const statusSchema = z.object({
   stack: z.string(),
   records: z.number(),
   baseUrl: z.string(),
+  /** How busy the stack's app has been; seeded sample records are left out. */
+  activity: z.object({
+    total: z.number(),
+    lastFiveMinutes: z.number(),
+    distinctIds: z.number(),
+    lastReceivedAt: z.coerce.date().nullable(),
+    lastName: z.string(),
+  }),
 });
+export type AnalyticsActivity = z.infer<typeof statusSchema>["activity"];
 
 const recordsSchema = z.object({
   records: z

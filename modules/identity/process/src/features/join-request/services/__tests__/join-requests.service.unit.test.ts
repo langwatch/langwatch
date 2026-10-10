@@ -274,6 +274,24 @@ describe("given an organization that was never offered", () => {
   });
 });
 
+describe("given a signed-in member whose shell reads the offer on every page", () => {
+  describe("when the lookup limiter is spent", () => {
+    /** @scenario Moving between pages does not ask for the offer again */
+    it("still answers the offer", async () => {
+      rateLimitMock.mockResolvedValue({ allowed: false, resetAt: Date.now() + 90_000 });
+      const { service } = harness({ candidates: [acme] });
+
+      const decision = await service.offerForSignedInUser({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      expect(decision.outcome).toBe("ask");
+      expect(rateLimitMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given somebody asking too often", () => {
   describe("when the limiter refuses", () => {
     /** @scenario Asking is rate limited the way signing in is */
@@ -470,6 +488,32 @@ describe("given a domain that admits colleagues automatically", () => {
           approvedByUserId: null,
         }),
       );
+    });
+  });
+
+  describe("when single sign-on has already made somebody a member", () => {
+    /** @scenario "Single sign-on records the arrival it admitted" */
+    it("records it as a request the sso-arrival policy approved, naming the connection", async () => {
+      const { service, requests, membership } = harness({ isMember: true });
+
+      await service.recordSsoArrival({
+        userId: "user_ivy",
+        organizationId: "org_acme",
+        domain: "acme.com",
+        connectionId: "conn_okta",
+      });
+
+      expect(requests.requestJoin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionId: "conn_okta",
+          matchedVia: "sso-connection-domain",
+          notifyAdmins: false,
+        }),
+      );
+      expect(requests.approveJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ resolvedBy: { type: "policy", id: "sso-arrival" } }),
+      );
+      expect(membership.attachDefaultMembership).not.toHaveBeenCalled();
     });
   });
 

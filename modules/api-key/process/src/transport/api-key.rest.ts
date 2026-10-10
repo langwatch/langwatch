@@ -1,7 +1,7 @@
 /**
  * `/api/api-keys` — the organization's own credentials, behind an organization
- * key. The door resolves the organization; the credential arrives as a bound
- * fact, because two questions here are asked of the KEY as well as the member.
+ * key. The door resolves the organization; the credential arrives as middleware
+ * context, because two questions here are asked of the KEY as well as the member.
  */
 import {
   ApiKeyAdminRequiredError,
@@ -21,10 +21,9 @@ import {
   type ApiKeyRestDetail,
 } from "@langwatch/api-key-contract";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { principalRefSchema } from "@langwatch/authorization";
 import { z } from "zod";
@@ -41,7 +40,7 @@ const INVALID_TOKEN: Readonly<{ status: 401; description: string }> = {
  * The organization credential this door resolved: the key, and the member it
  * acts as — null for a service key, which acts as nobody.
  */
-export const apiKeyRestCredential = defineRestMiddleware(
+export const apiKeyRestCredential = defineMiddlewareContext(
   "apiKeyRestCredential",
   z.object({ apiKeyId: z.string(), userId: z.string().nullable() }),
 );
@@ -50,7 +49,7 @@ export const apiKeyRestCredential = defineRestMiddleware(
  * The project credential the ingestion mint reads: the principal it is checked as (a person
  * only for a project-bound access token) and the project's organization.
  */
-export const apiKeyIngestionCaller = defineRestMiddleware(
+export const apiKeyIngestionCaller = defineMiddlewareContext(
   "apiKeyIngestionCaller",
   z.object({
     principal: principalRefSchema.nullable(),
@@ -268,11 +267,7 @@ const fullAccessKeyOwner = ({
   return principal.id;
 };
 
-export const apiKeyRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<ApiKeyApi>;
-}> = defineRestRouter(ApiKeyApi)
+export const apiKeyRest = defineRestRouter(ApiKeyApi)
   .withNamespace("api-keys")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
@@ -294,7 +289,7 @@ export const apiKeyRest: Readonly<{
       { status: 403, description: "Insufficient permissions (requires organization:view)" },
     ],
   })
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
   .handle(async ({ app, scope }, caller) => {
     const rows = await app.listForCaller(credentialCheck(caller, scope.id));
 
@@ -341,7 +336,8 @@ export const apiKeyRest: Readonly<{
       },
     ],
   })
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
+  .withAudit("management.api-key.create")
   .handle(async ({ app, input, scope }, caller) => {
     const isService = input.keyType === "service";
 
@@ -403,7 +399,7 @@ export const apiKeyRest: Readonly<{
   // writes the row from the actor, the id in the path and the organization
   // the door resolved.
   .withAudit("management.api-key.read")
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) =>
     detailOf(
       await app.getByIdForCaller({
@@ -446,7 +442,7 @@ export const apiKeyRest: Readonly<{
     ],
   })
   .withAudit("management.api-key.update")
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) => {
     const isAdmin = await callerIsAdmin({ app, caller, organizationId: scope.id });
 
@@ -496,7 +492,8 @@ export const apiKeyRest: Readonly<{
       { status: 409, description: "API key is already revoked (api_key_already_revoked)" },
     ],
   })
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
+  .withAudit("management.api-key.revoke")
   .handle(async ({ app, input, scope }, caller) => {
     // Real adminness, so revoke() can enforce its owner-only path: without
     // this, any organization:manage holder could revoke anyone's key.
@@ -533,7 +530,8 @@ export const apiKeyRest: Readonly<{
       { status: 422, description: "Validation error (validation_error)" },
     ],
   })
-  .withMiddleware(apiKeyIngestionCaller)
+  .withMiddlewareContext(apiKeyIngestionCaller)
+  .withAudit("management.api-key.create-ingestion")
   .handle(async ({ app, input, scope }, caller) => {
     const result = await app.createIngestionKey({
       key: input,
@@ -575,7 +573,8 @@ export const apiKeyRest: Readonly<{
       { status: 422, description: "Validation error (validation_error)" },
     ],
   })
-  .withMiddleware(apiKeyIngestionCaller)
+  .withMiddlewareContext(apiKeyIngestionCaller)
+  .withAudit("management.api-key.create-full-access")
   .handle(async ({ app, input, scope }, caller) => {
     const userId = fullAccessKeyOwner({ principal: caller.principal, input, projectId: scope.id });
 

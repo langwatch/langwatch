@@ -8,7 +8,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler, ProjectMissingCredentialsError } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
@@ -33,6 +33,7 @@ const notes = defineRestRouter(NoteApi)
 
 function mounted(onError: Parameters<ReturnType<typeof createRestRuntime>["mount"]>[1]["onError"]) {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new ProjectMissingCredentialsError();

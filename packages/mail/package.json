@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/mail",
-  "langwatch": { "group": "libraries" },
   "version": "0.1.0",
   "private": true,
   "description": "The transactional messages LangWatch sends, rendered here and sent through notification.",
@@ -21,6 +20,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "vite --config preview/vite.config.ts",
+    "build:studio": "vite build --config preview/vite.config.ts",
     "typecheck": "tsc -b tsconfig.json preview/tsconfig.json",
     "test": "vitest run"
   },
@@ -47,5 +47,26 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "libraries"
+  },
+  "nx": {
+    "targets": {
+      "build:studio": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild"
+        ],
+        "outputs": [
+          "{projectRoot}/preview/dist"
+        ]
+      }
+    }
   }
 }

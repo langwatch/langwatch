@@ -3,10 +3,10 @@
 # Renders the chart and asserts which pods each bundled Prometheus scrape job
 # selects, and that the pods carry what the jobs select on.
 #
-# The app serves /metrics on 5560 and the workers on 2999. Both jobs discover
+# The app and the workers both serve /metrics on 9464. Both jobs discover
 # every pod in the namespace, so a job that keeps on the scrape annotation
-# alone also keeps the other workload's pods and dials them on a port they do
-# not listen on. And a workload whose pods lack the annotation is dropped by
+# alone also keeps the other workload's pods and mixes the two workloads. And
+# a workload whose pods lack the annotation is dropped by
 # its own job: the queue backlog gauges live on the workers, so that is the
 # backlog alert going silent. Both are relabeling rules against pod metadata,
 # visible only in the render.
@@ -108,7 +108,7 @@ $(cat "$err")"
   fi
 
   local pair workload port annotations
-  for pair in "workers/deployment.yaml=2999" "app/deployment.yaml=5560"; do
+  for pair in "workers/deployment.yaml=9464" "app/deployment.yaml=9464"; do
     workload="${pair%%=*}"
     port="${pair#*=}"
     annotations="$(source_block "$out" "$workload" | pod_annotations)"
@@ -154,8 +154,8 @@ $(cat "$err")"
   fi
 
   local triple job workload port block label keep
-  for triple in "langwatch=app/deployment.yaml=5560" \
-                "langwatch-workers=workers/deployment.yaml=2999"; do
+  for triple in "langwatch=app/deployment.yaml=9464" \
+                "langwatch-workers=workers/deployment.yaml=9464"; do
     job="${triple%%=*}"
     workload="${triple#*=}"
     workload="${workload%%=*}"
@@ -193,6 +193,31 @@ $(cat "$err")"
   fi
 }
 
+# Verifies: with metrics on, app and workers open the scrape door (exporter,
+# port, key); with metrics off they set none of it
+test_door_env() {
+  local on="${TMPDIR:-/tmp}/prom-env-on.yaml" off="${TMPDIR:-/tmp}/prom-env-off.yaml"
+  local err="${TMPDIR:-/tmp}/prom-env.err" workload block
+  render_to "$on" "$err" t "${METRICS_ON[@]}" || { fail "env-render" "$(cat "$err")"; return; }
+  render_to "$off" "$err" t --set autogen.enabled=true || { fail "env-off-render" "$(cat "$err")"; return; }
+  for workload in "workers/deployment.yaml" "app/deployment.yaml"; do
+    block="$(source_block "$on" "$workload")"
+    grep -qF 'name: OTEL_METRICS_EXPORTER' <<<"$block" && grep -qF 'value: "prometheus"' <<<"$block" ||
+      fail "env-exporter-$workload" "$workload does not set OTEL_METRICS_EXPORTER=prometheus"
+    grep -qF 'name: OTEL_EXPORTER_PROMETHEUS_PORT' <<<"$block" && grep -qF 'value: "9464"' <<<"$block" ||
+      fail "env-port-$workload" "$workload does not set OTEL_EXPORTER_PROMETHEUS_PORT=9464"
+    grep -qF 'name: METRICS_API_KEY' <<<"$block" ||
+      fail "env-key-$workload" "$workload does not set METRICS_API_KEY"
+    if grep -q -E 'LANGWATCH_METRICS_(MODE|TOKEN)' <<<"$block"; then
+      fail "env-deleted-$workload" "$workload still sets a deleted LANGWATCH_METRICS_* name"
+    fi
+    if source_block "$off" "$workload" | grep -q -E 'OTEL_METRICS_EXPORTER|OTEL_EXPORTER_PROMETHEUS_PORT|METRICS_API_KEY'; then
+      fail "env-off-$workload" "$workload sets scrape-door env with metrics off"
+    fi
+  done
+}
+
+test_door_env
 test_pods_carry_scrape_annotations
 test_no_annotations_when_metrics_off
 test_each_job_selects_its_own_pods

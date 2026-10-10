@@ -6,6 +6,7 @@
 import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -87,6 +88,7 @@ export function mountGatewayInternalRest(
     "GatewayInternalDoorApi",
   );
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: GatewayInternalIdentityService.create({ secret }),
   });
 

@@ -12,13 +12,13 @@ import { TestUserApi } from "../../app/__tests__/support/test-user-api.ts";
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
 import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile-email.channel.ts";
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
+import { CliDeviceSessionService } from "../../features/cli-device/services/cli-device-session.service.ts";
 import { MemoryAuthSessionRepository } from "../../repositories/memory/memory.auth-session.repository.ts";
 import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
 import { MemoryCliDeviceSessionRepository } from "../../repositories/memory/memory.cli-device-session.repository.ts";
 import { AuthDoorService } from "../auth-door.service.ts";
 import { BrowserSessionVerificationService } from "../browser-session-verification.service.ts";
 import { BrowserSessionService } from "../browser-session.service.ts";
-import { CliDeviceSessionService } from "../cli-device-session.service.ts";
 import { signInSecurityFixture } from "./sign-in-security.fixture.ts";
 
 const SIGNED_IN_AT = Temporal.Instant.from("2026-09-30T09:00:00.000Z");

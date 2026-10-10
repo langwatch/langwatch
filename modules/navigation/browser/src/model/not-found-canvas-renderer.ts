@@ -1,3 +1,4 @@
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 interface GridParams {
   rotation: number;
   zOffset: number;
@@ -267,7 +268,7 @@ function paintBackground({
 
   const skyGradient = bg.createLinearGradient(0, 0, 0, h);
   skyGradient.addColorStop(0, rgba(particle, 0.08));
-  skyGradient.addColorStop(0.4, "rgba(8, 14, 24, 0.02)");
+  skyGradient.addColorStop(0.4, rgba(particle, 0.02));
   skyGradient.addColorStop(1, rgba(particle, 0.05));
   bg.fillStyle = skyGradient;
   bg.fillRect(0, 0, w, h);
@@ -275,12 +276,12 @@ function paintBackground({
   const horizonGlow = bg.createRadialGradient(cx, horizonY, 0, cx, horizonY, Math.max(w, h) * 0.7);
   horizonGlow.addColorStop(0, rgba(particle, 0.18 * alphaScale));
   horizonGlow.addColorStop(0.35, rgba(particle, 0.09 * alphaScale));
-  horizonGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+  horizonGlow.addColorStop(1, "transparent");
   bg.fillStyle = horizonGlow;
   bg.fillRect(0, 0, w, h);
 
   const floorGlow = bg.createLinearGradient(0, horizonY, 0, h);
-  floorGlow.addColorStop(0, "rgba(0, 0, 0, 0)");
+  floorGlow.addColorStop(0, "transparent");
   floorGlow.addColorStop(0.18, rgba(particle, 0.05 * alphaScale));
   floorGlow.addColorStop(1, rgba(particle, 0.12 * alphaScale));
   bg.fillStyle = floorGlow;
@@ -301,9 +302,9 @@ function paintBackground({
   }
 
   const horizonLineGlow = bg.createLinearGradient(0, horizonY - 4, 0, horizonY + 6);
-  horizonLineGlow.addColorStop(0, "rgba(0, 0, 0, 0)");
+  horizonLineGlow.addColorStop(0, "transparent");
   horizonLineGlow.addColorStop(0.5, rgba(particle, 0.06 * alphaScale));
-  horizonLineGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+  horizonLineGlow.addColorStop(1, "transparent");
   bg.fillStyle = horizonLineGlow;
   bg.fillRect(0, horizonY - 4, w, 10);
 
@@ -315,8 +316,8 @@ function paintBackground({
     cy,
     Math.max(w, h) * 0.75,
   );
-  vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
-  vignette.addColorStop(1, "rgba(0, 0, 0, 0.22)");
+  vignette.addColorStop(0, "transparent");
+  vignette.addColorStop(1, getRawColorValue("bg.scrim"));
   bg.fillStyle = vignette;
   bg.fillRect(0, 0, w, h);
 }

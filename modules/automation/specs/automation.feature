@@ -261,7 +261,7 @@ Feature: Automation ownership
     Then no automation is read and no match is recorded
 
   # Upgrade steps (migration plan D.1, DATA-AUTOMATION): each repair runs once early and once
-  # more after every older image stops serving; the operator tasks stay as re-runs.
+  # more after every older image stops serving; Ops > Upgrades, Retry step, re-runs a failed one.
   @unit
   Scenario: The first report-schedule step configures every active report that has no schedule
     Given an active report trigger without a schedule process
@@ -354,3 +354,35 @@ Feature: Automation ownership
     Given a caller who may view automations but not change them
     When they list a Slack connection's channels or test-fire a template
     Then both are refused before the service runs, the door asking triggers:update as main's did
+
+  @unit
+  Scenario: Slack deliveries reach the configured Slack addresses
+    Given a process whose Slack API base and webhook origin name a stand-in
+    When an automation posts through a bot connection and through an incoming webhook
+    Then chat.postMessage reaches the stand-in's Web API base
+    And the webhook send reaches the same webhook path under the stand-in's origin
+
+  @unit
+  Scenario: Slack deliveries reach Slack itself by default
+    Given a process that names no Slack addresses
+    When an automation posts through a bot connection and through an incoming webhook
+    Then chat.postMessage reaches https://slack.com/api and the webhook reaches https://hooks.slack.com
+
+  @unit
+  Scenario: A webhook automation refuses any URL but https on port 443 in production
+    Given a process that does not set the local-URL dev switch
+    When a webhook automation is saved with an http URL or an https URL on another port
+    Then the save is refused with the webhook URL problem
+
+  @unit
+  Scenario: The local-URL dev switch admits an http or ported webhook URL
+    Given a process that sets the webhook module's local-URL dev switch
+    When a webhook automation is saved with an http URL on a high port
+    Then the save is accepted
+
+  @unit
+  Scenario: A test fire to a revoked bot token names the remediation
+    Given an automation delivering through a bot token Slack has revoked
+    When the author test-fires it
+    Then the test fire is refused as test_fire_unavailable with the token remediation, not an internal error
+

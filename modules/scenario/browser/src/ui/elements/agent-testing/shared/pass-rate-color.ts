@@ -19,7 +19,7 @@ export const PASS_RATE_GREEN_FLOOR = 99.5;
 export type PassRateBand = "green" | "amber" | "red" | "none";
 
 /** The orange of the theme, the one colour of the three no run status reads. */
-export const PASS_RATE_AMBER_COLOR = "orange.500";
+export const PASS_RATE_AMBER_COLOR = "orange.fg";
 
 const BAND_COLORS: Record<PassRateBand, string> = {
   green: SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,

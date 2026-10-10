@@ -2,7 +2,9 @@ package idpsim
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -330,4 +332,49 @@ func (s *Server) handleControlVerification(w http.ResponseWriter, r *http.Reques
 	}
 	s.verification.SetToken(body.Domain, body.Token)
 	writeJSON(w, http.StatusOK, map[string]any{"domain": normalizeDomain(body.Domain), "token": body.Token})
+}
+
+// handleControlRotateKey makes a fresh signing key current, keeping the old one
+// published; {"dropPrevious":true} instead stops publishing the old one.
+func (s *Server) handleControlRotateKey(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	var body struct {
+		DropPrevious bool `json:"dropPrevious"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, "unparseable rotate-key body", http.StatusBadRequest)
+		return
+	}
+	if body.DropPrevious {
+		s.dropPreviousKey(w, t)
+		return
+	}
+	if err := t.RotateKey(); err != nil {
+		http.Error(w, "rotating the key failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.record(t, Event{Kind: "fault.key", Outcome: OutcomeOK, Detail: "rotated the signing key to " + t.KeyID()})
+	writeJSON(w, http.StatusOK, publishedKeyIDs(t))
+}
+
+func (s *Server) dropPreviousKey(w http.ResponseWriter, t *Tenant) {
+	if !t.DropPreviousKey() {
+		http.Error(w, "there is no previous key to drop; rotate first", http.StatusConflict)
+		return
+	}
+	s.record(t, Event{Kind: "fault.key", Outcome: OutcomeOK, Detail: "dropped the previous signing key"})
+	writeJSON(w, http.StatusOK, publishedKeyIDs(t))
+}
+
+// publishedKeyIDs answers a key change with the kids the tenant now publishes, current first.
+func publishedKeyIDs(t *Tenant) map[string]any {
+	kids := []string{}
+	for _, k := range t.SigningKeys() {
+		kids = append(kids, k.KID)
+	}
+	return map[string]any{"current": kids[0], "published": kids}
 }

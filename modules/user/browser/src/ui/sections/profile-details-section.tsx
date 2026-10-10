@@ -13,6 +13,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { UserRound } from "lucide-react";
 import { useState } from "react";
 
@@ -65,16 +66,12 @@ export function ProfileDetailsSection() {
   };
 
   return (
-    <VStack align="start" gap={4} width="full" data-testid="profile-details-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <UserRound size={18} />
-          <Text fontWeight={600}>Your details</Text>
-        </HStack>
-        <Text fontSize="sm" color="fg.muted">
-          How you are shown wherever LangWatch names a person.
-        </Text>
-      </VStack>
+    <SettingsSection
+      icon={<UserRound size={18} />}
+      title="Your details"
+      hint="How you are shown wherever LangWatch names a person."
+      data-testid="profile-details-section"
+    >
       <HStack align="start" gap={6} width="full" flexWrap="wrap">
         {organizationId ? <AvatarUploadControl organizationId={organizationId} /> : null}
 
@@ -127,6 +124,6 @@ export function ProfileDetailsSection() {
           </Button>
         </VStack>
       </HStack>
-    </VStack>
+    </SettingsSection>
   );
 }

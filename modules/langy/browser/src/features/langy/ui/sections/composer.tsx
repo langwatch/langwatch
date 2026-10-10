@@ -305,7 +305,7 @@ function ComposerImpl({
           boxShadow={
             floating
               ? undefined
-              : "0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 16px -6px rgba(0, 0, 0, 0.14)"
+              : "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent), 0 6px 16px -6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 14%, transparent)"
           }
           css={{
             "&:has(textarea:focus)": {
@@ -676,7 +676,7 @@ function StopTurnButton({ isStopping, onStop }: { isStopping: boolean; onStop: (
       onClick={onStop}
       disabled={isStopping}
       background={isStopping ? "bg.muted" : "red.solid"}
-      color={isStopping ? "fg.muted" : "white"}
+      color={isStopping ? "fg.muted" : "red.contrast"}
       cursor={isStopping ? "default" : "pointer"}
     >
       {isStopping ? (
@@ -698,7 +698,7 @@ function SubmitTurnButton({ canSend, onSend }: { canSend: boolean; onSend: () =>
       onClick={onSend}
       disabled={!canSend}
       background={canSend ? "orange.solid" : "bg.muted"}
-      color={canSend ? "white" : "fg.muted"}
+      color={canSend ? "orange.contrast" : "fg.muted"}
       cursor={canSend ? "pointer" : "default"}
     >
       {/* Centred, with nothing to interfere. Lucide's paper plane is very

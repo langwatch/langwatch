@@ -70,6 +70,8 @@ export type ProjectApiMap = {
           s3SecretAccessKey: string;
           s3Bucket: string;
           traceSharingEnabled?: boolean;
+          /** Read only when sharing is switched off; absent means revoke. */
+          revokeExistingLinks?: boolean;
           presenceEnabled?: boolean;
         };
         output: Partial<ProjectHostProject>;
@@ -85,6 +87,10 @@ export type ProjectApiMap = {
     resolveHome: {
       query: { input: Record<string, never>; output: unknown };
     };
+  };
+  /** Share's count of a project's trace links, asked before sharing is switched off. */
+  share: {
+    countTraceShares: { query: { input: { projectId: string }; output: number } };
   };
 };
 

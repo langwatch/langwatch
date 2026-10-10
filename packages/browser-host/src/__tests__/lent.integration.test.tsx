@@ -7,10 +7,10 @@ import { render, renderHook, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider } from "../capabilities.ts";
+import { UiHostServicesContextProvider } from "../capabilities.ts";
 import { type UiDeclarations, type UiLend, uiDeclarations } from "../declarations.ts";
 import { Lent, useLent, useLentAll, useLentHooks } from "../lent.ts";
-import { createUiCapabilitiesFromHost } from "../testing.ts";
+import { createUiHostServicesFromHost } from "../testing.ts";
 
 const Peek = uiTokens("trace").component<{ traceId: string }>("traceIdPeek");
 const Cards = uiTokens("organization").extension<{ organizationId: string }>("overviewCard");
@@ -20,9 +20,9 @@ const host = { route: () => ({ params: {}, query: {} }), navigate: vi.fn() };
 
 function within(declarations: UiDeclarations) {
   return ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={{ ...createUiCapabilitiesFromHost(host), declarations }}>
+    <UiHostServicesContextProvider value={{ ...createUiHostServicesFromHost(host), declarations }}>
       {children}
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 

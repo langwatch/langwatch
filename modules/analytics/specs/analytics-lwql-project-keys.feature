@@ -23,3 +23,10 @@ Feature: A deploy fills LangWatchQL's key map with every project's key
     Given the key map lacks two projects' rows
     When the step runs as a dry run
     Then it reports two rows to insert and writes none
+
+  @unit
+  Scenario: Each worker boot fills the key-map rows a project lacks
+    Given a project was stored without the project-created fact, as the dev seed stores one
+    When a worker boots and the reconvergence watch probes for the first time
+    Then the fill runs once and writes the project's missing row
+    And a failed fill is logged and the probe still runs

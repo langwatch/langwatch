@@ -39,8 +39,8 @@ async function waitForLease({
   log,
   signal,
 }: {
-  ledger: UpgradeLedgerRepository;
-  runner: UpgradeRunnerRepository;
+  ledger: Pick<UpgradeLedgerRepository, "acquireLease">;
+  runner: Pick<UpgradeRunnerRepository, "findLease">;
   identity: { owner: string; image: string; host: string };
   timing: UpgradeLeaseTiming;
   log: UpgradeRunnerLog;
@@ -93,8 +93,8 @@ export async function holdUpgradeLease<Result>({
   signal,
   work,
 }: {
-  ledger: UpgradeLedgerRepository;
-  runner: UpgradeRunnerRepository;
+  ledger: Pick<UpgradeLedgerRepository, "acquireLease" | "renewLease" | "releaseLease">;
+  runner: Pick<UpgradeRunnerRepository, "findLease">;
   identity: { owner: string; image: string; host: string };
   timing: UpgradeLeaseTiming;
   log: UpgradeRunnerLog;
@@ -131,6 +131,9 @@ export async function holdUpgradeLease<Result>({
 
   try {
     const result = await work({ signal: held.signal });
+    // A run shorter than the heartbeat never saw the thief; ask once before reporting success.
+    if (!lost && !(await ledger.renewLease({ name, owner: identity.owner, ttlMs: timing.ttlMs })))
+      loseLease("another runner holds the upgrade lease");
     return { acquired: true, lost, result };
   } finally {
     clearInterval(heartbeat);

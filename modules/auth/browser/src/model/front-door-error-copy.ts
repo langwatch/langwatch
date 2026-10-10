@@ -193,13 +193,17 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     // Same answer whether the credential belongs to somebody else or to
     // nobody: this endpoint does not tell callers which passkeys exist.
     title: "We couldn't use that passkey",
-    describe: () =>
-      "Try again, or sign in another way and check which passkeys are on your account.",
+    describe: () => "Try again, or use another way to sign in.",
   },
 
   identity_verification_expired: {
     title: "That verification link has expired",
     describe: () => "Request a new verification email and use the newest link.",
+  },
+
+  identity_verification_used: {
+    title: "That confirmation link no longer works",
+    describe: () => "It was already opened once. Send yourself a new link to finish signing up.",
   },
 
   identity_verification_invalid: {

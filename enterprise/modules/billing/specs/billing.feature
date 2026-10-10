@@ -229,6 +229,12 @@ Feature: Enterprise billing compatibility
       Then the invitations of both checkouts are cancelled
 
     @unit
+    Scenario: A checkout that answers no hosted page is reported to the customer
+      Given the provider answers a checkout request without a hosted page address
+      When the customer chooses Upgrade now
+      Then the customer is told the upgrade could not start and is not left on a silent page
+
+    @unit
     Scenario: A redelivered billing fact leaves the organisation as one delivery did
       Given organization applied each of billing's organisation-row facts once
       When every fact is delivered again

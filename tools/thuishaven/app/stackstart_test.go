@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -83,6 +84,97 @@ func TestStartWorktreeStack(t *testing.T) {
 		}
 		if len(sys.spawned) != 0 {
 			t.Error("and nothing may be run")
+		}
+	})
+}
+
+// @scenario "A service the stack does not run is started from its row"
+func TestStartStackService(t *testing.T) {
+	t.Run("given a registered stack, adding a selectable service runs up +<service> in its worktree", func(t *testing.T) {
+		o, sys := startOrch(t)
+		if err := o.StartStackService("main", "llm"); err != nil {
+			t.Fatalf("StartStackService: %v", err)
+		}
+		if len(sys.spawned) != 1 || sys.spawned[0].Dir != "/repo" || strings.Join(sys.spawned[0].Argv, " ") != "/usr/local/bin/haven up +llm" {
+			t.Errorf("spawned %v", sys.spawned)
+		}
+	})
+
+	t.Run("given an unknown service or an unregistered slug, nothing runs", func(t *testing.T) {
+		o, sys := startOrch(t)
+		for _, c := range [][2]string{{"main", "llm --force"}, {"main", "api"}, {"nope", "llm"}} {
+			if err := o.StartStackService(c[0], c[1]); err == nil {
+				t.Errorf("StartStackService(%q, %q) should be refused", c[0], c[1])
+			}
+		}
+		if len(sys.spawned) != 0 {
+			t.Errorf("a refused start must spawn nothing, got %v", sys.spawned)
+		}
+	})
+}
+
+// @scenario "A stack whose database is below the upgrade floor can reset its databases from the stack home"
+func TestResetStackDatabases(t *testing.T) {
+	t.Run("given a registered stack, the reset runs db reset --yes in its worktree with the slug pinned", func(t *testing.T) {
+		o, sys := startOrch(t)
+		if err := o.ResetStackDatabases("main"); err != nil {
+			t.Fatalf("ResetStackDatabases: %v", err)
+		}
+		want := "/usr/bin/env LANGWATCH_SLUG=main /usr/local/bin/haven db reset --yes"
+		if len(sys.spawned) != 1 || sys.spawned[0].Dir != "/repo" || strings.Join(sys.spawned[0].Argv, " ") != want {
+			t.Errorf("spawned %v, want %q in /repo", sys.spawned, want)
+		}
+		if got := o.cfg.UpArgv; len(got) != 2 || got[1] != "up" {
+			t.Errorf("the configured up argv was changed: %v", got)
+		}
+	})
+
+	t.Run("given a slug with no registered stack, nothing is reset", func(t *testing.T) {
+		o, sys := startOrch(t)
+		if err := o.ResetStackDatabases("idle"); err == nil {
+			t.Error("an unregistered slug should be refused")
+		}
+		if len(sys.spawned) != 0 {
+			t.Errorf("spawned %v", sys.spawned)
+		}
+	})
+}
+
+// @scenario "The stack home seeds a stack at a chosen size and shows its progress"
+func TestSeedStack(t *testing.T) {
+	t.Run("given a registered stack, the seed runs haven db seed in its worktree with the slug pinned", func(t *testing.T) {
+		o, sys := startOrch(t)
+		sys.now = time.Date(2026, 10, 10, 1, 0, 0, 0, time.UTC)
+		o.cfg.Home = t.TempDir()
+		if err := o.SeedStack("main", "small", "startup"); err != nil {
+			t.Fatalf("SeedStack: %v", err)
+		}
+		want := "/usr/bin/env LANGWATCH_SLUG=main /usr/local/bin/haven db seed --size small --persona startup"
+		if len(sys.spawned) != 1 || sys.spawned[0].Dir != "/repo" || strings.Join(sys.spawned[0].Argv, " ") != want {
+			t.Errorf("spawned %v, want %q in /repo", sys.spawned, want)
+		}
+	})
+
+	t.Run("given a size seedgen does not know, nothing is spawned", func(t *testing.T) {
+		o, sys := startOrch(t)
+		sys.now = time.Date(2026, 10, 10, 1, 0, 0, 0, time.UTC)
+		if err := o.SeedStack("main", "huge", "all"); err == nil {
+			t.Error("an unknown size should be refused")
+		}
+		if len(sys.spawned) != 0 {
+			t.Errorf("spawned %v", sys.spawned)
+		}
+	})
+
+	t.Run("given a slug with no registered stack, nothing is seeded", func(t *testing.T) {
+		o, sys := startOrch(t)
+		sys.now = time.Date(2026, 10, 10, 1, 0, 0, 0, time.UTC)
+		o.cfg.Home = t.TempDir()
+		if err := o.SeedStack("idle", "tiny", "all"); err == nil {
+			t.Error("an unregistered slug should be refused")
+		}
+		if len(sys.spawned) != 0 {
+			t.Errorf("spawned %v", sys.spawned)
 		}
 	})
 }

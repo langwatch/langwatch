@@ -17,6 +17,8 @@ export function JoinBeforeCreateInterstitial({
   pendingOrganizationId,
   onJoinOrganization,
   onCreateWorkspace,
+  onDeclineJoin = onCreateWorkspace,
+  declining = false,
   onAlreadyJoined,
 }: {
   verifiedEmail: string;
@@ -30,6 +32,9 @@ export function JoinBeforeCreateInterstitial({
   pendingOrganizationId?: string | null;
   onJoinOrganization: (organization: JoinableOrganization) => void;
   onCreateWorkspace: () => void;
+  /** Turning the offer down, which the caller records before moving on. */
+  onDeclineJoin?: () => void;
+  declining?: boolean;
   /** Called when the domain admitted them automatically: they are already a
    *  member, so sign-up skips both the offer and workspace creation. */
   onAlreadyJoined?: (organization: JoinableOrganization) => void;
@@ -86,7 +91,7 @@ export function JoinBeforeCreateInterstitial({
           Join {organization.name} ({colleagues(organization.colleagueCount)})
         </FrontDoorPrimaryButton>
       ))}
-      <Button variant="outline" width="full" onClick={onCreateWorkspace}>
+      <Button variant="outline" width="full" loading={declining} onClick={onDeclineJoin}>
         Create a new organization
       </Button>
     </AuthCard>

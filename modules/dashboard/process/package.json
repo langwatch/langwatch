@@ -29,6 +29,7 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -43,7 +44,6 @@
   },
   "devDependencies": {
     "@langwatch/analytics-process": "workspace:*",
-    "@langwatch/authorization": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",

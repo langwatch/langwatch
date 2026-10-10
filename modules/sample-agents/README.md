@@ -19,14 +19,16 @@ The demo agents a caller runs to see its own project fill with traces.
 | Kind            | Name                        | Declared at                                                   |
 | --------------- | --------------------------- | ------------------------------------------------------------- |
 | Stores required |                             | `process/src/channels/http/http.sample-agents.channels.ts:10` |
-| Secrets         | `openAi` (OPENAI_API_KEY)   | `process/src/app/sample-agents.app.ts:30`                     |
+| Secrets         | `openAi` (OPENAI_API_KEY)   | `process/src/app/sample-agents.app.ts:31`                     |
 | Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/sample-agents.config.ts:5`                      |
 
 Anything else sample-agents needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-None: sample-agents declares no peers.
+| Name      | Token       | Module                          |
+| --------- | ----------- | ------------------------------- |
+| `apiKeys` | `ApiKeyApi` | [api-key](../api-key/README.md) |
 
 ## Who depends on sample-agents
 

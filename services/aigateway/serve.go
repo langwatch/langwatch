@@ -10,7 +10,9 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
@@ -69,7 +71,11 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		lifecycle.WithDrainDelay(time.Duration(cfg.Server.DrainDelaySeconds)*time.Second),
 		lifecycle.WithHealth(deps.Health),
 	)
-	addManagedServices(g, deps, ownServices{Status: statusMon, HTTP: srv})
+	addManagedServices(g, deps, ownServices{
+		Status:  statusMon,
+		HTTP:    srv,
+		Metrics: metricsDoor(deps.Logger, cfg, deps.Metrics),
+	})
 	return g.Run(ctx)
 }
 
@@ -79,6 +85,8 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 type ownServices struct {
 	Status *statusprobe.Monitor
 	HTTP   *http.Server
+	// Metrics is the Prometheus pull door, nil while it stays shut.
+	Metrics *http.Server
 }
 
 // addManagedServices registers every managed service in start order.
@@ -113,7 +121,30 @@ func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 	if deps.Voice != nil {
 		g.Add(deps.Voice)
 	}
+	if own.Metrics != nil {
+		g.Add(lifecycle.ListenServer("metrics", own.Metrics))
+	}
 	g.Add(lifecycle.ListenServer("http", own.HTTP))
+}
+
+// metricsDoor is the pull door on its own listener (ADR-175 point 3), opened
+// by `prometheus` in OTEL_METRICS_EXPORTER. No METRICS_API_KEY keeps it shut
+// everywhere, loopback included (ruling GW-METRICS-NO-KEY).
+func metricsDoor(logger *zap.Logger, cfg Config, metrics *gatewaymetrics.Recorder) *http.Server {
+	addr := cfg.OTel.PrometheusPullAddr()
+	if addr == "" || metrics == nil {
+		return nil
+	}
+	if cfg.MetricsAPIKey == "" {
+		logger.Error("aigateway_metrics_door_unmounted",
+			zap.String("addr", addr),
+			zap.String("fix", "set METRICS_API_KEY"),
+		)
+		return nil
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", httpmiddleware.RequireBearer(cfg.MetricsAPIKey, "metrics", metrics.Handler()))
+	return &http.Server{Handler: mux, Addr: addr, ReadHeaderTimeout: 10 * time.Second}
 }
 
 // warnIfGracefulShutdownTooShort surfaces the two ways a graceful window can

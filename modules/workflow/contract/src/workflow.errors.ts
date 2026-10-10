@@ -86,6 +86,23 @@ export class LlmModelNotSetError extends HandledError {
   }
 }
 
+/** A dispatched Studio LLM node names a provider the project has not set up or has switched off. */
+export class WorkflowModelProviderUnavailableError extends HandledError {
+  declare readonly code: "workflow_model_provider_unavailable";
+
+  constructor({ provider, disabled }: { provider: string; disabled: boolean }) {
+    const message = disabled
+      ? `${provider} model provider is disabled, go to settings to enable it`
+      : `Model provider not configured: ${provider}`;
+    super("workflow_model_provider_unavailable", message, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { provider, disabled },
+    });
+    this.name = "WorkflowModelProviderUnavailableError";
+  }
+}
+
 /**
  * The caller may not act in a project the workflow's copy lineage reaches.
  * 401, not 403: the status this refusal has answered since shipping.

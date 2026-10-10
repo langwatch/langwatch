@@ -85,18 +85,24 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
     this.requireExpiryInRange({ expiresAtMs });
     await this.requireEligibleHolder({ organizationId, userId });
 
+    // A holder keeps one live way in: granting again renews theirs.
+    const held = (await this.live({ organizationId })).find((live) => live.userId === userId);
+    const now = this.now();
     const binding: BreakGlassBinding = {
       bindingId: this.deps.newBindingId(),
       organizationId,
       userId,
       grantedByUserId: actor.userId,
-      grantedAtMs: this.now(),
+      grantedAtMs: now,
       expiresAtMs,
       supersededAtMs: null,
-      renewedFromBindingId: null,
+      renewedFromBindingId: held?.bindingId ?? null,
       warnedDays: [],
     };
     await this.deps.bindings.create({ binding });
+    if (held) {
+      await this.deps.bindings.markSuperseded({ bindingId: held.bindingId, supersededAtMs: now });
+    }
 
     return binding;
   }

@@ -48,7 +48,7 @@ Feature: The haven hub — one place to see and act on every stack
     And its databases are kept for the next start
 
   # Boundary with the never-delete-uncommitted-work guardrail: automated
-  # cleanup (`haven clean`) never touches a dirty worktree. Destroying one
+  # cleanup (`haven machine clean`) never touches a dirty worktree. Destroying one
   # is only possible here, where a person deliberately types the stack's
   # exact name to confirm — that explicit confirmation is the sanctioned
   # exception, not a loophole in the guardrail.

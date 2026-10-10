@@ -10,6 +10,7 @@ import {
   type TestFireProjectIdentity,
   type TestFireTriggerIdentity,
 } from "@langwatch/automation-contract";
+import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
@@ -280,6 +281,30 @@ describe("testFireTrigger", () => {
       });
       // The gated block survived — proof the gate was opened for bot delivery.
       expect(JSON.stringify(sentSlackBot[0]?.payload)).toContain("data_table");
+    });
+
+    /** @scenario "A test fire to a revoked bot token names the remediation" */
+    it("refuses with the remediation when Slack rejects the token", async () => {
+      const { notifier } = makeNotifier();
+      notifier.sendSlackBot = async () => {
+        throw new DispatchError({
+          message: "Slack Web API dispatch: the bot token is invalid or was revoked.",
+          retryable: false,
+          customerMessage: "The bot token is invalid or was revoked. Paste a fresh token.",
+        });
+      };
+
+      await expect(
+        makeService(notifier).testFire({
+          channel: "slack",
+          trigger: TRIGGER,
+          project: PROJECT,
+          draft: {},
+          recipients: [],
+          webhook: null,
+          botDestination: { token: "xoxb-lapsed", channel: "C1" },
+        }),
+      ).rejects.toMatchObject({ code: "test_fire_unavailable" });
     });
 
     /** @scenario "A bot-token delivery posts Block Kit" */

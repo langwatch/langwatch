@@ -2,7 +2,7 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Badge, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type { Monaco } from "@monaco-editor/react";
 import { Check, Copy, RotateCcw, WrapText } from "lucide-react";
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import type { SpanConfig } from "../../model/foundry-types.ts";
@@ -23,9 +23,9 @@ export function JsonView() {
   const [parseError, setParseError] = useState<string | null>(null);
   const editorRef = useRef<{ getValue: () => string } | null>(null);
 
-  const jsonString = useMemo(() => JSON.stringify(trace, null, 2), [trace]);
+  const jsonString = JSON.stringify(trace, null, 2);
 
-  const spanCount = useMemo(() => countSpans(trace.spans), [trace.spans]);
+  const spanCount = countSpans(trace.spans);
   const lineCount = jsonString.split("\n").length;
 
   function handleChange(value: string | undefined) {
@@ -78,23 +78,23 @@ export function JsonView() {
             {lineCount} lines
           </Badge>
           {parseError ? (
-            <Text fontSize="xs" color="red.400" truncate maxW="300px">
+            <Text fontSize="xs" color="red.fg" truncate maxW="300px">
               {parseError}
             </Text>
           ) : (
-            <Text fontSize="xs" color="green.500">
+            <Text fontSize="xs" color="green.fg">
               Valid
             </Text>
           )}
         </HStack>
         <HStack gap={1}>
-          <Button size="2xs" variant="ghost" onClick={handleFormat} title="Format">
+          <Button size="sm" variant="ghost" onClick={handleFormat} title="Format">
             <WrapText size={12} />
           </Button>
-          <Button size="2xs" variant="ghost" onClick={handleCopy} title="Copy">
+          <Button size="sm" variant="ghost" onClick={handleCopy} title="Copy">
             {copied ? <Check size={12} /> : <Copy size={12} />}
           </Button>
-          <Button size="2xs" variant="ghost" onClick={resetTrace} title="Reset to default">
+          <Button size="sm" variant="ghost" onClick={resetTrace} title="Reset to default">
             <RotateCcw size={12} />
           </Button>
         </HStack>

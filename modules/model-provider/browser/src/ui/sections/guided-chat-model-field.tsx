@@ -1,47 +1,58 @@
-import { chakra, Flex, Text, VStack } from "@langwatch/design-system/primitives";
-import { SmallLabel } from "@langwatch/design-system/small-label";
+import { Box, chakra, Flex, Text } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
-import type { ComponentProps } from "react";
 
-import { CustomModelInputSection } from "./model-provider-custom-model-input.tsx";
-
-type CustomModelProps = ComponentProps<typeof CustomModelInputSection>;
+import { GuidedFieldLabel } from "./guided-provider-panel.tsx";
 
 /** The guided panel's model: catalog pills, recommendation first, or a typed deployment name. */
 export function GuidedChatModelField({
-  actions,
   guidedModels,
   pickedModel,
   onPick,
   locked,
-  provider,
   providerName,
-  state,
+  modelPlaceholder,
 }: {
-  actions: CustomModelProps["actions"];
   guidedModels: string[];
   pickedModel: string | undefined;
   onPick: (model: string) => void;
   /** While the key is checked or saved, and once connected, the pick stays as it is. */
   locked: boolean;
-  provider: CustomModelProps["provider"];
   providerName: string;
-  state: CustomModelProps["state"];
+  modelPlaceholder: string | undefined;
 }) {
   if (guidedModels.length === 0) {
     return (
-      <VStack align="stretch" width="full" gap={1}>
-        <CustomModelInputSection state={state} actions={actions} provider={provider} />
-        <Text fontSize="xs" color="fg.subtle">
+      <chakra.label display="block">
+        <GuidedFieldLabel>Chat model</GuidedFieldLabel>
+        <chakra.input
+          aria-label="Chat model"
+          value={pickedModel ?? ""}
+          onChange={(e) => onPick(e.target.value)}
+          placeholder={modelPlaceholder}
+          disabled={locked}
+          w="full"
+          borderRadius="12px"
+          border="1px solid"
+          borderColor="border"
+          bg="bg.page"
+          px={3}
+          py={2.5}
+          fontFamily="mono"
+          fontSize="12.5px"
+          outline="none"
+          _placeholder={{ color: "fg.subtle" }}
+          _focus={{ borderColor: "border.emphasized" }}
+        />
+        <Text as="span" display="block" mt={1} fontSize="11px" color="fg.subtle">
           Type it exactly as deployed: {providerName} has no model list we can read for you.
         </Text>
-      </VStack>
+      </chakra.label>
     );
   }
 
   return (
-    <VStack align="stretch" width="full" gap={1}>
-      <SmallLabel>Default chat model</SmallLabel>
+    <Box>
+      <GuidedFieldLabel>Default chat model</GuidedFieldLabel>
       <Flex
         wrap="wrap"
         gap={1.5}
@@ -74,6 +85,7 @@ export function GuidedChatModelField({
               px={2.5}
               py={1}
               cursor="pointer"
+              _hover={{ borderColor: picked ? "fg" : "border.emphasized" }}
               _disabled={{ cursor: "default" }}
             >
               {picked && <Sparkles size={11} />}
@@ -87,6 +99,6 @@ export function GuidedChatModelField({
           );
         })}
       </Flex>
-    </VStack>
+    </Box>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { rememberLastUsedMethod } from "../model/last-used-method.ts";
 import {
+  failedInBrowser,
   isCeremonyAbandoned,
   passkeyFailure,
   passkeyFailureFrom,
@@ -30,12 +31,11 @@ async function offerPasskeyFromAutofill({
     const result = await authClient.signIn.passkey({ autoFill: true });
     if (!isLive() || !result) return;
 
-    // Past this point somebody PICKED a credential, so a refusal they never
-    // see reads as the click doing nothing. The plugin RESOLVES an abandoned
-    // ceremony (doesn't throw) carrying a 400 — same as a real "no" from the
-    // server — so only a genuine refusal is reported, an abandoned one stays silent.
+    // Nobody asked for this ceremony, so only the server refusing a credential somebody PICKED
+    // is reported. The plugin resolves a failure in this browser with a 400 too: no answer, a
+    // dismissed sheet or no passkey at all stays silent.
     if (result.error) {
-      if (!isCeremonyAbandoned({ code: readPasskeyErrorCode(result.error) })) {
+      if (!failedInBrowser({ code: readPasskeyErrorCode(result.error) })) {
         onError(passkeyFailureFrom(result.error));
       }
       return;

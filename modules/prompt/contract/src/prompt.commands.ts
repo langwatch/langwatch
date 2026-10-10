@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { promptingTechniqueSchema } from "./prompt.field-schemas.ts";
@@ -11,7 +12,7 @@ import {
 } from "./prompt.ts";
 
 /** Plain objects as main's tRPC create/update inputs: unknown keys are stripped, not refused. */
-export const promptConfigFieldsSchema = z.object({
+const promptConfigFieldsSchemaDefinition = z.object({
   prompt: z.string().optional(),
   messages: z.array(promptMessageSchema).optional(),
   inputs: z.array(promptInputSchema).optional(),
@@ -33,8 +34,13 @@ export const promptConfigFieldsSchema = z.object({
   responseFormat: z.unknown().optional(),
   parameters: z.record(z.string(), z.unknown()).optional(),
 });
+export interface PromptConfigFieldsSchema extends Named<
+  typeof promptConfigFieldsSchemaDefinition
+> {}
+export const promptConfigFieldsSchema: PromptConfigFieldsSchema =
+  promptConfigFieldsSchemaDefinition;
 
-export const createPromptCommandSchema = z
+const createPromptCommandSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     organizationId: z.string().min(1).optional(),
@@ -44,25 +50,40 @@ export const createPromptCommandSchema = z
     commitMessage: z.string().nullable().optional(),
   })
   .safeExtend(promptConfigFieldsSchema.shape);
+export interface CreatePromptCommandSchema extends Named<
+  typeof createPromptCommandSchemaDefinition
+> {}
+export const createPromptCommandSchema: CreatePromptCommandSchema =
+  createPromptCommandSchemaDefinition;
 export type CreatePromptCommand = z.infer<typeof createPromptCommandSchema>;
 
-export const updatePromptCommandSchema = z.object({
+const updatePromptCommandSchemaDefinition = z.object({
   idOrHandle: z.string().min(1),
   projectId: z.string().min(1),
   data: z
     .object({ authorId: z.string().optional(), commitMessage: z.string().min(1) })
     .safeExtend(promptConfigFieldsSchema.shape),
 });
+export interface UpdatePromptCommandSchema extends Named<
+  typeof updatePromptCommandSchemaDefinition
+> {}
+export const updatePromptCommandSchema: UpdatePromptCommandSchema =
+  updatePromptCommandSchemaDefinition;
 export type UpdatePromptCommand = z.infer<typeof updatePromptCommandSchema>;
 
-export const updatePromptHandleCommandSchema = z.object({
+const updatePromptHandleCommandSchemaDefinition = z.object({
   idOrHandle: z.string().min(1),
   projectId: z.string().min(1),
   data: z.object({ handle: promptHandleSchema, scope: promptScopeSchema }),
 });
+export interface UpdatePromptHandleCommandSchema extends Named<
+  typeof updatePromptHandleCommandSchemaDefinition
+> {}
+export const updatePromptHandleCommandSchema: UpdatePromptHandleCommandSchema =
+  updatePromptHandleCommandSchemaDefinition;
 export type UpdatePromptHandleCommand = z.infer<typeof updatePromptHandleCommandSchema>;
 
-export const promptReferenceSchema = z
+const promptReferenceSchemaDefinition = z
   .object({
     idOrHandle: z.string().min(1),
     projectId: z.string().min(1),
@@ -71,14 +92,18 @@ export const promptReferenceSchema = z
     tag: z.string().optional(),
   })
   .strict();
+export interface PromptReferenceSchema extends Named<typeof promptReferenceSchemaDefinition> {}
+export const promptReferenceSchema: PromptReferenceSchema = promptReferenceSchemaDefinition;
 export type PromptReference = z.infer<typeof promptReferenceSchema>;
 
-export const copyPromptCommandSchema = z.object({
+const copyPromptCommandSchemaDefinition = z.object({
   idOrHandle: z.string().min(1),
   sourceProjectId: z.string().min(1),
   targetProjectId: z.string().min(1),
   authorId: z.string().optional(),
 });
+export interface CopyPromptCommandSchema extends Named<typeof copyPromptCommandSchemaDefinition> {}
+export const copyPromptCommandSchema: CopyPromptCommandSchema = copyPromptCommandSchemaDefinition;
 export type CopyPromptCommand = z.infer<typeof copyPromptCommandSchema>;
 
 export type PromptConfigFields = z.infer<typeof promptConfigFieldsSchema> &
@@ -88,11 +113,16 @@ export type PromptConfigFields = z.infer<typeof promptConfigFieldsSchema> &
 export const PROMPT_CREATED_EVENT_TYPE = "lw.prompt.created" as const;
 
 /** A project gained a prompt (write, copy or sync), the org-wide count including it, and when. */
-export const promptCreatedEventDataSchema = z.object({
+const promptCreatedEventDataSchemaDefinition = z.object({
   promptId: z.string(),
   projectId: z.string(),
   userId: z.string(),
   orgPromptCount: z.number().int().positive(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface PromptCreatedEventDataSchema extends Named<
+  typeof promptCreatedEventDataSchemaDefinition
+> {}
+export const promptCreatedEventDataSchema: PromptCreatedEventDataSchema =
+  promptCreatedEventDataSchemaDefinition;
 export type PromptCreatedEventData = z.infer<typeof promptCreatedEventDataSchema>;

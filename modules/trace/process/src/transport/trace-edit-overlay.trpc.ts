@@ -12,9 +12,10 @@ export const traceEditOverlayTrpcTransport: TrpcRouterDeclaration<
 > = defineTrpcRouter(TraceApi, traceEditOverlayTrpc)
   .procedure("getByTraceId")
   .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
+  .handle(async ({ app, input, actor, authorization }) => {
     const { overlay } = await app.readTraceEditOverlayForViewer({
       projectId: input.projectId,
+      authorization,
       traceId: input.traceId,
       viewerUserId: actor.id,
     });

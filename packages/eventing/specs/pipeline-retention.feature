@@ -45,3 +45,18 @@ Feature: A pipeline declares its tenants' retention
     When the queue's worker handles the job
     Then the failure is non-retryable so the job is not attempted again
     And other failures still surface unchanged and retryable
+
+  # Ruled 2026-10-09 (ARCHITECTURE §8, eventing retention): only customer telemetry expires.
+  @unit
+  Scenario: A row that never expires is kept forever even where no tenant policy is wired
+    Given an event store whose classifier calls a row's aggregate indefinite
+    And no tenant retention resolver is wired
+    When the row is stored
+    Then it is stamped to be kept forever
+
+  # Ruled 2026-10-09 (option b): the event store asks the row's own pipeline, as main's cache did.
+  @unit
+  Scenario: An event_log row takes the tenant's retention from its own pipeline's resolver
+    Given a pipeline declaring its tenants' retention and a tenant whose traces policy is 90 days
+    When a trace event of that pipeline is appended to the event log
+    Then its event_log row is stamped with 90 days

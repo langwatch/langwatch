@@ -6,6 +6,7 @@ import {
   type LangyMessagePart,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   type LangyWorker,
@@ -92,6 +93,8 @@ export interface LangyTurnServiceDeps {
   prompts?: LangyPrompt;
   promptProjectId?: string;
   models: LangyModel;
+  /** Asked the project's kind: an aggregate takes no turns (ADR-177 decision 8). */
+  projects: Pick<ProjectApi, "findById">;
   worker: LangyWorker | null;
   tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
@@ -118,6 +121,8 @@ export type LangyTurnTechnicalMembers = {
   prompts?: LangyPrompt;
   promptProjectId?: string;
   models: LangyModel;
+  /** Asked the project's kind: an aggregate takes no turns (ADR-177 decision 8). */
+  projects: Pick<ProjectApi, "findById">;
   worker: LangyWorker | null;
   tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;

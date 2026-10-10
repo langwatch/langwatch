@@ -1,11 +1,11 @@
 /**
  * Automation's answer to the port its screens declare: every method projects
- * a `@langwatch/browser-host` capability. The org/team graph and this
+ * a `@langwatch/browser-host` host service. The org/team graph and this
  * application's own address read honestly empty: no capability yet. §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -66,7 +66,7 @@ type AutomationOrganizationGraph = {
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly AutomationOrganizationGraph[] = [];
 
-class CapabilityAutomationHost extends AutomationHost {
+class HostServiceAutomationHost extends AutomationHost {
   constructor(
     private readonly members: {
       hostScope: AutomationScope;
@@ -113,10 +113,6 @@ class CapabilityAutomationHost extends AutomationHost {
 
   hasPermission(permission: string): boolean {
     return this.members.session.hasPermission(permission);
-  }
-
-  isFeatureEnabled(flag: string): boolean {
-    return this.members.session.isFeatureEnabled(flag);
   }
 
   route(): AutomationRouteReading {
@@ -192,6 +188,14 @@ class CapabilityAutomationHost extends AutomationHost {
     this.members.feedback.succeeded(notice);
   }
 
+  warned(notice: AutomationSuccessNotice): void {
+    this.members.feedback.warned(notice);
+  }
+
+  informed(notice: AutomationSuccessNotice): void {
+    this.members.feedback.informed(notice);
+  }
+
   failed(failure: AutomationFailureNotice): void {
     this.members.feedback.failed(failure);
   }
@@ -210,7 +214,7 @@ class CapabilityAutomationHost extends AutomationHost {
  * is what `mounts.load` resolves.
  */
 export default function AutomationHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
   const { openDrawer: openRegisteredDrawer, goBack, closeDrawer } = useDrawer();
@@ -233,7 +237,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityAutomationHost({
+      new HostServiceAutomationHost({
         hostScope,
         currentProject: project,
         session,

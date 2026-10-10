@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
@@ -21,14 +22,18 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryTraceEditOverlayRepository } from "../../../../repositories/memory/memory.trace-edit-overlay.repository.ts";
 import { TraceEditOverlayService } from "../../../edit-overlay/services/trace-edit-overlay.service.ts";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "../legacy-trace-mapping.service.ts";
 import {
   AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
 } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
+const OWN_READ = ownProof({ projectId: PROJECT_ID });
 const FULL_TRACE_ID = "63dc535cea6335c506bc81ef3543a07d";
 
 const protections: Protections = {
@@ -67,18 +72,26 @@ function trace(traceId: string): Trace {
 function makeService(): TraceLegacyReadService {
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
-    traceRead: {
-      findTracesWithSpans: mockGetTracesWithSpans,
-      findTracesWithSpansByThreadIds: vi.fn(),
-      resolveTraceIdByPrefix: mockResolveTraceIdByPrefix,
-      listAllTracesForProject: vi.fn(),
-      findTraceSummaries: vi.fn(),
-      findTracesByThreadId: vi.fn(),
-      findCustomersAndLabels: vi.fn(),
-      findDistinctFieldNames: vi.fn(),
-      findTopicCounts: vi.fn(),
-      findSpanForPromptStudio: vi.fn(),
-    },
+    traceRead: createApiFixture<TraceLegacyReadRepository>(
+      {
+        resolveTraceIdByPrefix: mockResolveTraceIdByPrefix,
+        findTraceSummaries: vi.fn(),
+        findCustomersAndLabels: vi.fn(),
+        findDistinctFieldNames: vi.fn(),
+        findTopicCounts: vi.fn(),
+        findSpanForPromptStudio: vi.fn(),
+      },
+      "trace read store",
+    ),
+    mapping: createApiFixture<LegacyTraceMappingService>(
+      {
+        findTracesWithSpans: mockGetTracesWithSpans,
+        findTracesWithSpansByThreadIds: vi.fn(),
+        listAllTracesForProject: vi.fn(),
+        findTracesByThreadId: vi.fn(),
+      },
+      "legacy trace mapping",
+    ),
     editOverlay: TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create()),
     evaluationRuns: refusingEvaluations(),
   });
@@ -97,6 +110,7 @@ describe("given a project with traces stored in ClickHouse", () => {
       mockGetTracesWithSpans.mockResolvedValue([trace(FULL_TRACE_ID)]);
 
       const result = await makeService().findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: FULL_TRACE_ID,
         protections,
@@ -116,6 +130,7 @@ describe("given a project with traces stored in ClickHouse", () => {
       mockResolveTraceIdByPrefix.mockResolvedValue([FULL_TRACE_ID]);
 
       const result = await makeService().findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: "63dc535cea6335c506bc",
         protections,
@@ -138,7 +153,12 @@ describe("given a project with traces stored in ClickHouse", () => {
       mockResolveTraceIdByPrefix.mockResolvedValue(candidates);
 
       const failure = await makeService()
-        .findById({ projectId: PROJECT_ID, traceId: "abc12345", protections })
+        .findById({
+          authorization: OWN_READ,
+          projectId: PROJECT_ID,
+          traceId: "abc12345",
+          protections,
+        })
         .catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(AmbiguousTraceIdPrefixError);
@@ -154,7 +174,12 @@ describe("given a project with traces stored in ClickHouse", () => {
     /** @scenario No match returns 404 */
     it("resolves to nothing so the transport answers not found", async () => {
       await expect(
-        makeService().findById({ projectId: PROJECT_ID, traceId: "deadbeef", protections }),
+        makeService().findById({
+          authorization: OWN_READ,
+          projectId: PROJECT_ID,
+          traceId: "deadbeef",
+          protections,
+        }),
       ).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).toHaveBeenCalled();
     });
@@ -163,7 +188,12 @@ describe("given a project with traces stored in ClickHouse", () => {
   describe("when the prefix belongs to another project", () => {
     /** @scenario Prefix match is scoped to the current project */
     it("scans only the caller's project", async () => {
-      await makeService().findById({ projectId: "project_b", traceId: "aaaa1111", protections });
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: "project_b",
+        traceId: "aaaa1111",
+        protections,
+      });
 
       expect(mockResolveTraceIdByPrefix.mock.calls[0]![0].projectId).toBe("project_b");
     });
@@ -173,7 +203,12 @@ describe("given a project with traces stored in ClickHouse", () => {
     /** @scenario Too-short prefix falls through to 404 */
     it("never scans", async () => {
       await expect(
-        makeService().findById({ projectId: PROJECT_ID, traceId: "ab", protections }),
+        makeService().findById({
+          authorization: OWN_READ,
+          projectId: PROJECT_ID,
+          traceId: "ab",
+          protections,
+        }),
       ).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).not.toHaveBeenCalled();
     });
@@ -184,6 +219,7 @@ describe("given a project with traces stored in ClickHouse", () => {
     it("never scans", async () => {
       await expect(
         makeService().findById({
+          authorization: OWN_READ,
           projectId: PROJECT_ID,
           traceId: "not-a-hex-id-zzzz",
           protections,

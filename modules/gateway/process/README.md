@@ -6,13 +6,13 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:52`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…)`, `src/gateway.module.ts:46`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:569`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:570`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -463,62 +463,6 @@ rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualK
 
 ```typescript
 revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
-```
-
-#### `provisionConnectManagedKey`
-
-The managed key a license resolves to (ADR-156 section 3): one per license, on the customer's hidden governance project, its secret discarded. Repeating this mints a second key; the registry calls it once.
-
-```typescript
-provisionConnectManagedKey(input: { organizationId: string; licenseId: string; actorUserId: string; }): Promise<{ id: string }>;
-```
-
-#### `revokeManagedInternal`
-
-Ends a managed key for the feature that owns it; customer-facing revocation refuses one. A key already gone is left alone, so this is safe to repeat, which is what makes revoking a license retryable.
-
-```typescript
-revokeManagedInternal(input: { virtualKeyId: string; organizationId: string; actorId: string; }): Promise<void>;
-```
-
-#### `invalidateManagedInternal`
-
-Tells every gateway to resolve a managed key again, unchanged, through the change feed each already polls — for cached state outside the key row, such as the install a license is bound to.
-
-```typescript
-invalidateManagedInternal(input: { virtualKeyId: string; organizationId: string }): Promise<void>;
-```
-
-#### `setManagedKeyConnectServicesInternal`
-
-The platform services a CONNECT key may serve, replaced whole; empty serves none. Only the feature holding the license gate writes it, never a transport.
-
-```typescript
-setManagedKeyConnectServicesInternal(input: { virtualKeyId: string; organizationId: string; services: readonly string[]; }): Promise<void>;
-```
-
-#### `setManagedKeyLicenseInternal`
-
-The license a CONNECT key serves: the registry hash of its token, the bound install and its end. Written by licensing at activation and on every sync.
-
-```typescript
-setManagedKeyLicenseInternal(input: { virtualKeyId: string; organizationId: string; tokenHash: string; instanceId: string | null; expiresAt: Instant | null; }): Promise<void>;
-```
-
-#### `setConnectUpstreamInternal`
-
-Where one organization's gateway reaches LangWatch-hosted models, replaced whole. Only licensing writes it, and it clears it on every change of license, service or Connect.
-
-```typescript
-setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void>;
-```
-
-#### `clearConnectUpstreamInternal`
-
-Drops the organization's hosted provider slot. Safe to repeat.
-
-```typescript
-clearConnectUpstreamInternal(input: { organizationId: string }): Promise<void>;
 ```
 
 #### `disableVirtualKey`
@@ -1686,7 +1630,7 @@ type Output = z.infer<typeof gatewayVirtualKeyUsageSummarySchema>; // ../contrac
 
 ### `virtualKeys`
 
-Contract `../contract/src/virtual-key.trpc.ts:24`, router `src/transport/virtual-key.trpc.ts:34`.
+Contract `../contract/src/virtual-key.trpc.ts:24`, router `src/transport/virtual-key.trpc.ts:38`.
 
 | Procedure                       | Kind     | Gate                                                                                                                                                                                                                                                                                                                  | Input                                       | Output                              |
 | ------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------- |
@@ -1783,6 +1727,21 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `gateway_connect_managed_key` (aggregate `gateway_connect_managed_key`)
+
+Declared at `src/eventing/gateway-connect-managed-key.pipeline.ts:63`. Events: `gatewayManagedKeyProvisionedEventSchema`.
+
+| Kind            | Name                                  | Handles                                                                                                    | Declared at                                                |
+| --------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| command         | `recordManagedKeyProvisioned`         | –                                                                                                          | `src/eventing/gateway-connect-managed-key.pipeline.ts:69`  |
+| peer subscriber | `gatewayConnectManagedKeyIssued`      | `lw.licensing.connect_credential_issued` from [licensing](../../../enterprise/modules/licensing/README.md) | `src/eventing/gateway-connect-managed-key.pipeline.ts:71`  |
+| peer subscriber | `gatewayConnectManagedKeyRetired`     | `lw.licensing.managed_key_retired` from [licensing](../../../enterprise/modules/licensing/README.md)       | `src/eventing/gateway-connect-managed-key.pipeline.ts:77`  |
+| peer subscriber | `gatewayConnectManagedKeyInvalidated` | `lw.licensing.managed_key_invalidated` from [licensing](../../../enterprise/modules/licensing/README.md)   | `src/eventing/gateway-connect-managed-key.pipeline.ts:84`  |
+| peer subscriber | `gatewayConnectManagedKeyLicenseSet`  | `lw.licensing.managed_key_license_set` from [licensing](../../../enterprise/modules/licensing/README.md)   | `src/eventing/gateway-connect-managed-key.pipeline.ts:91`  |
+| peer subscriber | `gatewayConnectManagedKeyServicesSet` | `lw.licensing.managed_key_services_set` from [licensing](../../../enterprise/modules/licensing/README.md)  | `src/eventing/gateway-connect-managed-key.pipeline.ts:105` |
+| peer subscriber | `gatewayConnectUpstreamSet`           | `lw.licensing.connect_upstream_set` from [licensing](../../../enterprise/modules/licensing/README.md)      | `src/eventing/gateway-connect-managed-key.pipeline.ts:112` |
+| peer subscriber | `gatewayConnectUpstreamCleared`       | `lw.licensing.connect_upstream_cleared` from [licensing](../../../enterprise/modules/licensing/README.md)  | `src/eventing/gateway-connect-managed-key.pipeline.ts:117` |
+
 ### Pipeline `governance_events_processing` (aggregate `governance_subject`)
 
 Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `gatewayVkLifecycleEventSchema`, `gatewayBudgetCrossingEventSchema`.
@@ -1834,18 +1793,17 @@ Declared at `src/eventing/gateway-spend.pipeline.ts:103`. Events: `gatewaySpendA
 
 Run by the tasks process, before serve.
 
-| Task                          | Class                          | Declared at                                         |
-| ----------------------------- | ------------------------------ | --------------------------------------------------- |
-| `trace-destination-report`    | `TraceDestinationReportTask`   | `src/tasks/trace-destination-report.task.ts:161`    |
-| `virtual-key-config-backfill` | `VirtualKeyConfigBackfillTask` | `src/tasks/virtual-key-config-backfill.task.ts:331` |
+| Task                       | Class                        | Declared at                                      |
+| -------------------------- | ---------------------------- | ------------------------------------------------ |
+| `trace-destination-report` | `TraceDestinationReportTask` | `src/tasks/trace-destination-report.task.ts:161` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1137`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1138`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1139`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1151`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1152`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1153`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:26` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:28` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:30` |

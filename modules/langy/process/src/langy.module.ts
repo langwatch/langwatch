@@ -12,6 +12,7 @@ import { langyInternalRest } from "./transport/langy-internal.rest.ts";
 import {
   langyLocalControlConnectDatedRests,
   langyLocalControlConnectRest,
+  localControlSessionKeyDoor,
 } from "./transport/langy-local-control-connect.rest.ts";
 import {
   langyLocalControlDatedRests,
@@ -43,14 +44,10 @@ export const langyProcessModule: PublishedProcessModule<"langy", LangyApi, Langy
       langyTrpcTransport,
       langyEgressTrpcTransport,
     )
-    .withTransportFacts(({ app }) => {
-      if (!(app instanceof LangyModule))
-        throw new TypeError("Langy transport requires its constructed application");
-      return [
-        bindRestCredential("internal_secret", () => app.internalDoor),
-        bindRestCredential("session_key", () => app.sessionKeyDoor),
-      ];
-    })
+    .provideMiddlewareBindings(({ app }) => [
+      bindRestCredential("internal_secret", () => app.internalDoor),
+    ])
+    .withDoors({ session_key: localControlSessionKeyDoor })
     .withEventing(langyConversationEventing)
     .withEventing(langyGuidedOnboardingEventing)
     .withEventing(langyMaintenanceEventing);

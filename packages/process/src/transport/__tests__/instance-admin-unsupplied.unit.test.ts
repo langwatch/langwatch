@@ -6,6 +6,7 @@ import { createErrorHandler } from "@langwatch/api";
 import { anyAuthenticated } from "@langwatch/api/access";
 import { createRestRuntime, defineRestRouter } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -26,6 +27,7 @@ const provisioning = defineRestRouter(ProvisioningApi)
   .withInput(z.object({ name: z.string().min(1) }))
   .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.provision(input))
   .build();
 
@@ -34,6 +36,7 @@ describe("given a process that supplies no instance administrator bearer", () =>
   it("refuses a caller presenting one, while the route it guards stays mounted", async () => {
     const provision = vi.fn(async () => ({ id: "organization-1" }));
     const app = createRestRuntime({
+      authorization: restTestAuthorization(),
       identity: instanceAdminDoor({ token: void 0, isSaas: false }),
     }).mount(provisioning.router(), { app: () => ({ provision }), onError: createErrorHandler() });
     const post = (path: string) =>

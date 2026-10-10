@@ -34,6 +34,7 @@ export class WebhookDestinationDispatchService {
           ...(config.signatureScheme ? { signatureScheme: config.signatureScheme } : {}),
           egress: this.deps.egress,
           allowInsecureLocal: this.deps.allowInsecureLocal,
+          allowSelfSignedCertificate: config.allowSelfSignedCertificate ?? false,
         });
       case "sqs":
         return SqsWebhookDestinationService.create({

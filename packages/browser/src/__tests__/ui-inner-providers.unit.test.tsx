@@ -21,14 +21,13 @@ afterEach(async () => {
 
 describe("given the providers that need router context", () => {
   describe("when the application installs the ones it still owns", () => {
-    it("keeps the page inside the command bar, with the toaster beside it and the footer after it", async () => {
+    it("keeps the page inside the command bar, with the toaster beside it", async () => {
       const InnerProvider = createUiInnerProvider({
         usePublicAppConfig: () => ({ data: publicAppConfig }),
         commandBar: ({ children }: { children: ReactNode }) => (
           <div data-testid="command-bar">{children}</div>
         ),
         toaster: () => <div data-testid="toaster" />,
-        footer: () => <div data-testid="footer" />,
         isDevelopment: false,
       });
       const router = createMemoryRouter(
@@ -59,10 +58,6 @@ describe("given the providers that need router context", () => {
       expect(
         container.querySelector("[data-testid='command-bar'] [data-testid='toaster']"),
       ).toBeTruthy();
-      expect(
-        container.querySelector("[data-testid='command-bar'] [data-testid='footer']"),
-      ).toBeNull();
-      expect(container.querySelector("[data-testid='footer']")).toBeTruthy();
 
       router.dispose();
     });

@@ -53,7 +53,7 @@ export function ExportConfigDialog({
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Export Traces</Dialog.Title>
@@ -107,7 +107,7 @@ export function ExportConfigDialog({
             <Button variant="outline" onClick={onClose} data-testid="trace-export-cancel">
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={handleExport} data-testid="trace-export-submit">
+            <Button colorPalette="orange" onClick={handleExport} data-testid="trace-export-submit">
               <Download size={16} />
               Export
             </Button>

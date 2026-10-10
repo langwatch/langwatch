@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * SSO's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 import {
   normalizeSignInErrorCode,
@@ -9,16 +9,16 @@ import {
   type SsoTestSignInOperations,
 } from "@langwatch/auth-contract";
 import {
-  UiCapabilityUnavailableError,
-  useUiCapabilities,
+  UiHostServiceUnavailableError,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { useLentOperations } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useLentOperations } from "@langwatch/browser-host/lent";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -34,14 +34,14 @@ import {
 type SsoTestSignIn = SsoTestSignInOperations["testSignIn"];
 
 const INERT_TEST_SIGN_IN: SsoTestSignIn = () => {
-  throw new UiCapabilityUnavailableError("sso test sign-in");
+  throw new UiHostServiceUnavailableError("sso test sign-in");
 };
 
 /** Every control on the page, as ADR-122 gates them. */
 const SSO_MANAGE_PERMISSION = "sso:manage";
 const SSO_VIEW_PERMISSION = "sso:view";
 
-class CapabilitySsoHost extends SsoHostApi {
+class HostServiceSsoHost extends SsoHostApi {
   constructor(
     private readonly deps: {
       orgId: string | undefined;
@@ -104,14 +104,14 @@ class CapabilitySsoHost extends SsoHostApi {
  * Default-exported because that is what `mounts.load` resolves.
  */
 export default function SsoHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route, session } = useUiCapabilities();
+  const { feedback, route, session } = useUiHostServices();
   const { organizationId } = useUiScope().activeScope();
   const loadSignIn = useLentOperations(SsoTestSignInToken);
   const { openDrawer } = useDrawer();
 
   const host = useMemo(
     () =>
-      new CapabilitySsoHost({
+      new HostServiceSsoHost({
         orgId: organizationId ?? void 0,
         feedback,
         route,

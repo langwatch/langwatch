@@ -1,13 +1,6 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Plus } from "lucide-react";
@@ -31,6 +24,7 @@ import { CreateDashboardWidgetDrawer } from "../../../features/dashboard-widget/
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { Link } from "../../elements/analytics-link.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 import AnalyticsLayout from "../analytics-layout.tsx";
 import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import { FilterSidebar } from "../filter-sidebar.tsx";
@@ -39,8 +33,12 @@ import { DashboardRefreshedAtContext } from "../use-dashboard-auto-refresh.ts";
 
 function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();
-  const { showFilters } = useFilterToggle();
   const host = useAnalyticsHost();
+  // Each write is refused where the server refuses it: on an aggregate (ADR-177) and without
+  // the grant. Grants come from the analytics host; the scope reading carries none.
+  const canAddChart = host.hasPermission("analytics:create");
+  const canRenameDashboard = host.hasPermission("analytics:update");
+  const { showFilters } = useFilterToggle();
   const showErrorToast = useShowErrorToast();
   const projectId = project?.id ?? "";
 
@@ -76,6 +74,9 @@ function ReportsContent() {
 
   const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
   const dashboardTitle = currentDashboard?.name ?? "Reports";
+  // A link to a deleted or mistyped dashboard says so, rather than drawing an empty grid.
+  const isMissingDashboard =
+    !!urlDashboardId && dashboardsQuery.data !== undefined && !currentDashboard;
 
   // Graphs for the active dashboard
   const graphsQuery = useDashboardGraphs({ projectId, dashboardId: activeDashboardId });
@@ -207,14 +208,15 @@ function ReportsContent() {
     <AnalyticsLayout
       title={dashboardTitle}
       railEntry="reports"
+      activeDashboardId={activeDashboardId}
       analyticsHeaderProps={{
-        isEditable: true,
+        isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
       extraHeaderButtons={
         <>
           <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
-          {project ? (
+          {project && canAddChart ? (
             <AddChartButton
               opensDrawer={customChartPlaygroundEnabled}
               href={addChartUrl}
@@ -230,7 +232,7 @@ function ReportsContent() {
           there would hit a Save button that always fails. This drawer is
           the one "create a new chart" path that still works, and it lands
           the new widget on this dashboard directly. */}
-      {project && customChartPlaygroundEnabled && (
+      {project && canAddChart && customChartPlaygroundEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
@@ -240,15 +242,31 @@ function ReportsContent() {
         />
       )}
 
+      {isMissingDashboard && (
+        <Alert.Root status="warning" variant="surface" marginBottom={6}>
+          <Alert.Indicator />
+          <VStack align="start">
+            <Alert.Title>This dashboard doesn&apos;t exist</Alert.Title>
+            <Alert.Description>
+              <Text as="span">It may have been deleted. Pick another dashboard from the menu.</Text>
+            </Alert.Description>
+          </VStack>
+        </Alert.Root>
+      )}
+
       {/* Empty state */}
-      {hasNoGraphs && (
+      {hasNoGraphs && !isMissingDashboard && (
         <Alert.Root status="info" variant="surface" marginBottom={6}>
           <Alert.Indicator />
           <VStack align="start">
-            <Alert.Title>Add your custom graphs here</Alert.Title>
+            <Alert.Title>
+              {canAddChart ? "Add your custom graphs here" : "No custom graphs yet"}
+            </Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart to get started.
+                {canAddChart
+                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+                  : "Nobody has added a custom graph to this dashboard yet."}
               </Text>
             </Alert.Description>
           </VStack>
@@ -259,7 +277,7 @@ function ReportsContent() {
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
           <HStack align="start" gap={6} width="full">
-            <Box flex={1}>
+            <Box flex={1} minWidth={0}>
               {graphsQuery.isLoading ? (
                 <Skeleton height="300px" />
               ) : (
@@ -307,23 +325,21 @@ function AddChartButton({
 }) {
   if (opensDrawer) {
     return (
-      <Button
-        colorPalette="orange"
-        size="sm"
-        data-testid="analytics-add-chart"
-        onClick={onOpenDrawer}
-      >
+      <PageLayout.HeaderButton primary data-testid="analytics-add-chart" onClick={onOpenDrawer}>
         <Plus /> Add chart
-      </Button>
+      </PageLayout.HeaderButton>
     );
   }
   return (
     <Link href={href} asChild>
-      <Button colorPalette="orange" size="sm" data-testid="analytics-add-chart">
+      <PageLayout.HeaderButton primary data-testid="analytics-add-chart">
         <Plus /> Add chart
-      </Button>
+      </PageLayout.HeaderButton>
     </Link>
   );
 }
 
-export default ReportsContent;
+/** Exported for the test that renders the body past the aggregate gate. */
+export { ReportsContent };
+
+export default withAggregateAnalyticsGate("Reports", ReportsContent);

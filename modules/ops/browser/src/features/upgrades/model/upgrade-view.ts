@@ -3,6 +3,7 @@
  * them. Nothing here restates a shape.
  */
 import type {
+  OpsUpgradePreview,
   OpsUpgradeRelease,
   OpsUpgradeRun,
   OpsUpgradeRunPhase,
@@ -11,6 +12,7 @@ import type {
   OpsUpgradeStep,
   OpsUpgradeStepDetail,
   OpsUpgradeTarget,
+  OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 
 export type UpgradeRunSummaryView = OpsUpgradeRunSummary;
@@ -23,3 +25,7 @@ export type UpgradeStepView = OpsUpgradeStep;
 export type UpgradeTargetView = OpsUpgradeTarget;
 export type UpgradeStepDetailView = OpsUpgradeStepDetail;
 export type UpgradeRunDetailView = OpsUpgradeRun;
+/** W5: the plan narrowed to a target release, or the reader's refusal, and the preflight rows. */
+export type UpgradePreviewView = OpsUpgradePreview;
+/** W7: one ClickHouse target's latest done version, outstanding steps and latest error. */
+export type UpgradeTargetSummaryView = OpsUpgradeTargetSummary;

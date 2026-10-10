@@ -11,7 +11,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -25,7 +25,7 @@ import { resolveRequestBound } from "@langwatch/plans";
 const JSON_MEDIA_TYPE = "application/json";
 
 /** The signature and the directory token a delivery presents, read off it by the process. */
-export const scimWebhookDelivery = defineRestMiddleware(
+export const scimWebhookDelivery = defineMiddlewareContext(
   "scimWebhookDelivery",
   scimWebhookDeliveryHeadersSchema,
 );
@@ -48,6 +48,7 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/webhooks/auth0-scim", "receiveAuth0ScimWebhook")
+  .withoutAudit("Auth0 webhook")
   // The HMAC is computed over these exact characters, so nothing parses them
   // first: a parse-then-reserialise verifies nothing.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
@@ -60,7 +61,7 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
         "credential opens this door",
     }),
   )
-  .withMiddleware(scimWebhookDelivery)
+  .withMiddlewareContext(scimWebhookDelivery)
   .withResponse("protocol", {
     produces: JSON_MEDIA_TYPE,
     because: "Auth0's log stream reads its own delivery acknowledgement, status and body.",

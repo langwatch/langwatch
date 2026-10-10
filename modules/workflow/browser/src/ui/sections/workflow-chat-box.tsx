@@ -18,8 +18,8 @@ import {
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { getEntryInputs } from "@langwatch/workflow-contract";
 import type { Edge, Node } from "@xyflow/react";
-import { useCallback, useState } from "react";
-import { Send } from "react-feather";
+import { Send } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -49,9 +49,9 @@ const useMultipleInputs = (entryEdges: Edge[]) => {
     }, {}),
   );
 
-  const handleInputChange = useCallback((key: string, value: string) => {
+  const handleInputChange = (key: string, value: string) => {
     setInputs((previous) => ({ ...previous, [key]: value }));
-  }, []);
+  };
 
   return { inputs, handleInputChange };
 };
@@ -140,8 +140,8 @@ export function WorkflowChatBox({
                   marginBottom={2}
                 >
                   <Text
-                    bg="blue.500"
-                    color="white"
+                    bg="blue.solid"
+                    color="blue.contrast"
                     padding={2}
                     borderRadius="lg"
                     whiteSpace="pre-wrap"

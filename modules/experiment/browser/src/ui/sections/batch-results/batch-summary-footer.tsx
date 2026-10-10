@@ -105,7 +105,7 @@ export function BatchSummaryFooter({
   return (
     <VStack
       width="full"
-      background="bg.surface"
+      background="bg.card"
       gap={0}
       position="sticky"
       left={0}
@@ -165,7 +165,7 @@ export function BatchSummaryFooter({
         {(run.timestamps.stoppedAt != null || actions != null) && <Spacer />}
         {run.timestamps.stoppedAt && (
           <HStack>
-            <Box width="12px" height="12px" background="red.500" borderRadius="full" />
+            <Box width="12px" height="12px" background="red.fg" borderRadius="full" />
             <Text>Stopped</Text>
           </HStack>
         )}

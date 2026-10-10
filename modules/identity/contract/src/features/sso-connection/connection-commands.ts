@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -130,7 +131,7 @@ function commandDataSchema<Schema extends z.ZodObject>(schema: Schema) {
   });
 }
 
-export const registerConnectionCommandDataSchema = commandDataSchema(
+const registerConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     type: ssoConnectionTypeSchema,
@@ -138,9 +139,14 @@ export const registerConnectionCommandDataSchema = commandDataSchema(
     arrivalPolicy: ssoArrivalPolicySchema,
   }),
 );
+export interface RegisterConnectionCommandDataSchema extends Named<
+  typeof registerConnectionCommandDataSchemaDefinition
+> {}
+export const registerConnectionCommandDataSchema: RegisterConnectionCommandDataSchema =
+  registerConnectionCommandDataSchemaDefinition;
 export type RegisterConnectionCommandData = z.infer<typeof registerConnectionCommandDataSchema>;
 
-export const registerReplacementConnectionCommandDataSchema = commandDataSchema(
+const registerReplacementConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     type: ssoConnectionTypeSchema,
@@ -149,60 +155,95 @@ export const registerReplacementConnectionCommandDataSchema = commandDataSchema(
     replacesConnectionId: z.string().min(1),
   }),
 );
+export interface RegisterReplacementConnectionCommandDataSchema extends Named<
+  typeof registerReplacementConnectionCommandDataSchemaDefinition
+> {}
+export const registerReplacementConnectionCommandDataSchema: RegisterReplacementConnectionCommandDataSchema =
+  registerReplacementConnectionCommandDataSchemaDefinition;
 export type RegisterReplacementConnectionCommandData = z.infer<
   typeof registerReplacementConnectionCommandDataSchema
 >;
 
-export const selectMigrationRouteCommandDataSchema = commandDataSchema(
+const selectMigrationRouteCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     route: ssoMigrationRouteSchema,
   }),
 );
+export interface SelectMigrationRouteCommandDataSchema extends Named<
+  typeof selectMigrationRouteCommandDataSchemaDefinition
+> {}
+export const selectMigrationRouteCommandDataSchema: SelectMigrationRouteCommandDataSchema =
+  selectMigrationRouteCommandDataSchemaDefinition;
 export type SelectMigrationRouteCommandData = z.infer<typeof selectMigrationRouteCommandDataSchema>;
 
-export const beginMigrationFinalizationCommandDataSchema = commandDataSchema(
+const beginMigrationFinalizationCommandDataSchemaDefinition = commandDataSchema(
   z.object(commandIdentitySchema.shape),
 );
+export interface BeginMigrationFinalizationCommandDataSchema extends Named<
+  typeof beginMigrationFinalizationCommandDataSchemaDefinition
+> {}
+export const beginMigrationFinalizationCommandDataSchema: BeginMigrationFinalizationCommandDataSchema =
+  beginMigrationFinalizationCommandDataSchemaDefinition;
 export type BeginMigrationFinalizationCommandData = z.infer<
   typeof beginMigrationFinalizationCommandDataSchema
 >;
 
-export const finalizeMigrationCommandDataSchema = commandDataSchema(
+const finalizeMigrationCommandDataSchemaDefinition = commandDataSchema(
   z.object(commandIdentitySchema.shape),
 );
+export interface FinalizeMigrationCommandDataSchema extends Named<
+  typeof finalizeMigrationCommandDataSchemaDefinition
+> {}
+export const finalizeMigrationCommandDataSchema: FinalizeMigrationCommandDataSchema =
+  finalizeMigrationCommandDataSchemaDefinition;
 export type FinalizeMigrationCommandData = z.infer<typeof finalizeMigrationCommandDataSchema>;
 
 /** The word on the card, and nothing else (ADR-117). Trimmed, non-empty, and
  *  bounded so a name stays a name rather than a paragraph. */
-export const renameConnectionCommandDataSchema = commandDataSchema(
+const renameConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     name: z.string().trim().min(1).max(120),
   }),
 );
+export interface RenameConnectionCommandDataSchema extends Named<
+  typeof renameConnectionCommandDataSchemaDefinition
+> {}
+export const renameConnectionCommandDataSchema: RenameConnectionCommandDataSchema =
+  renameConnectionCommandDataSchemaDefinition;
 export type RenameConnectionCommandData = z.infer<typeof renameConnectionCommandDataSchema>;
 
 /** The identity provider's dialing information, as references already in the
  *  credential store. The name is not part of it. */
-export const updateConnectionIdpCommandDataSchema = commandDataSchema(
+const updateConnectionIdpCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     idp: ssoIdpDialingSchema,
   }),
 );
+export interface UpdateConnectionIdpCommandDataSchema extends Named<
+  typeof updateConnectionIdpCommandDataSchemaDefinition
+> {}
+export const updateConnectionIdpCommandDataSchema: UpdateConnectionIdpCommandDataSchema =
+  updateConnectionIdpCommandDataSchemaDefinition;
 export type UpdateConnectionIdpCommandData = z.infer<typeof updateConnectionIdpCommandDataSchema>;
 
 /** The raw domain as it was typed; the guard normalizes it, and only the
  *  normalized form ever reaches a fact. */
 const domainShape = { domain: z.string().min(1) };
 
-export const claimDomainCommandDataSchema = commandDataSchema(
+const claimDomainCommandDataSchemaDefinition = commandDataSchema(
   z.object({ ...commandIdentitySchema.shape, ...domainShape }),
 );
+export interface ClaimDomainCommandDataSchema extends Named<
+  typeof claimDomainCommandDataSchemaDefinition
+> {}
+export const claimDomainCommandDataSchema: ClaimDomainCommandDataSchema =
+  claimDomainCommandDataSchemaDefinition;
 export type ClaimDomainCommandData = z.infer<typeof claimDomainCommandDataSchema>;
 
-export const approveDomainClaimCommandDataSchema = commandDataSchema(
+const approveDomainClaimCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     ...domainShape,
@@ -212,23 +253,38 @@ export const approveDomainClaimCommandDataSchema = commandDataSchema(
     authority: ssoDomainClaimAuthoritySchema.optional(),
   }),
 );
+export interface ApproveDomainClaimCommandDataSchema extends Named<
+  typeof approveDomainClaimCommandDataSchemaDefinition
+> {}
+export const approveDomainClaimCommandDataSchema: ApproveDomainClaimCommandDataSchema =
+  approveDomainClaimCommandDataSchemaDefinition;
 export type ApproveDomainClaimCommandData = z.infer<typeof approveDomainClaimCommandDataSchema>;
 
-export const rejectDomainClaimCommandDataSchema = commandDataSchema(
+const rejectDomainClaimCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     ...domainShape,
     note: z.string().min(1),
   }),
 );
+export interface RejectDomainClaimCommandDataSchema extends Named<
+  typeof rejectDomainClaimCommandDataSchemaDefinition
+> {}
+export const rejectDomainClaimCommandDataSchema: RejectDomainClaimCommandDataSchema =
+  rejectDomainClaimCommandDataSchemaDefinition;
 export type RejectDomainClaimCommandData = z.infer<typeof rejectDomainClaimCommandDataSchema>;
 
-export const discardConnectionCommandDataSchema = commandDataSchema(
+const discardConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object(commandIdentitySchema.shape),
 );
+export interface DiscardConnectionCommandDataSchema extends Named<
+  typeof discardConnectionCommandDataSchemaDefinition
+> {}
+export const discardConnectionCommandDataSchema: DiscardConnectionCommandDataSchema =
+  discardConnectionCommandDataSchemaDefinition;
 export type DiscardConnectionCommandData = z.infer<typeof discardConnectionCommandDataSchema>;
 
-export const requestVerificationCommandDataSchema = commandDataSchema(
+const requestVerificationCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     ...domainShape,
@@ -241,12 +297,17 @@ export const requestVerificationCommandDataSchema = commandDataSchema(
     expiresAtMs: z.number().int().nonnegative().nullable().optional(),
   }),
 );
+export interface RequestVerificationCommandDataSchema extends Named<
+  typeof requestVerificationCommandDataSchemaDefinition
+> {}
+export const requestVerificationCommandDataSchema: RequestVerificationCommandDataSchema =
+  requestVerificationCommandDataSchemaDefinition;
 export type RequestVerificationCommandData = z.infer<typeof requestVerificationCommandDataSchema>;
 
 /**
  * Domain attestation command (D05 tier 1): carries domain only; authorization checked via port.
  */
-export const attestDomainCommandDataSchema = commandDataSchema(
+const attestDomainCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     ...domainShape,
@@ -254,14 +315,24 @@ export const attestDomainCommandDataSchema = commandDataSchema(
     note: ssoAttestationNoteSchema,
   }),
 );
+export interface AttestDomainCommandDataSchema extends Named<
+  typeof attestDomainCommandDataSchemaDefinition
+> {}
+export const attestDomainCommandDataSchema: AttestDomainCommandDataSchema =
+  attestDomainCommandDataSchemaDefinition;
 export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSchema>;
 
-export const withdrawDomainCommandDataSchema = commandDataSchema(
+const withdrawDomainCommandDataSchemaDefinition = commandDataSchema(
   z.object({ ...commandIdentitySchema.shape, ...domainShape }),
 );
+export interface WithdrawDomainCommandDataSchema extends Named<
+  typeof withdrawDomainCommandDataSchemaDefinition
+> {}
+export const withdrawDomainCommandDataSchema: WithdrawDomainCommandDataSchema =
+  withdrawDomainCommandDataSchemaDefinition;
 export type WithdrawDomainCommandData = z.infer<typeof withdrawDomainCommandDataSchema>;
 
-export const verifyDomainCommandDataSchema = commandDataSchema(
+const verifyDomainCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     ...domainShape,
@@ -271,29 +342,44 @@ export const verifyDomainCommandDataSchema = commandDataSchema(
     channel: ssoPublishedProofChannelSchema.optional(),
   }),
 );
+export interface VerifyDomainCommandDataSchema extends Named<
+  typeof verifyDomainCommandDataSchemaDefinition
+> {}
+export const verifyDomainCommandDataSchema: VerifyDomainCommandDataSchema =
+  verifyDomainCommandDataSchemaDefinition;
 export type VerifyDomainCommandData = z.infer<typeof verifyDomainCommandDataSchema>;
 
-export const recordDomainProofPresentCommandDataSchema = commandDataSchema(
+const recordDomainProofPresentCommandDataSchemaDefinition = commandDataSchema(
   z.object({ ...commandIdentitySchema.shape, ...domainShape }),
 );
+export interface RecordDomainProofPresentCommandDataSchema extends Named<
+  typeof recordDomainProofPresentCommandDataSchemaDefinition
+> {}
+export const recordDomainProofPresentCommandDataSchema: RecordDomainProofPresentCommandDataSchema =
+  recordDomainProofPresentCommandDataSchemaDefinition;
 export type RecordDomainProofPresentCommandData = z.infer<
   typeof recordDomainProofPresentCommandDataSchema
 >;
 
 /** `graceMs` is passed in rather than read here, so the window a customer is
  *  told about is one composed constant and not a second copy of it. */
-export const recordDomainProofAbsentCommandDataSchema = commandDataSchema(
+const recordDomainProofAbsentCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     ...domainShape,
     graceMs: z.number().int().positive(),
   }),
 );
+export interface RecordDomainProofAbsentCommandDataSchema extends Named<
+  typeof recordDomainProofAbsentCommandDataSchemaDefinition
+> {}
+export const recordDomainProofAbsentCommandDataSchema: RecordDomainProofAbsentCommandDataSchema =
+  recordDomainProofAbsentCommandDataSchemaDefinition;
 export type RecordDomainProofAbsentCommandData = z.infer<
   typeof recordDomainProofAbsentCommandDataSchema
 >;
 
-export const activateConnectionCommandDataSchema = commandDataSchema(
+const activateConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     /** The account whose test login the activation rests on; null only for a
@@ -301,22 +387,37 @@ export const activateConnectionCommandDataSchema = commandDataSchema(
     testLoginAccountId: z.string().min(1).nullable(),
   }),
 );
+export interface ActivateConnectionCommandDataSchema extends Named<
+  typeof activateConnectionCommandDataSchemaDefinition
+> {}
+export const activateConnectionCommandDataSchema: ActivateConnectionCommandDataSchema =
+  activateConnectionCommandDataSchemaDefinition;
 export type ActivateConnectionCommandData = z.infer<typeof activateConnectionCommandDataSchema>;
 
-export const suspendConnectionCommandDataSchema = commandDataSchema(
+const suspendConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     reason: z.string().min(1).nullable(),
   }),
 );
+export interface SuspendConnectionCommandDataSchema extends Named<
+  typeof suspendConnectionCommandDataSchemaDefinition
+> {}
+export const suspendConnectionCommandDataSchema: SuspendConnectionCommandDataSchema =
+  suspendConnectionCommandDataSchemaDefinition;
 export type SuspendConnectionCommandData = z.infer<typeof suspendConnectionCommandDataSchema>;
 
-export const resumeConnectionCommandDataSchema = commandDataSchema(
+const resumeConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object(commandIdentitySchema.shape),
 );
+export interface ResumeConnectionCommandDataSchema extends Named<
+  typeof resumeConnectionCommandDataSchemaDefinition
+> {}
+export const resumeConnectionCommandDataSchema: ResumeConnectionCommandDataSchema =
+  resumeConnectionCommandDataSchemaDefinition;
 export type ResumeConnectionCommandData = z.infer<typeof resumeConnectionCommandDataSchema>;
 
-export const requestTeardownCommandDataSchema = commandDataSchema(
+const requestTeardownCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     reason: z.string().min(1).nullable(),
@@ -326,17 +427,27 @@ export const requestTeardownCommandDataSchema = commandDataSchema(
     graceMs: z.number().int().nonnegative(),
   }),
 );
+export interface RequestTeardownCommandDataSchema extends Named<
+  typeof requestTeardownCommandDataSchemaDefinition
+> {}
+export const requestTeardownCommandDataSchema: RequestTeardownCommandDataSchema =
+  requestTeardownCommandDataSchemaDefinition;
 export type RequestTeardownCommandData = z.infer<typeof requestTeardownCommandDataSchema>;
 
-export const completeTeardownCommandDataSchema = commandDataSchema(
+const completeTeardownCommandDataSchemaDefinition = commandDataSchema(
   z.object(commandIdentitySchema.shape),
 );
+export interface CompleteTeardownCommandDataSchema extends Named<
+  typeof completeTeardownCommandDataSchemaDefinition
+> {}
+export const completeTeardownCommandDataSchema: CompleteTeardownCommandDataSchema =
+  completeTeardownCommandDataSchemaDefinition;
 export type CompleteTeardownCommandData = z.infer<typeof completeTeardownCommandDataSchema>;
 
 /**
  * Grandfather migration command: encodes all history as one with fixed source and idempotent keys.
  */
-export const grandfatherConnectionCommandDataSchema = commandDataSchema(
+const grandfatherConnectionCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     type: ssoConnectionTypeSchema,
@@ -347,16 +458,26 @@ export const grandfatherConnectionCommandDataSchema = commandDataSchema(
     source: z.literal("legacy-grandfathered"),
   }),
 );
+export interface GrandfatherConnectionCommandDataSchema extends Named<
+  typeof grandfatherConnectionCommandDataSchemaDefinition
+> {}
+export const grandfatherConnectionCommandDataSchema: GrandfatherConnectionCommandDataSchema =
+  grandfatherConnectionCommandDataSchemaDefinition;
 export type GrandfatherConnectionCommandData = z.infer<
   typeof grandfatherConnectionCommandDataSchema
 >;
 
-export const setArrivalPolicyCommandDataSchema = commandDataSchema(
+const setArrivalPolicyCommandDataSchemaDefinition = commandDataSchema(
   z.object({
     ...commandIdentitySchema.shape,
     policy: ssoArrivalPolicySchema,
   }),
 );
+export interface SetArrivalPolicyCommandDataSchema extends Named<
+  typeof setArrivalPolicyCommandDataSchemaDefinition
+> {}
+export const setArrivalPolicyCommandDataSchema: SetArrivalPolicyCommandDataSchema =
+  setArrivalPolicyCommandDataSchemaDefinition;
 export type SetArrivalPolicyCommandData = z.infer<typeof setArrivalPolicyCommandDataSchema>;
 
 /** One connection command, typed on its verb — what the ledger stages. */

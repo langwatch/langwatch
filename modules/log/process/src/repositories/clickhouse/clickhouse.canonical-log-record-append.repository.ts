@@ -33,7 +33,7 @@ export interface LogClickHouseClient {
   }): Promise<{ json(): Promise<unknown[]> }>;
 }
 
-export type LogClickHouseClientResolver = (tenantId: string) => Promise<LogClickHouseClient>;
+type LogClickHouseClientResolver = (tenantId: string) => Promise<LogClickHouseClient>;
 
 /**
  * Adapts the process's routed `clickhouse` member to Log's tenant-resolved

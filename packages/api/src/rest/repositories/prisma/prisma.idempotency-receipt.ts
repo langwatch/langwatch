@@ -25,12 +25,26 @@ export type IdempotencyReceiptRecord = {
   responseBody: string | null;
 };
 
+/** A fenced write: the receipt row, and the claim (and pending state) it must still hold. */
+export type IdempotencyReceiptFence = {
+  id: string;
+  claimId: string;
+  responseStatus?: null;
+};
+
+/** The columns a fenced write sets. */
+export type IdempotencyReceiptUpdate = Partial<
+  Pick<
+    IdempotencyReceiptRecord,
+    "claimId" | "heartbeatAt" | "expiresAt" | "responseStatus" | "responseBody"
+  >
+>;
+
 /**
- * Minimal durable receipt store used by the idempotency protocol. The fenced
- * writes are SQL (see {@link takeOverClaim}), so a transaction client fits too.
+ * Minimal durable receipt store used by the idempotency protocol. Each fenced write is one
+ * conditional `updateMany`, so a transaction client fits too.
  */
 export interface IdempotencyReceiptPersistence {
-  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): PromiseLike<number>;
   readonly idempotencyReceipt: {
     create(input: {
       data: IdempotencyReceiptCreateInput;
@@ -40,5 +54,9 @@ export interface IdempotencyReceiptPersistence {
       where: { scopeId_key: { scopeId: string; key: string } };
     }): Promise<IdempotencyReceiptRecord | null>;
     deleteMany(input: { where: { id: string; claimId?: string } }): Promise<{ count: number }>;
+    updateMany(input: {
+      where: IdempotencyReceiptFence;
+      data: IdempotencyReceiptUpdate;
+    }): Promise<{ count: number }>;
   };
 }

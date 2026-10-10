@@ -6,7 +6,7 @@ The server half of [slack](../README.md). A project's Slack connections: the bot
 
 ## Installation
 
-`defineProcessModule("slack").withRepositories(slackRepositories).withChannels(slackChannels).withApi(SlackModule).withTransports(slackIntegrationTrpcTransport, slackRest)`, `src/slack.module.ts:10`.
+`defineProcessModule("slack").withRepositories(slackRepositories).withChannels(slackChannels).withApi(SlackModule).withTransports(slackIntegrationTrpcTransport, slackRest)`, `src/slack.module.ts:11`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -96,7 +96,7 @@ listSlackConnectionClaims(input: { after?: string; limit?: number; }): Promise<S
 
 |             |                                                            |
 | ----------- | ---------------------------------------------------------- |
-| Declared at | `src/transport/slack.rest.ts:40`                           |
+| Declared at | `src/transport/slack.rest.ts:32`                           |
 | Base URL    | `/api/slack-connections`, twin `/api/v1/slack-connections` |
 | Addressing  | dated                                                      |
 | Credential  | project                                                    |
@@ -106,12 +106,12 @@ listSlackConnectionClaims(input: { after?: string; limit?: number; }): Promise<S
 
 List the Slack connections this project can deliver through: its own and its organization's, by name. Never returns a token or webhook URL.
 
-Permission `project:view`. Declared at `src/transport/slack.rest.ts:44`.
+Permission `project:view`. Declared at `src/transport/slack.rest.ts:36`.
 
 Answers at `/api/slack-connections`, `/api/v1/slack-connections`; also, undocumented, `/api/slack-connections/2026-08-07`, `/api/v1/slack-connections/2026-08-07`, `/api/slack-connections/latest`, `/api/v1/slack-connections/latest`.
 
 ```typescript
-// Response: inline, src/transport/slack.rest.ts:46
+// Response: inline, src/transport/slack.rest.ts:38
 type Response = {
   id: string;
   name: string;
@@ -193,10 +193,11 @@ None: slack declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf                     | Environment variable          | Declared at               |
-| ------ | ------------------------ | ----------------------------- | ------------------------- |
-| secret | `fingerprintKey`         | `CREDENTIALS_SECRET`          | `src/app/slack.app.ts:42` |
-| secret | `fingerprintKeyFallback` | `NEXTAUTH_SECRET`             | `src/app/slack.app.ts:43` |
-| secret | `fingerprintKeyPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/slack.app.ts:45` |
+| Kind   | Leaf                     | Environment variable          | Declared at                         |
+| ------ | ------------------------ | ----------------------------- | ----------------------------------- |
+| secret | `fingerprintKey`         | `CREDENTIALS_SECRET`          | `src/app/slack.app.ts:45`           |
+| secret | `fingerprintKeyFallback` | `NEXTAUTH_SECRET`             | `src/app/slack.app.ts:46`           |
+| secret | `fingerprintKeyPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/slack.app.ts:48`           |
+| config | `slackApiBase`           | `SLACK_API_BASE`              | `../contract/src/slack.config.ts:4` |
 
 <!-- readme:generated:end -->

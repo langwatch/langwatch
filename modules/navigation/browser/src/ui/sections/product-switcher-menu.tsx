@@ -28,7 +28,7 @@ const productPillStyle = {
   borderStyle: "solid",
   borderColor: "border",
   borderRadius: "lg",
-  boxShadow: "0 1px 2px rgba(26, 26, 46, 0.05)",
+  boxShadow: "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 5%, transparent)",
   _hover: { backgroundColor: "bg.panel", borderColor: "border.emphasized" },
 } satisfies ButtonProps;
 
@@ -57,7 +57,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
         <Button {...productPillStyle} aria-label="Switch product" data-tour="product-switcher">
           <ActiveIcon size={14} color="var(--chakra-colors-fg-muted)" />
           <Text truncate>{active.label}</Text>
-          <ChevronsUpDown size={13} color="var(--chakra-colors-gray-400)" />
+          <ChevronsUpDown size={13} color="var(--chakra-colors-fg-subtle)" />
         </Button>
       </Menu.Trigger>
       <Portal>

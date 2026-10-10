@@ -27,7 +27,7 @@ export function VoiceAgentFooter({
   const prerequisites = { transport, voiceAgentId, hasElevenLabsKey };
   const talkTooltip = talkTooltipFor(prerequisites);
   return (
-    <Drawer.Footer borderTopWidth="1px" borderColor="border">
+    <Drawer.Footer>
       <HStack gap={3}>
         <Button variant="outline" onClick={onCancel}>
           Cancel

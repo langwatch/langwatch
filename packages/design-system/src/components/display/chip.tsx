@@ -18,14 +18,10 @@ interface ToneStyle {
 
 const TONE_STYLES: Record<ChipTone, ToneStyle> = {
   neutral: {
-    bg: "bg.subtle",
-    // Slightly more present than `border.muted` (which is nearly
-    // invisible against the now-translucent drawer header). Matches
-    // the perceived weight of the tinted-tone borders (purple/blue
-    // `/30`) so neutral and toned chips read as one strip.
-    border: "border",
+    bg: "bg.control",
+    border: "border.control",
     fg: "fg.muted",
-    hoverBg: "bg.muted",
+    hoverBg: "bg.control",
   },
   purple: {
     bg: "purple.solid/8",
@@ -183,7 +179,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
             cursor="pointer"
             opacity={0.55}
             transition="opacity 0.12s ease, background 0.12s ease"
-            _hover={{ opacity: 1, bg: "bg.muted" }}
+            _hover={{ opacity: 1, bg: "bg.hover" }}
           >
             <Icon as={LuFilter} boxSize={3} color={style.fg} />
           </Box>

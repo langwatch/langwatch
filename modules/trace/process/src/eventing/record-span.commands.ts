@@ -46,7 +46,7 @@ export interface TraceSpanTokenEstimation {
   estimate(span: OtlpSpan, tenantId: string): Promise<void>;
 }
 
-export type TraceSpanContentDropResult = {
+type TraceSpanContentDropResult = {
   droppedCount: number;
   droppedCategories: string[];
 };

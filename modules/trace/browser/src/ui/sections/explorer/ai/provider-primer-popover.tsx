@@ -79,8 +79,8 @@ const ProviderPrimerBody: React.FC<{ copy: ProviderPrimerCopy }> = ({ copy }) =>
             size="xs"
             width="full"
             bg="orange.solid"
-            color="white"
-            _hover={{ bg: "orange.fg" }}
+            color="orange.contrast"
+            _hover={{ bg: "orange.hover" }}
           >
             Add a provider
           </Button>

@@ -1,8 +1,9 @@
-import { z } from "zod";
+import type { Named } from "@langwatch/module";
 /**
  * Projection DSL: public contract for declaring which trace columns to fetch in
  * one query instead of per-trace fan-out. Optional fields `from` + `select`.
  */
+import { z } from "zod";
 
 import type { Trace } from "../../trace-format.schemas.ts";
 import type { Protections } from "../../trace-viewer-protections.contract.ts";
@@ -21,7 +22,7 @@ const projectionFromSchema = z.enum(PROJECTION_FROM_ROOTS);
  * FLAT dotted-path list; the server groups paths by root (`metadata.*` →
  * `metadata{}`, etc.) — the caller never declares the grouping.
  */
-export const projectionRequestSchema = z.object({
+const projectionRequestSchemaDefinition = z.object({
   from: projectionFromSchema
     .default("traces")
     .describe(
@@ -44,6 +45,8 @@ export const projectionRequestSchema = z.object({
         "When omitted, the response is unchanged from the legacy shape.",
     ),
 });
+export interface ProjectionRequestSchema extends Named<typeof projectionRequestSchemaDefinition> {}
+export const projectionRequestSchema: ProjectionRequestSchema = projectionRequestSchemaDefinition;
 export type ProjectionRequest = z.infer<typeof projectionRequestSchema>;
 
 /** Scalar value type advertised for a resolved column in the response `schema`. */

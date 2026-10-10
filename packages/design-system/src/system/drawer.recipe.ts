@@ -4,6 +4,7 @@
  */
 
 import { defineSlotRecipe } from "@chakra-ui/react";
+import { drawerAnatomy } from "@chakra-ui/react/anatomy";
 
 /**
  * The scenario editor of Agent Testing. Sits between Chakra's `md` (32rem)
@@ -13,20 +14,49 @@ import { defineSlotRecipe } from "@chakra-ui/react";
 export const DRAWER_SIZE_2XL_MAX_WIDTH = "38.5rem";
 
 export const drawerSlotRecipe = defineSlotRecipe({
-  slots: ["content", "header"],
+  slots: drawerAnatomy.keys(),
   base: {
     content: {
       maxWidth: "70%",
-      background:
-        "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
-      backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
+      background: "bg.overlay",
       border: "1px solid",
-      borderColor: "border",
+      borderColor: "border.card",
       borderRadius: "lg",
     },
     header: {
+      paddingX: 6,
       paddingY: 4,
-      paddingRight: 12,
+      paddingInlineEnd: 14,
+      gap: 1,
+      flexShrink: 0,
+      borderBottomWidth: "1px",
+      borderColor: "border.card",
+    },
+    title: {
+      textStyle: "md",
+      fontWeight: "semibold",
+      letterSpacing: "-0.01em",
+      color: "fg",
+    },
+    description: {
+      textStyle: "sm",
+      color: "fg.muted",
+    },
+    body: {
+      paddingX: 6,
+      paddingY: 4,
+      minHeight: 0,
+      flex: 1,
+      overflowY: "auto",
+    },
+    footer: {
+      paddingX: 6,
+      paddingY: 4,
+      gap: 2,
+      flexShrink: 0,
+      justifyContent: "flex-end",
+      borderTopWidth: "1px",
+      borderColor: "border.card",
     },
   },
   variants: {

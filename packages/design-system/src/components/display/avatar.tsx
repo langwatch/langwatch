@@ -40,8 +40,43 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
   },
 );
 
+/** Same-hue light: lighter top-left easing into the avatar's own colour. */
+const AVATAR_SHEEN =
+  "linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.06) 55%, transparent 100%)";
+
+/** The hue a style prop names: a token like "cyan.400" becomes its CSS variable. */
+function hueOf(props: AvatarRootProps): string {
+  const named = props.background ?? props.backgroundColor ?? props.bg;
+  if (typeof named !== "string") return "var(--chakra-colors-color-palette-solid)";
+  return /^[a-z]+\.\d+$/.test(named) ? `var(--chakra-colors-${named.replace(".", "-")})` : named;
+}
+
+type AvatarRootExtras = { lifted?: boolean };
+
+/** Projects and orgs get the sheen only; people (`lifted`) add a rim and a tinted shadow. */
+const AvatarRoot = React.forwardRef<HTMLDivElement, AvatarRootProps & AvatarRootExtras>(
+  function AvatarRoot({ lifted, ...props }, ref) {
+    const hue = hueOf(props);
+    const lift = lifted
+      ? {
+          boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${hue} 70%, black 30%), 0 1px 3px color-mix(in srgb, ${hue} 45%, transparent)`,
+        }
+      : {};
+    return (
+      <ChakraAvatar.Root
+        ref={ref}
+        backgroundImage={AVATAR_SHEEN}
+        data-lifted={lifted ? "" : undefined}
+        {...lift}
+        {...props}
+      />
+    );
+  },
+);
+
 export const Avatar: typeof ChakraAvatar = {
   ...ChakraAvatar,
+  Root: AvatarRoot,
   Fallback: AvatarFallback,
 };
 
@@ -59,10 +94,10 @@ export function UserAvatar({
   ...rootProps
 }: Omit<AvatarRootProps, "children"> & { name?: string | null; src?: string | null }) {
   return (
-    <Avatar.Root {...rootProps}>
+    <AvatarRoot lifted {...rootProps}>
       <UserAvatarPhoto src={src ?? null} />
       <Avatar.Fallback name={name ?? void 0} />
-    </Avatar.Root>
+    </AvatarRoot>
   );
 }
 

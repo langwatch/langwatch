@@ -7,14 +7,18 @@ import type {
   FeatureRestHost,
   FeatureTrpcHost,
   MountableTransport,
-  TransportFactBinding,
+  MiddlewareBinding,
 } from "@langwatch/api";
 
 import type { FeatureTransportDescriptor } from "./feature-installer.ts";
 
 /** A process's upgrade router, as the installer calls it. */
 export interface FeatureWebSocketHost {
-  mount(declaration: MountableTransport, app: () => unknown): void;
+  mount(
+    declaration: MountableTransport,
+    app: () => unknown,
+    options?: Readonly<{ middlewareBindings?: readonly MiddlewareBinding[] }>,
+  ): void;
 }
 
 /** The role's own port for sockets handed on unopened, as the installer calls it. */
@@ -78,8 +82,8 @@ export type DeclaredTransports = Readonly<{
   feature: string;
   transports: readonly FeatureTransportDescriptor[];
   provided: () => unknown;
-  /** What the module itself bound for the facts its declarations name. */
-  facts: readonly TransportFactBinding[];
+  /** What the module itself bound for its declarations. */
+  middlewareBindings: readonly MiddlewareBinding[];
 }>;
 
 /**
@@ -141,7 +145,13 @@ function mountSocket(
   host: FeatureWebSocketHost | undefined,
 ): void {
   if (!host) throw new MissingTransportHostError(entry.feature, "WebSocket");
-  host.mount(descriptor.router(), entry.provided);
+  // A socket may name its module's own session key door, bound as a REST credential is.
+  const middlewareBindings = entry.middlewareBindings.filter((binding) => "credential" in binding);
+  host.mount(
+    descriptor.router(),
+    entry.provided,
+    middlewareBindings.length > 0 ? { middlewareBindings } : {},
+  );
 }
 
 /** One raw-socket door on the role's own port, bound to the feature's app. */
@@ -188,10 +198,16 @@ function mountRest<Rest>(
 ): Rest {
   if (!host) throw new MissingTransportHostError(entry.feature, "REST");
 
-  // A module binds ONE facts list for both doors; each door takes only its
-  // own shape (REST bindings carry `middleware`, tRPC bindings carry `fact`).
-  const facts = entry.facts.filter((binding) => "middleware" in binding || "credential" in binding);
-  return host.mount(descriptor.router(), entry.provided, facts.length > 0 ? { facts } : {});
+  // A module binds ONE list for every door; each door takes only its own shape (REST
+  // bindings carry `middlewareContext`, tRPC bindings carry `trpcMiddlewareContext`).
+  const middlewareBindings = entry.middlewareBindings.filter(
+    (binding) => "middlewareContext" in binding || "credential" in binding,
+  );
+  return host.mount(
+    descriptor.router(),
+    entry.provided,
+    middlewareBindings.length > 0 ? { middlewareBindings } : {},
+  );
 }
 
 /** One tRPC namespace on the process's own root, bound to the feature's app. */
@@ -202,8 +218,10 @@ function mountTrpc<Trpc>(
 ): Trpc {
   if (!host) throw new MissingTransportHostError(entry.feature, "tRPC");
 
-  const facts = entry.facts.filter((binding) => "fact" in binding);
-  const options = facts.length > 0 ? { facts } : {};
+  const middlewareBindings = entry.middlewareBindings.filter(
+    (binding) => "trpcMiddlewareContext" in binding,
+  );
+  const options = middlewareBindings.length > 0 ? { middlewareBindings } : {};
 
   return host.mount(descriptor, entry.provided, options);
 }

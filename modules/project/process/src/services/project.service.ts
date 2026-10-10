@@ -1,3 +1,5 @@
+import type { PrincipalRef } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
@@ -34,8 +36,12 @@ import {
   ProjectNotFoundError,
   type ProjectIdPage,
   type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
+  type ProjectPrivateS3Page,
   type ProjectUsageCount,
+  type AggregateRule,
+  type ProjectKind,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -67,6 +73,7 @@ export class ProjectService {
 
   findProjectsWithDepartments(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
     return this.repository.findProjectsWithDepartments(input);
   }
@@ -116,6 +123,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    authorization: Pick<AuthzApi, "checkByIds">;
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
@@ -270,6 +278,9 @@ export class ProjectService {
     name: string;
     language: string;
     framework: string;
+    /** Already checked by `AggregateProjectService.createFields`. */
+    kind?: "aggregate" | undefined;
+    aggregateRule?: AggregateRule | undefined;
   }): Promise<Project> {
     return this.writes.create(input);
   }
@@ -278,6 +289,7 @@ export class ProjectService {
     id: string;
     organizationId: string;
     data: UpdateProjectInput;
+    by: PrincipalRef;
   }): Promise<Project> {
     return this.writes.update(input);
   }
@@ -292,6 +304,7 @@ export class ProjectService {
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    hiddenKinds?: ProjectKind[];
   }): Promise<PaginatedProjects> {
     return this.repository.listAllByOrganization(projectPaginationSchema.parse(input));
   }
@@ -327,6 +340,14 @@ export class ProjectService {
 
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage> {
     return this.repository.listAllWithOrganization(input);
+  }
+
+  listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page> {
+    return this.repository.listAllWithPrivateS3(input);
+  }
+
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage> {
+    return this.repository.listLwqlKeys(input);
   }
 
   findSharedProjectSlugs(input: {

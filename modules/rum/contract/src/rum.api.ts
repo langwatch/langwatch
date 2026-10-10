@@ -1,12 +1,14 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 
 /** The two headers the door names a caller by, both self-asserted. */
-export const rumReportHeadersSchema = z.object({
+const rumReportHeadersSchemaDefinition = z.object({
   [RUM_SESSION_HEADER]: z.string().optional(),
   "x-forwarded-for": z.string().optional(),
 });
+export interface RumReportHeadersSchema extends Named<typeof rumReportHeadersSchemaDefinition> {}
+export const rumReportHeadersSchema: RumReportHeadersSchema = rumReportHeadersSchemaDefinition;
 
 /** One browser trace export as the ingest door received it; every field is untrusted. */
 export type BrowserTraceReport = Readonly<{

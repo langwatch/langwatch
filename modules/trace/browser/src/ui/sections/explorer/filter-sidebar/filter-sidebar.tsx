@@ -333,12 +333,14 @@ export const FilterSidebar: React.FC = () => {
         css={{
           // Slim the scrollbar so it overlays the right gutter instead of the
           // fat default overlay that painted over the section chevrons.
-          "&::-webkit-scrollbar": { width: "4px" },
+          "&::-webkit-scrollbar": { width: "10px" },
           "&::-webkit-scrollbar-thumb": {
             background: "var(--chakra-colors-border-emphasized)",
-            borderRadius: "2px",
+            backgroundClip: "padding-box",
+            border: "3px solid transparent",
+            borderRadius: "999px",
           },
-          "&::-webkit-scrollbar-track": { background: "transparent" },
+          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
           scrollbarWidth: "thin",
         }}
       >

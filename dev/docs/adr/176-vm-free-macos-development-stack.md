@@ -36,8 +36,8 @@ haven, and the backend reload held changes for the length of an agent turn. Alex
    Digests are GitHub's recorded asset digests. Pins today: ClickHouse 25.8.33.6-lts and
    Tempo 3.1.0 (newest release with darwin assets and digests). Alloy is pinned the same way.
    `HAVEN_OBS_*_BIN` overrides a download.
-4. **`make haven install` installs the native tier unattended.** Without a TTY it runs
-   `haven install --yes`: the Homebrew formulae, then every missing pinned binary. A failure of a
+4. **`make haven install` installs the native tier unattended** (now `make haven self install`). Without a TTY it runs
+   `haven install --yes` (now `haven self install --yes`): the Homebrew formulae, then every missing pinned binary. A failure of a
    non-required item is printed and skipped; `haven up` still runs.
 5. **Storybook and the mail preview are lazy and owned by the UI dev server.** They start on the
    first request to their port and stop after idle (`LANGWATCH_DEV_TOOLS_IDLE`, `off` pins). Not

@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, HStack, Input, Spacer } from "@langwatch/design-system/primitives";
+import { SectionNavigationHeader } from "@langwatch/design-system/section-navigation-frame";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -58,7 +59,7 @@ export function AnalyticsHeader({
   };
 
   return (
-    <PageLayout.Header>
+    <SectionNavigationHeader>
       {isEditing ? (
         <Input
           ref={inputRef}
@@ -125,6 +126,6 @@ export function AnalyticsHeader({
         </Tooltip>
         {extraHeaderButtons}
       </HStack>
-    </PageLayout.Header>
+    </SectionNavigationHeader>
   );
 }

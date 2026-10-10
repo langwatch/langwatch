@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Single source of truth for the model catalog. Merges the base `llmModels.json`, regenerated
  * weekly from the upstream price sources, with the hand-curated `llmModels.overlay.json`. Merge
@@ -9,7 +10,7 @@ import llmModelsRaw from "./model-catalog.json" with { type: "json" };
 import llmModelsOverlayRaw from "./model-catalog.overlay.json" with { type: "json" };
 import type { LLMModelEntry, LLMModelRegistry } from "./model-catalog.types.ts";
 
-export const modelPricingSchema = z
+const modelPricingSchemaDefinition = z
   .object({
     inputCostPerToken: z.number(),
     outputCostPerToken: z.number(),
@@ -26,8 +27,10 @@ export const modelPricingSchema = z
     inputCostPerSecond: z.number().optional(),
   })
   .strict();
+export interface ModelPricingSchema extends Named<typeof modelPricingSchemaDefinition> {}
+export const modelPricingSchema: ModelPricingSchema = modelPricingSchemaDefinition;
 
-export const modelCatalogEntrySchema = z
+const modelCatalogEntrySchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -55,6 +58,8 @@ export const modelCatalogEntrySchema = z
       .optional(),
   })
   .strict();
+export interface ModelCatalogEntrySchema extends Named<typeof modelCatalogEntrySchemaDefinition> {}
+export const modelCatalogEntrySchema: ModelCatalogEntrySchema = modelCatalogEntrySchemaDefinition;
 
 const modelCatalogSchema = z
   .object({

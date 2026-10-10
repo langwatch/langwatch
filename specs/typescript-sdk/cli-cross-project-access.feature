@@ -55,6 +55,18 @@ Feature: CLI cross-project access with the user-scoped login key
       When the user runs `langwatch virtual-keys create --name ci` naming no scope
       Then the request names the personal project in the X-Project-Id header
 
+    @unit
+    Scenario: query run reads every project the login reaches unless --project narrows it
+      When the user runs `langwatch query "SELECT ..."` naming no project
+      Then the request body carries no projectId, so the statement spans every project the login can read
+      And no notice tells the user the command reads their personal project
+
+    @unit
+    Scenario: query run follows --project
+      Given the key reaches a project with slug "proj-b" and id "project_b"
+      When the user runs `langwatch query "SELECT ..." --project proj-b`
+      Then the request body names "project_b" as projectId, so only that project's rows come back
+
   Rule: --project selects the target project by id or slug
 
     @integration
@@ -110,6 +122,13 @@ Feature: CLI cross-project access with the user-scoped login key
       Given a command whose implementation calls no project argument of its own
       When the user runs it with `--project checkout-agent`
       Then the resolver receives "checkout-agent" as the project selector
+
+    @unit
+    Scenario: a command that builds its own request carries the resolved project
+      Given a command that sends its own request, such as `simulation-run list`
+      When the user runs it with a login key and `--project checkout-agent`
+      Then the request is scoped to the project the resolver chose
+      And the server never answers project_required for it
 
     @unit
     Scenario: a command with its own --project keeps its own meaning

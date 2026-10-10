@@ -17,7 +17,7 @@ import {
 } from "../rules/scenario-generate-nlpgo-error.rules.ts";
 import type { ScenarioGenerateBoundsService } from "./scenario-generate-bounds.service.ts";
 
-export interface ScenarioGenerationDependencies {
+interface ScenarioGenerationDependencies {
   bounds: Pick<ScenarioGenerateBoundsService, "assertGenerateWithinBounds">;
   modelProviders: Pick<ModelProviderApi, "generateStructured">;
   /** `SCENARIO_GENERATE_TIMEOUT_MS`, already defaulted by the scenario config leaf. */

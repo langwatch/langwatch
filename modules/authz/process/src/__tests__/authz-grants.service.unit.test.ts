@@ -43,7 +43,15 @@ type CompatibilityMethod = keyof Pick<
   | "deleteRole"
 >;
 
-type LedgerStub = Record<CompatibilityMethod, Mock>;
+type SharedProjectMethod = keyof Pick<
+  EventingAuthzLedgerAdapter,
+  | "findLiveSharedProjectGrants"
+  | "attachSharedProjectGrant"
+  | "awaitSharedProjectGrants"
+  | "revokeSharedProjectGrants"
+>;
+
+type LedgerStub = Record<CompatibilityMethod | SharedProjectMethod, Mock>;
 
 const OFFBOARD_COUNTS = {
   bindings: 2,
@@ -85,6 +93,10 @@ function makeLedger(overrides: Partial<LedgerStub> = {}): LedgerStub {
     attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
     attachResourceGrant: vi.fn().mockResolvedValue(undefined),
     revokeResourceGrants: vi.fn().mockResolvedValue(undefined),
+    findLiveSharedProjectGrants: vi.fn().mockResolvedValue([]),
+    attachSharedProjectGrant: vi.fn(),
+    awaitSharedProjectGrants: vi.fn().mockResolvedValue(undefined),
+    revokeSharedProjectGrants: vi.fn().mockResolvedValue(undefined),
     changeBindingRole: vi.fn().mockResolvedValue(undefined),
     revokeBindings: vi.fn().mockResolvedValue(undefined),
     revokeBindingsWhere: vi.fn().mockResolvedValue(0),
@@ -101,6 +113,7 @@ const WRITE_ACTOR = { type: "user", id: "admin-1" } as const;
 
 function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
   const epoch = new StubAuthzEpoch();
+  const offboarded = { memberOffboarded: vi.fn().mockResolvedValue(undefined) };
   const service = AuthzGrantsService.create({
     permissions: permissiveGrantGuards,
     repository,
@@ -108,9 +121,10 @@ function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger
     epoch,
     newBindingId: () => "rb_test_ksuid",
     bindings: new StubAuthzManagedGrantRepository(),
+    offboarded,
   });
   const bumpEpoch = epoch.bump;
-  return { service, bumpEpoch, ledger };
+  return { service, bumpEpoch, ledger, offboarded };
 }
 
 beforeEach(() => {
@@ -1138,5 +1152,42 @@ describe("when founder creation attaches its two admin grants", () => {
     expect(ledger.attachBindings).toHaveBeenCalledWith(
       expect.objectContaining({ bindings: [founderBinding], requireProjection: true }),
     );
+  });
+});
+
+describe("AuthzGrantsService.offboard and the seat-removal fact", () => {
+  describe("when the offboarding deletes the membership row", () => {
+    /** @scenario "A proven offboarding that took the seat records it once for organization" */
+    it("records member_offboarded once, naming who offboarded them", async () => {
+      const { service, offboarded } = makeService(
+        makeRepository({
+          offboardUser: vi.fn(async () => ({ ...OFFBOARD_COUNTS, organizationMembership: true })),
+        }),
+      );
+
+      await service.offboard({ actor, userId: "dave", organizationId: ORG });
+
+      expect(offboarded.memberOffboarded).toHaveBeenCalledTimes(1);
+      expect(offboarded.memberOffboarded).toHaveBeenCalledWith({
+        organizationId: ORG,
+        userId: "dave",
+        offboardedByUserId: "admin-1",
+      });
+    });
+  });
+
+  describe("when the membership row was already gone", () => {
+    /** @scenario "A proven offboarding that took the seat records it once for organization" */
+    it("records nothing, so a retry adds no second removal", async () => {
+      const { service, offboarded } = makeService(
+        makeRepository({
+          offboardUser: vi.fn(async () => ({ ...OFFBOARD_COUNTS, organizationMembership: false })),
+        }),
+      );
+
+      await service.offboard({ actor, userId: "dave", organizationId: ORG });
+
+      expect(offboarded.memberOffboarded).not.toHaveBeenCalled();
+    });
   });
 });

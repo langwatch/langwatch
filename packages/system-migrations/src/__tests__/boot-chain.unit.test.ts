@@ -4,6 +4,7 @@
  * tenant cost the start, driven through fakes of the ledger and the lease.
  * Spec: specs/migration/system-migrations-runner.feature
  */
+import { nowInstant } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { driveSystemMigrationsToConvergence } from "../convergence.ts";
@@ -75,6 +76,7 @@ function bootChain({
   migrateTenant: SystemMigration["migrateTenant"];
 }): Promise<void> {
   const runner = new SystemMigrationRunnerService({
+    now: nowInstant,
     state,
     lease: freeLease,
     tenants: {

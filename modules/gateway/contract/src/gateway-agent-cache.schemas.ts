@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const MIN_AGENT_CACHE_TTL_SECONDS = 5;
@@ -19,7 +20,7 @@ function utf8ByteLength(value: string): number {
   return bytes;
 }
 
-export const gatewayAgentCacheNameParamsSchema = z.object({
+const gatewayAgentCacheNameParamsSchemaDefinition = z.object({
   name: z
     .string()
     .min(1, "name is required")
@@ -29,8 +30,13 @@ export const gatewayAgentCacheNameParamsSchema = z.object({
       "name must contain only uppercase letters, digits, and underscores, and must start with a letter",
     ),
 });
+export interface GatewayAgentCacheNameParamsSchema extends Named<
+  typeof gatewayAgentCacheNameParamsSchemaDefinition
+> {}
+export const gatewayAgentCacheNameParamsSchema: GatewayAgentCacheNameParamsSchema =
+  gatewayAgentCacheNameParamsSchemaDefinition;
 
-export const gatewayAgentCacheWriteSchema = z.object({
+const gatewayAgentCacheWriteSchemaDefinition = z.object({
   value: z
     .string()
     .min(1, "value is required")
@@ -45,17 +51,42 @@ export const gatewayAgentCacheWriteSchema = z.object({
     .max(MAX_AGENT_CACHE_TTL_SECONDS)
     .optional(),
 });
+export interface GatewayAgentCacheWriteSchema extends Named<
+  typeof gatewayAgentCacheWriteSchemaDefinition
+> {}
+export const gatewayAgentCacheWriteSchema: GatewayAgentCacheWriteSchema =
+  gatewayAgentCacheWriteSchemaDefinition;
 
-export const gatewayAgentCacheEntrySchema = z.object({ name: z.string(), value: z.string() });
-export const gatewayAgentCacheWrittenSchema = z.object({
+const gatewayAgentCacheEntrySchemaDefinition = z.object({ name: z.string(), value: z.string() });
+export interface GatewayAgentCacheEntrySchema extends Named<
+  typeof gatewayAgentCacheEntrySchemaDefinition
+> {}
+export const gatewayAgentCacheEntrySchema: GatewayAgentCacheEntrySchema =
+  gatewayAgentCacheEntrySchemaDefinition;
+const gatewayAgentCacheWrittenSchemaDefinition = z.object({
   name: z.string(),
   ttl_seconds: z.number(),
 });
-export const gatewayAgentCacheClaimedSchema = z.object({
+export interface GatewayAgentCacheWrittenSchema extends Named<
+  typeof gatewayAgentCacheWrittenSchemaDefinition
+> {}
+export const gatewayAgentCacheWrittenSchema: GatewayAgentCacheWrittenSchema =
+  gatewayAgentCacheWrittenSchemaDefinition;
+const gatewayAgentCacheClaimedSchemaDefinition = z.object({
   ...gatewayAgentCacheWrittenSchema.shape,
   claimed: z.boolean(),
 });
-export const gatewayAgentCacheDeletedSchema = z.object({
+export interface GatewayAgentCacheClaimedSchema extends Named<
+  typeof gatewayAgentCacheClaimedSchemaDefinition
+> {}
+export const gatewayAgentCacheClaimedSchema: GatewayAgentCacheClaimedSchema =
+  gatewayAgentCacheClaimedSchemaDefinition;
+const gatewayAgentCacheDeletedSchemaDefinition = z.object({
   name: z.string(),
   deleted: z.boolean(),
 });
+export interface GatewayAgentCacheDeletedSchema extends Named<
+  typeof gatewayAgentCacheDeletedSchemaDefinition
+> {}
+export const gatewayAgentCacheDeletedSchema: GatewayAgentCacheDeletedSchema =
+  gatewayAgentCacheDeletedSchemaDefinition;

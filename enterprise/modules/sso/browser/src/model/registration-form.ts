@@ -36,8 +36,7 @@ export function canListLandingTarget({
 }): boolean {
   return (
     !listed.includes(target) &&
-    ssoSamlIdpInitiatedSchema.safeParse({ enabled: true, landingTargets: [...listed, target] })
-      .success
+    ssoSamlIdpInitiatedSchema.validate({ enabled: true, landingTargets: [...listed, target] })
   );
 }
 
