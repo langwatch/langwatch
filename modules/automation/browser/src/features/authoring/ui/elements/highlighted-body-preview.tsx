@@ -6,6 +6,7 @@ import {
   normalizeShikiLang,
   useShikiAdapter,
 } from "@langwatch/design-system/shiki";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { useEffect, useState } from "react";
 
 /**
@@ -94,7 +95,7 @@ export function HighlightedBodyPreview({
                 css={{
                   "& pre, & code": {
                     background: "transparent !important",
-                    fontSize: "0.75rem",
+                    fontSize: `${TYPE_SCALE_PX.caption}px`,
                     lineHeight: "1.6",
                     padding: "0 !important",
                     margin: "0 !important",

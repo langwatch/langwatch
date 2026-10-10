@@ -283,10 +283,7 @@ export function TableShell({ children }: { children: React.ReactNode }) {
           "& table": { tableLayout: "fixed", minWidth: "880px" },
           "& thead th": {
             backgroundColor: "var(--chakra-colors-bg-subtle)",
-            fontSize: "11px",
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
+            textStyle: "eyebrow",
             color: "var(--chakra-colors-fg-muted)",
             verticalAlign: "bottom",
             paddingTop: "0.6rem",

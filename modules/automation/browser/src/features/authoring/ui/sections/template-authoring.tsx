@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
@@ -140,7 +141,7 @@ export function TemplateDisclosure({
 
 const editorOptions = {
   minimap: { enabled: false },
-  fontSize: 13,
+  fontSize: TYPE_SCALE_PX.bodySm,
   wordWrap: "on" as const,
   automaticLayout: true,
   scrollBeyondLastLine: false,
