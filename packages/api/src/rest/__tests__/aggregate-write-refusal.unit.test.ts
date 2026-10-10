@@ -41,6 +41,15 @@ function mounted({ kind }: { kind: string }) {
     .withPermission("evaluations:manage")
     .withOutput(z.object({ ran: z.boolean() }))
     .handle(({ app }) => app.run())
+    .post("/clusters", "cluster")
+    .refusedOnAggregate()
+    .withPermission("project:update")
+    .withOutput(z.object({ ran: z.boolean() }))
+    .handle(({ app }) => app.run())
+    .post("/names", "rename")
+    .withPermission("project:update")
+    .withOutput(z.object({ ran: z.boolean() }))
+    .handle(({ app }) => app.run())
     .get("/", "list")
     .withPermission("evaluations:view")
     .withOutput(z.object({ ran: z.boolean() }))
@@ -61,8 +70,11 @@ function mounted({ kind }: { kind: string }) {
 
   return {
     ran,
-    request: (method: "GET" | "POST") =>
-      server.request(`/api/runs/${VERSION}/`, { method, headers: { authorization: "Bearer k" } }),
+    request: (method: "GET" | "POST", path = "") =>
+      server.request(`/api/runs/${VERSION}/${path}`, {
+        method,
+        headers: { authorization: "Bearer k" },
+      }),
   };
 }
 
@@ -93,5 +105,31 @@ describe("a REST route on an aggregate project", () => {
       expect((await request("GET")).status).toBe(200);
       expect(ran).toEqual(["run"]);
     });
+  });
+});
+
+describe("a REST route under an exempt permission that declared refusedOnAggregate", () => {
+  it("refuses it on the aggregate as read only and never runs the handler", async () => {
+    const { ran, request } = mounted({ kind: "aggregate" });
+
+    const response = await request("POST", "clusters");
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toContain("aggregate_project_is_read_only");
+    expect(ran).toEqual([]);
+  });
+
+  it("runs an exempt route that declared nothing on the aggregate", async () => {
+    const { ran, request } = mounted({ kind: "aggregate" });
+
+    expect((await request("POST", "names")).status).toBe(200);
+    expect(ran).toEqual(["run"]);
+  });
+
+  it("runs it on an ordinary project", async () => {
+    const { ran, request } = mounted({ kind: "application" });
+
+    expect((await request("POST", "clusters")).status).toBe(200);
+    expect(ran).toEqual(["run"]);
   });
 });

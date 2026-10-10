@@ -5,7 +5,6 @@ import {
   type AuthzDeclaredScopeId,
   type AuthzPermission,
   internalActor,
-  writesUnderProject,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
@@ -37,6 +36,7 @@ import {
   mintAuthorization,
   platformRefusal,
   refuseImpersonatedMint,
+  asksAggregateWrite,
   refuseWriteUnderAggregate,
   routeScopeOf,
   scopeWithOrganization,
@@ -1482,13 +1482,15 @@ async function refuseAggregateWrite({
   request: Request;
 }): Promise<void> {
   const permissions = routePermissions(route);
+  const refusedOnAggregate = route.refusedOnAggregate === true;
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
-  if (scope?.tier !== "project" || !permissions.some(writesUnderProject)) return;
+  if (!asksAggregateWrite({ permissions, scope, refusedOnAggregate })) return;
 
   const authorize = ports.authorization.forRequest(request);
   refuseWriteUnderAggregate({
     permissions,
     scope: await scopeWithOrganization({ scope, authorize }),
+    refusedOnAggregate,
   });
 }
 

@@ -11,7 +11,12 @@ import { describe, expect, it } from "vitest";
 
 import { processModules } from "../process-modules.generated.ts";
 
-type Mutation = { path: string; permissions: readonly AuthzPermission[]; namesProject: boolean };
+type Mutation = {
+  path: string;
+  permissions: readonly AuthzPermission[];
+  namesProject: boolean;
+  refusedOnAggregate: boolean;
+};
 
 /** The permissions the door admits a declaration under, as `declaredPermissions` reads them. */
 function permissionsOf(access: TrpcAccess): readonly AuthzPermission[] {
@@ -58,6 +63,7 @@ function declaredMutations(): Mutation[] {
         path: request.procedure,
         permissions,
         namesProject: carriesProjectId(request.member.input),
+        refusedOnAggregate: request.refusedOnAggregate === true,
       });
     }
     return request;
@@ -73,7 +79,8 @@ function declaredMutations(): Mutation[] {
   return mutations;
 }
 
-const letThrough = ({ permissions }: Mutation) => !permissions.some(writesUnderProject);
+const letThrough = ({ permissions, refusedOnAggregate }: Mutation) =>
+  !refusedOnAggregate && !permissions.some(writesUnderProject);
 
 describe("the aggregate write guard's exemptions", () => {
   const mutations = declaredMutations();
@@ -108,6 +115,20 @@ describe("the aggregate write guard's exemptions", () => {
     });
   });
 
+  describe("when a write under an exempt permission lands under the project's tenant", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it.each([
+      "topics.triggerTopicClustering",
+      "storedObjects.createUpload",
+      "storedObjects.confirmUpload",
+    ])("declares %s refused on the aggregate", (path) => {
+      const mutation = find(path);
+      expect(mutation, path).toBeDefined();
+      expect(mutation?.refusedOnAggregate, path).toBe(true);
+      expect(mutation && letThrough(mutation), path).toBe(false);
+    });
+  });
+
   describe("when every mutation is listed", () => {
     it("lets through exactly these permissions", () => {
       const permissions = new Set(mutations.filter(letThrough).flatMap((m) => m.permissions));
@@ -124,8 +145,8 @@ describe("the aggregate write guard's exemptions", () => {
 });
 
 /**
- * Written by hand, not derived. Organisation, project and team writes stay open by design (pins
- * are refused in data-retention's service); view-declared ones are reads shaped as mutations.
+ * Written by hand, not derived. Organisation, project and team writes stay open by design (pins are
+ * refused in data-retention's service; clustering and uploads declare `refusedOnAggregate()`).
  * Narrowing any of these is a decision for the ADR, not a quiet edit here.
  */
 const LET_THROUGH_MUTATIONS_NAMING_A_PROJECT: string[] = [
@@ -160,9 +181,6 @@ const LET_THROUGH_MUTATIONS_NAMING_A_PROJECT: string[] = [
   "slackIntegration.create",
   "slackIntegration.delete",
   "slackIntegration.update",
-  "storedObjects.confirmUpload",
-  "storedObjects.createUpload",
-  "topics.triggerTopicClustering",
   "traces.aiAction",
   "traces.aiQuery",
   "traces.getAllForDownload",

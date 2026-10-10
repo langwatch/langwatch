@@ -375,6 +375,8 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   entitlement?: EntitlementGate;
   /** Present exactly when the procedure mints a credential: the permission its refusal names. */
   mintsCredential?: AuthzPermission;
+  /** Present exactly when a mutation is refused on an aggregate though its permission is exempt. */
+  refusedOnAggregate?: true;
   /** Present exactly when the procedure's audit row names a target its input does not. */
   audit?: TrpcAuditTarget;
   /** Present exactly when the module hears of a caller its door refused (Q51). */
@@ -493,6 +495,11 @@ export interface TrpcRouterAccess<
     permission: AuthzPermission,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   /**
+   * The mutation writes under its project although its permission is exempt from the aggregate
+   * write guard, so the door refuses it on an aggregate (ADR-177 decision 8). Refused on a query.
+   */
+  refusedOnAggregate(): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
    * The mutation's audit row names the organization holding the scope its `via` input field
    * names, as its organization and its target. Refused on a query, twice, for a field the input
    * does not carry, and on a procedure that runs with no caller.
@@ -587,6 +594,7 @@ type Implementation = Readonly<{
   access: TrpcAccess;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   facts: readonly TrpcFact[];
@@ -634,6 +642,7 @@ type PermissionArgument =
 type ProcedureMarks = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
 }>;
@@ -650,6 +659,22 @@ function assertSingleEntitlement({ contract, name, entitlement }: EntitlementQue
   throw new Error(
     `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
       `"${entitlement.entitlement}"`,
+  );
+}
+
+/** Only a mutation writes, and it declares the refusal once. */
+function assertRefusableOnAggregate({
+  contract,
+  name,
+  declared,
+}: {
+  contract: TrpcContract;
+  name: string;
+  declared: true | undefined;
+}): void {
+  if (contract.members[name]?.kind === "mutation" && !declared) return;
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} declares refusedOnAggregate on a query or twice`,
   );
 }
 
@@ -717,6 +742,11 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       },
       mintsCredential: (permission: AuthzPermission) =>
         selected(name, facts, { ...marks, mintsCredential: permission }),
+      refusedOnAggregate: () => {
+        assertRefusableOnAggregate({ contract, name, declared: marks.refusedOnAggregate });
+
+        return selected(name, facts, { ...marks, refusedOnAggregate: true });
+      },
       onRefused: (hook: TrpcRefusalHook<unknown, unknown>) => {
         if (marks.onRefused) {
           throw new Error(`tRPC ${contract.namespace}.${name} declares onRefused twice`);
@@ -1191,6 +1221,7 @@ export function createTrpcRuntime<
           facts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
           ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
+          refusedOnAggregate: request.refusedOnAggregate === true,
           ...(request.onRefused ? { onRefused: request.onRefused } : {}),
         }),
       );
@@ -1364,6 +1395,7 @@ function access<TContext extends object>({
   kind,
   entitlement,
   mintsCredential,
+  refusedOnAggregate,
   onRefused,
   app,
   facts,
@@ -1374,6 +1406,7 @@ function access<TContext extends object>({
   kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  refusedOnAggregate: boolean;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
@@ -1396,6 +1429,7 @@ function access<TContext extends object>({
       facts,
       ...(entitlement ? { entitlement } : {}),
       ...(mintsCredential ? { mintsCredential } : {}),
+      refusedOnAggregate,
       ...(onRefused ? { onRefused } : {}),
     }),
   );
@@ -1410,6 +1444,7 @@ function check<TContext extends object>({
   kind,
   entitlement,
   mintsCredential,
+  refusedOnAggregate,
   onRefused,
   app,
   facts,
@@ -1420,6 +1455,7 @@ function check<TContext extends object>({
   kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  refusedOnAggregate: boolean;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
@@ -1492,6 +1528,7 @@ function check<TContext extends object>({
         declaration,
         decision,
         kind,
+        refusedOnAggregate,
         procedure,
         authorize: members.authorization.forRequest(ctx),
       })),
@@ -1510,18 +1547,24 @@ async function admittedScope({
   declaration,
   decision,
   kind,
+  refusedOnAggregate,
   procedure,
   authorize,
 }: {
   declaration: AccessDeclaration;
   decision: Awaited<ReturnType<typeof decide>>;
   kind: TrpcContractMember["kind"];
+  refusedOnAggregate: boolean;
   procedure: string;
   authorize: Authorize;
 }): Promise<Pick<ResolvedAccess, "scope" | "authorization">> {
   const scope = await scopeWithOrganization({ scope: decision.scope, authorize });
   if (kind === "mutation") {
-    refuseWriteUnderAggregate({ permissions: declaredPermissions(declaration), scope });
+    refuseWriteUnderAggregate({
+      permissions: declaredPermissions(declaration),
+      scope,
+      refusedOnAggregate,
+    });
   }
 
   return {

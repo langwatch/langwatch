@@ -564,6 +564,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly entitlement?: EntitlementGate;
   /** Present exactly when the route mints a credential: the permission its refusal names. */
   readonly mintsCredential?: AuthzPermission;
+  /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
+  readonly refusedOnAggregate?: true;
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -631,6 +633,7 @@ type RouteState = Readonly<{
   cache?: RestCachePolicy;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  refusedOnAggregate?: true;
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -1010,6 +1013,23 @@ class RouteBuilder<Api, S extends RouteShape> {
       path: this.path,
       operation: this.operation,
       state: { ...this.state, mintsCredential: permission },
+    });
+  }
+
+  /**
+   * The route writes under its project although its permission is exempt from the aggregate
+   * write guard, so the door refuses it on an aggregate (ADR-177 decision 8).
+   */
+  refusedOnAggregate(): RouteBuilder<Api, S> {
+    if (this.state.refusedOnAggregate)
+      throw new Error("REST route already declared refusedOnAggregate()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, refusedOnAggregate: true },
     });
   }
 
@@ -1649,6 +1669,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
+    ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),

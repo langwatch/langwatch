@@ -945,15 +945,38 @@ export function declaredPermissions(declaration: AccessDeclaration): readonly Au
   }
 }
 
-/** ADR-177 decision 8: a write under a project-tier permission is refused on an aggregate. */
+/** Whether a write is asked on an aggregate: a project-tier write, or a route that declared it. */
+export function asksAggregateWrite({
+  permissions,
+  scope,
+  refusedOnAggregate = false,
+}: {
+  permissions: readonly AuthzPermission[];
+  scope: AuthzDeclaredScopeId | AuthzHandlerScope | null;
+  refusedOnAggregate?: boolean;
+}): boolean {
+  return scope?.tier === "project" && (refusedOnAggregate || permissions.some(writesUnderProject));
+}
+
+/**
+ * ADR-177 decision 8: a write under a project-tier permission is refused on an aggregate, and so
+ * is a route that declared `refusedOnAggregate()` though its permission is exempt.
+ */
 export function refuseWriteUnderAggregate({
   permissions,
   scope,
+  refusedOnAggregate = false,
 }: {
   permissions: readonly AuthzPermission[];
   scope: AuthzHandlerScope | null;
+  refusedOnAggregate?: boolean;
 }): void {
-  if (scope?.tier !== "project" || !permissions.some(writesUnderProject)) return;
+  if (
+    scope?.tier !== "project" ||
+    !asksAggregateWrite({ permissions, scope, refusedOnAggregate })
+  ) {
+    return;
+  }
 
   assertProjectAcceptsWrites({ kind: scope.kind });
 }

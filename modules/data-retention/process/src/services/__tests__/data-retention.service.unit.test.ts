@@ -387,6 +387,7 @@ describe("given an aggregate project", () => {
     });
 
   describe("when a trace is pinned under it", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
     it("refuses with aggregate_project_is_read_only", async () => {
       await expect(service().pin({ projectId: PROJECT, traceId: "trace-1" })).rejects.toMatchObject(
         {
@@ -397,6 +398,7 @@ describe("given an aggregate project", () => {
   });
 
   describe("when a trace is unpinned under it", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
     it("refuses with aggregate_project_is_read_only", async () => {
       await expect(
         service().unpin({ projectId: PROJECT, traceId: "trace-1" }),
@@ -407,6 +409,7 @@ describe("given an aggregate project", () => {
   });
 
   describe("when a trace is pinned under an application project", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
     it("pins it", async () => {
       const application = createService({
         projectScopes: MemoryDataRetentionProjectScopeRepository.create({
