@@ -13,7 +13,10 @@ const { calls } = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/project-api.ts", () => {
   const utils = {
-    organization: { getAll: { invalidate: calls.invalidate } },
+    organization: {
+      getAll: { invalidate: calls.invalidate, refetch: calls.invalidate },
+      getScopeGraph: { invalidate: calls.invalidate },
+    },
     governance: { resolveHome: { invalidate: calls.invalidate } },
   };
   return {
@@ -39,7 +42,7 @@ import {
   FakeProjectHost,
   renderWithProjectHost,
 } from "../../../../testing.tsx";
-import ProjectSettingsScreen from "../project-settings-screen.tsx";
+import ProjectSettingsScreen, { ProjectGeneralScreen } from "../project-settings-screen.tsx";
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
@@ -56,11 +59,19 @@ describe("given no organization is in scope", () => {
 });
 
 describe("given an organization with a shared project", () => {
-  it("offers both halves of the address", () => {
+  it("keeps the project's own settings off the organization page", () => {
     renderWithProjectHost(<ProjectSettingsScreen />);
 
     expect(screen.getByText("Organization settings")).toBeTruthy();
+    expect(screen.queryByText("Project settings")).toBeNull();
+    expect(screen.queryByText("Project ID")).toBeNull();
+  });
+
+  it("gives the project its own page with its id and name", () => {
+    renderWithProjectHost(<ProjectGeneralScreen />);
+
     expect(screen.getByText("Project settings")).toBeTruthy();
+    expect(screen.getByText("Project ID")).toBeTruthy();
   });
 });
 
@@ -78,6 +89,15 @@ describe("given the project in scope is somebody's personal workspace", () => {
 
     expect(screen.getByText("Organization settings")).toBeTruthy();
     expect(screen.queryByText("Project settings")).toBeNull();
+  });
+
+  it("gives that project no settings page either", () => {
+    renderWithProjectHost(
+      <ProjectGeneralScreen />,
+      new FakeProjectHost({ project: aProject({ isPersonal: true }) }),
+    );
+
+    expect(screen.queryByText("Project ID")).toBeNull();
   });
 });
 
@@ -112,22 +132,36 @@ describe("when the reader may only view the organization", () => {
 });
 
 describe("when the reader holds the lite membership seat", () => {
-  /**
-   * The ORGANIZATION half only — a lite seat carries no organization
-   * change, and the project form keeps its own save.
-   */
-  it("takes the organization form's save away and leaves the project's", () => {
+  it("takes the organization form's save away", () => {
     renderWithProjectHost(<ProjectSettingsScreen />, new FakeProjectHost({ isLiteMember: true }));
 
-    expect(screen.getAllByRole("button", { name: "Save changes" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   });
 });
 
 describe("when the reader may manage the organization and holds a full seat", () => {
-  it("offers a save on each half", () => {
+  it("offers one save on each page", () => {
+    renderWithProjectHost(<ProjectSettingsScreen />);
+    expect(screen.getAllByRole("button", { name: "Save changes" })).toHaveLength(1);
+    cleanup();
+
+    renderWithProjectHost(<ProjectGeneralScreen />);
+    expect(screen.getAllByRole("button", { name: "Save changes" })).toHaveLength(1);
+  });
+});
+
+describe("when the reader flips a switch on the organization page", () => {
+  it("saves the one setting at once and says Saved", async () => {
+    calls.updateOrganization.mockImplementation((_input, options) => options.onSuccess());
     renderWithProjectHost(<ProjectSettingsScreen />);
 
-    expect(screen.getAllByRole("button", { name: "Save changes" })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Live presence" }));
+
+    expect(await screen.findByText("Saved")).toBeTruthy();
+    expect(calls.updateOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ presenceEnabled: false }),
+      expect.anything(),
+    );
   });
 });
 
@@ -139,7 +173,7 @@ describe("given the application mounts a project switcher", () => {
    */
   it("renders whatever the host hands it, and nothing when it hands none", () => {
     renderWithProjectHost(
-      <ProjectSettingsScreen />,
+      <ProjectGeneralScreen />,
       new FakeProjectHost({ projectSwitcher: <span>the project switcher</span> }),
     );
 

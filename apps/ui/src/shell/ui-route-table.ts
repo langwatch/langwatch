@@ -297,6 +297,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "layouts/project-langy",
         children: [
           { path: "/settings", page: "pages/settings" },
+          { path: "/settings/project", page: "pages/settings/project" },
           {
             // Role Bindings became the Roles page's assignments tab.
             path: "/settings/role-bindings",

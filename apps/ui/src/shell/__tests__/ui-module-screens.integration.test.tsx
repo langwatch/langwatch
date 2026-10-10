@@ -107,6 +107,7 @@ describe("given the installed web modules", () => {
           "pages/settings/data-privacy",
           "pages/settings/data-retention",
           "pages/settings",
+          "pages/settings/project",
           "pages/authorize",
           "pages/mcp/authorize",
           "pages/cli/auth",

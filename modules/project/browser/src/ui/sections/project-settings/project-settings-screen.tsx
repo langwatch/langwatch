@@ -23,9 +23,7 @@ import {
   SettingsFieldValue,
 } from "@langwatch/design-system/settings-field";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
-import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { SectionTitle } from "@langwatch/design-system/typography";
 import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import isEqual from "lodash-es/isEqual";
 import { Building2, FolderCog, Lock } from "lucide-react";
@@ -50,6 +48,7 @@ import {
 } from "../../../model/project-host.ts";
 import { ProjectTechStackIcon } from "../../../ui/blocks/tech-stack.tsx";
 import { TechStackSelector } from "../../blocks/onboarding/tech-stack.tsx";
+import { SaveOnChangeSwitch, type SaveOutcome } from "../../blocks/save-on-change-switch.tsx";
 
 type OrganizationFormData = {
   name: string;
@@ -57,8 +56,6 @@ type OrganizationFormData = {
   s3AccessKeyId: string;
   s3SecretAccessKey: string;
   s3Bucket: string;
-  presenceEnabled: boolean;
-  traceSharingEnabled: boolean;
   supportContact: string;
   primaryIntent: "" | OrganizationIntent;
 };
@@ -108,13 +105,11 @@ function OrganizationIdentityFields({
   canManage,
   control,
   organization,
-  project,
   register,
 }: {
   canManage: boolean;
   control: Control<OrganizationFormData>;
   organization: ProjectHostOrganization;
-  project: ProjectHostProject | undefined;
   register: UseFormRegister<OrganizationFormData>;
 }) {
   // A subscription, so a refused save re-renders the field as invalid (WEB-5602 pattern).
@@ -144,13 +139,6 @@ function OrganizationIdentityFields({
           <IdText value={organization.slug} label="organization slug" />
         </SettingsFieldValue>
       </SettingsField>
-      {project ? (
-        <SettingsField label="Project ID" hint="Use this ID when authenticating with API keys.">
-          <SettingsFieldValue>
-            <IdText value={project.id} label="project ID" />
-          </SettingsFieldValue>
-        </SettingsField>
-      ) : null}
       <SettingsField
         label="Support contact"
         hint="Shown to members in 'contact your admin' messages; empty falls back to the first admin's email."
@@ -187,6 +175,28 @@ export default function ProjectSettingsScreen() {
   if (!organization) return null;
 
   return <SettingsForm organization={organization} project={sharedProject} />;
+}
+
+/** Settings › Project › General: the project's own name, id, tech stack and switches. */
+export function ProjectGeneralScreen() {
+  const host = useProjectHost();
+  const project = host.project();
+  const sharedProject = project && !project.isPersonal ? project : undefined;
+
+  return (
+    <Box width="full">
+      <PageLayout.Header>
+        <PageLayout.Heading>Project settings</PageLayout.Heading>
+        <Spacer />
+        {host.projectSwitcher()}
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+        {sharedProject && host.hasPermission("project:update") ? (
+          <ProjectSettingsForm project={sharedProject} />
+        ) : null}
+      </VStack>
+    </Box>
+  );
 }
 
 function S3StorageField({
@@ -255,8 +265,6 @@ function SettingsForm({
     s3AccessKeyId: organization.s3AccessKeyId ?? "",
     s3SecretAccessKey: "",
     s3Bucket: organization.s3Bucket ?? "",
-    presenceEnabled: organization.presenceEnabled,
-    traceSharingEnabled: organization.traceSharingEnabled,
     supportContact: organization.supportContact ?? "",
     primaryIntent: organization.primaryIntent ?? "",
   });
@@ -282,8 +290,8 @@ function SettingsForm({
         s3AccessKeyId: data.s3AccessKeyId,
         s3SecretAccessKey: data.s3SecretAccessKey,
         s3Bucket: data.s3Bucket,
-        presenceEnabled: data.presenceEnabled,
-        traceSharingEnabled: data.traceSharingEnabled,
+        presenceEnabled: organization.presenceEnabled,
+        traceSharingEnabled: organization.traceSharingEnabled,
         supportContact: data.supportContact.trim() || null,
         primaryIntent: data.primaryIntent === "" ? null : data.primaryIntent,
       },
@@ -313,6 +321,40 @@ function SettingsForm({
       },
     );
   };
+
+  const saveOrganizationSwitch = ({
+    onSuccess,
+    onError,
+    ...flag
+  }: {
+    presenceEnabled?: boolean;
+    traceSharingEnabled?: boolean;
+    onSuccess: () => void;
+    onError: (message: string) => void;
+  }) =>
+    updateOrganization.mutate(
+      {
+        organizationId: organization.id,
+        name: organization.name,
+        s3Endpoint: organization.s3Endpoint ?? "",
+        s3AccessKeyId: organization.s3AccessKeyId ?? "",
+        s3SecretAccessKey: "",
+        s3Bucket: organization.s3Bucket ?? "",
+        presenceEnabled: organization.presenceEnabled,
+        traceSharingEnabled: organization.traceSharingEnabled,
+        supportContact: organization.supportContact ?? null,
+        primaryIntent: organization.primaryIntent ?? null,
+        ...flag,
+      },
+      {
+        onSuccess: () => {
+          void apiContext.organization.getAll.refetch();
+          void apiContext.organization.getScopeGraph.invalidate();
+          onSuccess();
+        },
+        onError: () => onError("Couldn't save. Try again."),
+      },
+    );
 
   return (
     <Box width="full">
@@ -351,7 +393,6 @@ function SettingsForm({
                 canManage={canManageOrganization}
                 control={control}
                 organization={organization}
-                project={project}
                 register={register}
               />
 
@@ -413,17 +454,13 @@ function SettingsForm({
                   </>
                 }
               >
-                <Controller
-                  control={control}
-                  name="presenceEnabled"
-                  render={({ field }) => (
-                    <Switch
-                      colorPalette="accent"
-                      checked={field.value}
-                      onCheckedChange={({ checked }) => field.onChange(checked)}
-                      disabled={!canManageOrganization}
-                    />
-                  )}
+                <SaveOnChangeSwitch
+                  label="Live presence"
+                  checked={organization.presenceEnabled}
+                  disabled={!canManageOrganization}
+                  onSave={({ checked, onSuccess, onError }) =>
+                    saveOrganizationSwitch({ presenceEnabled: checked, onSuccess, onError })
+                  }
                 />
               </SettingsField>
 
@@ -437,17 +474,13 @@ function SettingsForm({
                   </>
                 }
               >
-                <Controller
-                  control={control}
-                  name="traceSharingEnabled"
-                  render={({ field }) => (
-                    <Switch
-                      colorPalette="accent"
-                      checked={field.value}
-                      onCheckedChange={({ checked }) => field.onChange(checked)}
-                      disabled={!canManageOrganization}
-                    />
-                  )}
+                <SaveOnChangeSwitch
+                  label="Trace sharing"
+                  checked={organization.traceSharingEnabled}
+                  disabled={!canManageOrganization}
+                  onSave={({ checked, onSuccess, onError }) =>
+                    saveOrganizationSwitch({ traceSharingEnabled: checked, onSuccess, onError })
+                  }
                 />
               </SettingsField>
 
@@ -461,8 +494,6 @@ function SettingsForm({
             </SettingsFieldGroup>
           </SettingsSection>
         </form>
-
-        {project && hasPermission("project:update") && <ProjectSettingsForm project={project} />}
       </VStack>
 
       {/* ADR-038 v6: governance -> LLMOps flip on a project-less org — the
@@ -554,8 +585,6 @@ type ProjectFormData = {
   s3AccessKeyId?: string;
   s3SecretAccessKey?: string;
   s3Bucket?: string;
-  traceSharingEnabled: boolean;
-  presenceEnabled: boolean;
 };
 
 function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
@@ -575,8 +604,6 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
     s3AccessKeyId: project.s3AccessKeyId ?? "",
     s3SecretAccessKey: "",
     s3Bucket: project.s3Bucket ?? "",
-    traceSharingEnabled: project.traceSharingEnabled,
-    presenceEnabled: project.presenceEnabled,
   };
   const [previousValues, setPreviousValues] = useState<ProjectFormData>(defaultValues);
   const form = useForm({
@@ -590,52 +617,25 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
   const apiContext = projectApi.useUtils();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
   const [pendingSharingOff, setPendingSharingOff] = useState<{
-    data: ProjectFormData;
     linkCount: number;
+    outcome: SaveOutcome;
   } | null>(null);
 
-  const handleTraceSharingChange = (newValue: boolean) => {
-    form.setValue("traceSharingEnabled", newValue);
-  };
-
-  const onSubmit: SubmitHandler<ProjectFormData> = async (data: ProjectFormData) => {
+  const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
     if (isEqual(data, previousValues)) return;
-
-    if (data.traceSharingEnabled === false && project.traceSharingEnabled === true && userIsAdmin) {
-      const linkCount = await apiContext.share.countTraceShares.fetch({ projectId: project.id });
-      if (linkCount > 0) {
-        setPendingSharingOff({ data, linkCount });
-        return;
-      }
-    }
-
-    saveProject({ data, revokeExistingLinks: true });
-  };
-
-  const saveProject = ({
-    data,
-    revokeExistingLinks,
-  }: {
-    data: ProjectFormData;
-    revokeExistingLinks: boolean;
-  }) => {
-    setPendingSharingOff(null);
     setPreviousValues(data);
 
     updateProject.mutate(
       {
         projectId: project.id,
         ...data,
-        revokeExistingLinks,
         userLinkTemplate: data.userLinkTemplate ?? "",
         s3Endpoint: data.s3Endpoint ?? "",
         s3AccessKeyId: data.s3AccessKeyId ?? "",
         s3SecretAccessKey: data.s3SecretAccessKey ?? "",
         s3Bucket: data.s3Bucket ?? "",
-
-        // Only admins can change these settings, this is enforced in the backend
-        traceSharingEnabled: userIsAdmin ? data.traceSharingEnabled : void 0,
-        presenceEnabled: userIsAdmin ? data.presenceEnabled : void 0,
+        presenceEnabled: project.presenceEnabled,
+        traceSharingEnabled: project.traceSharingEnabled,
       },
       {
         onSuccess: () => {
@@ -656,13 +656,64 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
     );
   };
 
+  const saveProjectSwitch = ({
+    onSuccess,
+    onError,
+    ...change
+  }: {
+    presenceEnabled?: boolean;
+    traceSharingEnabled?: boolean;
+    revokeExistingLinks?: boolean;
+  } & SaveOutcome) => {
+    setPendingSharingOff(null);
+    updateProject.mutate(
+      {
+        projectId: project.id,
+        name: project.name,
+        language: project.language,
+        framework: project.framework,
+        userLinkTemplate: project.userLinkTemplate ?? "",
+        s3Endpoint: project.s3Endpoint ?? "",
+        s3AccessKeyId: project.s3AccessKeyId ?? "",
+        s3SecretAccessKey: "",
+        s3Bucket: project.s3Bucket ?? "",
+        presenceEnabled: project.presenceEnabled,
+        traceSharingEnabled: project.traceSharingEnabled,
+        ...change,
+      },
+      {
+        onSuccess: () => {
+          void apiContext.organization.getAll.refetch();
+          void apiContext.organization.getScopeGraph.invalidate();
+          onSuccess();
+        },
+        onError: () => onError("Couldn't save. Try again."),
+      },
+    );
+  };
+
+  const saveTraceSharing = async ({
+    checked,
+    onSuccess,
+    onError,
+  }: { checked: boolean } & SaveOutcome) => {
+    if (!checked && userIsAdmin) {
+      const linkCount = await apiContext.share.countTraceShares.fetch({ projectId: project.id });
+      if (linkCount > 0) {
+        setPendingSharingOff({ linkCount, outcome: { onSuccess, onError } });
+        return;
+      }
+    }
+    saveProjectSwitch({
+      traceSharingEnabled: checked,
+      revokeExistingLinks: true,
+      onSuccess,
+      onError,
+    });
+  };
+
   return (
     <>
-      <HStack width="full" paddingTop={2}>
-        <SectionTitle>Project settings</SectionTitle>
-        <Spacer />
-        {host.projectSwitcher()}
-      </HStack>
       <form id="project-settings-form" onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <SettingsSection
           icon={<FolderCog size={18} />}
@@ -693,6 +744,11 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
                   validate: (value) => value.trim().length > 0,
                 })}
               />
+            </SettingsField>
+            <SettingsField label="Project ID" hint="Use this ID when authenticating with API keys.">
+              <SettingsFieldValue>
+                <IdText value={project.id} label="project ID" />
+              </SettingsFieldValue>
             </SettingsField>
             <ProjectDepartmentField
               organizationId={organization?.id ?? ""}
@@ -738,17 +794,13 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
                 </>
               }
             >
-              <Controller
-                control={control}
-                name="presenceEnabled"
-                render={({ field }) => (
-                  <Switch
-                    colorPalette="accent"
-                    checked={field.value && (organization?.presenceEnabled ?? true)}
-                    onCheckedChange={({ checked }) => field.onChange(checked)}
-                    disabled={!userIsAdmin || !(organization?.presenceEnabled ?? true)}
-                  />
-                )}
+              <SaveOnChangeSwitch
+                label="Live presence"
+                checked={project.presenceEnabled && (organization?.presenceEnabled ?? true)}
+                disabled={!userIsAdmin || !(organization?.presenceEnabled ?? true)}
+                onSave={({ checked, onSuccess, onError }) =>
+                  saveProjectSwitch({ presenceEnabled: checked, onSuccess, onError })
+                }
               />
             </SettingsField>
             <SettingsField
@@ -763,17 +815,11 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
                 </>
               }
             >
-              <Controller
-                control={control}
-                name="traceSharingEnabled"
-                render={({ field }) => (
-                  <Switch
-                    colorPalette="accent"
-                    checked={field.value && (organization?.traceSharingEnabled ?? true)}
-                    onCheckedChange={({ checked }) => handleTraceSharingChange(checked)}
-                    disabled={!userIsAdmin || !(organization?.traceSharingEnabled ?? true)}
-                  />
-                )}
+              <SaveOnChangeSwitch
+                label="Trace sharing"
+                checked={project.traceSharingEnabled && (organization?.traceSharingEnabled ?? true)}
+                disabled={!userIsAdmin || !(organization?.traceSharingEnabled ?? true)}
+                onSave={saveTraceSharing}
               />
             </SettingsField>
             {organization?.useCustomS3 && (
@@ -788,8 +834,13 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
 
       <TurnOffSharingDialog
         pending={pendingSharingOff}
-        onClose={() => setPendingSharingOff(null)}
-        onChoose={({ data, revokeExistingLinks }) => saveProject({ data, revokeExistingLinks })}
+        onClose={() => {
+          pendingSharingOff?.outcome.onError("");
+          setPendingSharingOff(null);
+        }}
+        onChoose={({ outcome, revokeExistingLinks }) =>
+          saveProjectSwitch({ traceSharingEnabled: false, revokeExistingLinks, ...outcome })
+        }
       />
     </>
   );
@@ -834,12 +885,12 @@ function TurnOffSharingDialog({
   onClose,
   onChoose,
 }: {
-  pending: { data: ProjectFormData; linkCount: number } | null;
+  pending: { linkCount: number; outcome: SaveOutcome } | null;
   onClose: () => void;
-  onChoose: (choice: { data: ProjectFormData; revokeExistingLinks: boolean }) => void;
+  onChoose: (choice: { outcome: SaveOutcome; revokeExistingLinks: boolean }) => void;
 }) {
   const choose = (revokeExistingLinks: boolean) => {
-    if (pending) onChoose({ data: pending.data, revokeExistingLinks });
+    if (pending) onChoose({ outcome: pending.outcome, revokeExistingLinks });
   };
 
   return (

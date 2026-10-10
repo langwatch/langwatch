@@ -288,6 +288,7 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
     id: "settings-project",
     label: "Project",
     items: [
+      { label: "General", href: "/settings/project", icon: FolderOpen },
       {
         label: "Annotation scores",
         href: "/settings/annotation-scores",
