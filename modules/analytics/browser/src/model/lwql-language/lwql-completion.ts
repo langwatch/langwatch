@@ -216,7 +216,8 @@ export function lwqlCompletions({
 
   const head = before.slice(0, replaceFrom);
   const qualified = QUALIFIER_TAIL.exec(head);
-  if (RELATION_POSITION.test(qualified ? head.slice(0, qualified.index) : head)) {
+  const beforeRelation = head.slice(0, qualified?.index ?? head.length);
+  if (RELATION_POSITION.test(beforeRelation)) {
     return { replaceFrom, items: datasetItems(schema.views) };
   }
   const qualifier = qualified?.[1];
