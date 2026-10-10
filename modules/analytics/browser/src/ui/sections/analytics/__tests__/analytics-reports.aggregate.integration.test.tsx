@@ -52,18 +52,16 @@ vi.mock("@langwatch/feature-flag-client", () => ({
 // The layout is the page chrome; what the body hands it is under test.
 vi.mock("../../analytics-layout.tsx", () => ({
   default: ({
-    title,
-    analyticsHeaderProps,
+    dashboard,
     extraHeaderButtons,
     children,
   }: {
-    title: string;
-    analyticsHeaderProps?: { isEditable?: boolean };
+    dashboard?: { title: string; isEditable?: boolean };
     extraHeaderButtons?: React.ReactNode;
     children?: React.ReactNode;
   }) => (
     <div>
-      <h1 data-editable={String(!!analyticsHeaderProps?.isEditable)}>{title}</h1>
+      <h1 data-editable={String(!!dashboard?.isEditable)}>{dashboard?.title}</h1>
       {extraHeaderButtons}
       {children}
     </div>
