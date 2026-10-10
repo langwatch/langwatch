@@ -6,6 +6,7 @@ import {
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { GLYPH_ART_PX } from "@langwatch/design-system/typography";
 import { readableDate } from "@langwatch/time";
 import {
   Fragment,
@@ -954,7 +955,7 @@ const CODEX_MARK: MarkSpec = {
     ],
     TERMINAL_TOKENS.screenFg,
   ),
-  fontSize: "4px",
+  fontSize: `${GLYPH_ART_PX}px`,
 };
 
 /**

@@ -1,6 +1,6 @@
 import { Text, type TextProps } from "@chakra-ui/react";
 
-export { TYPE_SCALE_PX } from "../../system/text-styles.ts";
+export { GLYPH_ART_PX, TYPE_SCALE_PX } from "../../system/text-styles.ts";
 
 type TitleProps = Omit<TextProps, "fontSize" | "fontWeight" | "textStyle">;
 type LineProps = Omit<TextProps, "fontSize" | "textStyle">;

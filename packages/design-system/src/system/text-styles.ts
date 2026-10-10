@@ -82,3 +82,6 @@ export const TYPE_SCALE_PX = {
   metric: 18,
   pageTitle: 20,
 } as const;
+
+/** Block-glyph pixel art (the coding agents' startup marks): a glyph is one art pixel, not text. */
+export const GLYPH_ART_PX = 4;
