@@ -509,9 +509,7 @@ function VirtualKeyDetailPage() {
 
               <GridItem area="main" minWidth={0}>
                 <VStack align="stretch" gap={6}>
-                  <Section title="How to use">
-                    <VirtualKeyUsageSnippet model={snippetModel} />
-                  </Section>
+                  <VirtualKeyUsageSnippet model={snippetModel} />
 
                   <Section title="Scope & routing">
                     <VStack align="stretch" gap={3}>
