@@ -51,6 +51,10 @@ export const shareTrpc = defineTrpcContract("share")
   .withInput(shareRevokeInputSchema)
   .withOutput(z.void())
 
+  .query("countTraceShares")
+  .withInput(shareProjectInputSchema)
+  .withOutput(z.number().int().nonnegative())
+
   .mutation("revokeAllTraceShares")
   .withInput(shareProjectInputSchema)
   .withOutput(z.void())

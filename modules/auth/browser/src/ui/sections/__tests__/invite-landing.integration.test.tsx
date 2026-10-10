@@ -132,9 +132,9 @@ describe("given an invitation link", () => {
     it("names the organization and the inviter, and offers the routed methods", async () => {
       renderLanding();
 
-      expect(await screen.findByTestId("invite-inviter")).toHaveTextContent(
-        /Dana invited you to Acme/i,
-      );
+      const inviter = await screen.findByTestId("invite-inviter");
+      expect(inviter).toHaveTextContent(/Acme/);
+      expect(inviter).toHaveTextContent(/Invited by Dana/i);
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
       expect(routeMock).toHaveBeenCalledWith({
         identifier: null,
@@ -170,7 +170,7 @@ describe("given an invitation link", () => {
       sessionRef.current = { data: { user: { id: "u1" } } };
       renderLanding();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Let me in" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Join Acme" }));
       expect(acceptMock).toHaveBeenCalledWith({ inviteCode: INVITE_CODE });
     });
   });
@@ -184,17 +184,17 @@ describe("given an invitation link", () => {
       expect(await screen.findByTestId("invite-confirm")).toBeTruthy();
       expect(acceptMock).not.toHaveBeenCalled();
 
-      await userEvent.click(screen.getByRole("button", { name: "Let me in" }));
+      await userEvent.click(screen.getByRole("button", { name: "Join Acme" }));
       expect(acceptMock).toHaveBeenCalledWith({ inviteCode: INVITE_CODE });
     });
 
-    it("uses a warmer confirmation and keeps docs and sign-out quiet", async () => {
-      sessionRef.current = { data: { user: { id: "u1" } } };
+    it("names who it is signed in as, and keeps docs and the account switch quiet", async () => {
+      sessionRef.current = { data: { user: { id: "u1", email: "dana@acme.test" } } };
       signOutMock.mockResolvedValue(undefined);
       renderLanding();
 
-      expect(await screen.findByText("You’re invited to join Acme")).toBeTruthy();
-      expect(screen.getByText("Join your team on LangWatch.")).toBeTruthy();
+      expect(await screen.findByTestId("invite-confirm")).toHaveTextContent(/Invited by Dana/i);
+      expect(screen.getByText("dana@acme.test")).toBeTruthy();
 
       const docsLink = screen.getByRole("link", { name: "Read the docs" });
       expect(docsLink).toHaveAttribute("href", "https://docs.langwatch.ai/");
@@ -290,7 +290,7 @@ describe("given an invitation link", () => {
       renderLanding();
 
       expect(await screen.findByTestId("invite-switch-account")).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Let me in" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Join Acme" })).toBeNull();
       expect(screen.queryByTestId("invite-sign-out")).toBeNull();
     });
 

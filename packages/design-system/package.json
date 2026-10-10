@@ -130,6 +130,10 @@
       "types": "./dist/components/brand/langy-mark.d.ts",
       "default": "./src/components/brand/langy-mark.tsx"
     },
+    "./banner": {
+      "types": "./dist/components/states/banner.d.ts",
+      "default": "./src/components/states/banner.tsx"
+    },
     "./personal-access-token-banner": {
       "types": "./dist/components/states/personal-access-token-banner.d.ts",
       "default": "./src/components/states/personal-access-token-banner.tsx"

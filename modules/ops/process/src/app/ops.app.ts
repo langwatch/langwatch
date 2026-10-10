@@ -260,6 +260,7 @@ import {
   credentialsSecretPrevious,
   sessionSecret,
 } from "@langwatch/secrets/shared-secrets";
+import { ShareApi, type ShareApi as ShareApiContract } from "@langwatch/share-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
@@ -321,6 +322,7 @@ import {
 import {
   type InstanceAdminAccounts,
   InstanceAdminService,
+  type InstanceAdminShares,
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
@@ -529,6 +531,8 @@ export type OpsExplorers = Readonly<{
 /** What the process composes this feature's application from. */
 export interface OpsAppDependencies {
   users: UserApiContract;
+  /** The trace links a project holds, counted before its sharing is switched off. */
+  shares: Pick<ShareApiContract, "countTraceShares">;
   auth: AuthApiContract;
   /**
    * Which of an organization's two routes decides its sign-in — the module that owns connections
@@ -749,6 +753,7 @@ export class OpsModule implements OpsApi {
     retention: DataRetentionApi,
     // The same identity app, asked through its lookup surface for proved domains (D12).
     projects: ProjectApi,
+    shares: ShareApi,
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,
     featureFlags: FeatureFlagApi,
@@ -2355,6 +2360,7 @@ function buildOpsInfrastructure(input: {
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         accounts: dependencies.auth,
+        shares: dependencies.shares,
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
@@ -2455,6 +2461,7 @@ interface OpsOperationsOptions {
   now?: (() => Instant) | undefined;
   users: UserApi;
   accounts: InstanceAdminAccounts;
+  shares: InstanceAdminShares;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
@@ -2494,6 +2501,8 @@ export class OpsOperations {
         users: this.options.users,
         accounts: this.options.accounts,
         audit: this.options.audit,
+        projects: this.options.scheduler.projects,
+        shares: this.options.shares,
         ssoRouting: this.options.ssoRouting,
       }),
       blobStore: BlobStoreService.create(repositories.blobStore),

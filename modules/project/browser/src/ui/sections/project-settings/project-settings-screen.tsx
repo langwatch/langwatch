@@ -594,39 +594,44 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
   const updateProject = projectApi.project.update.useMutation();
   const apiContext = projectApi.useUtils();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
-  const [showTraceSharingDialog, setShowTraceSharingDialog] = useState(false);
+  const [pendingSharingOff, setPendingSharingOff] = useState<{
+    data: ProjectFormData;
+    linkCount: number;
+  } | null>(null);
 
   const handleTraceSharingChange = (newValue: boolean) => {
-    // Directly update the form value
     form.setValue("traceSharingEnabled", newValue);
   };
 
-  const confirmDisableTraceSharing = () => {
-    setShowTraceSharingDialog(false);
-    // Proceed with the form submission
-    void handleSubmit(onSubmit)();
-  };
-
-  const cancelDisableTraceSharing = () => {
-    setShowTraceSharingDialog(false);
-  };
-
-  const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
+  const onSubmit: SubmitHandler<ProjectFormData> = async (data: ProjectFormData) => {
     if (isEqual(data, previousValues)) return;
 
-    // Check if trace sharing is being disabled
-    if (data.traceSharingEnabled === false && project.traceSharingEnabled === true) {
-      // Show confirmation dialog before proceeding
-      setShowTraceSharingDialog(true);
-      return;
+    if (data.traceSharingEnabled === false && project.traceSharingEnabled === true && userIsAdmin) {
+      const linkCount = await apiContext.share.countTraceShares.fetch({ projectId: project.id });
+      if (linkCount > 0) {
+        setPendingSharingOff({ data, linkCount });
+        return;
+      }
     }
 
+    saveProject({ data, revokeExistingLinks: true });
+  };
+
+  const saveProject = ({
+    data,
+    revokeExistingLinks,
+  }: {
+    data: ProjectFormData;
+    revokeExistingLinks: boolean;
+  }) => {
+    setPendingSharingOff(null);
     setPreviousValues(data);
 
     updateProject.mutate(
       {
         projectId: project.id,
         ...data,
+        revokeExistingLinks,
         userLinkTemplate: data.userLinkTemplate ?? "",
         s3Endpoint: data.s3Endpoint ?? "",
         s3AccessKeyId: data.s3AccessKeyId ?? "",
@@ -813,49 +818,45 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
         </HStack>
       </form>
 
-      {/* Trace Sharing Disable Confirmation Dialog */}
       <Dialog.Root
-        open={showTraceSharingDialog}
-        onOpenChange={({ open }) => setShowTraceSharingDialog(open)}
+        open={pendingSharingOff !== null}
+        onOpenChange={({ open }) => {
+          if (!open) setPendingSharingOff(null);
+        }}
       >
         <Dialog.Content bg="bg">
           <Dialog.Header>
-            <Dialog.Title>Disable Trace Sharing?</Dialog.Title>
+            <Dialog.Title>Turn off sharing</Dialog.Title>
           </Dialog.Header>
           <Dialog.Body>
-            <VStack align="start" gap={4}>
-              <Text>
-                Are you sure you want to save these changes and disable trace sharing for this
-                project?
+            <VStack align="start" gap={2}>
+              <Text>{pendingSharingOff?.linkCount} share links exist for this project.</Text>
+              <Text fontSize="sm" color="fg.muted">
+                Paused links stop working while sharing is off and work again when you turn it back
+                on. Revoked links are gone for good.
               </Text>
-              <VStack
-                align="start"
-                gap={2}
-                padding={4}
-                backgroundColor="orange.subtle"
-                borderWidth="1px"
-                borderColor="orange.muted"
-                borderRadius="md"
-              >
-                <HStack gap={2}>
-                  <Text fontWeight="semibold" color="orange.fg">
-                    ⚠️ Warning
-                  </Text>
-                </HStack>
-                <Text fontSize="sm" color="orange.fg">
-                  This action will <b>immediately revoke</b> all existing shared trace links. Anyone
-                  with previously shared trace URLs will <b>no longer be able to access them</b>.
-                </Text>
-              </VStack>
             </VStack>
           </Dialog.Body>
           <Dialog.Footer>
             <HStack gap={2}>
-              <Button variant="outline" onClick={cancelDisableTraceSharing}>
-                Cancel
+              <Button
+                variant="outline"
+                onClick={() =>
+                  pendingSharingOff &&
+                  saveProject({ data: pendingSharingOff.data, revokeExistingLinks: false })
+                }
+              >
+                Keep links paused
               </Button>
-              <Button colorPalette="red" onClick={confirmDisableTraceSharing}>
-                Save & Disable Trace Sharing
+              <Button
+                colorPalette="red"
+                autoFocus
+                onClick={() =>
+                  pendingSharingOff &&
+                  saveProject({ data: pendingSharingOff.data, revokeExistingLinks: true })
+                }
+              >
+                Revoke {pendingSharingOff?.linkCount} links
               </Button>
             </HStack>
           </Dialog.Footer>

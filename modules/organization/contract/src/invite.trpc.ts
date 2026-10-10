@@ -4,6 +4,10 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  INVITE_ACCEPTED_EVENT_TYPE,
+  MEMBERS_INVITED_EVENT_TYPE,
+} from "./organization-lifecycle.events.ts";
+import {
   organizationInviteAcceptedSchema,
   organizationInviteResentSchema,
   organizationInvitesCreatedSchema,
@@ -32,7 +36,12 @@ export const inviteTrpc = defineTrpcContract("invite")
   .withInput(organizationApiInviteScopeSchema)
   .withOutput(organizationInviteResentSchema)
 
-  .query("getOrganizationPendingInvites")
+  .query("getOrganizationPendingInvites", {
+    invalidatedBy: [
+      { event: MEMBERS_INVITED_EVENT_TYPE, scope: "organizationId" },
+      { event: INVITE_ACCEPTED_EVENT_TYPE, scope: "organizationId" },
+    ],
+  })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationListedInvitesSchema)
 

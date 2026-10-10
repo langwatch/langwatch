@@ -42,6 +42,8 @@ export const projectUpdateInputSchema = z
     framework: z.string().optional(),
     teamId: z.string().optional(),
     traceSharingEnabled: z.boolean().optional(),
+    /** Read only when sharing is switched off; absent means revoke. */
+    revokeExistingLinks: z.boolean().optional(),
     presenceEnabled: z.boolean().optional(),
     userLinkTemplate: z.string().optional(),
     s3Endpoint: z.string().optional(),

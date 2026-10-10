@@ -133,11 +133,7 @@ function ResetPasswordForm({ token }: { token: string }) {
       title="Choose a new password"
       intro="Type it twice so a slip cannot lock you out again."
     >
-      <HandledErrorAlert
-        error={refusal?.error}
-        fallbackTitle="Couldn't reset your password"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={refusal?.error} fallbackTitle="Couldn't reset your password" />
       {refusal?.linkIsDead ? <RequestNewLink /> : null}
       {refusal?.waitLine ? (
         <Text fontSize="13px" lineHeight="1.55" color="fg.error" data-testid="reset-wait">
@@ -202,11 +198,7 @@ function PasswordUpdatedCard() {
       title="Password updated"
       intro="You are signed in with your new password. Every other device was signed out."
     >
-      <HandledErrorAlert
-        error={failure}
-        fallbackTitle="That passkey wasn't created"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={failure} fallbackTitle="That passkey wasn't created" />
       <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
         <Link href="/" data-testid="reset-sign-in">
           Continue

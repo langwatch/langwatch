@@ -9,6 +9,7 @@ import {
   PinnedToActiveShareError,
   resolveShareInputSchema,
   revokeShareInputSchema,
+  shareProjectScopeSchema,
   shareResourceInputSchema,
   sharedPayloadCacheInputSchema,
   ShareLinkExhaustedError,
@@ -22,6 +23,7 @@ import {
   type ResolveShareInput,
   type RevokeShareInput,
   type ShareLink,
+  type ShareProjectScope,
   type ShareResourceInput,
   type SharedPayloadCacheInput,
   type ShareViewer,
@@ -328,6 +330,16 @@ export class ShareService {
       resourceType,
       resourceId,
     });
+  }
+
+  async countTraceShares(input: ShareProjectScope): Promise<number> {
+    const { projectId } = shareProjectScopeSchema.parse(input);
+    const ids = await this.#options.repository.findAllIdsByResource({
+      projectId,
+      resourceType: "TRACE",
+    });
+
+    return ids.length;
   }
 
   async revokeAllTraceShares(projectId: string): Promise<void> {

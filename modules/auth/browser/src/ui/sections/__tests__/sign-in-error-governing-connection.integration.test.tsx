@@ -77,7 +77,7 @@ describe("given a refused link whose address an organization's connection govern
     it("falls back to signing in with the method used before", () => {
       renderErrorRoute({ error: "account_not_linked", error_description: "https://evil.test" });
 
-      expect(screen.getByText(/method you used before/i)).toBeTruthy();
+      expect(screen.getByText(/sign in the way you did before/i)).toBeTruthy();
       expect(screen.queryByRole("button", { name: /organization's sign-in/i })).toBeNull();
     });
   });

@@ -92,6 +92,10 @@ export class ShareModule implements ShareApiContract {
     return this.#shares.unshare(input);
   }
 
+  countTraceShares(input: ShareProjectScope): Promise<number> {
+    return this.#shares.countTraceShares(input);
+  }
+
   revokeAllTraceShares(projectId: string): Promise<void> {
     return this.#shares.revokeAllTraceShares(projectId);
   }

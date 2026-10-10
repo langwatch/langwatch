@@ -8,6 +8,7 @@ import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, statusHairline } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
+import { toastGlass } from "./status-glass.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -34,39 +35,6 @@ const toastPanel = {
   "--toast-trigger-bg": "colors.bg.muted",
   "--toast-border-color": "colors.border.muted",
 } as const;
-
-/** Each status drifts toward one neighbour across the page, so it still reads as its own hue. */
-const TOAST_DRIFT = { red: "pink", orange: "yellow", green: "teal", blue: "purple" } as const;
-
-/**
- * A light-mode toast is deep glass tinted with its status hue: a fine rim, a glow and a gloss.
- * Its tint is its own slice of one viewport-sized field, offset by the card's placement
- * (`--toast-shift`), so cards shift colour as they stack, fan and move.
- */
-const toastGlass = (hue: keyof typeof TOAST_DRIFT) => {
-  const c = (n: number, alpha: string, h: string = hue) =>
-    `color-mix(in srgb, var(--chakra-colors-${h}-${n}) ${alpha}, transparent)`;
-  const drift = (n: number, alpha: string) =>
-    `color-mix(in srgb, color-mix(in srgb, var(--chakra-colors-${TOAST_DRIFT[hue]}-${n}) 55%, var(--chakra-colors-${hue}-${n})) ${alpha}, transparent)`;
-  const between = (a: number, b: number, alpha: string) =>
-    `color-mix(in srgb, color-mix(in srgb, var(--chakra-colors-${hue}-${a}) 50%, var(--chakra-colors-${hue}-${b})) ${alpha}, transparent)`;
-  const field = "50% calc(100% + var(--viewport-offset-bottom, 1rem) - var(--toast-shift))";
-  return {
-    bg: between(600, 700, "92%"),
-    backgroundImage: [
-      "linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 45%)",
-      `radial-gradient(40% 24% at 50% 100%, ${c(500, "62%")} 0%, transparent 100%)`,
-      `linear-gradient(170deg, ${between(600, 700, "93%")} 0%, ${drift(600, "92%")} 50%, ${c(600, "92%")} 75%, ${between(500, 600, "92%")} 100%)`,
-    ].join(", "),
-    backgroundSize: "100% 100%, 100vw 100vh, 100vw 100vh",
-    backgroundPosition: `0 0, ${field}, ${field}`,
-    backgroundRepeat: "no-repeat",
-    borderWidth: "1px",
-    borderColor: c(400, "42%"),
-    backdropFilter: "var(--lw-backdrop-blur, blur(18px) saturate(160%))",
-    boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px -12px ${c(600, "55%")}, 0 2px 6px rgba(2, 6, 23, 0.18)`,
-  };
-};
 
 /** A light-mode solid badge is quiet glass on its palette's solid colour: a fine rim, a light. */
 const badgeGlass = {
@@ -126,10 +94,12 @@ export const designSystemConfig = defineConfig({
         from: { transform: "translateY(24px)", opacity: 0, filter: "blur(4px)" },
         to: { transform: "none", opacity: 1, filter: "none" },
       },
+      // A dismissed card sinks into the page like going under water: it swells, blurs and fades.
       "toast-sink": {
         from: { transform: "none", opacity: 1, filter: "none" },
-        to: { transform: "translateY(16px) scale(0.96)", opacity: 0, filter: "blur(2px)" },
+        to: { transform: "scale(1.04)", opacity: 0, filter: "blur(6px)" },
       },
+      "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
     tokens: {
       fonts: {
@@ -1342,9 +1312,13 @@ export const designSystemConfig = defineConfig({
               animation: "toast-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
             },
             "&[data-state=closed]": {
-              animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
+              animation: "toast-sink 300ms cubic-bezier(0.4, 0, 0.2, 1) both",
             },
-            _motionReduce: { transition: "none", animation: "none" },
+            _motionReduce: {
+              transition: "none",
+              animation: "none",
+              "&[data-state=closed]": { animation: "toast-fade 200ms linear both" },
+            },
             // Light mode: status toasts are deep tinted glass with white text.
             _light: {
               "&:is([data-type=error], [data-type=warning], [data-type=success], [data-type=info])":
