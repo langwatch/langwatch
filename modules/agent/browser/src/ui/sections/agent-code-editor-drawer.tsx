@@ -7,10 +7,10 @@ import {
   Field,
   HStack,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowLeft, HelpCircle } from "lucide-react";
@@ -102,9 +102,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
             )}
             {!props.errorMessage &&
               (agentId && props.isLoading ? (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
+                <SkeletonRows rows={4} />
               ) : (
                 <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
                   <Field.Root required>

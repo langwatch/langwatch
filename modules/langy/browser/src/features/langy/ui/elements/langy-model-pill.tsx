@@ -554,7 +554,7 @@ function ModelRow({ item }: { item: ModelItem }) {
             four trait icons plus the "Langy default" badge squeezed the label
             to "g…" — the one row a user most needs to read was the one row
             they could not. */}
-        <Combobox.ItemText css={{ flex: 1, minWidth: "8ch" }} fontSize="13px" truncate>
+        <Combobox.ItemText css={{ flex: 1, minWidth: "8ch" }} textStyle="bodySm" truncate>
           {item.label}
         </Combobox.ItemText>
         {/* Traits yield first: they are a glanceable extra, and losing one to

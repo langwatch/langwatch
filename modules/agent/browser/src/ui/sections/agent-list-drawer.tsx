@@ -1,15 +1,8 @@
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
@@ -121,12 +114,7 @@ function AgentListContent(
       </Alert.Root>
     );
   }
-  if (props.isLoading)
-    return (
-      <HStack justify="center" paddingY={8}>
-        <Spinner size="md" />
-      </HStack>
-    );
+  if (props.isLoading) return <SkeletonRows rows={4} />;
   if (props.items.length === 0) return <EmptyState onCreateNew={props.onCreateNew} />;
 
   return props.items.map((agent) => (

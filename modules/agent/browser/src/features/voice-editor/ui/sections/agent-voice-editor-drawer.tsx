@@ -5,7 +5,8 @@
  */
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 
 import {
   useVoiceAgentEditor,
@@ -21,11 +22,7 @@ import { VoiceAgentTalkView } from "./voice-agent-talk-view.tsx";
 function VoiceAgentBody({ editor }: { editor: VoiceAgentEditor }) {
   if (editor.isTalkOpen) return <VoiceAgentTalkView editor={editor} />;
   if (editor.isLoading) {
-    return (
-      <HStack justify="center" paddingY={8}>
-        <Spinner size="md" />
-      </HStack>
-    );
+    return <SkeletonRows rows={4} />;
   }
   return (
     <VoiceAgentForm

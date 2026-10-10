@@ -1,6 +1,7 @@
 import type { AgentHistoryEntry } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { ArrowUp, Bot, Copy, Edit, type LucideIcon, RefreshCw, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -61,11 +62,7 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          {isLoading && (
-            <HStack justify="center" paddingY={8}>
-              <Spinner />
-            </HStack>
-          )}
+          {isLoading && <SkeletonRows rows={4} />}
           {isError && (
             <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
               Failed to load history.

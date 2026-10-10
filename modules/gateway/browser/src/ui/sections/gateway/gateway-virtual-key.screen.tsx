@@ -22,6 +22,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
 import { Temporal, formatDistanceToNow, toEpochMs, readableDate } from "@langwatch/time";
 import { Bird, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
@@ -808,12 +809,12 @@ function UsageSection({
                 />
                 <XAxis
                   dataKey="day"
-                  tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+                  tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
                   tickFormatter={(d: string) => d.slice(5)}
                   minTickGap={24}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+                  tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
                   tickFormatter={(v: number) => `$${v.toFixed(2)}`}
                   width={56}
                 />
@@ -822,7 +823,7 @@ function UsageSection({
                     name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
                   }
                   labelFormatter={(label) => String(label ?? "")}
-                  contentStyle={{ fontSize: 12 }}
+                  contentStyle={{ fontSize: TYPE_SCALE_PX.caption }}
                 />
                 <Area
                   type="monotone"

@@ -9,11 +9,11 @@ import {
   Button,
   HStack,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import type { ReactNode } from "react";
@@ -88,11 +88,7 @@ function AgentBody({
   inputs?: ReactNode;
 }) {
   if (isLoading) {
-    return (
-      <HStack justify="center" paddingY={8}>
-        <Spinner />
-      </HStack>
-    );
+    return <SkeletonRows rows={4} />;
   }
 
   if (!agent) {

@@ -112,7 +112,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                   })}
                   <Field.Label>Name and Icon</Field.Label>
                   <HStack>
-                    <Button variant="outline" onClick={picker.onOpen} fontSize="18px">
+                    <Button variant="outline" onClick={picker.onOpen} fontSize="lg">
                       {icon}
                     </Button>
                     <Input

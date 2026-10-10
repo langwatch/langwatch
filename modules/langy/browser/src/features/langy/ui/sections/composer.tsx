@@ -773,9 +773,7 @@ function SigilButton({
           borderWidth="1px"
           borderStyle="solid"
           borderColor="border.emphasized"
-          fontFamily="mono"
-          fontSize="10px"
-          lineHeight="1"
+          textStyle="monoSm"
         >
           {sigil}
         </chakra.span>

@@ -1,4 +1,5 @@
-import { Button, Field, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Field, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
@@ -45,9 +46,7 @@ export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditor
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           {props.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
-            </HStack>
+            <SkeletonRows rows={4} />
           ) : (
             <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
               {props.workflowCard && (

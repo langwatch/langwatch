@@ -201,7 +201,7 @@ function ListeningIndicator() {
         }}
         animation="listening-dot 1.6s ease-in-out infinite"
       />
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         Waiting for an agent to connect
       </Text>
     </HStack>

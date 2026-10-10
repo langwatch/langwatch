@@ -1,5 +1,6 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type * as MonacoApi from "monaco-editor";
 import { lazy, Suspense } from "react";
 
@@ -61,7 +62,7 @@ export function HttpBodyCodeEditor({
           options={{
             readOnly: disabled,
             minimap: { enabled: false },
-            fontSize: 13,
+            fontSize: TYPE_SCALE_PX.bodySm,
             scrollBeyondLastLine: false,
             lineNumbers: "off",
             wordWrap: "on",

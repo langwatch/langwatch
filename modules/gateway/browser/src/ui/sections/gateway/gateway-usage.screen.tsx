@@ -24,6 +24,7 @@ import {
   StatTileSkeleton,
 } from "@langwatch/design-system/stat-tile";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import {
   formatBudgetUsd,
   type GatewayUsageSummary,
@@ -519,12 +520,12 @@ function SpendSparkline({
             />
             <XAxis
               dataKey="day"
-              tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+              tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
               tickFormatter={formatDayTick}
               minTickGap={24}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+              tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
               tickFormatter={(v: number) => `$${v.toFixed(2)}`}
               width={56}
             />
@@ -533,7 +534,7 @@ function SpendSparkline({
                 name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
               }
               labelFormatter={(label) => String(label ?? "")}
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={{ fontSize: TYPE_SCALE_PX.caption }}
             />
             <Area
               type="monotone"

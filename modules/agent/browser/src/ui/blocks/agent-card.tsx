@@ -253,7 +253,7 @@ export function AgentCard({
         </HStack>
       }
       info={
-        <Text color="fg.subtle" fontSize="12px">
+        <Text color="fg.subtle" textStyle="caption">
           {agentTypeLabels[agent.type]} • {updatedAtLabel}
         </Text>
       }

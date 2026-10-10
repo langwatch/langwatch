@@ -36,6 +36,7 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "@langwatch/browser/transport";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { saasWeb } from "@langwatch/enterprise-saas-browser/declaration";
 import { applyFeatureFlagOverridesFromSearch } from "@langwatch/feature-flag-client";
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
@@ -92,7 +93,9 @@ function UiAttributionCapture({ children }: { children: ReactNode }) {
 function UiBootPageError() {
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
-      <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>This page did not load</h1>
+      <h1 style={{ fontSize: `${TYPE_SCALE_PX.pageTitle}px`, marginBottom: "0.5rem" }}>
+        This page did not load
+      </h1>
       <p style={{ opacity: 0.7 }}>Something went wrong on our side. Try again in a moment.</p>
     </div>
   );

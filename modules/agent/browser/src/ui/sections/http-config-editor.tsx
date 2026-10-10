@@ -69,8 +69,7 @@ export function HttpConfigEditor({
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
               placeholder="https://api.example.com/endpoint"
-              fontFamily="mono"
-              fontSize="13px"
+              textStyle="mono"
               size="sm"
             />
           </HStack>

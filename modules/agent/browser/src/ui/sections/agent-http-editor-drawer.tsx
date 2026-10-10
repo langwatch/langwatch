@@ -1,14 +1,7 @@
 import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-test";
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Spinner,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, Field, HStack, Input, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -70,9 +63,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         )}
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           {props.agentId && props.isLoadingAgent ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
-            </HStack>
+            <SkeletonRows rows={4} />
           ) : (
             <VStack gap={4} align="stretch" flex={1} overflow="hidden">
               <Box paddingX={6} paddingTop={4}>

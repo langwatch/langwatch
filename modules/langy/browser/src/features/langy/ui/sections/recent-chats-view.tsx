@@ -556,8 +556,7 @@ function ChatRowTitleButton({
         <Box
           as="span"
           display="block"
-          fontSize="13px"
-          lineHeight="1.25"
+          textStyle="bodySm"
           fontWeight={isActive ? "600" : undefined}
           color={item.untitled ? "fg.muted" : "fg"}
           fontStyle={item.untitled ? "italic" : undefined}

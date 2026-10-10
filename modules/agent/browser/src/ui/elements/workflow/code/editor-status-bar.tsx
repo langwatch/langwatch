@@ -92,8 +92,7 @@ export function EditorStatusBar({
       paddingRight={2}
       paddingY={1}
       minHeight="32px"
-      fontSize="11px"
-      fontFamily="mono"
+      textStyle="monoSm"
       gap={3}
       borderBottomRadius="md"
       flexShrink={0}
@@ -174,7 +173,7 @@ function useModifierKeyLabel(): string {
  */
 function ShortcutHint({ children }: { children: React.ReactNode }) {
   return (
-    <Box as="span" ml={1.5} fontFamily="mono" fontSize="10px" letterSpacing="tight" opacity={0.6}>
+    <Box as="span" ml={1.5} textStyle="monoSm" letterSpacing="tight" opacity={0.6}>
       {children}
     </Box>
   );
