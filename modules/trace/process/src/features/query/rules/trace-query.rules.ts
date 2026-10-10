@@ -203,14 +203,17 @@ export function translateTraceTag({
   negated,
   ctx,
   fieldDefs,
+  searchContent = true,
 }: {
   tag: TagToken;
   negated: boolean;
   ctx: TranslationContext;
   fieldDefs: ReadonlyMap<string, FieldDef>;
+  /** False for a viewer under a content protection: free text then skips captured I/O. */
+  searchContent?: boolean;
 }): string {
   if (tag.field.type === "ImplicitField") {
-    return translateFreeText(tag, negated, ctx);
+    return translateFreeText({ tag, negated, ctx, searchContent });
   }
 
   const fieldName = tag.field.name;
@@ -347,7 +350,17 @@ function translateSpanAttribute({
   );
 }
 
-function translateFreeText(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+function translateFreeText({
+  tag,
+  negated,
+  ctx,
+  searchContent,
+}: {
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+  searchContent: boolean;
+}): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const paramName = nextParam(ctx, "freeText");
@@ -359,7 +372,8 @@ function translateFreeText(tag: TagToken, negated: boolean, ctx: TranslationCont
   // span off trace_summaries; the subquery covers every other span via
   // stored_spans.SpanName. Both branches evaluate to a definite true/false,
   // never NULL (parity suite pins this), keeping three-valued logic unchanged.
-  const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
+  const content = searchContent ? `ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ` : "";
+  const clause = `(${content}ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
     "stored_spans",
     "StartTime",
     `SpanName ILIKE ${p}`,

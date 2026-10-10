@@ -34,3 +34,10 @@ Scenario: A failed group membership read hides group-restricted trace content
     Given trace input on a project is hidden from a reader and visible to "Admins"
     When the reader asks traces for the project's field redaction status
     Then the input reads as redacted and visible to "Admins", and the output reads as visible
+
+  @unit
+  Scenario: Free text matches captured content only for a viewer who may read it
+    Given trace input on a project is hidden from a reader
+    When the reader searches the trace list with a bare word
+    Then the word is matched against trace and span names only, not captured input or output
+    And a reader under no content protection still matches captured input and output

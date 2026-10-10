@@ -18,16 +18,19 @@ export class TraceQueryTranslationService {
 
   /**
    * Translates a liqe query into a parameterized WHERE fragment or null.
-   * `evalRuns` carries the runs registered for the query's `eval` chips.
+   * `evalRuns` carries the runs registered for the query's `eval` chips;
+   * `searchContent` false keeps free text off captured input and output.
    */
   translateFilter({
     queryText,
     timeRange,
     evalRuns,
+    searchContent = true,
   }: {
     queryText: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    searchContent?: boolean;
   }): { sql: string; params: Record<string, unknown> } | null {
     const ctx: TranslationContext = {
       paramCounter: 0,
@@ -44,7 +47,13 @@ export class TraceQueryTranslationService {
       queryText,
       ctx,
       translateTag: (tag, negated, tagCtx) =>
-        translateTraceTag({ tag, negated, ctx: tagCtx, fieldDefs: this.#fields.fieldDefByName }),
+        translateTraceTag({
+          tag,
+          negated,
+          ctx: tagCtx,
+          fieldDefs: this.#fields.fieldDefByName,
+          searchContent,
+        }),
       translateScope: (scope, scopeCtx) =>
         translateEvaluationScope({ scope, ctx: scopeCtx, fields: this.#fields }),
     });

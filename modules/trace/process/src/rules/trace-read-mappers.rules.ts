@@ -375,13 +375,17 @@ export function contentSearchTermsForViewer({
   protections: V2Protections;
 }): string[] {
   if (terms.length === 0) return terms;
+  return canSearchCapturedContent(protections) ? terms : [];
+}
+
+/** Whether a viewer's words may match captured content: only under no content protection. */
+export function canSearchCapturedContent(protections: V2Protections): boolean {
   if (protections.canSeeCapturedInput !== true || protections.canSeeCapturedOutput !== true) {
-    return [];
+    return false;
   }
   const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
-  if (roles.size > 0 || stripToolCalls) return [];
-  if ((protections.hiddenAttributes?.length ?? 0) > 0) return [];
-  return terms;
+  if (roles.size > 0 || stripToolCalls) return false;
+  return (protections.hiddenAttributes?.length ?? 0) === 0;
 }
 
 /**

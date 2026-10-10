@@ -316,6 +316,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
+        protections,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -354,11 +355,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("newCount")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const filterWhere = app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
+        protections: await app.resolveViewerProtections({
+          projectId: input.projectId,
+          userId: actor.id,
+          authorization,
+        }),
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -406,11 +412,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("discover")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization }) =>
+    .handle(async ({ app, input, actor, authorization }) =>
       discoverResultSchema.parse(
         await app.readDiscoverForQuery({
           projectId: input.projectId,
           authorization,
+          protections: await app.resolveViewerProtections({
+            projectId: input.projectId,
+            userId: actor.id,
+            authorization,
+          }),
           timeRange: input.timeRange,
           query: input.query,
           evalRuns: input.evalRuns,
@@ -434,11 +445,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("facets")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization }) =>
+    .handle(async ({ app, input, actor, authorization }) =>
       discoverResultSchema.parse(
         await app.readFilteredFacets({
           projectId: input.projectId,
           authorization,
+          protections: await app.resolveViewerProtections({
+            projectId: input.projectId,
+            userId: actor.id,
+            authorization,
+          }),
           timeRange: input.timeRange,
           query: input.query ?? "",
           evalRuns: await app.findExplorerEvalRuns({

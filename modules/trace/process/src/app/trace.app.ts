@@ -421,6 +421,7 @@ import {
   buildContentPrivacy,
   buildSpanContentRedactions,
   mapSpanToDetail,
+  canSearchCapturedContent,
   contentSearchTermsForViewer,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
@@ -1925,6 +1926,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<DiscoverResult> {
     if (input.query === null || input.query === undefined) {
       return this.readDiscover({ authorization: input.authorization, timeRange: input.timeRange });
@@ -1934,6 +1936,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: input.authorization,
       timeRange: input.timeRange,
       query: input.query,
+      ...(input.protections ? { protections: input.protections } : {}),
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
         evalRuns: input.evalRuns,
@@ -2508,11 +2511,14 @@ export class TraceModule implements TraceApi, CollectorApp {
     tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    /** The viewer's; under any content protection free text skips captured I/O. */
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } | null {
     return this.#queryTranslation.translateFilter({
       queryText: input.query,
       timeRange: input.timeRange,
       ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+      ...(input.protections ? { searchContent: canSearchCapturedContent(input.protections) } : {}),
     });
   }
 
@@ -2540,6 +2546,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     evalRuns?: readonly ResolvedInstantEvalRun[];
     originNamed?: boolean;
     dateField?: TraceDateField;
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } {
     const compiled = this.translateTraceFilter(input);
 
@@ -2613,6 +2620,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
+      protections,
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
         evalRuns: input.evalRuns,
@@ -2654,6 +2662,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<DiscoverResult> {
     const filterFor = createFacetFilterResolver({
       queryText: input.query,
@@ -2663,6 +2672,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           tenantId: input.projectId,
           timeRange: input.timeRange,
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+          ...(input.protections ? { protections: input.protections } : {}),
         }) ?? undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(input.query) }),
     });
