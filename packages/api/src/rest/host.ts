@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
@@ -64,6 +65,11 @@ export type RestIdentities = Readonly<
  * naming `internal_secret` without binding its own door refuses every call.
  */
 export type RestFamilyBearers = (namespace: string) => RestIdentity;
+
+/** An upgrade in progress is an expected 503, so it warns; every other 5xx stays an error. */
+function restFailureLevel(error: unknown): "warn" | "error" {
+  return HandledError.isHandled(error) && error.code === "upgrade_in_progress" ? "warn" : "error";
+}
 
 export class RestHost implements FeatureRestHost<MountableRestApp> {
   static create(options: {
@@ -154,7 +160,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
         // A client that went away mid-request aborts its own read: no answer reaches it, no fault.
         const clientGone = context.req.raw.signal.aborted;
         if (response.status >= 500 && !clientGone) {
-          restErrorLogger.error(
+          restErrorLogger[restFailureLevel(error)](
             { error, method: context.req.method, path: context.req.path },
             "REST request failed",
           );
