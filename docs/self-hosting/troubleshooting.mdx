@@ -230,8 +230,6 @@ A failed upgrade in the pre-upgrade Job fails the `helm upgrade` before any pod 
 
 The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's or the workers' log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
-`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the api is not ready until the upgrade has applied every migration its version needs.
-
 ### Connection refused
 
 Verify the connection string:

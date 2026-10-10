@@ -76,7 +76,7 @@ Feature: Service orchestration after pre-deps are installed
   @unit
   Scenario: The backend leaves migrations to the worker's upgrade
     When the CLI starts "langwatch"
-    Then the backend's environment sets neither SKIP_PRISMA_MIGRATE nor SKIP_CLICKHOUSE_MIGRATE
+    Then the backend's environment does not set SKIP_LWQL_PROVISION
 
   @unit
   Scenario: nlpgo and the ai-gateway run as one Go process when the binary has combined mode

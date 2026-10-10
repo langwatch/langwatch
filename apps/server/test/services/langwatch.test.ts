@@ -131,11 +131,10 @@ describe("startLangwatch", () => {
     });
 
     /** @scenario "The backend leaves migrations to the worker's upgrade" */
-    it("leaves the worker's upgrade to run its migrations", async () => {
+    it("leaves LangWatchQL provisioning to the worker's upgrade", async () => {
       await startLangwatch(fakeCtx(), new EventBus(), {});
 
-      expect(spawned().env.SKIP_PRISMA_MIGRATE).toBeUndefined();
-      expect(spawned().env.SKIP_CLICKHOUSE_MIGRATE).toBeUndefined();
+      expect(spawned().env.SKIP_LWQL_PROVISION).toBeUndefined();
     });
   });
 

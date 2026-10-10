@@ -139,7 +139,7 @@ export function sqlReader({
 
 function clickhouseTargets({ environment }: TaskInput) {
   const config = resolveClickHouseMigrationTaskConfig(environment);
-  if (config.skipped || config.buildTime) return { config, targets: [] };
+  if (config.buildTime) return { config, targets: [] };
   const targets: { name: string; url: string }[] = [];
   if (config.sharedUrl) targets.push({ name: "shared", url: config.sharedUrl });
   for (const endpoint of config.privateEndpoints) {
@@ -149,10 +149,10 @@ function clickhouseTargets({ environment }: TaskInput) {
   return { config, targets };
 }
 
-/** Postgres left alone: SKIP_PRISMA_MIGRATE set (ok), or no DATABASE_URL (failed). */
-function prismaSkipped({ url }: { url: string | undefined }): SchemaTargetReport {
-  const error = url ? null : "DATABASE_URL is required to apply the Postgres schema";
-  return { engine: "postgres", target: "postgres", ok: !!url, error };
+/** Postgres left alone because no DATABASE_URL is set: a failed target. */
+function prismaMissing(): SchemaTargetReport {
+  const error = "DATABASE_URL is required to apply the Postgres schema";
+  return { engine: "postgres", target: "postgres", ok: false, error };
 }
 
 function deployPrisma({
@@ -165,7 +165,7 @@ function deployPrisma({
   signal: AbortSignal;
 }): Promise<SchemaTargetReport> {
   const url = input.environment.DATABASE_URL;
-  if (input.config.skipPrismaMigrate || !url) return Promise.resolve(prismaSkipped({ url }));
+  if (!url) return Promise.resolve(prismaMissing());
   const configPath = fileURLToPath(new URL("../prisma.config.ts", import.meta.url));
   return new Promise((resolve) => {
     const child = spawn("pnpm", ["exec", "prisma", "migrate", "deploy", "--config", configPath], {
@@ -197,10 +197,10 @@ function resolvePrismaRolledBack({
   signal: AbortSignal;
 }): Promise<{ ok: boolean; error: string | null }> {
   const url = input.environment.DATABASE_URL;
-  if (input.config.skipPrismaMigrate || !url)
+  if (!url)
     return Promise.resolve({
       ok: false,
-      error: "DATABASE_URL is required and SKIP_PRISMA_MIGRATE unset to resolve a migration",
+      error: "DATABASE_URL is required to resolve a migration",
     });
   const configPath = fileURLToPath(new URL("../prisma.config.ts", import.meta.url));
   return new Promise((resolve) => {
@@ -475,8 +475,7 @@ async function stepPrisma({
   signal: AbortSignal;
 }): Promise<SteppedSchema> {
   const url = input.environment.DATABASE_URL;
-  if (input.config.skipPrismaMigrate || !url)
-    return { reports: [prismaSkipped({ url })], applied: [] };
+  if (!url) return { reports: [prismaMissing()], applied: [] };
   const failed = (error: string): SteppedSchema => ({
     reports: [{ engine: "postgres", target: "postgres", ok: false, error }],
     applied: [],

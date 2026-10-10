@@ -309,8 +309,6 @@ A serving process that cannot read the ledger names `DATABASE_URL` in its refusa
 | `app.migrations.preRoll` (Helm, default `true`) | Renders the pre-upgrade Job, only when upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`); otherwise the new worker pods run the upgrade. `false` with serialised upgrades leaves it to you; until you run it, the new api is not ready. |
 | `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
 | `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
-| `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
-| `SKIP_CLICKHOUSE_MIGRATE` (`true` only) | The upgrade leaves ClickHouse alone, with the same consequence. |
 | `SKIP_LWQL_PROVISION` (`1` or `true`) | The upgrade skips LangWatchQL provisioning. |
 | `CLICKHOUSE_CLUSTER` | Names the ClickHouse cluster. When set, the upgrade creates Replicated engines and replicates DDL across nodes. |
 | `CLICKHOUSE_COLD_STORAGE_ENABLED` (`true`) | The reconcile phase writes table TTLs that move aged data to the cold volume. Hot days come from `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS`, else `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`, else the table's built-in default. |

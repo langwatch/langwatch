@@ -63686,8 +63686,6 @@ The app and the workers never migrate on startup: `pnpm task upgrade` does, befo
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `SKIP_PRISMA_MIGRATE` | `1` or `true` makes `pnpm task upgrade` leave PostgreSQL alone, and unable to mark a failed migration rolled back. The app and workers refuse to start until an upgrade runs without it | `false` |
-| `SKIP_CLICKHOUSE_MIGRATE` | `true` (only) makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence | `false` |
 | `SKIP_LWQL_PROVISION` | `1` or `true` makes `pnpm task upgrade` skip LangWatchQL provisioning | `false` |
 | `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Listed under [Core Configuration](#core-configuration) | `180` |
 | `CLICKHOUSE_CLUSTER` | Cluster name. When set, the upgrade creates Replicated engines and replicates DDL across nodes | - |
@@ -69378,8 +69376,6 @@ A failed upgrade in the pre-upgrade Job fails the `helm upgrade` before any pod 
 
 The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's or the workers' log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
-`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the api is not ready until the upgrade has applied every migration its version needs.
-
 ### Connection refused
 
 Verify the connection string:
@@ -70359,8 +70355,6 @@ A serving process that cannot read the ledger names `DATABASE_URL` in its refusa
 | `app.migrations.preRoll` (Helm, default `true`) | Renders the pre-upgrade Job, only when upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`); otherwise the new worker pods run the upgrade. `false` with serialised upgrades leaves it to you; until you run it, the new api is not ready. |
 | `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
 | `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
-| `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
-| `SKIP_CLICKHOUSE_MIGRATE` (`true` only) | The upgrade leaves ClickHouse alone, with the same consequence. |
 | `SKIP_LWQL_PROVISION` (`1` or `true`) | The upgrade skips LangWatchQL provisioning. |
 | `CLICKHOUSE_CLUSTER` | Names the ClickHouse cluster. When set, the upgrade creates Replicated engines and replicates DDL across nodes. |
 | `CLICKHOUSE_COLD_STORAGE_ENABLED` (`true`) | The reconcile phase writes table TTLs that move aged data to the cold volume. Hot days come from `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS`, else `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`, else the table's built-in default. |

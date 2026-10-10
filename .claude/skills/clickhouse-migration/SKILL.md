@@ -37,8 +37,7 @@ or `private:<organizationId>`) and its error with the URL redacted. The ledger k
 and target (`done`, `failed` or `pending`), so `pnpm task upgrade status` shows which target stopped
 at which `clickhouse:<NNNNN>`. The retry is `pnpm task upgrade` again: every statement is
 `IF [NOT] EXISTS`, so goose re-runs the failed file from its first statement. Other settings it reads:
-`CLICKHOUSE_CLUSTER` (set, every engine is Replicated), `SKIP_CLICKHOUSE_MIGRATE=true` (the app then
-refuses until an upgrade runs without it) and, in the reconcile phase, the cold-storage TTL variables
+`CLICKHOUSE_CLUSTER` (set, every engine is Replicated) and, in the reconcile phase, the cold-storage TTL variables
 (`packages/clickhouse-migrations/src/ttl.reconciler.ts`).
 
 **Numbering and collisions.** The step id is `clickhouse:<NNNNN>`. Take one above the highest on
