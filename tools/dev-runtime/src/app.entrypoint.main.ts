@@ -10,7 +10,6 @@ import {
   BACKEND_HALF_SERVICE,
   BACKEND_READY_MSG,
   drainBackend,
-  startBackend,
   type BackendHalves,
 } from "@langwatch/process/backend-host";
 import type * as WorkerMain from "@langwatch/worker";
@@ -29,6 +28,7 @@ import {
   listenersAddedSince,
   replaceBackend,
   snapshotListeners,
+  startFreshBackend,
   type AddedListener,
   type ListenerSnapshot,
   type PortForwarder,
@@ -286,9 +286,9 @@ function bootRefused(error: unknown): void {
 }
 
 /**
- * Boots the linked generation: beside the serving one when there is one (the api first, then
- * API_PORT moves, then the old drains and the worker starts), else both halves fresh. Answers how
- * many listeners the old generation left behind; a refused half throws, tagged with its name.
+ * Boots the linked generation: beside the serving one (api, API_PORT moves, old drains, worker),
+ * else both halves fresh, API_PORT routed once the api starts. Answers how many listeners the old
+ * generation left behind; a refused half throws, tagged with its name.
  */
 async function bootNext({
   worker,
@@ -302,12 +302,13 @@ async function bootNext({
   const port = await freeLoopbackPort();
   const old = halves;
   if (!old) {
-    const started = await startBackend({
+    const started = await startFreshBackend({
       startWorker: worker.startWorker,
-      startApi: (options) => api.startApi({ ...options, port }),
+      startApi: api.startApi,
+      apiPort: port,
+      route: (next) => apiPort?.route(next),
     });
     halves = started.halves;
-    apiPort?.route(port);
     if (started.workerFailure !== undefined) throw started.workerFailure;
     return 0;
   }

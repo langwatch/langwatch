@@ -4,12 +4,37 @@ import {
   bootHalf,
   drainBackend,
   IDLE_WORKER,
+  startBackend,
   type BackendHalves,
   type BackendStartOptions,
   type BootedBackend,
 } from "@langwatch/process/backend-host";
 
 import type { BootFailure } from "./boot-failure.ts";
+
+/**
+ * A cold boot: both halves start together and `route` moves the port to the api as soon as its
+ * own start resolves, so a slow worker boot never hides it. A refused api is never routed.
+ * Spec: specs/setup/dev-process-topology.feature
+ */
+export function startFreshBackend({
+  startApi,
+  startWorker,
+  apiPort,
+  route,
+}: BackendStartOptions & {
+  apiPort: number;
+  route: (port: number) => void;
+}): Promise<BootedBackend> {
+  return startBackend({
+    startWorker,
+    startApi: async (options) => {
+      const api = await startApi({ ...options, port: apiPort });
+      route(apiPort);
+      return api;
+    },
+  });
+}
 
 /**
  * A reload beside a serving generation: the next api boots on `apiPort`, `route` moves the port

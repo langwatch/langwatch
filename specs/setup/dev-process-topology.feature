@@ -316,6 +316,14 @@ Feature: The local development process topology
     Then the new api keeps serving and the worker's failure is logged by name
     And the next code change retries the boot
 
+  @unit
+  Scenario: A cold boot routes the api before the worker has finished booting
+    Given the in-process host holding API_PORT with no generation serving
+    When both halves boot and the api starts while the worker is still booting
+    Then API_PORT is routed to the api before the worker's boot resolves
+    And the api's readiness still answers from its own upgrade gate
+    And a worker that then refuses boot is answered by name and retried
+
   # --- A half that fails to boot is loud and retried (Alex, 2026-10-10) ---
 
   # A worker that threw on boot used to drain the api too, so every page was a
