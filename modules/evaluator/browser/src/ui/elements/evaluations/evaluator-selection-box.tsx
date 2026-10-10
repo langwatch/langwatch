@@ -43,7 +43,7 @@ export function EvaluatorSelectionBox({
         cursor="pointer"
         size="2xl"
         fontSize="14px"
-        boxShadow="inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)"
+        boxShadow="inset 0 -2px 5px 0px color-mix(in srgb, var(--chakra-colors-bg-scrim) 3%, transparent)"
       >
         <HStack justify="space-between" width="full">
           <HStack gap={3}>
@@ -86,7 +86,7 @@ export function EvaluatorSelectionBox({
       cursor="pointer"
       size="2xl"
       fontSize="14px"
-      boxShadow="inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)"
+      boxShadow="inset 0 -2px 5px 0px color-mix(in srgb, var(--chakra-colors-bg-scrim) 3%, transparent)"
     >
       <HStack justify="space-between" width="full">
         <Text color="fg.subtle">{placeholder}</Text>

@@ -255,7 +255,7 @@ function EvaluatorChoiceCard({
       width="full"
       padding={6}
       borderRadius={6}
-      boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
+      boxShadow="0px 4px 10px 0px color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent)"
       cursor={isDisabled ? "default" : "pointer"}
       textAlign="left"
       asChild
