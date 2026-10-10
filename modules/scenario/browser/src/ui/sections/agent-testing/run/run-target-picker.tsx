@@ -112,7 +112,7 @@ function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
             boxSize="8px"
             borderRadius="full"
             flexShrink={0}
-            background={isOnline ? "green.500" : "fg.subtle"}
+            background={isOnline ? "green.fg" : "fg.subtle"}
             data-testid={`agent-presence-${agent.id}`}
           />
           <Text fontSize="11px" color={FG_MUTED} truncate>
@@ -122,7 +122,7 @@ function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
       )}
       {!isConnected && hasDevTunnel && (
         <>
-          <Box boxSize="8px" borderRadius="full" flexShrink={0} background="orange.500" />
+          <Box boxSize="8px" borderRadius="full" flexShrink={0} background="orange.solid" />
           <Text fontSize="11px" color={FG_MUTED} truncate>
             Local tunnel
           </Text>
@@ -152,7 +152,7 @@ function AgentBlock({
       cursor={canRun ? "pointer" : "not-allowed"}
       opacity={canRun ? 1 : 0.5}
       borderWidth="1px"
-      borderColor={isActive ? "blue.500" : "border"}
+      borderColor={isActive ? "blue.fg" : "border"}
       background={isActive ? "blue.subtle" : undefined}
       _hover={{ background: cardHoverBackground({ isActive, canRun }) }}
       borderRadius="xl"

@@ -1433,11 +1433,6 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     runParameters: { model: "gpt-5-mini" },
   });
 
-  /** A hex colour as jsdom reads it back off a computed style. */
-  const rgbOf = (hex: string) => {
-    const [r, g, b] = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
-    return `rgb(${r}, ${g}, ${b})`;
-  };
   const tokenVar = (token: string) => `var(--chakra-colors-${token.replace(".", "-")})`;
 
   /** One run of a scenario against a target, keyed the way the platform keys it. */
@@ -1564,8 +1559,8 @@ describe("<RunPlanDetail/> on a comparison run", () => {
 
     const dotOf = (column: HTMLElement) =>
       window.getComputedStyle(within(column).getByTestId("target-dot")).backgroundColor;
-    expect(dotOf(columns[0]!)).toBe(rgbOf(TARGET_COLORS[0]!));
-    expect(dotOf(columns[1]!)).toBe(rgbOf(TARGET_COLORS[1]!));
+    expect(dotOf(columns[0]!)).toBe(TARGET_COLORS[0]!);
+    expect(dotOf(columns[1]!)).toBe(TARGET_COLORS[1]!);
 
     const row = within(table).getByTestId("comparison-row-scen_1");
     expect(row).toHaveTextContent("Angry refund request");
@@ -1680,8 +1675,8 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     const passRate = screen.getByTestId("comparison-chart-pass-rate");
     const bars = within(passRate).getAllByTestId("mini-bar");
     expect(bars).toHaveLength(2);
-    expect(window.getComputedStyle(bars[0]!).backgroundColor).toBe(rgbOf(TARGET_COLORS[0]!));
-    expect(window.getComputedStyle(bars[1]!).backgroundColor).toBe(rgbOf(TARGET_COLORS[1]!));
+    expect(window.getComputedStyle(bars[0]!).background).toBe(TARGET_COLORS[0]!);
+    expect(window.getComputedStyle(bars[1]!).background).toBe(TARGET_COLORS[1]!);
     expect(passRate).toHaveTextContent("50%");
     expect(passRate).toHaveTextContent("100%");
 
@@ -1786,7 +1781,7 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     const legend = screen.getByTestId(`comparison-grid-legend-${PROD}`);
     expect(legend).toHaveTextContent("prod-agent");
     expect(window.getComputedStyle(within(legend).getByTestId("target-dot")).backgroundColor).toBe(
-      rgbOf(TARGET_COLORS[1]!),
+      TARGET_COLORS[1]!,
     );
     expect(
       within(sections[0]!)
@@ -1812,7 +1807,7 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     expect(
       window.getComputedStyle(screen.getByTestId(`runs-sidebar-item-batch_3-target-dot-${DEV}`))
         .backgroundColor,
-    ).toBe(rgbOf(TARGET_COLORS[0]!));
+    ).toBe(TARGET_COLORS[0]!);
   });
 
   /** @scenario "The mark of a target carries its colour only in a comparison" */

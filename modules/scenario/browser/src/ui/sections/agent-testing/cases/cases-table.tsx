@@ -379,7 +379,7 @@ function CaseRowActionsMenu({
         {canManage && (
           <Menu.Item
             value="archive"
-            color="red.600"
+            color="red.fg"
             onClick={(event) => {
               stop(event);
               onArchive(testCase);

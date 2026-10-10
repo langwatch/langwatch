@@ -25,13 +25,13 @@ export const CARD = {
 export const DOT = {
   good: "green.solid",
   bad: "red.solid",
-  attention: "#c98a2f",
+  attention: "yellow.solid",
 } as const;
 
 export const FG = {
   good: "green.fg",
   bad: "red.fg",
-  attention: "#c98a2f",
+  attention: "fg.warning",
   neutral: "fg",
   muted: "fg.muted",
   subtle: "fg.subtle",

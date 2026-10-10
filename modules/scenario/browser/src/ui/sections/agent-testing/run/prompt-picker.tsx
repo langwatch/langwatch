@@ -57,7 +57,7 @@ function PromptRow({
       textAlign="left"
       boxShadow={QUIET_BUTTON_SHADOW}
       borderWidth="1px"
-      borderColor={isActive ? "blue.500" : "transparent"}
+      borderColor={isActive ? "blue.fg" : "transparent"}
       background={isActive ? "blue.subtle" : undefined}
       _hover={{ background: isActive ? "blue.subtle" : "bg.muted/60" }}
       borderRadius="lg"

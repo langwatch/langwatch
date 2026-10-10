@@ -27,17 +27,17 @@ function ConsoleTitleBar({ actions, fileName }: { actions?: ReactNode; fileName:
       paddingX={4}
       paddingY={2.5}
       borderBottomWidth="1px"
-      borderColor="gray.800"
-      bg="gray.900"
+      borderColor="border.strong"
+      bg="bg.panel"
       position="sticky"
       top={0}
     >
       <HStack gap={1.5} width={TRAFFIC_LIGHTS_WIDTH} flexShrink={0}>
-        <Circle size="10px" bg="gray.600" />
-        <Circle size="10px" bg="gray.600" />
-        <Circle size="10px" bg="gray.600" />
+        <Circle size="10px" bg="bg.emphasized" />
+        <Circle size="10px" bg="bg.emphasized" />
+        <Circle size="10px" bg="bg.emphasized" />
       </HStack>
-      <Text flex={1} textAlign="center" textStyle="2xs" color="gray.400" fontFamily="mono">
+      <Text flex={1} textAlign="center" textStyle="2xs" color="fg.subtle" fontFamily="mono">
         {fileName}
       </Text>
       <HStack width={TRAFFIC_LIGHTS_WIDTH} flexShrink={0} justify="flex-end" gap={0}>
@@ -96,7 +96,7 @@ export function SimulationConsole({
             {/* Scenario Name */}
             {scenarioName && (
               <HStack>
-                <Text color="white">Scenario:</Text>
+                <Text color="fg">Scenario:</Text>
                 <Text color={CONSOLE_COLORS.consoleText}>{scenarioName}</Text>
               </HStack>
             )}

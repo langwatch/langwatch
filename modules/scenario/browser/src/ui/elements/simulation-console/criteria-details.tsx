@@ -91,7 +91,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
 
       {results.reasoning && (
         <Box>
-          <Text color="white" fontWeight="semibold" mb={1}>
+          <Text color="fg" fontWeight="semibold" mb={1}>
             Reasoning:
           </Text>
           <Text

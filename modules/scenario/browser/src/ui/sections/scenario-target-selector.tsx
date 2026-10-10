@@ -321,7 +321,7 @@ function ScenarioTargetAgentOptions({
         _hover={{ bg: "bg.subtle" }}
         borderTopWidth="1px"
         borderColor="border.muted"
-        color="blue.500"
+        color="blue.fg"
         onClick={onCreate}
       >
         <Plus size={14} />
@@ -342,7 +342,7 @@ function ScenarioTargetAgentMark({ agent }: { agent: ScenarioTargetAgentOption }
         boxSize="8px"
         borderRadius="full"
         flexShrink={0}
-        background={agent.status === "online" ? "green.500" : "fg.subtle"}
+        background={agent.status === "online" ? "green.fg" : "fg.subtle"}
         data-testid={`target-option-status-${agent.status ?? "offline"}`}
       />
     );
@@ -378,7 +378,7 @@ function ScenarioTargetAgentRow({
       paddingY={2}
       cursor={agent.isRunnable ? "pointer" : "not-allowed"}
       opacity={agent.isRunnable ? 1 : 0.5}
-      bg={isSelected ? "blue.50" : "transparent"}
+      bg={isSelected ? "blue.subtle" : "transparent"}
       _hover={{ bg: "bg.subtle" }}
       onClick={agent.isRunnable ? onSelect : undefined}
       aria-disabled={!agent.isRunnable}
@@ -389,7 +389,7 @@ function ScenarioTargetAgentRow({
       </Text>
       {agent.hasDevTunnel && <LocalTunnelBadge />}
       {isSelected && (
-        <Text color="blue.500" fontSize="sm">
+        <Text color="blue.fg" fontSize="sm">
           ✓
         </Text>
       )}
@@ -461,7 +461,7 @@ function ScenarioTargetPromptOptions({
             cursor="pointer"
             bg={
               selectedTarget?.type === "prompt" && selectedTarget.id === prompt.id
-                ? "blue.50"
+                ? "blue.subtle"
                 : "transparent"
             }
             _hover={{ bg: "bg.subtle" }}
@@ -472,7 +472,7 @@ function ScenarioTargetPromptOptions({
               {prompt.handle ?? prompt.id}
             </Text>
             {selectedTarget?.type === "prompt" && selectedTarget.id === prompt.id && (
-              <Text color="blue.500" fontSize="sm">
+              <Text color="blue.fg" fontSize="sm">
                 ✓
               </Text>
             )}
@@ -486,7 +486,7 @@ function ScenarioTargetPromptOptions({
         _hover={{ bg: "bg.subtle" }}
         borderTopWidth="1px"
         borderColor="border.muted"
-        color="blue.500"
+        color="blue.fg"
         onClick={onCreate}
       >
         <Plus size={14} />

@@ -71,7 +71,7 @@ export function TargetPicker({
   return (
     <Box
       border="1px solid"
-      borderColor={hasError ? "red.500" : "border"}
+      borderColor={hasError ? "red.fg" : "border"}
       borderRadius="md"
       width="full"
     >

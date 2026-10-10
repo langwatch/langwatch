@@ -482,7 +482,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
             width="60px"
             height="60px"
             borderWidth="2px"
-            color="orange.400"
+            color="orange.fg"
           />
         </Box>
         <VStack gap={1}>
@@ -498,7 +498,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
 
   return (
     <VStack gap={4} py={8}>
-      <Spinner size="lg" color="blue.500" />
+      <Spinner size="lg" color="blue.fg" />
       <Text color="fg.muted">{text}</Text>
     </VStack>
   );
@@ -513,7 +513,7 @@ function ErrorState({ error }: ErrorStateProps) {
 
   return (
     <VStack gap={4} py={4}>
-      <Box p={3} borderRadius="full" bg="red.100" color="red.600">
+      <Box p={3} borderRadius="full" bg="red.subtle" color="red.fg">
         <Icon as={AlertCircle} boxSize={6} />
       </Box>
       <VStack gap={1}>
@@ -711,7 +711,6 @@ function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps)
             href="/settings/model-providers"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "white" }}
           >
             Configure model provider
           </a>

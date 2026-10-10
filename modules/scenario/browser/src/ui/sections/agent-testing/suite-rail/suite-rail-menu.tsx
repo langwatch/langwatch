@@ -123,7 +123,7 @@ export function SuiteRailMenu({
           <SuiteMenuItem
             value="archive-suite"
             action="archive"
-            color="red.600"
+            color="red.fg"
             onChoose={() => onArchiveSuite()}
           >
             Archive suite
