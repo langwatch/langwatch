@@ -142,13 +142,14 @@ describe("deriveUiDeployment", () => {
   });
 });
 
-/** @scenario "Cloud, self-hosted and local development are told apart" */
 describe("hostingOf", () => {
+  /** @scenario "Cloud, self-hosted and local development are told apart" */
   it("reads a development build as local, even when it runs SaaS-shaped", () => {
     expect(hostingOf({ isDevelopment: true, isSaaS: true })).toBe("local");
     expect(hostingOf({ isDevelopment: true, isSaaS: false })).toBe("local");
   });
 
+  /** @scenario "Cloud, self-hosted and local development are told apart" */
   it("reads a production build as cloud on SaaS and self-hosted elsewhere", () => {
     expect(hostingOf({ isDevelopment: false, isSaaS: true })).toBe("cloud");
     expect(hostingOf({ isDevelopment: false, isSaaS: false })).toBe("self-hosted");

@@ -83,7 +83,6 @@ var (
 		"specs/langy/langy-followup-suggestions.feature",
 		"specs/langy/langy-frontend-realtime.feature",
 		"specs/langy/langy-github-prs.feature",
-		"specs/langy/langy-plan-progress.feature",
 		"specs/langy/langy-projection-independent-reactions.feature",
 	}
 	legacyInert = []string{
