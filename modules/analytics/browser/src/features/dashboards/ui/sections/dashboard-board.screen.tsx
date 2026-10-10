@@ -126,6 +126,11 @@ function OpenBoard({ board }: { board: SavedBoard }) {
             />
           }
           onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
+          pointer={{
+            boardKind: "dashboard",
+            boardId: board.id,
+            widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
+          }}
           action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
           {...(projects.isShared
             ? {

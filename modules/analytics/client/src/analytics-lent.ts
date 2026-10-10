@@ -1,4 +1,7 @@
-/** Analytics UI lent by token to the screens that filter traces and chart them (§10.1). */
+/**
+ * Analytics UI lent by token to the screens that filter traces and chart them, and the
+ * extension points analytics reads from its peers (§10.1).
+ */
 
 import type {
   AnalyticsChartGroup,
@@ -114,3 +117,19 @@ export type LwqlReplayChartProps = {
 
 export const LwqlReplayChartToken =
   uiTokens("analytics").component<LwqlReplayChartProps>("lwqlReplayChart");
+
+/**
+ * A board's header, where a peer may lend an action beside "Add a widget". An extension
+ * point: analytics draws every lender and knows none of them. The board is named as a peer
+ * keeps a pointer to it: a stored board by its id, a From LangWatch board by its template id.
+ */
+export type BoardHeaderActionProps = {
+  boardKind: "dashboard" | "template";
+  boardId: string;
+  boardName: string;
+  /** How many widgets the board holds; undefined while a stored board's widgets load. */
+  widgetCount: number | undefined;
+};
+
+export const BoardHeaderActionToken =
+  uiTokens("analytics").extension<BoardHeaderActionProps>("boardHeaderAction");

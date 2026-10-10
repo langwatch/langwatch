@@ -1,10 +1,10 @@
 # @langwatch/insight-browser
 
-The browser half of [insight](../README.md). What a browser installs when it installs insight: the inbox screen behind `release_insights`, and what it lends the shell and Langy (the bell, the sidebar count and "Save as insight"). Everything loads lazily; none of it is on first paint.
+The browser half of [insight](../README.md). What a browser installs when it installs insight: the inbox screen behind `release_insights`, and what it lends the shell, Langy and a board's header (the bell, the sidebar count, "Save as insight" and "Daily insights"). Everything loads lazily; none of it is on first paint.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/insight.web.ts:14` (`defineBrowserModule("insight")`), exported as `insightWeb` at `./declaration`.
+Declared in `src/insight.web.ts:15` (`defineBrowserModule("insight")`), exported as `insightWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -24,7 +24,7 @@ None.
 
 - `withApi(insightApi)`, tRPC contracts: `insights.*`.
 - Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/langy-client`.
-- Lends: `InsightsBellToken`, `InsightsNavCountToken`, `LangyAnswerActionToken`.
+- Lends: `InsightsBellToken`, `InsightsNavCountToken`, `LangyAnswerActionToken`, `BoardHeaderActionToken`.
 - Host APIs it requires: `InsightHostApi`.
 
 <!-- readme:generated:end -->

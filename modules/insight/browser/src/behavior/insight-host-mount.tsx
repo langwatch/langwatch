@@ -105,13 +105,18 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
   const scopeProject = session.snapshot().scope.project;
   const projectId = scopeProject?.id;
   const projectSlug = scopeProject?.slug;
+  const projectKind = scopeProject?.kind;
 
   const host = useMemo(
     () =>
       new CapabilityInsightHost({
         project:
           projectId !== void 0 && projectSlug !== void 0
-            ? { id: projectId, slug: projectSlug }
+            ? {
+                id: projectId,
+                slug: projectSlug,
+                ...(projectKind !== void 0 ? { kind: projectKind } : {}),
+              }
             : void 0,
         enabled,
         session,
@@ -120,7 +125,7 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
         feedback,
         langy,
       }),
-    [projectId, projectSlug, enabled, session, route, navigation, feedback, langy],
+    [projectId, projectSlug, projectKind, enabled, session, route, navigation, feedback, langy],
   );
   return <InsightHostProvider value={host}>{children}</InsightHostProvider>;
 }

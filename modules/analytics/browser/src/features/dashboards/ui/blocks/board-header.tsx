@@ -1,20 +1,15 @@
 /**
- * A board's header: title (badged on a From LangWatch board, with its scope on a stored one)
- * and one action, then the description, the Project chip of an Organization board and the
- * period. Star and rename live in the sidebar.
+ * A board's header: title (badged on a From LangWatch board, with its scope on a stored one),
+ * what peers lend it and one action, then the description, the Project chip of an
+ * Organization board and the period. Star and rename live in the sidebar.
  */
 
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
+import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
+import { useLentAll } from "@langwatch/browser-host/lent";
+import { Button, Heading, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, Suspense, useState } from "react";
 
 import { InlineTextField } from "../elements/inline-text-field.tsx";
 
@@ -24,6 +19,7 @@ export function BoardHeader({
   isFromLangWatch = false,
   scope,
   onDescribe,
+  pointer,
   action,
   project,
   periodControl,
@@ -36,6 +32,8 @@ export function BoardHeader({
   scope?: ReactNode;
   /** Absent where the reader cannot edit the board. */
   onDescribe?: (description: string) => void;
+  /** The board as the actions peers lend the header point at it. */
+  pointer: Omit<BoardHeaderActionProps, "boardName">;
   /** "Add a widget" on a board the reader may edit; null where there is nothing to offer. */
   action: ReactNode;
   /** The Project chip of an Organization board: whose data it shows. */
@@ -59,7 +57,10 @@ export function BoardHeader({
           {isFromLangWatch && <FromLangWatchBadge />}
           {scope}
         </HStack>
-        <Box flexShrink={0}>{action}</Box>
+        <HStack flexShrink={0} gap={2}>
+          <LentBoardActions boardName={name} {...pointer} />
+          {action}
+        </HStack>
       </HStack>
       <HStack columnGap={4} rowGap={2} flexWrap="wrap">
         <BoardDescription description={description} onDescribe={onDescribe} />
@@ -69,6 +70,18 @@ export function BoardHeader({
       </HStack>
     </VStack>
   );
+}
+
+/** The actions peers lend the header (§10.1); nothing draws without a lender. */
+function LentBoardActions(props: BoardHeaderActionProps) {
+  const actions = useLentAll(BoardHeaderActionToken);
+  return actions.map(({ owner, Component }) => (
+    <IsolatedErrorBoundary key={owner} scope="This action failed to load">
+      <Suspense fallback={null}>
+        <Component {...props} />
+      </Suspense>
+    </IsolatedErrorBoundary>
+  ));
 }
 
 function FromLangWatchBadge() {

@@ -104,6 +104,27 @@ Turning off asks no board, so the run of a board that is gone can still be turne
 The row keeps what they last chose while the run is off. There is no cap on how many
 boards a person turns on.
 
+**The control is lent to the board's header.** Analytics hosts and insight owns, so
+analytics never imports insight: analytics' client declares an extension point,
+`BoardHeaderActionToken`, with the board's kind, id, name and widget count, and its
+board header draws every lender, on a stored board and on a From LangWatch board. Insight
+lends "Daily insights" to it. `undecided` and `off` show a quiet switch; `on` shows one
+dropdown with the schedule, how the last run ended, the way to Insights, the settings
+and the switch that turns it off. The words say "around 09:00", because a slot is a
+minute within the hour. The browser's defaults are 09, its own time zone and 3. Nothing
+shows while `release_insights` is off, without `analytics:view`, or on an aggregate,
+whose read answers `undecided` and whose writes are refused.
+
+**The offer is one rule, and the answer is the server's.** A board that opened with at
+least one widget offers the run in a dialog to a person who is `undecided`, once per
+visit. Closing the dialog decides nothing; "No thanks" stores `off`. The rule is one
+pure function, `shouldOfferDailyInsights`, so how often a board asks changes in one
+place, and the browser stores no answer of its own.
+
+**A write shows before it is folded.** A write is answered before the worker folds its
+event, so the browser writes the new state into the cached read first, and puts the read
+back and says so when the write is refused. The read hint then brings the folded row.
+
 **The schedule is a wake per person and board.** The aggregate's process manager,
 `dailyInsightsSchedule`, is keyed by the schedule and arms `nextWakeAt` itself, as a
 report's schedule does. A slot is the chosen hour and a minute fixed by a digest of the
@@ -164,6 +185,13 @@ stays off when the person turned it off since. A pass changes no setting.
 - A run's brief names custom chart widgets only. Builder graphs and saved charts
   placed on a board are not listed, so a board that holds only those is `board_empty`.
 - Daily runs on From LangWatch boards need the template catalogue, or the part of it
-  a brief needs, readable on the server. Until then they are skipped, visibly.
+  a brief needs, readable on the server. Until then they are skipped, visibly: the
+  control says "Did not run" and that Langy cannot read From LangWatch boards yet. The
+  offer and the schedule sentence on such a board still say Langy reads it.
+- The browser counts every widget of a board, while a run reads custom chart widgets
+  only. A board of builder graphs alone gets the offer, and its run ends `board_empty`.
+- The control's "N new" tag counts the person's unseen insights whose pointer has the
+  board's id. A From LangWatch board is pointed at by its template id in a run and by
+  `curated/<template id>` in a chat, so chat insights from a template are not counted.
 - The run events and a pass's request are per-run rows and age with the `traces`
   retention class. `configured` and `turned_off` are a person's setting and never expire.

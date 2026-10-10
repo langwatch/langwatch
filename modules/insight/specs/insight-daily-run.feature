@@ -811,3 +811,136 @@ Feature: The daily insights run
       When each delivery asks a schedule to arm itself
       Then both name the same pass
       And one request is recorded
+
+  Rule: A board's header carries the person's daily insights control
+
+    @integration
+    Scenario: A board's header draws the action a peer lends it
+      Given a stored board with widgets and a From LangWatch board
+      When a module lends an action to the board header
+      Then the stored board hands it the kind dashboard, its id, its name and its widget count
+      And the From LangWatch board hands it the kind template and its template id
+      And a header nobody lends to draws nothing more
+
+    @integration
+    Scenario: A board a member never answered offers daily insights
+      Given a board with widgets and a member who never answered for it
+      When they open the board
+      Then a dialog asks whether to turn on daily insights for that board
+      And the quiet control is in the header
+
+    @integration
+    Scenario: A board with no widgets offers nothing
+      Given a board with no widgets and a member who never answered for it
+      When they open the board
+      Then no offer opens and the header holds no daily insights control
+
+    @integration
+    Scenario: Closing the offer decides nothing
+      Given the offer is open on a board
+      When the member closes it without an answer
+      Then nothing is sent to the server
+      And the offer stays closed for this visit, with the quiet control in the header
+
+    @integration
+    Scenario: No thanks on the offer sends an off for the board
+      Given the offer is open on a board
+      When the member says no thanks
+      Then an off is sent for that board
+      And the offer closes and the quiet control stays
+
+    @integration
+    Scenario: Turning on from the offer sends the hour, the zone and the maximum
+      Given the offer is open on a board
+      When the member turns it on as offered, or after choosing another hour and maximum
+      Then the run is set for hour 9, the browser's time zone and at most 3 insights
+      And a changed hour and maximum are sent as chosen
+
+    @unit
+    Scenario: A daily run takes any hour, a time zone and one of four maximums
+      Given the daily run's choices
+      When they are listed
+      Then every hour from 00:00 to 23:00 can be chosen, and the maximums 1, 3, 5 and 10
+      And a board starts at 09:00, the reader's own time zone and at most 3
+      And the reader's zone is listed first, with a zone the run already has kept on the list
+
+    @unit
+    Scenario: A run time is said as around its hour
+      Given a run set for 9 in Europe/Amsterdam
+      When its time is put in words
+      Then it reads around 09:00 Amsterdam time, never at 09:00
+
+    @unit
+    Scenario: A board offers once per visit and never after an answer
+      Given a board that opened with widgets, without widgets, or while its widgets load
+      When the person is undecided, said no, or turned it on, and has or has not closed the offer
+      Then the offer shows only to an undecided person on a board that opened with a widget
+      And not again in a visit where they closed it
+
+    @integration
+    Scenario: A board that is off shows the quiet control and no offer
+      Given a member said no thanks to a board, or turned it off
+      When they open the board
+      Then no offer opens
+      And turning it on from the control sends what they last chose, or the defaults
+
+    @integration
+    Scenario: A board that is on shows one dropdown
+      Given a member turned a board's daily run on
+      When they open the dropdown in the board's header
+      Then it says when the run reads the board, around its hour, and what the last run did
+      And Open Insights leads to their inbox
+      And Settings opens the run's choices, and saving sends them
+      And the switch in the dropdown sends an off
+
+    @integration
+    Scenario: The control counts the board's unseen insights
+      Given a board that is on, with 2 unseen insights from it and 1 from another board
+      When the member looks at the board's header
+      Then the control says 2 new
+
+    @integration
+    Scenario: A board that is on with no widgets waits
+      Given a board that is on and lost its last widget
+      When the member opens the dropdown
+      Then the control says it waits, and the dropdown says there is nothing to read
+
+    @integration
+    Scenario: The dropdown says how the last run ended
+      Given a board that is on
+      When its last run filed 2, found nothing new, failed, or was skipped for each reason a run records
+      Then the dropdown names the outcome in plain words, and no run yet before the first one
+      And a skipped run says it did not run and why
+
+    @integration
+    Scenario: A From LangWatch board takes the control and is named by its template id
+      Given a From LangWatch board
+      When a member turns its daily run on
+      Then the setting is sent with the kind template and the template's id
+      And after a run it says calmly that Langy cannot read From LangWatch boards yet
+
+    @integration
+    Scenario: A From LangWatch board says before the answer that no run reads it yet
+      Given a From LangWatch board a member never answered for
+      When the offer opens
+      Then it says Langy cannot read From LangWatch boards yet and a run files nothing for now
+      And the offer on a stored board says no such thing
+
+    @integration
+    Scenario: The control is absent without the flag, the grant or a project that takes runs
+      Given the release_insights flag is off, or a member without analytics:view, or an aggregate project
+      When a board's header is drawn
+      Then no daily insights control shows, no offer opens and nothing is asked of the server
+
+    @integration
+    Scenario: The control changes before the server answers
+      Given a board that is off
+      When the member turns it on and the server has not answered yet
+      Then the header already shows the dropdown of a board that is on
+
+    @integration
+    Scenario: A refused write puts the control back and says so
+      Given a board that is off, and a server that refuses the write
+      When the member turns it on
+      Then the control goes back to off
+      And the member is told it could not be turned on

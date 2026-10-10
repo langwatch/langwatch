@@ -49,6 +49,11 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           name={board.name}
           description={board.job}
           isFromLangWatch
+          pointer={{
+            boardKind: "template",
+            boardId: board.templateId,
+            widgetCount: board.widgets.length,
+          }}
           action={null}
           periodControl={
             <BoardPeriodControl

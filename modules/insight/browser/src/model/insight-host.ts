@@ -7,7 +7,12 @@
 import type { LangyAskRequest } from "@langwatch/langy-contract";
 import { createContext, useContext } from "react";
 
-export type InsightHostProject = { id: string; slug: string };
+export type InsightHostProject = {
+  id: string;
+  slug: string;
+  /** The project's kind (`application`, `aggregate`, ...), when the scope has read it. */
+  kind?: string;
+};
 
 export type InsightSuccessNotice = { title: string; description?: string };
 
