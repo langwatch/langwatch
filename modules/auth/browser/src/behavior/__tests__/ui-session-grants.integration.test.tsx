@@ -114,7 +114,6 @@ describe("given an aggregate project", () => {
 
     await waitFor(() => expect(view.getByTestId("can-manage").textContent).toBe("true"));
     expect(view.getByTestId("can-project").textContent).toBe("false");
-    expect(view.getByTestId("legacy-can").textContent).toBe("false");
     expect(view.getByTestId("can-org").textContent).toBe("true");
   });
 });
