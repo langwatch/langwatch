@@ -7,6 +7,7 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
@@ -39,7 +40,10 @@ describe.skipIf(!DB_URL)("raceOnOneRow (real DB)", () => {
     userHashKey: string,
   ): Promise<number> =>
     tx.$executeRaw`
-      -- @tenancy: User is global; the row is the one this suite created.
+      ${skipTenantCheck({
+        // User is global; the row is the one this suite created.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "User" SET "userHashKey" = ${userHashKey}
        WHERE id = ${userId} AND "userHashKey" IS NULL
     `;

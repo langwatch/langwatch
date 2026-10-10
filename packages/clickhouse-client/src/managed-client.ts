@@ -172,13 +172,6 @@ export class ClickHouseManagedClientService<
 }
 
 /**
- * A statement that genuinely spans tenants, and the written reason it does.
- */
-export interface UnscopedStatementDeclaration {
-  reason: string;
-}
-
-/**
  * Refuses a `query` whose SQL names no tenant, outermost of every policy so a statement that
  * must not run never spends a slot or a socket. The refusal is a plain `Error`: a bug in a
  * query we wrote, logged with table and statement head.
@@ -199,9 +192,9 @@ export function withClickHouseTenantScope<Client extends ClickHouseVendorClient>
       // failure on this call rather than as a synchronous throw the caller's
       // `.catch` would miss.
       return async (params: unknown) => {
-        const { unscoped, ...forwarded } = recordOf(params);
+        const { SKIP_TENANT_CHECK, ...forwarded } = recordOf(params);
         const sql = typeof forwarded.query === "string" ? forwarded.query : "";
-        if (unscoped === undefined) {
+        if (SKIP_TENANT_CHECK !== true) {
           const violation = checkStatementTenantScope({ sql });
           if (violation !== null) {
             const table = tableNamedBy(sql);

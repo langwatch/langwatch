@@ -5,10 +5,7 @@ import {
   type LegacyStoredObjectRow,
   StoredObjectLegacySourceRepository,
 } from "../stored-object-legacy-source.repository.ts";
-import {
-  LEGACY_INDEX_UNSCOPED,
-  type StoredObjectsClickHouse,
-} from "./stored-objects.repository.ts";
+import { type StoredObjectsClickHouse } from "./stored-objects.repository.ts";
 
 const legacyRowSchema = z.object({
   id: z.string(),
@@ -66,7 +63,9 @@ export class ClickHouseStoredObjectLegacySourceRepository extends StoredObjectLe
       `,
       query_params: { projectId, afterId: afterId ?? "", limit },
       format: "JSONEachRow",
-      unscoped: LEGACY_INDEX_UNSCOPED,
+      // Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the
+      // statement is filtered by project_id.
+      SKIP_TENANT_CHECK: true,
     });
     const rows = await result.json<unknown>();
     return rows.map((raw) => {

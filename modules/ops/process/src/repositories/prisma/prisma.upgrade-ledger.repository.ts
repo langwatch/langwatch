@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   imageSteps,
@@ -25,9 +26,8 @@ import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
 
 import type { UpgradeLedgerRepository } from "../upgrade-ledger.repository.ts";
 
-/** Marks the reader's SQL for the tenancy guard: the ledger is the install's, no tenant's. */
-const LEDGER_TENANCY =
-  "-- @tenancy: the upgrade ledger describes the installation, not a tenant.\n";
+// The upgrade ledger describes the installation, not a tenant.
+const LEDGER_TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 /** The image's code steps that wait until no serving process lacks them (WAITINGON-LOOKUP). */
 function waitingCodeSteps(): ReadonlySet<string> {

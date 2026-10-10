@@ -70,7 +70,11 @@ describe("EventingClickHouseReplayEventSource", () => {
       await source.discoverAffectedAggregates({ eventTypes: ["lw.span.received"], sinceMs: 0 });
 
       expect(client.query).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "", unscoped: expect.anything() }),
+        expect.objectContaining({
+          tenantId: "",
+          // The discovery sweep reads every tenant's events, so it must skip the check.
+          SKIP_TENANT_CHECK: true,
+        }),
       );
     });
 

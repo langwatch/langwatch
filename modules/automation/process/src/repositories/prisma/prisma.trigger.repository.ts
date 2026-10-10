@@ -6,6 +6,7 @@ import {
   type UpdateTriggerCommand,
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AutomationClock } from "../automation.repositories.ts";
@@ -101,7 +102,10 @@ export class PrismaTriggerRepository extends TriggerRepository {
 			WHERE "triggerKind" = 'REPORT'
 			  AND "active" = true
 			  AND "deleted" = false
-			-- @tenancy: report-schedule reconciliation cross-tenant sweep (worker boot)
+			${skipTenantCheck({
+        // Report-schedule reconciliation cross-tenant sweep (worker boot)
+        SKIP_TENANT_CHECK: true,
+      })}
 		`;
   }
   async findAllReportTargets(): Promise<ReportScheduleTarget[]> {
@@ -110,7 +114,10 @@ export class PrismaTriggerRepository extends TriggerRepository {
 			FROM "Trigger"
 			WHERE "triggerKind" = 'REPORT'
 			  AND "deleted" = false
-			-- @tenancy: operator scheduler cross-tenant listing (ops)
+			${skipTenantCheck({
+        // Operator scheduler cross-tenant listing (ops)
+        SKIP_TENANT_CHECK: true,
+      })}
 		`;
   }
   async claimSend(input: {
@@ -211,7 +218,10 @@ export class PrismaTriggerRepository extends TriggerRepository {
 			  AND (${after ?? null}::text IS NULL OR "id" > ${after ?? null}::text)
 			ORDER BY "id" ASC
 			LIMIT ${limit}
-			-- @tenancy: Slack claim reconcile cross-tenant sweep (upgrade step, worker)
+			${skipTenantCheck({
+        // Slack claim reconcile cross-tenant sweep (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
 		`;
     return rows.map((row: unknown) => mapTriggerRow(row));
   }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { ConcurrencyLimiter } from "@langwatch/limiter";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { AggregateReconcileLockRepository } from "../aggregate-reconcile-lock.repository.ts";
@@ -36,7 +37,10 @@ export class PrismaAggregateReconcileLockRepository extends AggregateReconcileLo
       task: () =>
         this.prisma.$transaction(
           async (transaction) => {
-            await transaction.$executeRaw`-- @tenancy: advisory-lock helper, the key names one aggregate project
+            await transaction.$executeRaw` ${skipTenantCheck({
+              // Advisory-lock helper, the key names one aggregate project.
+              SKIP_TENANT_CHECK: true,
+            })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`aggregate-reconcile:${aggregateProjectId}`}, 0))`;
             return reconcile();
           },

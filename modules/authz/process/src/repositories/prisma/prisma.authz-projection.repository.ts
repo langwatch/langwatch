@@ -1,5 +1,6 @@
 // Guarded upserts in raw SQL; one statement per event; guard in WHERE for atomicity.
 import { createLogger } from "@langwatch/observability";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
@@ -344,7 +345,10 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     const { organizationId, principalType, principalId, roleKey, scopeType, scopeId } = write.row;
     const key = `authz-grant-identity:${organizationId}:${principalType}:${principalId}:${roleKey}:${scopeType}:${scopeId}`;
     return this.prisma.$executeRaw`
--- @tenancy: a lock on one grant identity, whose key carries its organization; no table is read.
+${skipTenantCheck({
+  // A lock on one grant identity, whose key carries its organization; no table is read.
+  SKIP_TENANT_CHECK: true,
+})}
 SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
   }
 

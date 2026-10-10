@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 import { z } from "zod";
@@ -85,7 +86,10 @@ export class PrismaDatasetMigrationRepository implements DatasetMigrationReposit
   }): Promise<DatasetMigrationOutcome> {
     return this.options.database.$transaction(
       async (database) => {
-        await database.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+        await database.$executeRaw` ${skipTenantCheck({
+          // Advisory-lock helper, key is dataset-bounded.
+          SKIP_TENANT_CHECK: true,
+        })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0))`;
 
         const locked = await database.dataset.findFirst({

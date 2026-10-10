@@ -5,7 +5,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { analyticsComparisonWindow } from "@langwatch/analytics-contract";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { generate } from "@langwatch/ksuid";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -70,7 +70,7 @@ function countingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
     },
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 const readPerformance = (monitors: { id: string; isGuardrail: boolean }[]) =>

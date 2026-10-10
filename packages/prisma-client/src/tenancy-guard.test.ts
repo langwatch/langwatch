@@ -16,10 +16,12 @@ vi.mock("./mass-delete-guard.ts", () => ({
 }));
 
 vi.mock("./multi-tenancy-guard.ts", () => ({
-  guardProjectId: (params: GuardParams, next: GuardNext): Promise<unknown> => {
-    calls.order.push("project");
-    return next({ ...params, args: { stage: "project" } });
-  },
+  projectGuard:
+    () =>
+    (params: GuardParams, next: GuardNext): Promise<unknown> => {
+      calls.order.push("project");
+      return next({ ...params, args: { stage: "project" } });
+    },
 }));
 
 vi.mock("./organization-guard.ts", () => ({

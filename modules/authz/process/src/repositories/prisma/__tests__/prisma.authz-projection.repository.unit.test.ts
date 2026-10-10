@@ -275,7 +275,8 @@ describe("PrismaAuthzProjectionRepository", () => {
 
       const sql = sqlFrom(executeRaw);
       expect(sql).toContain("pg_advisory_xact_lock");
-      expect(sql).toContain("-- @tenancy:");
+      const [, marker] = executeRaw.mock.calls[0] ?? [];
+      expect(marker instanceof Prisma.Sql && marker.sql).toContain("SKIP_TENANT_CHECK");
     });
   });
 

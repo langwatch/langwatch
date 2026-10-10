@@ -4,6 +4,7 @@ import {
   type ModelDefaultConfig,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type PrismaClient,
   type ModelDefaultConfig as PrismaModelDefaultConfig,
@@ -137,10 +138,16 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
     organizationId: string,
     scopes: ModelDefaultScope[],
   ): Promise<void> {
-    await database.$executeRaw`-- @tenancy: transaction-scoped advisory lock; organization is in the lock key
+    await database.$executeRaw` ${skipTenantCheck({
+      // Transaction-scoped advisory lock; organization is in the lock key.
+      SKIP_TENANT_CHECK: true,
+    })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`mdc-org:${organizationId}`}, 0))`;
     for (const scope of [...scopes].toSorted(scopeSort)) {
-      await database.$executeRaw`-- @tenancy: transaction-scoped advisory lock; scope is in the lock key
+      await database.$executeRaw` ${skipTenantCheck({
+        // Transaction-scoped advisory lock; scope is in the lock key.
+        SKIP_TENANT_CHECK: true,
+      })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scope.scopeType}:${scope.scopeId}`}, 0))`;
     }
   }

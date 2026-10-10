@@ -14,7 +14,7 @@ export interface EventLogRetentionClient {
     kind: "write";
     sql: string;
     params?: Record<string, unknown>;
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
   }): Promise<void>;
 }
 
@@ -114,10 +114,9 @@ export class EventLogRetention {
         `ALTER TABLE ${EVENT_LOG_TABLE} UPDATE _retention_days = 0 ` +
         `WHERE _retention_days != 0 AND ${this.indefinitePredicate()}` +
         ` AND length(${sqlString(markerOf(this.classification.indefiniteClass))}) > 0`,
-      unscoped: {
-        reason:
-          "keeping never-expiring rows forever is one rewrite per ClickHouse target, across every tenant on it",
-      },
+      // Keeping never-expiring rows forever is one rewrite per ClickHouse target, across every
+      // tenant on it.
+      SKIP_TENANT_CHECK: true,
     });
   }
 

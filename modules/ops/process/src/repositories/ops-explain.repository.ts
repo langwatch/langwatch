@@ -20,14 +20,14 @@ export interface OpsExplainClients {
 
 /**
  * The one call this repository makes, as it asks for it. Narrower than the
- * driver client so the fleet-wide EXPLAIN can carry its `unscoped` reason.
+ * driver client so the fleet-wide EXPLAIN can skip the tenant check.
  */
 export interface OpsExplainQueryClient {
   query(input: {
     query: string;
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
   }): Promise<{ json(): Promise<unknown[]> }>;
 }
 

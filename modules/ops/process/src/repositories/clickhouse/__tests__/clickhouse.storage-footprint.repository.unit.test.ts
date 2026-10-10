@@ -20,7 +20,7 @@ function repoAnswering(rows: Record<string, string>[], backupLogPresent = "1") {
 
 describe("given an endpoint's system tables", () => {
   describe("when the monitored tables are read", () => {
-    it("asks only for the named tables, unscoped, and reads the sums as numbers", async () => {
+    it("asks only for the named tables, skipping the tenant check, and reads the sums as numbers", async () => {
       const { repo, statements } = repoAnswering([
         { table: "stored_spans", total_rows: "10", total_bytes: "2048", parts_count: "3" },
       ]);
@@ -31,7 +31,7 @@ describe("given an endpoint's system tables", () => {
       expect(statements[0]?.sql).toContain("FROM system.parts");
       expect(statements[0]?.params).toEqual({ tables: ["stored_spans", "events"] });
       expect(statements[0]?.tenantId).toBe("");
-      expect(statements[0]?.unscoped?.reason).toContain("system.parts");
+      expect(statements[0]?.SKIP_TENANT_CHECK).toBe(true);
     });
   });
 

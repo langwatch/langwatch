@@ -226,7 +226,9 @@ describe("explicit Prisma lifecycle", () => {
 
     await PrismaReadinessService.create().check({ connection });
 
-    expect(query).toHaveBeenCalledWith("-- @tenancy: prisma readiness probe\nSELECT 1 AS ready");
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/\* SKIP_TENANT_CHECK [\w-]+ \*\/SELECT 1 AS ready$/),
+    );
   });
 
   it("disconnects the client and pool exactly once", async () => {

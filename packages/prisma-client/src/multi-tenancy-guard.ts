@@ -6,18 +6,20 @@ import {
   type GuardMiddleware,
   type GuardParams,
 } from "./guard-middleware.ts";
-import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
+import { ORG_BEARING_MODEL_NAMES, PRISMA_READ_ACTIONS } from "./organization-guard.ts";
+import { skipsTenantCheck } from "./skip-tenant-check.ts";
 
-// Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
-// the SQL string. The legacy outbox drainer carries an explicit
-// identifier; the advisory-lock helper opts out via the `-- @tenancy:`
-// marker below. Only a genuinely scope-less query would miss both.
-const RAW_TENANCY_PREDICATE_RE = /"?(projectId|organizationId|tenantId)"?/i;
+// A raw statement is tenant-scoped when it compares a tenant column with a bound parameter
+// (`"projectId" = $1`, `= ANY($1)`, `IN ($1, $2)`); `?` is how a template's holes are joined.
+const RAW_TENANT_COMPARISON_RE =
+  /"?\b(?:projectId|organizationId|tenantId)"?\s*(?:=\s*(?:ANY\s*\(\s*)?|IN\s*\(\s*)(?:\?|\$\d+)/i;
 
-// Opt-out marker for the rare query that intentionally scans across
-// tenants (e.g. a global recovery sweep, a deploy-time migration helper).
-// `-- @tenancy: <reason>` is grep-able and surfaces in code review.
-const RAW_TENANCY_OPTOUT_RE = /--\s*@tenancy\s*:/i;
+// An INSERT ... VALUES writes its own rows, so naming a tenant column in its column list scopes it.
+const RAW_TENANT_INSERT_RE =
+  /^\s*INSERT\s+INTO\s+[^(]+\([^)]*"?\b(?:projectId|organizationId|tenantId)\b"?[^)]*\)\s*VALUES\b/i;
+
+// The table a skipped statement names first, for the skip counter's label.
+const RAW_TABLE_RE = /\b(?:FROM|INTO|UPDATE|JOIN)\s+"?([A-Za-z_][\w]*)"?/i;
 
 function extractRawSql(args: unknown): string | null {
   if (!args || typeof args !== "object") return null;
@@ -870,24 +872,42 @@ const ORG_DERIVED_EXEMPT = ORG_BEARING_MODEL_NAMES.filter(
 const EXEMPT_MODELS = new Set<string>([
   ...GLOBAL_MODELS,
   ...RELATIONAL_PARENT_SCOPED,
-  ...LICENSE_COUNTED_PROJECT_MODELS,
   ...ORG_DERIVED_EXEMPT,
 ]);
 
+const LICENSE_COUNTED = new Set<string>(LICENSE_COUNTED_PROJECT_MODELS);
+const READ_ACTIONS = new Set<string>(PRISMA_READ_ACTIONS);
+
 const isRawAction = (action: string): boolean => action === "queryRaw" || action === "executeRaw";
 
-function assertRawTenancy(params: GuardParams): void {
+/** Who hears about a raw statement that set `SKIP_TENANT_CHECK`. */
+export type OnSkippedTenantCheck = (skipped: { table: string }) => void;
+
+function assertRawTenancy(params: GuardParams, onSkipped: OnSkippedTenantCheck): void {
   const sql = extractRawSql(params.args);
   if (!sql) return;
-  if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
-  if (RAW_TENANCY_PREDICATE_RE.test(sql)) return;
+  if (skipsTenantCheck(sql)) {
+    quietly(() => onSkipped({ table: RAW_TABLE_RE.exec(sql)?.[1] ?? "unknown" }));
+    return;
+  }
+  if (RAW_TENANT_COMPARISON_RE.test(sql)) return;
+  if (RAW_TENANT_INSERT_RE.test(sql)) return;
 
   throw new Error(
-    "The raw query is missing a tenancy predicate. Include `projectId`, " +
-      "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
-      "`-- @tenancy: <reason>` comment if the query intentionally scans " +
-      "across tenants.",
+    "The raw query compares no tenant column with a bound parameter. Add " +
+      '`"projectId" = ${projectId}` (or organizationId / tenantId), or interpolate ' +
+      "`skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason " +
+      "if the query intentionally spans tenants.",
   );
+}
+
+/** A throwing counter or logger must not refuse a statement the guard already allowed. */
+function quietly(report: () => void): void {
+  try {
+    report();
+  } catch {
+    // Observability never decides policy.
+  }
 }
 
 function assertScopedModel({ action, args }: GuardParams, model: string): boolean {
@@ -969,8 +989,16 @@ const PROJECT_SCOPED_KEYS = [
   "projectId_traceId",
 ] as const;
 
+// A compound unique led by projectId (`projectId_identityKey`) scopes as projectId does.
+const hasProjectCompoundKey = (where: unknown): boolean =>
+  isClause(where) &&
+  Object.entries(where).some(
+    ([key, value]) => key.startsWith("projectId_") && Boolean(clauseField(value, "projectId")),
+  );
+
 function whereHasProjectScope(where: unknown): boolean {
   if (PROJECT_SCOPED_KEYS.some((key) => clauseField(where, key))) return true;
+  if (hasProjectCompoundKey(where)) return true;
   const branches = clauseField(where, "OR");
   return (
     Array.isArray(branches) &&
@@ -991,16 +1019,19 @@ function assertWhereProjectId({ action, args }: GuardParams, model: string): voi
   );
 }
 
-const _guardProjectId = ({ params }: { params: GuardParams }) => {
+const _guardProjectId = ({
+  params,
+  onSkipped,
+}: {
+  params: GuardParams;
+  onSkipped: OnSkippedTenantCheck;
+}) => {
   const action = params.action;
 
-  // Raw queries (`$queryRaw`/`$executeRaw`) carry tenancy scope inside the
-  // SQL string, invisible to the structural guard. Two cheap defences apply:
-  // require a tenancy column mention, or a grep-able `-- @tenancy: <reason>`
-  // opt-out. Must run BEFORE the no-model exemption below — raw ops have no
-  // `params.model`, so an earlier `!params.model` return would skip this.
+  // Raw SQL carries its scope in the text, so it is checked there. Before the no-model return
+  // below: raw operations have no `params.model`.
   if (isRawAction(action)) {
-    assertRawTenancy(params);
+    assertRawTenancy(params, onSkipped);
     return;
   }
 
@@ -1011,6 +1042,9 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
   if (EXEMPT_MODELS.has(params.model)) return;
 
   const model = params.model;
+
+  // Licence counting reads these across an organization's projects; writes still need projectId.
+  if (LICENSE_COUNTED.has(model) && READ_ACTIONS.has(action)) return;
 
   // Scoped models opt in to a stricter check than EXEMPT_MODELS: SOMETHING
   // tenancy-shaped (row id, scope predicate, parent FK, or legacy projectId)
@@ -1033,7 +1067,16 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
   assertWhereProjectId(params, model);
 };
 
-export const guardProjectId: GuardMiddleware = async (params, next) => {
-  _guardProjectId({ params });
-  return next(params);
-};
+/** The project guard, reporting each raw statement that skipped the tenant check. */
+export function projectGuard({
+  onSkippedTenantCheck,
+}: {
+  onSkippedTenantCheck: OnSkippedTenantCheck;
+}): GuardMiddleware {
+  return async (params, next) => {
+    _guardProjectId({ params, onSkipped: onSkippedTenantCheck });
+    return next(params);
+  };
+}
+
+export const guardProjectId: GuardMiddleware = projectGuard({ onSkippedTenantCheck: () => {} });

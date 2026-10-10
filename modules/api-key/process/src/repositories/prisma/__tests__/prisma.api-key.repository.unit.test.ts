@@ -84,9 +84,10 @@ describe("PrismaApiKeyRepository", () => {
       await repository.revokeExpiredByName({ name: "Agent sandbox run", now });
 
       const { text, values } = sweptSql(sweep);
-      expect(text).toContain("-- @tenancy:");
+      const [marker, ...bound] = values;
+      expect(String((marker as { sql?: string } | undefined)?.sql)).toContain("SKIP_TENANT_CHECK");
       expect(text).toContain('"expiresAt" <= ?');
-      expect(values).toEqual([toDate(now), "Agent sandbox run", toDate(now), false]);
+      expect(bound).toEqual([toDate(now), "Agent sandbox run", toDate(now), false]);
     });
 
     /** @scenario "A key with no expiry is never swept" */
@@ -165,9 +166,9 @@ describe("PrismaApiKeyRepository", () => {
 
       await repository.sweepElapsedLoginKeys({ before: now });
 
-      const [sql, ...values] = query.mock.calls[0] ?? [];
+      const [sql, marker, ...values] = query.mock.calls[0] ?? [];
       const text = sql?.join("?") ?? "";
-      expect(text).toContain("-- @tenancy:");
+      expect(String((marker as { sql?: string } | undefined)?.sql)).toContain("SKIP_TENANT_CHECK");
       expect(text).toContain('starts_with("name", ?)');
       expect(text).toContain('"revokedAt" IS NULL');
       expect(text).toContain('"expiresAt" IS NOT NULL');
@@ -227,11 +228,11 @@ describe("when a key is revoked", () => {
       revocationCause: null,
     });
 
-    await repository.revoke({ id: "key-1", cause: "user" });
+    await repository.revoke({ id: "key-1", organizationId: "org-1", cause: "user" });
 
     const [sql, ...values] = $executeRaw.mock.calls[0] ?? [];
     expect(sql?.join("?")).toContain('"revokedAt" IS NULL');
-    expect(values).toEqual(["user", "key-1"]);
+    expect(values).toEqual(["user", "key-1", "org-1"]);
     expect(row.revocationCause).toBe("user");
   });
 
@@ -242,9 +243,9 @@ describe("when a key is revoked", () => {
       revocationCause: null,
     });
 
-    await repository.revoke({ id: "key-1", cause: "user" });
+    await repository.revoke({ id: "key-1", organizationId: "org-1", cause: "user" });
     const first = row.revokedAt;
-    await repository.revoke({ id: "key-1", cause: "cap" });
+    await repository.revoke({ id: "key-1", organizationId: "org-1", cause: "cap" });
 
     expect(row.revocationCause).toBe("user");
     expect(row.revokedAt).toBe(first);

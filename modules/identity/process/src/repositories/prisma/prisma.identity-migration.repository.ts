@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { IdentityMigrationRepository } from "../identity-migration.repository.ts";
@@ -19,7 +20,10 @@ export class PrismaIdentityMigrationRepository extends IdentityMigrationReposito
   async reopenUnprovenAccounts({ dryRun }: { dryRun: boolean }): Promise<number> {
     if (dryRun) {
       const [row] = await this.database.$queryRaw<{ count: bigint }[]>`
-        -- @tenancy: a fleet-wide step over (migrationName, tenantId); the tenant is the key.
+        ${skipTenantCheck({
+          // A fleet-wide step over (migrationName, tenantId); the tenant is the key.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT count(*) AS "count"
           FROM "SystemMigrationTenantState" s
           JOIN "User" u ON u."id" = s."tenantId"
@@ -32,7 +36,10 @@ export class PrismaIdentityMigrationRepository extends IdentityMigrationReposito
       return Number(row?.count ?? 0);
     }
     return this.database.$executeRaw`
-      -- @tenancy: a fleet-wide step over (migrationName, tenantId); the tenant is the key.
+      ${skipTenantCheck({
+        // A fleet-wide step over (migrationName, tenantId); the tenant is the key.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "SystemMigrationTenantState" s
          SET "status" = 'migrated',
              "report" = '{"kind":"unproven_account"}'::jsonb,

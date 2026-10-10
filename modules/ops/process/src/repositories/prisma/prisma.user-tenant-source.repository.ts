@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-migrations";
 
@@ -77,8 +78,11 @@ export class PrismaUserTenantSourceRepository implements UserTenantSourceReposit
     // EVERY named migration has latched, and `SystemMigrationTenantState` is
     // keyed `(migrationName, tenantId)`, so the count cannot double-count.
     const rows = await this.prisma.$queryRaw`
-      -- @tenancy: the tenant source itself; an installation-wide walk whose
-      -- answer IS the list of users a pass drives
+      ${skipTenantCheck({
+        // The tenant source itself; an installation-wide walk whose answer IS the list of users a
+        // pass drives.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT u."id"
       FROM "User" u
       WHERE (${cursor}::text IS NULL OR u."id" > ${cursor}::text)

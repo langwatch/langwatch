@@ -81,7 +81,7 @@ describe("given the memory API-key repository", () => {
       const { repository: keys } = repository();
       await keys.create(record({ name: HIDDEN_SYSTEM_KEY_NAMES[0] ?? AGENT_SANDBOX_API_KEY_NAME }));
       const revoked = await keys.create(record({ name: "Retired" }));
-      await keys.revoke({ id: revoked.id, cause: "user" });
+      await keys.revoke({ id: revoked.id, organizationId: ORGANIZATION, cause: "user" });
       await keys.create(record({ name: "Live" }));
 
       const listed = await keys.findForOrganization({ organizationId: ORGANIZATION });
@@ -118,8 +118,12 @@ describe("given the memory API-key repository", () => {
       const { repository: keys } = repository();
       const created = await keys.create(record());
 
-      await keys.revoke({ id: created.id, cause: "user" });
-      const second = await keys.revoke({ id: created.id, cause: "cap" });
+      await keys.revoke({ id: created.id, organizationId: ORGANIZATION, cause: "user" });
+      const second = await keys.revoke({
+        id: created.id,
+        organizationId: ORGANIZATION,
+        cause: "cap",
+      });
 
       expect(second.revocationCause).toBe("user");
     });

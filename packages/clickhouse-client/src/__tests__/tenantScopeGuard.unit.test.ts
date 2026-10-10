@@ -162,7 +162,8 @@ describe("the ClickHouse tenant-scope guard", () => {
 
       await guarded.query({
         query: "SELECT name FROM system.parts",
-        unscoped: { reason: "system.parts carries no tenant column." },
+        // system.parts carries no tenant column.
+        SKIP_TENANT_CHECK: true,
       });
 
       expect(driver.calls).toEqual([{ query: "SELECT name FROM system.parts" }]);

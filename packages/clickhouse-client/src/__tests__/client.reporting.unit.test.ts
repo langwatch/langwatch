@@ -1,8 +1,3 @@
-/**
- * The client's reporting step: each read and write is logged and counted once its
- * retries settle, the way the vendor-client policy reports it.
- * @see specs/ops/clickhouse-statement-reporting.feature
- */
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
@@ -13,6 +8,12 @@ import {
   type StatementLogSink,
   type StatementMetrics,
 } from "../statementReporting.ts";
+/**
+ * The client's reporting step: each read and write is logged and counted once its
+ * retries settle, the way the vendor-client policy reports it.
+ * @see specs/ops/clickhouse-statement-reporting.feature
+ */
+import { TenantGuard } from "../tenantGuard.ts";
 
 type Line = { level: "debug" | "warn" | "error"; fields: Record<string, unknown>; message: string };
 
@@ -41,6 +42,7 @@ function reportingClient(driver: Partial<QueryDriver>) {
     throw new Error("not part of this case");
   };
   const client = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
     driver: { execute: unused, insert: unused, command: unused, ...driver },
     reporter,
   });
@@ -59,7 +61,7 @@ describe("ClickHouseQueryClient reporting", () => {
       await client.query({
         tenantId: "project_abc",
         table: "stored_spans",
-        sql: "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String} AND StartTime >= {from:DateTime64(3)}",
+        sql: "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String} AND StartTime >= {start:DateTime64(3)}",
         params: { tenantId: "project_abc" },
       });
 

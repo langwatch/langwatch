@@ -15,8 +15,8 @@ import type { QueryTracer } from "./tracing.ts";
 export interface ClickHouseQueryClientOptions {
   /** The only collaborator that talks to a server. */
   driver: QueryDriver;
-  /** Refuses statements with no tenant predicate. Omit to allow everything. */
-  tenantGuard?: TenantGuard | undefined;
+  /** Refuses statements with no tenant predicate unless they set `SKIP_TENANT_CHECK`. */
+  tenantGuard: TenantGuard;
   /** Records a span per statement. Omit to record none. */
   tracer?: QueryTracer | undefined;
   /** Bounds statements in flight; refuses as overloaded on a full queue or an outlasted wait. */
@@ -33,7 +33,7 @@ const now = (): number => globalThis.performance.now();
 
 export class ClickHouseQueryClient {
   private readonly driver: QueryDriver;
-  private readonly tenantGuard: TenantGuard | undefined;
+  private readonly tenantGuard: TenantGuard;
   private readonly tracer: QueryTracer | undefined;
   private readonly limiter: ClickHouseStatementAdmission | undefined;
   private readonly retries: RetryPolicy | undefined;
@@ -72,7 +72,7 @@ export class ClickHouseQueryClient {
    * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
   async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-    this.tenantGuard?.assert(request);
+    this.tenantGuard.assert(request);
 
     const runOnce = () => this.driver.execute<Row>(request);
     const withRetries = () =>
@@ -102,7 +102,7 @@ export class ClickHouseQueryClient {
    * A driver that cannot stream answers the whole result, under every policy, as one batch.
    */
   async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
-    this.tenantGuard?.assert(request);
+    this.tenantGuard.assert(request);
     if (this.driver.stream === undefined) {
       yield (await this.query<Row>(request)).rows;
       return;
@@ -115,7 +115,7 @@ export class ClickHouseQueryClient {
    * given. Same order, same reasons as {@link query}.
    */
   async command(request: QueryRequest): Promise<void> {
-    this.tenantGuard?.assert(request);
+    this.tenantGuard.assert(request);
 
     const runOnce = () => this.driver.command(request);
     const withRetries = () =>
@@ -133,7 +133,7 @@ export class ClickHouseQueryClient {
    * slot or socket, and a retrying insert keeps its slot.
    */
   async insert(request: InsertRequest): Promise<void> {
-    this.tenantGuard?.assertInsert(request);
+    this.tenantGuard.assertInsert(request);
     if (request.rows.length === 0) return;
 
     const runOnce = () => this.driver.insert(request);

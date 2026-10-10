@@ -3,6 +3,7 @@ import {
   routingDriver,
   type ClickHouseConnection,
   type RoutableStatementClient,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -26,7 +27,10 @@ function meterOver(rows: unknown[]) {
     },
   });
   const meter = BillableEventsMeterClickHouseRepository.create(
-    new ClickHouseQueryClient({ driver: routingDriver(connection) }),
+    new ClickHouseQueryClient({
+      tenantGuard: new TenantGuard(),
+      driver: routingDriver(connection),
+    }),
   );
 
   return { meter, organizationsResolved, statements };

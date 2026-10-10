@@ -45,10 +45,9 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
         GROUP BY table
       `,
       params: { tables: [...tables] },
-      unscoped: {
-        reason:
-          "system.parts carries no tenant column: this is per-table storage size for the operator's dashboards.",
-      },
+      // System.parts carries no tenant column: this is per-table storage size for the operator's
+      // dashboards.
+      SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({
       table: row.table,
@@ -70,9 +69,8 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
         SELECT name, total_space, free_space, (total_space - free_space) as used_space
         FROM system.disks
       `,
-      unscoped: {
-        reason: "system.disks carries no tenant column: this is the instance's disk capacity.",
-      },
+      // System.disks carries no tenant column: this is the instance's disk capacity.
+      SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({
       disk: row.name,
@@ -101,10 +99,8 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
         FROM system.backup_log
         GROUP BY status
       `,
-      unscoped: {
-        reason:
-          "system.backup_log carries no tenant column: this is the instance's backup history.",
-      },
+      // System.backup_log carries no tenant column: this is the instance's backup history.
+      SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({
       status: row.status,
@@ -119,9 +115,8 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     const result = await this.clickhouse.query<{ present: string }>({
       tenantId: "",
       sql: "SELECT count() AS present FROM system.tables WHERE database = 'system' AND name = 'backup_log'",
-      unscoped: {
-        reason: "system.tables carries no tenant column: this asks what the server has.",
-      },
+      // System.tables carries no tenant column: this asks what the server has.
+      SKIP_TENANT_CHECK: true,
     });
     return Number.parseInt(result.rows[0]?.present ?? "0", 10) > 0;
   }

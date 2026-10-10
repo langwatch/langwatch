@@ -6,6 +6,7 @@ import type { PrismaConfiguration } from "./config.ts";
 import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter.ts";
 import { type Prisma, PrismaClient } from "./generated/client.ts";
 import { OperatorReadGuard, type OperatorReadMint } from "./operator-read.ts";
+import { skipTenantCheck } from "./skip-tenant-check.ts";
 
 /**
  * A short constant name per Prisma log level, used as the pino `msg` so a
@@ -226,7 +227,12 @@ export class PrismaReadinessService {
 
   async check(options: PrismaReadinessOptions): Promise<void> {
     await options.connection.client.$queryRawUnsafe(
-      "-- @tenancy: prisma readiness probe\nSELECT 1 AS ready",
+      `${
+        skipTenantCheck({
+          // A readiness probe asks whether the server answers; it reads no tenant's rows.
+          SKIP_TENANT_CHECK: true,
+        }).sql
+      }SELECT 1 AS ready`,
     );
   }
 }

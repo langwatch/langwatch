@@ -84,7 +84,7 @@ eventing, so a contract keys a map by an event table without naming it (Alex, 20
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and
-  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineRestMiddleware`). Zod-only,
+  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineMiddlewareContext`). Zod-only,
   framework-free, browser-safe, near-zero weight. Every contract depends on
   it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
   here — it lives in the runtime that consumes it, so nothing backend-shaped
@@ -1475,7 +1475,7 @@ accepts a tenant step and the background runner skips it; its ledger row is `don
 tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
 2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
-raw SQL marked `-- @tenancy: <reason>`, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1). Stored-object's ClickHouse import is a `project` tenant step with
+raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
@@ -1617,13 +1617,14 @@ declaration of the env family in its own config.
 **Routing is folded into the `clickhouse` member** (Alex, 2026-09-28): the member routes every
 statement by its tenant's organization itself, so a module hands the member its statement and
 never writes a routed-client adapter (ops' replay and event-explorer adapters are deleted). A
-statement spanning every tenant names none (`tenantId: ""`) with a written `unscoped` reason, and
+statement spanning every tenant names none (`tenantId: ""`) and sets `SKIP_TENANT_CHECK: true` under a comment giving the reason
+(Alex, 2026-10-10: the guard is required, every skip is counted and logged, `langwatch/skip-tenant-check-reason` refuses a flag without a real reason), and
 the member reads it on the shared server, where main's `"default"` fallback read. A read across one
 organization's projects (a gateway budget's ledger) declares its **tenant set** (`tenantIds`) instead:
 the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
 `tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
 the tenant directory it already routes by and refuses a set spanning organizations. One statement,
-answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). The list may
+answered on that organization's server, never a skipped tenant check (Alex, 2026-09-29). The list may
 also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
 bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
 subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
@@ -1810,8 +1811,16 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's
-  credential facts), then the body is parsed and validated, then any authorisation that reads the parsed input.
-  A fact that reads the input is declared `source: "input"` and resolves after the validators (Alex, 2026-09-30).
+  middleware context read off the credential), then the body is parsed and validated, then any authorisation that
+  reads the parsed input. Context that reads the input is declared `source: "input"` and resolves after the
+  validators, handed the validated input (Alex, 2026-09-30).
+- **What a route needs beyond its input is middleware context, supplied by its own module** (Alex, 2026-10-10).
+  `defineMiddlewareContext(name, schema)` declares it, the route names it with `.withMiddlewareContext(x)`, and the
+  module installer supplies every name its routes ask for with `.provideMiddlewareContext({ name: (request,
+  { app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
+  routes need context it never provides does not publish, and the mount still refuses an unprovided name. No
+  process supplies a module's context; a value several modules need is a shared helper (`projectRequestContextOf`
+  in `@langwatch/api/rest`). `.withHeaders(...)` values bind themselves.
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - REST authenticates with API keys only and tRPC with the session (Alex, 2026-09-30); `/api/files` and
@@ -1828,6 +1837,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a
   connect-host bearer, bound by licensing: a licence token on sync, an activation code looked up unclaimed on
   activate, which `redeemActivationCode` claims; Alex 2026-10-10 W02-ACTIVATE-DOOR).
+- A module-bound door is `defineRestDoor(credential, { needs, identify })` typed by `DoorContract`; the framework hands it `{ bearer, request }`, a module binds `.withDoors({...})` keyed exactly by its routes' module-bound credentials, and a route naming a credential nobody bound refuses the boot (Alex 2026-10-10 TYPED-DOORS, W02-DOOR-BEARER).
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
@@ -3100,6 +3110,11 @@ the rest `@langwatch/process`), `@langwatch/process-server`, `@langwatch/ui-kern
 `@langwatch/installed-server-modules` and `@langwatch/installed-web-modules`, `packages/audit-log-null`,
 `defineServerModule` / `defineWebModule`, `serverModules` / `webModules`, `<id>Server`,
 `openProcessStores`, `<f>.server.ts` stems, `<X>App` module classes and `.withApp(...)`.
+· REST middleware facts (Alex, 2026-10-10; §8): `defineRestMiddleware` and `RestTransportMiddleware` (now
+`defineMiddlewareContext` and `MiddlewareContext`), `.withMiddleware(...)` on a REST route (now
+`.withMiddlewareContext(...)`), `bindRestMiddleware`, `bindRestHeader` and `RestTransportMiddlewareBinding` in a
+module (now keys of `.provideMiddlewareContext({ ... })`), `projectRestFacts` (now `projectRequestContext`), and
+a REST context value bound in `withTransportFacts` or by the process.
 
 ---
 

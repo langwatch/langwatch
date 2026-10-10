@@ -15,7 +15,7 @@
  * Spec: specs/ai-gateway/governance/folds.feature
  */
 import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -32,6 +32,7 @@ const unusedCommand = async (): Promise<void> => {
 function memberOver(rows: unknown[]) {
   const calls: QueryRequest[] = [];
   const clickhouse = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
     driver: {
       // Generic, matching QueryDriver.execute exactly: a stub driver cannot
       // know the caller's Row at compile time, only at the one call site

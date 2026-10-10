@@ -19,9 +19,11 @@ export { type GuardMiddleware, type GuardNext, type GuardParams } from "./guard-
 export { guardEnMasse } from "./mass-delete-guard.ts";
 export {
   guardProjectId,
+  type OnSkippedTenantCheck,
   PROJECT_TENANCY_REGIMES,
   SCOPED_MODEL_NAMES,
 } from "./multi-tenancy-guard.ts";
+export { skipTenantCheck } from "./skip-tenant-check.ts";
 export {
   guardOrganizationId,
   ORG_BEARING_MODEL_NAMES,

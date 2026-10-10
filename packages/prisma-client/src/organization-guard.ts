@@ -198,7 +198,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   ApiKey: {
     // lookupId is the globally-unique public token half. The api-key module declares its
-    // fleet-wide sweeps as `@tenancy` SQL in its own repository; no hatch here.
+    // fleet-wide sweeps as raw SQL that skips the tenant check; no hatch here.
     extraBound: ({ clause }) => typeof clauseField(clause, "lookupId") === "string",
   },
   RoutingPolicy: {},

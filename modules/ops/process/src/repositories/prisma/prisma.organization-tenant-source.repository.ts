@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-migrations";
 
 import type { OrganizationTenantSourceRepository } from "../tenant-source.repository.ts";
@@ -75,8 +76,11 @@ export class PrismaOrganizationTenantSourceRepository implements OrganizationTen
     // EVERY named migration has latched, and `SystemMigrationTenantState` is
     // keyed `(migrationName, tenantId)`, so the count cannot double-count.
     const rows = await this.prisma.$queryRaw`
-      -- @tenancy: the tenant source itself; an installation-wide walk whose
-      -- answer IS the list of organizations a pass drives
+      ${skipTenantCheck({
+        // The tenant source itself; an installation-wide walk whose answer IS the list of
+        // organizations a pass drives.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT o."id"
       FROM "Organization" o
       WHERE (${cursor}::text IS NULL OR o."id" > ${cursor}::text)

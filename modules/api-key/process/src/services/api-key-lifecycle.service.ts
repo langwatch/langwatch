@@ -300,7 +300,11 @@ export class ApiKeyLifecycleService {
     // that is refused, never one that is live with its grants gone.
     const cause = input.cause ?? "user";
     const revoked = publicApiKey({
-      ...(await this.repository.revoke({ id: input.id, cause })),
+      ...(await this.repository.revoke({
+        id: input.id,
+        organizationId: input.organizationId,
+        cause,
+      })),
       grants: existing.grants,
     });
     await this.answers.forget({ lookupId: existing.lookupId, revoked: true });

@@ -23,6 +23,7 @@ import {
   type SignInSecurityPolicy,
   type OrganizationCurrency,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -256,7 +257,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     // The condition sits on the table, as in billing's Stripe customer claim: a second
     // click parked on the row lock re-checks it and keeps the first record.
     await this.database.$executeRaw`
-      -- @tenancy: an organization is addressed by its own primary key.
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "Organization"
          SET "instantEvalsEnabledAt" = ${toDate(input.at)},
              "instantEvalsEnabledByUserId" = ${input.userId},
