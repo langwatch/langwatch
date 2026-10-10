@@ -118,6 +118,7 @@ pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # nx sync: project references, after a dependency change
 pnpm test:affected                  # Nx: only packages this change reached, cached
 pnpm typecheck                      # one root tsc -b; incremental, rechecks only what changed
+pnpm typecheck:src                  # same, without the test programs: the local default; CI runs the full one
 pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran
 make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```
