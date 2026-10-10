@@ -117,8 +117,8 @@ function animateSwipe(
 ) {
   let transition: Transition = {
     type: "spring",
-    stiffness: 420,
-    damping: 30,
+    stiffness: 300,
+    damping: 26,
   };
   if (dismissing) transition = { duration: 0.2, ease: "easeOut" };
   if (reduced) transition = { duration: 0 };
@@ -291,7 +291,7 @@ function useToastPeek(region: React.RefObject<HTMLDivElement | null>, peeking: b
     const animation = animate(
       region.current,
       { "--toast-peek": peeking ? 14 : 0 },
-      reduced ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 25 },
+      reduced ? { duration: 0 } : { type: "spring", stiffness: 240, damping: 22 },
     );
     return () => animation.stop();
   }, [region, peeking, reduced]);

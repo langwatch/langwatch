@@ -25,6 +25,9 @@ const displayFontFamily = '"Sentient", ui-serif, Georgia, "Times New Roman", ser
 const monoFontFamily =
   '"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
 
+const TOAST_SPRING =
+  "linear(0, 0.013 0.6%, 0.05 1.2%, 0.2 2.6%, 0.48 4.7%, 0.76 7.2%, 0.91 9.6%, 1.006 12.4%, 1.043 15.2%, 1.048 17.5%, 1.036 20.6%, 1.012 26.6%, 0.998 34.2%, 0.997 41.1%, 1 56.3%, 1)";
+
 /** The card a toast wears: the panel, its hairline and the ordinary foreground. */
 const toastPanel = {
   bg: "bg.panel",
@@ -92,7 +95,7 @@ export const designSystemConfig = defineConfig({
     keyframes: {
       // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
       "toast-in": {
-        from: { transform: "translateY(8px)", opacity: 0 },
+        from: { transform: "translateY(16px) scale(0.96)", opacity: 0 },
         to: { transform: "none", opacity: 1 },
       },
       "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
@@ -1383,16 +1386,23 @@ export const designSystemConfig = defineConfig({
             "&:not([data-mounted])": { scale: "1" },
             transitionProperty: "translate, scale, opacity, height",
             // Collapsed, the newest card and two behind it show; behind cards show no content.
+            // Cards behind recede: each 6% smaller, a softer shadow, under a front card that floats.
             "&[data-overlap]": {
               opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
               transformOrigin: "top center",
               translate: "0 calc(var(--y) - var(--toast-peek, 0) * var(--index) * 1px)",
+              scale: "calc(1 - var(--index) * 0.06)",
+              "&:not([data-mounted])": { scale: "1" },
+              boxShadow: "md",
+              "&[data-first]": { boxShadow: "2xl" },
               "&:not([data-first]) > *": { opacity: 0 },
             },
-            transitionDuration: "240ms",
-            transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)",
+            // A soft spring with a slight settle, as iOS stacks move; the curve is the spring
+            // sampled into linear(), so CSS runs it without JavaScript.
+            transitionDuration: "460ms",
+            transitionTimingFunction: TOAST_SPRING,
             "&[data-state=open]": {
-              animation: "toast-in 180ms cubic-bezier(0.2, 0, 0, 1) backwards",
+              animation: `toast-in 460ms ${TOAST_SPRING} backwards`,
             },
             "&[data-state=closed]": { animation: "toast-fade 120ms ease-in both" },
             _motionReduce: {
