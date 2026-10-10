@@ -17,6 +17,7 @@ seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
   port for drivers (`POST /v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`).
   Calls tab: filter, per-call detail, Clear calls. Settings tab: forced error, seed and the
   per-call override headers.
+- The loopback port is stable per stack (a slug hash in 21000-21999, probed if taken), so seeded providers survive `haven up` restarts.
 - Overlay sets `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and dummy keys, so the seeded
   providers, playground, evaluators, scenarios and Langy reach it. A base URL `.env`
   names wins. Standalone: `make service svc=llmsim` (:5595).

@@ -247,6 +247,11 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		if r.Name == "app" && opts.Selection.IsBuiltUI() && !st.Layout.IsMonolith() {
 			svc.Port = st.APIPort
 		}
+		if r.Name == domain.LLMService && runsLocally(r.Name, opts) {
+			if port := o.stableLLMPort(slug); port != 0 {
+				svc.Port = port
+			}
+		}
 		if r.Name == domain.MailService {
 			svc.SMTPPort = ports[nSvc+3]
 		}
@@ -1298,6 +1303,31 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 	}
 	scheme, port := o.proxy.Endpoint()
 	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
+}
+
+// stableLLMPort is the port llmsim keeps for a slug across restarts and
+// reconciles: its registered one while the stack is registered, else the slug's
+// own, probed past every port another stack holds and any live listener.
+func (o *Orchestrator) stableLLMPort(slug string) int {
+	taken := map[int]bool{}
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		port := llmPortOf(stacks[i])
+		if stacks[i].Slug == slug && port != 0 {
+			return port
+		}
+		taken[port] = true
+	}
+	return domain.AllocateLLMPort(slug, func(port int) bool { return taken[port] || o.sys.PortInUse(port) })
+}
+
+func llmPortOf(st domain.Stack) int {
+	for _, svc := range st.Services {
+		if svc.Name == domain.LLMService {
+			return svc.Port
+		}
+	}
+	return 0
 }
 
 // allocateRedisDB picks this stack's Redis database, keeping the one it already
