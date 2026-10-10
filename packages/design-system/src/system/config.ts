@@ -910,7 +910,10 @@ export const designSystemConfig = defineConfig({
           root: {
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
-            background: "bg.card",
+            // The card tint at half strength, blurred: the ground's colour shows through and
+            // every card blends with it, as home's did.
+            background: "bg.card/50",
+            backdropFilter: "blur(12px)",
             borderColor: "border.card",
             // Clip children to the rounded border. Square child paints —
             // table row hover/selection/tints, header bands, code blocks —
@@ -927,7 +930,7 @@ export const designSystemConfig = defineConfig({
                 borderWidth: "1px",
                 borderStyle: "solid",
                 borderColor: "border.card",
-                background: "bg.card",
+                background: "bg.card/50",
                 borderRadius: "showcase",
                 boxShadow: "showcase",
               },
@@ -943,7 +946,7 @@ export const designSystemConfig = defineConfig({
             // `bg` and `borderColor` by the same keys Chakra's own variants set, so ours win.
             outline: {
               root: {
-                bg: "bg.card",
+                bg: "bg.card/50",
                 borderWidth: "1px",
                 borderStyle: "solid",
                 borderColor: "border.card",
@@ -954,7 +957,7 @@ export const designSystemConfig = defineConfig({
             // governance figures use. A clickable card adds its own hover lift.
             elevated: {
               root: {
-                bg: "bg.card",
+                bg: "bg.card/50",
                 borderWidth: "1px",
                 borderStyle: "solid",
                 borderColor: "border.card",
