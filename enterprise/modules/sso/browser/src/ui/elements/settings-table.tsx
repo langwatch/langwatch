@@ -5,32 +5,13 @@
  * it are meant to read as one screen, and two things that must match stop
  * matching the moment each draws its own frame.
  */
-import { Box, Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import type { ReactNode } from "react";
 
 export function SettingsTable({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <Box
-      width="full"
-      // Lets the box shrink under its content so the scroll can happen at
-      // all: a flex child refuses to go below its content's natural width,
-      // and `overflowX` on its own then never engages.
-      minWidth={0}
-      overflowX="auto"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-    >
-      <Table.Root
-        size="sm"
-        variant="line"
-        data-testid={testId}
-        // The last row's own rule would sit a hairline above the frame's
-        // bottom edge and read as a double border.
-        css={{ "& tbody tr:last-of-type td": { borderBottomWidth: 0 } }}
-      >
-        {children}
-      </Table.Root>
-    </Box>
+    <ListTable size="sm" data-testid={testId} containerProps={{ width: "full", minWidth: 0 }}>
+      {children}
+    </ListTable>
   );
 }
