@@ -84,7 +84,10 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
   }
 
   async append(write: GrantProjectionWrite): Promise<void> {
-    const result = await this.statementFor(write);
+    const lock = this.identityLockFor(write);
+    const result = lock
+      ? (await this.prisma.$transaction([lock, this.statementFor(write)]))[1]
+      : await this.statementFor(write);
     reportMissedRow(write, result);
     await this.writeCompatHeads([{ write, result }]);
   }
@@ -93,7 +96,15 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     // Each write names one row and they are independent, so batching is only
     // about round trips. One transaction keeps a partial batch from leaving
     // the model half-written.
-    const results = await this.prisma.$transaction(writes.map((write) => this.statementFor(write)));
+    const statements: Prisma.PrismaPromise<unknown>[] = [];
+    const resultAt: number[] = [];
+    for (const write of writes) {
+      const lock = this.identityLockFor(write);
+      if (lock) statements.push(lock);
+      resultAt.push(statements.push(this.statementFor(write)) - 1);
+    }
+    const all = await this.prisma.$transaction(statements);
+    const results = resultAt.map((index) => all[index]);
     writes.forEach((write, index) => reportMissedRow(write, results[index]));
     await this.writeCompatHeads(writes.map((write, index) => ({ write, result: results[index] })));
   }
@@ -323,10 +334,23 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     });
   }
 
+  /**
+   * A skipping attach serialises on its identity so two identical grants applied at
+   * once cannot both see "none held": the lock is released at commit, after which
+   * the waiter's insert statement reads the winner's row.
+   */
+  private identityLockFor(write: GrantProjectionWrite): Prisma.PrismaPromise<number> | null {
+    if (write.kind !== "grant.upsert" || write.onDuplicate !== "skip") return null;
+    const { organizationId, principalType, principalId, roleKey, scopeType, scopeId } = write.row;
+    const key = `authz-grant-identity:${organizationId}:${principalType}:${principalId}:${roleKey}:${scopeType}:${scopeId}`;
+    return this.prisma.$executeRaw`
+SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+  }
+
   private statementFor(write: GrantProjectionWrite): Prisma.PrismaPromise<unknown> {
     switch (write.kind) {
       case "grant.upsert":
-        return this.upsertGrant(write.row, write.membershipStamp, write.membershipBootstrap);
+        return this.upsertGrant(write);
 
       case "grant.setRole":
         return this.prisma.grant.updateMany({
@@ -386,11 +410,12 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
    * The leading WHERE is the membership fence: a USER grant only enters while
    * the lifetime it was stamped against is still the live one.
    */
-  private upsertGrant(
-    row: GrantRow,
-    membershipStamp: string | undefined,
-    membershipBootstrap: boolean | undefined,
-  ): Prisma.PrismaPromise<number> {
+  private upsertGrant({
+    row,
+    membershipStamp,
+    membershipBootstrap,
+    onDuplicate,
+  }: Extract<GrantProjectionWrite, { kind: "grant.upsert" }>): Prisma.PrismaPromise<number> {
     const stamp = membershipStamp ?? null;
     const bootstrapScopeIsAllowed =
       row.scopeType === "TEAM" ||
@@ -427,6 +452,20 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
           AND NOT EXISTS (
             SELECT 1 FROM "Organization" WHERE "id" = ${row.organizationId}
           )
+        )
+      )
+      AND (
+        ${onDuplicate !== "skip"}::boolean
+        OR NOT EXISTS (
+          SELECT 1 FROM "Grant"
+          WHERE "organizationId" = ${row.organizationId}
+            AND "principalType" = ${row.principalType}::"GrantPrincipalType"
+            AND "principalId" = ${row.principalId}
+            AND "roleKey" = ${row.roleKey}
+            AND "scopeType" = ${row.scopeType}::"GrantScopeType"
+            AND "scopeId" = ${row.scopeId}
+            AND "revokedAt" IS NULL
+            AND "id" <> ${row.id}
         )
       )
       ON CONFLICT ("id") DO UPDATE SET
