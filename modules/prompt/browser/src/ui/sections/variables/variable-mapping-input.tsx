@@ -693,7 +693,7 @@ function fieldFrameStyle(isMissing: boolean) {
     background: undefined,
     paddingX: undefined,
     focusBorderColor: "blue.emphasized",
-    focusShadow: "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
+    focusShadow: "var(--chakra-colors-blue-emphasized) 0px 1px 0px 0px",
     placeholderColor: undefined,
     testId: undefined,
   };
@@ -1133,7 +1133,7 @@ function UseAsValueOption({ view }: { view: MappingView }) {
         data-highlighted={isHighlighted}
         data-testid="use-as-value-option"
       >
-        <Type size={14} color="var(--chakra-colors-gray-500)" />
+        <Type size={14} color="var(--chakra-colors-fg-muted)" />
         <Text fontSize="13px" color="fg.muted">
           Use "
           <Text as="span" fontWeight="medium" color="fg">

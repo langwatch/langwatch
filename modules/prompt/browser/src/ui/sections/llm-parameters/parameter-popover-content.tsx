@@ -75,7 +75,7 @@ function SliderControl({ config, value, onChange, maxOverride, minOverride }: Sl
         borderColor="blue.emphasized"
         _focus={{
           borderColor: "blue.emphasized",
-          boxShadow: "0 0 0 1px var(--chakra-colors-blue-400)",
+          boxShadow: "0 0 0 1px var(--chakra-colors-blue-emphasized)",
         }}
       />
       <Slider.Root
