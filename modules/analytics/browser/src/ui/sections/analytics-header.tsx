@@ -58,7 +58,7 @@ export function AnalyticsHeader({
   };
 
   return (
-    <PageLayout.Header>
+    <PageLayout.Header height="auto" minHeight="48px" flexWrap="wrap" paddingY={2}>
       {isEditing ? (
         <Input
           ref={inputRef}
@@ -99,7 +99,7 @@ export function AnalyticsHeader({
         </HStack>
       )}
       <Spacer />
-      <HStack gap={2}>
+      <HStack gap={2} flexWrap="wrap" minWidth={0}>
         <FilterToggle />
         <AnalyticsPeriodPicker
           period={{ startDate, endDate }}

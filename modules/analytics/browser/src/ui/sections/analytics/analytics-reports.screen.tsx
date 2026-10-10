@@ -283,7 +283,7 @@ function ReportsContent() {
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
           <HStack align="start" gap={6} width="full">
-            <Box flex={1}>
+            <Box flex={1} minWidth={0}>
               {graphsQuery.isLoading ? (
                 <Skeleton height="300px" />
               ) : (
