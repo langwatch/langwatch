@@ -10,10 +10,11 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                | URL         | Within   | Label            | Permission          | Flags |
-| ----------------------- | ----------- | -------- | ---------------- | ------------------- | ----- |
-| `pages/[project]/index` | `/:project` | project  | Home             | –                   | –     |
-| `pages/settings`        | `/settings` | settings | Project Settings | `organization:view` | –     |
+| Page key                 | URL                 | Within   | Label                 | Permission          | Flags |
+| ------------------------ | ------------------- | -------- | --------------------- | ------------------- | ----- |
+| `pages/[project]/index`  | `/:project`         | project  | Home                  | –                   | –     |
+| `pages/settings`         | `/settings`         | settings | Organization settings | `organization:view` | –     |
+| `pages/settings/project` | `/settings/project` | settings | Project settings      | `project:update`    | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
