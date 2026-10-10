@@ -404,6 +404,22 @@ export class PrismaUserRepository
     });
   }
 
+  async hasSeenWhatsNewEntry(input: { id: string; entryId: string }): Promise<boolean> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: input.id },
+      select: { whatsNewSeenEntryId: true },
+    });
+
+    return row?.whatsNewSeenEntryId === input.entryId;
+  }
+
+  async setWhatsNewSeenEntry(input: { id: string; entryId: string }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: input.id },
+      data: { whatsNewSeenEntryId: input.entryId },
+    });
+  }
+
   async findJoinOfferDismissedDomains(id: string): Promise<string[]> {
     const row = await this.prisma.user.findUnique({
       where: { id },

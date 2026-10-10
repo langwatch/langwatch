@@ -74,6 +74,7 @@ export interface LwqlPrismaRows {
     readonly passkeyNudgeDismissedAt: "DateTime?";
     readonly joinOfferDismissedDomains: "String[]";
     readonly notificationPreferences: "Json";
+    readonly whatsNewSeenEntryId: "String?";
   };
   readonly VerificationToken: {
     readonly id: "String";

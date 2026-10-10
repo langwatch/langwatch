@@ -235,6 +235,10 @@ model User {
   /// answered. The browser's own permission is not stored here.
   /// Spec: specs/langy/langy-notifications.feature
   notificationPreferences       Json                     @default("{}")
+  /// The public changelog entry (its feed guid) this person last opened from the
+  /// sidebar's "What's new" card. NULL means none; a different latest entry shows the dot.
+  /// Spec: modules/navigation/specs/whats-new.feature
+  whatsNewSeenEntryId           String?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]

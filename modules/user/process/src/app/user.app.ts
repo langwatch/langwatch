@@ -43,6 +43,8 @@ import type {
   UserTourPreference,
   UserCodeAccessPreference,
   UserNotificationPreference,
+  UserWhatsNewEntry,
+  MarkUserWhatsNewSeenInput,
   UserNotificationTopicInput,
   SetUserNotificationPreferenceInput,
   UpdateUserEmailInput,
@@ -66,6 +68,8 @@ import {
 
 import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
 import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
+import { userChangelogChannels } from "../channels/user-changelog-channels.registry.ts";
+import type { UserChangelogChannel } from "../channels/user-changelog.channel.ts";
 import type { UserChannels } from "../channels/user.channels.ts";
 import { EventingUserStandingRepository } from "../repositories/eventing/eventing.user-standing.repository.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
@@ -91,6 +95,7 @@ import {
   type UserStandingFactBackfillReport,
   type UserStandingFactBackfillRun,
 } from "../services/user-standing-fact-backfill.service.ts";
+import { UserWhatsNewService } from "../services/user-whats-new.service.ts";
 import { UserService } from "../services/user.service.ts";
 
 const logger = createLogger("langwatch:user-app");
@@ -141,6 +146,8 @@ type UserTestSetup = Readonly<{
   channels: UserChannels;
   facts: UserFacts;
   budgetRequests: UserBudgetRequestMailChannel;
+  /** The public changelog; a test that does not name one reads none. */
+  changelog?: UserChangelogChannel;
   passwords?: UserPasswordHasher;
   now?: () => Instant;
 }>;
@@ -171,6 +178,7 @@ export class UserModule implements UserApi {
         mailer,
         baseUrl: setup.config.publicBaseUrl,
       }),
+      changelog: userChangelogChannels.http.create({ disabled: setup.config.whatsNewDisabled }),
       facts: {
         passkeysEnabled: setup.config.passkeysEnabled,
         mfaEnrollmentOpen: setup.config.mfaEnrollmentOpen,
@@ -193,6 +201,7 @@ export class UserModule implements UserApi {
     repositories,
     facts,
     budgetRequests,
+    changelog = userChangelogChannels.memory.create(),
     passwords = UserPasswordService.create(),
     now = nowInstant,
   }: UserTestSetup): UserModule {
@@ -234,6 +243,7 @@ export class UserModule implements UserApi {
       avatarObjects,
       rateLimits: repositories.rateLimits,
       budgetRequests,
+      whatsNew: UserWhatsNewService.create({ changelog, users: repositories.users }),
       passwords,
       now,
       dependencies,
@@ -255,6 +265,7 @@ export class UserModule implements UserApi {
   readonly #avatarObjects: UserAvatarObjectService;
   readonly #rateLimits: UserRateLimitRepository;
   readonly #budgetRequests: UserBudgetRequestMailChannel;
+  readonly #whatsNew: UserWhatsNewService;
   readonly #passwords: UserPasswordHasher;
   readonly #now: () => Instant;
   readonly #facts: UserFacts;
@@ -270,6 +281,7 @@ export class UserModule implements UserApi {
     avatarObjects: UserAvatarObjectService;
     rateLimits: UserRateLimitRepository;
     budgetRequests: UserBudgetRequestMailChannel;
+    whatsNew: UserWhatsNewService;
     passwords: UserPasswordHasher;
     now: () => Instant;
     dependencies: UserAppDependencies;
@@ -289,6 +301,7 @@ export class UserModule implements UserApi {
     this.#avatarObjects = input.avatarObjects;
     this.#rateLimits = input.rateLimits;
     this.#budgetRequests = input.budgetRequests;
+    this.#whatsNew = input.whatsNew;
     this.#passwords = input.passwords;
     this.#now = input.now;
     this.#facts = input.facts;
@@ -493,6 +506,14 @@ export class UserModule implements UserApi {
   /** "Not now" to the whole offer, dated rather than flagged: it comes back. */
   dismissPasskeyNudge(input: UserIdInput): Promise<void> {
     return this.#users.dismissPasskeyNudge(input);
+  }
+
+  findWhatsNew(input: UserIdInput): Promise<UserWhatsNewEntry[]> {
+    return this.#whatsNew.findWhatsNew(input);
+  }
+
+  markWhatsNewSeen(input: MarkUserWhatsNewSeenInput): Promise<void> {
+    return this.#whatsNew.markWhatsNewSeen(input);
   }
 
   findJoinOfferDismissedDomains(input: UserIdInput): Promise<string[]> {

@@ -12,7 +12,11 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => ({}) } },
     limits: { getUsage: { useQuery: () => ({}) } },
-    user: { getSsoStatus: { useQuery: () => ({}) } },
+    user: {
+      getSsoStatus: { useQuery: () => ({}) },
+      whatsNew: { useQuery: () => ({}) },
+      markWhatsNewSeen: { useMutation: () => ({ mutate: () => undefined }) },
+    },
     ops: { getBadgeCounts: { useQuery: () => ({}) } },
     featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
     personalWorkspaceFeatures: { get: { useQuery: () => ({}) } },

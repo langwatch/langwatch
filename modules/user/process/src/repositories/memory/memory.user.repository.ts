@@ -222,6 +222,16 @@ export class MemoryUserRepository implements UserRepository {
     this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: input.dismissedAt });
   }
 
+  async hasSeenWhatsNewEntry(input: { id: string; entryId: string }): Promise<boolean> {
+    const [user] = this.#database.usersById([input.id]);
+    return user?.whatsNewSeenEntryId === input.entryId;
+  }
+
+  async setWhatsNewSeenEntry(input: { id: string; entryId: string }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({ ...row, whatsNewSeenEntryId: input.entryId });
+  }
+
   async findJoinOfferDismissedDomains(id: string): Promise<string[]> {
     return [...(this.#database.usersById([id])[0]?.joinOfferDismissedDomains ?? [])];
   }

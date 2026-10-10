@@ -132,6 +132,7 @@ export class ContentSecurityPolicy {
             "https://cdn.jsdelivr.net",
             "https://cdnjs.cloudflare.com",
             "https://image.crisp.chat",
+            "https://langwatch.ai",
             "https://*.googletagmanager.com",
             "https://*.pendo.io",
             "https://*.google-analytics.com",

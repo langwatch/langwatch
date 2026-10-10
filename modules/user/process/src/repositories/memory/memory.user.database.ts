@@ -25,6 +25,8 @@ export type MemoryUserRow = {
   tracesExplorerTourDismissedAt: Instant | null;
   langyCodeAccessPreference?: string | null;
   passkeyNudgeDismissedAt: Instant | null;
+  /** The changelog entry this person last opened; absent means none. */
+  whatsNewSeenEntryId?: string | null;
   /** Two-step verification confirmed on the account, as the plugin records it. */
   twoFactorEnabled: boolean;
   joinOfferDismissedDomains: readonly string[];

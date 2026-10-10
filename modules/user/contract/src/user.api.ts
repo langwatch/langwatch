@@ -18,6 +18,8 @@ import type {
   UnlinkUserAccountInput,
   UnlinkUserAccountOutcome,
   UserCaller,
+  UserWhatsNewEntry,
+  MarkUserWhatsNewSeenInput,
   UserEmailInput,
   UserLinkedAccount,
   UserPasswordRotationOutcome,
@@ -78,6 +80,9 @@ export interface UserApi {
   setNotificationPreference(
     input: SetUserNotificationPreferenceInput,
   ): Promise<UserNotificationPreference>;
+  /** The public changelog's latest entry, marked seen or not for this person; empty when off. */
+  findWhatsNew(input: UserIdInput): Promise<UserWhatsNewEntry[]>;
+  markWhatsNewSeen(input: MarkUserWhatsNewSeenInput): Promise<void>;
   /** Whether the account behind an id holds the platform-operator grant. */
   isOperator(input: { userId: string }): Promise<boolean>;
   /** The account an address belongs to, ignoring case; the exact address wins over case-twins. */

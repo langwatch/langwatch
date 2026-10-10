@@ -79,6 +79,8 @@ class StubRepository implements UserRepository {
     accountCreatedAt: new Date(0),
   }));
   setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
+  hasSeenWhatsNewEntry = vi.fn(async () => false);
+  setWhatsNewSeenEntry = vi.fn(async () => undefined);
   findJoinOfferDismissedDomains = vi.fn(async (): Promise<string[]> => ["acme.com"]);
   addJoinOfferDismissedDomain = vi.fn(async () => undefined);
   getLangyCodeAccessPreference = vi.fn(async () => ({ preference: null }));

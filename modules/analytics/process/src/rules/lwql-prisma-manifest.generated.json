@@ -790,6 +790,15 @@
           "documentation": "This person's answer about browser notifications, one entry per topic:\n{ \"langy\": \"enabled\" | \"declined\" }. A topic that is absent was never\nanswered. The browser's own permission is not stored here.\nSpec: specs/langy/langy-notifications.feature"
         },
         {
+          "name": "whatsNewSeenEntryId",
+          "columnName": "whatsNewSeenEntryId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The public changelog entry (its feed guid) this person last opened from the\nsidebar's \"What's new\" card. NULL means none; a different latest entry shows the dot.\nSpec: modules/navigation/specs/whats-new.feature"
+        },
+        {
           "name": "Annotation",
           "columnName": "Annotation",
           "type": "Annotation",

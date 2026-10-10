@@ -57,6 +57,21 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     app.getNotificationPreference({ id: callerOf(actor).operatorId, topic: input.topic }),
   )
 
+  // An operator browsing as somebody clears their own dot, not the account's.
+  .procedure("whatsNew")
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor }) => ({
+    entries: await app.findWhatsNew({ id: callerOf(actor).operatorId }),
+  }))
+
+  .procedure("markWhatsNewSeen")
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }) => {
+    await app.markWhatsNewSeen({ id: callerOf(actor).operatorId, entryId: input.entryId });
+
+    return { ok: true as const };
+  })
+
   .procedure("setNotificationPreference")
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(({ app, actor, input }) =>

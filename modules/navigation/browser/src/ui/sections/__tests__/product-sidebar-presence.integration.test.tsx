@@ -19,7 +19,11 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
       resolveHome: { useQuery: () => ({}) },
       recordWorkspaceView: { useMutation: () => ({ mutate: vi.fn() }) },
     },
-    user: { getSsoStatus: { useQuery: () => ({}) } },
+    user: {
+      getSsoStatus: { useQuery: () => ({}) },
+      whatsNew: { useQuery: () => ({}) },
+      markWhatsNewSeen: { useMutation: () => ({ mutate: () => undefined }) },
+    },
     featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
   },
 }));

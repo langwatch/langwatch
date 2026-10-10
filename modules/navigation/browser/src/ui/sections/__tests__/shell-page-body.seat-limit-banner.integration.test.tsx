@@ -30,7 +30,11 @@ const { usage } = vi.hoisted(() => ({
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     limits: { getUsage: { useQuery: () => ({ data: usage.data }) } },
-    user: { getSsoStatus: { useQuery: () => ({ data: undefined }) } },
+    user: {
+      getSsoStatus: { useQuery: () => ({ data: undefined }) },
+      whatsNew: { useQuery: () => ({}) },
+      markWhatsNewSeen: { useMutation: () => ({ mutate: () => undefined }) },
+    },
     governance: {
       recordWorkspaceView: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },

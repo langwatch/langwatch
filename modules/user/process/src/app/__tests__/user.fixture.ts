@@ -15,6 +15,7 @@ import { vi } from "vitest";
 
 import { MemoryUserBudgetRequestMailChannel } from "../../channels/memory/memory.user-budget-request-mail.channel.ts";
 import type { UserBudgetRequestMailChannel } from "../../channels/user-budget-request-mail.channel.ts";
+import type { UserChangelogChannel } from "../../channels/user-changelog.channel.ts";
 import type { RecordUserLifecycleCommandData } from "../../eventing/user-lifecycle.events.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
@@ -201,6 +202,7 @@ export function createUserTestApp(
     facts?: Partial<UserFacts>;
     lifecycle?: UserLifecycleSenders;
     budgetRequests?: UserBudgetRequestMailChannel;
+    changelog?: UserChangelogChannel;
     now?: () => Instant;
   }> = {},
 ): UserModule {
@@ -213,6 +215,7 @@ export function createUserTestApp(
     facts: { ...TEST_USER_CONFIG, ...input.facts },
     budgetRequests: input.budgetRequests ?? MemoryUserBudgetRequestMailChannel.create(),
     passwords: new TestPasswordHasher(),
+    ...(input.changelog ? { changelog: input.changelog } : {}),
     ...(input.now ? { now: input.now } : {}),
     dependencies: {
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),

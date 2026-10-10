@@ -81,6 +81,9 @@ export interface UserRepository {
   findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
   setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void>;
   findJoinOfferDismissedDomains(id: string): Promise<string[]>;
+  /** Whether the changelog entry is the one this person last opened. */
+  hasSeenWhatsNewEntry(input: { id: string; entryId: string }): Promise<boolean>;
+  setWhatsNewSeenEntry(input: { id: string; entryId: string }): Promise<void>;
   addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void>;
   updateProfile(input: StoredProfileChange): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;

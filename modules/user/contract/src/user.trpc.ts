@@ -23,6 +23,7 @@ import {
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
   userApiSetNotificationPreferenceInputSchema,
+  userApiMarkWhatsNewSeenInputSchema,
   userApiUnlinkAccountInputSchema,
   userApiUpdateNameInputSchema,
   userApiUserInputSchema,
@@ -35,6 +36,7 @@ import {
   userAvatarUrlSchema,
   userSsoStatusSchema,
   userTourPreferenceSchema,
+  userWhatsNewSchema,
 } from "./user.ts";
 
 export const userTrpc = defineTrpcContract("user")
@@ -61,6 +63,15 @@ export const userTrpc = defineTrpcContract("user")
   .mutation("setNotificationPreference")
   .withInput(userApiSetNotificationPreferenceInputSchema)
   .withOutput(userNotificationPreferenceSchema)
+
+  // The public changelog's latest entry for the sidebar's "What's new" card.
+  .query("whatsNew")
+  .withInput(userApiEmptyInputSchema)
+  .withOutput(userWhatsNewSchema)
+
+  .mutation("markWhatsNewSeen")
+  .withInput(userApiMarkWhatsNewSeenInputSchema)
+  .withOutput(userApiOkSchema)
 
   // Whether to render admin-only surfaces. NOT an authorization gate: every
   // operator route asks the same question again on the server.

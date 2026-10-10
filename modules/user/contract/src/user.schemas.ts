@@ -23,6 +23,9 @@ export const userApiSetNotificationPreferenceInputSchema = z.object({
   choice: userNotificationChoiceSchema,
 });
 
+/** The changelog entry the caller just opened. */
+export const userApiMarkWhatsNewSeenInputSchema = z.object({ entryId: z.string().min(1).max(512) });
+
 /** A blank name is refused here, not trimmed down to nothing and stored. */
 export const userApiUpdateNameInputSchema = z.object({ name: userProfileNameSchema });
 
