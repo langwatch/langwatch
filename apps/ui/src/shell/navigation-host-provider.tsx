@@ -161,9 +161,19 @@ function useNavigationHostReading({
   const rpc = useUiRpc();
   const { openDrawer } = useDrawer();
 
+  const uiDeployment = useUiDeployment();
+  const deployment = useMemo(
+    () => navigationDeploymentOf({ deployment: uiDeployment, process }),
+    [uiDeployment, process],
+  );
+  // The demo project sits in nobody's own graph: its address reads the graph that carries it.
+  const isDemo = Boolean(
+    deployment.demoProjectSlug && routeReading.projectParam === deployment.demoProjectSlug,
+  );
+
   const organizations = scopeHostService.useUiOrganizations({
     transport: rpc,
-    isDemo: false,
+    isDemo,
     enabled: true,
     userId: session.currentUser()?.id,
   });
@@ -214,12 +224,6 @@ function useNavigationHostReading({
         teamRules: scopeHostService,
       }),
     [organization, currentUser?.id, organizationRole, scopeHostService],
-  );
-
-  const uiDeployment = useUiDeployment();
-  const deployment = useMemo(
-    () => navigationDeploymentOf({ deployment: uiDeployment, process }),
-    [uiDeployment, process],
   );
 
   const flags = useUiFlags();
