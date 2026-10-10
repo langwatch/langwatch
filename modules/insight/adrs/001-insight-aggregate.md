@@ -38,6 +38,61 @@ insight moves to Stale without a job.
 The filer's own insight is marked seen when it is filed, so saving an answer
 does not light up the filer's own badge.
 
+## Public surfaces and transports
+
+One tRPC router, `insight`, in `process/src/transport/insight.trpc.ts`: `getAll`,
+`file`, `markSeen`, `archive` and `keep`. Each takes `analytics:view`
+([ADR-003](./003-personal-insights.md)), and the four writes are refused on the
+aggregate. There is no REST route: the action under a Langy answer calls `file` from
+the browser. The browser half lends the shell a bell and a sidebar count. The
+operator task `insight-daily-run-request` asks for one run
+([ADR-004](./004-daily-run.md)).
+
+## Dependencies
+
+The contract depends on the handled-error and module packages. The process half
+depends on the contracts of analytics, authz, dashboard, feature-flag, langy,
+project and user, and on the eventing, process, task and Prisma packages. The
+browser half depends on the analytics, langy and feature-flag clients. No module
+depends on insight.
+
+## Persistence
+
+Three Postgres projections: `InsightProjection`, `InsightReaderProjection` and
+`InsightDailyScheduleProjection` (ADR-004). The insight and reader tables are
+folded from the `insight_processing` stream, and the schedule table from
+`insight_daily_run`. Migrations `20261010120020` to `20261010120022` and
+`20261010120031` create them and add the board pointer and the owner. ClickHouse is
+not used. Nothing is deleted when a member leaves.
+
+## Runtime and registration
+
+`insightProcessModule` is listed for the api, the worker and the tasks runner. The
+worker folds both pipelines, and the daily run reaches its outbox from the run
+process manager. Every procedure and command checks the `release_insights` flag
+for the project and throws `insights_not_enabled` while it is off. No cron
+exists yet: a run starts only from the operator task.
+
+## Environment and configuration
+
+None of its own. Module code reads no `process.env` value. The flag comes from the
+feature-flag module, and the repositories and clients are handed in at composition.
+
+## Errors
+
+Two handled errors, both in the contract. `insight_not_found` (404) answers an
+unknown insight and another person's insight alike (ADR-003).
+`insights_not_enabled` (403) answers a call while the flag is off.
+
+## Contracts and validation
+
+Zod schemas in `contract/src` define every input, output and event. An insight
+title holds 1 to 200 characters and a body up to 20,000. The run holds a finding
+to 120 and 4,000, and refuses the whole answer when its findings block does not
+parse (ADR-004). A read returns at most 500 insights per owner and project
+(ADR-003). Events carry calendar versions, and later fields are additive with
+defaults.
+
 ## Consequences
 
 - A read is two queries: the owner's insights in the project, then their reader
