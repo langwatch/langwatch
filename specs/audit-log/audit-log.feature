@@ -215,12 +215,36 @@ Feature: Unified Audit Log
     Then she is told what organisation-wide audit logs cover and how to obtain them
     And no table is rendered at all
 
+  # The trail shows every member's actions, so reading it is an administrator's by
+  # default. The menu entry, the page and the read all ask the one grant, "auditLog:view".
+
   @unit
-  Scenario: Only an organization administrator may open the audit trail
-    Given bob holds "organization:view" and not "organization:manage"
+  Scenario: Only a reader holding the audit-log grant may open the audit trail
+    Given bob holds "organization:manage" and not "auditLog:view"
     When he opens `/settings/audit-log`
-    Then he is refused, and told which grant the page needs
+    Then he is refused, and told the page needs "auditLog:view"
     And the refusal is framed in the settings chrome he navigated into
+    And a reader holding "auditLog:view" opens the page
+
+  @unit
+  Scenario: The built-in Viewer and Member roles do not read the audit trail
+    Given carol is a Viewer and dave is a Member of the organization's team
+    When either reads the organization's audit trail, with or without a project filter
+    Then the read is refused
+
+  @unit
+  Scenario: An administrator reads the audit trail by default
+    Given erin is an organization administrator
+    When she reads the organization's audit trail, with or without a project filter
+    Then the read is allowed
+    And a team Admin also holds "auditLog:view" on that team's projects
+
+  @unit
+  Scenario: A custom role can grant the audit trail
+    Given frank holds an organization-wide custom role that lists "auditLog:view"
+    When he reads the organization's audit trail
+    Then the read is allowed
+    And a custom role that does not list it is refused
 
   # ──────────────────────────────────────────────────────────────────────────
   # Filtering and paging — all of it in the address, because a compliance

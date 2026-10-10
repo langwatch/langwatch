@@ -10,12 +10,12 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                        | URL                        | Within   | Label          | Permission            | Flags |
-| ------------------------------- | -------------------------- | -------- | -------------- | --------------------- | ----- |
-| `pages/settings/audit-log`      | `/settings/audit-log`      | settings | Audit Log      | `organization:manage` | –     |
-| `pages/settings/directory`      | `/settings/directory`      | settings | Directory      | –                     | –     |
-| `pages/settings/authentication` | `/settings/authentication` | settings | Authentication | `sso:view`            | –     |
-| `pages/settings/teams/[team]`   | `/settings/teams/:team`    | settings | –              | `team:view`           | –     |
+| Page key                        | URL                        | Within   | Label          | Permission      | Flags |
+| ------------------------------- | -------------------------- | -------- | -------------- | --------------- | ----- |
+| `pages/settings/audit-log`      | `/settings/audit-log`      | settings | Audit Log      | `auditLog:view` | –     |
+| `pages/settings/directory`      | `/settings/directory`      | settings | Directory      | –               | –     |
+| `pages/settings/authentication` | `/settings/authentication` | settings | Authentication | `sso:view`      | –     |
+| `pages/settings/teams/[team]`   | `/settings/teams/:team`    | settings | –              | `team:view`     | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
