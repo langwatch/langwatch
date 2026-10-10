@@ -537,7 +537,7 @@ Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:59`.
 Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
 
 ```typescript
-// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:181
+// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:207
 interface Body {
   name: string;
 }
@@ -561,7 +561,7 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:79`.
 Answers at `/api/dashboards/reorder`, `/api/v1/dashboards/reorder`; also, undocumented, `/api/dashboards/2026-08-07/reorder`, `/api/v1/dashboards/2026-08-07/reorder`, `/api/dashboards/latest/reorder`, `/api/v1/dashboards/latest/reorder`.
 
 ```typescript
-// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:190
+// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:216
 interface Body {
   dashboardIds: string[];
 }
@@ -580,7 +580,7 @@ Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:96`.
 Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
 
 ```typescript
-// Params: dashboardRestParamsSchema, ../contract/src/dashboard.ts:197
+// Params: dashboardRestParamsSchema, ../contract/src/dashboard.ts:223
 interface Params {
   id: string;
 }
@@ -596,8 +596,8 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:114`
 Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:197
-type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:181
+type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:223
+type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:207
 type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dashboard.responses.ts:84
 ```
 
@@ -610,7 +610,7 @@ Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:133`
 Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:197
+type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:223
 // Response: dashboardDeletedResponseSchema, ../contract/src/dashboard.responses.ts:106
 interface Response {
   id: string;
@@ -1047,14 +1047,14 @@ type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboa
 
 // dashboards.scopeImpact
 type Input = z.infer<typeof dashboardRefSchema>; // ../contract/src/dashboard.trpc.ts:27
-// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:100
+// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:109
 interface Output {
   otherStars: number;
 }
 
 // dashboards.scopeProjects
 type Input = z.infer<typeof dashboardRefSchema>; // ../contract/src/dashboard.trpc.ts:27
-// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:106
+// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:120
 interface Output {
   ownerProject: {
     id: string;
@@ -1110,7 +1110,7 @@ type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src
 
 // dashboards.sourcePresence
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:26
-// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:163
+// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:198
 interface Output {
   traces: "present" | "absent" | "failed";
   scenarios: "present" | "absent" | "failed";
@@ -1326,7 +1326,7 @@ interface Input {
   granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
   onBudgetOverflow?: "refuse" | "coarsen";
 }
-type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../../analytics/contract/src/features/lwql/analytics.lwql.ts:109
+type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../../analytics/contract/src/features/lwql/analytics.lwql.ts:111
 
 // analytics.savedWorkbenchCharts.delete
 type Input = z.infer<typeof chartScopeSchema>; // ../contract/src/saved-workbench-chart.trpc.ts:17
