@@ -7,7 +7,6 @@ import {
   Badge,
   Box,
   Button,
-  Link as ChakraLink,
   Field,
   HStack,
   Input,
@@ -500,31 +499,38 @@ function RefChipList({
   }
   if (!Array.isArray(refs) || refs.length === 0) return <EmptyCell />;
   return (
-    <Wrap gap={1} minWidth="180px" maxWidth="240px">
-      {refs.map((ref) => (
-        <ChakraLink
-          key={ref.id}
-          asChild
-          fontSize="xs"
-          color="fg"
-          _hover={{ textDecoration: "underline" }}
-        >
-          <RoutedLink href={`/ops/${resource}?q=${ref.id}`}>
-            <Box
-              as="span"
-              paddingX={2}
-              paddingY={0.5}
-              whiteSpace="nowrap"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.emphasized"
-              background="bg.subtle"
-            >
+    <Wrap gap={1} minWidth="44" maxWidth="60">
+      {refs.slice(0, 2).map((ref) => (
+        <Badge key={ref.id} variant="outline" asChild maxWidth="full">
+          <RoutedLink href={`/ops/${resource}?q=${encodeURIComponent(ref.id)}`}>
+            <Text as="span" truncate>
               {ref.name}
-            </Box>
+            </Text>
           </RoutedLink>
-        </ChakraLink>
+        </Badge>
       ))}
+      {refs.length > 2 && (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label={`Show ${refs.length - 2} more ${resource}`}
+            >
+              +{refs.length - 2} more
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content maxHeight="80" overflowY="auto">
+            {refs.slice(2).map((ref) => (
+              <Menu.Item key={ref.id} value={ref.id} asChild>
+                <RoutedLink href={`/ops/${resource}?q=${encodeURIComponent(ref.id)}`}>
+                  {ref.name}
+                </RoutedLink>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Root>
+      )}
     </Wrap>
   );
 }
