@@ -25,6 +25,13 @@ Feature: Monitor service boundary
     Then mappings contain mapping and expansions keys
 
   @unit
+  Scenario: A REST monitor mapping is checked at the door
+    Given a REST create or update body whose mappings has a mapping but no expansions
+    When the door validates the body
+    Then the mapping is accepted with no expansions
+    And a mapping that is not an object of fields is refused as a validation error naming mappings
+
+  @unit
   Scenario: Runtime reads are project scoped
     Given monitors in two projects
     When a project reads enabled ON_MESSAGE monitors
