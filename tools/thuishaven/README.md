@@ -236,7 +236,11 @@ local or CI stack needs a Stripe account. Unless `.env` or the shell names
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, the overlay
 points billing at it (`STRIPE_API_BASE=https://payment.<slug>.langwatch.localhost`,
 `sk_test_paymentsim`, `whsec_paymentsim`); with your own keys set, those are
-used. `haven up` prints `Stripe: paymentsim` or `Stripe: your key from .env`.
+used, and `STRIPE_API_BASE` stays your custom base URL (a test key without it
+goes to Stripe's test API). A live key (`sk_live_`, `rk_live_`) in
+`STRIPE_SECRET_KEY` makes `haven up` refuse to start: use `sk_test_` or remove
+it. `haven up` prints `Stripe: paymentsim`, `Stripe: your test key from .env` or
+`Stripe: custom base <url>`.
 `haven up -payment` drops the lane. The selection stores it as `"paymentsim"`:
 the old `"payment"` key, written as false while it was opt-in, is not read.
 Objects persist in `storage/<slug>/` under Haven's home.

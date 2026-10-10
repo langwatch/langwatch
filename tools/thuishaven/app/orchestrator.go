@@ -497,6 +497,9 @@ func (o *Orchestrator) serviceEndpoint(proxyScheme string, proxyPort, ownPort in
 // Up is the launcher hook `make haven up` runs, in either routing mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
 	p.StartedAt = time.Now()
+	if err := domain.RefuseLiveStripe(resolvedDevEnv(p.WorktreeDir)); err != nil {
+		return err
+	}
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
 	}

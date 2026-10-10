@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -27,8 +28,9 @@ func TestStripeNotice(t *testing.T) {
 		want     string
 	}{
 		{map[string]string{}, true, "Stripe: paymentsim"},
-		{map[string]string{"STRIPE_SECRET_KEY": "set"}, true, "Stripe: your key from .env"},
-		{map[string]string{"STRIPE_SECRET_KEY": "set"}, false, "Stripe: your key from .env"},
+		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x"}, true, "Stripe: your test key from .env"},
+		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x"}, false, "Stripe: your test key from .env"},
+		{map[string]string{"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_API_BASE": "http://stripe.local"}, true, "Stripe: custom base http://stripe.local"},
 		{map[string]string{}, false, "Stripe: none, billing is off (`haven up +payment` starts paymentsim)"},
 	}
 	for _, c := range cases {
@@ -38,5 +40,27 @@ func TestStripeNotice(t *testing.T) {
 	}
 	if !DefaultSelection().Payment {
 		t.Error("paymentsim is off on a default haven up")
+	}
+}
+
+// @scenario "haven refuses a live Stripe key"
+func TestRefuseLiveStripe(t *testing.T) {
+	for _, key := range []string{"sk_live_abc", "rk_live_abc"} {
+		err := RefuseLiveStripe(map[string]string{"STRIPE_SECRET_KEY": key})
+		if err == nil || !strings.Contains(err.Error(), "STRIPE_SECRET_KEY") || strings.Contains(err.Error(), key) {
+			t.Errorf("live key: err = %v, want a refusal naming the variable, not the value", err)
+		}
+	}
+	for _, resolved := range []map[string]string{
+		{},
+		{"STRIPE_SECRET_KEY": "sk_test_abc"},
+		{"STRIPE_SECRET_KEY": "sk_test_abc", "STRIPE_API_BASE": "http://stripe.local"},
+	} {
+		if err := RefuseLiveStripe(resolved); err != nil {
+			t.Errorf("RefuseLiveStripe(%v) = %v, want nil", resolved, err)
+		}
+	}
+	if env := PaymentProviderEnv(map[string]string{"STRIPE_SECRET_KEY": "sk_test_abc"}, "x"); env != nil {
+		t.Errorf("a test key without a base was rewired: %v", env)
 	}
 }

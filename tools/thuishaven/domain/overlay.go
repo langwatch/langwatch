@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -518,11 +519,23 @@ func PaymentProviderEnv(resolved map[string]string, endpoint string) []string {
 	return []string{"STRIPE_API_BASE=" + endpoint, "STRIPE_SECRET_KEY=" + PaymentSimSecretKey, "STRIPE_WEBHOOK_SECRET=" + PaymentSimWebhookSecret}
 }
 
+// RefuseLiveStripe refuses a dev stack a live Stripe key: it names the variable,
+// never the value. Webhook secrets (whsec_) carry no live/test mark, so the key decides.
+func RefuseLiveStripe(resolved map[string]string) error {
+	key := resolved["STRIPE_SECRET_KEY"]
+	if strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_") {
+		return errors.New("haven refuses a live Stripe key in STRIPE_SECRET_KEY: use a test key (sk_test_) or remove it to get paymentsim")
+	}
+	return nil
+}
+
 // StripeNotice is the line `haven up` prints: which Stripe billing talks to.
 func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
 	switch {
+	case resolved["STRIPE_API_BASE"] != "":
+		return "Stripe: custom base " + resolved["STRIPE_API_BASE"]
 	case HasOwnStripe(resolved):
-		return "Stripe: your key from .env"
+		return "Stripe: your test key from .env"
 	case isPaymentSimOn:
 		return "Stripe: paymentsim"
 	}
