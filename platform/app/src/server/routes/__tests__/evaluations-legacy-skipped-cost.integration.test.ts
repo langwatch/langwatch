@@ -213,4 +213,34 @@ describe("POST /api/evaluations/:evaluator/evaluate", () => {
       });
     });
   });
+
+  describe("given a judge that failed without details (langwatch#8507)", () => {
+    beforeEach(() => {
+      // No `details` field at all — the shape a real evaluator can return at
+      // runtime even though SingleEvaluationResult's error variant types it
+      // as a required string. Through isTimeoutError alone this only pins
+      // the predicate; routing it through the real route handler here is
+      // what proves the unguarded `result.details.toLowerCase()` call this
+      // PR removed is actually gone from the dispatch path, not just from
+      // one helper.
+      mockRunEvaluation.mockResolvedValue({
+        status: "error",
+        error_type: "SomeInternalName",
+        traceback: ["line one", "line two"],
+      });
+    });
+
+    it("returns the evaluator error once, without retrying or throwing", async () => {
+      const response = await evaluateComparison();
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        status: "error",
+        error_type: "EVALUATOR_ERROR",
+      });
+      // A missing `details` must not be treated as a timeout: the dispatch
+      // calls runEvaluation exactly once, never a retry.
+      expect(mockRunEvaluation).toHaveBeenCalledTimes(1);
+    });
+  });
 });
