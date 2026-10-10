@@ -34,7 +34,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
   # Open the Monaco editor on a platform-default template
   # ---------------------------------------------------------------------------
 
-  @bdd @template-ottl-authoring @open-editor @platform-default-fork
+  @bdd @unit @unimplemented @template-ottl-authoring @open-editor @platform-default-fork
   Scenario: Admin clones a platform-default template to author OTTL
     When carol opens the platform claude_code template row in the
         IngestionTemplates editor and clicks "Clone to customise"
@@ -53,7 +53,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
         re-pointed to the new fork on next trace receive (not snapshot —
         runtime-resolved per ingestion-templates-catalog.feature)
 
-  @bdd @template-ottl-authoring @open-editor @org-fork-direct-edit
+  @bdd @unit @unimplemented @template-ottl-authoring @open-editor @org-fork-direct-edit
   Scenario: Admin edits an existing org-authored template directly (no fork)
     Given acme already has an org-authored row at templateId "tpl_acme_claude_code"
     When carol clicks "Edit OTTL" on that row
@@ -68,7 +68,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
   # Editor surface
   # ---------------------------------------------------------------------------
 
-  @bdd @template-ottl-authoring @editor @ergonomics
+  @bdd @unit @unimplemented @template-ottl-authoring @editor @ergonomics
   Scenario: Editor surface reuses the existing OttlEditor component
     When the editor opens
     Then it uses the existing `OttlEditor` component at
@@ -88,7 +88,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
     # this PR (Alexis at d61842a3f) per rchaves's "use what we already
     # have" directive.
 
-  @bdd @template-ottl-authoring @editor @validation-on-save
+  @bdd @unit @unimplemented @template-ottl-authoring @editor @validation-on-save
   Scenario: Save triggers OTTL syntax + protected-key validation server-side
     Given carol has authored OTTL that includes a syntax error
     When she clicks "Save & validate"
@@ -109,7 +109,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
     And the source's `parserConfig.ottlStatements` is NOT updated
     And a check the gateway defers still saves, as the editor says
 
-  @bdd @template-ottl-authoring @editor @protected-key-rejection
+  @bdd @unit @unimplemented @template-ottl-authoring @editor @protected-key-rejection
   Scenario: Save rejects OTTL that would write protected keys
     Given carol has authored OTTL containing
         `set(attributes["langwatch.user.id"], "different.user@acme.com")`
@@ -128,7 +128,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
   # Successful save + propagation
   # ---------------------------------------------------------------------------
 
-  @bdd @template-ottl-authoring @save @propagation
+  @bdd @unit @unimplemented @template-ottl-authoring @save @propagation
   Scenario: Successful save emits audit row + propagates on next trace
     Given carol authored valid OTTL that maps `cursor.workspace.path` →
         `langwatch.cursor.workspace`
@@ -149,14 +149,14 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
   # Authorization
   # ---------------------------------------------------------------------------
 
-  @bdd @template-ottl-authoring @authz
+  @bdd @unit @unimplemented @template-ottl-authoring @authz
   Scenario: A non-admin cannot author or edit OTTL
     Given user "ben@acme.com" has role MEMBER
     When ben tries to PATCH the template's ottlRules via direct API
     Then the response is 403 FORBIDDEN
     And no audit row is emitted
 
-  @bdd @template-ottl-authoring @authz @cross-org-isolation
+  @bdd @unit @unimplemented @template-ottl-authoring @authz @cross-org-isolation
   Scenario: An org admin cannot edit another org's authored template
     Given user "carol@acme.com" is an admin on acme
     And an org-authored template exists with organizationId="beta-corp"
@@ -164,7 +164,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
     Then the response is 404 NOT_FOUND (collapse-to-NOT_FOUND, no enumeration)
     And no audit row is emitted
 
-  @bdd @template-ottl-authoring @authz @platform-default-cannot-edit
+  @bdd @unit @unimplemented @template-ottl-authoring @authz @platform-default-cannot-edit
   Scenario: Admin cannot edit a platform-default template directly
     Given the platform-default claude_code template exists with organizationId IS NULL
     When carol tries to PATCH that template's ottlRules directly
@@ -178,7 +178,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
   # Per-template ottlRules tier-of-trust (forward-looking — once admin authoring lands)
   # ---------------------------------------------------------------------------
 
-  @bdd @template-ottl-authoring @tier-of-trust
+  @bdd @unit @unimplemented @template-ottl-authoring @tier-of-trust
   Scenario: Org-authored templates carry the protected-key guard AND cost/token/model lockdown
     Given an org-authored template's OTTL is being applied to an ingestion-key-routed trace
     When the receiver applies the OTTL
