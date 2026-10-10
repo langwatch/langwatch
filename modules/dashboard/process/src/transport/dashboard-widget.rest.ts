@@ -26,6 +26,8 @@ import {
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
+import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+
 /**
  * The deep link back into the dashboards page for the project this credential
  * resolved. Middleware context, because the deployment's own origin is the process's
@@ -104,9 +106,9 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The project's dashboard widgets" },
     },
   })
-  .handle(async ({ app, scope }, platformUrl) => {
+  .handle(async ({ app, scope, actor }, platformUrl) => {
     const projectId = scope.id;
-    const widgets = await app.listDashboardWidgets({ projectId });
+    const widgets = await app.listDashboardWidgets({ projectId, ...viewerOfActor({ actor }) });
 
     return { data: widgets.map((widget) => widgetResource(widget, platformUrl)) };
   })
@@ -167,9 +169,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The dashboard widget" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
-    const widget = await app.getDashboardWidget({ id: input.widgetId, projectId });
+    const widget = await app.getDashboardWidget({
+      id: input.widgetId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
 
     return widgetResource(widget, platformUrl);
   })
@@ -195,12 +201,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The updated widget" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
     const { name, code, queries, description, source } = input;
     const widget = await app.updateDashboardWidget({
       id: input.widgetId,
       projectId,
+      ...viewerOfActor({ actor }),
       ...(name === undefined ? {} : { name }),
       ...(code === undefined ? {} : { code }),
       ...(queries === undefined ? {} : { queries }),
@@ -232,12 +239,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The widget was added to the dashboard" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
     const widget = await app.assignDashboardWidgetToDashboard({
       id: input.widgetId,
       projectId,
       dashboardId: input.dashboardId,
+      ...viewerOfActor({ actor }),
     });
 
     return widgetResource(widget, platformUrl);
@@ -262,9 +270,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       204: { description: "The widget was deleted", content: {} },
     },
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
 
-    await app.deleteDashboardWidget({ id: input.widgetId, projectId });
+    await app.deleteDashboardWidget({
+      id: input.widgetId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
   })
   .build();
