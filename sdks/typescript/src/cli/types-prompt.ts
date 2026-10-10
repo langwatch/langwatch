@@ -1,17 +1,7 @@
 import { z } from "zod";
 
-import type { JsonValue } from "./types";
-
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValueSchema),
-    z.record(z.string(), jsonValueSchema),
-  ]),
-);
+// zod's own JSON schema: the same lazy union, already typed, so no recursive annotation to check.
+const jsonValueSchema = z.json();
 
 // Kept OUT of `types.ts` on purpose: `types.ts` is imported by `program.ts`,
 // which is on the always-loaded cold-start path of every CLI invocation, and
