@@ -28,7 +28,7 @@ const productPillStyle = {
   borderStyle: "solid",
   borderColor: "border",
   borderRadius: "lg",
-  boxShadow: "0 1px 2px rgba(26, 26, 46, 0.05)",
+  boxShadow: "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 5%, transparent)",
   _hover: { backgroundColor: "bg.panel", borderColor: "border.emphasized" },
 } satisfies ButtonProps;
 

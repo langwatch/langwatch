@@ -25,8 +25,8 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
   const safeIndex = selectedIndex === -1 ? 0 : selectedIndex;
   const currentOption = themeOptions[safeIndex];
   const pillShadow = useColorModeValue(
-    "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
-    "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",
+    "0 1px 3px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent), 0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent)",
+    "0 1px 3px color-mix(in srgb, var(--chakra-colors-bg-scrim) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-fg) 5%, transparent)",
   );
 
   if (!currentOption) return null;

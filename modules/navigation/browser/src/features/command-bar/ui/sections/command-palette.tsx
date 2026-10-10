@@ -584,7 +584,7 @@ export function CommandPalette({
           borderWidth="1px"
           borderColor="border.muted"
           borderRadius="16px"
-          boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
+          boxShadow="0 2px 8px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent), 0 24px 70px -20px color-mix(in srgb, var(--chakra-colors-bg-scrim) 35%, transparent)"
           overflow="hidden"
           paddingTop={2}
           // Capped to the room actually left below the field, so a long list
