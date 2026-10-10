@@ -36,7 +36,12 @@ export function UnavailableTraceCard({
             Remove from queue
           </Button>
         )}
-        <Button colorPalette="blue" disabled={!canSkip || isStale} onClick={onSkip}>
+        <Button
+          colorPalette="orange"
+          variant="solid"
+          disabled={!canSkip || isStale}
+          onClick={onSkip}
+        >
           Skip
         </Button>
       </HStack>

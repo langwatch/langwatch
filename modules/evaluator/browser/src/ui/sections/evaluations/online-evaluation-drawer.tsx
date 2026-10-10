@@ -576,7 +576,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               data-testid="online-evaluation-save"
               onClick={handleSave}
               disabled={!canSave}

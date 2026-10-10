@@ -117,7 +117,7 @@ export function EditorStatusBar({
         </Button>
         <Button
           size="xs"
-          colorPalette="blue"
+          colorPalette="orange"
           variant="solid"
           onClick={onSaveAndClose}
           data-testid="code-editor-save-and-close"

@@ -172,7 +172,8 @@ export function PrivacyRuleDrawer({
         <Drawer.Footer>
           <HStack width="full" justify="end">
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               disabled={!canSave}
               loading={isSaving}
               onClick={() => {

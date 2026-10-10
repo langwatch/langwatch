@@ -187,7 +187,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 Cancel
               </Button>
               <Button
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 onClick={form.save}
                 disabled={!form.valid || isSaving || Boolean(props.errorMessage)}
                 loading={isSaving}

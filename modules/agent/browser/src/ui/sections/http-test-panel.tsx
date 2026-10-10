@@ -168,7 +168,8 @@ export function HttpTestPanel({
 
       <HStack justify="flex-end">
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           onClick={handleTest}
           disabled={disabled || isLoading || !url || !bodyValidation.valid}
           size="sm"

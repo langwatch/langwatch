@@ -563,7 +563,12 @@ function IdleFooter({ onSkip, onGenerate, isGenerateDisabled, footerHint }: Idle
         <Button variant="ghost" onClick={onSkip}>
           I&apos;ll write it myself
         </Button>
-        <Button colorPalette="blue" onClick={onGenerate} disabled={isGenerateDisabled}>
+        <Button
+          colorPalette="orange"
+          variant="solid"
+          onClick={onGenerate}
+          disabled={isGenerateDisabled}
+        >
           <Sparkles size={14} />
           Generate with AI
         </Button>
@@ -713,7 +718,7 @@ function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps)
         {assistant ? "Set up manually" : "I'll write it myself"}
       </Button>
       {showConfigure && (
-        <Button colorPalette="blue" asChild>
+        <Button colorPalette="orange" variant="solid" asChild>
           <a
             data-testid="error-configure-model-provider-button"
             href="/settings/model-providers"
@@ -725,7 +730,7 @@ function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps)
         </Button>
       )}
       {showRetry && (
-        <Button colorPalette="blue" onClick={onTryAgain}>
+        <Button colorPalette="orange" variant="solid" onClick={onTryAgain}>
           Try again
         </Button>
       )}

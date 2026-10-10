@@ -324,7 +324,8 @@ export function AddOrEditDatasetDrawer({
             </LabelledField>
 
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               type="submit"
               data-testid="dataset-form-submit"
               minWidth="fit-content"

@@ -340,7 +340,8 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
             )}
             {showFooterSpacer && <Box />}
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={form.handleSave}
               disabled={!form.canSave}
               loading={form.isPending}

@@ -924,7 +924,8 @@ function RuleComposer({
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={onSubmit}
               loading={isPending}
               disabled={

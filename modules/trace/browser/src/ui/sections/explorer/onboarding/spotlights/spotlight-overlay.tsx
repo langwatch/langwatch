@@ -367,7 +367,7 @@ export function SpotlightPopover({
             <Button
               size="xs"
               variant="solid"
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={onNext}
               aria-label="Next spotlight"
             >
@@ -377,7 +377,7 @@ export function SpotlightPopover({
             <Button
               size="xs"
               variant="solid"
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={onDismiss}
               aria-label="Finish tour"
             >

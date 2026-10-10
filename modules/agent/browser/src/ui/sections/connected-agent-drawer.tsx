@@ -50,7 +50,12 @@ export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button colorPalette="blue" onClick={props.onClose} data-testid="connected-agent-close">
+            <Button
+              colorPalette="orange"
+              variant="solid"
+              onClick={props.onClose}
+              data-testid="connected-agent-close"
+            >
               Close
             </Button>
           </HStack>

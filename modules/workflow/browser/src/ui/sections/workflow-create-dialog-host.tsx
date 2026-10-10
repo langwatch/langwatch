@@ -178,7 +178,8 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
       <Dialog.Footer>
         <Button
           type="submit"
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           data-testid="workflow-create-submit"
           loading={createWorkflowMutation.isPending}
           onClick={() => {

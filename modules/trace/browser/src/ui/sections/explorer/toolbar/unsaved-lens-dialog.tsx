@@ -56,7 +56,7 @@ export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
             Discard
           </Button>
           {onSaveAsNew && (
-            <Button colorPalette="blue" size="sm" onClick={onSaveAsNew}>
+            <Button colorPalette="orange" variant="solid" size="sm" onClick={onSaveAsNew}>
               Save as new lens…
             </Button>
           )}

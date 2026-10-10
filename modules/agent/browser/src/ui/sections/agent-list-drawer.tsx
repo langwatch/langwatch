@@ -61,7 +61,8 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
               <Drawer.Title>Choose Agent</Drawer.Title>
               <Button
                 size="sm"
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 onClick={props.onCreateNew}
                 data-testid="new-agent-button"
               >
@@ -156,7 +157,12 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
           Create your first agent to get started
         </Text>
       </VStack>
-      <Button colorPalette="blue" onClick={onCreateNew} data-testid="create-first-agent-button">
+      <Button
+        colorPalette="orange"
+        variant="solid"
+        onClick={onCreateNew}
+        data-testid="create-first-agent-button"
+      >
         <Plus size={16} />
         Create your first agent
       </Button>

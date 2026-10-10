@@ -305,7 +305,8 @@ function EditModeControls({
       )}
       <Button
         size="xs"
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         onClick={onDone}
         flexShrink={0}
         data-testid="saved-views-done-button"

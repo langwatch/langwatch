@@ -368,7 +368,7 @@ export function EditApiKeyDrawer({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={handleSave} disabled={!canSave}>
+            <Button colorPalette="orange" variant="solid" onClick={handleSave} disabled={!canSave}>
               Save
             </Button>
           </HStack>

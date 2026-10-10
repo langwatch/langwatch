@@ -250,7 +250,8 @@ export function DatasetModal({
                 </Button>
                 <Button
                   size="sm"
-                  colorPalette="blue"
+                  colorPalette="orange"
+                  variant="solid"
                   data-testid="new-draft-dataset"
                   onClick={handleNewDraft}
                 >

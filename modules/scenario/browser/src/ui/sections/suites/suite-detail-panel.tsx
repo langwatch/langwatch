@@ -92,7 +92,8 @@ export function SuiteDetailPanel({
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={onRun}
               disabled={isRunning}
               loading={isRunning}
@@ -248,7 +249,7 @@ export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
             Select a run plan from the sidebar or create a new one
           </EmptyState.Description>
           <HStack gap={2}>
-            <Button colorPalette="blue" onClick={onNewSuite}>
+            <Button colorPalette="orange" variant="solid" onClick={onNewSuite}>
               <Plus size={16} /> New Run Plan
             </Button>
             <SetupWithAgentButton surface="simulations" size="md" />

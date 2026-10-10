@@ -123,7 +123,7 @@ export function SaveAndRunMenu({
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        <Button colorPalette="blue" size="sm" loading={isLoading}>
+        <Button colorPalette="orange" variant="solid" size="sm" loading={isLoading}>
           <Play size={14} />
           Save and Run
           <ChevronDown size={14} />

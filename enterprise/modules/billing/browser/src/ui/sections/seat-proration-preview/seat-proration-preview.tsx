@@ -177,7 +177,8 @@ export function SeatProrationPreview({ variant, open, onClose }: SeatProrationPr
           Cancel
         </Button>
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           onClick={() => void confirm()}
           loading={isConfirming}
           disabled={preview.isLoading || preview.isError}

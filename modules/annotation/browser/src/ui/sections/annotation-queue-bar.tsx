@@ -146,7 +146,8 @@ export function AnnotationQueueBar({
               />
             )}
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               data-testid="annotation-queue-next"
               disabled={
                 currentQueueItem.doneAt !== null || isFinishing || isNavigating || stepIsStale

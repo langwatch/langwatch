@@ -1165,7 +1165,8 @@ function AgentTestingActions({
         Save
       </Button>
       <Button
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         size="sm"
         loading={isSubmitting}
         disabled={!hasTarget || isHydrating}

@@ -296,7 +296,8 @@ function DbEvaluatorForm({
           Save
         </Button>
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           size="sm"
           onClick={handleApply}
           data-testid="evaluator-apply-button"
@@ -418,7 +419,8 @@ export function EvaluatorDrawerFooter({
         Apply
       </Button>
       <Button
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         size="sm"
         onClick={onSave}
         loading={isSaving}

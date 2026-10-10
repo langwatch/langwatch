@@ -122,7 +122,7 @@ export function ScenarioEmptyState({ onCreateClick }: { onCreateClick: () => voi
       <Text fontSize="sm" color="fg.subtle">
         Create your first scenario to get started
       </Text>
-      <Button colorPalette="blue" onClick={onCreateClick}>
+      <Button colorPalette="orange" variant="solid" onClick={onCreateClick}>
         <Plus size={16} /> Create Scenario
       </Button>
     </VStack>

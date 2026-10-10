@@ -244,7 +244,8 @@ export function EditModeBar({ traceId }: { traceId: string }) {
           </Button>
           <Button
             size="xs"
-            colorPalette="blue"
+            colorPalette="orange"
+            variant="solid"
             onClick={handleSave}
             disabled={!isDirty || isSaving}
             gap={1.5}

@@ -111,7 +111,12 @@ export const ColumnEducationDialog: React.FC = () => {
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Button size="sm" colorPalette="blue" onClick={() => dismiss(dontShowAgain)}>
+          <Button
+            size="sm"
+            colorPalette="orange"
+            variant="solid"
+            onClick={() => dismiss(dontShowAgain)}
+          >
             Got it
           </Button>
         </DialogFooter>

@@ -760,7 +760,8 @@ export function BulkUploadDrawer({
                 Close
               </Button>
               <Button
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 data-testid="dataset-bulk-upload-submit"
                 disabled={!bulk.hasUploadable || !projectId || hasInvalidColumns}
                 onClick={() => bulk.start()}

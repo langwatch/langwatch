@@ -222,7 +222,7 @@ export function TraceDrawerEmptyState({
             <Text>Try again</Text>
           </Button>
         )}
-        <Button size="sm" variant="solid" colorPalette="blue" onClick={onClose}>
+        <Button size="sm" variant="solid" colorPalette="orange" onClick={onClose}>
           Close
         </Button>
       </HStack>

@@ -72,7 +72,8 @@ export function AgentTestPanel({
           <Box>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               loading={test.isPending}
               disabled={offline || message.trim().length === 0}
               onClick={() =>

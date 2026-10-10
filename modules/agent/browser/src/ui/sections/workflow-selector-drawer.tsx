@@ -138,7 +138,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={() => void handleSubmit(submit)()}
               disabled={!name.trim() || isSaving}
               loading={isSaving}

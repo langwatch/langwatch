@@ -1515,7 +1515,8 @@ export function SourceComposerDrawer({
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={onSubmit}
               loading={isPending}
               disabled={
@@ -1964,7 +1965,8 @@ export function SourceEditDrawer({
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={handleSubmit}
               loading={isPending}
               // The same gate the create drawer uses. The server already

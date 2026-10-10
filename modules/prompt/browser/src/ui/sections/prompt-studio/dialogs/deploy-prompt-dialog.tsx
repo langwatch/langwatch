@@ -319,7 +319,8 @@ export function DeployPromptDialog({
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               size="sm"
               data-testid="prompt-deploy-save"
               onClick={() => void tags.handleSave()}

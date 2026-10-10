@@ -327,7 +327,8 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
             >
               <Button
                 type="submit"
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 marginTop={6}
                 marginBottom={4}
                 loading={createDatasetRecord.isPending}

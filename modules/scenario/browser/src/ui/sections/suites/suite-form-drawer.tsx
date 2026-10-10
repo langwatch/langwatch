@@ -392,7 +392,12 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
               <Button variant="outline" onClick={handleSave} loading={isSaving}>
                 Save
               </Button>
-              <Button colorPalette="blue" onClick={handleRunNow} loading={isSaving}>
+              <Button
+                colorPalette="orange"
+                variant="solid"
+                onClick={handleRunNow}
+                loading={isSaving}
+              >
                 <Play size={14} />
                 Run Now
               </Button>

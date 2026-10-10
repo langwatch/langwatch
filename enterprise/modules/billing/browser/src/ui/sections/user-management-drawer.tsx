@@ -288,7 +288,7 @@ export function UserManagementDrawer({
               <Button variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button colorPalette="blue" onClick={handleSave}>
+              <Button colorPalette="orange" variant="solid" onClick={handleSave}>
                 Done
               </Button>
             </HStack>

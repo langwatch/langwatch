@@ -64,7 +64,7 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
           </HStack>
         ))}
       </VStack>
-      <Button colorPalette="blue" size="lg" onClick={onProceed}>
+      <Button colorPalette="orange" variant="solid" size="lg" onClick={onProceed}>
         Create Your First Scenario <ArrowRight size={16} />
       </Button>
     </VStack>

@@ -503,7 +503,8 @@ export function CreateApiKeyDrawer({
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={handleCreate}
               disabled={!canCreate}
               data-testid="api-key-create-submit"

@@ -417,7 +417,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               </VStack>
             </HorizontalFormControl>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               type="submit"
               data-testid="dataset-form-submit"
               minWidth="fit-content"

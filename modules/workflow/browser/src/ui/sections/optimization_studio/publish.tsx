@@ -135,7 +135,8 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           <Button
             disabled={isDisabled}
             size="sm"
-            colorPalette="blue"
+            colorPalette="orange"
+            variant="solid"
             data-testid="workflow-publish-open"
           >
             Publish <ChevronDown />

@@ -268,7 +268,7 @@ function SuiteSidebarEmptyState({
               Group scenarios into a plan and run them together against your agent.
             </EmptyState.Description>
             {onNewSuite && (
-              <Button size="xs" colorPalette="blue" onClick={onNewSuite}>
+              <Button size="xs" colorPalette="orange" variant="solid" onClick={onNewSuite}>
                 <Plus size={14} /> New Run Plan
               </Button>
             )}

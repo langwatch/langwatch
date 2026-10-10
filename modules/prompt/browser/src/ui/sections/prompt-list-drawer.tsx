@@ -133,7 +133,8 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
             </HStack>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={onCreateNew}
               data-testid="new-prompt-button"
             >
@@ -241,7 +242,12 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
           Create your first prompt to get started
         </Text>
       </VStack>
-      <Button colorPalette="blue" onClick={onCreateNew} data-testid="create-first-prompt-button">
+      <Button
+        colorPalette="orange"
+        variant="solid"
+        onClick={onCreateNew}
+        data-testid="create-first-prompt-button"
+      >
         <Plus size={16} />
         Create your first prompt
       </Button>

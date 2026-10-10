@@ -128,7 +128,8 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={form.save}
               disabled={!form.isValid || props.isSaving}
               loading={props.isSaving}

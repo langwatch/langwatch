@@ -969,7 +969,13 @@ function AgentFooter({
       >
         Save
       </Button>
-      <Button colorPalette="blue" size="sm" onClick={onApply} data-testid="agent-apply-button">
+      <Button
+        colorPalette="orange"
+        variant="solid"
+        size="sm"
+        onClick={onApply}
+        data-testid="agent-apply-button"
+      >
         Apply
       </Button>
     </HStack>

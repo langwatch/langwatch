@@ -77,7 +77,7 @@ function PreparingRowAction({
   if (!isReady) return null;
 
   return (
-    <Button size="sm" colorPalette="blue" onClick={onViewDataset}>
+    <Button size="sm" colorPalette="orange" variant="solid" onClick={onViewDataset}>
       View dataset
     </Button>
   );
@@ -826,7 +826,8 @@ export function UploadCSVForm({
         )}
         <Spacer />
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           loading={isUploading}
           loadingText="Uploading"
           disabled={!!disabled || isUploading || !canUpload}

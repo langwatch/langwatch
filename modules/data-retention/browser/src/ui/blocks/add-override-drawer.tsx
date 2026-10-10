@@ -298,7 +298,8 @@ export function AddOverrideDrawer({
               </Button>
             )}
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               disabled={!canSave}
               loading={isSaving}
               onClick={() => onSave({ scopes, retentionDays: resolvedDays, applyToExisting })}

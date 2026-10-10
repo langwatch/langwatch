@@ -190,7 +190,8 @@ const AbsoluteRangeColumn: React.FC<{
       </VStack>
       <Button
         size="xs"
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         disabled={!parsed}
         onClick={() => parsed && onApply(parsed)}
       >

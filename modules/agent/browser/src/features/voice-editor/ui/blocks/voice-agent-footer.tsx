@@ -47,7 +47,8 @@ export function VoiceAgentFooter({
           </Box>
         </Tooltip>
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           onClick={onSave}
           disabled={isSaving}
           loading={isSaving}
