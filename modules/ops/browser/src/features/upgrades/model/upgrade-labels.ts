@@ -158,7 +158,13 @@ export function releaseGroupName({
   return oldest ? `${release} and earlier` : release;
 }
 
-export type UpgradeStateLine = { text: string; tone: UpgradeTone; retry: boolean };
+/** `organizations` is set when the line names held organizations and links to their tab. */
+export type UpgradeStateLine = {
+  text: string;
+  tone: UpgradeTone;
+  retry: boolean;
+  organizations?: true;
+};
 
 /** The states in which the worker is still carrying the upgrade through. */
 const UPGRADING_STATES = new Set([
@@ -176,11 +182,19 @@ function plural({ count, one, many }: { count: number; one: string; many: string
 export function upgradeStateLine(
   status: Pick<UpgradeStatusView, "state" | "label" | "tone" | "summary" | "counts"> & {
     failedStepIds: readonly string[];
+    /** Organizations a tenant step holds or parks; they turn Up to date into needs attention. */
+    heldOrganizations?: number;
   },
 ): UpgradeStateLine {
-  if (status.state === "up-to-date") return { text: "Up to date", tone: "success", retry: false };
-  if (status.state === "unsupported") {
-    return { text: `Refused: ${status.summary}`, tone: "danger", retry: false };
+  if (status.state === "up-to-date") {
+    const held = status.heldOrganizations ?? 0;
+    if (held === 0) return { text: "Up to date", tone: "success", retry: false };
+    return {
+      text: `Needs attention: ${plural({ count: held, one: "organization held", many: "organizations held" })}`,
+      tone: "warning",
+      retry: false,
+      organizations: true,
+    };
   }
   if (status.state === "needs-attention") {
     const failed = status.failedStepIds.length;
@@ -200,6 +214,14 @@ export function upgradeStateLine(
     return { text, tone: "info", retry: false };
   }
   return { text: `${status.label}: ${status.summary}`, tone: toneOf(status.tone), retry: false };
+}
+
+/** Organizations a tenant step holds or parks, each counted once however many steps hold it. */
+export function heldOrganizationCount(
+  migrations: readonly { attention: readonly { tenantId: string }[] }[],
+): number {
+  return new Set(migrations.flatMap((migration) => migration.attention.map((row) => row.tenantId)))
+    .size;
 }
 
 /** Steps grouped by release in the reader's order; a step with no release goes last. */

@@ -4,10 +4,11 @@ import { VStack } from "@langwatch/design-system/primitives";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 import { useOpsRouter } from "../../../../behavior/ops-router.ts";
+import { useIsSharedInstall } from "../../../../behavior/ops-session.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useRetryUpgradeStep } from "../../behavior/use-retry-upgrade-step.ts";
 import { useUpgradeReadHints } from "../../behavior/use-upgrade-read-hints.ts";
-import { isFinished } from "../../model/upgrade-labels.ts";
+import { heldOrganizationCount, isFinished } from "../../model/upgrade-labels.ts";
 import { UpgradeReadState } from "./upgrade-read-state.tsx";
 import { UpgradeReleaseStepsRead } from "./upgrade-release-steps.tsx";
 import { UPGRADE_RUN_OVERLAY, UpgradeRunDrawer } from "./upgrade-run-drawer.tsx";
@@ -39,6 +40,8 @@ export default function UpgradesScreen() {
   const background = api.ops.upgrade.listSteps.useQuery({ mode: "background" });
   const operator = api.ops.upgrade.listSteps.useQuery({ mode: "operator" });
   const targets = api.ops.upgrade.listTargets.useQuery();
+  const migrations = api.ops.upgrade.listSystemMigrations.useQuery();
+  const sharedInstall = useIsSharedInstall();
   const canManage = useOpsHost().isOpsAdmin();
   const { retryStep, retryingStepId } = useRetryUpgradeStep();
   const onRetryStep = canManage ? retryStep : void 0;
@@ -78,6 +81,9 @@ export default function UpgradesScreen() {
                   onRetryStep={onRetryStep}
                   retryingStepId={retryingStepId}
                   onOpenStep={stepDrawer.open}
+                  heldOrganizations={heldOrganizationCount(migrations.data ?? [])}
+                  sharedInstall={sharedInstall}
+                  onOpenOrganizations={() => selectTab("organizations")}
                 />
               }
               runs={<UpgradeRuns runs={runs.data?.items ?? []} onOpenRun={runDrawer.open} />}

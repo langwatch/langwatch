@@ -27,6 +27,11 @@ export type UpgradesOverviewProps = {
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
   onOpenStep: (stepId: string) => void;
+  /** Organizations a tenant step holds or parks, counted once each. */
+  heldOrganizations?: number;
+  /** Self-hosted has no staff to resolve a held organization, so the line names its owner. */
+  sharedInstall?: boolean;
+  onOpenOrganizations?: () => void;
 };
 
 /** The one state line; Needs attention offers one Retry that reopens every failed step. */
@@ -34,12 +39,18 @@ function StateLine({
   status,
   onRetryStep,
   retryingStepId,
+  heldOrganizations,
+  sharedInstall,
+  onOpenOrganizations,
 }: {
   status: UpgradeStatusView;
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
+  heldOrganizations?: number;
+  sharedInstall?: boolean;
+  onOpenOrganizations?: () => void;
 }) {
-  const line = upgradeStateLine(status);
+  const line = upgradeStateLine({ ...status, heldOrganizations });
   const retrying =
     retryingStepId !== null && status.failedStepIds.some((id) => id === retryingStepId);
   return (
@@ -56,6 +67,21 @@ function StateLine({
           data-testid="upgrade-retry-failed"
         >
           Retry
+        </Button>
+      )}
+      {line.organizations && !sharedInstall && (
+        <Text textStyle="sm" color="fg.muted" data-testid="upgrade-held-contact-owner">
+          Contact the organization owner.
+        </Text>
+      )}
+      {line.organizations && onOpenOrganizations && (
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={onOpenOrganizations}
+          data-testid="upgrade-open-held-organizations"
+        >
+          View organizations
         </Button>
       )}
     </HStack>
@@ -113,6 +139,9 @@ export function UpgradesOverview({
   onRetryStep,
   retryingStepId = null,
   onOpenStep,
+  heldOrganizations,
+  sharedInstall = true,
+  onOpenOrganizations,
 }: UpgradesOverviewProps) {
   if (status.reason === "no-upgrade-recorded" && !hasRuns) {
     return (
@@ -129,7 +158,14 @@ export function UpgradesOverview({
         <Heading size="md" data-testid="upgrade-version">
           {versionLine(status.version)}
         </Heading>
-        <StateLine status={status} onRetryStep={onRetryStep} retryingStepId={retryingStepId} />
+        <StateLine
+          status={status}
+          onRetryStep={onRetryStep}
+          retryingStepId={retryingStepId}
+          heldOrganizations={heldOrganizations}
+          sharedInstall={sharedInstall}
+          onOpenOrganizations={onOpenOrganizations}
+        />
       </Stack>
       {operatorSteps.length > 0 && (
         <OverviewBlock title="Action needed">

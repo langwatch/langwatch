@@ -34,8 +34,6 @@ function statusWith(overrides: Partial<UpgradeStatusView>): UpgradeStatusView {
     installed: "3.23.0",
     origin: "recorded",
     image: "3.23.0",
-    floor: "3.20.1",
-    ledgerFloor: "3.20.1",
     lease: null,
     lastRun: null,
     counts: { done: 4 },
@@ -81,13 +79,18 @@ function renderOverview({
   operatorSteps,
   onRetryStep,
   retryingStepId,
+  heldOrganizations,
+  sharedInstall,
 }: {
   status: UpgradeStatusView;
   operatorSteps?: UpgradeStepView[];
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
+  heldOrganizations?: number;
+  sharedInstall?: boolean;
 }) {
   const onOpenStep = vi.fn();
+  const onOpenOrganizations = vi.fn();
   renderIn(
     <UpgradesOverview
       status={status}
@@ -96,9 +99,12 @@ function renderOverview({
       onRetryStep={onRetryStep}
       retryingStepId={retryingStepId}
       onOpenStep={onOpenStep}
+      heldOrganizations={heldOrganizations}
+      sharedInstall={sharedInstall}
+      onOpenOrganizations={onOpenOrganizations}
     />,
   );
-  return { onOpenStep };
+  return { onOpenStep, onOpenOrganizations };
 }
 
 function renderStepsTab({
@@ -222,27 +228,6 @@ describe("UpgradesOverview", () => {
     });
   });
 
-  describe("when the installed release is below the floor", () => {
-    /** @scenario "A release below the floor reads as refused with the reader's message" */
-    it("reads refused with the message naming the LTS release to upgrade to first", () => {
-      renderOverview({
-        status: statusWith({
-          state: "unsupported",
-          label: "Unsupported",
-          tone: "danger",
-          reason: "installed-below-floor",
-          summary:
-            "Installed release 3.18.0 is below the supported floor 3.20.1. Upgrade to 3.20.1 first.",
-          installed: "3.18.0",
-        }),
-      });
-
-      const state = screen.getByTestId("upgrade-installation-state");
-      expect(state).toHaveTextContent("Refused: Installed release 3.18.0");
-      expect(state).toHaveTextContent("Upgrade to 3.20.1 first.");
-    });
-  });
-
   describe("when no upgrade has been recorded", () => {
     /** @scenario "The overview says when no upgrade has been recorded yet" */
     it("says the installation has not recorded an upgrade yet", () => {
@@ -283,6 +268,40 @@ describe("UpgradesOverview", () => {
       renderOverview({ status: attention });
 
       expect(screen.queryByTestId("upgrade-retry-failed")).toBeNull();
+    });
+  });
+
+  describe("when an up-to-date installation has held organizations", () => {
+    /** @scenario "On cloud, held organizations turn Up to date into needs attention linking to the Organizations tab" */
+    it("reads needs attention with the count and links to the Organizations tab, naming no owner", () => {
+      const { onOpenOrganizations } = renderOverview({
+        status: statusWith({}),
+        heldOrganizations: 2,
+        sharedInstall: true,
+      });
+
+      const state = screen.getByTestId("upgrade-installation-state");
+      expect(state).toHaveTextContent("Needs attention: 2 organizations held");
+      expect(state).not.toHaveTextContent("Up to date");
+      expect(screen.queryByTestId("upgrade-held-contact-owner")).toBeNull();
+      fireEvent.click(within(state).getByRole("button", { name: "View organizations" }));
+      expect(onOpenOrganizations).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "On self-hosted, the held organizations line also says to contact the organization owner" */
+    it("on self-hosted also says to contact the organization owner", () => {
+      renderOverview({ status: statusWith({}), heldOrganizations: 1, sharedInstall: false });
+
+      const state = screen.getByTestId("upgrade-installation-state");
+      expect(state).toHaveTextContent("Needs attention: 1 organization held");
+      expect(state).toHaveTextContent("Contact the organization owner.");
+    });
+
+    it("reads Up to date when no organization is held", () => {
+      renderOverview({ status: statusWith({}), heldOrganizations: 0, sharedInstall: false });
+
+      expect(screen.getByTestId("upgrade-installation-state")).toHaveTextContent("Up to date");
+      expect(screen.queryByTestId("upgrade-open-held-organizations")).toBeNull();
     });
   });
 
@@ -562,7 +581,6 @@ describe("UpgradeRunDetail", () => {
         id: "run_1",
         kind: "upgrade",
         release: "3.23.0",
-        floor: "3.20.1",
         startedAt: "2026-10-06T10:00:00.000Z",
         finishedAt: "2026-10-06T10:01:00.000Z",
         outcome: "succeeded",
@@ -608,7 +626,6 @@ describe("UpgradeRunDetail, phases", () => {
         id: "run_2",
         kind: "upgrade",
         release: "3.23.0",
-        floor: "3.20.1",
         startedAt: at,
         finishedAt: at,
         outcome: "succeeded",
@@ -644,7 +661,6 @@ function runWith(overrides: Partial<UpgradeRunDetailView>): UpgradeRunDetailView
     id: "run_1",
     kind: "upgrade",
     release: "3.23.0",
-    floor: "3.20.1",
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: "2026-10-06T10:01:00.000Z",
     outcome: "succeeded",

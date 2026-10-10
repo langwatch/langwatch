@@ -1,7 +1,7 @@
 Feature: Ops shows an installation's release upgrades, read-only
   The Upgrades pages under Ops read the upgrade ledger through UpgradeReader and
-  show where the installation stands: the installed and image releases, the LTS
-  floor, each release's steps and each run's phases. Nothing here runs a step.
+  show where the installation stands: the installed and image releases, each
+  release's steps and each run's phases. Nothing here runs a step.
   Plan: dev/docs/plans/upgrade-ui-2026-10-06.md sections 4, 7 (W1 to W4) and 9.
   Layout and names: dev/docs/adr/173-upgrades-run-on-deploy.md section 7 (UPGRADE-UI-2). The
   page has the tabs Overview, Runs, Steps and Organizations, plus Dataplanes when targets exist.
@@ -26,12 +26,6 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator opens Ops, Upgrades
     Then the overview reads "Running 3.23.0"
     And its one state line reads "Up to date"
-
-  @integration
-  Scenario: A release below the floor reads as refused with the reader's message
-    Given the reader says the installed release 3.18.0 is below the floor 3.20.1
-    When an operator opens Ops, Upgrades
-    Then the state line reads "Refused" with the message to upgrade to 3.20.1 first
 
   @integration
   Scenario: An upgrade in progress reads as step n of m and names no command
@@ -67,6 +61,31 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator holding ops:manage opens Ops, Upgrades
     Then the state line reads "Needs attention: 2 failed steps"
     And its Retry reopens both failed steps
+
+  # Held organizations (Alex, 2026-10-11): a tenant step that holds or parks an organization is
+  # not up to date. Self-hosted has no staff, so the line also names who resolves it.
+  @unit
+  Scenario: Held organizations are counted once however many steps hold them
+    Given one organization held by two organization steps and another parked by one
+    When the overview counts the held organizations
+    Then it counts 2
+
+  @integration
+  Scenario: On cloud, held organizations turn Up to date into needs attention linking to the Organizations tab
+    Given an installation that is up to date on cloud
+    And an organization step that holds or parks 2 organizations
+    When someone holding ops:view opens Ops, Upgrades
+    Then the state line reads "Needs attention: 2 organizations held" instead of "Up to date"
+    And it links to the Organizations tab
+    And it does not tell the reader to contact the organization owner
+
+  @integration
+  Scenario: On self-hosted, the held organizations line also says to contact the organization owner
+    Given a self-hosted installation that is up to date
+    And an organization step that holds 1 organization
+    When someone holding ops:view opens Ops, Upgrades
+    Then the state line reads "Needs attention: 1 organization held"
+    And it says to contact the organization owner
 
   @integration
   Scenario: A release's steps read as a summary, the unfinished ones first, the applied ones collapsed

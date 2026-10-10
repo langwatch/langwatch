@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   groupStepsByRelease,
+  heldOrganizationCount,
   orderReleasesNewestFirst,
   releaseGroupName,
   remainingCount,
@@ -120,6 +121,21 @@ describe("groupStepsByRelease()", () => {
         ["3.23.0", ["b"]],
         [null, ["x"]],
       ]);
+    });
+  });
+});
+
+describe("heldOrganizationCount()", () => {
+  describe("when one organization is held by two steps and another is parked", () => {
+    /** @scenario "Held organizations are counted once however many steps hold them" */
+    it("counts each organization once", () => {
+      expect(
+        heldOrganizationCount([
+          { attention: [{ tenantId: "org-a" }, { tenantId: "org-b" }] },
+          { attention: [{ tenantId: "org-a" }] },
+          { attention: [] },
+        ]),
+      ).toBe(2);
     });
   });
 });
