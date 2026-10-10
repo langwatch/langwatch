@@ -48,5 +48,6 @@
   "apps/telemetrysim-web/package.json",
   "apps/lambdasim-web/package.json",
   "tools/fuzz/runner/package.json",
-  "tools/interactionsimulator/package.json"
+  "tools/interactionsimulator/package.json",
+  "tools/seedgen/runner/package.json"
 ]

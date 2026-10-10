@@ -987,9 +987,6 @@ jobs:
         # ciphertext is not readable text cannot mock the cipher it asserts on.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      - name: Setup database
-        run: pnpm prisma:migrate
-
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
@@ -997,6 +994,10 @@ jobs:
         env:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
+
+      # `prisma:migrate` runs `task upgrade`, which needs ClickHouse up first.
+      - name: Setup database
+        run: pnpm prisma:migrate
 
       - name: Run ClickHouse migrations
         working-directory: apps/tasks
