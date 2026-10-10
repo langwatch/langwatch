@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 /**
  * What a search router is asked, and what it answers.
  *
@@ -58,6 +59,8 @@ export interface ModelFailure {
 
 export interface RouteSearchInput {
   projectId: string;
+  /** The route's proof; every trace read behind the routing applies it. */
+  authorization: Authorization;
   /** The whole submitted text: bare words plus any explicit terms. */
   text: string;
   timeRange: { from: number; to: number };
@@ -145,7 +148,7 @@ export interface SearchRouterDeps {
   routeWithModel: (input: SearchRouteInput) => Promise<SearchRouteDecision>;
   /** Evaluator and event names on the project, for the context line. */
   listKnownSignals: (input: {
-    projectId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
   }) => Promise<KnownProjectSignals>;
   /** Whether Instant Evals are released for the project (the flag alone). */

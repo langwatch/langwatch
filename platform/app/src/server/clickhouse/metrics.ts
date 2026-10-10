@@ -146,8 +146,17 @@ export const setClickHouseActiveConnections = (count: number) =>
 // could see during the 2026-07-31 overload: the server's own counters show
 // what it admitted, never what a client was holding back. Sized from the
 // limiter itself at scrape time rather than tracked by hand, so the gauges
-// cannot drift from the limiter they describe.
-type LimiterStatsProbe = () => { inFlight: number; queued: number };
+// cannot drift from the limiter they describe. One entry per lane: inserts and
+// reads are bounded separately, so a saturated insert lane must not hide behind
+// an idle read lane. "all" is the single shared bound of a pool too small to
+// split.
+export type LimiterLane = "read" | "insert" | "all";
+
+type LimiterStatsProbe = () => Array<{
+  lane: LimiterLane;
+  inFlight: number;
+  queued: number;
+}>;
 
 const limiterProbes = new Map<string, LimiterStatsProbe>();
 
@@ -172,14 +181,16 @@ register.removeSingleMetric("clickhouse_statements_in_flight");
 const clickhouseStatementsInFlight = new Gauge({
   name: "clickhouse_statements_in_flight",
   help: "ClickHouse statements this process currently has in flight",
-  labelNames: ["instance"] as const,
+  labelNames: ["instance", "lane"] as const,
   collect() {
     // Reset first. `labels().set()` only ever writes, so a client that has
     // been closed would keep publishing its final value for the life of the
     // process - a gauge describing a limiter that no longer fronts anything.
     this.reset();
     for (const [instance, probe] of limiterProbes) {
-      this.labels(instance).set(probe().inFlight);
+      for (const { lane, inFlight } of probe()) {
+        this.labels(instance, lane).set(inFlight);
+      }
     }
   },
 });
@@ -188,11 +199,13 @@ register.removeSingleMetric("clickhouse_statements_queued");
 const clickhouseStatementsQueued = new Gauge({
   name: "clickhouse_statements_queued",
   help: "ClickHouse statements waiting for a concurrency slot in this process",
-  labelNames: ["instance"] as const,
+  labelNames: ["instance", "lane"] as const,
   collect() {
     this.reset();
     for (const [instance, probe] of limiterProbes) {
-      this.labels(instance).set(probe().queued);
+      for (const { lane, queued } of probe()) {
+        this.labels(instance, lane).set(queued);
+      }
     }
   },
 });

@@ -52,10 +52,11 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 1 });
-      // store.get receives the event's occurredAt as a read hint; store.store
-      // still gets the original context.
+      // store.get receives the event it reads for and its occurredAt as a
+      // read hint; store.store still gets the original context.
       expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, {
         ...context,
+        eventId: event.id,
         occurredAtMs: 1000000,
       });
       expect(store.store).toHaveBeenCalledWith(
@@ -197,6 +198,7 @@ describe("FoldProjectionExecutor.execute", () => {
       expect(result).toEqual({ count: 11 });
       expect(store.get).toHaveBeenCalledWith("custom-key-123", {
         ...context,
+        eventId: event.id,
         occurredAtMs: 1000000,
       });
     });
@@ -218,7 +220,7 @@ describe("FoldProjectionExecutor.execute", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
       );
-      // No usable occurredAt -> the context must be passed through unchanged.
+      // No usable occurredAt -> only the event id is added to the context.
       (event as { occurredAt?: number }).occurredAt = 0;
 
       const context: ProjectionStoreContext = {
@@ -228,10 +230,10 @@ describe("FoldProjectionExecutor.execute", () => {
 
       await executor.execute(foldDef, event, context);
 
-      expect(store.get).toHaveBeenCalledWith(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context,
-      );
+      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, {
+        ...context,
+        eventId: event.id,
+      });
       const passedContext = (store.get as ReturnType<typeof vi.fn>).mock
         .calls[0]![1];
       expect(passedContext).not.toHaveProperty("occurredAtMs");

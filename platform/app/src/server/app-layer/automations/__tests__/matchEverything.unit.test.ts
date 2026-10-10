@@ -146,9 +146,7 @@ describe("grandfathered condition-less automations", () => {
     // automations a customer is relying on, on a deploy they did not ask for.
     const confirmed = await confirmSettledMatch({
       deps: {
-        evaluationRuns: {
-          findByTraceId: async () => [],
-        } as never,
+        findEvaluations: async () => [],
         deriveEvents: async () => [],
       },
       trigger: trigger(),

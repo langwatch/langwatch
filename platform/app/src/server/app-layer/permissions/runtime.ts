@@ -7,6 +7,7 @@
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { authzChecksFor } from "../authz/checks";
+import { projectKindReaderFor } from "./aggregate-admin-gate";
 import { EngineCredentialDecisionRepository } from "./credential-decision.repository";
 import { EnginePermissionDecisionRepository } from "./permission-decision.repository";
 import { PermissionsService } from "./permissions.service";
@@ -17,6 +18,7 @@ export function permissionsServiceFor(
   return new PermissionsService({
     decisions: EnginePermissionDecisionRepository.create(
       authzChecksFor(prisma),
+      projectKindReaderFor(prisma),
     ),
     credentials: new EngineCredentialDecisionRepository(prisma),
   });

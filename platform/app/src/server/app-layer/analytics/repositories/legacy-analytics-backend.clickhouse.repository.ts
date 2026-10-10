@@ -20,6 +20,7 @@ import type {
   TopDocumentsResult,
 } from "~/server/analytics/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { tenantAnalyticsLimiter } from "~/server/clickhouse/tenantStatementLimit";
 import type { FilterField } from "~/server/filters/types";
 import type { ElasticSearchEvent } from "~/server/tracer/types";
 import { AnalyticsClientUnavailableError } from "../errors";
@@ -149,43 +150,27 @@ export class LegacyAnalyticsBackendClickHouseRepository
     logger.debug({ sql, params }, "Executing topDocuments query");
 
     try {
-      // The query has two parts separated by semicolon
-      const parts = sql.split(";");
-      if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
-        throw new Error(
-          `Expected topDocuments query to have exactly 2 non-empty statements ` +
-            `separated by semicolon, got ${parts.length} parts`,
-        );
-      }
-      const [topDocsSql, totalSql] = parts;
+      const topDocs = await tenantAnalyticsLimiter.run({
+        tenantId: projectId,
+        task: async () => {
+          const result = await client.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          });
+          return (await result.json()) as Array<{
+            documentId: string;
+            count: string | number;
+            traceId: string;
+            content?: string;
+            total: string | number;
+          }>;
+        },
+      });
 
-      const [topDocsResult, totalResult] = await Promise.all([
-        client.query({
-          query: topDocsSql,
-          query_params: params,
-          format: "JSONEachRow",
-          clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-        }),
-        client.query({
-          query: totalSql,
-          query_params: params,
-          format: "JSONEachRow",
-          clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-        }),
-      ]);
-
-      const topDocs = (await topDocsResult.json()) as Array<{
-        documentId: string;
-        count: string | number;
-        traceId: string;
-        content?: string;
-      }>;
-
-      const totalRows = (await totalResult.json()) as Array<{
-        total: string | number;
-      }>;
-
-      const total = totalRows[0]?.total ?? 0;
+      // Every row carries the distinct-document total; no rows means none.
+      const total = topDocs[0]?.total ?? 0;
 
       return {
         topDocuments: topDocs.map((doc) => ({

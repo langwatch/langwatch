@@ -23,6 +23,7 @@ function mapApiKeyHandledError(error: unknown): never {
       case "api_key_not_owned":
       case "api_key_permission_denied":
       case "api_key_scope_violation":
+      case "aggregate_project_has_no_credential":
         throw new TRPCError({
           code: "FORBIDDEN",
           message: error.message,
