@@ -4,6 +4,7 @@
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 
+import { formatMoney } from "@langwatch/design-system/format-money";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -20,6 +21,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowDown, ArrowUp, ArrowUpDown, Coins, MoreVertical, Plus, SearchX } from "lucide-react";
 import { useState } from "react";
 
@@ -39,19 +41,32 @@ import {
 } from "../../model/model-provider-host.ts";
 import { RegexHighlight } from "../elements/regex-highlight.tsx";
 
-/**
- * One per-token rate, rendered at full precision. Rates run to nine decimal
- * places, so the default number formatting would round several of them to zero.
- */
+const exactRate = (rate: number) =>
+  rate.toLocaleString("fullwide", { useGrouping: false, maximumSignificantDigits: 20 });
+
+/** One rate as US dollars per million tokens; the exact per-token figure sits in the tooltip. */
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
     <Table.Cell padding={0}>
-      <Text whiteSpace="nowrap" paddingX={3} color={isCustom ? "green.fg" : undefined}>
-        {rate?.toLocaleString("fullwide", {
-          useGrouping: false,
-          maximumSignificantDigits: 20,
-        })}
-      </Text>
+      {rate !== undefined && (
+        <Tooltip content={`$${exactRate(rate)} per token`}>
+          <Text
+            as="span"
+            display="inline-block"
+            whiteSpace="nowrap"
+            paddingX={3}
+            textStyle="sm"
+            fontVariantNumeric="tabular-nums"
+            color={isCustom ? "green.fg" : undefined}
+          >
+            {formatMoney({ amount: rate * 1_000_000, currency: "USD" })}
+            <Text as="span" color="fg.muted" textStyle="xs">
+              {" "}
+              / 1M
+            </Text>
+          </Text>
+        </Tooltip>
+      )}
     </Table.Cell>
   );
 }
@@ -73,7 +88,8 @@ function ModelNameCell(props: { model: string; isCustom: boolean; modelProviderI
       padding={0}
       height="auto"
       aria-label={`Open provider for ${props.model}`}
-      onClick={() =>
+      onClick={(event) => {
+        event.stopPropagation();
         host.openPlatformDrawer({
           drawer: "editModelProvider",
           params: {
@@ -82,13 +98,20 @@ function ModelNameCell(props: { model: string; isCustom: boolean; modelProviderI
             providerKey: props.model.split("/")[0],
             modelProviderId: props.modelProviderId,
           },
-        })
-      }
+        });
+      }}
     >
       {code}
     </Button>
   );
 }
+
+/** A stored rule opens for editing; a catalogue rate opens as a new rule that overrides it. */
+const editorParams = (row: { id?: string; model: string }) =>
+  row.id ? { id: row.id } : { cloneModel: row.model };
+
+const SORT_ICONS = { asc: ArrowUp, desc: ArrowDown } as const;
+const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
 
 function SortHeader(props: {
   label: string;
@@ -98,12 +121,12 @@ function SortHeader(props: {
   minWidth?: string;
 }) {
   const active = props.sort?.key === props.sortKey ? props.sort.direction : null;
-  const Icon = active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ArrowUpDown;
+  const Icon = active ? SORT_ICONS[active] : ArrowUpDown;
   return (
     <Table.ColumnHeader
       minWidth={props.minWidth}
       whiteSpace="nowrap"
-      aria-sort={active === "asc" ? "ascending" : active === "desc" ? "descending" : "none"}
+      aria-sort={active ? ARIA_SORT[active] : "none"}
     >
       <Button size="xs" variant="ghost" onClick={() => props.onSort(props.sortKey)}>
         {props.label}
@@ -286,7 +309,6 @@ export default function ModelCostsScreen() {
               <Table.Root variant="line" width="full" maxWidth="100%">
                 <Table.Header width="full">
                   <Table.Row width="full">
-                    {/* Rates run to nine decimals: headers and values never wrap. */}
                     <SortHeader
                       label="Model name"
                       sortKey="model"
@@ -332,7 +354,18 @@ export default function ModelCostsScreen() {
                       </Table.Row>
                     ))}
                   {visibleRows.map((row) => (
-                    <Table.Row key={row.model} width="full">
+                    <Table.Row
+                      key={row.model}
+                      width="full"
+                      cursor="pointer"
+                      _hover={{ bg: "bg.muted" }}
+                      onClick={() =>
+                        host.openPlatformDrawer({
+                          drawer: "llmModelCost",
+                          params: editorParams(row),
+                        })
+                      }
+                    >
                       <Table.Cell>
                         <ModelNameCell
                           model={row.model}
@@ -350,7 +383,7 @@ export default function ModelCostsScreen() {
                       <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
                       <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
                       <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
-                      <Table.Cell padding={1}>
+                      <Table.Cell padding={1} onClick={(event) => event.stopPropagation()}>
                         <ActionsMenu id={row.id} model={row.model} />
                       </Table.Cell>
                     </Table.Row>
@@ -393,7 +426,7 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
               });
             }}
           >
-            Clone
+            Override cost
           </Menu.Item>
         )}
         {id && (

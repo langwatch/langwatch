@@ -117,6 +117,12 @@ function reportCostFailure({
   });
 }
 
+function drawerTitle({ id, cloneModel }: { id?: string; cloneModel?: string }) {
+  if (id) return "Edit LLM Model Cost";
+  if (cloneModel) return `Override cost for ${cloneModel}`;
+  return "Add LLM Model Cost";
+}
+
 export function LLMModelCostDrawer({
   id,
   cloneModel,
@@ -145,7 +151,7 @@ export function LLMModelCostDrawer({
     <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading>{id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}</Heading>
+          <Heading>{drawerTitle({ id, cloneModel })}</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
