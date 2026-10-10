@@ -1,16 +1,5 @@
-import { formatInstant } from "@langwatch/design-system/describe-instant";
-import { FormattedDate } from "@langwatch/design-system/formatted-date";
-import {
-  Badge,
-  Box,
-  Heading,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import type { SsoConnectionHistoryEntry } from "@langwatch/enterprise-sso-contract";
-import { currentTimeZone, nowInstant, Temporal } from "@langwatch/time";
+import { ActivityTimeline } from "@langwatch/design-system/activity-timeline";
+import { Badge, Box, Skeleton, Text } from "@langwatch/design-system/primitives";
 import {
   Circle,
   CircleCheck,
@@ -58,32 +47,27 @@ const EVENT_ICONS: Record<string, LucideIcon> = {
   "lw.identity.migration_finalized": CircleCheck,
 };
 
-function historyDays({ entries }: { entries: SsoConnectionHistoryEntry[] }) {
-  const timeZone = currentTimeZone();
-  const today = nowInstant().toZonedDateTimeISO(timeZone).toPlainDate();
-  const yesterday = today.subtract({ days: 1 });
-  const days = new Map<string, { label: string; entries: SsoConnectionHistoryEntry[] }>();
-
-  for (const entry of entries.toSorted((left, right) => right.occurredAtMs - left.occurredAtMs)) {
-    const date = Temporal.Instant.fromEpochMilliseconds(entry.occurredAtMs)
-      .toZonedDateTimeISO(timeZone)
-      .toPlainDate();
-    const key = date.toString();
-    let label = formatInstant({ epochMs: entry.occurredAtMs, display: "date", timeZone });
-    if (date.equals(today)) label = "Today";
-    if (date.equals(yesterday)) label = "Yesterday";
-    const day = days.get(key);
-    if (day) day.entries.push(entry);
-    else days.set(key, { label, entries: [entry] });
-  }
-
-  return [...days.entries()];
-}
-
 export function ConnectionHistory({ connectionId }: { connectionId: string }) {
   const history = api.ssoConnections.getHistory.useQuery({ connectionId });
   const rows = history.data ?? [];
-  const days = historyDays({ entries: rows });
+  const entries = rows.map((entry) => {
+    const EventIcon = EVENT_ICONS[entry.eventType ?? ""] ?? Circle;
+    return {
+      id: entry.eventId,
+      occurredAtMs: entry.occurredAtMs,
+      content: entry.summary,
+      icon: <EventIcon size={14} />,
+      meta: entry.carriedOver ? (
+        <Badge colorPalette="gray" size="xs">
+          Carried over
+        </Badge>
+      ) : null,
+    };
+  });
+  let emptyState = <Text>Nothing has happened to this connection yet.</Text>;
+  if (history.isLoading) emptyState = <Skeleton height="16" />;
+  if (history.error)
+    emptyState = <Text color="fg.error">This connection’s history could not be loaded.</Text>;
 
   return (
     <Box
@@ -93,79 +77,11 @@ export function ConnectionHistory({ connectionId }: { connectionId: string }) {
       borderColor="border.muted"
       paddingTop={5}
     >
-      <HStack justify="space-between" marginBottom={4}>
-        <Heading as="h3" size="sm">
-          History
-        </Heading>
-        <Text fontSize="xs" color="fg.muted">
-          Newest first
-        </Text>
-      </HStack>
-      {history.isLoading && <Skeleton height="16" />}
-      {history.error && (
-        <Text color="fg.error" fontSize="sm">
-          This connection’s history could not be loaded.
-        </Text>
-      )}
-      {!history.isLoading && !history.error && rows.length === 0 && (
-        <Text color="fg.muted" fontSize="sm">
-          Nothing has happened to this connection yet.
-        </Text>
-      )}
-      <VStack align="stretch" gap={5}>
-        {days.map(([key, day]) => (
-          <Box key={key}>
-            <Heading as="h4" size="xs" color="fg.muted" marginBottom={3}>
-              {day.label}
-            </Heading>
-            <Box as="ol" listStyleType="none" margin={0} padding={0} aria-label={day.label}>
-              {day.entries.map((entry, index) => (
-                <HistoryEntry
-                  key={entry.eventId}
-                  entry={entry}
-                  last={index === day.entries.length - 1}
-                />
-              ))}
-            </Box>
-          </Box>
-        ))}
-      </VStack>
+      <ActivityTimeline
+        title="History"
+        entries={history.isLoading || history.error ? [] : entries}
+        emptyState={emptyState}
+      />
     </Box>
-  );
-}
-
-function HistoryEntry({ entry, last }: { entry: SsoConnectionHistoryEntry; last: boolean }) {
-  const EventIcon = EVENT_ICONS[entry.eventType ?? ""] ?? Circle;
-
-  return (
-    <HStack as="li" gap={3} align="stretch">
-      <VStack gap={0} width="7" flexShrink={0} aria-hidden>
-        <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          boxSize="7"
-          borderRadius="full"
-          bg="bg.muted"
-          color="fg.muted"
-        >
-          <EventIcon size={14} />
-        </Box>
-        {!last && <Box width="1px" flex={1} bg="border.muted" marginY={1} />}
-      </VStack>
-      <Box minWidth={0} flex={1} paddingTop={0.5} paddingBottom={last ? 0 : 4}>
-        <Text fontSize="sm" lineHeight="tall" overflowWrap="anywhere">
-          {entry.summary}
-        </Text>
-        <HStack gap={2} marginTop={0.5} fontSize="xs" color="fg.muted" flexWrap="wrap">
-          <FormattedDate value={entry.occurredAtMs} display="relative" />
-          {entry.carriedOver && (
-            <Badge colorPalette="gray" size="xs">
-              Carried over
-            </Badge>
-          )}
-        </HStack>
-      </Box>
-    </HStack>
   );
 }

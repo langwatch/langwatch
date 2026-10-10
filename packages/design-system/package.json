@@ -10,6 +10,22 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./detail-drawer-header": {
+      "types": "./dist/components/overlays/detail-drawer-header.d.ts",
+      "default": "./src/components/overlays/detail-drawer-header.tsx"
+    },
+    "./summary-list": {
+      "types": "./dist/components/display/summary-list.d.ts",
+      "default": "./src/components/display/summary-list.tsx"
+    },
+    "./resource-row": {
+      "types": "./dist/components/display/resource-row.d.ts",
+      "default": "./src/components/display/resource-row.tsx"
+    },
+    "./activity-timeline": {
+      "types": "./dist/components/display/activity-timeline.d.ts",
+      "default": "./src/components/display/activity-timeline.tsx"
+    },
     "./formatted-number": {
       "types": "./dist/components/values/formatted-number.d.ts",
       "default": "./src/components/values/formatted-number.tsx"
