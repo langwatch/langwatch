@@ -46,6 +46,10 @@
       "types": "./dist/unified-diff.d.ts",
       "default": "./src/unified-diff.ts"
     },
+    "./json-value-preview": {
+      "types": "./dist/components/display/json-value-preview.d.ts",
+      "default": "./src/components/display/json-value-preview.tsx"
+    },
     "./code-preview": {
       "types": "./dist/components/display/code-preview.d.ts",
       "default": "./src/components/display/code-preview.tsx"
