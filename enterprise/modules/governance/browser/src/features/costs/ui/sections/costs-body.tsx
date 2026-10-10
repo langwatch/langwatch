@@ -102,13 +102,14 @@ function CostsWithoutFigures({
     );
   }
 
+  const noCostStore = data.unavailableReason === "no_cost_store";
   return (
     <NoDataInfoBlock
       testId="cost-lanes-unavailable"
       icon={<ChartNoAxesCombined />}
-      title="No cost recorded yet"
+      title={noCostStore ? "Cost data is unavailable" : "No cost recorded yet"}
       description={
-        data.unavailableReason === "no_cost_store"
+        noCostStore
           ? "This deployment does not have cost storage configured, so no cost has been recorded."
           : "No cost has been recorded for this organization yet."
       }
