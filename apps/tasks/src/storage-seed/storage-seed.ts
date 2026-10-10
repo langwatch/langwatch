@@ -377,6 +377,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       projectId: project.id,
       organizationId: organization.id,
       userId: user.id,
+      environment,
     });
   }
 
