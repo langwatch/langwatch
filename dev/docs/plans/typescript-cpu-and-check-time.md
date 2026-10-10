@@ -67,6 +67,10 @@ The contract spine (organization → … → analytics) stays: 3.8s in total.
 - **C. Keep emit, shrink it.** Step 6 (named schemas) plus step 8 hotspots. No
   layout change; RAM stays bounded.
 
+### Trial: compile units per module (2026-10-11, not adopted)
+
+Worktree branch `feat/ts-compile-units` (a485d9f69c, codemod `dev/scripts/compile-unit-codemod.mjs`): trace, gateway, experiment, organization went from 30 programs to 12. Cold CPU +2% (693 → 706 CPU-s), root peak RSS 3.2 → 4.0 GB, export edit +8% CPU, leaf edit about 2.4x CPU (the unit rechecks all its tests). Contract and process cannot share a unit where other modules' contracts sit between them (trace, gateway, organization), and `pnpm sync:references` strips the unit wiring. Step 4 had already taken the duplicate-checking gain. Not worth rolling out.
+
 Not doing: `isolatedDeclarations` (ruled out, `typescript-tidy-projects.md`
 §10.6); more `--builders` (§13 lever 5, no win on a chain).
 
