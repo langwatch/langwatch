@@ -1,3 +1,4 @@
+import { system } from "@langwatch/design-system";
 import { Box, Text } from "@langwatch/design-system/primitives";
 import { presenceUserColor, presenceUserDisplayName } from "@langwatch/presence-contract";
 import { memo, useRef } from "react";
@@ -92,11 +93,11 @@ const PeerCursorMarker = memo(function PeerCursorMarker({ cursor }: { cursor: Pe
           paddingX={1.5}
           paddingY={0.5}
           borderRadius="sm"
-          background={color}
-          color="white"
+          background={color.replace(".emphasized", ".subtle")}
+          color={color.replace(".emphasized", ".fg")}
           whiteSpace="nowrap"
         >
-          <Text textStyle="2xs" fontWeight="semibold" color="white">
+          <Text textStyle="2xs" fontWeight="semibold" color={color.replace(".emphasized", ".fg")}>
             {name}
           </Text>
         </Box>
@@ -107,10 +108,10 @@ const PeerCursorMarker = memo(function PeerCursorMarker({ cursor }: { cursor: Pe
 
 function CursorArrow({ color }: { color: string }) {
   return (
-    <svg width="14" height="18" viewBox="0 0 14 18" fill={color}>
+    <svg width="14" height="18" viewBox="0 0 14 18" fill={system.token.var(`colors.${color}`)}>
       <path
         d="M1 1 L1 14 L4.5 11 L7 17 L9 16 L6.5 10.5 L11 10.5 Z"
-        stroke="white"
+        stroke={system.token.var("colors.bg.card")}
         strokeWidth="1"
         strokeLinejoin="round"
       />
