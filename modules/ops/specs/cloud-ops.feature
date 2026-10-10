@@ -4,10 +4,16 @@ Feature: Cloud admin capability
 
   @unit
   Scenario: Cloud admin is on only when asked for and the licence key matches the release
-    Given LANGWATCH_CLOUD_OPS is not set
+    Given a production build with LANGWATCH_CLOUD_OPS not set
     Then Cloud admin is off whether or not a licence private key is held
     When LANGWATCH_CLOUD_OPS is true and the licence private key pairs with the release's public key
     Then Cloud admin is on
+
+  @unit
+  Scenario: Cloud admin is always on on a developer's local stack
+    Given a development build (NODE_ENV=development) with LANGWATCH_CLOUD_OPS not set
+    Then Cloud admin is on with no licence private key
+    And the Ops menu offers Feature Flags and the Cloud admin pages
 
   @unit
   Scenario: Asking for Cloud admin without a matching licence key refuses boot

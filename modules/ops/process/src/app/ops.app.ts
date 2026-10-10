@@ -802,6 +802,7 @@ export class OpsModule implements OpsApi {
     const cloudOps = await setup.secrets.into(OpsModule.secrets.licensePrivateKey, (privateKey) =>
       decideCloudOps({
         asked: setup.config.cloudOps,
+        isLocalDevelopment: setup.config.nodeEnvironment === "development",
         privateKey,
         builtInPublicKey: DEFAULT_LICENSE_PUBLIC_KEY,
       }),
