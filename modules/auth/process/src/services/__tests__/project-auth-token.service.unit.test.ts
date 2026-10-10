@@ -71,6 +71,7 @@ describe("ProjectAuthTokenService", () => {
 
   /** ADR-177 decision 7: an aggregate accepts no key, its own stored one included. */
   describe("when the token names an aggregate project", () => {
+    /** @scenario "The aggregate project cannot receive traces" */
     it("refuses with the aggregate's code and no slug", async () => {
       const { service } = tokenCheck({
         ...ACME,

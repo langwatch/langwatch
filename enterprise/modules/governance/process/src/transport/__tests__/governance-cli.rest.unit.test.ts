@@ -496,6 +496,7 @@ describe("the CLI governance plane", () => {
       });
     });
 
+    /** @scenario "The aggregate project is absent from every send-traces-here picker" */
     it("refuses an aggregate project before any permission is asked, and mints nothing", async () => {
       const issueForProject = vi.fn();
       const permittedOnProject = vi.fn().mockResolvedValue(true);

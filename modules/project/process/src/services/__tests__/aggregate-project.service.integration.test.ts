@@ -38,6 +38,7 @@ describe.skipIf(!DB_URL)(
       governance: "",
       foreign: "",
       aggregate: "",
+      personalGovernance: "",
     };
 
     const serviceFor = ({ role }: { role: "ADMIN" | "MEMBER" | null }) =>
@@ -111,6 +112,11 @@ describe.skipIf(!DB_URL)(
         teamId: team.id,
         suffix: "governance",
         extra: { kind: "internal_governance" },
+      });
+      ids.personalGovernance = await seedProject({
+        teamId: team.id,
+        suffix: "personal-governance",
+        extra: { kind: "internal_governance", isPersonal: true, ownerUserId: by.id },
       });
       ids.aggregate = await seedProject({
         teamId: team.id,
@@ -203,6 +209,60 @@ describe.skipIf(!DB_URL)(
             by,
           }),
         ).rejects.toMatchObject({ code: "aggregate_rule_outside_organization" });
+      });
+    });
+
+    describe("when the members of an all-personal rule are read", () => {
+      /** @scenario "The hidden governance project is never a member" */
+      it("leaves out the governance project, even one that looks personal", async () => {
+        const members = await repository.findPersonalProjectIds({
+          organizationId: ids.organization,
+        });
+
+        expect(members).toEqual([ids.personal]);
+        expect(members).not.toContain(ids.governance);
+        expect(members).not.toContain(ids.personalGovernance);
+      });
+    });
+
+    describe("when the admin lists the projects she may pick", () => {
+      /** @scenario "The admin sees every member's personal workspace under Personal projects" */
+      it("lists the personal workspace as personal, naming its owner, and the shared one as not", async () => {
+        const candidates = await serviceFor({ role: "ADMIN" }).candidateMembers({
+          organizationId: ids.organization,
+          by,
+        });
+        const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+
+        expect(byId.get(ids.personal)).toMatchObject({
+          isPersonal: true,
+          owner: { name: "Seller", email: `${ns}@example.com` },
+        });
+        expect(byId.get(ids.shared)).toMatchObject({ isPersonal: false, owner: null });
+      });
+
+      /** @scenario "The admin sees every member's personal workspace under Personal projects" */
+      it("refuses the list to a member who is not an admin", async () => {
+        await expect(
+          serviceFor({ role: "MEMBER" }).candidateMembers({
+            organizationId: ids.organization,
+            by,
+          }),
+        ).rejects.toMatchObject({ code: "aggregate_project_admin_only" });
+      });
+
+      /** @scenario "The project picker leaves out aggregates and the governance project" */
+      it("lists neither the aggregate nor the governance project", async () => {
+        const listed = (
+          await serviceFor({ role: "ADMIN" }).candidateMembers({
+            organizationId: ids.organization,
+            by,
+          })
+        ).map((candidate) => candidate.id);
+
+        expect(listed).not.toContain(ids.aggregate);
+        expect(listed).not.toContain(ids.governance);
+        expect(listed).not.toContain(ids.personalGovernance);
       });
     });
 
