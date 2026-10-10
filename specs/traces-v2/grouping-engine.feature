@@ -40,6 +40,13 @@ Rule: Grouping selector dropdown
     And each group row shows its model and trace count, even when the flat lens's columns were customised
     And the change is recorded as a draft on the active lens (orange dot appears)
 
+  @integration
+  Scenario: Switching between two groupings relabels the group column
+    Given the user has selected "By Model" grouping
+    When the user selects "By Service" from the grouping dropdown
+    Then the group column header reads "Service"
+    And a header sorted afterwards shows its own sort direction
+
   Scenario: Selector trigger reflects the active grouping
     When the user selects a non-flat grouping
     Then the trigger switches to the "subtle" button variant
