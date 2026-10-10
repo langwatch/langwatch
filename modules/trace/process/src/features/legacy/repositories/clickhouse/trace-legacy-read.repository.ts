@@ -1,12 +1,12 @@
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { Authorization } from "@langwatch/authorization";
 import {
+  type AuthorizedClickHouse,
   DEFAULT_PARTITION_WINDOW_MS,
   expandFragment,
   fenceFor,
   queryWindowed,
   RetentionFloorService,
-  type RetentionDaysProvider,
 } from "@langwatch/clickhouse-client";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -84,6 +84,7 @@ import {
   TraceLegacyReadRepository,
   type ResolveTraceSpansBatchFn,
   type ResolveTraceSpansFn,
+  type TraceLegacyReadPolicies,
 } from "../trace-legacy-read.repository.ts";
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
@@ -343,18 +344,12 @@ class ClickHouseClientUnavailableError extends Error {
 
 const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
 
-/** What a composition root gives the legacy trace read over ClickHouse. */
-export interface ClickHouseTraceLegacyReadOptions {
-  traceCanonicalisation: TraceCanonicalisationService;
+/** The registry's store under the legacy trace read; policies arrive by `withPolicies`. */
+type TraceLegacyReadStore = {
   /** The process's tenant-keyed connection; absent, every read refuses. */
   resolveClickHouseClient?: ((tenantId: string) => Promise<TraceClickHouseClient>) | undefined;
-  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
-  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
-  /**
-   * The tenant's retention policy, which widens the span read's floor. Absent, the floor stays
-   * at the platform default, which still bounds every read.
-   */
-  retentionDays?: RetentionDaysProvider | undefined;
+  /** The proof-checked reader the fenced reads go through (ADR-177); absent, they refuse. */
+  clickhouse?: AuthorizedClickHouse | undefined;
   /** Annotation's rows and score names via its shared tables (R40), for the projection join. */
   annotations?:
     | {
@@ -362,7 +357,11 @@ export interface ClickHouseTraceLegacyReadOptions {
         scores: Pick<TraceAnnotationScoresReadRepository, "findScoreNames">;
       }
     | undefined;
-}
+};
+
+/** What a composition root gives the legacy trace read over ClickHouse. */
+export type ClickHouseTraceLegacyReadOptions = TraceLegacyReadStore &
+  Partial<TraceLegacyReadPolicies>;
 
 /** The compiled filter, its tenant markers expanded into the proof's fence (ADR-177 block C). */
 function fenceFilterWhere({
@@ -818,19 +817,20 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
-  private readonly resolveClickHouseClient:
-    | ((tenantId: string) => Promise<TraceClickHouseClient>)
-    | undefined;
-  private readonly annotations: ClickHouseTraceLegacyReadOptions["annotations"];
-  private readonly traceCanonicalisation: TraceCanonicalisationService;
+  private readonly store: TraceLegacyReadStore;
+  private readonly resolveClickHouseClient: TraceLegacyReadStore["resolveClickHouseClient"];
+  private readonly annotations: TraceLegacyReadStore["annotations"];
+  private readonly canonicalisation: TraceCanonicalisationService | undefined;
 
   private readonly retentionFloor: RetentionFloorService;
 
   constructor(options: ClickHouseTraceLegacyReadOptions) {
     super();
-    this.resolveClickHouseClient = options.resolveClickHouseClient;
-    this.annotations = options.annotations;
-    this.traceCanonicalisation = options.traceCanonicalisation;
+    const { resolveClickHouseClient, clickhouse, annotations } = options;
+    this.store = { resolveClickHouseClient, clickhouse, annotations };
+    this.resolveClickHouseClient = resolveClickHouseClient;
+    this.annotations = annotations;
+    this.canonicalisation = options.traceCanonicalisation;
     this.resolveTraceSpans = options.resolveTraceSpans;
     this.resolveTraceSpansBatch = options.resolveTraceSpansBatch;
     this.retentionFloor = new RetentionFloorService({
@@ -844,9 +844,29 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return new TraceLegacyReadClickHouseRepository(options);
   }
 
-  /**
-   * Resolve the ClickHouse client for a given project.
-   */
+  withPolicies(policies: TraceLegacyReadPolicies): TraceLegacyReadClickHouseRepository {
+    return new TraceLegacyReadClickHouseRepository({ ...this.store, ...policies });
+  }
+
+  private get traceCanonicalisation(): TraceCanonicalisationService {
+    if (!this.canonicalisation) {
+      throw new Error("The legacy trace read was composed without its policies");
+    }
+    return this.canonicalisation;
+  }
+
+  /** The fenced reader for one proof; refuses by name where no ClickHouse was composed. */
+  private reader({
+    authorization,
+    projectId,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+  }) {
+    if (!this.store.clickhouse) throw new ClickHouseClientUnavailableError(projectId);
+    return this.store.clickhouse.as(authorization, { reads: "traces" });
+  }
+
   /** Translates the caller's filter selection into a ClickHouse predicate. */
   private translateFilters(
     filters: Record<string, unknown>,

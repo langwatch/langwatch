@@ -26,6 +26,7 @@ const { TraceModule } = await import("../trace.app.ts");
 const { TraceLegacyReadClickHouseRepository } =
   await import("../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
+const repository = TraceLegacyReadClickHouseRepository.create({});
 const retentionResolver = { resolve: async () => null };
 
 /** The service keeps its floor service private; this is the wiring under test. */
@@ -44,6 +45,7 @@ describe("the production trace-service factory", () => {
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("still wires a live retention cascade, so the floor is tenant-aware", () => {
         const service = TraceModule.composeLegacyRead({
+          repository,
           retentionResolver: retentionResolver as never,
           traceCanonicalisation,
         });
@@ -54,6 +56,7 @@ describe("the production trace-service factory", () => {
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("wires the policy cascade itself, not some other provider", () => {
         const service = TraceModule.composeLegacyRead({
+          repository,
           retentionResolver: retentionResolver as never,
           traceCanonicalisation,
         });
@@ -65,10 +68,10 @@ describe("the production trace-service factory", () => {
         expect(provider?.resolver).toBe(retentionResolver);
       });
 
-      it("keeps the annotation service supplied to the factory", () => {
+      it("keeps the registry's annotation reads under the policies", () => {
         const annotations = {} as never;
         const service = TraceModule.composeLegacyRead({
-          annotations,
+          repository: TraceLegacyReadClickHouseRepository.create({ annotations }),
           traceCanonicalisation,
         });
 

@@ -14,6 +14,7 @@ import type { TraceSummaryFoldCacheRepository } from "../trace-summary-fold-cach
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-attributed-rollup.repository.ts";
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
+import { MemoryNullTraceLegacyReadRepository } from "./memory.null-trace-legacy-read.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
@@ -160,6 +161,7 @@ export class MemoryTraceRepositories {
       evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
       annotations: MemoryTraceAnnotationsRepository.create(),
       annotationScores: MemoryTraceAnnotationScoresRepository.create(),
+      legacyRead: MemoryNullTraceLegacyReadRepository.create(),
       // The list and the session rollup are ClickHouse aggregations over the
       // summary projection, which this tier does not fold: they answer empty
       // pages rather than a half-built rollup over the spans it does hold.

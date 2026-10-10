@@ -1,4 +1,6 @@
+import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
+  TraceCanonicalisationService,
   NormalizedSpan,
   Protections,
   CustomersAndLabelsResult,
@@ -47,12 +49,24 @@ interface TraceOccurredAtRange {
   to: number;
 }
 
+/** The composition root's layer over the registry's store: canonicalisation, offload, retention. */
+export type TraceLegacyReadPolicies = {
+  traceCanonicalisation: TraceCanonicalisationService;
+  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
+  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
+  /** The tenant's retention policy; absent, the span read floors at the platform default. */
+  retentionDays?: RetentionDaysProvider | undefined;
+};
+
 /**
  * Every read the legacy trace surface makes against the stored trace summaries
  * and spans. The store behind it is chosen at the composition root, so the
  * service that orchestrates a read never names one.
  */
 export abstract class TraceLegacyReadRepository {
+  /** The same store with the composition root's policies over it. */
+  abstract withPolicies(policies: TraceLegacyReadPolicies): TraceLegacyReadRepository;
+
   abstract listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,

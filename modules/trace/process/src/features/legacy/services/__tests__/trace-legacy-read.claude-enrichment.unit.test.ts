@@ -161,6 +161,7 @@ function makeService(
       findDistinctFieldNames: vi.fn(),
       findTopicCounts: vi.fn(),
       findSpanForPromptStudio: vi.fn(),
+      withPolicies: vi.fn(),
     },
     editOverlay: {} as TraceEditOverlayService,
     logRecordStorage: { getLogsByTraceId },

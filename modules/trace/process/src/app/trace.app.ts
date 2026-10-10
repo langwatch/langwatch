@@ -264,10 +264,10 @@ import {
   TraceIngressCommand,
   type CodingAgentIngestFilter,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
-import {
-  TraceLegacyReadClickHouseRepository,
-  type ClickHouseTraceLegacyReadOptions,
-} from "../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
+import type {
+  TraceLegacyReadPolicies,
+  TraceLegacyReadRepository,
+} from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
   type GenerateFilterConditionsResult,
   translateLegacyFilters,
@@ -850,7 +850,9 @@ type TraceReaderCompositionOptions = {
 };
 
 /** What a composition root gives the legacy trace read: the store, and the policies over it. */
-type TraceLegacyReadCompositionOptions = Omit<ClickHouseTraceLegacyReadOptions, "retentionDays"> & {
+type TraceLegacyReadCompositionOptions = Omit<TraceLegacyReadPolicies, "retentionDays"> & {
+  /** The registry's legacy read store (§3.3). */
+  repository: TraceLegacyReadRepository;
   /** Restores offloaded spans from the blob store (ADR-022) where no resolver is supplied. */
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
@@ -1025,13 +1027,9 @@ export class TraceModule implements TraceApi, CollectorApp {
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: options.canonicalisation,
       traceRead: TraceModule.composeLegacyRead({
+        repository: options.repositories.legacyRead,
         traceCanonicalisation: options.canonicalisation,
-        ...(resolve ? { resolveClickHouseClient: resolve } : {}),
         retentionResolver: options.dataRetention,
-        annotations: {
-          rows: options.repositories.annotations,
-          scores: options.repositories.annotationScores,
-        },
         blobResolutionDeps,
       }),
       editOverlay,
@@ -1193,23 +1191,21 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** The legacy trace read over ClickHouse, with its offload resolution and retention floor. */
-  static composeLegacyRead(
-    options: TraceLegacyReadCompositionOptions,
-  ): TraceLegacyReadClickHouseRepository {
-    const { blobResolutionDeps, retentionResolver, ...read } = options;
+  static composeLegacyRead(options: TraceLegacyReadCompositionOptions): TraceLegacyReadRepository {
+    const { repository, blobResolutionDeps, retentionResolver, ...policies } = options;
 
-    return TraceLegacyReadClickHouseRepository.create({
-      ...read,
+    return repository.withPolicies({
+      ...policies,
       ...(retentionResolver
         ? { retentionDays: TraceRetentionFloorService.create(retentionResolver) }
         : {}),
       resolveTraceSpans:
-        read.resolveTraceSpans ??
+        policies.resolveTraceSpans ??
         (blobResolutionDeps
           ? TraceOffloadResolutionService.create().resolverFor(blobResolutionDeps)
           : undefined),
       resolveTraceSpansBatch:
-        read.resolveTraceSpansBatch ??
+        policies.resolveTraceSpansBatch ??
         (blobResolutionDeps
           ? TraceOffloadResolutionBatchService.create().resolverFor(blobResolutionDeps)
           : undefined),

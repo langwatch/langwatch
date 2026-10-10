@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type {
@@ -101,7 +102,10 @@ function compose({
   });
 
   const deps = TraceModule.composeDependencies({
-    repositories: MemoryTraceRepositories.create(),
+    repositories: {
+      ...MemoryTraceRepositories.create(),
+      legacyRead: TraceLegacyReadClickHouseRepository.create({ resolveClickHouseClient: resolve }),
+    },
     resolveClickHouseClient: resolve,
     storedObjects: createApiFixture<StoredObjectApi>(),
     canonicalisation: TraceCanonicalisationService.create(),

@@ -83,6 +83,7 @@ function makeService(): TraceLegacyReadService {
       findDistinctFieldNames: vi.fn(),
       findTopicCounts: vi.fn(),
       findSpanForPromptStudio: vi.fn(),
+      withPolicies: vi.fn(),
     },
     editOverlay,
     evaluationRuns: refusingEvaluations(),
