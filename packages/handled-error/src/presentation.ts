@@ -3187,7 +3187,7 @@ const presentations = {
   sso_setup_address_mismatch: {
     title: "That sign-in came from a different address",
     describe: () =>
-      "The test sign-in used an address outside the domain this connection is being set up for. Sign in with an account on the connection's domain.",
+      "Until this connection is live, only the person who registered it can test it, and your identity provider signed in somebody else. Sign in at your identity provider as the person who registered the connection.",
   },
   sso_domain_not_verified: {
     title: "This domain is not verified yet",
