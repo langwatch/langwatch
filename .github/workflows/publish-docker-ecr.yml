@@ -189,6 +189,9 @@ jobs:
               - 'skills/**'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - 'dev/tests/agentic-e2e/package.json'
+              - 'dev/tests/e2e-stack/package.json'
+              - 'tools/seedgen/runner/package.json'
+              - 'patches/**'
               - 'dev/scripts/**'
               - 'dev/tsconfig.web-declarations.json'
               - 'vendor/**'
@@ -353,7 +356,7 @@ jobs:
           # consumers (Lambda in particular) refuse to run.
           provenance: false
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |

@@ -170,33 +170,20 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server build
 
-      # Pre-build the langwatch app (vite client + the dist/server bundles +
-      # mcp-server) so the published tarball ships dist/ artifacts. Without
-      # this, end users see vite chunder past at startup on first run —
-      # exactly the bureaucracy we're trying to eliminate.
-      #
-      # No separate app install: since ADR-076 langwatch/ is a member of the
-      # single root workspace, so "Install pnpm dependencies (workspace)"
-      # above already covers it and a filtered re-install here would only
-      # re-resolve the same lockfile for a subset.
+      # Pre-build what the backend serves and spawns, so the published tarball
+      # ships its dist/ artefacts and nobody waits for a vite build on first run.
+      # `build:server` is the one recipe: npx-server-smoke.yml and the CLI's own
+      # fallback (apps/server/src/services/node-deps.ts) run it too. It writes
+      # the generated files, builds the dist bundles (`ensure:built`) and the
+      # declarations, then the browser bundle and the scenario child bundle.
+      # apps/backend, apps/api and apps/worker build nothing: they run from source.
       #
       # node_modules/ never reaches the tarball (dev/scripts/pack-npm.sh excludes
       # it), so end users still run `pnpm install` once on first start, which
       # is what generates the platform-specific Prisma client via prisma's
       # postinstall hook — see apps/server/src/services/node-deps.ts.
-      # The browser bundle plus every workspace build the two Node processes
-      # need (the SDK dist and mcp/typescript's). apps/api and apps/worker
-      # declare no build of their own — they run from source through node, and
-      # the tarball ships that source.
-      - name: Build langwatch app (vite + sdk + mcp + generated types)
-        run: >
-          pnpm start:prepare:files
-          && pnpm ensure:built
-          && pnpm run build:types
-          && pnpm --filter "@langwatch/ui..."
-          --filter "@langwatch/platform-api..."
-          --filter "@langwatch/worker..."
-          run build
+      - name: Build what the backend serves (build:server)
+        run: pnpm run build:server
         env:
           NODE_ENV: production
 
@@ -232,12 +219,16 @@ jobs:
             # The browser bundle. apps/ui is a build, not a process: the API
             # process serves this directory.
             "package/app/apps/ui/dist/client/index.html"
-            # The three Node processes, as SOURCE. None is bundled any more —
-            # each runs from source through node: its `start`
-            # (or `task`) script runs the entry point, so what the
-            # tarball has to carry is the entry point and the tree it imports.
+            # The Node processes, as SOURCE. None is bundled any more: the CLI
+            # spawns apps/backend's `start` (the api and the worker in one
+            # process) and apps/tasks' `task`, so the tarball carries those
+            # entry points and the tree they import.
+            "package/app/apps/backend/src/main.ts"
             "package/app/apps/api/src/main.ts"
             "package/app/apps/worker/src/main.ts"
+            # The scenario module spawns this prebuilt bundle per run; without
+            # it the spawn falls back to tsx, which the pruned install lacks.
+            "package/app/apps/scenario-child/dist/server/scenario-child-process.mjs"
             # The task launcher the first boot runs: `upgrade`, then the
             # system-migrations pass; `upgrade` reads the release manifests.
             "package/app/apps/tasks/src/main.ts"
@@ -294,6 +285,7 @@ jobs:
           done
           forbidden=(
             "package/app/apps/api/node_modules"
+            "package/app/apps/backend/node_modules"
             "package/app/apps/worker/node_modules"
             "package/app/apps/ui/node_modules"
             "package/app/.env"

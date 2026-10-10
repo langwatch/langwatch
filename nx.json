@@ -1,18 +1,16 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "origin/main",
+  "defaultProject": "workspace",
   "namedInputs": {
-    "sharedGlobals": [
-      "{workspaceRoot}/tsconfig.base.json",
-      "{workspaceRoot}/tsconfig.shared.json",
-      "{workspaceRoot}/pnpm-workspace.yaml"
-    ],
+    "sharedGlobals": ["{workspaceRoot}/tsconfig.base.json", "{workspaceRoot}/tsconfig.shared.json"],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
-      "!{projectRoot}/**/*.test.ts",
-      "!{projectRoot}/**/*.test.tsx",
-      "!{projectRoot}/**/*.test.mts",
+      "!{projectRoot}/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+      "!{projectRoot}/**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+      "!{projectRoot}/**/*.stories.{ts,tsx}",
+      "!{projectRoot}/tsconfig.test.json",
       "!{projectRoot}/vitest.config.*",
       "!{projectRoot}/vitest.integration.config.*"
     ],
@@ -79,70 +77,6 @@
     "./dev/nx/test-reads-plugin.mjs"
   ],
   "targetDefaults": {
-    "typecheck": [
-      {
-        "cache": true,
-        "dependsOn": ["^typecheck", "^build", "^prisma:generate"],
-        "inputs": [
-          "default",
-          "^production",
-          "npmDeps",
-          {
-            "externalDependencies": ["typescript"]
-          }
-        ],
-        "outputs": [
-          "{projectRoot}/dist/**/*.d.ts",
-          "{projectRoot}/dist/**/*.d.ts.map",
-          "{projectRoot}/dist/**/*.tsbuildinfo",
-          "{projectRoot}/dist/**/*.json"
-        ]
-      },
-      {
-        "filter": {
-          "projects": [
-            "@langwatch/ui",
-            "@langwatch/server",
-            "@langwatch/scenario-child",
-            "@langwatch/langyworker"
-          ]
-        },
-        "outputs": [
-          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
-          "{projectRoot}/dist/tsconfig.test.tsbuildinfo"
-        ]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/prisma-client"]
-        },
-        "dependsOn": ["^typecheck", "^build", "prisma:generate"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/mail"]
-        },
-        "outputs": [
-          "{projectRoot}/dist/typecheck",
-          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
-          "{projectRoot}/dist/tsconfig.preview.tsbuildinfo"
-        ]
-      },
-      {
-        "filter": {
-          "projects": ["langwatch"]
-        },
-        "dependsOn": ["^typecheck", "^build", "^prisma:generate", "build"],
-        "outputs": [
-          "{projectRoot}/dist/src",
-          "{projectRoot}/dist/__tests__",
-          "{projectRoot}/dist/*.config.*",
-          "{projectRoot}/dist/test-setup.*",
-          "{projectRoot}/dist/package.json",
-          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo"
-        ]
-      }
-    ],
     "build": [
       {
         "cache": true,
@@ -355,6 +289,15 @@
           "testReads",
           {
             "externalDependencies": ["vitest"]
+          },
+          {
+            "env": "LANGWATCH_TEST_DATABASE_URL"
+          },
+          {
+            "env": "LANGWATCH_TEST_REDIS_URL"
+          },
+          {
+            "env": "LANGWATCH_TEST_CLICKHOUSE_URL"
           }
         ],
         "outputs": []
@@ -382,6 +325,15 @@
         "testReads",
         {
           "externalDependencies": ["vitest"]
+        },
+        {
+          "env": "LANGWATCH_TEST_DATABASE_URL"
+        },
+        {
+          "env": "LANGWATCH_TEST_REDIS_URL"
+        },
+        {
+          "env": "LANGWATCH_TEST_CLICKHOUSE_URL"
         }
       ],
       "outputs": []
@@ -409,7 +361,14 @@
     ],
     "lint:types": {
       "cache": true,
-      "dependsOn": ["^build", "^prisma:generate"],
+      "dependsOn": [
+        "^build",
+        "^prisma:generate",
+        {
+          "projects": ["workspace"],
+          "target": "build:types"
+        }
+      ],
       "inputs": [
         "default",
         "^production",

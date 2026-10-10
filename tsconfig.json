@@ -130,6 +130,9 @@
       "path": "packages/aws-client/tsconfig.json"
     },
     {
+      "path": "apps/backend/tsconfig.json"
+    },
+    {
       "path": "packages/browser/tsconfig.test.json"
     },
     {
@@ -502,6 +505,9 @@
       "path": "apps/mailsim-web/tsconfig.json"
     },
     {
+      "path": "mcp/typescript/tsconfig.json"
+    },
+    {
       "path": "modules/metric/contract/tsconfig.json"
     },
     {
@@ -694,7 +700,7 @@
       "path": "modules/scenario/client/tsconfig.json"
     },
     {
-      "path": "modules/scenario/contract/tsconfig.json"
+      "path": "modules/scenario/contract/tsconfig.test.json"
     },
     {
       "path": "modules/scenario/process/tsconfig.json"
