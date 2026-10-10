@@ -89,14 +89,11 @@ export async function setupModelEnv(
 ): Promise<Record<string, string>> {
   const modelProviders = await getProjectModelProviders(projectId);
   const provider = model.split("/")[0]!;
-  const modelProvider = modelProviders[provider];
-
-  if (!modelProvider) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not configured`);
-  }
-  if (!modelProvider.enabled) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not enabled`);
-  }
+  const modelProvider = requireEnabledProvider(
+    modelProviders,
+    model,
+    embeddings,
+  );
 
   const modelName = model.split("/").slice(1).join("/");
   const modelList = embeddings
@@ -147,13 +144,7 @@ export async function setupModelEnv(
     modelProvider,
     projectId,
   });
-
-  let envResult = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
-      embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
-      value,
-    ]),
-  );
+  let envResult = litellmEnv(litellmParams, modelProvider, embeddings);
 
   // Generation params (temperature, max_tokens, etc.)
   const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
@@ -174,4 +165,95 @@ export async function setupModelEnv(
   }
 
   return envResult;
+}
+
+type ProjectModelProviders = Awaited<
+  ReturnType<typeof getProjectModelProviders>
+>;
+type ProjectModelProvider = NonNullable<ProjectModelProviders[string]>;
+
+/**
+ * The project's row for the model's provider. Throws `EvaluatorConfigError`
+ * when the provider is missing or disabled; for an embeddings model the error
+ * also lists the enabled providers that do serve embeddings.
+ */
+function requireEnabledProvider(
+  modelProviders: ProjectModelProviders,
+  model: string,
+  embeddings: boolean,
+): ProjectModelProvider {
+  const provider = model.split("/")[0]!;
+  const modelProvider = modelProviders[provider];
+  if (modelProvider?.enabled) return modelProvider;
+
+  const status = modelProvider ? "not enabled" : "not configured";
+  throw embeddings
+    ? embeddingsProviderError(modelProviders, model, status)
+    : new EvaluatorConfigError(`Provider ${provider} is ${status}`);
+}
+
+function embeddingsProviderError(
+  modelProviders: ProjectModelProviders,
+  model: string,
+  status: "not configured" | "not enabled",
+): EvaluatorConfigError {
+  const provider = model.split("/")[0]!;
+  const availableProviders = Object.entries(modelProviders)
+    .filter(
+      ([, candidate]) =>
+        candidate.enabled &&
+        !candidate.embeddingsUnsupported &&
+        ((candidate.embeddingsModels?.length ?? 0) > 0 ||
+          (candidate.customEmbeddingsModels?.length ?? 0) > 0),
+    )
+    .map(([name]) => name)
+    .sort();
+  const availability =
+    availableProviders.length > 0
+      ? ` Available embeddings providers: ${availableProviders.join(", ")}.`
+      : " No enabled embeddings providers are available.";
+
+  return new EvaluatorConfigError(
+    `settings.embeddings_model is "${model}", but provider "${provider}" is ${status}. Set the project's EMBEDDINGS default or select an enabled embeddings model.${availability}`,
+  );
+}
+
+/**
+ * The X_LITELLM_* block for the model's litellm params. An Azure deployment
+ * name is not a litellm call param, so it goes on its own env key instead.
+ */
+function litellmEnv(
+  litellmParams: Awaited<ReturnType<typeof prepareLitellmParams>>,
+  modelProvider: ProjectModelProvider,
+  embeddings: boolean,
+): Record<string, string> {
+  const { deployment, ...callParams } = litellmParams;
+  return {
+    ...Object.fromEntries(
+      Object.entries(callParams).map(([key, value]) => [
+        embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
+        value,
+      ]),
+    ),
+    ...azureDeploymentEnv(modelProvider, deployment, embeddings),
+  };
+}
+
+/** An Azure provider's deployment name, on the env key for this model kind. */
+function azureDeploymentEnv(
+  modelProvider: ProjectModelProvider,
+  deployment: unknown,
+  embeddings: boolean,
+): Record<string, string> {
+  if (
+    modelProvider.provider !== "azure" ||
+    typeof deployment !== "string" ||
+    deployment.trim() === ""
+  ) {
+    return {};
+  }
+  const key = embeddings
+    ? "AZURE_EMBEDDINGS_DEPLOYMENT_NAME"
+    : "AZURE_DEPLOYMENT_NAME";
+  return { [key]: deployment };
 }
