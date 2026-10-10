@@ -99,7 +99,7 @@ export function ShikiCodeBlock({
                 // Bumped from 0.78/0.8em which landed at ~9 px (or as low as ~7 px when
                 // nested under a 2xs textStyle parent) — operator minimum is 10 px
                 // everywhere.
-                fontSize: "0.625rem",
+                textStyle: "micro",
                 lineHeight: "1.55",
                 padding: "0 !important",
                 margin: "0 !important",

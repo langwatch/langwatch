@@ -295,7 +295,7 @@ export function SpotlightPopover({
         paddingBottom={spotlight.title ? 1 : 3}
       >
         {spotlight.title ? (
-          <Text textStyle="sm" fontWeight="600" color="fg">
+          <Text textStyle="sm" fontWeight="semibold" color="fg">
             {spotlight.title}
           </Text>
         ) : (

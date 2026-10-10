@@ -215,7 +215,7 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) =>
           rows={VALUE_ROWS.map((r) => ({
             key: r.form,
             cells: [
-              <Text key="form" textStyle="sm" fontWeight="600" color="fg">
+              <Text key="form" textStyle="sm" fontWeight="semibold" color="fg">
                 {r.form}
               </Text>,
               <CopyableQuery key="ex" query={r.example} onApply={apply} />,
@@ -333,7 +333,7 @@ const ExampleCard: React.FC<{
         </Box>
         <Text
           textStyle="2xs"
-          fontWeight="700"
+          fontWeight="semibold"
           color="fg"
           textTransform="uppercase"
           letterSpacing="0.08em"

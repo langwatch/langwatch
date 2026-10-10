@@ -45,7 +45,7 @@ const traceColumnDefs = {
   }),
   trace: traceCol.accessor((row): unknown => row.name, {
     id: "trace",
-    header: "Trace (summary)",
+    header: "Trace",
     // Fixed rather than flex: a flex column absorbing leftover space balloons out to mostly empty
     // whitespace whenever the visible column set is slim or the sidebar is collapsed.
     size: 560,

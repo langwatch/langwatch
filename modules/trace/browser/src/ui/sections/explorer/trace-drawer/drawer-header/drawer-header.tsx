@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
+import { IdText } from "@langwatch/design-system/id-text";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import {
@@ -19,20 +20,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  LuArrowLeft,
-  LuCopy,
-  LuMaximize2,
-  LuMinimize2,
-  LuRefreshCw,
-  LuShare2,
-  LuX,
-} from "react-icons/lu";
+import { LuArrowLeft, LuMaximize2, LuMinimize2, LuRefreshCw, LuShare2, LuX } from "react-icons/lu";
 
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
@@ -63,7 +55,6 @@ import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/dr
 import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
 import { TracePresenceAvatars } from "../../../../elements/presence/trace-presence-avatars.tsx";
 import { EditableTraceName } from "../../../editable-trace-name.tsx";
-import { showErrorToast } from "../../../errors/index.ts";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
 import { useDejaViewLink } from "../../../use-deja-view-link.ts";
@@ -96,75 +87,9 @@ interface DrawerHeaderProps {
   readOnly?: boolean;
 }
 
-/**
- * Inline trace ID chip, collapsed by default so it doesn't compete with the trace name; expands
- * to the full ID with a copy icon on hover.
- */
+/** Inline trace ID: cut in the middle so both ends stay legible, copyable on hover. */
 function TraceIdChip({ traceId }: { traceId: string }) {
-  const short = traceId.slice(0, 8);
-  const handleCopy = async () => {
-    // navigator.clipboard requires a secure context (https or localhost).
-    // Surface a friendly hint when it fails so users running LangWatch on
-    // a plain-http internal domain understand what went wrong instead of
-    // seeing a silent no-op.
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(traceId);
-        toaster.create({
-          title: "Trace ID copied",
-          // Show the full id so the operator can verify what landed on
-          // their clipboard at a glance. The chip shows a short id by
-          // design (git-SHA convention) but the toast has the real
-          // estate — operator report: the previous "<8 chars>…" felt
-          // truncated for no benefit.
-          description: traceId,
-          type: "success",
-          duration: 2500,
-        });
-        return;
-      }
-      throw new Error("clipboard unavailable");
-    } catch {
-      showErrorToast({
-        fallbackTitle: "Couldn't copy trace ID",
-        description:
-          "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
-      });
-    }
-  };
-  const value = (
-    <Box
-      display="inline-flex"
-      alignItems="center"
-      gap={1}
-      fontFamily="mono"
-      // Hover affordances: swap short text for full id, reveal the copy
-      // icon. CSS-only so we don't need a React state per row of header.
-      css={{
-        "& [data-hover-only]": { display: "none" },
-        ".chip-root:hover & [data-hover-only]": { display: "inline-flex" },
-        ".chip-root:hover & [data-collapsed]": { display: "none" },
-        ".chip-root:hover & [data-expanded]": { display: "inline" },
-      }}
-    >
-      <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
-        {short}
-      </Text>
-      <Text as="span" data-expanded textStyle="xs" color="fg" fontWeight="medium" display="none">
-        {traceId}
-      </Text>
-      <Icon as={LuCopy} boxSize={3} color="fg.muted" data-hover-only />
-    </Box>
-  );
-  return (
-    <Chip
-      value={value}
-      tone="neutral"
-      onClick={() => void handleCopy()}
-      tooltip="Hover to see full ID, click to copy"
-      ariaLabel={`Copy trace ID ${traceId}`}
-    />
-  );
+  return <IdText value={traceId} label="trace ID" tail={4} />;
 }
 
 /**
@@ -1550,7 +1475,7 @@ function HeaderIdentity({
         // and without a resolved project there is no tenant to make it in.
         <Text
           fontSize="sm"
-          fontWeight="600"
+          fontWeight="semibold"
           color={titleIsFallback ? "fg.muted" : "fg"}
           lineClamp={1}
         >

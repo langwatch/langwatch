@@ -120,7 +120,7 @@ export const RootSpanNameCell = {
   id: "root-span-name",
   label: "Root span name",
   render: ({ row }) => (
-    <Text textStyle="sm" color={row.name ? "fg" : "fg.subtle"} fontWeight="500" truncate>
+    <Text textStyle="sm" color={row.name ? "fg" : "fg.subtle"} fontWeight="medium" truncate>
       {row.name || dash}
     </Text>
   ),
@@ -182,7 +182,7 @@ export const TraceNameCell = {
   id: "trace-name",
   label: "Trace name",
   render: ({ row }) => (
-    <Text textStyle="sm" color={row.traceName ? "fg" : "fg.subtle"} fontWeight="500" truncate>
+    <Text textStyle="sm" color={row.traceName ? "fg" : "fg.subtle"} fontWeight="medium" truncate>
       {row.traceName || dash}
     </Text>
   ),

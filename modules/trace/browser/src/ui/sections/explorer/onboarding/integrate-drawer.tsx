@@ -116,7 +116,7 @@ export function IntegrateDrawer({
           <VStack align="stretch" gap={1}>
             <Drawer.Title>Send your own traces</Drawer.Title>
             <Text color="fg.muted" textStyle="sm">
-              Mint a token, then pick how you want to integrate.
+              Create a token, then pick how you want to integrate.
             </Text>
           </VStack>
           <Drawer.CloseTrigger />

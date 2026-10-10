@@ -81,7 +81,7 @@ export const TerminalOutput = memo(function TerminalOutput({
       {isDisplayCapped && (
         <Text
           fontFamily={TERMINAL_FONT_STACK}
-          fontSize="13px"
+          textStyle="bodySm"
           color={TERMINAL_TOKENS.faint}
           userSelect="none"
         >
@@ -91,7 +91,7 @@ export const TerminalOutput = memo(function TerminalOutput({
       {isCollapsible && (
         <Text
           fontFamily={TERMINAL_FONT_STACK}
-          fontSize="13px"
+          textStyle="bodySm"
           color={TERMINAL_TOKENS.faint}
           cursor="pointer"
           userSelect="none"

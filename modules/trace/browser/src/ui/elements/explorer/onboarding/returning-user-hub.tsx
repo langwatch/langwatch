@@ -46,7 +46,7 @@ export function ReturningUserHub({ onJump }: ReturningUserHubProps): React.React
       <Heading
         fontSize={{ base: "3xl", md: "4xl" }}
         letterSpacing="-0.035em"
-        fontWeight={400}
+        fontWeight="normal"
         lineHeight="1.05"
         color="fg"
       >
@@ -74,7 +74,7 @@ export function ReturningUserHub({ onJump }: ReturningUserHubProps): React.React
             <Icon boxSize={4} color="orange.fg">
               <opt.icon />
             </Icon>
-            <Text textStyle="sm" fontWeight={500} color="fg">
+            <Text textStyle="sm" fontWeight="medium" color="fg">
               {opt.label}
             </Text>
           </Button>

@@ -40,7 +40,7 @@ export const SyntaxHighlightedCode = memo(function SyntaxHighlightedCode({
   return (
     <Box
       fontFamily={TERMINAL_FONT_STACK}
-      fontSize="13px"
+      textStyle="bodySm"
       lineHeight="1.55"
       css={{
         "& .shiki, & .shiki pre": {

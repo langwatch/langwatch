@@ -487,7 +487,7 @@ const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => 
           fontSize={fontSize}
           color={textColor}
           fontStyle="italic"
-          fontWeight="400"
+          fontWeight="normal"
         />
         {row.media.imageSrc && <RowThumbnail src={row.media.imageSrc} height="36px" />}
       </VStack>
@@ -548,11 +548,11 @@ const ComfortableIOPreview: React.FC<
     [output, outputMediaRefs],
   );
   return (
-    <VStack align="stretch" gap={2} fontFamily="mono">
+    <VStack align="stretch" gap={2}>
       {inputRow && (
         <ComfortableRow
           label="Input"
-          labelColor={{ base: "blue.fg", _dark: "blue.fg" }}
+          labelColor="fg.muted"
           textColor="fg.muted"
           text={inputRow.text}
           media={inputRow.media}
@@ -562,7 +562,7 @@ const ComfortableIOPreview: React.FC<
       {outputRow && (
         <ComfortableRow
           label="Output"
-          labelColor={{ base: "green.solid", _dark: "green.fg" }}
+          labelColor="fg.muted"
           textColor="fg"
           text={outputRow.text}
           media={outputRow.media}
@@ -577,7 +577,7 @@ const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ di
   <HStack align="flex-start" gap={2}>
     <Text
       textStyle="sm"
-      fontWeight="600"
+      fontWeight="semibold"
       color="fg.subtle"
       flexShrink={0}
       width={COMFORTABLE_LABEL_WIDTH}
@@ -605,7 +605,7 @@ const ComfortableRow: React.FC<{
   <HStack align="flex-start" gap={2}>
     <Text
       textStyle="sm"
-      fontWeight="600"
+      fontWeight="semibold"
       color={labelColor}
       flexShrink={0}
       width={COMFORTABLE_LABEL_WIDTH}

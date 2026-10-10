@@ -133,7 +133,7 @@ export function TypewriterHero({
       <Heading
         fontSize={{ base: "3xl", md: "4xl" }}
         letterSpacing="-0.035em"
-        fontWeight={400}
+        fontWeight="normal"
         lineHeight="1.05"
         color="fg"
         whiteSpace="pre-line"

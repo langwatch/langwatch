@@ -404,7 +404,7 @@ export const FilterSidebar: React.FC = () => {
             justifyContent="center"
             gap={1.5}
             color="fg.subtle"
-            fontWeight="500"
+            fontWeight="medium"
             marginTop={1}
             marginBottom={2}
             onClick={() => setFacetManagerOpen(true)}
@@ -600,7 +600,7 @@ const DragGhostHeader: React.FC<{
       )}
       <Text
         textStyle="2xs"
-        fontWeight="500"
+        fontWeight="medium"
         color="fg.subtle"
         textTransform="uppercase"
         letterSpacing="0.08em"

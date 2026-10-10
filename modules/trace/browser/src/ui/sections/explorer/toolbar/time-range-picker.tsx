@@ -114,7 +114,7 @@ const PresetColumn: React.FC<{
       <Fragment key={group.label}>
         <Text
           textStyle="2xs"
-          fontWeight="700"
+          fontWeight="semibold"
           color="fg.subtle"
           textTransform="uppercase"
           letterSpacing="0.08em"

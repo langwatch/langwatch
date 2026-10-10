@@ -138,7 +138,7 @@ export function buildMarkdownComponents(colorMode: string) {
             fontFamily="mono"
             // Flat 10 px — operator minimum, matches the bumped
             // ShikiCodeBlock / JsonHighlight code-block sizing.
-            fontSize="0.625rem"
+            textStyle="micro"
             paddingX={1}
             paddingY="1px"
             borderRadius="xs"

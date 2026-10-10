@@ -140,7 +140,7 @@ export function KeyboardShortcutsHelp({
                       color={`${accent}.fg`}
                       textTransform="uppercase"
                       letterSpacing="0.08em"
-                      fontWeight="bold"
+                      fontWeight="semibold"
                     >
                       {group.title}
                     </Text>

@@ -1,3 +1,4 @@
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import mermaid from "mermaid";
 import { type Dispatch, type RefObject, type SetStateAction, useEffect, useState } from "react";
 
@@ -82,7 +83,7 @@ function mermaidConfig(colorMode: "light" | "dark"): Parameters<typeof mermaid.i
     themeVariables: {
       fontFamily:
         "ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
-      fontSize: "12px",
+      fontSize: `${TYPE_SCALE_PX.caption}px`,
     },
     sequence: {
       // Generous spacing values prevent label/lifeline overlap when

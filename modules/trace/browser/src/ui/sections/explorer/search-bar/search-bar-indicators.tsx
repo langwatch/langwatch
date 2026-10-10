@@ -61,7 +61,7 @@ export const StatusBadge: React.FC<{
           _hover={{ bg: palette.bg, filter: "brightness(0.96)" }}
         >
           <AlertTriangle size={12} />
-          <Text textStyle="xs" fontWeight="600">
+          <Text textStyle="xs" fontWeight="semibold">
             {palette.label}
           </Text>
         </Button>
@@ -85,7 +85,7 @@ export const StatusBadge: React.FC<{
             <VStack align="start" gap={0.5} minWidth={0} flex={1}>
               <Text
                 textStyle="xs"
-                fontWeight="700"
+                fontWeight="semibold"
                 color="fg"
                 textTransform="uppercase"
                 letterSpacing="0.08em"

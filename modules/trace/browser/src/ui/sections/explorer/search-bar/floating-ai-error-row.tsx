@@ -53,7 +53,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({ error }
             href="/settings/model-providers"
             textStyle="2xs"
             color="blue.fg"
-            fontWeight="600"
+            fontWeight="semibold"
             flexShrink={0}
             marginLeft={1}
           >

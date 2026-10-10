@@ -284,7 +284,7 @@ const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
     bg="red.solid"
     color="red.contrast"
     fontSize="xs"
-    fontWeight="bold"
+    fontWeight="semibold"
     lineHeight="1"
     minWidth="20px"
     height="18px"

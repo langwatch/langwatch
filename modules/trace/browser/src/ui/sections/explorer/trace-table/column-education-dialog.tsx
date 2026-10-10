@@ -66,7 +66,7 @@ export const ColumnEducationDialog: React.FC = () => {
                 marginBottom={2}
               >
                 <Icon as={LuColumns3} boxSize={4} color="fg.muted" />
-                <Text textStyle="xs" color="fg.muted" fontWeight="600">
+                <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
                   Columns
                 </Text>
               </HStack>

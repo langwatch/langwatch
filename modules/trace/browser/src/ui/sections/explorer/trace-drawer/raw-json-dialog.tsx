@@ -5,10 +5,10 @@ import {
   HStack,
   Icon,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { useEffect, useMemo, useState } from "react";
@@ -177,12 +177,9 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
         </Dialog.Header>
         <Dialog.Body padding={0} overflow="hidden" display="flex" flexDirection="column" flex={1}>
           {spansLoading && (
-            <VStack gap={2} paddingY={8} flex={1} justify="center">
-              <Spinner size="sm" color="blue.fg" />
-              <Text textStyle="xs" color="fg.muted">
-                Loading spans…
-              </Text>
-            </VStack>
+            <Box flex={1} paddingY={4}>
+              <SkeletonRows rows={6} />
+            </Box>
           )}
           {!spansLoading && spansFailed && (
             <VStack gap={2} paddingY={8} flex={1} justify="center">

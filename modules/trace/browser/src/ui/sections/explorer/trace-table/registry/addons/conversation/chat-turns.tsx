@@ -179,7 +179,7 @@ const TurnDivider: React.FC<{
         <Text
           textStyle="2xs"
           color={labelColor}
-          fontWeight="600"
+          fontWeight="semibold"
           textTransform="uppercase"
           letterSpacing="0.06em"
         >
