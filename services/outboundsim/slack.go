@@ -128,6 +128,10 @@ func (s *Server) slackAnswer(method, token string, args map[string]any) reply {
 		return slackError("unknown_method")
 	case token == "":
 		return slackError("not_authed")
+	case strings.Contains(token, "revoked"):
+		return slackError("token_revoked")
+	case strings.Contains(token, "invalid"):
+		return slackError("invalid_auth")
 	}
 	switch method {
 	case "auth.test":

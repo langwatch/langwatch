@@ -48,6 +48,11 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       Then outboundsim answers 200 with ok false and error "not_authed"
 
     @unit
+    Scenario: A token that says it is invalid or revoked is refused as Slack refuses it
+      When a client calls a Web API method with a bearer token containing "invalid" or "revoked"
+      Then outboundsim answers 200 with ok false and error "invalid_auth" or "token_revoked"
+
+    @unit
     Scenario: A post to an unknown channel fails as Slack fails it
       When the product posts to /api/chat.postMessage naming a channel the workspace does not have
       Then outboundsim answers 200 with ok false and error "channel_not_found"
