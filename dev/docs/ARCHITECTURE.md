@@ -1669,9 +1669,8 @@ window; the producer-only rule stands for everything else (Alex, 2026-10-06, rou
 **A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
 under its trace's start, which never moves, so a lookup reads windows widening back from the span's
 own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
-partition. Parked for later: a `trace_index` ClickHouse table (TenantId, TraceId to StartTime, ordered by
-trace id, no time partition, filled by a materialised view, TTL by retention) for one exact read, and a
-default retention-period bound on every ClickHouse read.
+partition. Parked for later: a `trace_index` ClickHouse table for one exact read by trace id
+(`dev/docs/plans/trace-index-2026-10-10.md`), and a default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
