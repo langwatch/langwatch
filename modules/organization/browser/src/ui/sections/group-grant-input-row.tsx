@@ -603,7 +603,7 @@ export function DirectGrantRow({
         <Button
           size="xs"
           variant="ghost"
-          color={markedForRemoval ? "blue.500" : "fg.muted"}
+          color={markedForRemoval ? "blue.fg" : "fg.muted"}
           aria-label={markedForRemoval ? "Undo removal" : "Remove access"}
           onClick={onToggle}
         >
