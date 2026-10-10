@@ -9,6 +9,8 @@ import type { TraceStatus } from "../types/trace";
  */
 export interface SessionGroupPayloadItem {
   conversationId: string;
+  /** The project the session belongs to; on an aggregate, the member. */
+  projectId: string;
   traceCount: number;
   totalCost: number;
   totalTokens: number;
@@ -62,6 +64,7 @@ export function mapSessionGroupToConversationGroup(
 ): ConversationGroup {
   return {
     conversationId: item.conversationId,
+    projectId: item.projectId,
     traces: [],
     traceCount: item.traceCount,
     totalDuration: item.totalDurationMs,

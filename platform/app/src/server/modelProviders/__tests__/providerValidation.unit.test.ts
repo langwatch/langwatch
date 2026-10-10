@@ -271,6 +271,80 @@ describe("validateProviderApiKey", () => {
         "https://custom.openai.com/v1/models",
         expect.anything(),
       );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    describe("given a base URL the gateway will normalise", () => {
+      /** @scenario A base URL is checked at the address the gateway will call */
+      it.each([
+        ["https://api.openai.com", "https://api.openai.com/v1/models"],
+        ["https://api.openai.com/", "https://api.openai.com/v1/models"],
+        ["https://api.openai.com/v1/", "https://api.openai.com/v1/models"],
+        ["https://api.openai.com/v1//", "https://api.openai.com/v1/models"],
+        [
+          "https://proxy.acme.test/openai/v1",
+          "https://proxy.acme.test/openai/v1/models",
+        ],
+      ])("asks %s at %s", async (baseUrl, expected) => {
+        mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-valid-key",
+          OPENAI_BASE_URL: baseUrl,
+        });
+
+        expect(result.outcome).toBe("verified");
+        expect(mockFetch.mock.calls[0]![0]).toBe(expected);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario A base URL is checked at the address the gateway will call */
+      it("accepts a base URL typed without /v1", async () => {
+        // What api.openai.com really answers: 404 on /models, 200 on /v1/models.
+        mockFetch.mockImplementation(async (url: string) =>
+          url === "https://api.openai.com/v1/models"
+            ? { ok: true, status: 200 }
+            : { ok: false, status: 404, json: async () => ({}) },
+        );
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-valid-key",
+          OPENAI_BASE_URL: "https://api.openai.com",
+        });
+
+        expect(result.outcome).toBe("verified");
+      });
+
+      /** @scenario An address the gateway will not call cannot pass the check */
+      it("does not accept a key that answers only at the base URL as typed", async () => {
+        mockFetch.mockImplementation(async (url: string) =>
+          url === "https://llm.acme.test/api/models"
+            ? { ok: true, status: 200 }
+            : { ok: false, status: 404, json: async () => ({}) },
+        );
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-valid-key",
+          OPENAI_BASE_URL: "https://llm.acme.test/api",
+        });
+
+        expect(result.outcome).not.toBe("verified");
+        expect(mockFetch.mock.calls.map((call) => call[0])).toEqual([
+          "https://llm.acme.test/api/v1/models",
+        ]);
+      });
+
+      /** @scenario A key the gateway address refuses is refused */
+      it("refuses a key the gateway address refuses", async () => {
+        mockFetch.mockResolvedValue({ ok: false, status: 401 });
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-invalid-key",
+          OPENAI_BASE_URL: "https://api.openai.com",
+        });
+
+        expect(codeOf(result)).toBe("provider_key_invalid");
+      });
     });
   });
 
@@ -323,9 +397,9 @@ describe("validateProviderApiKey", () => {
         ANTHROPIC_BASE_URL: "https://custom-anthropic.example.com",
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://custom-anthropic.example.com/models",
-        expect.anything(),
+      // The gateway posts to "<base>/v1/messages", so that is the root asked.
+      expect(mockFetch.mock.calls[0]![0]).toBe(
+        "https://custom-anthropic.example.com/v1/models",
       );
     });
   });

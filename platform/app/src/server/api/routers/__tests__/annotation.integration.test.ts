@@ -51,12 +51,18 @@ vi.mock("~/server/app-layer/app", async () => {
   const { permissionsServiceFor } = await import(
     "~/server/app-layer/permissions/runtime"
   );
+  const { authorizationServiceFor } = await import(
+    "~/server/app-layer/authz/checks"
+  );
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
     getApp: () => ({
       permissions: permissionsServiceFor(dbForPermissions),
+      // The correction upsert runs under annotations:update, which carries no
+      // trace proof, so the route mints one for its summary read (ADR-144).
+      authorization: authorizationServiceFor(dbForPermissions),
       // The trace service resolves its client through getApp().clickhouse now
       // (two-door access); the queue-item reads join real ClickHouse summaries,
       // so the facet delegates to the environment-configured client.

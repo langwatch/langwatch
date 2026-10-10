@@ -353,6 +353,13 @@ Feature: Unified API Keys
     Then the lastUsedAt timestamp is updated on the key
     And the API key ID is available in the request context for downstream logging
 
+  @unit
+  Scenario: Last used is written at most once a minute per key per process
+    Given a key used 100 times within one minute
+    Then its last-used time is written once
+    And a use after the minute writes it again
+    And a write that fails lets the next use try again
+
   # ── Naming a single key ────────────────────────────────────────
 
   # `apiKey.list` is admin-gated for the whole organization, so anywhere a key

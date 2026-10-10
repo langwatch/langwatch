@@ -1,11 +1,12 @@
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { describe, expect, it, vi } from "vitest";
-
 import type {
   PIIRedactionLevel,
   RecordSpanCommandData,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { parseOtlpTraces } from "../../../otel/parseOtlpBody";
 import type { SpanDedupService } from "../span-dedupe.service";
 import { TraceRequestCollectionService } from "../trace-request-collection.service";
 
@@ -281,6 +282,191 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
 
         expect(result.rejectedSpans).toBe(0);
         expect(recordSpan).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given an OTLP/JSON request that omits default-valued fields", () => {
+    describe("when a span has no attributes or kind, and its link, event and resource carry only required fields", () => {
+      /** @scenario "An OTLP/JSON request omitting default-valued fields ingests every span" */
+      it("ingests the span without rejecting it", async () => {
+        const { service, recordSpan } = makeService();
+        const nowNs = String(Date.now() * 1_000_000);
+        const request = {
+          resourceSpans: [
+            {
+              resource: {},
+              scopeSpans: [
+                {
+                  scope: { name: "test" },
+                  spans: [
+                    {
+                      traceId: "aaaa0000000000000000000000000001",
+                      spanId: "bbbb000000000001",
+                      name: "span",
+                      startTimeUnixNano: nowNs,
+                      endTimeUnixNano: nowNs,
+                      links: [
+                        {
+                          traceId: "cccc0000000000000000000000000001",
+                          spanId: "dddd000000000001",
+                        },
+                      ],
+                      events: [{ timeUnixNano: nowNs, name: "evt" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        } as unknown as IExportTraceServiceRequest;
+
+        const result = await service.handleOtlpTraceRequest(
+          tenantId,
+          request,
+          piiRedactionLevel,
+        );
+
+        expect(result.rejectedSpans).toBe(0);
+        expect(recordSpan).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given the same span sent as OTLP/JSON with omitted defaults and as protobuf", () => {
+    describe("when each request is ingested", () => {
+      /** @scenario "A span sent as OTLP/JSON with omitted defaults is stored the same as its protobuf form" */
+      it("stores the same span content", async () => {
+        // The JSON and protobuf decoders already differ in scalar encoding (Long vs
+        // string nanos, null vs 0 for unset fields); compare what the span carries.
+        const storedContent = (data: RecordSpanCommandData) => {
+          const { span, resource, instrumentationScope } = data;
+          return {
+            traceId: span.traceId,
+            spanId: span.spanId,
+            name: span.name,
+            kind: span.kind,
+            attributes: span.attributes,
+            links: span.links.map((l) => ({
+              traceId: l.traceId,
+              spanId: l.spanId,
+              attributes: l.attributes ?? [],
+              droppedAttributesCount: l.droppedAttributesCount ?? 0,
+            })),
+            events: span.events.map((e) => ({
+              name: e.name,
+              attributes: e.attributes ?? [],
+              droppedAttributesCount: e.droppedAttributesCount ?? 0,
+            })),
+            resourceAttributes: resource?.attributes ?? [],
+            scopeName: instrumentationScope?.name,
+          };
+        };
+
+        const nowNs = String(Date.now() * 1_000_000);
+        const ids = {
+          traceId: "aaaa0000000000000000000000000001",
+          spanId: "bbbb000000000001",
+          linkTraceId: "cccc0000000000000000000000000001",
+          linkSpanId: "dddd000000000001",
+        };
+        const toBuffer = (body: string | Uint8Array): ArrayBuffer => {
+          const bytes =
+            typeof body === "string" ? new TextEncoder().encode(body) : body;
+          return bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength,
+          ) as ArrayBuffer;
+        };
+        const hex = (value: string) => Buffer.from(value, "hex");
+
+        const jsonBody = toBuffer(
+          JSON.stringify({
+            resourceSpans: [
+              {
+                resource: {},
+                scopeSpans: [
+                  {
+                    scope: { name: "test" },
+                    spans: [
+                      {
+                        traceId: ids.traceId,
+                        spanId: ids.spanId,
+                        name: "span",
+                        startTimeUnixNano: nowNs,
+                        endTimeUnixNano: nowNs,
+                        links: [
+                          { traceId: ids.linkTraceId, spanId: ids.linkSpanId },
+                        ],
+                        events: [{ timeUnixNano: nowNs, name: "evt" }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+
+        const requestType = (root as any).opentelemetry.proto.collector.trace.v1
+          .ExportTraceServiceRequest;
+        const protobufBody = toBuffer(
+          requestType
+            .encode(
+              requestType.create({
+                resourceSpans: [
+                  {
+                    resource: {},
+                    scopeSpans: [
+                      {
+                        scope: { name: "test" },
+                        spans: [
+                          {
+                            traceId: hex(ids.traceId),
+                            spanId: hex(ids.spanId),
+                            name: "span",
+                            startTimeUnixNano: nowNs,
+                            endTimeUnixNano: nowNs,
+                            links: [
+                              {
+                                traceId: hex(ids.linkTraceId),
+                                spanId: hex(ids.linkSpanId),
+                              },
+                            ],
+                            events: [{ timeUnixNano: nowNs, name: "evt" }],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              }),
+            )
+            .finish(),
+        );
+
+        const ingest = async (body: ArrayBuffer, contentType: string) => {
+          const parsed = parseOtlpTraces(body, contentType);
+          if (!parsed.ok) throw new Error(parsed.error);
+          const harness = makeService();
+          const result = await harness.service.handleOtlpTraceRequest(
+            tenantId,
+            parsed.request,
+            piiRedactionLevel,
+          );
+          return { result, recordSpan: harness.recordSpan };
+        };
+
+        const json = await ingest(jsonBody, "application/json");
+        const protobuf = await ingest(protobufBody, "application/x-protobuf");
+
+        expect(json.result.rejectedSpans).toBe(0);
+        expect(protobuf.result.rejectedSpans).toBe(0);
+        expect(json.recordSpan).toHaveBeenCalledTimes(1);
+        expect(protobuf.recordSpan).toHaveBeenCalledTimes(1);
+        expect(storedContent(json.recordSpan.mock.calls[0]![0])).toEqual(
+          storedContent(protobuf.recordSpan.mock.calls[0]![0]),
+        );
       });
     });
   });

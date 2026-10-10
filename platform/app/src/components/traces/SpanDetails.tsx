@@ -12,7 +12,10 @@ import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
 import type { Project } from "~/generated/prisma/client";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import {
+  type PlaygroundSpanLink,
+  useGoToSpanInPlaygroundTabUrlBuilder,
+} from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type {
   ErrorCapture,
   EvaluationResult,
@@ -129,7 +132,10 @@ export function SpanDetails({
               buildUrl={buildUrl}
             />
           ) : canOpenSpanInPromptStudio ? (
-            <Link href={buildUrl(span.span_id)?.toString() ?? ""} isExternal>
+            <Link
+              href={buildUrl({ spanId: span.span_id })?.toString() ?? ""}
+              isExternal
+            >
               <Button size="sm" colorPalette="orange">
                 <Play size={16} />
                 Open in Prompts
@@ -392,10 +398,7 @@ function OpenInPromptsMenu({
 }: {
   spanId: string;
   promptRef: string;
-  buildUrl: (
-    spanId: string,
-    action?: "open-existing" | "create-new",
-  ) => URL | null;
+  buildUrl: (link: PlaygroundSpanLink) => URL | null;
 }) {
   return (
     <Menu.Root>
@@ -409,7 +412,9 @@ function OpenInPromptsMenu({
       <Menu.Content>
         <Menu.Item value="open-existing" asChild>
           <Link
-            href={buildUrl(spanId, "open-existing")?.toString() ?? ""}
+            href={
+              buildUrl({ spanId, action: "open-existing" })?.toString() ?? ""
+            }
             isExternal
           >
             Open {promptRef}
@@ -417,7 +422,7 @@ function OpenInPromptsMenu({
         </Menu.Item>
         <Menu.Item value="create-new" asChild>
           <Link
-            href={buildUrl(spanId, "create-new")?.toString() ?? ""}
+            href={buildUrl({ spanId, action: "create-new" })?.toString() ?? ""}
             isExternal
           >
             Create new prompt

@@ -8,6 +8,7 @@
  * the moment it flips.
  *
  * @see specs/traces-v2/onboarding-empty-state.feature
+ * @see specs/governance/aggregate-project.feature
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,7 +16,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { projectRef, firstTraceRef, useQueryMock, invalidateMock } = vi.hoisted(
   () => ({
     projectRef: {
-      current: null as { id: string; firstMessage: boolean } | null,
+      current: null as {
+        id: string;
+        firstMessage: boolean;
+        kind?: string;
+      } | null,
     },
     firstTraceRef: {
       current: undefined as { firstMessage: boolean } | undefined,
@@ -111,6 +116,23 @@ describe("useFirstTraceWatch", () => {
 
     expect(lastQueryOptions().enabled).toBe(false);
     expect(invalidateMock).not.toHaveBeenCalled();
+  });
+
+  describe("when the project is an aggregate that was never sent a trace", () => {
+    /** @scenario "Aggregate Trace Explorer shows member rows without onboarding" */
+    it("never polls, since an aggregate reads its members' traces", () => {
+      projectRef.current = {
+        id: "project-aggregate",
+        firstMessage: false,
+        kind: "aggregate",
+      };
+      firstTraceRef.current = undefined;
+
+      renderHook(() => useFirstTraceWatch());
+
+      expect(lastQueryOptions().enabled).toBe(false);
+      expect(invalidateMock).not.toHaveBeenCalled();
+    });
   });
 
   it("does nothing while the project context is still loading", () => {

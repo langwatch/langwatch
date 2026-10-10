@@ -394,11 +394,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     describe("when inserting a span for a private-CH org", () => {
       /** @scenario Spans for a private-CH org go to the private instance only */
       it("stores the span in the private instance only", async () => {
-        const { SpanStorageClickHouseRepository } = await import(
-          "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository"
+        const { spanStorageRepositoryFor } = await import(
+          "~/test-utils/spanStorageRepository"
         );
         const resolver = await buildResolver();
-        const repo = new SpanStorageClickHouseRepository(resolver);
+        const repo = spanStorageRepositoryFor(resolver);
 
         const span = makeSpanInsertData({ tenantId: privateProjectId });
         await repo.insertSpan(span);
@@ -422,11 +422,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
       /** @scenario Spans for a shared-CH org go to the shared instance only */
       /** @scenario Concurrent writes for different orgs route correctly */
       it("routes each write to the correct container", async () => {
-        const { SpanStorageClickHouseRepository } = await import(
-          "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository"
+        const { spanStorageRepositoryFor } = await import(
+          "~/test-utils/spanStorageRepository"
         );
         const resolver = await buildResolver();
-        const repo = new SpanStorageClickHouseRepository(resolver);
+        const repo = spanStorageRepositoryFor(resolver);
 
         const privateSpan = makeSpanInsertData({
           tenantId: privateProjectId,
