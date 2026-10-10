@@ -9,7 +9,6 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { isBrowserClick } from "./back-link.tsx";
 import { PageHeaderSizeProvider, PageLayout, type PageHeaderSize } from "./page-layout.tsx";
-import { useSectionNavigationIndicator } from "./use-section-navigation-indicator.ts";
 
 /** How wide the rail is, open and folded to its icons. */
 export const SECTION_RAIL_WIDTH = 196;
@@ -73,14 +72,23 @@ export function SectionNavigationItem({
         display="flex"
         width="full"
         paddingX={2}
-        height="32px"
-        paddingY={1.5}
-        borderRadius="sm"
-        color={active ? "fg" : "nav.fgMuted"}
-        background="transparent"
-        transition="color 0.15s ease-out"
-        fontWeight={active ? "semibold" : void 0}
-        _hover={{ color: "fg", textDecoration: "none" }}
+        height="28px"
+        alignItems="center"
+        borderRadius="lg"
+        color={active ? "fg" : "nav.fg"}
+        background={active ? "nav.bgActive" : "transparent"}
+        transition="background-color 0.15s ease-out, color 0.15s ease-out"
+        fontWeight={active ? "medium" : "normal"}
+        _hover={{
+          color: "fg",
+          background: active ? "nav.bgActive" : "nav.bgHover",
+          textDecoration: "none",
+        }}
+        _focusVisible={{
+          outline: "2px solid",
+          outlineColor: "colorPalette.focusRing",
+          outlineOffset: "-2px",
+        }}
       >
         <HStack gap={2} minWidth={0} flex={1}>
           {collapsed && link.icon ? (
@@ -89,15 +97,16 @@ export function SectionNavigationItem({
             </Box>
           ) : null}
           {collapsed ? null : (
-            <Text fontSize="sm" truncate title={link.label} flex={1}>
+            <Text fontSize="13px" lineHeight="20px" truncate title={link.label} flex={1}>
               {link.label}
             </Text>
           )}
           {collapsed || link.badge === void 0 ? null : (
             <Text
               as="span"
-              fontSize="xs"
+              fontSize="12px"
               color="fg.muted"
+              fontVariantNumeric="tabular-nums"
               _groupHover={actions ? { opacity: 0 } : void 0}
             >
               {link.badge}
@@ -137,18 +146,22 @@ export function SectionNavigationAddRow({ add }: { add: SectionNavigationAdd }) 
       gap={2}
       flexShrink={0}
       paddingX={2}
-      height="32px"
-      paddingY={1.5}
-      borderRadius="sm"
+      height="28px"
+      borderRadius="lg"
       textAlign="left"
       cursor="pointer"
       color="fg.muted"
       background="transparent"
-      transition="color 0.15s ease-out"
-      _hover={{ color: "fg" }}
+      transition="background-color 0.15s ease-out, color 0.15s ease-out"
+      _hover={{ color: "fg", background: "nav.bgHover" }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "colorPalette.focusRing",
+        outlineOffset: "-2px",
+      }}
     >
       <Plus size={14} />
-      <Text fontSize="sm" truncate>
+      <Text fontSize="13px" lineHeight="20px" truncate>
         {add.label}
       </Text>
     </chakra.button>
@@ -189,6 +202,7 @@ export function SectionNavigationRail({
       paddingTop={0}
       paddingBottom={2}
     >
+      {/* An eyebrow, not a second page title: the content's header owns the one 20px title. */}
       <Text
         data-testid="section-navigation-title"
         display="flex"
@@ -196,13 +210,11 @@ export function SectionNavigationRail({
         height={SECTION_HEADER_HEIGHT}
         minHeight={SECTION_HEADER_HEIGHT}
         flexShrink={0}
-        paddingTop="1px"
-        borderBottomWidth="1px"
-        borderBottomColor="transparent"
-        paddingX={6}
-        fontSize="20px"
-        lineHeight="28px"
+        paddingX={5}
+        fontSize="13px"
+        lineHeight="20px"
         fontWeight="semibold"
+        color="fg.muted"
         title={label}
         overflow="hidden"
         whiteSpace="nowrap"
@@ -216,13 +228,12 @@ export function SectionNavigationRail({
           direction={{ base: "row", md: "column" }}
           alignItems="stretch"
           gap={{ base: 1, md: 4 }}
-          paddingX={collapsed ? 3 : "22px"}
-          paddingTop={2}
+          paddingX={3}
+          paddingTop={0}
           paddingBottom={2}
           minWidth="full"
           width={{ base: "max-content", md: "full" }}
         >
-          <SectionNavigationIndicator />
           {runs.map((run, index) => (
             <Stack
               key={run.label ?? index}
@@ -233,12 +244,12 @@ export function SectionNavigationRail({
               {run.label && !collapsed ? (
                 <Text
                   display={{ base: "none", md: "block" }}
-                  fontSize="11px"
+                  fontSize="12px"
                   lineHeight="16px"
                   fontWeight="medium"
                   color="nav.fgMuted"
                   paddingX={2}
-                  paddingBottom={1}
+                  paddingBottom="6px"
                 >
                   {run.label}
                 </Text>
@@ -260,26 +271,6 @@ export function SectionNavigationRail({
       </Box>
       {footer ? <Box flexShrink={0}>{footer}</Box> : null}
     </Box>
-  );
-}
-
-function SectionNavigationIndicator() {
-  const markerRef = useSectionNavigationIndicator();
-  return (
-    <Box
-      ref={markerRef}
-      data-testid="section-navigation-indicator"
-      aria-hidden="true"
-      position="absolute"
-      top={0}
-      left={0}
-      width="3px"
-      background="fg.subtle"
-      borderStartEndRadius="2px"
-      borderEndEndRadius="2px"
-      pointerEvents="none"
-      style={{ visibility: "hidden" }}
-    />
   );
 }
 

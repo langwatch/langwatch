@@ -209,7 +209,7 @@ export function SidebarSection({
             gap={showExpanded ? 1 : 0}
             justifyContent={showExpanded ? "flex-start" : "center"}
             borderRadius="md"
-            color="gray.500"
+            color="nav.fgMuted"
             _hover={{ color: "nav.fg" }}
           >
             {showExpanded ? heading : null}

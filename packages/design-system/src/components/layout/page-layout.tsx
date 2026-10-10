@@ -26,6 +26,10 @@ import {
   type Ref,
 } from "react";
 
+import { PageTabMenu, PageTabs } from "./page-header-tabs.tsx";
+
+export type { PageTab } from "./page-header-tabs.tsx";
+
 /** The one left and right edge a page's header and body share; the shell area may set it. */
 const PAGE_INSET = "var(--page-inset, var(--chakra-spacing-6))";
 
@@ -240,4 +244,7 @@ export const PageLayout = {
   Heading,
   Subtitle,
   HeaderButton,
+  /** Routed header tabs; see page-header-tabs.tsx. */
+  Tabs: PageTabs,
+  TabMenu: PageTabMenu,
 };
