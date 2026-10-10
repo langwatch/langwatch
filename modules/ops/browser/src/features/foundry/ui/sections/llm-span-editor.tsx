@@ -6,10 +6,10 @@ import { LLM_MODELS } from "../../model/foundry-models.ts";
 import type { ChatMessage, LLMConfig, SpanConfig } from "../../model/foundry-types.ts";
 
 const ROLE_COLORS: Record<string, string> = {
-  system: "purple.500",
-  user: "green.400",
-  assistant: "blue.400",
-  tool: "yellow.400",
+  system: "purple.fg",
+  user: "green.fg",
+  assistant: "blue.fg",
+  tool: "yellow.fg",
 };
 
 export function LLMSpanEditor({ span }: { span: SpanConfig }) {
@@ -28,8 +28,8 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
   }
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="blue.500/20" bg="blue.500/5" p={4}>
-      <Text fontSize="sm" fontWeight="semibold" color="blue.400" mb={3}>
+    <Box rounded="lg" border="1px solid" borderColor="blue.muted" bg="blue.subtle" p={4}>
+      <Text fontSize="sm" fontWeight="semibold" color="blue.fg" mb={3}>
         LLM Configuration
       </Text>
 
@@ -81,7 +81,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
             border="1px solid"
             borderColor="border"
             borderLeftWidth="2px"
-            borderLeftColor={ROLE_COLORS[msg.role] ?? "gray.500"}
+            borderLeftColor={ROLE_COLORS[msg.role] ?? "gray.fg"}
             bg="bg.subtle"
             p={2}
           >
@@ -122,7 +122,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
               size="sm"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.400" }}
+              _hover={{ color: "red.fg" }}
               onClick={() => updateLLM({ messages: messages.filter((_, j) => j !== i) })}
               alignSelf="flex-start"
             >

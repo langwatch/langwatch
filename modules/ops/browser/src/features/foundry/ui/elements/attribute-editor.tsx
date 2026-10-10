@@ -44,7 +44,7 @@ export function AttributeEditor({
             size="sm"
             variant="ghost"
             color="fg.muted"
-            _hover={{ color: "red.400" }}
+            _hover={{ color: "red.fg" }}
             onClick={() => {
               const next = { ...attributes };
               delete next[key];

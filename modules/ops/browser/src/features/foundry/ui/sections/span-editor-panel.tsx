@@ -178,7 +178,7 @@ export function SpanEditorPanel() {
       </Flex>
 
       {span.status === "error" && (
-        <Box rounded="lg" border="1px solid" borderColor="red.500/30" bg="red.500/5" p={3}>
+        <Box rounded="lg" border="1px solid" borderColor="red.muted" bg="red.subtle" p={3}>
           <Text fontSize="xs" fontWeight="medium" color="fg.error" mb={1}>
             Exception
           </Text>

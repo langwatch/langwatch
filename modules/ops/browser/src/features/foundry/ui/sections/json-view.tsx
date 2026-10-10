@@ -78,11 +78,11 @@ export function JsonView() {
             {lineCount} lines
           </Badge>
           {parseError ? (
-            <Text fontSize="xs" color="red.400" truncate maxW="300px">
+            <Text fontSize="xs" color="red.fg" truncate maxW="300px">
               {parseError}
             </Text>
           ) : (
-            <Text fontSize="xs" color="green.500">
+            <Text fontSize="xs" color="green.fg">
               Valid
             </Text>
           )}

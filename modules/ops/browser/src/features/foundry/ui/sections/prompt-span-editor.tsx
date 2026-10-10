@@ -16,8 +16,8 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
   const entries = Object.entries(variables);
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="yellow.500/20" bg="yellow.500/5" p={4}>
-      <Text fontSize="sm" fontWeight="semibold" color="yellow.400" mb={3}>
+    <Box rounded="lg" border="1px solid" borderColor="yellow.muted" bg="yellow.subtle" p={4}>
+      <Text fontSize="sm" fontWeight="semibold" color="yellow.fg" mb={3}>
         Prompt Configuration
       </Text>
       <Flex gap={3} mb={3}>
@@ -96,7 +96,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
               size="sm"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.400" }}
+              _hover={{ color: "red.fg" }}
               onClick={() => {
                 const next = { ...variables };
                 delete next[key];
