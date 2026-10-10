@@ -128,13 +128,9 @@ type PlanOptions struct {
 	// hand-over, following its log and downing it when it goes (D7).
 	IsForegroundClient bool
 	ShouldGoWatch      bool // rebuild and swap the Go services (haven go-watch; air for langyagent); only under up --watch or --hmr, and never with LANGWATCH_GO_WATCH=0
-	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
-	// lane: Vite, api and worker in one Node process (ADR-168, B1). On unless
-	// LANGWATCH_DEV_ONE_PROCESS=0.
-	ShouldRunOneProcess bool
 	// ShouldRunGoAsOneProcess hosts the linked simulators in the go lane, not a
-	// sims lane of their own: one Go process. Set with ShouldRunOneProcess from
-	// LANGWATCH_DEV_ONE_PROCESS (=0 splits).
+	// sims lane of their own: one Go process. On unless
+	// LANGWATCH_DEV_ONE_PROCESS=0, which no longer touches the Node lanes.
 	ShouldRunGoAsOneProcess bool
 	// Selection is the worktree's sticky service choice (ADR-064): gateway,
 	// nlp, langy, idp. The three Node lanes — ui, api and workers — always run

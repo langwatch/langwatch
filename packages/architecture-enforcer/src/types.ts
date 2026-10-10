@@ -1,6 +1,6 @@
 export type FeaturePackageRole = "contract" | "process" | "browser";
 
-export type ApplicationPackageRole = "ui" | "api" | "worker" | "server" | "tasks";
+export type ApplicationPackageRole = "ui" | "api" | "worker" | "server" | "tasks" | "backend";
 
 export type EnterpriseCompositionRole = "api" | "worker";
 

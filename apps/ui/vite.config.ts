@@ -228,6 +228,37 @@ function bundledRefreshStub(): Plugin {
   };
 }
 
+type RenderBuiltUrl = NonNullable<NonNullable<UserConfig["experimental"]>["renderBuiltUrl"]>;
+type RollupOnWarn = NonNullable<
+  NonNullable<NonNullable<UserConfig["build"]>["rollupOptions"]>["onwarn"]
+>;
+
+// A module imported both statically and dynamically splits nothing; fail the build on it.
+const failOnIneffectiveDynamicImport: RollupOnWarn = (warning, defaultHandler) => {
+  if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
+    throw new Error(
+      `${warning.message}\nMove the value the entry imports statically out of the screen — into the module's model/*-host.ts, which the entry already re-exports — so the screen is reached only through its loader.`,
+    );
+  }
+  defaultHandler(warning);
+};
+
+// ADR-086: the base for content-hashed assets is chosen at container start, not build time.
+// JS assets call the runtime resolver (vite/asset-base.ts), defaulting to same-origin;
+// CSS assets stay relative, HTML refs base-absolute, public/ assets same-origin.
+const renderBuiltUrl: RenderBuiltUrl = (filename, { type, hostType }) => {
+  if (type === "public") return undefined;
+  if (hostType === "css") return { relative: true };
+  if (hostType !== "js") return undefined;
+  const literal = JSON.stringify(filename).replace(
+    /[<>/\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+  return {
+    runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${literal})`,
+  };
+};
+
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
 
@@ -242,7 +273,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     customLogger: devLogger,
     plugins: [
       // Oxc's Rust React Compiler, not the Babel one: auto-memoisation without slowing HMR.
-      react({ compiler: { logDiagnostics: true } }),
+      // Skipped components are logged by the dev server only; a build stays quiet.
+      react({ compiler: command === "serve" ? { logDiagnostics: true } : true }),
       patchObjectInspectBrowserStub(),
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
@@ -294,14 +326,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
         // nothing -- the module stays in the importer's chunk. Rolldown always
         // detected this and we only logged it, which is how 468 kB of screens
         // ended up eager across 22 modules.
-        onwarn(warning, defaultHandler) {
-          if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
-            throw new Error(
-              `${warning.message}\nMove the value the entry imports statically out of the screen — into the module's model/*-host.ts, which the entry already re-exports — so the screen is reached only through its loader.`,
-            );
-          }
-          defaultHandler(warning);
-        },
+        onwarn: failOnIneffectiveDynamicImport,
         output: {
           manualChunks(id: string) {
             // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
@@ -313,28 +338,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     },
     experimental: {
       bundledDev: IS_BUNDLED,
-      // ADR-086: the base for content-hashed assets is chosen at container start, not
-      // build time. JS-referenced assets call the runtime resolver
-      // (vite/asset-base.ts); CSS-referenced assets stay relative to the CSS
-      // file; HTML entry refs stay base-absolute for the server to rewrite; public/
-      // assets stay same-origin.
-      renderBuiltUrl(filename, { type, hostType }) {
-        if (type === "public") return undefined;
-        if (hostType === "js") {
-          // Self-defaulting so the built bundle is usable even when the server hasn't
-          // injected the resolver: `vite preview`, the boot-smoke, and any raw-`dist/`
-          // static server fall back to same-origin ("/"+path).
-          const literal = JSON.stringify(filename).replace(
-            /[<>/\u2028\u2029]/g,
-            (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
-          );
-          return {
-            runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${literal})`,
-          };
-        }
-        if (hostType === "css") return { relative: true };
-        return undefined;
-      },
+      renderBuiltUrl,
     },
     server: {
       watch: {

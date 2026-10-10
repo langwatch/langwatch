@@ -13,6 +13,7 @@ describe("port allocation", () => {
         langevals: 5562,
         aigateway: 5563,
         langyagent: 5564,
+        workerHealth: 5565,
         postgres: 6560,
         redis: 6561,
         clickhouseHttp: 6562,
@@ -40,12 +41,13 @@ describe("port allocation", () => {
         "langevals",
         "ai gateway",
         "langy agent",
+        "langwatch worker health",
         "postgres",
         "redis",
         "clickhouse http",
         "clickhouse native",
       ]);
-      expect(new Set(checks.map((c) => c.port)).size).toBe(9);
+      expect(new Set(checks.map((c) => c.port)).size).toBe(10);
     });
   });
 });

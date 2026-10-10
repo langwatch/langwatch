@@ -177,7 +177,7 @@ Feature: The local development topology
     And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
 
   # One Go process for the data plane and the simulators is the default
-  # (HAVEN-ONE-SWITCH); LANGWATCH_DEV_ONE_PROCESS=0 splits it, with the Node app lane.
+  # (HAVEN-ONE-SWITCH); LANGWATCH_DEV_ONE_PROCESS=0 splits it.
   @unit
   Scenario: One Go process hosts the data plane and the simulators unless split
     Given a checkout whose dev build links the simulators

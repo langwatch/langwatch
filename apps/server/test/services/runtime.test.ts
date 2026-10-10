@@ -30,9 +30,8 @@ function makeStub(name: string, durationMs = 1) {
 const postgresStub = makeStub("postgres");
 const redisStub = makeStub("redis");
 const clickhouseStub = makeStub("clickhouse");
-const nlpStub = makeStub("nlpgo");
+const goStub = makeStub("go");
 const langevalsStub = makeStub("langevals");
-const gatewayStub = makeStub("aigateway");
 const langwatchStub = makeStub("langwatch");
 const langyStub = makeStub("langyagent");
 
@@ -57,12 +56,13 @@ vi.mock("../../src/services/redis.ts", () => ({ startRedis: redisStub.fn }));
 vi.mock("../../src/services/clickhouse.ts", () => ({
   startClickhouse: clickhouseStub.fn,
 }));
-vi.mock("../../src/services/nlpgo.ts", () => ({ startNlpgo: nlpStub.fn }));
+vi.mock("../../src/services/go-services.ts", () => ({
+  startGoServices: vi.fn(async (...args: Parameters<typeof goStub.fn>) => [
+    await goStub.fn(...args),
+  ]),
+}));
 vi.mock("../../src/services/langevals.ts", () => ({
   startLangevals: langevalsStub.fn,
-}));
-vi.mock("../../src/services/aigateway.ts", () => ({
-  startAigateway: gatewayStub.fn,
 }));
 vi.mock("../../src/services/langwatch.ts", () => ({
   startLangwatch: langwatchStub.fn,
@@ -74,15 +74,6 @@ vi.mock("../../src/services/langyagent.ts", () => ({
 }));
 vi.mock("../../src/services/langy-cli.ts", () => ({
   ensureLangyCli: langyCliFn,
-}));
-vi.mock("../../src/services/langwatch-workers.ts", () => ({
-  startLangwatchWorkers: () => ({
-    name: "workers",
-    pid: 0,
-    stop: async () => {
-      callLog.push("stop:workers");
-    },
-  }),
 }));
 vi.mock("../../src/services/venvs.ts", () => ({ syncVenvs: venvsFn }));
 vi.mock("../../src/services/node-deps.ts", () => ({
@@ -110,6 +101,7 @@ function fakeCtx(): RuntimeContext {
       langevals: 5562,
       aigateway: 5563,
       langyagent: 5564,
+      workerHealth: 5565,
       postgres: 6560,
       redis: 6561,
       clickhouseHttp: 6562,
@@ -154,9 +146,8 @@ describe("services/runtime", () => {
       postgresStub.fn,
       redisStub.fn,
       clickhouseStub.fn,
-      nlpStub.fn,
+      goStub.fn,
       langevalsStub.fn,
-      gatewayStub.fn,
       langwatchStub.fn,
       venvsFn,
       nodeDepsFn,
@@ -189,10 +180,10 @@ describe("services/runtime", () => {
   });
 
   describe("when startAll is called", () => {
-    it("starts infra (pg+redis+clickhouse) → starts app tier with no migration phase (nlp+langevals+gateway+langwatch+langyagent+workers)", async () => {
+    it("starts infra (pg+redis+clickhouse) → starts app tier with no migration phase (go+langevals+langwatch+langyagent)", async () => {
       const ctx = fakeCtx();
       const handles = await runtime.startAll(ctx);
-      expect(handles).toHaveLength(9);
+      expect(handles).toHaveLength(7);
       const positions: Record<string, number> = {};
       callLog.forEach((entry, idx) => {
         if (!(entry in positions)) positions[entry] = idx;
@@ -205,10 +196,16 @@ describe("services/runtime", () => {
       );
       expect(callLog).not.toContain("migrate");
       // App tier strictly after infra healthy.
-      expect(positions["start:nlpgo"]).toBeGreaterThan(infraEnd);
+      expect(positions["start:go"]).toBeGreaterThan(infraEnd);
       expect(positions["start:langevals"]).toBeGreaterThan(infraEnd);
-      expect(positions["start:aigateway"]).toBeGreaterThan(infraEnd);
       expect(positions["start:langwatch"]).toBeGreaterThan(infraEnd);
+    });
+
+    it("runs the api and the worker as the one langwatch process, with no second worker spawn", async () => {
+      const handles = await runtime.startAll(fakeCtx());
+      const names = handles.map((h) => h.name);
+      expect(names.filter((name) => name === "langwatch")).toHaveLength(1);
+      expect(names).not.toContain("workers");
     });
 
     it("starts the assistant alongside the rest of the app tier", async () => {
@@ -231,7 +228,7 @@ describe("services/runtime", () => {
       const ctx = fakeCtx();
       ctx.userEnv = { OPENAI_API_KEY: "sk-user" };
       await runtime.startAll(ctx);
-      const gatewayEnv = gatewayStub.fn.mock.calls.at(-1)![2];
+      const gatewayEnv = goStub.fn.mock.calls.at(-1)![2];
       const appEnv = langwatchStub.fn.mock.calls.at(-1)![2];
       expect(gatewayEnv).toEqual(appEnv);
       expect(gatewayEnv).toMatchObject({ OPENAI_API_KEY: "sk-user" });
@@ -251,7 +248,7 @@ describe("services/runtime", () => {
 
       await expect(runtime.startAll(fakeCtx())).rejects.toThrow("did not become healthy");
 
-      for (const sibling of ["nlpgo", "langevals", "aigateway"]) {
+      for (const sibling of ["go", "langevals"]) {
         expect(callLog).toContain(`stop:${sibling}`);
       }
       // Infra + the assistant come down with them.
@@ -270,7 +267,7 @@ describe("services/runtime", () => {
         expect(callLog).not.toContain("start:langyagent");
         expect(callLog).not.toContain("langy-cli");
         // Everything else is untouched.
-        expect(handles).toHaveLength(8);
+        expect(handles).toHaveLength(6);
         expect(callLog).toContain("start:langwatch");
         expect(callLog).toContain("venvs");
       } finally {
@@ -314,7 +311,7 @@ describe("services/runtime", () => {
       // The whole install still boots; only the assistant is absent.
       expect(callLog).not.toContain("start:langyagent");
       expect(callLog).toContain("start:langwatch");
-      expect(handles).toHaveLength(8);
+      expect(handles).toHaveLength(6);
       // The app is told the assistant is off, not left pointing at a corpse.
       const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
       expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
@@ -346,11 +343,11 @@ describe("services/runtime", () => {
       callLog.length = 0; // reset to count only stops
       await runtime.stopAll(handles);
       const stopOrder = callLog.filter((entry) => entry.startsWith("stop:"));
-      expect(stopOrder).toHaveLength(9);
+      expect(stopOrder).toHaveLength(7);
       // First stopped should be langwatch (last started); last stopped should be one of the infra.
       const firstStopped = stopOrder[0]!.replace("stop:", "");
       const lastStopped = stopOrder[stopOrder.length - 1]!.replace("stop:", "");
-      expect(firstStopped).toBe("workers");
+      expect(firstStopped).toBe("langwatch");
       expect(["postgres", "redis", "clickhouse"]).toContain(lastStopped);
     });
 
@@ -378,7 +375,7 @@ describe("services/runtime", () => {
       const collector = (async () => {
         for await (const ev of events) {
           collected.push(ev);
-          if (collected.filter((e) => e.type === "healthy").length >= 8) break;
+          if (collected.filter((e) => e.type === "healthy").length >= 7) break;
         }
       })();
       await runtime.startAll(ctx);
@@ -393,7 +390,7 @@ describe("services/runtime", () => {
             () =>
               reject(
                 new Error(
-                  `runtime.events collector did not see 8 healthy events within 5s — got ${
+                  `runtime.events collector did not see 7 healthy events within 5s — got ${
                     collected.filter((e) => e.type === "healthy").length
                   }`,
                 ),
@@ -411,9 +408,8 @@ describe("services/runtime", () => {
           "redis",
           "clickhouse",
           "langyagent",
-          "nlpgo",
+          "go",
           "langevals",
-          "aigateway",
           "langwatch",
         ]),
       );

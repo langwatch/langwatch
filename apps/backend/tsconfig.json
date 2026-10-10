@@ -19,9 +19,6 @@
     },
     {
       "path": "../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

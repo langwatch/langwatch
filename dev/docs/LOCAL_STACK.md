@@ -6,17 +6,17 @@ like a slow boot are covered by the `haven` skill's `troubleshooting.md`.
 
 ## Processes
 
-| Process               | Package                   | What it is                                            |
-| --------------------- | ------------------------- | ----------------------------------------------------- |
-| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA, :5560)             |
-| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560)  |
-| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers          |
-| `apps/tasks`          | `@langwatch/tasks`        | `pnpm task upgrade` and one-shot tasks, before serve  |
-| `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                       |
-| `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                        |
-| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561) |
-| `services/langyagent` | Go                        | Langy conversation manager (PORT+4)                   |
-| `services/langevals`  | Python                    | Evaluators                                            |
+| Process               | Package                   | What it is                                                                                  |
+| --------------------- | ------------------------- | ------------------------------------------------------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite-built SPA the api serves; Vite dev server only under `--hmr`) |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560; :5560 under `pnpm dev`)                |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                                                |
+| `apps/tasks`          | `@langwatch/tasks`        | `pnpm task upgrade` and one-shot tasks, before serve                                        |
+| `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                                                             |
+| `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                                                              |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561)                                       |
+| `services/langyagent` | Go                        | Langy conversation manager (PORT+4)                                                         |
+| `services/langevals`  | Python                    | Evaluators                                                                                  |
 
 ui, api and worker always run together. A stack missing one serves pages and
 quietly processes no jobs, which looks healthy until a job was expected to run.
@@ -209,30 +209,34 @@ container, and both are opt-in.
 
 ## Plain `pnpm dev`
 
-Without haven, every port derives from `PORT` (default 5560): ui on `PORT`, api
-on `PORT+1000`, worker metrics on `PORT-2561`, gateway on `PORT+3`, nlp on
-:5561, langy on `PORT+4`. If the ports are held, `dev/scripts/check-ports.sh`
-refuses and prints two ready-to-paste options (a free slot via
-`PORT=5570 pnpm dev`, or a port-scoped kill). Paste one; don't hunt processes by
-hand. `dev/scripts/kill-dev-tree.sh` already does it correctly.
+`pnpm dev` matches `haven up`: it builds the UI once (the cached Nx target
+`@langwatch/ui:build:local`, copied to `apps/ui/dist/client.dev`) and the `backend`
+lane serves it on `PORT` (default 5560), with no Vite. `pnpm dev:hmr` matches
+`haven up --hmr`: Vite runs as its own `ui` lane on `PORT` and proxies `/api` to the
+backend on `PORT+1000`. Vite runs in no other shape (ADR-168, amendment 2026-10-10).
+Worker metrics sit on `PORT-2561`, the gateway on `PORT+3`, nlp on :5561, langy on
+`PORT+4`. If the ports are held, `dev/scripts/check-ports.sh` refuses and prints two
+ready-to-paste options (a free slot via `PORT=5570 pnpm dev`, or a port-scoped kill).
+Paste one; don't hunt processes by hand. `dev/scripts/kill-dev-tree.sh` already does
+it correctly.
 
-Locally there is one Node process by default: the `app` lane runs the ui's Vite
-server, the api and the worker together (see "One process" below). It is a
-launcher, not a process role: each still resolves its
-own secrets, config and graph; the api and worker boot together (the api answers
-while the worker upgrades), and shutdown drains the worker first. Production runs three Node deployments.
+The `backend` lane is api and worker in one Node process. It is a launcher, not a
+process role: each still resolves its own secrets, config and graph; the api and
+worker boot together (the api answers while the worker upgrades), and shutdown
+drains the worker first. Production runs three Node deployments.
 
-| Script                                   | What runs                                                                                |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm dev`                               | app (ui + api + worker) + go (+ langy when selected)                                     |
-| `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                           |
-| `pnpm dev:one`                           | the app lane alone: ui + api + worker in one Node process                                |
-| `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
+| Script                             | What runs                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm dev`                         | UI built once, then backend (api + worker, serving it) + go (+ langy when selected)      |
+| `pnpm dev:hmr`                     | the same, but a Vite `ui` lane serves the UI with HMR instead of the build               |
+| `pnpm dev:backend` / `dev:go`      | one lane alone                                                                           |
+| `pnpm dev:api` + `pnpm dev:worker` | the production process shape; use when a blocked worker job must not read as API latency |
 
 The backend reloads on change, debounced by `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`
 (default 2000 ms, never more than `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`, 30 s, after
 the first change), one reload at a time; the Go lane restarts through
-`air` on successful builds only. The Go services auto-start when the toolchain is
+`air` on successful builds only. A browser edit under `pnpm dev` needs a restart
+(or `pnpm dev:hmr`). The Go services auto-start when the toolchain is
 on PATH and reuse an existing listener from another worktree. Opt out per
 service with `LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1` or
 `LANGWATCH_SKIP_LANGY=1` (plain `pnpm dev` only; under haven use
@@ -241,15 +245,15 @@ or `make service-watch svc=nlpgo`. The gateway needs the "AI GATEWAY" block
 from `.env.example`; langyagent writes its own `.env` block on first run and
 needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
 
-### One process (the default, ADR-168 B1)
+### The backend host (ADR-168)
 
-Plain `pnpm dev` and `haven up` run one `app` lane: `tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
-unchanged, still proxying `/api`) and loads the api and worker through a Vite
-module runner and re-links them in process on a change. A host that recycles itself
-exits 75 and the `dev` script's loop (or haven's lane) starts a fresh one. `LANGWATCH_DEV_ONE_PROCESS=0` (plain `pnpm dev`, or `haven up -f` with it
-exported or in `.env`) splits it back into a `ui` lane and a `backend` lane
-(haven: `api`). Ports are the same either way. Under haven the same switch also
-folds the simulators into the `go` lane (`=0` gives them a `sims` lane);
+`tools/dev-runtime` loads the api and worker through a Vite module runner and
+re-links them in process on a change; it hosts no UI. A host that recycles itself
+exits 75 and the `dev` script's loop (or haven's lane) starts a fresh one. Under
+haven a still or `--watch` stack runs it as the `app` lane, serving the built UI;
+an `--hmr` stack runs it as the `api` lane beside a `ui` lane (`@langwatch/ui dev`).
+`LANGWATCH_DEV_ONE_PROCESS=0` (`haven up -f` with it exported or in `.env`) now only
+splits the simulators out of the `go` lane into a `sims` lane;
 `LANGWATCH_GO_ONE_PROCESS` is a deprecated alias, warned once and refused when it
 disagrees. The Go lane is watched under `haven up --watch` or `--hmr` (`haven go-watch`
 rebuilds and swaps the child); `LANGWATCH_GO_WATCH=0` keeps it off.
@@ -261,14 +265,14 @@ switching needs no `--force` (ADR-064 amendment 2026-10-10 b). `haven status` na
 | ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `haven up` (still) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing reloads; `haven reload [app\|api\|worker\|ui]` applies changes on demand     |
 | `haven up --watch` | the same, plus a `ui` lane, `haven ui-watch`                      | one UI build that exits, swapped in, open pages reload once idle; Node and Go reload |
-| `haven up --hmr`   | Vite 8 `bundledDev`, bundles rebuilt in memory                    | HMR updates the page in place; Node and Go reload                                    |
+| `haven up --hmr`   | a `ui` lane: Vite 8 `bundledDev`, bundles rebuilt in memory       | HMR updates the page in place; Node and Go reload                                    |
 
 Commits and cherry-picks would reload the backend under anyone using the stack, so the default
 is still: `LANGWATCH_DEV_WATCH=0` in the Node lane and no Go rebuilds. `haven reload
 [app|api|worker]` re-links the backend in place (SIGUSR2; the UI and sessions stay up) and
 returns when the host logs `backend reload finished`. A changed env still needs `haven up -f`.
-`--ui=...` and `--watch=false` are retired and exit 64. `pnpm dev` runs the Vite dev server
-outside haven.
+`--ui=...` and `--watch=false` are retired and exit 64. Outside haven, `pnpm dev` is
+the still shape with a reloading backend and `pnpm dev:hmr` the `--hmr` one.
 
 **Still and watch.** The api serves `apps/ui/dist/client` the way production does, at the same
 `app.<slug>` URL, so sessions, cookies and routes are unchanged. There is no HMR. Both build at

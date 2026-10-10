@@ -103,7 +103,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if slices.ContainsFunc(targets, isSimsTarget) {
 		if goLane, ok := o.goLaneHostingSims(st); ok {
 			targets = foldSimsIntoGoLane(targets, goLane)
-			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
+			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one Go process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
 		}
 	}
 	for _, t := range targets {

@@ -2,7 +2,7 @@
   "name": "@langwatch/dev-runtime",
   "version": "0.0.0",
   "private": true,
-  "description": "Contributor-only: the Node applications in one local process (dev:one, the default, adds the UI's Vite server; ADR-168).",
+  "description": "Contributor-only: api and worker in one local process, reloaded in place (ADR-168).",
   "type": "module",
   "exports": {
     ".": {
@@ -11,16 +11,14 @@
     }
   },
   "scripts": {
-    "dev": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts --backend-only; code=$?; test $code -eq 75 || exit $code; done",
-    "predev:one": "bash ../../dev/scripts/devscripts.sh ensure-built",
-    "dev:one": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts; code=$?; test $code -eq 75 || exit $code; done",
-    "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
+    "dev": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts; code=$?; test $code -eq 75 || exit $code; done",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/worker": "workspace:*",
     "vite": "catalog:"

@@ -14,8 +14,7 @@ start-up time, and a stack missing the worker silently processes no jobs.
 
 ## Decision
 
-`tools/dev-runtime` composes the existing application entry points (api, worker and, for `dev:one`,
-the UI's Vite server) inside one Node process. It is contributor-only: nothing ships it, no
+`tools/dev-runtime` composes the existing application entry points (api and worker) inside one Node process. It is contributor-only: nothing ships it, no
 production image includes it, and no application imports it.
 
 It holds no product code and no module logic. It calls the same `main.ts` composition each app
@@ -24,12 +23,13 @@ ADR-168; this record fixes only the boundary.
 
 ## Public surfaces and transports
 
-None beyond the package entry `src/backend.process.ts`, which the dev entry points import. It serves
-no route and declares no transport.
+None. The boot and drain seam it hosts (`startBackend`, `drainBackend`) is framework, in
+`@langwatch/process/backend-host`, which `apps/backend` also runs; `src/backend.process.ts` adds only the
+reload generation the dev entry uses. It serves no route and declares no transport.
 
 ## Dependencies
 
-The application composition (`@langwatch/platform-api`, `@langwatch/worker`), `@langwatch/observability`,
+The application composition (`@langwatch/platform-api`, `@langwatch/worker`), `@langwatch/process`, `@langwatch/observability`,
 `@langwatch/time` and `vite`. No feature module is imported directly.
 
 ## Persistence
@@ -38,7 +38,7 @@ None. It owns no table, store or file.
 
 ## Runtime and registration
 
-A local Node process started by `pnpm dev` or `pnpm dev:one`. It is not registered in any deployment.
+A local Node process started by `pnpm dev` or `pnpm dev:hmr`. It is not registered in any deployment.
 
 ## Environment and configuration
 

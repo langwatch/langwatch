@@ -707,7 +707,7 @@ var baseTable = []commandSpec{
 		args:    "[--affected|--all] [args…]",
 		maxArgs: -1,
 		flags: []flagSpec{
-			{long: "--affected", summary: "nx affected -t typecheck from the merge-base with the upstream, or origin/main (the agent default)"},
+			{long: "--affected", summary: "the root incremental pnpm typecheck (same as --all; tsc rechecks only what changed)"},
 			{long: "--all", summary: "the whole-tree pnpm typecheck (the default for a person)"},
 		},
 		// The summary promises the arguments are forwarded, and they are handed

@@ -435,7 +435,6 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 	isOneProcess, _, _ := readOneProcess()
 	return app.PlanOptions{
 		ShouldGoWatch:           devEnv("LANGWATCH_GO_WATCH") != "0",
-		ShouldRunOneProcess:     isOneProcess,
 		ShouldRunGoAsOneProcess: isOneProcess,
 		ShouldSeed:              os.Getenv("LANGWATCH_SEED") == "1",
 		// The langyagent isolation request; `up` settles it against this machine
@@ -448,8 +447,8 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 	}
 }
 
-// readOneProcess reads the one switch that splits (=0) or folds both the Node
-// app lane and the Go lane: LANGWATCH_DEV_ONE_PROCESS, with the old
+// readOneProcess reads the switch that splits (=0) or folds the Go lane and the
+// simulators: LANGWATCH_DEV_ONE_PROCESS, with the old
 // LANGWATCH_GO_ONE_PROCESS read only when the new name is unset.
 func readOneProcess() (isOneProcess, isAlias bool, err error) {
 	newVal, _ := dotenvLookup("LANGWATCH_DEV_ONE_PROCESS")
@@ -468,7 +467,7 @@ func resolveOneProcess(newVal, oldVal string) (isOneProcess, isAlias bool, err e
 	}
 	if (newVal != "0") != (oldVal != "0") {
 		return newVal != "0", true, fmt.Errorf(
-			"LANGWATCH_DEV_ONE_PROCESS=%s and LANGWATCH_GO_ONE_PROCESS=%s disagree — LANGWATCH_DEV_ONE_PROCESS is the one switch for the Node app lane and the Go lane; remove LANGWATCH_GO_ONE_PROCESS",
+			"LANGWATCH_DEV_ONE_PROCESS=%s and LANGWATCH_GO_ONE_PROCESS=%s disagree — LANGWATCH_DEV_ONE_PROCESS is the one switch for the Go lane; remove LANGWATCH_GO_ONE_PROCESS",
 			newVal, oldVal,
 		)
 	}
@@ -480,7 +479,7 @@ func resolveOneProcess(newVal, oldVal string) (isOneProcess, isAlias bool, err e
 func checkOneProcessEnv(warn io.Writer) error {
 	_, isAlias, err := readOneProcess()
 	if isAlias && err == nil {
-		fmt.Fprintln(warn, "haven: LANGWATCH_GO_ONE_PROCESS is deprecated; LANGWATCH_DEV_ONE_PROCESS=0 now splits both the Node app lane and the Go lane")
+		fmt.Fprintln(warn, "haven: LANGWATCH_GO_ONE_PROCESS is deprecated; LANGWATCH_DEV_ONE_PROCESS=0 now splits the Go lane from the sims lane")
 	}
 	return err
 }

@@ -371,7 +371,7 @@ EOF
   ensure_prepared
   write_overrides dev-infra
   echo "Starting: redis + workers compose services (preset=dev-infra)"
-  echo "  The ui and api applications run via 'pnpm dev:app' on the host for hot-reload."
+  echo "  The ui and api applications run via 'pnpm dev:api' and 'pnpm dev:ui' on the host."
   echo "  Workers run in the compose 'workers' container."
   echo "  DB / ClickHouse / NLP / S3 come from .env (shared dev)."
   $COMPOSE --profile workers up -d redis workers
@@ -380,7 +380,8 @@ EOF
 Redis is running detached on localhost:6379.
 Workers compose container is running detached. Next:
 
-  pnpm dev:app        # ui + api on the host; the workers container has the rest
+  pnpm dev:api        # the api on the host; the workers container has the rest
+  pnpm dev:ui         # Vite with HMR, in a second terminal
 
 Stop redis + workers with: dev/scripts/dev.sh down
 EOF

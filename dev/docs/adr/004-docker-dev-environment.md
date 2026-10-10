@@ -197,7 +197,8 @@ independently. Collapsing them is a _dev-only_ convenience, never a prod change.
 Make **single-process dev the default**. `pnpm dev` sets
 `WORKERS_IN_PROCESS=1` and hosts the worker stack inside the app process; the
 two-process topology is still available as `pnpm dev:concurrent`, and
-`pnpm dev:app` / `pnpm dev:worker` run one side on its own. Amended after the
+`pnpm dev:app` / `pnpm dev:worker` run one side on its own (`dev:concurrent` and
+`dev:app` were deleted on 2026-10-10, ADR-168; `dev:api` and `dev:worker` remain). Amended after the
 default was inverted: a laptop running several worktrees cannot afford a second
 Node process per stack, and haven had already defaulted this way, so plain
 `pnpm dev` disagreeing with it was the surprise rather than the safeguard.
@@ -245,7 +246,9 @@ development but changes its physical owner. The contributor-only
 `tools/dev-runtime` composition imports the API and worker runtime construction
 entry points, owns their shared infrastructure scope and closes it once. The API
 application no longer imports or starts the worker application itself. The
-separate `dev:app`, `dev:worker` and `dev:concurrent` modes remain available.
+separate `dev:app`, `dev:worker` and `dev:concurrent` modes remained available until
+2026-10-10, when `dev:app` and `dev:concurrent` were deleted (ADR-168); `dev:api` and
+`dev:worker` remain.
 
 When `platform/app` is retired, the contributor source of truth moves from
 `.env` to repository-root `.env`; quickstart and Haven write the

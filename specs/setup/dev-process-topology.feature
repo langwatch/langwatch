@@ -21,7 +21,8 @@ Feature: The local development process topology
   # that hosts the api and the worker together is exactly that — a launcher,
   # not a role — and no value of either variable changes what it starts.
   #
-  # Ports are derived from PORT (default 5560): ui on PORT, api on PORT + 1000,
+  # Ports are derived from PORT (default 5560): ui on PORT, api on PORT + 1000
+  # (on PORT itself under plain `pnpm dev`, which runs no ui lane),
   # the worker's metrics/healthz listener on PORT - 2561, and the AI Gateway on
   # PORT + 3.
 
@@ -193,18 +194,12 @@ Feature: The local development process topology
     Then the host does not start the next worker beside it
     And it logs "backend recycling" and exits non-zero, so the dev script's loop (or haven's lane) starts a fresh process
 
-  # --- One process is the default (ADR-168, amendment 2026-10-09) ---
+  # --- The simulators' switch (ADR-168, amendment 2026-10-10) ---
 
-  # Plain `pnpm dev` and `haven up` run the ui's Vite server, the api and the
-  # worker as one `app` lane; LANGWATCH_DEV_ONE_PROCESS=0 is the opt-out.
-  @unit
-  Scenario: A local stack runs the ui, the api and the worker in one process unless split
-    Given a contributor starts a stack with plain pnpm dev or haven up
-    When LANGWATCH_DEV_ONE_PROCESS is unset
-    Then one app lane hosts the ui's Vite server, the api and the worker
-    And setting LANGWATCH_DEV_ONE_PROCESS=0 runs a ui lane and a backend lane instead
-    And the same switch folds the simulators into the go lane, and =0 gives them a sims lane
-
+  # No process hosts the UI's Vite server beside the backend any more (see "An
+  # hmr stack runs Vite as its own ui lane beside the backend"), so
+  # LANGWATCH_DEV_ONE_PROCESS no longer touches the Node lanes: it folds the
+  # simulators into the go lane, and =0 gives them a sims lane.
   # HAVEN-ONE-SWITCH: the old Go name is read only while the new one is unset.
   @unit
   Scenario: LANGWATCH_GO_ONE_PROCESS is a warned alias of the one switch
@@ -384,7 +379,9 @@ Feature: The local development process topology
   # Still and watch serve the built UI: one backend-only Node lane, no Vite;
   # the api serves apps/ui/dist/client, built once at up and on `haven reload
   # ui`. watch rebuilds it with `haven ui-watch` on a change. hmr runs Vite
-  # bundledDev with HMR. `pnpm dev` runs the Vite dev server outside haven.
+  # bundledDev with HMR in its own lane. Outside haven `pnpm dev` matches still
+  # and watch (the UI built once, the backend lane serving it on PORT and
+  # reloading) and `pnpm dev:hmr` adds the Vite ui lane.
   @unit
   Scenario: A plain haven up serves the built UI and holds it still
     Given a stack started with "haven up"
@@ -410,11 +407,12 @@ Feature: The local development process topology
     And a page from a built or production server reloads at once on a stale chunk and never polls
 
   @unit
-  Scenario: An hmr stack runs Vite on bundled output with HMR
+  Scenario: An hmr stack runs Vite as its own ui lane beside the backend
     Given a stack started with "haven up --hmr"
     When haven plans the Node lanes
-    Then the app lane runs with LANGWATCH_UI_BUNDLED=1 and keeps its Vite server
-    And the backend reloads on a change
+    Then a ui lane runs the UI's Vite dev server with LANGWATCH_UI_BUNDLED=1
+    And a separate api lane hosts the api and the worker and reloads on a change
+    And no lane hosts Vite inside the backend process
     And "haven reload ui" is refused, because Vite reloads itself
 
   @unit

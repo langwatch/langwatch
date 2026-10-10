@@ -149,9 +149,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		Stack: st, Opts: opts, RepoDir: repoDir, Base: p.base,
 		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
-	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.IsBuiltUI())
-	out := []Child{p.frontChild(mono, isOneProcess)}
-	if isOneProcess && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
+	isBuiltUI := !st.Layout.IsMonolith() && opts.Selection.IsBuiltUI()
+	out := []Child{p.frontChild(mono, isBuiltUI)}
+	if isBuiltUI && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
 		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui"), p.o.cfg.UIWatchArgv))
 	}
 	out = append(out, p.goLanes(mono)...)
@@ -169,9 +169,10 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		langy.LogPath = p.logPath("langyagent")
 		out = append(out, langy)
 	}
-	if st.Layout.IsMonolith() || isOneProcess {
+	if st.Layout.IsMonolith() || isBuiltUI {
 		return out
 	}
+	// --hmr: Vite runs as its own ui lane beside the backend (ADR-168, 2026-10-10).
 	return append(out, p.backendChild())
 }
 
@@ -292,15 +293,13 @@ func (p *childPlan) nodeEnv(lane string) []string {
 }
 
 // frontChild is the lane serving the browser application: the monolith's app
-// lane, the one-process app lane, or the ui lane.
-func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
+// lane, the built-UI app lane (still and --watch), or the --hmr Vite ui lane.
+func (p *childPlan) frontChild(mono monolithPlan, isBuiltUI bool) Child {
 	switch {
 	case p.st.Layout.IsMonolith():
 		return mono.appChild()
-	case isOneProcess && p.opts.Selection.IsBuiltUI():
+	case isBuiltUI:
 		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
-	case isOneProcess:
-		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}
 	return Child{
 		Name: "ui", Dir: p.repoDir, Color: palette[1], LogPath: p.logPath("ui"),
@@ -400,7 +399,7 @@ func (sp *simulatorPlan) host(binary string, env func() []string, child func() C
 // planSimulators places every selected simulator. The linked simulators get a
 // lane of their own, so a simulator under load cannot starve the gateway: a
 // second `service combined` process. LANGWATCH_DEV_ONE_PROCESS (on by
-// default) folds them into the go lane instead; Langy always keeps its own lane.
+// default; it governs only the Go lanes) folds them into the go lane instead; Langy always keeps its own lane.
 func (p *childPlan) planSimulators() simulatorPlan {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	sp := simulatorPlan{
@@ -475,21 +474,8 @@ func (p *childPlan) backendChild() Child {
 	}
 }
 
-// oneProcessChild is a modular checkout's ui and api lanes as one: the UI's
-// Vite server, the api and the worker in one Node process, the backend
-// reloaded in-process (ADR-168, B1). It still listens on the app port and the
-// API port, so `haven restart ui|api` bounces it and the rows stay truthful.
-// No readiness probe, as for the ui lane: the UI's boot-wait screen covers it.
-func oneProcessChild(repoDir string, env []string, logPath string) Child {
-	return Child{
-		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath, SplitLog: true,
-		Shell: "pnpm --silent --filter " + BackendPackage + " dev:one",
-		Env:   env,
-	}
-}
-
 // builtUIChild is the built and watch UI modes' app lane: the api and worker with
-// no Vite (`dev`, --backend-only), serving apps/ui/dist/client as production does;
+// no Vite (`dev`), serving apps/ui/dist/client as production does;
 // app.<slug> routes to the API port (see provision). It builds once at start (Nx
 // restores an unchanged tree); after that only `haven ui-watch` or `haven reload ui` rebuild.
 func builtUIChild(repoDir string, env []string, logPath string) Child {
@@ -580,7 +566,7 @@ const (
 	// it has its own liveness, and a stack whose worker is down looks healthy
 	// from every other row.
 	WorkerLane = "worker"
-	// AppLane is the ui and api lanes run as one process, the default (LANGWATCH_DEV_ONE_PROCESS=0 splits them).
+	// AppLane is the built-UI stack's one Node lane: api and worker serving apps/ui/dist/client (still and --watch).
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
 	// GoLane is the process hosting the Go data-plane services, and the

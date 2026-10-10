@@ -36,7 +36,31 @@ const APPLICATION_PACKAGES: readonly {
   { role: "worker", path: "worker", name: "@langwatch/worker" },
   { role: "server", path: "server", name: "@langwatch/server" },
   { role: "tasks", path: "tasks", name: "@langwatch/tasks" },
+  { role: "backend", path: "backend", name: "@langwatch/backend" },
 ];
+
+/** The one composite application's root; no other application or tool may combine both runtimes. */
+export const BACKEND_APPLICATION_ROOT = "apps/backend";
+
+const COMPOSED_BY_BACKEND: ReadonlySet<ApplicationPackageRole> = new Set(["api", "worker"]);
+
+/**
+ * apps/backend runs the api and the worker in one Node process, what `npx @langwatch/server` runs
+ * (Alex, 2026-10-10; ARCHITECTURE.md §1). It may compose those two applications and no other.
+ */
+export function composesApplication({
+  importer,
+  target,
+}: {
+  importer: ClassifiedPackage;
+  target: ClassifiedPackage;
+}): boolean {
+  if (importer.kind !== "application" || importer.applicationRole !== "backend") return false;
+
+  if (target.kind !== "application" || target.applicationRole === undefined) return false;
+
+  return COMPOSED_BY_BACKEND.has(target.applicationRole);
+}
 
 /**
  * Programs under apps/ that are neither a composition root nor a shared library: the scenario
@@ -254,7 +278,7 @@ function discoverApplications(discovery: Discovery): void {
       file: unexpectedManifest,
       message: `Unknown application workspace apps/${directory}.`,
       allowed:
-        "The fixed application roots are ui, api, worker, server, and tasks, beside the standalone scenario-child program and the internal consoles analyticssim-web, haven-web, idpsim-web, llmsim-web, mailsim-web, storagesim-web and voicesim-web (ADR-160).",
+        "The fixed application roots are ui, api, worker, server, tasks and backend, beside the standalone scenario-child program and the internal consoles analyticssim-web, haven-web, idpsim-web, llmsim-web, mailsim-web, storagesim-web and voicesim-web (ADR-160).",
     });
   }
 
@@ -298,7 +322,8 @@ function discoverDevRuntime(discovery: Discovery): void {
         policy: "application-layout",
         file: devRuntimeManifest,
         message: "tools/dev-runtime must be a private contributor package.",
-        allowed: 'Set "private": true; the combined runtime is never shipped.',
+        allowed:
+          'Set "private": true; tools/dev-runtime is never shipped (apps/backend is the shipped combined runtime).',
       });
     }
 

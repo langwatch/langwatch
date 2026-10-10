@@ -3,7 +3,11 @@ import { join } from "node:path";
 
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
-import { featurePackageName, type WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import {
+  composesApplication,
+  featurePackageName,
+  type WorkspaceSnapshot,
+} from "../../workspace/snapshot.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
   if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {
@@ -343,6 +347,8 @@ const applicationBoundaryCheck: DependencyCheck = (pkg, target, dependency) => {
   if (pkg.kind !== "application" || target.kind !== "application" || target === pkg) {
     return undefined;
   }
+
+  if (composesApplication({ importer: pkg, target })) return undefined;
 
   return {
     policy: "application-boundary",
