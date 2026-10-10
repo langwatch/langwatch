@@ -384,6 +384,35 @@ describe("clickHouseFilterConditions", () => {
       expect(result.sql).toBe("1=0");
       expect(result.params).toEqual({});
     });
+
+    it("returns no-match for a bound with trailing non-numeric text", () => {
+      // Number("0.6x") is NaN — the same parser the in-memory matcher uses, so
+      // the preview and the trigger cannot disagree on a non-numeric bound
+      // (#8170). parseFloat("0.6x") would have yielded 0.6 and matched here.
+      const builder = clickHouseFilterConditions["evaluations.score"];
+      const result = builder!(["0.6x", "0.9"], "f0", "eval-1");
+      expect(result.sql).toBe("1=0");
+      expect(result.params).toEqual({});
+    });
+
+    it("parses a hex-literal bound the same way the matcher does (agreement, not divergence)", () => {
+      // The whole point of using Number over parseFloat is that both paths
+      // read the same value: Number("0x1") is 1 in both the matcher and here,
+      // whereas parseFloat("0x1") was 0 — the mismatch this fix removes.
+      const builder = clickHouseFilterConditions["evaluations.score"];
+      const result = builder!(["0x0", "0x1"], "f0", "eval-1");
+      expect(result.params.f0_min).toBe(0);
+      expect(result.params.f0_max).toBe(1);
+    });
+
+    it("returns no-match for a blank bound", () => {
+      // Number("") is 0 — a blank bound must be rejected explicitly, not
+      // treated as a 0 boundary.
+      const builder = clickHouseFilterConditions["evaluations.score"];
+      const result = builder!(["", "0.9"], "f0", "eval-1");
+      expect(result.sql).toBe("1=0");
+      expect(result.params).toEqual({});
+    });
   });
 
   describe("evaluations.state", () => {

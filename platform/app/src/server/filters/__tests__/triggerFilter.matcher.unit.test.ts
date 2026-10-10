@@ -861,28 +861,84 @@ describe("matchesEvaluationFilters", () => {
   });
 
   describe("when filtering by evaluations.score (double-keyed)", () => {
-    it("matches when score equals filter value", () => {
-      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.85 })];
+    // The filter is a numeric range [min, max], matching the ClickHouse path
+    // (filter-conditions.ts) that the UI preview count uses — not exact
+    // string membership. A score strictly inside the bounds must match, or the
+    // trigger silently never fires (#8170).
+    it("matches a score inside the range", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.73 })];
       const filters: TriggerFilters = {
-        "evaluations.score": { "eval-abc": { score: ["0.85"] } },
+        "evaluations.score": { "eval-abc": { score: ["0", "1"] } },
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(true);
     });
 
-    it("does not match when score differs", () => {
+    it("matches a score on the range boundary", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 1 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["0", "1"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(true);
+    });
+
+    it("does not match a score outside the range", () => {
       const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.5 })];
       const filters: TriggerFilters = {
-        "evaluations.score": { "eval-abc": { score: ["0.85"] } },
+        "evaluations.score": { "eval-abc": { score: ["0.6", "0.9"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches nothing for an inverted range", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.5 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["1", "0"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches nothing for a non-numeric range", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.5 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["low", "high"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches nothing for a bound with trailing non-numeric text", () => {
+      // `parseFloat("0.6x")` is 0.6; `Number("0.6x")` is NaN. The matcher must
+      // fail closed on a trailing-text bound, not silently parse it and fire.
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.7 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["0.6x", "0.9"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches nothing for a blank bound", () => {
+      // `Number("")` is 0 — a blank bound must be rejected explicitly, not
+      // treated as a 0 boundary.
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.7 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["", "0.9"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches nothing when the range has fewer than two bounds", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.5 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["0.5"] } },
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
 
     it("does not match a score attached to an errored run", () => {
       const evals = [
-        makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 }),
+        makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.73 }),
       ];
       const filters: TriggerFilters = {
-        "evaluations.score": { "eval-abc": { score: ["0.85"] } },
+        "evaluations.score": { "eval-abc": { score: ["0", "1"] } },
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
