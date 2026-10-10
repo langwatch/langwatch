@@ -97,3 +97,6 @@ because 64 sends were still out; `lastError` is the newest refusal or transport 
    `retryAfter` for a 429/503). To see the door refuse on purpose, post a broken export as
    JSON (`--body-file broken.json --encoding json`); the sim only refuses a body with no
    `resourceSpans`, `resourceLogs` or `resourceMetrics`.
+5. Out of order across batches: `haven sim telemetry fixture llm-trace --seed <n> | jq .body > t.json`, split it
+   with `jq '.resourceSpans[].scopeSpans[].spans |= map(select((.parentSpanId // "") != ""))'` (children; `==` for the root),
+   `post --body-file` the children, then the root; `haven api GET /api/traces/<traceId>` should hold every span.
