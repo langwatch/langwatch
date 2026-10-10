@@ -30,6 +30,13 @@ Feature: Enterprise billing compatibility
     When the webhook receives it
     Then the body holds the message's fields and no "timeout"
 
+  @unit
+  Scenario: A blank Stripe API base reads as unset and the api still boots
+    Given STRIPE_API_BASE is exported blank
+    When the process parses its configuration
+    Then the Stripe API base is unset, so Stripe itself is reached
+    And a value that is set but not a URL is still refused by name
+
   Rule: A billing month names one whole calendar month in UTC
 
     The month a usage figure is billed under is a UTC calendar month, not a
