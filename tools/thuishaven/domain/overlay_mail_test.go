@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // @scenario "A stack with the mail lane sends its email into the sink"
 func TestMailSMTPEnvInjectsWhenNoProviderIsConfigured(t *testing.T) {
@@ -57,6 +60,16 @@ func TestMailSMTPEnvInjectsOverABareProviderKey(t *testing.T) {
 		}
 		if got := valueOf(env, "SMTP_PORT"); got != "45510" {
 			t.Fatalf("with only %s set, SMTP_PORT = %q, want the sink's port", key, got)
+		}
+	}
+}
+
+// @scenario "A stack started with --no-mail has no mail provider"
+func TestNoMailEnvBlanksEveryMailSetting(t *testing.T) {
+	env := NoMailEnv()
+	for _, want := range []string{"EMAIL_PROVIDER=", "SMTP_URL=", "SMTP_HOST=", "USE_AWS_SES=", "SENDGRID_API_KEY=", "RESEND_API_KEY="} {
+		if !slices.Contains(env, want) {
+			t.Errorf("NoMailEnv %v lacks %q", env, want)
 		}
 	}
 }

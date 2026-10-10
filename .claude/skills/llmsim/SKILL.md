@@ -26,6 +26,7 @@ seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
 - Models: `markov-small`, `markov-json`, `markov-tools`, `langy-echo`, `text-embedding-llmsim`; any name works.
 - `canned-hello`, `canned-ok`, `canned-json` return that fixed text for every prompt.
 - `error-429` / `error-500` in the model name, or header `X-Llmsim-Error`, force that error.
+- The seed gives the OpenAI provider custom models `error-429` and `error-500` (on a newly created row), so any member can pick them in a model selector.
 - `X-Llmsim-Seed` pins or (`random`) varies the answer; `X-Llmsim-Mode: langy` echoes.
 - `response_format` json_schema and forced tools get schema-valid output.
 - Agentic runs: `tools` in the model name (`markov-tools`) or `X-Llmsim-Tools: auto` makes
@@ -48,6 +49,8 @@ GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"
 - Caps: `LLMSIM_MAX_CALLS` (default 500) and `LLMSIM_MAX_BODY_BYTES` (default 262144 per
   recorded request; larger bodies keep a size and a head).
 - A load run should hit the loopback port; the sims lane keeps it off the gateway's process.
+- SDK experiment runs on llmsim: `dev/scripts/dogfood/experiments/run.sh log_steps` (a small GEPA run, steps via
+  `/api/dspy/log_steps`) or `run.sh compare` (SDK comparison; the judge needs langevals). Each prints the experiment URL.
 
 ## From a terminal or agent
 

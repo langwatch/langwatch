@@ -44,6 +44,7 @@ import {
   seedEmailAddress,
 } from "./seed-identity.ts";
 import { chooseSeedLicense, type SeedLicenseChoice } from "./seed-license.ts";
+import { llmsimCustomModels } from "./seed-llmsim-models.ts";
 
 const logger = createLogger("langwatch:tasks:storage-seed");
 
@@ -678,6 +679,7 @@ async function seedModelProviderFromEnv({
 
   const id = MODEL_PROVIDER_ID_PREFIX + provider;
   const customKeys = encryption.encrypt(JSON.stringify(keys));
+  const customModels = llmsimCustomModels({ provider, environment: envMap });
   const row = await prisma.modelProvider.upsert({
     where: { id },
     create: {
@@ -686,6 +688,7 @@ async function seedModelProviderFromEnv({
       provider,
       enabled: true,
       customKeys,
+      ...(customModels ? { customModels } : {}),
       organizationId,
     },
     update: { customKeys, enabled: true, disabledAt: null },

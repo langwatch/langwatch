@@ -125,6 +125,13 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the seed's environment carries OPENAI_BASE_URL and ANTHROPIC_BASE_URL pointing at llmsim
     So that the seeded OpenAI and Anthropic provider rows reach llmsim, not the vendor
 
+  @unit
+  Scenario: The seeded OpenAI provider offers llmsim's error models
+    Given haven routes the OpenAI provider at llmsim
+    When the storage seed creates the OpenAI provider row
+    Then its custom models are "error-429" and "error-500", so a member can pick a model that fails
+    And without haven's llmsim marker the row gets no custom models
+
   Scenario: A developer's own provider base URL wins over llmsim
     Given .env names OPENAI_BASE_URL
     When the developer runs "haven up +llm"

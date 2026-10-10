@@ -204,6 +204,9 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
 	p.base = append(p.base, simulatorsEnv(opts.Selection, st, repoDir)...)
+	if os.Getenv(domain.NoMailKnob) == "1" {
+		p.base = append(p.base, domain.NoMailEnv()...) // after mailsim's SMTP lines, so these win
+	}
 	return p
 }
 

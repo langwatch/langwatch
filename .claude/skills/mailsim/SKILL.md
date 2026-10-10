@@ -16,6 +16,7 @@ nothing, whatever the recipient domain. Code: `services/mailsim`, console
 - URL: `https://mail.<slug>.langwatch.localhost` (console); `haven status` shows the
   loopback HTTP port (`MAILSIM_HTTP_ADDR`) and the SMTP port (`MAILSIM_SMTP_ADDR`).
 - The app's own mail is routed at it (`SMTP_HOST=127.0.0.1`) unless `.env` names a provider.
+- No mail provider at all (even one `.env` names): `haven up --no-mail --force` blanks every mail setting for that run; `haven up --force` restores it. It restarts the stack.
 - Standalone: `make service svc=mailsim` (HTTP :5580, SMTP :5581).
 
 ## Inspect and assert (HTTP)

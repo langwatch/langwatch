@@ -114,7 +114,7 @@ var envHelpText = `Environment variables.
 
     These describe ONE run rather than one machine, so they are read from the
     process environment only: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED,
-    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR,
+    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, HAVEN_NO_MAIL, NO_COLOR, FORCE_COLOR,
     HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT, HAVEN_JOB_DIR,
     CLAUDE_JOB_DIR. Every worktree shares one
     .env, so pinning a slug or a baseline marker there would apply it to all of

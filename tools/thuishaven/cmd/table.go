@@ -11,6 +11,7 @@ import (
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The CLI constitution (ADR-064): one name per command (no aliases, ever), one
@@ -246,10 +247,14 @@ var baseTable = []commandSpec{
 			{long: "--ui", takesValue: true, value: "<built|watch|bundled>", summary: "built (the default) serves a production build of apps/ui from the api, built once at up and on `haven reload ui`; watch rebuilds it on a change and open pages reload once idle; bundled runs Vite bundledDev with HMR. `pnpm dev` runs the Vite dev server outside haven; sticks"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
+			{long: "--no-mail", summary: "the app sees no mail provider, even one .env names (HAVEN_NO_MAIL=1 does too); not sticky"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if inv.has("--no-seed") {
 				disableAutoSeed()
+			}
+			if inv.has("--no-mail") {
+				_ = os.Setenv(domain.NoMailKnob, "1")
 			}
 			if err := rejectRemovedSelectionEnv(); err != nil {
 				return err

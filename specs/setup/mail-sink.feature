@@ -82,6 +82,12 @@ Feature: Local mail sink (mailsim)
     When the stack is planned
     Then haven injects SMTP settings pointing the app at the sink
 
+  @unit
+  Scenario: A stack started with --no-mail has no mail provider
+    Given a `.env` that names a real email provider
+    When the developer runs `haven up --no-mail`
+    Then every mail setting reaches the app blank, so it sees no mail provider
+
   # --- Reading mail from the CLI -------------------------------------------
 
   @unit

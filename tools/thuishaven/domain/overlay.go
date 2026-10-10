@@ -395,6 +395,20 @@ func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
 	}
 }
 
+// NoMailKnob is the per-run variable `haven up --no-mail` sets.
+const NoMailKnob = "HAVEN_NO_MAIL"
+
+// NoMailEnv blanks every mail setting for `haven up --no-mail`: an empty
+// variable beats the root .env under node --env-file, so the app sees no
+// provider. A key only 1Password holds is out of its reach.
+func NoMailEnv() []string {
+	env := []string{"SENDGRID_API_KEY=", "RESEND_API_KEY="}
+	for _, key := range MailProviderEnvVars {
+		env = append(env, key+"=")
+	}
+	return env
+}
+
 // StorageProviderEnvVars are the env keys that mean a developer chose where
 // objects go: a named backend, a bucket, an endpoint, or a filesystem root.
 // Any one set means haven points nothing at storagesim.
@@ -576,6 +590,9 @@ func LLMProviderEnv(resolved map[string]string, port int) []string {
 		env = append(env, p.url+"="+p.value)
 		if resolved[p.key] == "" {
 			env = append(env, p.key+"=llmsim")
+		}
+		if p.url == "OPENAI_BASE_URL" {
+			env = append(env, "HAVEN_SEED_LLMSIM_MODELS=1") // the seed adds error-429/500 models
 		}
 	}
 	return env

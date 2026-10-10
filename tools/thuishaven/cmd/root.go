@@ -995,7 +995,7 @@ func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 //
 // Deliberately not used for the switches that describe one run rather than one
 // machine: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED, HAVEN_SEED_TRACES,
-// HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR. Every worktree inherits the
+// HAVEN_STUB, HAVEN_AGENT, HAVEN_NO_MAIL, NO_COLOR, FORCE_COLOR. Every worktree inherits the
 // same .env, so a slug or a baseline marker pinned there would claim all of
 // them at once, and a seed flag would re-seed on every up. Keep this list and
 // the ENVIRONMENT section of help.go in step.
