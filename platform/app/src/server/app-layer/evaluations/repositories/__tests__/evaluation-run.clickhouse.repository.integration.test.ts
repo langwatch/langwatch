@@ -12,11 +12,14 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { narrowAuthorization } from "@langwatch/actor";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { EvaluationRunData } from "../../types";
-import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 
 const tenantId = `test-eval-resolve-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
@@ -59,7 +62,7 @@ beforeAll(async () => {
   const rawClient = getTestClickHouseClient();
   if (!rawClient) throw new Error("ClickHouse test container not available");
   ch = rawClient;
-  repo = new EvaluationRunClickHouseRepository({
+  repo = evaluationRunRepositoryFor({
     resolveClient: async () => ch,
   });
 
@@ -93,7 +96,7 @@ afterAll(async () => {
 describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", () => {
   it("returns the latest version when no ScheduledAt hint is passed", async () => {
     const result = await repo.getByEvaluationId({
-      tenantId,
+      authorization: ownProof({ projectId: tenantId }),
       evaluationId: "eval-resolve-1",
     });
 
@@ -116,12 +119,12 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository({
+    const recordingRepo = evaluationRunRepositoryFor({
       resolveClient: async () => recordingClient,
     });
 
     const result = await recordingRepo.getByEvaluationId({
-      tenantId,
+      authorization: ownProof({ projectId: tenantId }),
       evaluationId: "eval-resolve-1",
     });
 
@@ -151,12 +154,12 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository({
+    const recordingRepo = evaluationRunRepositoryFor({
       resolveClient: async () => recordingClient,
     });
 
     const result = await recordingRepo.getByEvaluationId({
-      tenantId,
+      authorization: ownProof({ projectId: tenantId }),
       evaluationId: `missing-${nanoid()}`,
     });
 
@@ -210,7 +213,10 @@ describe("EvaluationRunClickHouseRepository.findByTraceId (integration)", () => 
 
   describe("when the trace has evaluation runs", () => {
     it("returns the latest version of each run on that trace", async () => {
-      const runs = await repo.findByTraceId(tenantId, traceId);
+      const runs = await repo.findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId,
+      });
 
       expect(
         runs
@@ -244,8 +250,91 @@ describe("EvaluationRunClickHouseRepository.findByTraceId (integration)", () => 
   describe("when the trace has no evaluation runs", () => {
     it("returns nothing", async () => {
       expect(
-        await repo.findByTraceId(tenantId, `trace-none-${nanoid()}`),
+        await repo.findByTraceId({
+          authorization: ownProof({ projectId: tenantId }),
+          traceId: `trace-none-${nanoid()}`,
+        }),
       ).toEqual([]);
+    });
+  });
+});
+
+describe("EvaluationRunClickHouseRepository.findByTraceId under an aggregate's proof (integration)", () => {
+  const aggregate = `test-eval-aggregate-${nanoid()}`;
+  const memberA = `test-eval-member-a-${nanoid()}`;
+  const memberB = `test-eval-member-b-${nanoid()}`;
+  const outsider = `test-eval-outsider-${nanoid()}`;
+  const sharedTraceId = `trace-shared-${nanoid()}`;
+  const proof = () =>
+    aggregateProof({
+      projectId: aggregate,
+      members: [
+        { projectId: memberA, from: 0 },
+        { projectId: memberB, from: 0 },
+      ],
+    });
+
+  beforeAll(async () => {
+    await repo.upsert(
+      makeEval(`eval-a-${nanoid()}`, {
+        traceId: sharedTraceId,
+        evaluatorId: "monitor-a",
+      }),
+      memberA,
+    );
+    await repo.upsert(
+      makeEval(`eval-b-${nanoid()}`, {
+        traceId: sharedTraceId,
+        evaluatorId: "monitor-b",
+      }),
+      memberB,
+    );
+    await repo.upsert(
+      makeEval(`eval-out-${nanoid()}`, {
+        traceId: sharedTraceId,
+        evaluatorId: "monitor-out",
+      }),
+      outsider,
+    );
+  }, 60_000);
+
+  afterAll(async () => {
+    await ch.exec({
+      query:
+        "ALTER TABLE evaluation_runs DELETE WHERE TenantId IN ({tenants:Array(String)})",
+      query_params: { tenants: [memberA, memberB, outsider] },
+    });
+  });
+
+  describe("when the proof is narrowed to the member that holds the trace", () => {
+    /** @scenario "The owner's existing evaluation results show on a member trace" */
+    it("returns that member's evaluation and not the other member's of the same trace id", async () => {
+      const narrowed = narrowAuthorization({
+        authorization: proof(),
+        projectId: memberA,
+      });
+      if (!narrowed) throw new Error("expected member A in the proof");
+
+      const runs = await repo.findByTraceId({
+        authorization: narrowed,
+        traceId: sharedTraceId,
+      });
+
+      expect(runs.map((run) => run.evaluatorId)).toEqual(["monitor-a"]);
+    });
+  });
+
+  describe("when the proof spans every member", () => {
+    it("reads each member's evaluation and nothing from outside the proof", async () => {
+      const runs = await repo.findByTraceId({
+        authorization: proof(),
+        traceId: sharedTraceId,
+      });
+
+      expect(runs.map((run) => run.evaluatorId).sort()).toEqual([
+        "monitor-a",
+        "monitor-b",
+      ]);
     });
   });
 });

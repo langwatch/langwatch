@@ -10,6 +10,7 @@ function payloadItem(
 ): SessionGroupPayloadItem {
   return {
     conversationId: "sess-1",
+    projectId: "project-member",
     traceCount: 42,
     totalCost: 3.5,
     totalTokens: 120_000,
@@ -77,8 +78,10 @@ describe("given a session group payload from the sessions procedure", () => {
         lastMessage: "make the tests pass",
         lastOutput: "all green",
         worstStatus: "ok",
-        // What a click on the row opens: the conversation's newest trace.
+        // What a click on the row opens: the conversation's newest trace,
+        // in the project the session belongs to.
         lastTraceId: "trace-latest",
+        projectId: "project-member",
       });
       // Turn rows load lazily on expand; the totals never depend on them.
       expect(group.traces).toEqual([]);

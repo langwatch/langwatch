@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
+import type { Authorization } from "@langwatch/actor";
 import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 
 /**
@@ -52,9 +53,13 @@ export interface TraceAnalyticsRepository {
    * applies it verbatim (a pruning optimisation only), so a caller that cannot
    * rule out a row outside its window retries without one — the fold path gets
    * that retry from the executor's declared-read-window contract.
+   *
+   * The proof fences the tenants the read may see (ADR-144 block C). The
+   * fold mints an own-only one for the tenant it folds, so the read-back sees
+   * exactly the row the fold wrote.
    */
   findByTraceIdWithApplied(params: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null>;

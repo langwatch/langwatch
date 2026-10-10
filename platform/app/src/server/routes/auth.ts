@@ -13,7 +13,9 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { sessionRevocation } from "~/server/app-layer/identity/runtime";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
@@ -50,6 +52,11 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
 
   if (!project) {
     return c.json({ message: "Invalid auth token." }, 401);
+  }
+  // ADR-144 decision 7: an aggregate accepts no key, so an SDK must not be
+  // told its stored one is good to send traces with.
+  if (traceDestinationViolation(project.kind)) {
+    throw new AggregateProjectHasNoCredentialError();
   }
 
   return c.json({ projectSlug: project.slug });

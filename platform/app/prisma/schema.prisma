@@ -1773,9 +1773,18 @@ model Project {
   ///     (project picker, /api/v1/projects, billing exports, RBAC
   ///     pickers, etc.) - the regression-test invariant in
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
+  ///   - "aggregate": a project that owns no traces and reads its member
+  ///     projects through shared project-reader grants (ADR-144). Hidden
+  ///     from every "send traces here" picker and from ingestion; visible in
+  ///     the project switcher to organisation admins only.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
   kind                String                    @default("application")
+  /// The scope rule an aggregate project materialises into grants. Null on
+  /// every other kind; decided in ADR-144. Shapes: { kind: "all-personal" } |
+  /// { kind: "personal-by-department", departmentId } |
+  /// { kind: "explicit", projectIds: string[] }.
+  aggregateRule       Json?
   firstMessage        Boolean                   @default(false)
   integrated          Boolean                   @default(false)
   createdAt           DateTime                  @default(now())
@@ -4138,7 +4147,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-server; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration | aggregate-reconciler (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-server; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
@@ -4162,6 +4171,12 @@ model Grant {
   createdByUserId String?
   expiresAt       DateTime?
   maxViews        Int?
+
+  // ADR-144 / ADR-166: what a SHARED grant lets its principal reach. Null on
+  // every own grant. Shape: { type: "trace" | "span" | "log", where?: OTTL
+  // (empty in v1), from?: ISO date, until?: ISO date }. Owned by the fold
+  // like every other fact column; the proof minted at the door copies it.
+  condition Json?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())

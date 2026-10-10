@@ -1,4 +1,13 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
+import {
+  type AuthorizedClickHouse,
+  ownProjectIdOf,
+  singleTenantOf,
+  tenantScope,
+  tenantScopeKey,
+  tenantSet,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -10,10 +19,12 @@ import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import { capSerializedInputs, capText } from "../evaluation-column-caps";
-import type { EvalSummary, EvaluationRunData } from "../types";
+import type { EvaluationRunData } from "../types";
 import type {
   EvaluationRunRepository,
+  FindByTraceIdParams,
   GetByEvaluationIdParams,
+  TenantEvalSummary,
 } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
@@ -67,12 +78,22 @@ export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
   private readonly resolveClient: ClickHouseClientResolver;
+  /**
+   * The proof-fenced reader every read goes through (ADR-144 blocks C and
+   * F). Only the writes resolve a tenant's own client, since a write carries
+   * no proof; the lint gate in
+   * `clients/clickhouse/__tests__/store-call-carries-authorization.unit.test.ts`
+   * keeps it so.
+   */
+  private readonly clickhouse: AuthorizedClickHouse;
 
   constructor({
     resolveClient,
+    clickhouse,
     retentionResolver,
   }: {
     resolveClient: ClickHouseClientResolver;
+    clickhouse: AuthorizedClickHouse;
     /**
      * Bounds the ScheduledAt resolver's fallback to this tenant's own retention
      * horizon. Optional so existing construction sites keep working on the
@@ -81,6 +102,7 @@ export class EvaluationRunClickHouseRepository
     retentionResolver?: RetentionPolicyResolver;
   }) {
     this.resolveClient = resolveClient;
+    this.clickhouse = clickhouse;
     this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
 
@@ -201,10 +223,10 @@ export class EvaluationRunClickHouseRepository
    * pays the unbounded fallback.
    */
   private async resolveScheduledAtMs({
-    tenantId,
+    authorization,
     evaluationId,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     evaluationId: string;
   }): Promise<{ scheduledAtMs?: number; floorMs: number }> {
     // Floor the fallback at this tenant's retention horizon rather than leaving
@@ -219,11 +241,11 @@ export class EvaluationRunClickHouseRepository
     // bounded on the one path that used to leave it unbounded.
     const floorMs = await this.retentionFloor.getFloorMs({
       table: TABLE_NAME,
-      tenantId,
+      tenantId: retentionTenantOf(authorization),
     });
 
     const recent = await this.queryScheduledAtMs({
-      tenantId,
+      authorization,
       evaluationId,
       sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
     });
@@ -231,7 +253,7 @@ export class EvaluationRunClickHouseRepository
 
     return {
       scheduledAtMs: await this.queryScheduledAtMs({
-        tenantId,
+        authorization,
         evaluationId,
         sinceMs: floorMs,
       }),
@@ -259,12 +281,12 @@ export class EvaluationRunClickHouseRepository
    * evaluations legitimately scheduled into the future.
    */
   private async resolveScheduledAtRange({
-    tenantId,
+    authorization,
     evaluationId,
     hintedScheduledAtMs,
     slackMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     evaluationId: string;
     hintedScheduledAtMs?: number;
     slackMs: number;
@@ -280,7 +302,7 @@ export class EvaluationRunClickHouseRepository
     // from a cheap sort-key point seek so the heavy read still prunes
     // partitions instead of scanning every weekly one incl. cold S3.
     const { scheduledAtMs, floorMs } = await this.resolveScheduledAtMs({
-      tenantId,
+      authorization,
       evaluationId,
     });
 
@@ -290,15 +312,15 @@ export class EvaluationRunClickHouseRepository
   }
 
   private async queryScheduledAtMs({
-    tenantId,
+    authorization,
     evaluationId,
     sinceMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     evaluationId: string;
     sinceMs?: number;
   }): Promise<number | undefined> {
-    const client = await this.resolveClient(tenantId);
+    const client = this.clickhouse.as(authorization, { reads: "traces" });
     const windowPredicate =
       sinceMs !== undefined
         ? "AND ScheduledAt >= fromUnixTimestamp64Milli({sinceMs:Int64})"
@@ -307,14 +329,12 @@ export class EvaluationRunClickHouseRepository
       query: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("ScheduledAt")}
           AND EvaluationId = {evaluationId:String}
           ${windowPredicate}
       `,
       query_params:
-        sinceMs !== undefined
-          ? { tenantId, evaluationId, sinceMs }
-          : { tenantId, evaluationId },
+        sinceMs !== undefined ? { evaluationId, sinceMs } : { evaluationId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
@@ -329,17 +349,12 @@ export class EvaluationRunClickHouseRepository
   }
 
   async getByEvaluationId({
-    tenantId,
+    authorization,
     evaluationId,
     hints,
   }: GetByEvaluationIdParams): Promise<EvaluationRunData | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "EvaluationRunClickHouseRepository.getByEvaluationId",
-    );
-
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.clickhouse.as(authorization, { reads: "traces" });
 
       // IN-tuple dedup over the ReplacingMergeTree, with two ClickHouse-
       // specific shapes that matter under load:
@@ -365,10 +380,16 @@ export class EvaluationRunClickHouseRepository
       // projected UInt64 alias instead of the raw DateTime64 column and the
       // type comparison would break. See
       // dev/docs/best_practices/clickhouse-queries.md.
+      //
+      // The same alias decides where the fence goes. Its windowed form names
+      // a bare `ScheduledAt`, which in the outer scope is that UInt64 alias,
+      // so the window is applied once, in the dedup subquery that reads the
+      // raw column; the outer scope takes the tenant set alone, which the
+      // IN-tuple already narrows to the winning (tenant, evaluation) row.
 
       const { scheduledAtFrom, scheduledAtTo } =
         await this.resolveScheduledAtRange({
-          tenantId,
+          authorization,
           evaluationId,
           hintedScheduledAtMs: hints?.scheduledAt?.getTime(),
           slackMs: hints?.scheduledAtSlackMs ?? 7 * 24 * 60 * 60 * 1000,
@@ -415,18 +436,17 @@ export class EvaluationRunClickHouseRepository
           PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("ScheduledAt")}
               AND EvaluationId = {evaluationId:String}
               ${innerPartitionPredicate}
             GROUP BY TenantId, EvaluationId
           )
-          WHERE t.TenantId = {tenantId:String}
+          WHERE ${tenantSet()}
             AND t.EvaluationId = {evaluationId:String}
             ${partitionPredicate}
           LIMIT 1
         `,
         query_params: {
-          tenantId,
           evaluationId,
           scheduledAtFrom,
           ...(scheduledAtTo !== undefined ? { scheduledAtTo } : {}),
@@ -441,29 +461,30 @@ export class EvaluationRunClickHouseRepository
       return this.fromClickHouseRecord(row);
     } catch (error) {
       logger.warn(
-        { tenantId, evaluationId, error },
+        {
+          evaluationId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to get evaluation run from ClickHouse",
       );
       throw error;
     }
   }
 
-  async findByTraceId(
-    tenantId: string,
-    traceId: string,
-  ): Promise<EvaluationRunData[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "EvaluationRunClickHouseRepository.findByTraceId",
-    );
-
+  async findByTraceId({
+    authorization,
+    traceId,
+  }: FindByTraceIdParams): Promise<EvaluationRunData[]> {
     // The outer query reads every column through the `t.` alias: the SELECT
     // projects `toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt`, and a bare
     // `UpdatedAt` in WHERE resolves to that integer alias, which never equals
     // the subquery's DateTime64 `max(UpdatedAt)`, so the read returns no rows.
-    // See dev/docs/best_practices/clickhouse-queries.md.
+    // See dev/docs/best_practices/clickhouse-queries.md. The windowed fence
+    // names a bare `ScheduledAt` for the same reason, so it sits in the
+    // dedup subquery and the outer scope takes the tenant set alone.
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.clickhouse.as(authorization, { reads: "traces" });
       const result = await client.query({
         query: `
           SELECT
@@ -494,20 +515,20 @@ export class EvaluationRunClickHouseRepository
             t.LastProcessedEventId AS LastProcessedEventId,
             toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
+          WHERE ${tenantSet()}
             AND t.ScheduledAt >= now() - INTERVAL 7 DAY
             AND t.TraceId = {traceId:String}
             AND (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= now() - INTERVAL 7 DAY
                 AND TraceId = {traceId:String}
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY t.UpdatedAt DESC
         `,
-        query_params: { tenantId, traceId },
+        query_params: { traceId },
         format: "JSONEachRow",
       });
 
@@ -518,30 +539,40 @@ export class EvaluationRunClickHouseRepository
       return rows.map((row) => this.fromClickHouseRecord(row));
     } catch (error) {
       logger.warn(
-        { tenantId, traceId, error },
+        {
+          traceId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to find evaluation runs by trace ID in ClickHouse",
       );
       throw error;
     }
   }
 
-  async findSummariesByTraceIds(
-    tenantId: string,
-    traceIds: string[],
-    since: number,
-  ): Promise<Record<string, EvalSummary[]>> {
-    if (traceIds.length === 0) return {};
-
-    EventUtils.validateTenantId(
-      { tenantId },
-      "EvaluationRunClickHouseRepository.findSummariesByTraceIds",
-    );
+  /**
+   * The fence is the only tenant predicate, in the outer scope and in the
+   * dedup subquery alike, on `ScheduledAt`, the table's partition column
+   * (migration 00002). The window on a shared grant applies to the
+   * evaluation's own time, which is what the list's `since` bounds too.
+   */
+  async findSummariesByTraceIds({
+    authorization,
+    traceIds,
+    since,
+  }: {
+    authorization: Authorization;
+    traceIds: string[];
+    since: number;
+  }): Promise<TenantEvalSummary[]> {
+    if (traceIds.length === 0) return [];
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.clickhouse.as(authorization, { reads: "traces" });
       const result = await client.query({
         query: `
           SELECT
+            TenantId,
             EvaluationId,
             EvaluatorId,
             EvaluatorType,
@@ -553,24 +584,25 @@ export class EvaluationRunClickHouseRepository
             Passed,
             Label
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("ScheduledAt")}
             AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
             AND TraceId IN ({traceIds:Array(String)})
             AND (TenantId, EvaluationId, UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
                 AND TraceId IN ({traceIds:Array(String)})
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceIds, since },
+        query_params: { traceIds, since },
         format: "JSONEachRow",
       });
 
       interface SlimRow {
+        TenantId: string;
         EvaluationId: string;
         EvaluatorId: string;
         EvaluatorType: string;
@@ -585,38 +617,33 @@ export class EvaluationRunClickHouseRepository
 
       const rows = await result.json<SlimRow>();
 
-      const byTrace: Record<string, EvalSummary[]> = {};
-
-      // Dedup is now enforced by the IN-tuple subquery — no JS-side `seen` set.
-      for (const row of rows) {
+      // Dedup is enforced by the IN-tuple subquery; no JS-side `seen` set.
+      return rows.flatMap((row): TenantEvalSummary[] => {
         const traceId = row.TraceId;
-        if (!traceId) continue;
-
-        const summary: EvalSummary = {
-          evaluationId: row.EvaluationId,
-          evaluatorId: row.EvaluatorId,
-          evaluatorType: row.EvaluatorType,
-          evaluatorName: row.EvaluatorName,
-          traceId,
-          isGuardrail: !!row.IsGuardrail,
-          status: row.Status as EvalSummary["status"],
-          score: row.Score,
-          passed: row.Passed === null ? null : !!row.Passed,
-          label: row.Label,
-        };
-
-        const arr = byTrace[traceId];
-        if (arr) {
-          arr.push(summary);
-        } else {
-          byTrace[traceId] = [summary];
-        }
-      }
-
-      return byTrace;
+        if (!traceId) return [];
+        return [
+          {
+            tenantId: row.TenantId,
+            evaluationId: row.EvaluationId,
+            evaluatorId: row.EvaluatorId,
+            evaluatorType: row.EvaluatorType,
+            evaluatorName: row.EvaluatorName,
+            traceId,
+            isGuardrail: !!row.IsGuardrail,
+            status: row.Status as TenantEvalSummary["status"],
+            score: row.Score,
+            passed: row.Passed === null ? null : !!row.Passed,
+            label: row.Label,
+          },
+        ];
+      });
     } catch (error) {
       logger.warn(
-        { tenantId, traceIdCount: traceIds.length, error },
+        {
+          traceIdCount: traceIds.length,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
       throw error;
@@ -729,4 +756,17 @@ export class EvaluationRunClickHouseRepository
       _retention_days: retentionDays,
     };
   }
+}
+
+/**
+ * The tenant whose retention horizon floors an unhinted evaluation read: the
+ * one project the proof reads, else the project it was minted for. The
+ * worker and the fold store mint an own-only proof, so both name the same
+ * project.
+ */
+function retentionTenantOf(authorization: Authorization): string {
+  return (
+    singleTenantOf({ authorization, reads: "traces" }) ??
+    ownProjectIdOf({ authorization, reads: "traces" })
+  );
 }

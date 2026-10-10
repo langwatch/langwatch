@@ -549,6 +549,10 @@ describe("readAuthoredMessage", () => {
       ["a real SQL fragment", "SELECT id FROM traces WHERE project_id = $1"],
       ["a stack frame", "boom\n    at Object.handler (/app/index.js:1:1)"],
       ["a runtime error prefix", "TypeError: cannot read properties of null"],
+      [
+        "a request router's missing-procedure answer",
+        'No procedure found on path "project.aggregateMemberCandidates"',
+      ],
     ])("still refuses %s", (_label, message) => {
       expect(readAuthoredMessage(trpcError(400, message))).toBeUndefined();
     });

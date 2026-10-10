@@ -1,8 +1,22 @@
 import { z } from "zod";
 import type { Prisma } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer/app";
+import {
+  assertProjectAcceptsWrites,
+  projectAcceptsWrites,
+} from "~/server/app-layer/projects/project-write-guard";
 import { savedViewErrorHandler } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+/**
+ * Refuses a saved-view write on an aggregate project (ADR-144 decision 8).
+ * The writes below are declared under `traces:view`, so a member who only
+ * reads traces can still keep a view; the permission-level guard reads that
+ * as a read and never sees them, so each asks the same guard itself.
+ */
+const refuseOnAggregate = (projectId: string) =>
+  assertProjectAcceptsWrites({ kinds: getApp().projectKinds, projectId });
 
 /**
  * Saved Views Router - Manages saved view CRUD operations for traces page
@@ -35,6 +49,12 @@ export const savedViewsRouter = createTRPCRouter({
         projectId: input.projectId,
         userId: ctx.session.user.id,
         kind: input.kind,
+        // A query, so the mutation write guard never sees the seed: on an
+        // aggregate it reads what exists and writes nothing.
+        acceptsWrites: await projectAcceptsWrites({
+          kinds: getApp().projectKinds,
+          projectId: input.projectId,
+        }),
       });
     }),
 
@@ -74,6 +94,7 @@ export const savedViewsRouter = createTRPCRouter({
     .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      await refuseOnAggregate(input.projectId);
       const service = SavedViewService.create(ctx.prisma);
       return await service.createView({
         projectId: input.projectId,
@@ -102,6 +123,7 @@ export const savedViewsRouter = createTRPCRouter({
     .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      await refuseOnAggregate(input.projectId);
       const service = SavedViewService.create(ctx.prisma);
       return await service.delete({
         projectId: input.projectId,
@@ -124,6 +146,7 @@ export const savedViewsRouter = createTRPCRouter({
     .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      await refuseOnAggregate(input.projectId);
       const service = SavedViewService.create(ctx.prisma);
       return await service.rename({
         projectId: input.projectId,
@@ -146,6 +169,7 @@ export const savedViewsRouter = createTRPCRouter({
     .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      await refuseOnAggregate(input.projectId);
       const service = SavedViewService.create(ctx.prisma);
       return await service.reorder({
         projectId: input.projectId,

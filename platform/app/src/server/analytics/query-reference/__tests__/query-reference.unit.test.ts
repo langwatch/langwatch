@@ -127,7 +127,7 @@ describe("the trace filter example library", () => {
     )("parses, passes the semantic check and translates %s", (_id, example) => {
       const ast = parse(example.text);
       expect(validateAst(ast)).toBeNull();
-      const translated = translateFilterToClickHouse(example.text, "tenant-a", {
+      const translated = translateFilterToClickHouse(example.text, {
         from: 0,
         to: 1,
       });
@@ -140,7 +140,7 @@ describe("the trace filter example library", () => {
     /**
      * The legacy builder names every parameter `f<n>` plus a suffix
      * (`f0_values`, `f0_k0_canonical`) and two window bounds; the translator
-     * names its own `<field>_<n>` plus a tenant and two time bounds. Both sets
+     * names its own `<field>_<n>` plus two time bounds. Both sets
      * land in one `query_params` object on the same statement, so a name
      * carrying two meanings would silently answer one of the two conditions
      * with the other's value.
@@ -148,15 +148,12 @@ describe("the trace filter example library", () => {
     /** @scenario "The filter's bound parameters cannot collide with the legacy filter's" */
     it("never emits a parameter the legacy builder also owns", () => {
       const legacyOwned = /^(f\d+_|spanWindowStart$|spanWindowEnd$)/;
-      const legacySharedValue = new Set(["tenantId"]);
       for (const example of TRACE_FILTER_EXAMPLES) {
-        const translated = translateFilterToClickHouse(
-          example.text,
-          "tenant-a",
-          { from: 0, to: 1 },
-        );
+        const translated = translateFilterToClickHouse(example.text, {
+          from: 0,
+          to: 1,
+        });
         for (const name of Object.keys(translated?.params ?? {})) {
-          if (legacySharedValue.has(name)) continue;
           expect(legacyOwned.test(name), `${example.id}: ${name}`).toBe(false);
         }
       }
