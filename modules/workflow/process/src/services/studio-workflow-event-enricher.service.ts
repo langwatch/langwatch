@@ -13,6 +13,7 @@ import {
   type StudioClientEvent,
   type StudioWorkflow,
   type WorkflowRunPrincipal,
+  WorkflowModelProviderUnavailableError,
 } from "@langwatch/workflow-contract";
 
 import type {
@@ -263,11 +264,11 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
     const provider = llm.model.split("/")[0]!;
     const resolution = input.resolutions.find((item) => item.model === llm.model);
     if (!resolution || !resolution.configured) {
-      throw new Error(`Model provider not configured: ${provider}`);
+      throw new WorkflowModelProviderUnavailableError({ provider, disabled: false });
     }
 
     if (!resolution.enabled) {
-      throw new Error(`${provider} model provider is disabled, go to settings to enable it`);
+      throw new WorkflowModelProviderUnavailableError({ provider, disabled: true });
     }
 
     if (!resolution.litellmParams) {

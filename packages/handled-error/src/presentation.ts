@@ -5838,6 +5838,16 @@ const presentations = {
     title: "This step has no model selected",
     describe: () => "Open the node and choose a model.",
   },
+  workflow_model_provider_unavailable: {
+    title: "A step's model provider isn't available",
+    describe: (error) => {
+      const provider = str(error, "provider", "");
+      const subject = provider ? `The ${provider} model provider` : "The model provider";
+      return error.meta.disabled === true
+        ? `${subject} is switched off. Turn it on in Settings, Model Providers, or pick another model.`
+        : `${subject} isn't set up for this project. Add it in Settings, Model Providers, or pick another model.`;
+    },
+  },
 
   // ---- code node ----
   code_runner_error: {

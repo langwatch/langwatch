@@ -848,6 +848,7 @@ export const APP_ERROR_CODES = [
   "workflow_execution_failed",
   "workflow_has_no_copies",
   "workflow_has_no_latest_version",
+  "workflow_model_provider_unavailable",
   "workflow_no_copies_selected",
   "workflow_not_a_copy",
   "workflow_not_found",
