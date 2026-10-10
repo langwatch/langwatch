@@ -42,12 +42,12 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
     }),
 };
 
-/** Light mode inks the icon with the toast's own text; dark mode tints it on the neutral panel. */
+/** The icon carries the status hue: light on the tinted glass, a tint on the dark panel. */
 const STATUS = {
-  error: { fg: { _light: "inherit", _dark: "red.fg" } },
-  warning: { fg: { _light: "inherit", _dark: "orange.fg" } },
-  success: { fg: { _light: "inherit", _dark: "green.fg" } },
-  info: { fg: { _light: "inherit", _dark: "fg.muted" } },
+  error: { fg: { _light: "red.300", _dark: "red.fg" } },
+  warning: { fg: { _light: "orange.300", _dark: "orange.fg" } },
+  success: { fg: { _light: "green.300", _dark: "green.fg" } },
+  info: { fg: { _light: "blue.300", _dark: "fg.muted" } },
   loading: { fg: "fg.muted" },
 } as const;
 
