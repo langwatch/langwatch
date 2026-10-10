@@ -6,11 +6,11 @@ import { AccessState } from "@langwatch/design-system/access-state";
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
 import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
+import { PolicySection } from "../elements/policy-section.tsx";
 
 const OFF_EXPLANATION =
   "Requiring two-step verification of every member is part of the Enterprise plan. Members can still set it up on their own accounts.";
@@ -41,7 +41,7 @@ export function TwoStepRequirementCard({
   const explanation = mfaRequired ? HELD_EXPLANATION : OFF_EXPLANATION;
 
   return (
-    <SettingsCard
+    <PolicySection
       title="Require two-step verification"
       hint="A code, a passkey, or one their identity provider confirms. Turning it on signs nobody out."
       badge={
@@ -54,10 +54,10 @@ export function TwoStepRequirementCard({
           gap={3}
           borderTopWidth="1px"
           borderColor="border.muted"
-          paddingTop={3}
+          paddingTop={1.5}
         >
           <VStack align="start" gap={0}>
-            <Text fontSize="sm">Require two-step verification</Text>
+            <Text fontSize="xs">Require two-step verification</Text>
             <Text color="fg.muted" fontSize="xs">
               Changes apply immediately.
             </Text>
@@ -66,6 +66,7 @@ export function TwoStepRequirementCard({
           <Tooltip content={explanation} disabled={!planLocked || mfaRequired}>
             <Box>
               <Switch
+                size="sm"
                 checked={mfaRequired}
                 disabled={saving || (!canTurnOn && !mfaRequired)}
                 onCheckedChange={(details) => onChange(details.checked)}
@@ -86,14 +87,14 @@ export function TwoStepRequirementCard({
           description={explanation}
           data-testid="two-step-requirement-plan-notice"
           actions={
-            <Button asChild size="sm" colorPalette="orange">
+            <Button asChild size="xs" colorPalette="orange">
               <Link href={planLink.href}>{planLink.label}</Link>
             </Button>
           }
         />
       )}
 
-      <Text fontSize="sm" data-testid="two-step-held-count">
+      <Text fontSize="xs" data-testid="two-step-held-count">
         {heldCount === 0
           ? `All ${memberCount} members can prove a second factor.`
           : `${heldCount} of ${memberCount} members cannot prove a second factor yet${
@@ -104,7 +105,7 @@ export function TwoStepRequirementCard({
       </Text>
 
       {connection.connected && !connection.assertsSecondFactor ? (
-        <Alert.Root status="warning" data-testid="two-step-connection-warning">
+        <Alert.Root size="sm" status="warning" data-testid="two-step-connection-warning">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>
@@ -119,6 +120,6 @@ export function TwoStepRequirementCard({
           </Alert.Content>
         </Alert.Root>
       ) : null}
-    </SettingsCard>
+    </PolicySection>
   );
 }

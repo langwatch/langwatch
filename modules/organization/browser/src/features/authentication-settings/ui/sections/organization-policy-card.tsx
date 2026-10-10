@@ -30,7 +30,7 @@ export function OrganizationPolicyCard({
   if (!canManage) return null;
 
   return (
-    <VStack align="stretch" gap={4} width="full" data-testid="organization-policy">
+    <VStack align="stretch" gap={2} width="full" maxWidth="2xl" data-testid="organization-policy">
       <JoinPolicyCard
         key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}:${joinRequests.joining.joinerRole}`}
         domainJoin={joinRequests.joining.domainJoin}

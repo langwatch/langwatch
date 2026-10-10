@@ -3,10 +3,19 @@ import type { SignInSecuritySettings } from "@langwatch/auth-contract";
  * The two sign-in security cards (GAC-09, GAC-10). Presentational: each is
  * handed the saved settings and a save callback, and keeps its own draft.
  */
-import { Alert, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Button,
+  HStack,
+  Input,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
-import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { useState } from "react";
+
+import { PolicySection } from "../elements/policy-section.tsx";
 
 const OFFERED_ATTEMPTS = 5;
 const OFFERED_LOCKOUT_MINUTES = 30;
@@ -53,17 +62,17 @@ function RuleOptions({
   testIdPrefix: string;
 }) {
   return (
-    <VStack align="stretch" gap={1}>
+    <VStack align="stretch" gap={0}>
       {options.map((option) => (
-        <RadioGroup.Item key={option.value} value={option.value} paddingY={1.5} alignItems="start">
+        <RadioGroup.Item key={option.value} value={option.value} paddingY={0.5} alignItems="start">
           <RadioGroup.ItemHiddenInput data-testid={`${testIdPrefix}-${option.value}`} />
           <RadioGroup.ItemIndicator marginTop={0.5} />
           <RadioGroup.ItemText>
             <VStack align="start" gap={0}>
-              <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
+              <Text fontSize="xs" fontWeight="medium" lineHeight="short">
                 {option.label}
               </Text>
-              <Text color="fg.muted" fontSize="xs" lineHeight="1.5">
+              <Text color="fg.muted" fontSize="xs" lineHeight="short">
                 {option.help}
               </Text>
             </VStack>
@@ -93,12 +102,12 @@ function NumberField({
 }) {
   return (
     <VStack align="stretch" gap={1}>
-      <Text fontSize="13px" fontWeight="500">
+      <Text fontSize="xs" fontWeight="medium">
         {label}
       </Text>
       <HStack gap={2}>
         <Input
-          size="sm"
+          size="xs"
           type="number"
           width="84px"
           value={value === 0 && placeholder !== undefined ? "" : String(value)}
@@ -139,13 +148,13 @@ function SaveAction({
       flexWrap="wrap"
       borderTopWidth="1px"
       borderColor="border.muted"
-      paddingTop={3}
+      paddingTop={1.5}
     >
       <Text color="fg.muted" fontSize="xs" flex="1">
         {effect}
       </Text>
       <Button
-        size="sm"
+        size="xs"
         variant="outline"
         loading={saving}
         disabled={!changed}
@@ -168,7 +177,7 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
     (locking && minutes !== settings.lockoutMinutes);
 
   return (
-    <SettingsCard
+    <PolicySection
       title="Account lockout"
       hint="Protect accounts after repeated failed sign-ins."
       data-testid="sign-in-lockout-card"
@@ -196,7 +205,7 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
       </RadioGroup.Root>
 
       {locking && (
-        <VStack align="stretch" gap={3} data-testid="sign-in-lockout-settings">
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={2} data-testid="sign-in-lockout-settings">
           <NumberField
             label="Failed sign-ins before lock"
             value={attempts}
@@ -213,9 +222,9 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
             hint="New sign-ins are allowed again after this time."
             testId="sign-in-lockout-minutes"
           />
-        </VStack>
+        </SimpleGrid>
       )}
-    </SettingsCard>
+    </PolicySection>
   );
 }
 
@@ -229,7 +238,7 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
   const maximumIsUnreachable = maximum > 0 && maximum < idle;
 
   return (
-    <SettingsCard
+    <PolicySection
       title="Session limits"
       hint="Choose when browser sessions should end."
       data-testid="session-limit-card"
@@ -265,7 +274,7 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
       </RadioGroup.Root>
 
       {maximumIsUnreachable && (
-        <Alert.Root status="warning" data-testid="session-limit-unreachable">
+        <Alert.Root size="sm" status="warning" data-testid="session-limit-unreachable">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>
@@ -280,7 +289,7 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
       )}
 
       {bounded && (
-        <VStack align="stretch" gap={3} data-testid="session-limit-settings">
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={2} data-testid="session-limit-settings">
           <NumberField
             label="Idle timeout"
             value={idle}
@@ -298,8 +307,8 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
             hint="Optional. Ends the session at this age, even with activity."
             testId="session-limit-maximum"
           />
-        </VStack>
+        </SimpleGrid>
       )}
-    </SettingsCard>
+    </PolicySection>
   );
 }
