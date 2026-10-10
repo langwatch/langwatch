@@ -9,6 +9,8 @@ import type { UiLinkSignInMethodOutcome } from "@langwatch/auth-contract";
 import type { TimeInput } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 
+import { rememberPasskeyOnThisDevice } from "../model/passkey-on-this-device.ts";
+
 export type { UiLinkSignInMethodOutcome };
 
 /** One passkey, as the plugin stores it and the screen reads it. */
@@ -89,7 +91,9 @@ export async function registerUiPasskey(
   client: UiPasskeyClient = passkeyAuthClient(),
 ): Promise<UiPasskeyOutcome> {
   try {
-    return readPasskeyOutcome(await client.passkey.addPasskey({}));
+    const outcome = readPasskeyOutcome(await client.passkey.addPasskey({}));
+    if (outcome.ok) rememberPasskeyOnThisDevice();
+    return outcome;
   } catch {
     return { ok: false, cancelled: false };
   }

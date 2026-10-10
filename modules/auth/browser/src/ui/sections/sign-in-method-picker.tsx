@@ -6,7 +6,8 @@ import { useState } from "react";
 
 import { MONO_FONT } from "../../model/front-door-theme.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
-import { rankMethodsForBrowser } from "../../model/method-ranking.ts";
+import { methodsWorthOffering, rankMethodsForBrowser } from "../../model/method-ranking.ts";
+import { readPasskeyOnThisDevice } from "../../model/passkey-on-this-device.ts";
 
 import "../elements/auth-front-door.css";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
@@ -54,7 +55,13 @@ export function SignInMethodPicker({
   const guidance = showGuidance ? signInRoutingReasonCopy(reasonCode) : null;
   // The server's ranking with this browser's last-used method promoted: one
   // promotion, never a re-sort.
-  const ordered = rankMethodsForBrowser({ methodSet, lastUsedMethodId });
+  const [passkeyOnThisDevice] = useState(readPasskeyOnThisDevice);
+  const offered = methodsWorthOffering({ methodSet, reasonCode, passkeyOnThisDevice });
+  // A passkey-only installation still shows its one way in rather than "no way to sign in".
+  const ordered = rankMethodsForBrowser({
+    methodSet: offered.length > 0 ? offered : methodSet,
+    lastUsedMethodId,
+  });
   // A WebAuthn ceremony hands the screen to the browser and the operating
   // system: while one is in flight, a second click on another method would
   // open a competing prompt on top of it. Scoped to this picker rather than a
@@ -113,7 +120,11 @@ export function hasAlternativeMethods({
 }: {
   methodSet: readonly SignInMethod[];
 }): boolean {
-  return methodSet.some((method) => method.kind === "federated" || method.kind === "passkey");
+  return methodsWorthOffering({
+    methodSet,
+    reasonCode: null,
+    passkeyOnThisDevice: readPasskeyOnThisDevice(),
+  }).some((method) => method.kind === "federated" || method.kind === "passkey");
 }
 
 /**
@@ -139,6 +150,7 @@ export function AlternativeMethods({
   // See `SignInMethodPicker`: the same local flag, so a second click here
   // cannot start a competing WebAuthn prompt while one is already running.
   const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
+  const [passkeyOnThisDevice] = useState(readPasskeyOnThisDevice);
 
   return (
     <VStack width="full" align="stretch" gap={3} data-testid="alternative-methods">
@@ -149,7 +161,7 @@ export function AlternativeMethods({
           hand-offs would be putting the longest routes in front of the
           shortest. It stays under the address field rather than over it: the
           address is what most people came to type. */}
-      {methodSet.some((method) => method.kind === "passkey") ? (
+      {passkeyOnThisDevice && methodSet.some((method) => method.kind === "passkey") ? (
         <PasskeySignInButton
           callbackUrl={callbackUrl}
           badge={lastUsedMethodId === "passkey" ? <LastUsedBadge /> : null}

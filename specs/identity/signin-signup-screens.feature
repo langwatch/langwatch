@@ -97,6 +97,31 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I click a button on the card without touching the field
     Then no passkey request has started
 
+  # Browsers say nothing about whether a passkey exists for this site, and
+  # asking the server by address would say which accounts exist. So the button
+  # follows a flag this browser keeps once a passkey worked or was made here;
+  # the address field's own autofill still finds one on a new device.
+  @integration
+  Scenario: The passkey button waits until this browser has used a passkey
+    Given this deployment offers passkeys
+    And this browser has never used or made a passkey
+    When the sign-in screen or an invitation opens
+    Then "Continue with a passkey" is not offered
+
+  @integration
+  Scenario: A browser that has used a passkey is offered the passkey button
+    Given this deployment offers passkeys
+    And this browser has signed in with or made a passkey before
+    When the sign-in screen or an invitation opens
+    Then "Continue with a passkey" is offered
+
+  @integration
+  Scenario: A passkey that works here is remembered without naming anybody
+    Given this deployment offers passkeys
+    When I sign in with or create a passkey in this browser
+    Then this browser remembers that it has a passkey
+    And what it keeps holds no address and no account id
+
   # ── The device is being asked, and the card says so ────────────────────
   #
   # A WebAuthn ceremony hands the screen to the browser and the operating
