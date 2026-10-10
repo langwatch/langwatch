@@ -24,7 +24,7 @@ export class MemoryScimRepositories {
 }
 
 /** Holds no seats for any organization. */
-export class MemoryScimSeatRepository implements ScimSeatRepository {
+class MemoryScimSeatRepository implements ScimSeatRepository {
   static create(): MemoryScimSeatRepository {
     return new MemoryScimSeatRepository();
   }
