@@ -1,11 +1,10 @@
-import { IconGlyph } from "@langwatch/design-system/icons";
+import { Azure, IconGlyph } from "@langwatch/design-system/icons";
 import { modelProviderIcons as designSystemIcons } from "@langwatch/design-system/provider-icons";
 import type { modelProviders } from "@langwatch/model-provider-contract";
 // biome-ignore lint/style/useImportType: React needed at runtime for non-jsdom JSX
 import React from "react";
 
 import { Anthropic } from "../../elements/icons/anthropic.tsx";
-import { Azure } from "../../elements/icons/azure.tsx";
 import { DeepSeek } from "../../elements/icons/deep-seek.tsx";
 
 export const modelProviderIcons: Record<keyof typeof modelProviders, React.ReactNode> = {

@@ -7,7 +7,7 @@ import { useTraceListRefresh } from "../../../../features/explorer/behavior/use-
 import { AuroraSvg } from "../../../elements/explorer/traces-page/aurora-svg.tsx";
 
 const FADE_MASK =
-  "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%)";
+  "linear-gradient(to bottom, var(--chakra-colors-fg) 0%, var(--chakra-colors-fg) 35%, color-mix(in srgb, var(--chakra-colors-fg) 70%, transparent) 65%, transparent 100%)";
 
 interface RefreshProgressBarProps {
   /** Render even when not refreshing — for dev-mode preview. */

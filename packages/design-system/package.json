@@ -544,6 +544,7 @@
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
+    "oxc-parser": "catalog:",
     "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

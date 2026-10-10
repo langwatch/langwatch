@@ -19,3 +19,23 @@ export const aiBrandPaletteHot: string[] = [
 
 // The amber accent in Display-P3, paired with the hex fallback AI_ACCENT.
 export const AI_ACCENT_P3 = "color(display-p3 0.929 0.537 0.149)";
+
+// Terminal startup marks reproduce vendor artwork, independent of the UI theme.
+export const CLAUDE_MARK_GRADIENT = [
+  "#F2C4AA",
+  "#E8A587",
+  "#DA7756",
+  "#C15F3C",
+  "#9C4A2E",
+] as const;
+export const GEMINI_MARK_GRADIENT = [
+  "#4796E4",
+  "#6688D9",
+  "#847ACE",
+  "#A471A7",
+  "#C3677F",
+] as const;
+export const OPENCODE_GRAY = "#808080";
+export const OPENCODE_GRAY_FILL = "#282828";
+export const OPENCODE_WHITE = "#EEEEEE";
+export const OPENCODE_WHITE_FILL = "#434343";

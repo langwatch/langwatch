@@ -141,6 +141,37 @@ export const designSystemConfig = defineConfig({
       radii: { showcase: { value: "{radii.xl}" } },
       shadows: { showcase: { value: "{shadows.md}" } },
       colors: {
+        // Terminal roles preserve the existing ANSI rendering in both colour modes.
+        terminal: {
+          fg: { value: { _light: "{colors.fg}", _dark: "{colors.fg}" } },
+          bg: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
+          black: { value: { _light: "{colors.fg.subtle}", _dark: "{colors.fg.subtle}" } },
+          red: { value: { _light: "{colors.red.fg}", _dark: "{colors.red.fg}" } },
+          green: { value: { _light: "{colors.green.fg}", _dark: "{colors.green.fg}" } },
+          yellow: { value: { _light: "{colors.yellow.fg}", _dark: "{colors.yellow.fg}" } },
+          blue: { value: { _light: "{colors.blue.fg}", _dark: "{colors.blue.fg}" } },
+          magenta: { value: { _light: "{colors.purple.fg}", _dark: "{colors.purple.fg}" } },
+          cyan: { value: { _light: "{colors.cyan.fg}", _dark: "{colors.cyan.fg}" } },
+          white: { value: { _light: "{colors.fg}", _dark: "{colors.fg}" } },
+          brightBlack: { value: { _light: "{colors.fg.muted}", _dark: "{colors.fg.muted}" } },
+          brightRed: { value: { _light: "{colors.red.fg}", _dark: "{colors.red.fg}" } },
+          brightGreen: { value: { _light: "{colors.green.fg}", _dark: "{colors.green.fg}" } },
+          brightYellow: { value: { _light: "{colors.yellow.fg}", _dark: "{colors.yellow.fg}" } },
+          brightBlue: { value: { _light: "{colors.blue.fg}", _dark: "{colors.blue.fg}" } },
+          brightMagenta: { value: { _light: "{colors.pink.fg}", _dark: "{colors.pink.fg}" } },
+          brightCyan: { value: { _light: "{colors.cyan.fg}", _dark: "{colors.cyan.fg}" } },
+          brightWhite: { value: { _light: "{colors.fg}", _dark: "{colors.fg}" } },
+        },
+        // Fixed illustration pigments keep the artwork identical in either mode.
+        illustration: {
+          sunShadow: { value: { _light: "#ECC94B", _dark: "#ECC94B" } },
+          sun: { value: { _light: "#F6E05E", _dark: "#F6E05E" } },
+          ink: { value: { _light: "#3C2415", _dark: "#3C2415" } },
+          cloud: { value: { _light: "#BEE3F8", _dark: "#BEE3F8" } },
+          python: { value: { _light: "#4584b6", _dark: "#4584b6" } },
+          typescript: { value: { _light: "#2563eb", _dark: "#2563eb" } },
+          go: { value: { _light: "#00ADD8", _dark: "#00ADD8" } },
+        },
         // Palette-specific semantic tokens
         gray: {
           solid: {

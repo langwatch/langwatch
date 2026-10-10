@@ -503,6 +503,9 @@ catalogs:
     ora:
       specifier: ^9.3.0
       version: 9.4.1
+    oxc-parser:
+      specifier: ^0.127.0
+      version: 0.127.0
     oxc-transform-react:
       specifier: ~0.145.0
       version: 0.145.0
@@ -17289,6 +17292,9 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 30.0.1(@noble/hashes@2.2.0)
+      oxc-parser:
+        specifier: 'catalog:'
+        version: 0.127.0
       playwright:
         specifier: 'catalog:'
         version: 1.63.0

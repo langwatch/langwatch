@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { PACKAGE_ROOT, publishedEntries, storyExists, storyFor } from "./catalogue.ts";
+import { collectRawColours } from "./raw-colours.ts";
 
 const ROOT = path.resolve(PACKAGE_ROOT, "../..");
 const CONSUMER_DIRS = ["apps", "modules", "enterprise", "packages"];
@@ -157,7 +158,7 @@ export function collectAdoption(): Adoption {
         }),
       }),
       rawColour: debtFrom({
-        lines: grep({ pattern: "[\"'`](#[0-9a-fA-F]{3,8}|rgba?\\()", paths: BROWSER_SOURCES }),
+        lines: collectRawColours(),
       }),
       paletteStep: debtFrom({
         lines: grep({
