@@ -367,6 +367,10 @@
       "types": "./dist/components/display/tab-count.d.ts",
       "default": "./src/components/display/tab-count.tsx"
     },
+    "./cron-schedule": {
+      "types": "./dist/components/display/cron-schedule.d.ts",
+      "default": "./src/components/display/cron-schedule.tsx"
+    },
     "./settings-section": {
       "types": "./dist/components/layout/settings-section.d.ts",
       "default": "./src/components/layout/settings-section.tsx"

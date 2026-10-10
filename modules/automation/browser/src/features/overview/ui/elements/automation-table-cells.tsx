@@ -486,28 +486,3 @@ export function ReportSubjectCell({
     </VStack>
   );
 }
-
-/** Weekday names for `describeSchedule`, in cron `dow` order (0 = Sunday). */
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-/** Humanises the cron shapes the report drawer emits (weekly / daily /
- *  monthly). Anything else falls back to the raw expression — a shape lookup
- *  for the presets we generate, not a general cron parser. */
-export function describeSchedule(cron: string, timezone: string): string {
-  const parts = cron.trim().split(/\s+/);
-  if (parts.length !== 5) return `${cron} (${timezone})`;
-  const [min, hour, dom, , dow] = parts;
-  if (!/^\d+$/.test(min ?? "") || !/^\d+$/.test(hour ?? "")) return `${cron} (${timezone})`;
-  const at = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-  if (dom === "*" && dow !== "*") {
-    const day = WEEKDAYS[Number(dow) % 7] ?? `day ${dow}`;
-    return `Weekly · ${day} ${at} ${timezone}`;
-  }
-  if (dom === "*" && dow === "*") {
-    return `Daily · ${at} ${timezone}`;
-  }
-  if (dom !== "*" && dow === "*") {
-    return `Monthly · day ${dom} ${at} ${timezone}`;
-  }
-  return `${cron} (${timezone})`;
-}

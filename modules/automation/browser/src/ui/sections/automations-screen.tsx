@@ -6,6 +6,7 @@ import {
 } from "@langwatch/automation-contract";
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { CronSchedule } from "@langwatch/design-system/cron-schedule";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -51,7 +52,6 @@ import { type TriggerActionParams } from "../../features/overview/model/trigger-
 import { AutomationHistory } from "../../features/overview/ui/elements/automation-history.tsx";
 import {
   AlertRuleCell,
-  describeSchedule,
   EmailList,
   EmptyHint,
   FiringStatus,
@@ -801,13 +801,12 @@ function ReportsSection({
                         graphNameById={graphNameById}
                       />
                     </Table.Cell>
-                    {/* No nowrap: a cadence plus an IANA zone is wider than this column. */}
-                    <Table.Cell>
-                      <Text textStyle="sm">
-                        {schedule?.cron
-                          ? describeSchedule(schedule.cron, schedule.timezone ?? "UTC")
-                          : "Not set"}
-                      </Text>
+                    <Table.Cell maxWidth="240px">
+                      {schedule?.cron ? (
+                        <CronSchedule cron={schedule.cron} timezone={schedule.timezone ?? "UTC"} />
+                      ) : (
+                        <Text textStyle="sm">Not set</Text>
+                      )}
                     </Table.Cell>
                     <ReportRunCells
                       schedule={scheduleByTriggerId.get(trigger.id)}
