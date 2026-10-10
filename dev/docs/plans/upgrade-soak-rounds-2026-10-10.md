@@ -54,7 +54,7 @@ scenario first (`specs/upgrade/…`), owns only its paths, and runs scoped tests
 | W1 | **Snapshot origin.** `upgradelab produce -deployment X -tier T` = stores, main up, seed (W2), jobs queued, capture. `upgradelab cell -from-snapshot DIR` restores instead of seeding. Local cache by (main sha, shape, tier, recipe) | `tools/upgradelab/cell/**`, `cmd/upgradelab`, `specs/upgrade/upgrade-snapshots.feature` | a cloud S snapshot produced once, two cells from it give equal "before" fingerprints | lane-opus, medium |
 | W2 | **Heavy main seed.** seedgen's door executor gains product kinds (port `product.go` as door actions) and REST kinds; tenancy at volume by main-schema SQL; tier M = seedgen `medium` (12 orgs, 300k spans, every kind in every state, rare-state cohort); runs against a URL, not a haven slug | `tools/seedgen/door*.go`, `tools/upgradelab/seed/**` | `upgradelab produce -tier M` finishes on a laptop under the memory guard; `coverage.json` lists every kind main holds as seeded or says why not | lane-sonnet, medium |
 | W3 | **Watch and judge.** Cell prints its api origin; Playwright captures console and failed requests per phase; samples RSS/CPU of each process and ClickHouse memory every 5 s; `report.md` gets a timeline ribbon. Integrity: I5 read-model checks, I7 stored-event parse (D4 (b), worker integration test), and A/B: restore the snapshot twice, main on copy A, branch on copy B, `apidiff probe -method GET` | `tools/upgradelab/cell/{checks,report,ops-upgrades.mjs}`, `apps/worker/src/__tests__/stored-events-parse.integration.test.ts` | a cloud S round reports all of it; a planted unknown event type is named by type and count | lane-sonnet, medium |
-| W4 | **Self-hosted.** Profile `self-hosted` from origin/main (no tag; 3.20.1 stays its own cell). Real install paths: docker compose and helm on kind, with branch images built locally. A UX walk per phase: holding page, first-install token console (fresh install only), Ops > Upgrades in each state, sign-in, a trace list, settings. Screenshots judged by Haiku agents here, never in CI | `tools/upgradelab/cell/profile.go`, `tools/upgradelab/selfhosted/**` | compose and helm rounds each produce a report and a screenshot set per phase | lane-opus, medium |
+| W4 | **Self-hosted.** Profile `self-hosted` from origin/main (no tag; 3.20.1 stays its own cell). Real install paths: docker compose and helm on kind, with branch images built locally. A UX walk per phase: the app as a visitor meets it mid-upgrade (no holding page: "No holds", ARCHITECTURE.md), first-install token console (fresh install only), Ops > Upgrades in each state, sign-in, a trace list, settings. Screenshots judged by Haiku agents here, never in CI | `tools/upgradelab/cell/profile.go`, `tools/upgradelab/selfhosted/**` | compose and helm rounds each produce a report and a screenshot set per phase | lane-opus, medium |
 
 W1 and W3 start together; W2 after W1's `produce` shape is fixed; W4 after W1.
 
@@ -87,7 +87,7 @@ Triaged 2026-10-10 (`.claude/tmp/handoffs/soak-r0-triage.md`):
 | **Upgrade itself** | Ops > Upgrades states; `upgrade status --json` | I0, I2, I2b, I3, I8, H1-H5 | every step done or not-needed on every target; second run is a no-op; hybrid data stays on its target |
 | **Queues** | backlog sample | N4 | jobs queued at the cut drain on the branch worker |
 | **Updates panel** | a screenshot per phase | O1 + Haiku judgement against `page-look` rules | Behind → Upgrading → Finishing in background → Up to date; no error flash while pending; text an operator understands |
-| **Self-hosted UX** | the W4 walk | Haiku judgement, then Alex skims the set | holding page branded and centred; every message names what to do next |
+| **Self-hosted UX** | the W4 walk | Haiku judgement, then Alex skims the set | the sign-in page and app render mid-upgrade (never blank); every message names what to do next |
 | **Resources** | RSS, CPU, ClickHouse memory every 5 s | I10 at M and L | under bounds (set from round 2's numbers) |
 
 A round run with host load over 40 is void, never red.
@@ -243,7 +243,7 @@ the cell check that judges it.
 | F1 | Fresh install: every data step is not-needed; the api serves | I2 |
 | F2 | A second run is a no-op | I8 |
 | F3 | The first-install token console shows only when the first install fails | forced failure + screenshot |
-| U1 | The holding and upgrading pages are branded, centred and say what is happening | screenshots + Haiku |
+| U1 | Mid-upgrade a visitor meets the sign-in page and app, never a blank page; reads behind retry (no holding page, ruled "No holds") | screenshots + Haiku |
 | U2 | The upgrade guide's commands work exactly as written | the R5 operator transcript |
 | U3 | Ops > Upgrades explains a held tenant and a failed step, and Retry fixes the failed one | overlay rows + D3 |
 | U4 | An operator can tell from the panel alone when it is safe to stop the old release | Haiku + Alex skim |
