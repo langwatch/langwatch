@@ -95,11 +95,12 @@ function canRefold<State, E extends Event>(
 }
 
 /**
- * Returns a context carrying the event's occurredAt — and, when the fold
- * DECLARED a read window (`options.readWindow`), the computed
- * `occurredAt ± widthMs` bound for the store's backing read. The original
- * context is returned unchanged when the event has no usable occurredAt: an
- * unusable business time cannot anchor a window, so the read stays unbounded.
+ * Returns a context naming the event the read is for and carrying its
+ * occurredAt — and, when the fold DECLARED a read window
+ * (`options.readWindow`), the computed `occurredAt ± widthMs` bound for the
+ * store's backing read. Only the event id is added when the event has no
+ * usable occurredAt: an unusable business time cannot anchor a window, so
+ * the read stays unbounded.
  */
 function withReadHints<State, E extends Event>({
   context,
@@ -110,11 +111,12 @@ function withReadHints<State, E extends Event>({
   event: Event;
   projection: FoldProjectionDefinition<State, E>;
 }): ProjectionStoreContext {
+  const named = { ...context, eventId: event.id };
   const occurredAt = (event as Record<string, unknown>).occurredAt;
-  if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
+  if (typeof occurredAt !== "number" || occurredAt <= 0) return named;
   const widthMs = projection.options?.readWindow?.widthMs;
   return {
-    ...context,
+    ...named,
     occurredAtMs: occurredAt,
     ...(widthMs !== undefined
       ? { readWindow: readWindowAround({ anchorMs: occurredAt, widthMs }) }

@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   serviceOver,
   serviceOverUnavailable,
 } from "./support/evaluationServiceOver";
+
+/** A viewer who may read captured input and output. */
+const CONTENT_VISIBLE = {
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
 
 describe("EvaluationService.getEvaluationInputs", () => {
   beforeEach(() => {
@@ -19,14 +26,18 @@ describe("EvaluationService.getEvaluationInputs", () => {
             query_params: Record<string, unknown>;
           }) => ({
             json: async () => [
-              { Inputs: '{"input":"hello","output":"world"}' },
+              {
+                TenantId: "project_test",
+                Inputs: '{"input":"hello","output":"world"}',
+              },
             ],
           }),
         );
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          protections: CONTENT_VISIBLE,
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
@@ -37,10 +48,10 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const sql = query.mock.calls[0]?.[0]?.query ?? "";
         expect(sql).toContain("EvaluationId = {evaluationId:String}");
         expect(sql).not.toContain("TraceId");
-        expect(query.mock.calls[0]?.[0]?.query_params).toMatchObject({
-          tenantId: "project_test",
-          evaluationId: "eval-1",
-        });
+        const params = query.mock.calls[0]?.[0]?.query_params ?? {};
+        expect(params).toMatchObject({ evaluationId: "eval-1" });
+        // The tenant comes from the proof's fence, not from the caller.
+        expect(JSON.stringify(params)).toContain("project_test");
       });
     });
   });
@@ -49,12 +60,13 @@ describe("EvaluationService.getEvaluationInputs", () => {
     describe("when its inputs are requested", () => {
       it("returns null", async () => {
         const query = vi.fn(async () => ({
-          json: async () => [{ Inputs: null }],
+          json: async () => [{ TenantId: "project_test", Inputs: null }],
         }));
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          protections: CONTENT_VISIBLE,
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
@@ -74,7 +86,25 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          protections: CONTENT_VISIBLE,
+          authorization: ownProof({ projectId: "project_test" }),
+          evaluationId: "eval-1",
+        });
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given no project the proof reads holds the evaluation", () => {
+    describe("when its inputs are requested", () => {
+      it("returns null", async () => {
+        const query = vi.fn(async () => ({ json: async () => [] }));
+        const service = serviceOver({ query });
+
+        const result = await service.getEvaluationInputs({
+          protections: CONTENT_VISIBLE,
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
@@ -91,11 +121,31 @@ describe("EvaluationService.getEvaluationInputs", () => {
         );
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          protections: CONTENT_VISIBLE,
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
         expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given a reachable ClickHouse whose query fails", () => {
+    describe("when its inputs are requested", () => {
+      it("fails the read", async () => {
+        const query = vi.fn(async () => {
+          throw new Error("Code: 62. Syntax error");
+        });
+        const service = serviceOver({ query });
+
+        await expect(
+          service.getEvaluationInputs({
+            protections: CONTENT_VISIBLE,
+            authorization: ownProof({ projectId: "project_test" }),
+            evaluationId: "eval-1",
+          }),
+        ).rejects.toThrow("Failed to fetch evaluation inputs");
       });
     });
   });

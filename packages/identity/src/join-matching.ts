@@ -1,4 +1,5 @@
 import { identifierDomain, normalizeIdentifierValue } from "./identifier";
+import type { JoinRequestOrigin } from "./join-request";
 
 /**
  * Which organizations will take an address (ADR-117, D12). One question, and
@@ -72,6 +73,23 @@ export function readJoinerRole(stored: string | null | undefined): JoinerRole {
   return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
     ? (stored as JoinerRole)
     : DEFAULT_JOINER_ROLE;
+}
+
+/**
+ * The seat a join lands in (ADR-143 v6): the organisation's joiner seat for a
+ * request made on the web, and a Developer for one made from the terminal,
+ * whatever the joiner seat says. A pure decision, so the service can take it
+ * from the request in hand on the automatic path, where the projection row
+ * may not exist yet, and from the stored request on a later approval.
+ */
+export function seatForJoiner({
+  origin,
+  joinerRole,
+}: {
+  origin: JoinRequestOrigin;
+  joinerRole: JoinerRole;
+}): JoinerRole {
+  return origin === "cli" ? "DEVELOPER" : joinerRole;
 }
 
 /**

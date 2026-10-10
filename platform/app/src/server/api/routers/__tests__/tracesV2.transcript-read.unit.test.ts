@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
+import { ownProof } from "~/test-utils/authorizationProofs";
 
 const { mockGetSpansByTraceId, mockGetLogsByTraceId } = vi.hoisted(() => ({
   mockGetSpansByTraceId: vi.fn(),
@@ -76,6 +77,7 @@ describe("readCodingAgentTranscriptWithProtections", () => {
       ]);
 
       const transcript = await readCodingAgentTranscriptWithProtections({
+        authorization: ownProof({ projectId: PROJECT_ID }),
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
@@ -111,6 +113,7 @@ describe("readCodingAgentTranscriptWithProtections", () => {
       ]);
 
       const transcript = await readCodingAgentTranscriptWithProtections({
+        authorization: ownProof({ projectId: PROJECT_ID }),
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,

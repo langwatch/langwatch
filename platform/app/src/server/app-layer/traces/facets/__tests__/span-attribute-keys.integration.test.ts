@@ -19,6 +19,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { expandStatementForProject } from "~/test-utils/authorizationProofs";
 import { seedSpans } from "../../../../analytics/clickhouse/__tests__/test-utils/clickhouse-fixtures";
 import {
   cleanupTestData,
@@ -27,6 +28,16 @@ import {
 import { buildSpanAttributeKeysFacetQuery } from "../span-attribute-keys";
 
 const TENANT_ID = "facet-span-attr-keys-test";
+
+/** The facet query as the authorized reader would send it for this tenant. */
+function forTenant(query: { sql: string; params: Record<string, unknown> }) {
+  const expanded = expandStatementForProject({
+    query: query.sql,
+    queryParams: query.params,
+    projectId: TENANT_ID,
+  });
+  return { sql: expanded.query, params: expanded.queryParams };
+}
 const ATTRIBUTE_KEYS = 80;
 // seedSpans adds one extra synthetic key ("langwatch.span.type") on top of the
 // attr_key_0..N-1 it generates.
@@ -60,7 +71,6 @@ describe("span-attribute-keys facet integration", () => {
   });
 
   const ctx = {
-    tenantId: TENANT_ID,
     // Wide window: seeded spans land within a few minutes of now.
     timeRange: { from: Date.now() - 60 * 60 * 1000, to: Date.now() + 60_000 },
     limit: 1000,
@@ -69,7 +79,7 @@ describe("span-attribute-keys facet integration", () => {
 
   describe("when discovering keys under a tight memory budget", () => {
     it("completes and returns every distinct key exactly once", async () => {
-      const query = buildSpanAttributeKeysFacetQuery(ctx);
+      const query = forTenant(buildSpanAttributeKeysFacetQuery(ctx));
       const result = await ch.query({
         query: query.sql,
         query_params: query.params,
@@ -93,7 +103,7 @@ describe("span-attribute-keys facet integration", () => {
       // Identical query except the empty-map short-circuit reads the full
       // Map. This is the pre-fix shape; it must exceed the budget that the
       // keys-only query clears.
-      const query = buildSpanAttributeKeysFacetQuery(ctx);
+      const query = forTenant(buildSpanAttributeKeysFacetQuery(ctx));
       const preFixSql = query.sql.replace(
         "length(SpanAttributes.keys) > 0",
         "length(SpanAttributes) > 0",

@@ -9,6 +9,7 @@
  *   PROJECT_ID=KAXYxPR8MUgTcP8CF193y TRACE_ID=c2481ff682fc54e912b7016a55db8153 \
  *     npx tsx scripts/seed-trace-evals.ts
  */
+import { AuthorizedClickHouse } from "../src/server/app-layer/clients/clickhouse/authorized-reads";
 import { EvaluationRunClickHouseRepository } from "../src/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
 
@@ -19,13 +20,15 @@ async function main() {
     throw new Error("PROJECT_ID and TRACE_ID required");
   }
 
+  const resolveClient = async (tenantId: string) => {
+    const client = await getClickHouseClientForTenant(tenantId);
+    if (!client)
+      throw new Error(`No ClickHouse client for project ${tenantId}`);
+    return client;
+  };
   const repo = new EvaluationRunClickHouseRepository({
-    resolveClient: async (tenantId: string) => {
-      const client = await getClickHouseClientForTenant(tenantId);
-      if (!client)
-        throw new Error(`No ClickHouse client for project ${tenantId}`);
-      return client;
-    },
+    resolveClient,
+    clickhouse: new AuthorizedClickHouse({ resolveClient }),
   });
 
   const now = new Date();

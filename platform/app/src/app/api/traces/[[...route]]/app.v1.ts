@@ -1,8 +1,14 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import { ownOnlyTraceReadAuthorization } from "~/server/api/authorization";
+import {
+  getAllForProjectInput,
+  MAX_TRACE_LIST_PAGE_SIZE,
+  publicTraceSearchPageSizeInput,
+} from "~/server/api/routers/traces.schemas";
 import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -232,6 +238,7 @@ const traceSearchBodySchema = getAllForProjectInput
   .extend({
     startDate: flexibleDateSchema,
     endDate: flexibleDateSchema,
+    pageSize: publicTraceSearchPageSizeInput,
     scrollId: z.string().optional().nullable(),
     format: z
       .enum(["digest", "json"])
@@ -350,7 +357,10 @@ export function registerTracesRoutes(
 
       logger.info({ projectId: project.id }, "Searching traces for project");
 
-      const pageSize = Math.min(searchFields.pageSize ?? 1000, 1000);
+      const pageSize = Math.min(
+        searchFields.pageSize ?? MAX_TRACE_LIST_PAGE_SIZE,
+        MAX_TRACE_LIST_PAGE_SIZE,
+      );
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
@@ -377,7 +387,10 @@ export function registerTracesRoutes(
       const filterWhere = withHiddenOrigins(
         compileTraceFilter({
           filter,
-          tenantId: project.id,
+          authorization: await authorizeTraceRead({
+            projectId: project.id,
+            route: "api/v1/traces/search",
+          }),
           timeRange: { from: startDate, to: endDate },
           dateField,
         }),
@@ -609,6 +622,10 @@ export function registerTracesRoutes(
       }
 
       const transcript = await readCodingAgentTranscriptWithProtections({
+        authorization: await authorizeTraceRead({
+          projectId: project.id,
+          route: "api/v1/traces/:traceId/transcript",
+        }),
         projectId: project.id,
         traceId: trace.trace_id,
         occurredAtMs: trace.timestamps.started_at,
@@ -926,6 +943,25 @@ function visibleWindow({
 }
 
 /**
+ * The proof an API-key route reads the trace list through. The key's access
+ * check already admitted the request; this fences the read to the key's own
+ * project, the way the tRPC mint does for the browser (ADR-144 block C).
+ */
+function authorizeTraceRead({
+  projectId,
+  route,
+}: {
+  projectId: string;
+  route: string;
+}): Promise<Authorization> {
+  return ownOnlyTraceReadAuthorization({
+    codePath: "app/api/traces/[[...route]]/app.v1",
+    projectId,
+    route,
+  });
+}
+
+/**
  * `GET /facets`: what the filter fields actually hold.
  *
  * Registered BEFORE `/:traceId`: hono matches in registration order, so the
@@ -958,11 +994,14 @@ function registerFacetsRoute(
           to: endDate === undefined ? now : facetWindowBound(endDate),
         };
 
-        const list = getApp().traces.list;
+        const authorization = await authorizeTraceRead({
+          projectId: project.id,
+          route: "api/v1/traces/facets",
+        });
 
         if (field === undefined) {
-          const discover = await list.getDiscover({
-            tenantId: project.id,
+          const discover = await getApp().traces.list.getDiscover({
+            authorization,
             timeRange,
           });
           return c.json(discover);
@@ -972,8 +1011,8 @@ function registerFacetsRoute(
           projectId: project.id,
         });
         const facetKey = resolveFacetKey({ field, protections });
-        const result = await list.getFacetValues({
-          tenantId: project.id,
+        const result = await getApp().traces.list.getFacetValues({
+          authorization,
           timeRange: visibleWindow({ timeRange, facetKey, protections }),
           facetKey,
           limit,

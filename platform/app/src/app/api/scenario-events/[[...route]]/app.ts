@@ -31,6 +31,7 @@ import {
 } from "~/utils/streaming-event-codec";
 import { blockTraceUsageExceededMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { checkScenarioSetLimitForRunStarted } from "./scenario-set-limit";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -80,6 +81,13 @@ secured.access(requires("scenarios:create")).post(
       },
       "Received scenario event",
     );
+
+    // A run that starts a new simulation past the plan's cap is refused
+    // before anything is stored.
+    await checkScenarioSetLimitForRunStarted({
+      project,
+      event: validatedEvent,
+    });
 
     // Extract inline media bytes, externalize to stored objects, and rewrite
     // the event payload to reference them by URL before dispatch.

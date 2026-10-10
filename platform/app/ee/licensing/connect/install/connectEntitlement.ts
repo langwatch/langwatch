@@ -106,19 +106,85 @@ export async function organizationEnabledConnectServices({
   publicKey?: string;
   now?: Date;
 }): Promise<ConnectService[]> {
-  // One read for both halves of the answer. A run of judgements asks this per
-  // text, so a second query here is a second query per judged row.
+  const { entitled, disabled } = await readOrganizationConnectServices({
+    prisma,
+    organizationId,
+    publicKey,
+    now,
+  });
+  return entitled.filter((service) => !disabled.has(service));
+}
+
+/** One service's answer, with the license's half and the admin's half apart. */
+export interface ConnectServiceState {
+  /** The license names the service. */
+  readonly isEntitled: boolean;
+  /** Named, and no organization admin switched it off. */
+  readonly isSwitchedOn: boolean;
+}
+
+/**
+ * Both halves of one service's answer apart: whether the license names it,
+ * and whether it is still switched on. What a refusal reads to say which half
+ * said no, since each has its own remedy.
+ */
+export async function connectServiceState({
+  prisma,
+  organizationId,
+  service,
+  publicKey,
+  now,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  service: ConnectService;
+  publicKey?: string;
+  now?: Date;
+}): Promise<ConnectServiceState> {
+  const { entitled, disabled } = await readOrganizationConnectServices({
+    prisma,
+    organizationId,
+    publicKey,
+    now,
+  });
+  const isEntitled = entitled.includes(service);
+  return { isEntitled, isSwitchedOn: isEntitled && !disabled.has(service) };
+}
+
+/**
+ * The services an organization's license names, and the ones an admin
+ * switched off, from one read of its row. Both answers above come from here,
+ * so the license fallback lives in one place.
+ *
+ * One read for both halves: a run of judgements asks this per text, so a
+ * second query here is a second query per judged row.
+ */
+async function readOrganizationConnectServices({
+  prisma,
+  organizationId,
+  publicKey,
+  now,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  publicKey: string | undefined;
+  now: Date | undefined;
+}): Promise<{
+  entitled: ConnectService[];
+  disabled: ReadonlySet<string>;
+}> {
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: { license: true, connectServicesDisabled: true },
   });
-  const entitled = licenseConnectServices({
-    licenseKey: organization?.license ?? configuredSignedLicenseKey(),
-    ...(publicKey ? { publicKey } : {}),
-    ...(now ? { now } : {}),
-  });
-  const disabled = new Set(organization?.connectServicesDisabled ?? []);
-  return entitled.filter((service) => !disabled.has(service));
+  return {
+    entitled: licenseConnectServices({
+      licenseKey: organization?.license ?? configuredSignedLicenseKey(),
+      ...(publicKey ? { publicKey } : {}),
+      ...(now ? { now } : {}),
+    }),
+    disabled: new Set(organization?.connectServicesDisabled ?? []),
+  };
 }
 
 /** Whether one hosted service is both entitled and switched on. */

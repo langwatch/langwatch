@@ -1,9 +1,17 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
+import {
+  fenceFor,
+  ownProjectIdOf,
+  tenantScopeKey,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { TenantEvalSummary } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {
   parseMediaRefs,
@@ -35,15 +43,23 @@ import type {
   EventMetricValues,
   TraceListCursor,
   TraceListRepository,
+  TraceListRow,
   TraceListSort,
   TraceListSortColumn,
+  TraceRef,
 } from "./repositories/trace-list.repository";
 import { scopeTraceFilterToTable } from "./trace-filter-scope";
-import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
 
 export interface TraceListItem {
   traceId: string;
+  /**
+   * The project that owns the trace (ADR-144 block F). On an aggregate it is
+   * the member the row was read from: two members may hold the same trace
+   * id, so the id alone does not say which trace a row is, and the drawer
+   * hands this back on every read it makes for the row.
+   */
+  projectId: string;
   timestamp: number;
   name: string;
   serviceName: string;
@@ -103,23 +119,33 @@ export interface TraceListItem {
   ttft: number | null;
   traceName: string;
   rootSpanType: string | null;
+  /**
+   * The evaluations already scored on this row's trace, matched by project
+   * and trace id together, so a member's evaluation never decorates another
+   * member's row of the same id.
+   */
+  evaluations: EvalSummary[];
 }
 
 export interface TraceListPage {
   items: TraceListItem[];
   totalHits: number;
-  evaluations: Record<string, EvalSummary[]>;
   nextCursor: TraceListCursor | null;
 }
 
 interface ListParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
   /** 1-based offset compatibility for non-cursor callers. */
   page?: number;
   pageSize: number;
-  cursor?: TraceListCursor;
+  /**
+   * The keyset cursor a previous page handed back. One minted before the
+   * cursor carried its tenant is read as the project the proof was minted
+   * for, which is the only tenant a plain project ever lists.
+   */
+  cursor?: Omit<TraceListCursor, "tenantId"> & { tenantId?: string };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   /** Origins left out on top of the filter, see `explorerHiddenOrigins`. */
   hiddenOrigins?: readonly string[];
@@ -131,7 +157,7 @@ interface ListParams {
 }
 
 interface FacetParams {
-  tenantId: string;
+  authorization: Authorization;
   /** The exact window the list reads, never snapped. */
   timeRange: { from: number; to: number; live?: boolean };
   /**
@@ -154,7 +180,7 @@ export interface FacetsResult {
 }
 
 interface TraceIdsParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   hiddenOrigins?: readonly string[];
@@ -162,7 +188,7 @@ interface TraceIdsParams {
 }
 
 interface NewCountParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -170,14 +196,14 @@ interface NewCountParams {
 }
 
 interface SuggestParams {
-  tenantId: string;
+  authorization: Authorization;
   field: string;
   prefix: string;
   limit?: number;
 }
 
 interface DiscoverParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
 }
 
@@ -195,7 +221,7 @@ export interface DiscoverResult {
 }
 
 interface FacetValuesParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   facetKey: string;
   prefix?: string;
@@ -222,7 +248,7 @@ const ATTRIBUTE_KEY_REGEX = /^[a-zA-Z0-9_.\-]+$/;
  * Attribute key sets and top values turn over slowly, so a 30-min ceiling
  * with a 2-min background refresh is the right trade: the user almost
  * always gets a cached answer, and active sessions still see fresh data
- * within ~2 minutes of ingest. Cache keys include `tenantId`, so this is
+ * within ~2 minutes of ingest. Cache keys include the proof's scope, so this is
  * tenant-isolated by construction.
  */
 const FACET_VALUES_TTL_MS = 30 * 60 * 1000; // cache lives up to 30 minutes
@@ -248,7 +274,7 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
  * underlying ClickHouse scans are ~125MB+ on busy tenants, the result
  * turns over slowly (top values + key sets), and the SWR pattern means
  * users still get a background refresh every ~2 min of actual reads.
- * Cache keys are tenant-scoped — see `discoverCacheKey`.
+ * Cache keys are scoped to the proof's tenant set; see `discoverCacheKey`.
  */
 const DISCOVER_TTL_MS = 30 * 60 * 1000;
 /**
@@ -293,7 +319,7 @@ const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(
  * (which is shared with the null repo / test factories that don't
  * want the dependency); production callers register the live one.
  */
-type DiscoverBroadcaster = (tenantId: string) => void;
+type DiscoverBroadcaster = (projectId: string) => void;
 let discoverBroadcaster: DiscoverBroadcaster | null = null;
 
 export function setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
@@ -366,11 +392,36 @@ function snapToWindowPreset(timeRange: { from: number; to: number }): {
   return { from, to, label: preset.label };
 }
 
+/** The tenant set and windows a proof fences reads to, as one cache key part. */
+function scopeKeyOf(authorization: Authorization): string {
+  return tenantScopeKey({ authorization, reads: "traces" });
+}
+
+/**
+ * The project the proof was minted for. The discover broadcast channel
+ * lives under it; on an aggregate that is the aggregate itself, not a member.
+ */
+function ownProjectOf(authorization: Authorization): string {
+  return ownProjectIdOf({ authorization, reads: "traces" });
+}
+
+/**
+ * Every project the proof reads traces from: its own project and each shared
+ * member. A facet over an aggregate carries topic ids owned by any of them,
+ * so their names are looked up across all of them.
+ */
+function projectsReadBy(authorization: Authorization): string[] {
+  const fence = fenceFor({ authorization, reads: "traces" });
+  return [...fence.own, ...fence.shared.map((window) => window.projectId)];
+}
+
 function facetValuesCacheKey(params: FacetValuesParams): string {
   // "Live" time ranges roll forward by milliseconds each request — bucket to the
-  // minute so identical user intent hits the same cache slot.
+  // minute so identical user intent hits the same cache slot. The scope key
+  // names every project in the proof and its window, so an aggregate and one
+  // of its members never share a slot.
   return [
-    params.tenantId,
+    scopeKeyOf(params.authorization),
     params.facetKey,
     bucketTime(params.timeRange.from),
     bucketTime(params.timeRange.to),
@@ -380,17 +431,25 @@ function facetValuesCacheKey(params: FacetValuesParams): string {
   ].join("|");
 }
 
-function discoverCacheKey(
-  tenantId: string,
-  snapped: ReturnType<typeof snapToWindowPreset>,
-): string {
+function discoverCacheKey({
+  authorization,
+  snapped,
+}: {
+  authorization: Authorization;
+  snapped: ReturnType<typeof snapToWindowPreset>;
+}): string {
   // Include the snapped `from` alongside `to` so two requests with
   // different actual spans that happen to land in the same preset
   // label (e.g. a 15-minute window and a 1-hour window both classify
   // as "1h") don't collide on a single cache slot. Without `from` we'd
   // serve the first-computed payload to both viewers; the second
   // viewer's facets would be for a window they aren't looking at.
-  return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
+  return [
+    scopeKeyOf(authorization),
+    snapped.label,
+    snapped.from,
+    snapped.to,
+  ].join("|");
 }
 
 /**
@@ -510,12 +569,15 @@ export class TraceListService {
    * The `value` field stays as the ID (used for filtering); `label` carries the name.
    */
   private async enrichTopicNames(
-    projectId: string,
+    authorization: Authorization,
     result: CategoricalFacetResult,
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds({ projectId, ids });
+    const names = await this.topicService.getNamesByIds({
+      projectIds: projectsReadBy(authorization),
+      ids,
+    });
     return {
       ...result,
       values: result.values.map((v) => {
@@ -539,13 +601,20 @@ export class TraceListService {
     }
 
     const result = await this.repository.findAll({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },
       // Read one sentinel row so `nextCursor` is exact without guessing from
       // totalHits (which may change under a live range between requests).
       limit: params.pageSize + 1,
-      cursor: params.cursor,
+      cursor: params.cursor
+        ? {
+            sortValue: params.cursor.sortValue,
+            tenantId:
+              params.cursor.tenantId ?? ownProjectOf(params.authorization),
+            traceId: params.cursor.traceId,
+          }
+        : undefined,
       offset,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
     });
@@ -554,39 +623,25 @@ export class TraceListService {
     const visibleRows = hasMore
       ? result.rows.slice(0, params.pageSize)
       : result.rows;
-    const items = visibleRows.map((row) => mapToTraceListItem(row));
-    const traceIds = items.map((item) => item.traceId);
-
-    const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
-      params.tenantId,
-      traceIds,
-      params.timeRange.from,
+    const evaluations = evaluationsByListedRow(
+      await this.evaluationRunService.findSummariesByTraceIds({
+        authorization: params.authorization,
+        // Two members may list the same id; the read needs it once.
+        traceIds: [...new Set(visibleRows.map((row) => row.traceId))],
+        since: params.timeRange.from,
+      }),
     );
-
-    // Tease input/output/error previews and user-authored labels of items
-    // beyond the caller's visibility window — existence and counts stay
-    // untouched. Labels are user-authored metadata strings, so they're gated
-    // alongside the content fields to avoid leaking through on old traces.
-    const gatedItems =
-      params.visibilityCutoffMs === null ||
-      params.visibilityCutoffMs === undefined
-        ? items
-        : items.map((item) =>
-            item.timestamp < params.visibilityCutoffMs!
-              ? {
-                  ...item,
-                  input: item.input ? teaserOf(item.input) : item.input,
-                  output: item.output ? teaserOf(item.output) : item.output,
-                  error: item.error ? teaserOf(item.error) : item.error,
-                  labels: item.labels.map((label) => teaserOf(label)),
-                }
-              : item,
-          );
+    const items = visibleRows.map((row) => ({
+      ...mapToTraceListItem(row),
+      evaluations: evaluations.get(listedRowKey(row)) ?? [],
+    }));
 
     return {
-      items: gatedItems,
+      items: teasedBeyondCutoff({
+        items,
+        cutoffMs: params.visibilityCutoffMs,
+      }),
       totalHits: result.totalHits,
-      evaluations,
       nextCursor:
         hasMore && visibleRows.length > 0
           ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
@@ -624,7 +679,6 @@ export class TraceListService {
   async getFacets(params: FacetParams): Promise<FacetsResult> {
     const compiler = createFacetFilterCompiler({
       queryText: params.query ?? "",
-      tenantId: params.tenantId,
       timeRange: params.timeRange,
       ...(params.evalRuns ? { evalRuns: params.evalRuns } : {}),
     });
@@ -648,7 +702,7 @@ export class TraceListService {
     };
 
     const facets = await this.computeFacets({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       filterFor,
       includeDynamicKeys: false,
@@ -657,13 +711,13 @@ export class TraceListService {
   }
 
   /**
-   * The trace ids a filter selects, newest first, capped. What an Instant
-   * Eval run started from the Explorer judges when its filter names a field
-   * the shorthand dialect cannot answer.
+   * The traces a filter selects, newest first, capped, each named by its
+   * tenant and trace id. What an Instant Eval run started from the Explorer
+   * judges when its filter names a field the shorthand dialect cannot answer.
    */
-  async getTraceIds(params: TraceIdsParams): Promise<string[]> {
-    return this.repository.findTraceIds({
-      tenantId: params.tenantId,
+  async getTraceRefs(params: TraceIdsParams): Promise<TraceRef[]> {
+    return this.repository.findTraceRefs({
+      authorization: params.authorization,
       timeRange: params.timeRange,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
       limit: params.limit,
@@ -672,7 +726,7 @@ export class TraceListService {
 
   async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       since: params.since,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
@@ -684,7 +738,7 @@ export class TraceListService {
     if (!column) return [];
 
     return this.repository.findDistinctValues({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       column,
       prefix: params.prefix,
       limit: params.limit ?? 20,
@@ -702,10 +756,13 @@ export class TraceListService {
     // content always matches its key.
     const snapped = snapToWindowPreset(params.timeRange);
     const snappedParams: DiscoverParams = {
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: { from: snapped.from, to: snapped.to },
     };
-    const cacheKey = discoverCacheKey(params.tenantId, snapped);
+    const cacheKey = discoverCacheKey({
+      authorization: params.authorization,
+      snapped,
+    });
     const cached = await DISCOVER_CACHE.get(cacheKey);
 
     if (cached) {
@@ -771,11 +828,11 @@ export class TraceListService {
         // never bubble up into the user-facing path (the cache write
         // already succeeded).
         try {
-          discoverBroadcaster?.(params.tenantId);
+          discoverBroadcaster?.(ownProjectOf(params.authorization));
         } catch (broadcastErr) {
           discoverLogger.warn(
             {
-              tenantId: params.tenantId,
+              scope: scopeKeyOf(params.authorization),
               cacheKey,
               error:
                 broadcastErr instanceof Error
@@ -816,17 +873,17 @@ export class TraceListService {
    * dynamic-key facets run on their own.
    */
   private async computeFacets({
-    tenantId,
+    authorization,
     timeRange,
     filterFor,
     includeDynamicKeys,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: (def: FacetDefinition) => FilterWhere | undefined;
     includeDynamicKeys: boolean;
   }): Promise<FacetDescriptor[]> {
-    const params: DiscoverParams = { tenantId, timeRange };
+    const params: DiscoverParams = { authorization, timeRange };
     const TOP_N = 50;
     // Distinct integer values fetched per `isDiscrete`-flagged facet. The exact
     // distinct count comes back regardless of this cap, so the sidebar can
@@ -910,7 +967,7 @@ export class TraceListService {
           `batch:${slotKey}`,
           this.repository
             .findBatchedFacets({
-              tenantId: params.tenantId,
+              authorization: params.authorization,
               timeRange: params.timeRange,
               table,
               timeColumn: TABLE_TIME_COLUMNS[table],
@@ -971,7 +1028,7 @@ export class TraceListService {
           `discrete:${def.key}`,
           this.repository
             .findDiscreteValues({
-              tenantId: params.tenantId,
+              authorization: params.authorization,
               timeRange: params.timeRange,
               table: def.table,
               timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -996,7 +1053,7 @@ export class TraceListService {
       taskTimings.sort((a, b) => b.durationMs - a.durationMs);
       discoverLogger.info(
         {
-          tenantId: params.tenantId,
+          scope: scopeKeyOf(params.authorization),
           totalMs,
           breakdown: taskTimings.slice(0, 20),
           taskCount: tasks.length,
@@ -1062,7 +1119,7 @@ export class TraceListService {
       if (!raw) return null;
       const enriched =
         def.key === "topic" || def.key === "subtopic"
-          ? await this.enrichTopicNames(params.tenantId, raw)
+          ? await this.enrichTopicNames(params.authorization, raw)
           : raw;
       return {
         key: def.key,
@@ -1181,7 +1238,7 @@ export class TraceListService {
     let result: CategoricalFacetResult;
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -1192,20 +1249,19 @@ export class TraceListService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit: params.limit,
         offset: params.offset,
         prefix: params.prefix,
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.enrichTopicNames(params.tenantId, result);
+      result = await this.enrichTopicNames(params.authorization, result);
     }
 
     return result;
@@ -1215,7 +1271,7 @@ export class TraceListService {
     params: FacetValuesParams,
     facetPrefix: string,
     find: (p: {
-      tenantId: string;
+      authorization: Authorization;
       timeRange: { from: number; to: number };
       attributeKey: string;
       prefix?: string;
@@ -1229,7 +1285,7 @@ export class TraceListService {
     }
 
     return find({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       attributeKey,
       limit: params.limit,
@@ -1253,7 +1309,7 @@ export class TraceListService {
 
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -1264,7 +1320,6 @@ export class TraceListService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit,
         offset: 0,
@@ -1277,13 +1332,13 @@ export class TraceListService {
           : undefined,
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.enrichTopicNames(params.tenantId, result);
+      result = await this.enrichTopicNames(params.authorization, result);
     }
 
     return {
@@ -1306,7 +1361,7 @@ export class TraceListService {
     filterWhere: FilterWhere | undefined;
   }): Promise<RangeFacetDescriptor> {
     const result = await this.repository.findRangeStatsForTable({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       table: def.table,
       timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -1330,13 +1385,12 @@ export class TraceListService {
     limit: number,
   ): Promise<DynamicKeysFacetDescriptor> {
     const query = def.queryBuilder({
-      tenantId: params.tenantId,
       timeRange: params.timeRange,
       limit,
       offset: 0,
     });
     const result = await this.repository.findCategoricalFacetRaw({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       query,
     });
 
@@ -1383,9 +1437,60 @@ export function parseLabels(raw: string | undefined): string[] {
   }
 }
 
+/**
+ * Tease input/output/error previews and user-authored labels of items beyond
+ * the caller's visibility window; existence and counts stay untouched. Labels
+ * are user-authored metadata strings, so they're gated alongside the content
+ * fields to avoid leaking through on old traces.
+ */
+function teasedBeyondCutoff({
+  items,
+  cutoffMs,
+}: {
+  items: TraceListItem[];
+  cutoffMs: number | null | undefined;
+}): TraceListItem[] {
+  if (cutoffMs === null || cutoffMs === undefined) return items;
+  return items.map((item) =>
+    item.timestamp < cutoffMs
+      ? {
+          ...item,
+          input: item.input ? teaserOf(item.input) : item.input,
+          output: item.output ? teaserOf(item.output) : item.output,
+          error: item.error ? teaserOf(item.error) : item.error,
+          labels: item.labels.map((label) => teaserOf(label)),
+        }
+      : item,
+  );
+}
+
+/** A listed row's identity: its tenant and trace id together. */
+function listedRowKey(row: { tenantId: string; traceId: string }): string {
+  return listedTraceKey({ projectId: row.tenantId, traceId: row.traceId });
+}
+
+/**
+ * The evaluations of a page's rows, keyed by tenant and trace id together.
+ *
+ * The read is fenced by the proof, so on an aggregate it returns every
+ * member's evaluations under the listed ids, and two members may hold the
+ * same id (ADR-144 v4.1). Keying by the pair is what keeps one member's
+ * evaluation off another member's row of the same id.
+ */
+function evaluationsByListedRow(
+  evaluations: readonly TenantEvalSummary[],
+): Map<string, EvalSummary[]> {
+  const byRow = new Map<string, EvalSummary[]>();
+  for (const { tenantId, ...summary } of evaluations) {
+    const key = listedRowKey({ tenantId, traceId: summary.traceId });
+    byRow.set(key, [...(byRow.get(key) ?? []), summary]);
+  }
+  return byRow;
+}
+
 /** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
 function cursorForTraceRow(
-  row: TraceSummaryData,
+  row: TraceListRow,
   sortColumn: TraceListSortColumn,
 ): TraceListCursor {
   let sortValue: number;
@@ -1422,6 +1527,7 @@ function cursorForTraceRow(
 
   return {
     sortValue: Number.isFinite(sortValue) ? sortValue : 0,
+    tenantId: row.tenantId,
     traceId: row.traceId,
   };
 }
@@ -1434,7 +1540,9 @@ function presentMediaRefs(
   return refs.length > 0 ? refs : undefined;
 }
 
-export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(
+  row: TraceListRow,
+): Omit<TraceListItem, "evaluations"> {
   const status = deriveTraceStatus(row);
 
   const totalTokens =
@@ -1442,6 +1550,7 @@ export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
+    projectId: row.tenantId,
     timestamp: deriveTraceTimestamp({
       occurredAt: row.occurredAt,
       storageAnchorMs: row.storageAnchorMs,

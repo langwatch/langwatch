@@ -9,8 +9,8 @@
  * vs cross-platform Activity Monitor), but they share the OTLP wire
  * shape and must therefore share a single hardened parser. Specifically:
  *
- *   - decompression: gzip / deflate / brotli per Content-Encoding (most
- *     production OTel collectors enable gzip by default)
+ *   - decompression: gzip / deflate / brotli / zstd, chosen by the body's
+ *     magic bytes first and Content-Encoding second
  *   - protobuf + JSON: most production collectors emit protobuf for size,
  *     so JSON-only parsing silently fails them
  *   - JSON-then-protobuf fallback path (for reasonable-looking JSON that
@@ -28,7 +28,7 @@
  */
 
 import { promisify } from "node:util";
-import { brotliDecompress, gunzip, inflate } from "node:zlib";
+import { brotliDecompress, gunzip, inflate, zstdDecompress } from "node:zlib";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
@@ -44,6 +44,7 @@ import {
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
+const zstdDecompressAsync = promisify(zstdDecompress);
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -99,12 +100,34 @@ const DECOMPRESSORS = {
   gzip: gunzipAsync,
   deflate: inflateAsync,
   br: brotliDecompressAsync,
+  zstd: zstdDecompressAsync,
 } as const satisfies Record<string, Decompressor>;
 
 type SupportedEncoding = keyof typeof DECOMPRESSORS;
 
 function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
   return encoding in DECOMPRESSORS;
+}
+
+const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
+const ZSTD_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
+
+function startsWith(buf: Buffer, magic: Buffer): boolean {
+  return buf.subarray(0, magic.length).equals(magic);
+}
+
+/**
+ * The encoding a body's leading bytes announce, or null when they announce none.
+ *
+ * Exporters are known to send zstd with no Content-Encoding, or gzip under a
+ * wrong one, so the header alone cannot be trusted. Only formats with a fixed
+ * magic number are sniffed; deflate and brotli have none, so they stay
+ * header-driven.
+ */
+function sniffEncoding(buf: Buffer): SupportedEncoding | null {
+  if (startsWith(buf, GZIP_MAGIC)) return "gzip";
+  if (startsWith(buf, ZSTD_MAGIC)) return "zstd";
+  return null;
 }
 
 /**
@@ -206,31 +229,34 @@ async function readWireBody(req: Request): Promise<Buffer> {
 }
 
 /**
- * Read the request body, decompressing per `Content-Encoding`.
+ * Read the request body, decompressing it.
+ *
+ * The encoding is sniffed from the body's magic bytes (gzip, zstd) and only
+ * falls back to `Content-Encoding` when none is recognised.
  *
  * Throws on unsupported encodings, and on a body that passes
  * {@link OTLP_MAX_BODY_BYTES} either on the wire or on expanding — the caller
- * decides how to respond. Decompression is bounded by zlib itself, so an
- * oversized body stops being written the moment it crosses the line.
+ * decides how to respond. Decompression is bounded by each decoder's
+ * `maxOutputLength`, so an oversized body stops being written the moment it
+ * crosses the line.
  */
 export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
-  const encoding = req.headers.get("content-encoding");
+  // The body has to be read before the encoding is known, because the encoding
+  // may come from the body itself. The read is already bounded by
+  // OTLP_MAX_BODY_BYTES, so an unsupported encoding costs at most that.
+  const raw = await readWireBody(req);
+  const encoding = sniffEncoding(raw) ?? req.headers.get("content-encoding");
 
-  if (!encoding || encoding === "identity") {
-    return toArrayBuffer(await readWireBody(req));
-  }
+  if (!encoding || encoding === "identity") return toArrayBuffer(raw);
 
-  // Settled before the body is read, so a request we are going to refuse
-  // outright does not get to spend the read budget first.
   if (!isSupportedEncoding(encoding)) {
     throw new OtlpUnsupportedEncodingError({ encoding });
   }
 
-  // Widened to the shared signature deliberately: the three entries differ in
-  // their options type (ZlibOptions vs BrotliOptions), so calling the indexed
-  // union directly is not something TypeScript will resolve.
+  // Widened to the shared signature deliberately: the entries differ in
+  // their options type (ZlibOptions vs BrotliOptions vs ZstdOptions), so calling
+  // the indexed union directly is not something TypeScript will resolve.
   const decompress: Decompressor = DECOMPRESSORS[encoding];
-  const raw = await readWireBody(req);
 
   try {
     return toArrayBuffer(
@@ -243,7 +269,7 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
         encoding,
       });
     }
-    // Anything else zlib raises here is a body that does not decompress —
+    // Anything else the decoder raises here is a body that does not decompress —
     // truncated by a disconnect, or not the encoding it claimed. Both are the
     // sender's, and neither is a reason to answer 500.
     throw new OtlpBodyUnreadableError({ cause: error });
