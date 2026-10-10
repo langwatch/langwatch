@@ -2,8 +2,11 @@ package cell
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/upgradelab/generate"
@@ -42,6 +45,20 @@ func (cell *run) emptyAccount(ctx context.Context) {
 	}
 	email, password := generate.SeedAccount(cell.options.Seed)
 	cell.seeder = seed.NewSeeder(seed.ProductInput{AppURL: cell.url(), Email: email, Password: password, Label: cell.options.Name()})
+	cell.seeder.PlainWire = true
+	if err := cell.emptyOrganization(ctx); err != nil {
+		cell.report.Notes = append(cell.report.Notes, "organization for the seed account after ready (O1 needs one): "+err.Error())
+	}
+}
+
+// emptyOrganization gives the seed account an organization through head's own sign-up door (T0-F9),
+// so O1's shot reaches Ops > Upgrades instead of /onboarding/welcome.
+func (cell *run) emptyOrganization(ctx context.Context) error {
+	if err := cell.seeder.SignIn(ctx); err != nil {
+		return err
+	}
+	label := "Upgradelab " + cell.options.Name()
+	return cell.seeder.Call(ctx, true, "onboarding.initializeOrganization", map[string]any{"orgName": label, "projectName": label}, nil)
 }
 
 func (cell *run) emptyChecks(ctx context.Context) error {
@@ -63,19 +80,55 @@ func (cell *run) emptyChecks(ctx context.Context) error {
 	return nil
 }
 
-// notNeededVerdict (F1): on empty stores every step that is not schema or seed settles not-needed.
+// notNeededVerdict (F1, Alex's T0-F2 ruling): main made the schema, so a data step over empty stores ends done
+// having touched zero rows (not-needed also passes); any row count its report names must be zero.
 func notNeededVerdict(rows []LedgerRow) Verdict {
-	var ran []string
+	var wrong []string
 	data := 0
 	for _, row := range rows {
 		if strings.HasSuffix(row.Kind, "-schema") || row.Kind == "seed" || row.Mode == "operator" {
 			continue
 		}
 		data++
-		if row.Status != "not-needed" {
-			ran = append(ran, row.ID+"="+row.Status)
+		switch touched := rowsTouched(row.Report); {
+		case row.Status != "done" && row.Status != "not-needed":
+			wrong = append(wrong, row.ID+"="+row.Status)
+		case len(touched) > 0:
+			wrong = append(wrong, row.ID+" touched "+strings.Join(touched, ", "))
 		}
 	}
-	return Verdict{ID: "F1", Name: "fresh install: every data step is not-needed", Result: map[bool]string{true: "pass", false: "fail"}[len(ran) == 0],
-		Detail: fmt.Sprintf("%d data steps; not not-needed: %v", data, ran)}
+	return Verdict{ID: "F1", Name: invariantNames["F1"], Result: map[bool]string{true: "pass", false: "fail"}[len(wrong) == 0],
+		Detail: fmt.Sprintf("%d data steps; not done over zero rows: %v", data, wrong)}
+}
+
+// rowCountKey is a report key that counts rows a step changed.
+var rowCountKey = regexp.MustCompile(`(?i)rows|processed|migrated|updated|copied|moved|touched|written|rewritten|backfilled`)
+
+// rowsTouched lists the non-zero row counts anywhere in a step's report, as key=value.
+func rowsTouched(report json.RawMessage) []string {
+	var tree any
+	if len(report) == 0 || json.Unmarshal(report, &tree) != nil {
+		return nil
+	}
+	var touched []string
+	var walk func(key string, node any)
+	walk = func(key string, node any) {
+		switch value := node.(type) {
+		case map[string]any:
+			for child, each := range value {
+				walk(child, each)
+			}
+		case []any:
+			for _, each := range value {
+				walk(key, each)
+			}
+		case float64:
+			if value != 0 && rowCountKey.MatchString(key) {
+				touched = append(touched, fmt.Sprintf("%s=%v", key, value))
+			}
+		}
+	}
+	walk("", tree)
+	slices.Sort(touched)
+	return touched
 }

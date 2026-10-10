@@ -28,6 +28,7 @@ type Stores struct {
 	Private                      []string       // private ClickHouse labels (hybrid)
 	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
 	IDP                          int            // idpsim port, for profiles that sign in through an identity provider
+	IDPPublic, IDPCA             string         // legacy SSO: idpsim behind the cell's TLS proxy, and the CA the releases trust
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.

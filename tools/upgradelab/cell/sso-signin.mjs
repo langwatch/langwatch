@@ -1,6 +1,6 @@
 // Plain members signing in through SSO for an upgradelab cell (E6, E7). cwd = <head>/apps/ui;
 // argv[2] = JSON { url, phase, project, stateDir, shots, members: [{ email, inviteCode, door,
-// connectionId }] }. One JSON line per check: { phase, member, door, check, ok, url, detail }.
+// connectionId, project? }] }. One JSON line per check: { phase, member, door, check, ok, url, detail }.
 // Phase test-login is the go-live checklist's round trip through a connection not yet live;
 // head first replays main's cookie.
 import { existsSync, mkdirSync } from "node:fs";
@@ -13,8 +13,9 @@ mkdirSync(stateDir, { recursive: true });
 const emit = (record) => console.log(JSON.stringify({ phase, ...record }));
 const shown = async (page) =>
   `${new URL(page.url()).pathname}: ${(await page.innerText("body").catch(() => "")).replace(/\s+/g, " ").slice(0, 200)}`;
-const onProject = (at) =>
-  at.origin === new URL(url).origin && at.pathname.split("/")[1] === project;
+// A member of another organization (the SAML one) lands on that organization's project.
+const onProject = (at, member) =>
+  at.origin === new URL(url).origin && at.pathname.split("/")[1] === (member?.project ?? project);
 const atAuth = (at) => at.pathname.startsWith("/auth/");
 const stateFile = (member) => join(stateDir, `${member.email.replace(/[^a-z0-9]+/gi, "-")}.json`);
 
@@ -22,6 +23,8 @@ async function newContext(browser, storageState) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     storageState,
+    // Legacy-sso cells put idpsim behind the cell's own TLS certificate.
+    ignoreHTTPSErrors: true,
   });
   // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds
   // the page.
@@ -49,13 +52,13 @@ async function checkCookie(browser, member) {
     if (response.request().isNavigationRequest()) worst = Math.max(worst, response.status());
   });
   await page
-    .goto(`${url}/${project}`, { timeout: 30_000, waitUntil: "domcontentloaded" })
+    .goto(`${url}/${member.project ?? project}`, { timeout: 30_000, waitUntil: "domcontentloaded" })
     .catch(() => undefined);
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
   const at = new URL(page.url());
   const blank = (await page.innerText("body").catch(() => "")).trim() === "";
   let outcome = "neither";
-  if (onProject(at)) outcome = "still signed in";
+  if (onProject(at, member)) outcome = "still signed in";
   else if (atAuth(at)) outcome = "sent to sign in";
   const ok = worst < 500 && !blank && outcome !== "neither";
   emit({
@@ -76,6 +79,13 @@ async function hinted(browser, member) {
     if (to.searchParams.get("login_hint")) return route.continue();
     to.searchParams.set("login_hint", member.email);
     return route.fulfill({ status: 302, headers: { location: to.toString() } });
+  });
+  // SAML: idpsim reads login_hint off the SSO URL whichever binding carries the request.
+  await context.route(/\/saml\/sso/, (route) => {
+    const to = new URL(route.request().url());
+    if (to.searchParams.get("login_hint")) return route.continue();
+    to.searchParams.set("login_hint", member.email);
+    return route.continue({ url: to.toString() });
   });
   return context;
 }
@@ -155,8 +165,9 @@ async function signIn(browser, member) {
       await page.waitForURL((at) => !atAuth(at), { timeout: 30_000 });
     }
     step = "landing";
-    await page.waitForURL(onProject, { timeout: 30_000 }).catch(() => undefined);
-    if (!onProject(new URL(page.url())) && member.inviteCode && phase === "main") {
+    const landed = (at) => onProject(at, member);
+    await page.waitForURL(landed, { timeout: 30_000 }).catch(() => undefined);
+    if (!landed(new URL(page.url())) && member.inviteCode && phase === "main") {
       step = "accept invite";
       const answer = await page.request.post(`${url}/api/trpc/invite.acceptInvite`, {
         data: { json: { inviteCode: member.inviteCode } },
@@ -164,9 +175,9 @@ async function signIn(browser, member) {
       });
       if (!answer.ok()) step += ` (answered ${answer.status()})`;
       await page.goto(`${url}/`, { timeout: 30_000, waitUntil: "domcontentloaded" });
-      await page.waitForURL(onProject, { timeout: 30_000 }).catch(() => undefined);
+      await page.waitForURL(landed, { timeout: 30_000 }).catch(() => undefined);
     }
-    const ok = onProject(new URL(page.url()));
+    const ok = landed(new URL(page.url()));
     if (ok && phase === "main") await context.storageState({ path: stateFile(member) });
     emit({
       ...base,

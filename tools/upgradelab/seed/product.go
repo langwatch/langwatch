@@ -232,8 +232,13 @@ func teamOf(organizations []organization, projectID string) (string, string) {
 
 // Invite asks main to invite email as a plain MEMBER of the seed team and returns the invite code.
 func (seeder *Seeder) Invite(ctx context.Context, email string) (string, error) {
-	input := map[string]any{"organizationId": seeder.Context.OrganizationID, "invites": []any{map[string]any{
-		"email": email, "role": "MEMBER", "teams": []any{map[string]string{"teamId": seeder.Context.TeamID, "role": "MEMBER"}}}}}
+	return seeder.InviteTo(ctx, email, seeder.Context.OrganizationID, seeder.Context.TeamID)
+}
+
+// InviteTo asks main to invite email as a plain MEMBER of another organization's team the seed account administers.
+func (seeder *Seeder) InviteTo(ctx context.Context, email, organizationID, teamID string) (string, error) {
+	input := map[string]any{"organizationId": organizationID, "invites": []any{map[string]any{
+		"email": email, "role": "MEMBER", "teams": []any{map[string]string{"teamId": teamID, "role": "MEMBER"}}}}}
 	var created []struct{ InviteCode string }
 	if err := seeder.trpc(ctx, trpcCall{mutation: true, path: "invite.createInvites", input: input, out: &created}); err != nil {
 		return "", err
@@ -345,6 +350,9 @@ func orNull(raw json.RawMessage) json.RawMessage {
 func (seeder *Seeder) Call(ctx context.Context, mutation bool, path string, input, out any) error {
 	return seeder.trpc(ctx, trpcCall{mutation: mutation, path: path, input: input, out: out})
 }
+
+// SignIn signs the seed account in through the release's email door, for a seeder that never ran Seed.
+func (seeder *Seeder) SignIn(ctx context.Context) error { return seeder.signIn(ctx) }
 
 // Session is the signed-in seed account's headers (Origin and the session cookie), for callers that drive the app as it.
 func (seeder *Seeder) Session() http.Header { return seeder.session() }

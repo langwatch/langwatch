@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/upgradelab/seed"
+
+	"github.com/langwatch/langwatch/tools/upgradelab/snapshot"
 )
 
 const sigStop = syscall.SIGSTOP
@@ -44,6 +46,8 @@ func (cell *run) checks(ctx context.Context) error {
 		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyVerdicts(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.retentionVerdict(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
 	for index := range cell.report.Verdicts {
@@ -123,20 +127,34 @@ func (cell *run) copyVerdict(ctx context.Context) Verdict {
 	if err != nil {
 		return Verdict{ID: "I4", Name: "copy never move", Result: "inconclusive", Detail: err.Error()}
 	}
-	var shrunk []string
-	for store, tables := range cell.before {
-		for table, before := range tables {
-			if now, ok := after[store][table]; !ok || now.Count < before.Count {
-				shrunk = append(shrunk, fmt.Sprintf("%s.%s %d->%d", store, table, before.Count, now.Count))
+	return judgeCopy(cell.before, after, cell.retentionAllowance())
+}
+
+// judgeCopy fails a table that lost rows, beyond what main's own retention TTL may expire (allowance, R1's slices).
+func judgeCopy(before, after snapshot.Fingerprint, allowance map[string]map[string]int64) Verdict {
+	var shrunk, expired []string
+	for store, tables := range before {
+		for table, was := range tables {
+			now, ok := after[store][table]
+			switch {
+			case !ok || now.Count < was.Count-allowance[store][table]:
+				shrunk = append(shrunk, fmt.Sprintf("%s.%s %d->%d", store, table, was.Count, now.Count))
+			case now.Count < was.Count:
+				expired = append(expired, fmt.Sprintf("%s.%s %d->%d (TTL may expire %d)", store, table, was.Count, now.Count, allowance[store][table]))
 			}
 		}
 	}
-	tables := make([]string, 0, len(cell.before))
-	for store, each := range cell.before {
+	tables := make([]string, 0, len(before))
+	for store, each := range before {
 		tables = append(tables, fmt.Sprintf("%s %d tables", store, len(each)))
 	}
 	slices.Sort(tables)
-	return verdict("I4", len(shrunk) == 0, fmt.Sprintf("every table counted at the cut and after (%s); shrunk: %v", strings.Join(tables, ", "), shrunk))
+	slices.Sort(shrunk)
+	detail := fmt.Sprintf("every table counted at the cut and after (%s); shrunk: %v", strings.Join(tables, ", "), shrunk)
+	if len(expired) > 0 {
+		detail += fmt.Sprintf("; expired by main's own retention TTL only: %v", expired)
+	}
+	return verdict("I4", len(shrunk) == 0, detail)
 }
 
 func (cell *run) readBackVerdict(ctx context.Context) Verdict {

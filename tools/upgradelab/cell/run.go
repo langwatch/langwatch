@@ -39,6 +39,7 @@ type Options struct {
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
 	Ledger                           []string // #8553 rows this cell claims and reports to
 	FromSnapshot                     string   // a produce entry directory or cache key: restore instead of seeding
+	Overlays                         []string // planted on top of the shape (OverlayRetention)
 	MaxLoad                          float64  // refuse to start above this 1-minute load average
 	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
@@ -83,6 +84,8 @@ type run struct {
 	recipe             snapshot.Recipe
 	anchor             time.Time
 	sso                ssoSeed
+	retention          retentionState
+	legacy             legacySeed
 
 	stopTraffic, stopPoller, stopSampler context.CancelFunc
 	trafficDone                          chan struct{}
@@ -90,7 +93,11 @@ type run struct {
 
 // Name is the cell's store suffix and report id, e.g. cloud_s_typical_1.
 func (options Options) Name() string {
-	return strings.ToLower(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s_%d", options.Deployment, options.Tier, options.Shape, options.Seed), "-", "_"))
+	name := fmt.Sprintf("%s_%s_%s_%d", options.Deployment, options.Tier, options.Shape, options.Seed)
+	for _, overlay := range options.Overlays {
+		name += "_" + overlay
+	}
+	return strings.ToLower(strings.ReplaceAll(name, "-", "_"))
 }
 
 // Run executes the cell and writes report.json and report.md into RunDir; the error is operational only.
@@ -109,8 +116,14 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	if options.FromSnapshot != "" {
 		origin = []step{{"stores", cell.freshStores}, {"restore", cell.restore}, {"from-up", cell.fromUp}, {"sign-in", cell.resumeSeed}}
 	}
-	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, []step{
-		{"traffic-before", cell.trafficBefore}, {"cut", cell.cut}, {"switch", cell.switchToHead}, {"ready", cell.awaitReady},
+	before, cut := []step{{"traffic-before", cell.trafficBefore}}, []step{{"cut", cell.cut}}
+	if cell.overlay(OverlayRetention) {
+		origin = append(origin, step{"retention-rules", cell.retentionRules})
+		before = append(before, step{"retention-age", cell.retentionAge})
+		cut = append(cut, step{"retention-cut", cell.retentionAtCut})
+	}
+	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, before, cut, []step{
+		{"switch", cell.switchToHead}, {"ready", cell.awaitReady},
 		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", func(ctx context.Context) error {
 			cell.stopObservers()
 			return cell.checks(ctx)
@@ -184,6 +197,13 @@ func prepare(options Options) (*run, error) {
 		return nil, fmt.Errorf("deployment %s cannot run yet: %s", options.Deployment, profile.Missing)
 	case !contains(Tiers, options.Tier) || !contains(DataShapes, options.Shape):
 		return nil, fmt.Errorf("tier %q shape %q: only %v x %v so far", options.Tier, options.Shape, Tiers, DataShapes)
+	case len(options.Overlays) > 0 && options.Shape == EmptyShape:
+		return nil, errors.New("an overlay needs seeded data: the empty shape takes none")
+	}
+	for _, overlay := range options.Overlays {
+		if !contains(Overlays, overlay) {
+			return nil, fmt.Errorf("unknown overlay %q: want one of %v", overlay, Overlays)
+		}
 	}
 	for _, dir := range []string{options.FromDir, options.HeadDir} {
 		if err := CheckSourceDir(dir); err != nil {
@@ -531,11 +551,21 @@ func (cell *run) fingerprint(ctx context.Context) (snapshot.Fingerprint, error) 
 	if err != nil {
 		return nil, err
 	}
-	clickhouse, err := snapshot.NewClickHouseHTTP(cell.stores.ClickHouseURL(""))
-	if err != nil {
-		return nil, err
+	targets := map[string]snapshot.ClickHouse{}
+	for _, label := range append([]string{""}, cell.stores.Private...) {
+		if targets[clickHouseTarget(label)], err = snapshot.NewClickHouseHTTP(cell.stores.ClickHouseURL(label)); err != nil {
+			return nil, err
+		}
 	}
-	return snapshot.TakeFingerprint(ctx, snapshot.Stores{Postgres: postgres, ClickHouse: map[string]snapshot.ClickHouse{"shared": clickhouse}})
+	return snapshot.TakeFingerprint(ctx, snapshot.Stores{Postgres: postgres, ClickHouse: targets})
+}
+
+// clickHouseTarget names a ClickHouse target as snapshots do: shared, or private-<label>.
+func clickHouseTarget(label string) string {
+	if label == "" {
+		return "shared"
+	}
+	return "private-" + label
 }
 
 func (cell *run) addProc(proc *Proc) {
@@ -804,6 +834,9 @@ func (cell *run) teardown() {
 	}
 	if cell.balancer != nil {
 		cell.balancer.Close()
+	}
+	if cell.legacy.proxy != nil {
+		_ = cell.legacy.proxy.Close()
 	}
 	if !cell.options.Keep && cell.stores.Name != "" && cell.report.Error == "" {
 		_ = cell.stores.Drop(context.Background())

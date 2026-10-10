@@ -52,8 +52,14 @@ func parse(args []string) (Options, error) {
 	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key: restore it instead of seeding")
 	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
 	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry")
+	overlays := flags.String("overlays", "", "comma-separated overlays planted on main: retention (aged telemetry under three retention rules)")
 	if err := flags.Parse(args); err != nil {
 		return options, err
+	}
+	for _, overlay := range strings.Split(*overlays, ",") {
+		if overlay = strings.TrimSpace(overlay); overlay != "" {
+			options.Overlays = append(options.Overlays, overlay)
+		}
 	}
 	return withDrills(options, *ledger, *drills)
 }
@@ -61,7 +67,7 @@ func parse(args []string) (Options, error) {
 // cellFlags are the flags cell and produce share.
 func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
-	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | cloud-sso | hybrid | self-hosted")
+	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | cloud-sso | cloud-legacy-sso | hybrid | self-hosted | self-hosted-legacy-sso")
 	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S or M (L and XL wait for lane L4)")
 	flags.BoolVar(&options.NoAdminEmails, "no-admin-emails", false, "self-hosted-free boots without ADMIN_EMAILS")
 	flags.StringVar(&options.Shape, "shape", "typical", "data shape: typical, or empty (a fresh install: no seed, no traffic)")

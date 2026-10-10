@@ -275,11 +275,13 @@ type LedgerRow struct {
 	Attempt  int    `json:"attempt"`
 	Finished string `json:"finished_at"`
 	Started  string `json:"started_at"`
+	// Report is the step's own JSON report; F1 reads the row counts a data step names there.
+	Report json.RawMessage `json:"report,omitempty"`
 }
 
 // Ledger reads every step row; a missing ledger schema is an empty ledger.
 func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
-	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
+	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text, 'report', report) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
 			return nil, nil
