@@ -31,6 +31,9 @@ DELETE /_sim/api/object?bucket=&key=   one object
 DELETE /_sim/api/objects[?bucket=]     every object (in one bucket), answers {"deleted": n}
 ```
 
+Private-storage org: bucket `langwatch-private` always exists; export `DATAPLANE_S3__dev__<orgId>=` main's JSON
+(`endpoint` = the stack's S3 endpoint, that bucket, keys `storagesim`) before `haven up`.
+
 Or use any S3 client with path-style addressing, region `auto`, the dev key. A missing
 key answers `NoSuchKey`.
 

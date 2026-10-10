@@ -79,6 +79,10 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   `haven sim idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
   `azure` is Entra: the product's authority host is hard-wired, so resolve
   `login.microsoftonline.com` to idpsim over https; the env gives `AZURE_AD_TENANT_ID`.
+- Legacy-SSO org (main's shape, no connection): `haven db seed --org name=<n>,plan=licence`, then set its
+  `Organization."ssoDomain"` to `acme<t>.test` and `"ssoProvider"` to the legacy provider name over `haven db url`.
+- Failed SCIM apply (needs `SCIM_V2_GRANTS=1` at `haven up`): push the org's last active admin `active=false`;
+  it fails `cannot_remove_last_admin`, retires at once, and re-drives once another admin exists.
 - `populate` also gives each user `department`, `costCenter` and `manager` (from `--seed`);
   pushes carry them under the SCIM enterprise extension.
 - Negative tokens: `haven sim idp fault <t> bad-signature|wrong-audience|expired|replayed-nonce`
