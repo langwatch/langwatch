@@ -519,7 +519,7 @@ export const designSystemConfig = defineConfig({
           card: {
             value: {
               _light: "white",
-              _dark: "color-mix(in srgb, {colors.gray.800} 80%, {colors.gray.700})",
+              _dark: "color-mix(in srgb, {colors.gray.800} 70%, {colors.zinc.750})",
             },
           },
           nested: {
