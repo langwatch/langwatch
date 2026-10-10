@@ -1,5 +1,5 @@
 import {
-  findWebhookUrlProblemMessage,
+  findWebhookUrlProblem,
   sanitizeWebhookHeaders,
   webhookMethodSchema,
   type WebhookMethod,
@@ -29,15 +29,22 @@ export function isWebhookContentType(value: string): boolean {
   return MEDIA_TYPE_RX.test(value.trim());
 }
 
-export const webhookActionParamsSchema = z.object({
-  url: z
+/** The URL field; the dev switch `allowInsecureLocalUrls` admits http and any port. */
+export function webhookUrlSchema({
+  allowInsecureLocalUrls = false,
+}: { allowInsecureLocalUrls?: boolean } = {}): z.ZodType<string> {
+  return z
     .string()
     .trim()
     .min(1, "A webhook URL is required.")
     .superRefine((url, context) => {
-      const problem = findWebhookUrlProblemMessage(url);
-      if (problem) context.addIssue({ code: "custom", message: problem });
-    }),
+      const problem = findWebhookUrlProblem(url, { allowInsecureOrigin: allowInsecureLocalUrls });
+      if (problem) context.addIssue({ code: "custom", message: problem.message });
+    });
+}
+
+export const webhookActionParamsSchema = z.object({
+  url: webhookUrlSchema(),
   method: webhookMethodSchema.default("POST"),
   headers: z.record(z.string(), z.string()).default({}).transform(sanitizeWebhookHeaders),
   /** NULL = the framework default envelope for a JSON content type, an empty body otherwise. */

@@ -367,3 +367,15 @@ Feature: Automation ownership
     Given a process that names no Slack addresses
     When an automation posts through a bot connection and through an incoming webhook
     Then chat.postMessage reaches https://slack.com/api and the webhook reaches https://hooks.slack.com
+
+  @unit
+  Scenario: A webhook automation refuses any URL but https on port 443 in production
+    Given a process that does not set the local-URL dev switch
+    When a webhook automation is saved with an http URL or an https URL on another port
+    Then the save is refused with the webhook URL problem
+
+  @unit
+  Scenario: The local-URL dev switch admits an http or ported webhook URL
+    Given a process that sets the webhook module's local-URL dev switch
+    When a webhook automation is saved with an http URL on a high port
+    Then the save is accepted

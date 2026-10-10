@@ -50,6 +50,7 @@ const CONFIG: AutomationServerConfig = {
   publicBaseUrl: "https://app.langwatch.test",
   slackApiBase: "https://slack.com/api",
   slackWebhookBase: "https://hooks.slack.com",
+  allowInsecureLocalUrls: false,
 };
 
 function eventingFor(role: "api" | "worker"): EventSourcing {

@@ -53,6 +53,7 @@ export {
   isJsonWebhookContentType,
   isWebhookContentType,
   webhookActionParamsSchema,
+  webhookUrlSchema,
   type WebhookActionParams,
   type WebhookPreview,
 } from "./providers/webhook.ts";

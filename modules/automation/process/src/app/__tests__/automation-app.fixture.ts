@@ -222,6 +222,7 @@ export function createCanonicalAutomationApp(): {
         publicBaseUrl: undefined,
         slackApiBase: "https://slack.com/api",
         slackWebhookBase: "https://hooks.slack.com",
+        allowInsecureLocalUrls: false,
       },
     }),
     triggerCreate,

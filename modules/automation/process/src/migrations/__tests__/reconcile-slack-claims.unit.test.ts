@@ -47,6 +47,7 @@ const CONFIG: AutomationServerConfig = {
   publicBaseUrl: "https://app.langwatch.test",
   slackApiBase: "https://slack.com/api",
   slackWebhookBase: "https://hooks.slack.com",
+  allowInsecureLocalUrls: false,
 };
 
 /** A memory-tier worker hosting automation's pipeline, every peer a fixture but `slack`. */
