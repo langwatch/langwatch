@@ -5540,12 +5540,15 @@ const presentations = {
     // server's sentence: `meta.message` on this code can carry an internal
     // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
-    describe: (error) =>
-      strEq(error, "reason", "metadata_address")
-        ? "That address is reserved for the hosting platform's own services, so webhooks can't be sent to it. Use the address of your own receiving service."
-        : strEq(error, "reason", "private_address")
-          ? "That address is on a private network, so webhooks can't be sent to it. Use a publicly reachable HTTPS address."
-          : "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
+    describe: (error) => {
+      if (strEq(error, "reason", "metadata_address")) {
+        return "That address is reserved for the hosting platform's own services, so webhooks can't be sent to it. Use the address of your own receiving service.";
+      }
+      if (strEq(error, "reason", "private_address")) {
+        return "That address is on a private network, so webhooks can't be sent to it. Use a publicly reachable HTTPS address.";
+      }
+      return "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.";
+    },
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
@@ -5962,6 +5965,29 @@ const presentations = {
     title: "Hosted services are still being set up",
     describe: () =>
       "Your license is valid and its key is being prepared. Try again in a few seconds.",
+  },
+  below_lts_floor: {
+    title: "This version is too old to upgrade from",
+    describe: () =>
+      "Upgrade to the oldest supported long-term release first, then continue to this version.",
+  },
+  image_below_ledger_floor: {
+    title: "This image is older than the database",
+    describe: () =>
+      "The database has already been upgraded past what this image supports. Start an image at or above the version last run.",
+  },
+  step_after_unknown: {
+    title: "An upgrade step depends on a step that doesn't exist",
+    describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
+  },
+  step_after_cycle: {
+    title: "Upgrade steps depend on each other in a loop",
+    describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
+  },
+  contract_archive_failed: {
+    title: "The upgrade couldn't archive data before removing it",
+    describe: () =>
+      "Nothing was dropped. Check the archive destination is reachable and writable, then retry the step.",
   },
   connect_instance_required: {
     title: "This install did not identify itself",
