@@ -96,3 +96,14 @@ Feature: OTLP ingestion doors refuse what they cannot safely hold
       When an exporter with a valid key posts to that same path
       Then the export is answered as not found
       And nothing is recorded
+
+  Rule: The log and metric doors ask for the key before they read the path alias or the body
+
+    @integration
+    Scenario: The log and metric doors refuse a missing key before they judge the exporter path
+      Given the log and metric doors verify the exporter's key before the body (Alex, 2026-10-10, W02-DOOR-SHAPE)
+      When an exporter with no key posts to an exporter path the log or metric receiver does not recognise
+      Then the export is refused as unauthenticated, in the receiver's own body
+      When an exporter with a valid key posts to that same path
+      Then the export is answered as not found
+      And nothing is recorded

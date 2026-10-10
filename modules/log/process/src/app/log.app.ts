@@ -16,7 +16,7 @@ import {
 } from "@langwatch/log-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 import type { FeatureSetup } from "@langwatch/process";
-import { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
 import type { LogRepositories } from "../repositories/log.repositories.ts";
@@ -98,8 +98,11 @@ export class LogModule implements LogApiContract {
     return this.#service.prepareCanonicalLogRecords(input);
   }
 
-  receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult> {
-    return this.#receiver.receive(request);
+  receiveOtlpLogs(input: {
+    request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
+  }): Promise<LogOtlpDoorResult> {
+    return this.#receiver.receive(input);
   }
 
   collectOtlpLogs(input: LogCollectionInput): Promise<LogRequestCollectionResult> {

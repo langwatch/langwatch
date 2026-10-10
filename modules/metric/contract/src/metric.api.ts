@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
+import type { OtlpIngestCredential } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import type {
@@ -56,8 +57,11 @@ export interface MetricApi {
     piiRedactionLevel: MetricPiiRedactionLevel;
     acceptedAt?: number;
   }): Promise<MetricDataPointPreparation>;
-  /** One exporter request at the metrics door: key, allowance, parse, then collection. */
-  receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult>;
+  /** One exporter request the metrics door verified: allowance, parse, then collection. */
+  receiveOtlpMetrics(input: {
+    request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
+  }): Promise<MetricOtlpDoorResult>;
   /** Prepares and records one OTLP metric export, for a receiver that authenticated it itself. */
   collectOtlpMetrics(input: MetricCollectionInput): Promise<MetricRequestCollectionResult>;
   /** Sends prepared points onto the `metric_processing` pipeline for durable storage. */

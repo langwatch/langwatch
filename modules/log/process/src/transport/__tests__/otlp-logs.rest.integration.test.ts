@@ -1,4 +1,4 @@
-import { RestHost } from "@langwatch/api/rest";
+import { bindRestCredential, RestHost } from "@langwatch/api/rest";
 import type { LogApi } from "@langwatch/log-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 /**
@@ -10,12 +10,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { otlpLogsRest } from "../otlp-logs.rest.ts";
+import { otlpLogsDoor, otlpLogsRest } from "../otlp-logs.rest.ts";
 
 function mountedDoor() {
   const received: OtlpDoorRequest[] = [];
   const app = createApiFixture<LogApi>({
-    receiveOtlpLogs: async (request) => {
+    receiveOtlpLogs: async ({ request }) => {
       received.push(request);
       return request.path.endsWith("/")
         ? { outcome: "parse-failed" }
@@ -24,7 +24,7 @@ function mountedDoor() {
   });
   const closed = {
     authenticate: () => {
-      throw new Error("the logs door resolves its key itself.");
+      throw new Error("the logs door binds its own otlp_ingest key.");
     },
   };
   const host = RestHost.create({
@@ -40,7 +40,18 @@ function mountedDoor() {
     bearers: () => closed,
     audit: { record: async () => {} },
   });
-  host.mount(otlpLogsRest.router(), () => app);
+  const door = otlpLogsDoor(async () => ({
+    project: { id: "project-1", teamId: "team-1", organizationId: "organization-1" },
+    identity: {
+      apiKeyId: "key-1",
+      organizationId: "organization-1",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+    },
+  }));
+  host.mount(otlpLogsRest.router(), () => app, {
+    facts: [bindRestCredential("otlp_ingest", () => door)],
+  });
   const post = (path: string) =>
     host.app.fetch(
       new Request(`http://api.test${path}`, {
@@ -67,8 +78,8 @@ describe("the OTLP logs door", () => {
       const response = await post(path);
 
       expect([response.status, await response.json()]).toEqual([200, {}]);
-      expect(received.map((request) => [request.path, request.headers["x-auth-token"]])).toEqual([
-        [path, "sk-lw-test"],
+      expect(received.map((request) => [request.path, request.headers])).toEqual([
+        [path, { "content-type": "application/json" }],
       ]);
     });
 

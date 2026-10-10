@@ -14,7 +14,7 @@ import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OtlpLogReceiverService } from "../../services/otlp-log-receiver.service.ts";
-import { otlpLogsRest } from "../otlp-logs.rest.ts";
+import { otlpLogsDoor, otlpLogsRest } from "../otlp-logs.rest.ts";
 
 const receiverLog = vi.hoisted(() => ({
   loggerName: "langwatch:otel:v1:logs",
@@ -80,9 +80,10 @@ function mount() {
     collection: createApiFixture(),
   });
   const app = createApiFixture<LogApi>({
-    receiveOtlpLogs: (request) => receiver.receive(request),
+    receiveOtlpLogs: (input) => receiver.receive(input),
   });
   const hono = createRestRuntime({
+    doors: { otlp_ingest: otlpLogsDoor((input) => traces.otlpCredential(input)) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -91,7 +92,7 @@ function mount() {
     },
   }).mount(otlpLogsRest.router(), {
     app: () => app,
-    credential: "public",
+    credential: "otlp_ingest",
     onError: (error) => {
       throw error;
     },

@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
+import type { OtlpIngestCredential } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import type { LogPiiRedactionLevel, LogPreparation, CanonicalLogRecord } from "./log-record.ts";
@@ -40,8 +41,11 @@ export interface LogApi {
     piiRedactionLevel: LogPiiRedactionLevel;
     acceptedAt?: number;
   }): Promise<LogPreparation>;
-  /** One exporter request at the logs door: key, allowance, parse, then collection. */
-  receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult>;
+  /** One exporter request the logs door verified: allowance, parse, then collection. */
+  receiveOtlpLogs(input: {
+    request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
+  }): Promise<LogOtlpDoorResult>;
   /** Prepares and records one OTLP log export, for a receiver that authenticated it itself. */
   collectOtlpLogs(input: LogCollectionInput): Promise<LogRequestCollectionResult>;
   /** Sends prepared records onto the `log_processing` pipeline for durable storage. */

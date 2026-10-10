@@ -8,8 +8,17 @@ import type { MetricApi } from "@langwatch/metric-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { otlpMetricsRest } from "../otlp-metrics.rest.ts";
+import { otlpMetricsDoor, otlpMetricsRest } from "../otlp-metrics.rest.ts";
 
+const CREDENTIAL = {
+  project: { id: "project-1", teamId: "team-1", organizationId: "organization-1" },
+  identity: {
+    apiKeyId: "key-1",
+    organizationId: "organization-1",
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+  },
+};
 const unused = () => Promise.reject(new Error("not part of this door"));
 
 function mount() {
@@ -18,12 +27,13 @@ function mount() {
     prepareMetricDataPoints: unused,
     collectOtlpMetrics: unused,
     recordCanonicalMetricDataPoints: unused,
-    receiveOtlpMetrics: async ({ path }) => {
-      received.push(path);
+    receiveOtlpMetrics: async ({ request }) => {
+      received.push(request.path);
       return { outcome: "collected", acceptedDataPoints: 0, rejectedDataPoints: 0 };
     },
   };
   const hono = createRestRuntime({
+    doors: { otlp_ingest: otlpMetricsDoor(async () => CREDENTIAL) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -32,7 +42,7 @@ function mount() {
     },
   }).mount(otlpMetricsRest.router(), {
     app: () => app,
-    credential: "public",
+    credential: "otlp_ingest",
     onError: (error) => {
       throw error;
     },
