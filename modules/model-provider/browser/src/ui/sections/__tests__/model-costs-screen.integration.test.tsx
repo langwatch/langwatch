@@ -73,6 +73,13 @@ vi.mock("@langwatch/design-system/menu", () => ({
   },
 }));
 
+// The tooltip's text rides on the trigger, so a test reads it without hovering.
+vi.mock("@langwatch/design-system/tooltip", () => ({
+  Tooltip: ({ children, content }: { children?: ReactNode; content?: string }) => (
+    <span data-tooltip={content}>{children}</span>
+  ),
+}));
+
 const { default: ModelCostsScreen } = await import("../model-costs-screen.tsx");
 
 /** Main's wire for a catalogue rate: no id, no scope, `projectId: ""`. */
@@ -173,8 +180,25 @@ describe("given the LLM Model Costs screen", () => {
 
       expect(screen.getByText("Image input")).toBeTruthy();
       expect(screen.getByText("Image output")).toBeTruthy();
-      expect(screen.getByText("0.000008")).toBeTruthy();
-      expect(screen.getByText("0.00003")).toBeTruthy();
+      expect(screen.getByText("$8.00")).toBeTruthy();
+      expect(screen.getByText("$30.00")).toBeTruthy();
+    });
+  });
+
+  describe("when the table shows a rate", () => {
+    /** @scenario Rates read as dollars per million tokens */
+    it("prints it as US dollars per million tokens, keeping the exact figure in the tooltip", () => {
+      mockState.costs = [
+        { ...CATALOGUE_ROW, inputCostPerToken: 0.00001, outputCostPerToken: 0.00000125 },
+      ];
+
+      renderScreen();
+
+      const input = screen.getByText("$10.00").closest("[data-tooltip]")!;
+      expect(input.textContent).toBe("$10.00 / 1M");
+      expect(input.getAttribute("data-tooltip")).toBe("$0.00001 per token");
+      const cached = screen.getByText("$1.25").closest("[data-tooltip]")!;
+      expect(cached.getAttribute("data-tooltip")).toBe("$0.00000125 per token");
     });
   });
 
@@ -187,17 +211,47 @@ describe("given the LLM Model Costs screen", () => {
   });
 
   describe("when a rule comes from the model catalogue rather than a stored row", () => {
-    it("offers cloning it rather than editing a row that does not exist", () => {
+    it("offers overriding it rather than editing a row that does not exist", () => {
       const { host } = renderScreen();
 
       const clone = document.querySelector('[data-menu-item="clone"]');
-      expect(clone).toBeTruthy();
+      expect(clone?.textContent).toBe("Override cost");
 
       fireEvent.click(clone!);
 
       expect(host.drawerOpens).toEqual([
         { drawer: "llmModelCost", params: { cloneModel: "openai/gpt-5.5" } },
       ]);
+    });
+  });
+
+  describe("when the reader clicks a row", () => {
+    /** @scenario Clicking a stored cost rule opens it in the editor */
+    it("opens a stored rule in the editor", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByText("anthropic/claude-sonnet-4-6"));
+
+      expect(host.drawerOpens).toEqual([{ drawer: "llmModelCost", params: { id: "cost_1" } }]);
+    });
+
+    /** @scenario Clicking a catalogue rate opens an override for it */
+    it("opens a catalogue rate as a new rule that overrides it", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByText("openai/gpt-5.5").closest("tr")!);
+
+      expect(host.drawerOpens).toEqual([
+        { drawer: "llmModelCost", params: { cloneModel: "openai/gpt-5.5" } },
+      ]);
+    });
+
+    it("opens only the provider when the model name link is clicked", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open provider for openai/gpt-5.5" }));
+
+      expect(host.drawerOpens.map((open) => open.drawer)).toEqual(["editModelProvider"]);
     });
   });
 

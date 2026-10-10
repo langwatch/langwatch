@@ -40,15 +40,15 @@ const toastGlass = (hue: "red" | "orange" | "green" | "blue") => {
   const c = (n: number, alpha: string) =>
     `color-mix(in srgb, var(--chakra-colors-${hue}-${n}) ${alpha}, transparent)`;
   return {
-    bg: c(950, "82%"),
+    bg: c(900, "88%"),
     backgroundImage: [
       "linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 45%)",
-      `radial-gradient(90% 160% at 0% 50%, ${c(500, "28%")} 0%, transparent 60%)`,
+      `radial-gradient(110% 190% at 0% 50%, ${c(500, "45%")} 0%, transparent 62%)`,
     ].join(", "),
     borderWidth: "1px",
-    borderColor: c(400, "28%"),
+    borderColor: c(400, "42%"),
     backdropFilter: "var(--lw-backdrop-blur, blur(18px) saturate(160%))",
-    boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px -12px ${c(900, "60%")}, 0 2px 6px rgba(2, 6, 23, 0.18)`,
+    boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px -12px ${c(600, "55%")}, 0 2px 6px rgba(2, 6, 23, 0.18)`,
   };
 };
 

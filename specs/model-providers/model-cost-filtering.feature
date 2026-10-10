@@ -50,3 +50,20 @@ Feature: Filtering the model costs table
     Given the table is wider than the page column
     Then the card scrolls horizontally
     And the page itself does not scroll sideways
+
+  @integration
+  Scenario: Clicking a stored cost rule opens it in the editor
+    When I click the row of a cost rule the project stored
+    Then the cost editor opens on that rule
+
+  @integration
+  Scenario: Clicking a catalogue rate opens an override for it
+    When I click the row of a catalogue rate
+    Then the cost editor opens pre-filled from that rate, saving a new rule
+    And the row's actions menu names this "Override cost"
+
+  @integration
+  Scenario: Rates read as dollars per million tokens
+    Given a model whose input costs 0.00001 per token
+    Then its input cell reads "$10.00 / 1M"
+    And hovering it shows the exact "$0.00001 per token"
