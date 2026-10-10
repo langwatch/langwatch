@@ -249,6 +249,33 @@ describe("given an email deployment", () => {
         );
         expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
       });
+
+      /** @scenario Wrong current password keeps the dialog open and shows an error */
+      it("puts invalid_credentials on the current password field, never the API key copy", async () => {
+        state.changeRejectsWith = {
+          message: "invalid_credentials",
+          data: {
+            code: "UNAUTHORIZED",
+            httpStatus: 401,
+            error: {
+              code: "invalid_credentials",
+              kind: "invalid_credentials",
+              httpStatus: 401,
+              fault: "customer",
+              meta: {},
+              tips: [],
+            },
+          },
+        };
+        const host = renderSection();
+
+        await openChangePassword();
+        await fillAndSubmit({ current: "wrong-pw" });
+
+        expect(await screen.findByText("Current password is incorrect")).toBeTruthy();
+        expect(host.recording.failures).toHaveLength(0);
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
     });
   });
 

@@ -5,6 +5,7 @@
 
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, Field, HStack, Input, Stack, Text } from "@langwatch/design-system/primitives";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useEffect, useState } from "react";
 
@@ -62,6 +63,9 @@ const DIALOG_COPY = {
     failed: "Couldn't change your password",
   },
 } as const;
+
+/** Main's wording for a wrong current password (`user.changePassword`). */
+const WRONG_CURRENT_PASSWORD = "Current password is incorrect";
 
 export function ChangePasswordDialog({
   open,
@@ -126,11 +130,13 @@ export function ChangePasswordDialog({
       });
       onClose();
     } catch (error) {
-      // A rejection that names `currentPassword` or `newPassword` belongs on
-      // that input, not in a notice the reader sees after they have already
-      // looked away. Everything else this mutation raises — the wrong current
-      // password, a provider that has no password to change, the attempt
-      // throttle — is about the submission as a whole.
+      // A wrong current password arrives as `invalid_credentials`, which the registry explains as
+      // a refused API key; here it can only mean the first field.
+      if (!isSetting && readHandledError(error)?.code === "invalid_credentials") {
+        setProblems({ currentPassword: WRONG_CURRENT_PASSWORD });
+        return;
+      }
+      // A rejection naming a field lands on it; the provider and the throttle are form-wide.
       const fields = fieldProblems(error);
       const form = formProblems(error);
       if (Object.keys(fields).length > 0 || form.length > 0) {
