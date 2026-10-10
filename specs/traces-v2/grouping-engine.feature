@@ -33,9 +33,11 @@ Rule: Grouping selector dropdown
     When the user opens the grouping dropdown
     Then the options are "Flat", "By Conversation", "By Service", "By User", and "By Model"
 
+  @unit
   Scenario: Selecting a grouping transforms the table
     When the user selects "By Model" from the grouping dropdown
     Then the table renders as grouped sections by model
+    And each group row shows its model and trace count, even when the flat lens's columns were customised
     And the change is recorded as a draft on the active lens (orange dot appears)
 
   Scenario: Selector trigger reflects the active grouping
@@ -44,6 +46,7 @@ Rule: Grouping selector dropdown
     And its `aria-label` reads "Group rows — currently <Label>" (e.g. "By Service")
     # The trigger does NOT show a "Group: by X" text label — only an icon + chevron.
 
+  @unit
   Scenario: Selecting flat restores the ungrouped table
     Given the user has selected "By Model" grouping
     When the user selects "Flat" from the grouping dropdown

@@ -6,7 +6,7 @@ import type { StateCreator } from "zustand";
 import {
   LENS_CAPABILITIES,
   reconcileAddons,
-  reconcileColumns,
+  columnsForGrouping,
   reconcileSort,
 } from "../model/lens-capabilities.ts";
 import type { ExplorerStore } from "./explorer.store.ts";
@@ -583,7 +583,7 @@ function viewShapeActions(
       // e.g. flat knows `time/trace/service`, group knows `group/count/duration`.
       const s = get();
       const capability = LENS_CAPABILITIES[mode];
-      const columns = reconcileColumns({ ids: s.columnOrder, capability });
+      const columns = columnsForGrouping({ ids: s.columnOrder, capability });
       const sort = reconcileSort(s.sort, capability);
       // reconcileSort can swap the sort column out from under the table without
       // the user ever touching a header: a grouped RowKind can't order by
