@@ -16,7 +16,6 @@ import { FaSlack } from "react-icons/fa";
 
 import { AutomationMarkdown as Markdown } from "../../../../ui/elements/automation-markdown.tsx";
 import {
-  monacoBackgroundFor,
   trapEscapeInsideEditor,
   useMonacoTheme,
   clearLiquidMarkers,
@@ -244,7 +243,7 @@ export function LiquidEditor({
       borderRadius="md"
       overflow="hidden"
       height={height}
-      background={monacoBackgroundFor(theme)}
+      background="bg.card"
     >
       <MonacoEditor
         height="100%"
