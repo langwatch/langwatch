@@ -1,5 +1,5 @@
 /**
- * The toast stack's two-step opening, measured in real Chromium.
+ * The toast stack listing its cards on hover, measured in real Chromium.
  * @see specs/design-system/toast-stack.feature
  */
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
@@ -31,15 +31,14 @@ const roots = () => [
 const tops = () => roots().map((root) => root.getBoundingClientRect().top);
 const spread = () => Math.max(...tops()) - Math.min(...tops());
 
-describe("the toast stack opening in two steps", () => {
-  /** @scenario "Clicking the stack opens it into the full list" */
-  it("fans a little on hover and opens fully on click", async () => {
+describe("the toast stack on hover", () => {
+  /** @scenario "Reaching for the stack lists every card and holds every timer" */
+  it("lists the cards one above another while the pointer is over them", async () => {
     act(() => {
-      for (const title of ["One", "Two", "Three", "Four"])
-        toaster.create({ title, duration: 60000 });
+      for (const title of ["One", "Two", "Three"]) toaster.create({ title, duration: 60000 });
     });
-    await screen.findByText("Four");
-    await waitFor(() => expect(roots()).toHaveLength(4));
+    await screen.findByText("Three");
+    await waitFor(() => expect(roots()).toHaveLength(3));
     await waitFor(() => expect(spread()).toBeLessThan(70));
     const collapsed = spread();
 
@@ -47,17 +46,8 @@ describe("the toast stack opening in two steps", () => {
     await waitFor(() =>
       expect(roots().every((root) => root.hasAttribute("data-stack"))).toBe(true),
     );
-    await waitFor(() => expect(spread()).toBeGreaterThan(collapsed));
-    const fanned = spread();
-    expect(fanned).toBeLessThan(front().getBoundingClientRect().height * 2);
-
-    front().querySelector("button")?.click();
-    expect(document.querySelector("[data-fan]")).not.toBeNull();
-    await waitFor(() => expect(roots()).toHaveLength(3));
-    await waitFor(() => expect(spread()).toBeLessThan(fanned));
-    const fannedThree = spread();
-
-    await userEvent.click(front());
-    await waitFor(() => expect(spread()).toBeGreaterThan(fannedThree + 40));
+    await waitFor(() =>
+      expect(spread()).toBeGreaterThan(collapsed + front().getBoundingClientRect().height),
+    );
   });
 });

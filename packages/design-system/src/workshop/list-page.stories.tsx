@@ -144,8 +144,8 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => (
     <Frame>
-      <Rows />
-      <Box borderWidth="1px" borderColor="border.muted" borderRadius="md">
+      <Stack gap={0}>
+        <Rows />
         <Pagination
           page={1}
           pageSize={25}
@@ -154,7 +154,7 @@ export const Default: Story = {
           onPageChange={() => undefined}
           onPageSizeChange={() => undefined}
         />
-      </Box>
+      </Stack>
     </Frame>
   ),
 };

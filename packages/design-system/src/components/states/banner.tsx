@@ -2,12 +2,12 @@ import { Box, Button, type ButtonProps, chakra, HStack, Text } from "@chakra-ui/
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { forwardRef, type ReactNode } from "react";
 
-import { bannerGlass, bannerRim, type StatusHue } from "../../system/status-glass.ts";
+import { statusMesh } from "../../system/alert.recipe.ts";
 import { CloseButton } from "../overlays/close-button.tsx";
 
 export type BannerStatus = "info" | "warning" | "error" | "success";
 
-const HUE: Record<BannerStatus, StatusHue> = {
+const HUE: Record<BannerStatus, "blue" | "orange" | "red" | "green"> = {
   info: "blue",
   warning: "orange",
   error: "red",
@@ -15,6 +15,9 @@ const HUE: Record<BannerStatus, StatusHue> = {
 };
 
 const GLYPH = { info: Info, warning: TriangleAlert, error: AlertCircle, success: CheckCircle2 };
+
+/** The quietest of the status meshes: a banner sits across content without shouting. */
+const BANNER_MESH = statusMesh("banner");
 
 /** The panel's own corner radius, so a top banner's one rounded corner continues it. */
 const PANEL_RADIUS = "xl";
@@ -38,7 +41,7 @@ export type BannerProps = {
   "data-testid"?: string;
 };
 
-/** The banner's one action: a small pill in the banner's rim colour, a link through `asChild`. */
+/** The banner's one action: a small outline button, a link through `asChild`. */
 export const BannerAction = forwardRef<HTMLButtonElement, ButtonProps>(
   function BannerAction(props, ref) {
     return (
@@ -46,20 +49,16 @@ export const BannerAction = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         size="xs"
         variant="outline"
-        borderRadius="full"
-        borderColor="var(--banner-rim)"
-        bg={{ _light: "bg.surface/70", _dark: "whiteAlpha.100" }}
-        color="fg"
-        fontWeight="semibold"
+        colorPalette="gray"
+        bg="bg.panel"
         flexShrink={0}
-        _hover={{ bg: { _light: "bg.surface", _dark: "whiteAlpha.200" } }}
         {...props}
       />
     );
   },
 );
 
-/** A status message across a page or a section, in the toasts' glass at a pale tint. */
+/** A status message across a page or a section: a light status tint, a hairline, an icon. */
 export function Banner({
   status = "info",
   placement = "inline",
@@ -85,35 +84,24 @@ export function Banner({
       paddingStart="4"
       paddingEnd="3"
       textStyle="sm"
-      {...bannerGlass(hue)}
-      css={{
-        "--banner-rim": bannerRim(hue),
-        ...(top
+      colorPalette={hue}
+      color="fg"
+      bg={BANNER_MESH.bg}
+      backgroundImage={BANNER_MESH.backgroundImage}
+      css={
+        top
           ? {
               borderRadius: 0,
               borderBottomLeftRadius: PANEL_RADIUS,
-              boxShadow: "inset 0 -1px 0 var(--banner-rim)",
+              borderBottomWidth: "1px",
+              borderColor: BANNER_MESH.borderColor,
               // Stacked top banners read as one band: only the last one curves.
               "&:has(+ [data-banner-placement=top])": { borderBottomLeftRadius: 0 },
             }
-          : {
-              borderRadius: "xl",
-              borderWidth: "1px",
-              borderColor: "var(--banner-rim)",
-              boxShadow: {
-                _light: "inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(2, 6, 23, 0.04)",
-                _dark: "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
-              },
-            }),
-      }}
+          : { borderRadius: "lg", borderWidth: "1px", borderColor: BANNER_MESH.borderColor }
+      }
     >
-      <Box
-        color={{ _light: `${hue}.600`, _dark: `${hue}.300` }}
-        display="flex"
-        alignItems="center"
-        height="5"
-        flexShrink={0}
-      >
+      <Box color="colorPalette.fg" display="flex" alignItems="center" height="5" flexShrink={0}>
         {icon ?? <Glyph size={16} aria-hidden="true" />}
       </Box>
       <chakra.div

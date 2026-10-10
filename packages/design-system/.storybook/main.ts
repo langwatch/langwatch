@@ -16,6 +16,14 @@ const config: StorybookConfig = {
   // `src/system`, or the workshop's own pages in `src/workshop`.
   stories: ["../src/**/*.stories.@(ts|tsx)"],
   addons: ["@storybook/addon-a11y", "@storybook/addon-docs"],
+  // Chakra's own Storybook, composed in because its package names it; folded until wanted.
+  refs: {
+    "@chakra-ui/react": {
+      title: "Chakra UI",
+      url: "https://storybook.chakra-ui.com",
+      expanded: false,
+    },
+  },
   env: (existing) => ({ ...existing, STORYBOOK_DESIGN_SYSTEM_ADOPTION: adoptionJson() }),
   // The self-hosted display face. One copy of the woff2 files exists, in the
   // browser application's public directory, because that is the only place a

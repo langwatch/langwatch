@@ -106,7 +106,7 @@ function PageSummary({
 
   return (
     <HStack gap={1.5} justifySelf="start" data-testid="pagination-indicator">
-      <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
+      <Text textStyle="xs" color="fg.muted" flexShrink={0}>
         {segments.join(" · ")}
       </Text>
       {onPageSizeChange && (
@@ -259,15 +259,15 @@ export function Pagination({
   if (!isLoading && totalCount === 0) return null;
 
   return (
+    // The count on the left, the pages on the right, on whatever ground the list sits on.
     <Grid
-      templateColumns="1fr auto 1fr"
+      templateColumns="1fr auto"
       alignItems="center"
       gap={3}
       paddingX={2}
       paddingY={1.5}
       borderTopWidth="1px"
       borderColor="border.muted"
-      bg="bg.surface"
       flexShrink={0}
       data-testid="pagination"
     >

@@ -92,6 +92,7 @@ export function AgentCardShell({
       variant="elevated"
       onClick={handleCardClick}
       cursor="pointer"
+      _hover={{ boxShadow: "lg" }}
       height="142px"
       transition="all 0.2s ease-in-out"
       data-testid={testId}

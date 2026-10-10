@@ -49,8 +49,8 @@ describe("the shared toaster's stack", () => {
   });
 
   describe("when the pointer enters a collapsed stack", () => {
-    /** @scenario "Reaching for the stack fans it out and holds every timer" */
-    it("fans the cards out and holds every timer until it leaves", async () => {
+    /** @scenario "Reaching for the stack lists every card and holds every timer" */
+    it("lists the cards and holds every timer until it leaves", async () => {
       await raise(3);
 
       fireEvent.mouseEnter(group());
@@ -64,49 +64,6 @@ describe("the shared toaster's stack", () => {
         for (const root of roots()) expect(root.hasAttribute("data-overlap")).toBe(true);
       });
       for (const root of roots()) expect(root.hasAttribute("data-paused")).toBe(false);
-    });
-  });
-
-  describe("when more toasts are raised than the stack shows", () => {
-    /** @scenario "A stack says how many toasts wait behind it" */
-    it("counts the ones waiting behind the front card", async () => {
-      await raise(6);
-
-      const chips = document.querySelectorAll("[data-toast-more]");
-      expect(chips).toHaveLength(1);
-      expect(chips[0]?.textContent).toBe("+3 more");
-      expect(chips[0]?.closest("[data-first]")).not.toBeNull();
-    });
-
-    /** @scenario "A stack says how many toasts wait behind it" */
-    it.each([1, 2, 3])("shows no count for %i toasts", async (count) => {
-      await raise(count);
-
-      expect(document.querySelector("[data-toast-more]")).toBeNull();
-    });
-  });
-
-  describe("when a toast with a lifetime is raised", () => {
-    /** @scenario "A toast shows the time it has left" */
-    it("draws a lifetime bar, and none for a toast that stays", async () => {
-      act(() => {
-        toaster.create({ title: "Prompt saved", type: "success", duration: 4000 });
-        toaster.create({ title: "Stays put", type: "info", duration: Number.POSITIVE_INFINITY });
-        toaster.create({ title: "Running", type: "loading" });
-      });
-      const saved = (await screen.findByText("Prompt saved")).closest<HTMLElement>(
-        '[data-part="root"]',
-      );
-      const stays = (await screen.findByText("Stays put")).closest<HTMLElement>(
-        '[data-part="root"]',
-      );
-      const running = (await screen.findByText("Running")).closest<HTMLElement>(
-        '[data-part="root"]',
-      );
-
-      expect(saved?.querySelector("[data-toast-lifetime]")).not.toBeNull();
-      expect(stays?.querySelector("[data-toast-lifetime]")).toBeNull();
-      expect(running?.querySelector("[data-toast-lifetime]")).toBeNull();
     });
   });
 });

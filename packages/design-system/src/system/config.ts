@@ -6,9 +6,8 @@
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 
 import { colorSystem } from "../color-mode/color-system.ts";
-import { alertSlotRecipe, statusHairline } from "./alert.recipe.ts";
+import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
-import { toastGlass } from "./status-glass.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -22,19 +21,23 @@ const displayFontFamily = '"Sentient", ui-serif, Georgia, "Times New Roman", ser
 const monoFontFamily =
   '"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
 
-/**
- * The card material a toast wears in dark mode — same panel + hairline pair
- * as `INSET` in `features/asaplangy/tokens.ts`, repeated per `&[data-type=…]`
- * to outrank Chakra's own filled defaults. Light mode keeps those fills.
- */
+/** The card a toast wears: the panel, its hairline and the ordinary foreground. */
 const toastPanel = {
   bg: "bg.panel",
   color: "fg",
+  borderColor: "border.muted",
   // Those same filled defaults hand the action trigger a white border and a
   // white hover wash, both of which disappear on a panel.
   "--toast-trigger-bg": "colors.bg.muted",
   "--toast-border-color": "colors.border.muted",
 } as const;
+
+/** A status toast: the panel, in its status palette, at the toast strength of the mesh. */
+const toastMesh = (palette: string) => ({
+  ...toastPanel,
+  colorPalette: palette,
+  ...statusMesh("toast"),
+});
 
 /** A light-mode solid badge is quiet glass on its palette's solid colour: a fine rim, a light. */
 const badgeGlass = {
@@ -82,22 +85,10 @@ export const designSystemConfig = defineConfig({
   },
   theme: {
     keyframes: {
-      // A toast's remaining lifetime, drained left to right; see toaster.tsx.
-      "toast-drain": {
-        from: { clipPath: "inset(0 0 0 0)" },
-        to: { clipPath: "inset(0 100% 0 0)" },
-      },
-      // A toast card rising into the stack and sinking out of it. It runs on
-      // `transform`, so it composes with the stack's own translate and scale.
-      // No scale on the way in: the stack measures a card's height as it opens.
-      "toast-rise": {
-        from: { transform: "translateY(24px)", opacity: 0, filter: "blur(4px)" },
-        to: { transform: "none", opacity: 1, filter: "none" },
-      },
-      // A dismissed card sinks into the page like going under water: it swells, blurs and fades.
-      "toast-sink": {
-        from: { transform: "none", opacity: 1, filter: "none" },
-        to: { transform: "scale(1.04)", opacity: 0, filter: "blur(6px)" },
+      // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
+      "toast-in": {
+        from: { transform: "translateY(8px)", opacity: 0 },
+        to: { transform: "none", opacity: 1 },
       },
       "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
@@ -827,14 +818,13 @@ export const designSystemConfig = defineConfig({
                 boxShadow: "2xs",
               },
             },
+            // A card that sits up off the page: a fine hairline and a soft shadow, as the
+            // governance figures use. A clickable card adds its own hover lift.
             elevated: {
               root: {
                 border: "1px solid",
                 borderColor: "border.muted",
                 boxShadow: "md",
-                _hover: {
-                  boxShadow: "lg",
-                },
               },
             },
           },
@@ -1253,10 +1243,6 @@ export const designSystemConfig = defineConfig({
         },
       }),
       drawer: drawerSlotRecipe,
-      /**
-       * Dark mode uses panel material; light mode uses Chakra's filled style.
-       * Dark rules here (not props) because attribute selectors outrank styles.
-       */
       toast: defineSlotRecipe({
         slots: ["root", "title", "description"],
         base: {
@@ -1264,7 +1250,6 @@ export const designSystemConfig = defineConfig({
             borderRadius: "xl",
             boxShadow: "lg",
             border: "1px solid",
-            borderColor: "border.muted",
             // The icon, the title and the close button share the title's line,
             // so a one-line toast is as tall as its text plus the padding.
             alignItems: "flex-start",
@@ -1274,86 +1259,37 @@ export const designSystemConfig = defineConfig({
             // lands it as far from the right edge as the icon is from the left.
             paddingInlineStart: "3.5",
             paddingInlineEnd: "3",
-            // Collapsed, the newest card and two behind it show; the rest wait
-            // at zero opacity until a dismissal brings them forward.
-            // Scaling from the top edge keeps each card's peek one gap step
-            // above the next whatever its height; behind cards show no content.
+            // Collapsed, the newest card and two behind it show; behind cards show no content.
             "&[data-overlap]": {
               opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
               transformOrigin: "top center",
               "&:not([data-first]) > *": { opacity: 0 },
             },
-            // Hovering fans the cards a little; a click on the stack (the group
-            // loses `data-fan`) lets Chakra's full list show.
-            "[data-fan] &": {
-              "&[data-stack]": {
-                translate: "var(--x) var(--toast-shift)",
-                "--toast-shift": "calc(var(--lift) * var(--index) * 32px)",
-                scale: "calc(1 - var(--index) * 0.03)",
-                height: "var(--first-height)",
-                opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
-                transformOrigin: "top center",
-                "&:not([data-first]) > *": { opacity: 0 },
-              },
-            },
-            // The stack measures a card unscaled, before it mounts: the last
-            // card measured sizes every card behind the front, so a back card
-            // measured at its 0.85 would shrink them all. It scales on mount.
+            // The stack measures a card unscaled before it mounts, so cards behind keep its height.
             "&:not([data-mounted])": { scale: "1" },
-            // How far the card sits from its slot; light glass reads its tint from it.
-            "--toast-shift": "var(--y)",
-            // Cards glide when the stack fans out, collapses or moves up, and their tint with them.
-            transitionProperty:
-              "translate, scale, opacity, height, box-shadow, background-position",
-            transitionDuration: "450ms",
-            transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
-            "&[data-state=open]": {
-              animation: "toast-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
-            },
-            "&[data-state=closed]": {
-              animation: "toast-sink 300ms cubic-bezier(0.4, 0, 0.2, 1) both",
-            },
+            transitionProperty: "translate, scale, opacity, height",
+            transitionDuration: "240ms",
+            transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)",
+            "&[data-state=open]": { animation: "toast-in 180ms cubic-bezier(0.2, 0, 0, 1) both" },
+            "&[data-state=closed]": { animation: "toast-fade 120ms ease-in both" },
             _motionReduce: {
               transition: "none",
               animation: "none",
-              "&[data-state=closed]": { animation: "toast-fade 200ms linear both" },
+              "&[data-state=closed]": { animation: "toast-fade 120ms linear both" },
             },
-            // Light mode: status toasts are deep tinted glass with white text.
-            _light: {
-              "&:is([data-type=error], [data-type=warning], [data-type=success], [data-type=info])":
-                {
-                  color: "white",
-                  "--toast-trigger-bg": "rgba(255, 255, 255, 0.14)",
-                  "--toast-border-color": "rgba(255, 255, 255, 0.26)",
-                },
-              "&[data-type=error]": toastGlass("red"),
-              "&[data-type=warning]": toastGlass("orange"),
-              "&[data-type=success]": toastGlass("green"),
-              "&[data-type=info]": toastGlass("blue"),
-            },
-            _dark: {
-              ...toastPanel,
-              backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
-              "&[data-type=info]": {
-                ...toastPanel,
-                borderColor: "border.muted",
-              },
-              "&[data-type=loading]": {
-                ...toastPanel,
-                borderColor: "border.muted",
-              },
-              "&[data-type=error]": {
-                ...toastPanel,
-                borderColor: statusHairline("red-solid"),
-              },
-              "&[data-type=warning]": {
-                ...toastPanel,
-                borderColor: statusHairline("yellow-solid"),
-              },
-              "&[data-type=success]": {
-                ...toastPanel,
-                borderColor: statusHairline("green-solid"),
-              },
+            // A status toast wears the middle strength of the status mesh. Repeated per type to
+            // outrank Chakra's own filled defaults.
+            ...toastPanel,
+            "&[data-type=loading]": toastPanel,
+            "&[data-type=error]": toastMesh("red"),
+            "&[data-type=warning]": toastMesh("orange"),
+            "&[data-type=success]": toastMesh("green"),
+            "&[data-type=info]": toastMesh("blue"),
+            // Collapsed, each card behind the front one sits a shade darker than the one before.
+            "&[data-overlap][data-type]": { backgroundImage: deepeningMesh("toast") },
+            "&[data-overlap][data-type=loading]": {
+              backgroundImage:
+                "linear-gradient(rgba(0, 0, 0, calc(var(--index, 0) * 0.2)), rgba(0, 0, 0, calc(var(--index, 0) * 0.2)))",
             },
           },
           // Chakra reserves room after the title for a close button it places

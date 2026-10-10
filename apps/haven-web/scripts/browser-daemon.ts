@@ -47,6 +47,12 @@ const TOKEN = env("HAVEN_BROWSER_TOKEN");
 const DIR = env("HAVEN_BROWSER_DIR");
 const STACK = env("HAVEN_BROWSER_STACK");
 const APP = new URL(env("HAVEN_BROWSER_APP"));
+/** The stack's own domain: `app.<slug>.langwatch.localhost` without its `app.` label. */
+const STACK_DOMAIN = APP.hostname.split(".").slice(1).join(".");
+
+/** The app, or another of this stack's services on the same proxy (design-system, mail-room). */
+const onThisStack = ({ url }: { url: URL }) =>
+  url.port === APP.port && url.hostname.endsWith(`.${STACK_DOMAIN}`);
 const HAVEN = env("HAVEN_BROWSER_HAVEN");
 const APP_LOG = process.env.HAVEN_BROWSER_APP_LOG ?? "";
 const IDLE_MS = Number(process.env.HAVEN_BROWSER_IDLE_MS ?? 5 * 60_000);
@@ -357,8 +363,8 @@ async function visit({
 }) {
   await backendServes({ timeout });
   const target = url ? new URL(url, APP).toString() : "";
-  if (target && new URL(target).host !== APP.host)
-    throw new Error(`haven browser only opens this stack (${APP.host})`);
+  if (target && !onThisStack({ url: new URL(target) }))
+    throw new Error(`haven browser only opens this stack (*.${STACK_DOMAIN}:${APP.port})`);
   if (target) await lane.page.goto(target, { waitUntil: "domcontentloaded", timeout });
   if (target || lane.page.url() !== "about:blank")
     await settle({ page: lane.page, waitFor: "", timeout });
