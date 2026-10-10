@@ -40,8 +40,16 @@ type KeeperSeed struct {
 	Since    time.Time `json:"since"`
 }
 
-// upgradeNotice is how often a keeper still waiting on the upgrade says so.
-const upgradeNotice = 30 * time.Second
+// readyNotice is how often a keeper still waiting for the backend to report ready says so.
+const readyNotice = 30 * time.Second
+
+// Haven sees only the api's readiness probe, not whether an upgrade is what holds it,
+// so the wait names readiness rather than an upgrade.
+const (
+	readyWaitPhase  = "waiting for the backend to report ready; the seed runs after"
+	readyStillPhase = "still waiting for the backend to report ready (`haven logs worker` shows its progress)"
+	readyDonePhase  = "backend reports ready"
+)
 
 // keeperPlanPath sits in an owner-only run dir beside the logs, never in the
 // log dir people browse (ruling R1, 2026-10-09).
@@ -178,20 +186,20 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 	return nil
 }
 
-// seedWhenReady waits for the api to report ready, saying every upgradeNotice
-// that the worker's upgrade still runs, then seeds. A stopped keeper never seeds.
+// seedWhenReady waits for the api to report ready, saying every readyNotice
+// that it still waits, then seeds. A stopped keeper never seeds.
 func (o *Orchestrator) seedWhenReady(ctx context.Context, seed KeeperSeed) {
-	sayPhase(seed.Since, "upgrade: the worker runs it; the seed waits for the api to report ready")
+	sayPhase(seed.Since, readyWaitPhase)
 	waiting, stopNotices := context.WithCancel(ctx)
 	go func() {
-		tick := time.NewTicker(upgradeNotice)
+		tick := time.NewTicker(readyNotice)
 		defer tick.Stop()
 		for {
 			select {
 			case <-waiting.Done():
 				return
 			case <-tick.C:
-				sayPhase(seed.Since, "upgrade: still running (`haven logs api` shows the worker's lines)")
+				sayPhase(seed.Since, readyStillPhase)
 			}
 		}
 	}()
@@ -200,11 +208,15 @@ func (o *Orchestrator) seedWhenReady(ctx context.Context, seed KeeperSeed) {
 	if !isReady {
 		return
 	}
-	sayPhase(seed.Since, "upgrade done: the api reports ready")
+	sayPhase(seed.Since, readyDonePhase)
 	sayPhase(seed.Since, "seed")
 	if o.runSeedJob(ctx, seed.Job) {
 		sayPhase(seed.Since, "seed done")
+		_, seededBefore := o.readSeedStatus(seed.Job.Slug)
 		o.AutoSeed(ctx, seed)
+		if !seededBefore {
+			o.reloadAfterFirstSeed(ctx, seed)
+		}
 		return
 	}
 	sayPhase(seed.Since, "seed failed (continuing); `haven db seed` runs it again")
@@ -351,4 +363,17 @@ func (o *Orchestrator) awaitKeeper(ctx context.Context, slug string, provisioner
 func (o *Orchestrator) IsStackOwner(slug string, pid int) bool {
 	st, ok := o.stackBySlug(slug)
 	return ok && st.OwnerPID == pid && o.sys.ProcessAlive(st.LauncherPID)
+}
+
+// reloadAfterFirstSeed reloads the Node host once the first seed landed. The seed writes its
+// project straight into the database, so the worker's boot-time LangWatchQL key-map fill (which
+// ran before the project existed) has to run again: the reload is what runs it.
+func (o *Orchestrator) reloadAfterFirstSeed(ctx context.Context, seed KeeperSeed) {
+	if os.Getenv("HAVEN_AUTO_SEED") == "0" || o.cfg.Home == "" {
+		return
+	}
+	sayPhase(seed.Since, "reloading the worker so it fills the seeded project's analytics key")
+	if err := o.Reload(ctx, UpParams{ExplicitSlug: seed.Job.Slug}, "worker"); err != nil {
+		sayPhase(seed.Since, fmt.Sprintf("worker reload failed (continuing): %v", err))
+	}
 }
