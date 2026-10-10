@@ -514,7 +514,7 @@ const JsonSchemaDialog = ({
         }
       }}
     >
-      <Dialog.Content margin="64px" background="bg.surface" color="fg">
+      <Dialog.Content margin="64px" background="bg.card" color="fg">
         <Dialog.Header>
           <Dialog.Title>JSON Schema</Dialog.Title>
         </Dialog.Header>
