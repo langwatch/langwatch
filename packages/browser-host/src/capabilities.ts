@@ -181,6 +181,7 @@ export type UiActor = {
   name: string | null;
   email: string | null;
   image: string | null;
+  impersonator?: { id: string; email: string | null } | null;
 };
 
 /**

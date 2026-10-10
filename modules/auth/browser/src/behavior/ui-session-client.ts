@@ -36,6 +36,7 @@ type UiSessionPayload = {
     name?: unknown;
     email?: unknown;
     image?: unknown;
+    impersonator?: unknown;
   };
 };
 
@@ -58,7 +59,16 @@ export function toUiActor(payload: unknown): UiActor | null {
     name: readableString(user.name),
     email: readableString(user.email),
     image: readableString(user.image),
+    impersonator: readImpersonator(user.impersonator),
   };
+}
+
+/** The operator acting as this user, so the shell can show its banner; absent when nobody is. */
+function readImpersonator(value: unknown): UiActor["impersonator"] {
+  if (!value || typeof value !== "object") return undefined;
+  const id = readableString((value as { id?: unknown }).id);
+  if (id === null) return undefined;
+  return { id, email: readableString((value as { email?: unknown }).email) };
 }
 
 /** The keys the reader's mirrored reads are sealed under, this epoch's and the last. */

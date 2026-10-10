@@ -129,3 +129,21 @@ describe("given the client the session is read with", () => {
     });
   });
 });
+
+describe("given an impersonated session", () => {
+  it("carries the operator acting as the user", () => {
+    expect(
+      toUiActor({
+        user: {
+          id: "user-jane",
+          email: "jane@example.com",
+          impersonator: { id: "op-1", email: "op@example.com", name: "Op" },
+        },
+      })?.impersonator,
+    ).toEqual({ id: "op-1", email: "op@example.com" });
+  });
+
+  it("carries no operator for a normal session", () => {
+    expect(toUiActor({ user: { id: "user-jane" } })?.impersonator).toBeUndefined();
+  });
+});
