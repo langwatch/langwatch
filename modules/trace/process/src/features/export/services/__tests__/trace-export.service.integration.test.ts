@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TraceLegacyReadService } from "../../../legacy/services/trace-legacy-read.service.ts";
 import { TraceExportService } from "../trace-export.service.ts";
-import { legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
+import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
 const fullProtections: Protections = {
   canSeeCosts: true,
@@ -116,7 +116,10 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 2,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -146,7 +149,10 @@ describe("TraceExportService", () => {
           batches: [batch1, batch2],
           totalHits: 5,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -183,7 +189,10 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 1,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -214,7 +223,10 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 2,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -263,7 +275,10 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 1,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -288,7 +303,10 @@ describe("TraceExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -311,7 +329,10 @@ describe("TraceExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         for await (const _ of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
@@ -334,7 +355,10 @@ describe("TraceExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         for await (const _ of service.exportTraces({
           request: buildExportRequest(),
