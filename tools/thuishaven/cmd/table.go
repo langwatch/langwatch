@@ -363,6 +363,13 @@ var baseTable = []commandSpec{
 		run:     runIdP,
 	},
 	{
+		name:    "history",
+		summary: "record Nx task rows piped in by the Nx plugin (`history add`, JSON lines on stdin) into nx-history.jsonl",
+		args:    "add",
+		maxArgs: 1,
+		run:     runHistory,
+	},
+	{
 		name:    "limits",
 		summary: "machine resource limits: show them, or set <name> <value> | unset <name>",
 		args:    "[set <name> <value> | unset <name>]",

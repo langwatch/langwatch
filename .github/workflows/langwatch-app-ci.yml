@@ -1225,7 +1225,7 @@ jobs:
       # ran in no job until now. TZ=UTC because the
       # log renderer prints local wall time and the fixture is pinned to UTC.
       - name: Test dev scripts
-        run: TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs
+        run: TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/nx/__tests__/*.unit.test.mjs
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

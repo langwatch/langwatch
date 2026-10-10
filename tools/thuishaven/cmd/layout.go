@@ -63,7 +63,7 @@ func buildTable() []commandSpec {
 		{name: "orb", summary: "what the haven orb on the app page saw and was sent", subs: []commandSpec{take("feedback"), pageVerb("console"), pageVerb("network")}},
 		dbCommand(take("db"), take("seed")),
 		apiCommand(take("api"), take("gateway")),
-		{name: "machine", summary: "this machine: limits, slotted runs, typecheck, cleanup", subs: []commandSpec{take("limits"), take("run"), take("slot"), take("typecheck"), take("clean")}},
+		{name: "machine", summary: "this machine: limits, slotted runs, typecheck, cleanup", subs: []commandSpec{take("limits"), take("run"), take("slot"), take("typecheck"), take("clean"), take("history")}},
 		{name: "self", summary: "haven itself: install, setup, upgrade, doctor, the shell function", subs: []commandSpec{take("install"), take("setup"), take("upgrade"), doctorSpec(take("install")), take("shell-init")}},
 		{name: "hub", summary: "the interactive hub: every stack, health, RAM and actions (a terminal only)", run: func(ctx context.Context, d deps, _ invocation) error {
 			if d.isAgent {
