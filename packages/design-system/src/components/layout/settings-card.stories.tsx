@@ -1,7 +1,15 @@
-import { Button, SimpleGrid, Text } from "@chakra-ui/react";
+import { Button, Card, HStack, SimpleGrid, Stack, Text, Theme } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { ChevronRight } from "lucide-react";
 
-import { OverviewCard, OverviewDetail, StatusChip } from "./settings-card.tsx";
+import { ProviderScopeChips } from "../scope/provider-scope-chips.tsx";
+import {
+  OverviewCard,
+  OverviewDetail,
+  SettingItem,
+  SettingList,
+  StatusChip,
+} from "./settings-card.tsx";
 
 const meta = {
   title: "Navigation and layout/Settings card",
@@ -57,6 +65,69 @@ export const SideBySide: Story = {
           <Text>3 of 4</Text>
         </OverviewDetail>
       </OverviewCard>
+    </SimpleGrid>
+  ),
+};
+
+export const ConnectionList: Story = {
+  render: () => (
+    <SimpleGrid columns={{ base: 1, lg: 2 }} gap="6">
+      {(["light", "dark"] as const).map((mode) => (
+        <Theme key={mode} appearance={mode} colorPalette="gray">
+          <Stack bg="bg.page" padding="6" color="fg">
+            <Card.Root bg="bg.card" borderColor="border.card">
+              <Card.Body gap="3">
+                <Text fontWeight="medium">Connections</Text>
+                <Text textStyle="sm" color="fg.muted">
+                  Connections available to this project.
+                </Text>
+                <SettingList>
+                  {[
+                    "Production alerts",
+                    "A longer connection name that wraps in a narrow card",
+                    "Release updates",
+                  ].map((name, index) => (
+                    <SettingItem key={name} as="button">
+                      <HStack gap="4" justify="space-between">
+                        <Stack minWidth={0} gap="1">
+                          <HStack flexWrap="wrap" gap="2">
+                            <Text textStyle="sm" fontWeight="medium">
+                              {name}
+                            </Text>
+                            <Text textStyle="xs" color="fg.muted">
+                              {index ? "Bot" : "Webhook"}
+                            </Text>
+                            <ProviderScopeChips
+                              size="sm"
+                              tone="neutral"
+                              scopes={[
+                                { scopeType: "PROJECT", scopeId: "example", name: "This project" },
+                              ]}
+                            />
+                          </HStack>
+                          <Text textStyle="xs" color="fg.muted">
+                            Workspace connection
+                          </Text>
+                        </Stack>
+                        <HStack color="fg.muted" flexShrink={0}>
+                          <Text
+                            textStyle="xs"
+                            maxWidth={{ base: "28", md: "none" }}
+                            textAlign="end"
+                          >
+                            Used by {index + 1} automations
+                          </Text>
+                          <ChevronRight size={16} />
+                        </HStack>
+                      </HStack>
+                    </SettingItem>
+                  ))}
+                </SettingList>
+              </Card.Body>
+            </Card.Root>
+          </Stack>
+        </Theme>
+      ))}
     </SimpleGrid>
   ),
 };

@@ -117,13 +117,7 @@ export function Banner({
         {icon ?? <Glyph size={16} />}
       </Box>
       <HStack align="start" gap="3" rowGap="2" flexWrap="wrap" minWidth={0}>
-        <Box
-          flex="1 1 20rem"
-          minWidth={0}
-          paddingY={top ? "1" : "0"}
-          lineHeight="5"
-          overflowWrap="anywhere"
-        >
+        <Box flex="1 1 20rem" minWidth={0} paddingY={top ? "1" : "0"} overflowWrap="anywhere">
           {title && (
             <Text
               as="span"

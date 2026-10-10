@@ -9,8 +9,6 @@ import { describeError } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,
-  Badge,
-  Box,
   Button,
   Card,
   Heading,
@@ -20,6 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { SettingItem, SettingList } from "@langwatch/design-system/settings-card";
 import {
   maskedSecret,
   slackConnectionKindLabel,
@@ -64,7 +63,7 @@ export function SlackCard() {
       );
     }
     return (
-      <VStack align="stretch" gap={2}>
+      <SettingList>
         {list.data.connections.map((connection) => (
           <SlackConnectionRow
             key={connection.id}
@@ -72,12 +71,12 @@ export function SlackCard() {
             onOpen={() => openDrawer("slackConnection", { connectionId: connection.id })}
           />
         ))}
-      </VStack>
+      </SettingList>
     );
   };
 
   return (
-    <Card.Root id="slack">
+    <Card.Root bg="bg.card" borderColor="border.card" id="slack">
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <HStack gap={2} justify="space-between">
@@ -111,30 +110,19 @@ function SlackConnectionRow({
   onOpen: () => void;
 }) {
   return (
-    <Box
-      as="button"
-      textAlign="left"
-      width="full"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-      cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
-      onClick={onOpen}
-      aria-label={`Edit ${connection.name}`}
-    >
-      <HStack justify="space-between" gap={3} align="start">
+    <SettingItem as="button" onClick={onOpen} aria-label={`Edit ${connection.name}`}>
+      <HStack justify="space-between" gap={4} align="center">
         <VStack align="start" gap={1} minWidth={0}>
           <HStack gap={2} wrap="wrap">
-            <Text fontSize="sm" fontWeight="600">
+            <Text fontSize="sm" fontWeight="medium">
               {connection.name}
             </Text>
-            <Badge variant="subtle" size="sm">
+            <Text fontSize="xs" color="fg.muted">
               {slackConnectionKindLabel(connection.kind)}
-            </Badge>
+            </Text>
             <ProviderScopeChips
-              size="xs"
+              size="sm"
+              tone="neutral"
               scopes={[
                 {
                   scopeType: connection.scopeType,
@@ -150,10 +138,12 @@ function SlackConnectionRow({
           </Text>
         </VStack>
         <HStack gap={2} flexShrink={0} color="fg.muted">
-          <Text fontSize="xs">{usedByLabel(connection.dependentAutomations)}</Text>
+          <Text fontSize="xs" textAlign="end" maxWidth={{ base: "28", md: "none" }}>
+            {usedByLabel(connection.dependentAutomations)}
+          </Text>
           <LuChevronRight size={16} aria-hidden />
         </HStack>
       </HStack>
-    </Box>
+    </SettingItem>
   );
 }
