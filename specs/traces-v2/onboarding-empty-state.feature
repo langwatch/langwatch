@@ -265,7 +265,7 @@ Rule: Sample data preview overlays fixture rows on the trace list
   During the journey the trace list is overridden by `useSamplePreview`,
   which serves fixtures from `samplePreviewTraces.ts` (no real OTLP
   POST happens). A persistent `SampleDataBanner` reads
-  "Sample data — facets, filters, and the drawer all work, but
+  "Sample data: facets, filters, and the drawer all work, but
   nothing here is real." Pre-aurora stages see only
   `SAMPLE_PREVIEW_TRACES`; arrival-and-after stages also include
   `ARRIVAL_PREVIEW_TRACES` so the rich + simple "just arrived" rows
@@ -277,7 +277,7 @@ Rule: Sample data preview overlays fixture rows on the trace list
   Scenario: Banner appears whenever the preview is active
     When `usePreviewTracesActive()` returns true
     Then the `SampleDataBanner` is visible above the trace list
-    And the banner reads "Sample data — facets, filters, and the drawer all work, but nothing here is real."
+    And the banner reads "Sample data: facets, filters, and the drawer all work, but nothing here is real."
 
   Scenario: Arrival fixtures join the preview after the aurora chapter
     Given the journey has reached an arrival-and-after stage
