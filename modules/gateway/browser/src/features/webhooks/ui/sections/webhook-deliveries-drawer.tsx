@@ -4,11 +4,11 @@ import {
   Box,
   Button,
   HStack,
-  Spinner,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { type TimeInput, readableDate } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
 
@@ -306,7 +306,7 @@ export function WebhookDeliveriesDrawer({
           <VStack align="start" gap={4} width="full">
             {endpoint && <WebhookHealthStrip endpoint={endpoint} health={health.data} />}
 
-            {deliveries.isLoading && <Spinner size="sm" />}
+            {deliveries.isLoading && <SkeletonRows rows={4} />}
             {deliveries.data && rows.length === 0 && isFirstPage && (
               <Text fontSize="sm" color="fg.muted">
                 No deliveries recorded in the last 30 days.

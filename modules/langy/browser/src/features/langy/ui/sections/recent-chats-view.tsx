@@ -10,6 +10,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
 /**
@@ -220,7 +221,7 @@ function OlderChats({
   if (!history.isFetchingNextPage) return null;
   return (
     <HStack justify="center" paddingY={2} aria-label="Loading older conversations">
-      <Spinner size="xs" />
+      <SkeletonRows rows={1} />
     </HStack>
   );
 }
@@ -321,11 +322,8 @@ export function RecentChatsView({
       {searchable ? <ChatSearch pad={pad} query={query} onQueryChange={setQuery} /> : null}
 
       {isLoading ? (
-        <HStack gap={2} paddingX={pad} paddingY={1.5} aria-label="Loading recent conversations">
-          <Spinner size="xs" />
-          <Text textStyle="xs" color="fg.muted">
-            Loading…
-          </Text>
+        <HStack paddingX={pad} paddingY={1.5} aria-label="Loading recent conversations">
+          <SkeletonRows rows={3} />
         </HStack>
       ) : null}
 

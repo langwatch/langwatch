@@ -699,7 +699,7 @@ function VirtualKeysEmptyState({
   onCreate: () => void;
 }) {
   return (
-    <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
+    <VStack gap={6} align="center" paddingY={8}>
       <NoDataInfoBlock
         title="No virtual keys yet"
         description="Mint your first virtual key to route requests through the LangWatch AI Gateway with budgets, guardrails, and per-tenant tracing attached."

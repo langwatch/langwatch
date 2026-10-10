@@ -8,11 +8,11 @@ import {
   Code,
   HStack,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -514,7 +514,7 @@ function EventsSection({
           testId="webhook-events-info"
         />
       </HStack>
-      {!eventTypes && <Spinner size="sm" />}
+      {!eventTypes && <SkeletonRows rows={3} />}
       {families.map(([family, types]) => (
         <EventFamilySection
           key={family}

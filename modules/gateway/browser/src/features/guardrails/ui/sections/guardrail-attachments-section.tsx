@@ -5,10 +5,10 @@ import {
   Button,
   HStack,
   Separator,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
@@ -118,7 +118,7 @@ export function GuardrailAttachmentsSection({
   if (guardrailsQuery.isLoading) {
     return (
       <SectionShell>
-        <Spinner size="sm" />
+        <SkeletonRows rows={3} />
       </SectionShell>
     );
   }
