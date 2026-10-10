@@ -240,11 +240,12 @@ export type SsoSetupPageView = z.infer<typeof ssoSetupPageViewSchema>;
 
 /**
  * One line of a connection's history, already in a reader's words: identity
- * composes the sentence, so no surface has to know an event's internal name.
+ * composes the sentence; the optional event type lets a surface choose its icon.
  */
 export const ssoConnectionHistoryEntrySchema = z
   .object({
     eventId: z.string(),
+    eventType: z.string().optional(),
     occurredAtMs: z.number(),
     summary: z.string(),
     /** True where the grandfather migration produced the fact, not a person. */

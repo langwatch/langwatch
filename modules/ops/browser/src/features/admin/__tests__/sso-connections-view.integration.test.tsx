@@ -3,10 +3,11 @@
  * The back office's single sign-on list and its detail drawer.
  * Corresponds to specs/identity/sso-onboarding-tiers.feature.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOpsHost } from "../../../testing.tsx";
+import { useAdminOne } from "../behavior/use-admin-resource.ts";
 import SsoConnectionsView from "../ui/sections/sso-connections-view.tsx";
 
 const listState = vi.hoisted(() => ({
@@ -30,6 +31,17 @@ const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string>,
   replace: vi.fn(),
 }));
+const verifierState = vi.hoisted(() => ({
+  current: {
+    data: { data: { name: "Olive Admin", email: "olive@acme.com" } },
+    isLoading: false,
+    error: null as Error | null,
+  },
+}));
+vi.mock("../behavior/use-admin-resource.ts", () => ({
+  useAdminOne: vi.fn(() => verifierState.current),
+}));
+
 const mutations = vi.hoisted(() => ({
   approveDomainClaim: vi.fn(),
   rejectDomainClaim: vi.fn(),
@@ -125,6 +137,11 @@ function renderView() {
 beforeEach(() => {
   vi.clearAllMocks();
   routerState.query = {};
+  verifierState.current = {
+    data: { data: { name: "Olive Admin", email: "olive@acme.com" } },
+    isLoading: false,
+    error: null,
+  };
   historyState.current = { data: [], isLoading: false, error: null };
   migrationState.current = { data: null, error: null };
   listState.current = {
@@ -325,7 +342,8 @@ describe("the admin single sign-on list", () => {
       expect(screen.getByText("https://login.acme.okta.com")).toBeTruthy();
       expect(screen.getByText("OIDC")).toBeTruthy();
       // The history of what proved the domain, naming the operator and when.
-      expect(screen.getByText(/user_olive/)).toBeTruthy();
+      expect(screen.getByText("Olive Admin")).toBeTruthy();
+      expect(screen.queryByText(/user_olive/)).toBeNull();
 
       // The list is still mounted underneath: the drawer is beside it, not a
       // page that replaced it.
@@ -364,11 +382,125 @@ describe("the admin single sign-on list", () => {
       routerState.query = { connection: "ssoc_1" };
     });
 
+    /** @scenario "The drawer identifies the connection and its domain verifier" */
+    it("names the connection and verifier with compact sections and relative dates", async () => {
+      byIdState.current = {
+        data: { ...ATTESTED, providerId: "Acme Workforce", issuer: null },
+        error: null,
+      };
+      renderView();
+
+      const drawer = within(await screen.findByRole("dialog", { name: "Acme Workforce" }));
+      expect(drawer.getByText("Acme")).toBeTruthy();
+      expect(drawer.getByText("OIDC")).toBeTruthy();
+      expect(drawer.getByText("Active")).toBeTruthy();
+      const summary = within(drawer.getByRole("region", { name: "Summary" }));
+      expect(summary.getByText("—")).toBeTruthy();
+      expect(summary.getByText("Administrator approval")).toBeTruthy();
+      expect(drawer.queryByText("not recorded")).toBeNull();
+      const domains = within(drawer.getByRole("region", { name: "Domains" }));
+      expect(domains.getByText("Verified")).toBeTruthy();
+      expect(domains.getByText("Attested by LangWatch")).toBeTruthy();
+      expect(domains.getByText("Olive Admin")).toBeTruthy();
+      expect(useAdminOne).toHaveBeenCalledWith("user", "user_olive", { retry: false });
+      expect(domains.getByText(/olive@acme.com/)).toBeTruthy();
+      expect(drawer.queryByText(/user_olive/)).toBeNull();
+      const date = domains.getByRole("button");
+      expect(date.textContent).toMatch(/ago|yesterday|last/);
+      expect(date.querySelector("time")?.getAttribute("datetime")).toBe("2026-08-24T10:00:00Z");
+      fireEvent.focus(date);
+      expect(await screen.findByText("Unix ms")).toBeTruthy();
+      expect(screen.getByText(String(ATTESTED.domainVerifications[0]!.verifiedAtMs))).toBeTruthy();
+    });
+
+    /** @scenario "History groups events by day in reverse chronological order" */
+    it("groups the timeline by day and chooses an icon for each event kind", async () => {
+      const events = [
+        { eventType: "lw.identity.domain_claimed", summary: "Domain claimed", icon: "globe" },
+        {
+          eventType: "lw.identity.domain_verified",
+          summary: "Domain verified",
+          icon: "shield-check",
+        },
+        {
+          eventType: "lw.identity.domain_withdrawn",
+          summary: "Domain removed",
+          icon: "circle-minus",
+        },
+        {
+          eventType: "lw.identity.connection_renamed",
+          summary: "Connection renamed",
+          icon: "pencil",
+        },
+        {
+          eventType: "lw.identity.connection_activated",
+          summary: "Connection turned on",
+          icon: "play",
+        },
+        {
+          eventType: "lw.identity.connection_arrival_policy_set",
+          summary: "Join policy changed",
+          icon: "users",
+        },
+      ];
+      const firstDay = new Date("2026-08-24T12:00:00").getTime();
+      historyState.current = {
+        data: events.map((event, index) => ({
+          ...event,
+          eventId: `event-${index}`,
+          occurredAtMs: firstDay + (index < 3 ? 0 : 86_400_000) + index * 60_000,
+          carriedOver: false,
+        })),
+        isLoading: false,
+        error: null,
+      };
+      renderView();
+
+      const history = within(await screen.findByRole("region", { name: "History" }));
+      const groups = history.getAllByRole("list");
+      expect(groups).toHaveLength(2);
+      expect(within(groups[0]!).getAllByRole("listitem")).toHaveLength(3);
+      expect(within(groups[1]!).getAllByRole("listitem")).toHaveLength(3);
+      expect(history.getByRole("heading", { name: "Aug 25, 2026" })).toBeTruthy();
+      expect(history.getByRole("heading", { name: "Aug 24, 2026" })).toBeTruthy();
+      const rows = history.getAllByRole("listitem");
+      expect(
+        rows.map((row) => within(row).getByText(/Domain|Connection|Join policy/).textContent),
+      ).toEqual(events.toReversed().map((event) => event.summary));
+      for (const event of events) {
+        const row = history.getByText(event.summary).closest("li")!;
+        expect(row.querySelector(`svg.lucide-${event.icon}`)).toBeTruthy();
+        expect(within(row).getByRole("button").querySelector("time")).toBeTruthy();
+      }
+      fireEvent.focus(within(rows[0]!).getByRole("button"));
+      expect(await screen.findByText("Unix ms")).toBeTruthy();
+    });
+
+    /** @scenario "An unavailable verifier never exposes an internal identifier" */
+    it("keeps verification evidence visible when the person cannot be resolved", async () => {
+      verifierState.current.error = new Error("Person read failed");
+      renderView();
+      const domains = within(await screen.findByRole("region", { name: "Domains" }));
+      expect(domains.getByText("Verifier unavailable")).toBeTruthy();
+      expect(domains.getByText("Verified")).toBeTruthy();
+      expect(domains.queryByText(/user_olive|Olive Admin/)).toBeNull();
+    });
+
+    /** @scenario "A failed history read is distinct from an empty history" */
+    it("reports a failed history read without claiming the history is empty", async () => {
+      historyState.current.error = new Error("History read failed");
+      renderView();
+      expect(
+        await screen.findByText("This connection’s history could not be loaded."),
+      ).toBeTruthy();
+      expect(screen.queryByText("Nothing has happened to this connection yet.")).toBeNull();
+    });
+
     it("says who a newcomer signing in becomes, in the customer's own words", async () => {
       renderView();
 
       await waitFor(() => {
-        expect(screen.getByText("Asks to join, and waits for an administrator")).toBeTruthy();
+        expect(screen.getByText("Administrator approval")).toBeTruthy();
       });
     });
 
@@ -392,7 +524,7 @@ describe("the admin single sign-on list", () => {
         expect(screen.getByText("Sign-in turned on")).toBeTruthy();
       });
       expect(screen.getByText("Domain acme.com proved")).toBeTruthy();
-      expect(screen.getByText("carried over")).toBeTruthy();
+      expect(screen.getByText("Carried over")).toBeTruthy();
     });
 
     it("shows a carried-over connection's cutover progress and what it waits on", async () => {
