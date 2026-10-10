@@ -414,3 +414,17 @@ Feature: Enterprise licensing lifecycle
       Given a recorded licence with unlimited lite seats
       When an operator reissues it without naming lite seats
       Then the replacement licence signs unlimited lite seats and its row reads unlimited
+
+    @unit
+    Scenario: An activation code for a GROWTH plan stores unlimited lite seats as the flag
+      Given an operator issues a GROWTH activation code with no lite seats given
+      When the code is stored and later redeemed
+      Then the code row holds liteSeatsUnlimited true and no lite seat count
+      And the licence it mints signs unlimited lite seats
+
+    @unit
+    Scenario: An operator's lite seats above the seat column's maximum are refused by name
+      Given an operator issuing a licence, reissuing one, or issuing an activation code
+      When they state more than 2147483647 lite seats
+      Then the request is refused as invalid, with a message naming the maximum
+      And nothing is signed or stored

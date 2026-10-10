@@ -17,13 +17,9 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
-import {
-  blankIssuedLicenseRow,
-  replacementColumns,
-  signedLiteSeats,
-  storedLiteSeats,
-} from "../rules/issued-license-row.rules.ts";
+import { blankIssuedLicenseRow, replacementColumns } from "../rules/issued-license-row.rules.ts";
 import { isUniqueViolation, violationNames } from "../rules/issued-license.rules.ts";
+import { signedLiteSeats, storedLiteSeats } from "../rules/lite-seats.rules.ts";
 
 type IssuedLicenseRowDraft = {
   licenseKey: string;

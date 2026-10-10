@@ -1418,7 +1418,10 @@ model ActivationCode {
   email            String
   planType         String
   maxMembers       Int
-  maxMembersLite   Int      @default(0)
+  /// The lite seats the minted license carries: null when unlimited. Never a stand-in number.
+  maxMembersLite   Int?     @default(0)
+  /// True when the minted license carries unlimited lite seats; maxMembersLite is then null.
+  liteSeatsUnlimited Boolean @default(false)
   /// How long the license this code mints runs for.
   licenseTermDays  Int
   /// Hosted services the minted license may call.
