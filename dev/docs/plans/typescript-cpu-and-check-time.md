@@ -20,6 +20,23 @@ are the source of truth; this plan orders them after the nx-sync layout landed).
 | Same, without the 142 build-config refs to test-only `vitest-config` and 190 declared-but-unimported workspace deps | 21 |
 | What remains | 8 contracts in a row, real imports: organization → project → data-privacy → evaluation → evaluator → trace → instant-eval → analytics |
 
+### Cold profile after the reshape (2026-10-10 18:18, load ~25, `GOMAXPROCS=2`)
+
+Wall time is void at that load (939s); per-phase sums and shares are what to read.
+479 projects built, 0 errors, 3.5 GB peak.
+
+| Phase | Seconds | | Group | Share of parse+check+emit |
+| --- | --- | --- | --- | --- |
+| Check | 270 | | browser build (45) | 27% (35s of it emit) |
+| Emit | 101 | | process test (65) | 24% |
+| Config | 88 | | process build (65) | 16% (35s of it emit) |
+| Parse | 43 | | contracts build (64) | 5% |
+| Changes compute | 22 | | apps (18) | 5% |
+
+- The 8-contract spine costs 3.8s in total (trace's 1.4s the largest): not worth an ownership move.
+- Biggest single programs: `apps/ui` app (11s check, 22M instantiations), trace/experiment/scenario browser builds (7-11s), `packages/api` test and type-tests (3.3-3.6M instantiations).
+- Declaration emit is ~100s of ~415s compile work (24%), most of it in browser and process builds: step 5's target.
+
 ## Steps
 
 1. **Cap the compiler (small, now).** `CheckGoMaxProcs` returns 2 on a green
