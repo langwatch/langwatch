@@ -165,10 +165,10 @@ pre-roster-rollback` records a rollback and reopens done background steps. The c
 The pure rule is `preRosterWriters` in `packages/upgrade/src/serving-roster/pre-roster.ts`;
 scenarios in `specs/upgrade/cloud-automatic.feature` and `specs/upgrade/upgrade-command.feature`.
 
-### 7. Amendment 2026-10-10: the Upgrades surface shows only what an install can know (UPGRADE-UI-2)
+### 7. The Upgrades surface shows only what an install can know (Alex, 2026-10-10, UPGRADE-UI-2)
 
 An install knows its own image and ledger; it cannot know what a later release holds until that
-image runs. So (Alex, 2026-10-10):
+image runs. So:
 
 - **No pre-upgrade preview page.** It could only describe the running image. A newer release is
   named only from cloud's usage-report reply (`latest_release`, U8-Q-U3), with a release-notes link,
