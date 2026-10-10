@@ -133,7 +133,11 @@ async function boot() {
         USER,
       )
     ).experiment;
-  /** Opens the copy the way the editor does (row identity first), edits the name and saves. */
+  /**
+   * Opens the copy the way the editor does (row identity first), edits the name and saves.
+   * Server half only: the editor's own load and save are in the browser module's
+   * use-autosave-evaluations-v3.replicate.integration.test.tsx.
+   */
   const openAndSave = async ({
     projectId,
     experimentId,
@@ -226,6 +230,81 @@ describe("replicating an experiment", () => {
         expect(after.workbenchState).toEqual(before.workbenchState);
         expect(after.updatedAt).toEqual(before.updatedAt);
         expect(t.stateOf(await t.read(SOURCE, oldCopy.experimentId)).name).toBe("Edited old copy");
+      } finally {
+        await t.runtime.stop();
+      }
+    });
+  });
+
+  describe("given an original whose saved state embeds its own id and slug, as the editor autosaves it", () => {
+    /** @scenario "A copy of a copy and a second copy are independent of the original" */
+    it("copies, a copy of a copy and a sibling are all independent rows", async () => {
+      const t = await boot();
+      try {
+        const original = await t.seed({ state: bareState() });
+        await t.runtime.service(ExperimentApi).saveWorkbenchState(
+          {
+            projectId: SOURCE,
+            id: original.experimentId,
+            state: bareState({
+              experimentId: original.experimentId,
+              experimentSlug: original.slug,
+            }),
+          },
+          { kind: "user", id: USER.id },
+        );
+        const first = await t.replicate({ experimentId: original.experimentId });
+        const sibling = await t.replicate({ experimentId: original.experimentId });
+        const ofCopy = await t.replicate({ experimentId: first.id });
+        const untouched = [original.experimentId, first.id, sibling.id];
+        const before = await Promise.all(untouched.map((id) => t.read(SOURCE, id)));
+
+        expect(new Set([...untouched, ofCopy.id]).size).toBe(4);
+        expect(new Set([original.slug, first.slug, sibling.slug, ofCopy.slug]).size).toBe(4);
+        const stored = JSON.stringify((await t.read(SOURCE, ofCopy.id)).workbenchState);
+        expect(stored).not.toContain(original.experimentId);
+        expect(stored).not.toContain(`"${original.slug}"`);
+
+        await t.openAndSave({ projectId: SOURCE, experimentId: ofCopy.id, edit: "Edited" });
+
+        const after = await Promise.all(untouched.map((id) => t.read(SOURCE, id)));
+        after.forEach((row, i) => {
+          expect(row.workbenchState).toEqual(before[i]!.workbenchState);
+          expect(row.updatedAt).toEqual(before[i]!.updatedAt);
+        });
+        expect(t.stateOf(await t.read(SOURCE, ofCopy.id)).name).toBe("Edited");
+      } finally {
+        await t.runtime.stop();
+      }
+    });
+  });
+
+  describe("given a save addressed to the copy whose state embeds the original's id and slug", () => {
+    /** @scenario "A save is written to the experiment it is addressed to" */
+    it("writes to the copy only", async () => {
+      const t = await boot();
+      try {
+        const original = await t.seed({ state: bareState() });
+        const copy = await t.replicate({ experimentId: original.experimentId });
+        const before = await t.read(SOURCE, original.experimentId);
+
+        await t.runtime.service(ExperimentApi).saveWorkbenchState(
+          {
+            projectId: SOURCE,
+            id: copy.id,
+            state: bareState({
+              name: "Hostile",
+              experimentId: original.experimentId,
+              experimentSlug: original.slug,
+            }),
+          },
+          { kind: "user", id: USER.id },
+        );
+
+        const after = await t.read(SOURCE, original.experimentId);
+        expect(after.workbenchState).toEqual(before.workbenchState);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+        expect(t.stateOf(await t.read(SOURCE, copy.id)).name).toBe("Hostile");
       } finally {
         await t.runtime.stop();
       }
