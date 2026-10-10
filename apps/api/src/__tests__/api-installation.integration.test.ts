@@ -3,6 +3,7 @@
  * @vitest-environment node
  * @see specs/platform/process-installation.feature
  */
+import type { FeatureRestHost } from "@langwatch/api";
 import { RestHost } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
@@ -15,11 +16,13 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const OTLP_FAMILIES: ReadonlySet<string> = new Set(["otel", "otel-logs", "otel-metrics"]);
+const restFamilySchema = z.object({ namespace: z.string(), api: z.object({ name: z.string() }) });
 const OTLP_TRACE_BATCH = {
   resourceSpans: [
     {
@@ -395,10 +398,11 @@ describe("the api process installation", () => {
     const families = new Map<string, string>();
     const mountNothing = { mount: () => {} };
     // The booted process mounts each OTLP family with the doors its module bound.
-    const otlpOnly: Pick<RestHost, "mount"> = {
+    const otlpOnly: FeatureRestHost<unknown> = {
       mount: (declaration, app, options) => {
-        if (!OTLP_FAMILIES.has(declaration.namespace)) return;
-        families.set(declaration.namespace, declaration.api.name);
+        const family = restFamilySchema.parse(declaration);
+        if (!OTLP_FAMILIES.has(family.namespace)) return;
+        families.set(family.namespace, family.api.name);
         host.mount(declaration, app, options);
       },
     };

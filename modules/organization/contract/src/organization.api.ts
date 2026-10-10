@@ -413,10 +413,9 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts): a
-   * MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER or Lite
-   * (EXTERNAL) row is the whole admission, held `pending` when no seat is free. `seat` is the row's
-   * role; `"already-present"` is a concurrent callback or a retry, answered from the row there.
+   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts).
+   * A MEMBER's grant lands now or resumes on SSO arrival; a DEVELOPER or Lite row is the whole
+   * admission, held `pending` when no seat is free. `"already-present"` answers a retry.
    */
   createMembership(
     input: Readonly<{

@@ -6,7 +6,7 @@ The server half of [onboarding](../README.md). Onboarding: the guided paths a ne
 
 ## Installation
 
-`defineProcessModule("onboarding").withApi(OnboardingModule).withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest).withEventing(guidedOnboardingLifecycleEventing).provideMiddlewareBindings(…)`, `src/onboarding.module.ts:12`.
+`defineProcessModule("onboarding").withApi(OnboardingModule).withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest).withEventing(guidedOnboardingLifecycleEventing).provideMiddlewareContext(…)`, `src/onboarding.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -155,7 +155,7 @@ type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/
 
 ### `onboarding`
 
-Contract `../contract/src/onboarding.trpc.ts:91`, router `src/transport/onboarding.trpc.ts:24`.
+Contract `../contract/src/onboarding.trpc.ts:91`, router `src/transport/onboarding.trpc.ts:28`.
 
 | Procedure                           | Kind     | Gate                                                                                                                                                           | Input                                         | Output                                |
 | ----------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |

@@ -144,7 +144,7 @@ export class ProjectOperationsService {
     return updated;
   }
 
-  /** A no-op when the switch already reads `enabled`, so a resubmitted form records no second fact. */
+  /** A no-op when the switch already reads `enabled`: a resubmitted form records nothing new. */
   async setTraceSharing(input: SetTraceSharingInput): Promise<void> {
     const { projectId, enabled, revokeExistingLinks, by } = setTraceSharingInputSchema.parse(input);
     const project = await this.dependencies.projects.findWithTeam(projectId);

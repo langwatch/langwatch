@@ -407,21 +407,8 @@ export function AutomationDrawer({
     draft: previewDraft,
     name: draft.name,
     alertType: draft.alertType,
-    graphAlert: isGraphAlert
-      ? {
-          graphName: graphName ?? undefined,
-          metricLabel: seriesLabel ?? undefined,
-          operator: draft.graphAlert.operator,
-          threshold: draft.graphAlert.threshold,
-          timePeriodMinutes: draft.graphAlert.timePeriod,
-        }
-      : null,
-    report: isReport
-      ? {
-          sourceKind: draft.report.sourceKind,
-          scheduleLabel: describeCron(draft.report.cron, draft.report.timezone),
-        }
-      : null,
+    graphAlert: graphAlertPreviewOf({ isGraphAlert, draft, graphName, seriesLabel }),
+    report: reportPreviewOf({ isReport, draft }),
   });
   const localPreview = useNotifyPreview({
     channel: section === "configuration" && channel !== "email" ? channel : null,
@@ -481,8 +468,7 @@ export function AutomationDrawer({
   // Alerts always deliver immediately (the server pins their cadence), so
   // template pickers and variable filtering treat them as immediate even if
   // the dormant draft cadence says otherwise.
-  const cadenceMode: "immediate" | "digest" =
-    isGraphAlert || draft.notificationCadence === "immediate" ? "immediate" : "digest";
+  const cadenceMode = cadenceModeOf({ isGraphAlert, cadence: draft.notificationCadence });
   const hasEvaluationFilter = Object.keys(draft.filters).some((k) => k.startsWith("evaluations."));
 
   // Each source renders against its OWN context — autocomplete, hover, and the
@@ -642,6 +628,51 @@ export function AutomationDrawer({
       />
     </>
   );
+}
+
+function graphAlertPreviewOf({
+  isGraphAlert,
+  draft,
+  graphName,
+  seriesLabel,
+}: {
+  isGraphAlert: boolean;
+  draft: AutomationDraft;
+  graphName: string | null | undefined;
+  seriesLabel: string | null | undefined;
+}): AutomationApiPreviewEmailInput["graphAlert"] {
+  if (!isGraphAlert) return null;
+  return {
+    graphName: graphName ?? undefined,
+    metricLabel: seriesLabel ?? undefined,
+    operator: draft.graphAlert.operator,
+    threshold: draft.graphAlert.threshold,
+    timePeriodMinutes: draft.graphAlert.timePeriod,
+  };
+}
+
+function reportPreviewOf({
+  isReport,
+  draft,
+}: {
+  isReport: boolean;
+  draft: AutomationDraft;
+}): AutomationApiPreviewEmailInput["report"] {
+  if (!isReport) return null;
+  return {
+    sourceKind: draft.report.sourceKind,
+    scheduleLabel: describeCron(draft.report.cron, draft.report.timezone),
+  };
+}
+
+function cadenceModeOf({
+  isGraphAlert,
+  cadence,
+}: {
+  isGraphAlert: boolean;
+  cadence: AutomationDraft["notificationCadence"];
+}): "immediate" | "digest" {
+  return isGraphAlert || cadence === "immediate" ? "immediate" : "digest";
 }
 
 /**
@@ -1017,7 +1048,7 @@ async function renderNotifyPreview({
 
 const EMAIL_PREVIEW_DEBOUNCE_MS = 300;
 
-/** The server renders the email (it sanitises HTML); the last good preview stays up while it reloads. */
+/** The server renders the email (it sanitises HTML); the last good preview stays up on reload. */
 function useEmailPreview({
   enabled,
   projectId,
@@ -1046,11 +1077,14 @@ function useEmailPreview({
     [projectId, name, alertType, draft, graphAlert, report],
   );
   const inputKey = JSON.stringify(input);
+  const latestInput = useRef(input);
+  useEffect(() => {
+    latestInput.current = input;
+  });
   const [debounced, setDebounced] = useState(input);
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(input), EMAIL_PREVIEW_DEBOUNCE_MS);
+    const t = setTimeout(() => setDebounced(latestInput.current), EMAIL_PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(t);
-    // keyed on the serialised input: graphAlert and report arrive as fresh objects each render
   }, [inputKey]);
 
   const query = api.automation.previewTriggerEmail.useQuery(debounced, {

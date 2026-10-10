@@ -92,6 +92,12 @@ function ProjectSearchHeader() {
   );
 }
 
+function ProjectItemIcon({ item }: { item: ProjectPickItem }) {
+  if (item.kind === "new-project") return <Plus size={13} aria-hidden />;
+  if (item.isAggregate) return <AggregateProjectAvatar name={item.label} />;
+  return <ProjectAvatar name={item.label} />;
+}
+
 function ProjectItemRow({ item, isCurrent }: { item: ProjectPickItem; isCurrent: boolean }) {
   return (
     <Combobox.Item
@@ -103,13 +109,7 @@ function ProjectItemRow({ item, isCurrent }: { item: ProjectPickItem; isCurrent:
       _highlighted={{ background: "bg.subtle" }}
     >
       <HStack gap={2} width="full">
-        {item.kind === "new-project" ? (
-          <Plus size={13} aria-hidden />
-        ) : item.isAggregate ? (
-          <AggregateProjectAvatar name={item.label} />
-        ) : (
-          <ProjectAvatar name={item.label} />
-        )}
+        <ProjectItemIcon item={item} />
         <Combobox.ItemText flex={1} truncate>
           {item.label}
         </Combobox.ItemText>

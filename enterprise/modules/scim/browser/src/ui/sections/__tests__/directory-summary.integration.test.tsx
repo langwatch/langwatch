@@ -95,7 +95,9 @@ describe("the directory's status band", () => {
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
       expect(screen.getByTestId("members-outside-directory")).toHaveTextContent("1 of 4");
-      expect(screen.getByLabelText(/removing them there will not remove them here/)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/removing them there will not remove them here/),
+      ).toBeInTheDocument();
     });
   });
 

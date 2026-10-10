@@ -80,7 +80,7 @@ describe("given an organization member looking a key up by its id", () => {
     it("still answers a revoked key's name, marked as revoked", async () => {
       const { app, apiKeys } = await appOver({ member: true });
       const { id } = await apiKeys.create(record({ name: "Retired key" }));
-      await apiKeys.revoke({ id, cause: "user" });
+      await apiKeys.revoke({ id, organizationId: ORG_ID, cause: "user" });
 
       await expect(
         app.findKeyName({ organizationId: ORG_ID, apiKeyId: id }, MEMBER),

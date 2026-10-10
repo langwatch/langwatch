@@ -84,24 +84,24 @@ describe("narrowMapColumnProjection", () => {
   });
 
   describe("when the map is used as a whole", () => {
-    it("returns null so the caller keeps the whole map", () => {
+    it("returns the bare column so the whole map is kept", () => {
       expect(
         narrowMapColumnProjection({
           column: "Attributes",
           expressions: ["ts.Attributes['langwatch.user_id']", "mapKeys(ts.Attributes)"],
         }),
-      ).toBeNull();
+      ).toBe("Attributes");
     });
   });
 
   describe("when a key is a query parameter", () => {
-    it("returns null so the caller keeps the whole map", () => {
+    it("returns the bare column so the whole map is kept", () => {
       expect(
         narrowMapColumnProjection({
           column: "Attributes",
           expressions: ["ts.Attributes[{p_key:String}] IN ({p:Array(String)})"],
         }),
-      ).toBeNull();
+      ).toBe("Attributes");
     });
   });
 

@@ -28,21 +28,20 @@ runHotelBot(input: HotelBotRunInput): Promise<HotelBotReply>;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/hotel-bot.rest.ts:14`   |
+| Declared at | `src/transport/hotel-bot.rest.ts:13`   |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/demo/hotel_bot` · `runHotelBot`
 
-Platform permission `ops:manage`. Credential `browser`. Hidden from the OpenAPI document. Declared at `src/transport/hotel-bot.rest.ts:19`.
+Permission `traces:create`. Credential `project`. Hidden from the OpenAPI document. Declared at `src/transport/hotel-bot.rest.ts:18`.
 
 Answers at `/api/demo/hotel_bot`.
 
 ```typescript
 // Body: hotelBotRequestSchema, ../contract/src/sample-agents.api.ts:13
 type Body = Record<string, unknown>;
-type Headers = z.infer<typeof hotelBotHeadersSchema>; // ../contract/src/sample-agents.api.ts:16
 // Response: hotelBotReplySchema, ../contract/src/sample-agents.api.ts:25
 interface Response {
   message: "Sent to LangWatch";
@@ -66,7 +65,7 @@ None: sample-agents declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf            | Environment variable | Declared at                                 |
 | ------ | --------------- | -------------------- | ------------------------------------------- |
-| secret | `openAi`        | `OPENAI_API_KEY`     | `src/app/sample-agents.app.ts:30`           |
+| secret | `openAi`        | `OPENAI_API_KEY`     | `src/app/sample-agents.app.ts:31`           |
 | config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/sample-agents.config.ts:5` |
 
 <!-- readme:generated:end -->

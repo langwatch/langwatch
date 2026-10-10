@@ -67,10 +67,14 @@ export function HttpTestResponseDisplay({
 }) {
   const parsed = responseShape({ response: result.response });
   const located =
-    outputPath && parsed !== undefined ? locateJsonPathNode({ value: parsed, path: outputPath }) : undefined;
+    outputPath && parsed !== undefined
+      ? locateJsonPathNode({ value: parsed, path: outputPath })
+      : undefined;
   const responseString =
     located?.text ??
-    (typeof result.response === "string" ? result.response : JSON.stringify(result.response, null, 2));
+    (typeof result.response === "string"
+      ? result.response
+      : JSON.stringify(result.response, null, 2));
   const range = located?.range;
 
   return (

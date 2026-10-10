@@ -15,6 +15,7 @@ import {
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
 import {
+  type CustomModelEntry,
   elevenLabsLoopbackKeysSchema,
   getSchemaShape,
   modelProviders,

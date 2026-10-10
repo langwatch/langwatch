@@ -1,8 +1,4 @@
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  BadRequestError,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, BadRequestError } from "@langwatch/api/rest";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import {
@@ -285,6 +281,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
   })
 
   .post("/endpoints/:id/test", "postApiWebhooksV1EndpointsByIdTest")
+  .withoutAudit("run, not a change")
   .withParams(endpointIdParams)
   .withInput(testEndpointBodySchema)
   .withPermission("webhookEndpoints:manage")

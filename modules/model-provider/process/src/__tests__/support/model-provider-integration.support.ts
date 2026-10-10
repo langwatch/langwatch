@@ -106,6 +106,7 @@ export function createPrismaProjects(prisma: PrismaClient): ProjectApi {
           organizationId: row.team.organizationId,
           isPersonal: row.isPersonal,
           ownerUserId: row.ownerUserId,
+          kind: row.kind,
         }));
       },
     },

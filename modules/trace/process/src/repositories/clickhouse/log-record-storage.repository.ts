@@ -215,7 +215,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
       query_params: {
         tenantId,
         traceId,
-        // Not `from`/`to`: the tenant guard reads a bare `{from:` as a FROM clause and refuses the read.
+        // Not `from`/`to`: the tenant guard reads a bare `{from:` as a FROM clause and refuses it.
         windowStart: clickHouseTimestamp(center - LOG_RECORDS_LOOKBACK_MS),
         windowEnd: clickHouseTimestamp(center + LOG_RECORDS_LOOKAHEAD_MS),
         limit,

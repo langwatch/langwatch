@@ -17,6 +17,11 @@ import { vi, expect } from "vitest";
 import { createLangWatchSpan } from "../span";
 import { getLangWatchTracerFromProvider } from "../tracer";
 
+function fallbackMessage(exception: Exception): string {
+  if (typeof exception === "string") return exception;
+  return JSON.stringify(exception) ?? "";
+}
+
 /**
  * Mock implementation of OpenTelemetry Span for testing
  */
@@ -60,8 +65,7 @@ export class MockSpan implements Span {
     const exceptionMessage =
       typeof exception === "object" && exception !== null && "message" in exception
         ? (exception as any).message
-        : // eslint-disable-next-line @typescript-eslint/no-base-to-string
-          String(exception);
+        : fallbackMessage(exception);
 
     this._events.push({
       name: "exception",

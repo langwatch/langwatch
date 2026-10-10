@@ -6,7 +6,7 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:37`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:38`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -902,14 +902,14 @@ retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/admin.rest.ts:30`       |
+| Declared at | `src/transport/admin.rest.ts:32`       |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/admin/impersonate` · `startAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:35`.
+Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:37`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -927,7 +927,7 @@ interface Response {
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:45`.
+Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:47`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -942,7 +942,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:55`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:57`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 

@@ -69,6 +69,14 @@ class RecordingFeedback extends UiFeedback {
     throw new Error("The session read reported a success.");
   }
 
+  warned(_notice: UiSuccessNotice): void {
+    throw new Error("The session read reported a warning.");
+  }
+
+  informed(_notice: UiSuccessNotice): void {
+    throw new Error("The session read reported a notice.");
+  }
+
   failed(failure: UiFailureNotice): void {
     this.failures.push(failure);
   }

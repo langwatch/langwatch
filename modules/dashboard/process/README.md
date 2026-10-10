@@ -6,7 +6,7 @@ The server half of [dashboard](../README.md). Dashboards and the graphs and save
 
 ## Installation
 
-`defineProcessModule("dashboard").withRepositories(dashboardRepositories).withApi(DashboardModule).withTransports(dashboardRest, dashboardWidgetRest, graphRest, savedWorkbenchChartRest, dashboardTrpcTransport, graphTrpcTransport, savedViewTrpcTransport, savedWorkbenchChartTrpcTransport, dashboardWidgetTrpcTransport).provideMiddlewareBindings(…)`, `src/dashboard.module.ts:29`.
+`defineProcessModule("dashboard").withRepositories(dashboardRepositories).withApi(DashboardModule).withTransports(dashboardRest, dashboardWidgetRest, graphRest, savedWorkbenchChartRest, dashboardTrpcTransport, graphTrpcTransport, savedViewTrpcTransport, savedWorkbenchChartTrpcTransport, dashboardWidgetTrpcTransport).provideMiddlewareContext(…)`, `src/dashboard.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -312,7 +312,7 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 |             |                                             |
 | ----------- | ------------------------------------------- |
-| Declared at | `src/transport/dashboard-widget.rest.ts:85` |
+| Declared at | `src/transport/dashboard-widget.rest.ts:76` |
 | Base URL    | none: each route's path is its address      |
 | Addressing  | literal                                     |
 | Credential  | project                                     |
@@ -321,7 +321,7 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 List dashboard widgets
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:90`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:81`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets`.
 
@@ -337,7 +337,7 @@ type Response = z.infer<typeof dashboardWidgetListSchema>; // ../contract/src/da
 
 Create a dashboard widget
 
-Permission `analytics:create`. Declared at `src/transport/dashboard-widget.rest.ts:116`.
+Permission `analytics:create`. Declared at `src/transport/dashboard-widget.rest.ts:107`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets`.
 
@@ -351,7 +351,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Get a dashboard widget
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:149`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:140`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -368,7 +368,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Update a dashboard widget
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:176`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:167`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -382,7 +382,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Add a dashboard widget to a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:211`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:202`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard`.
 
@@ -399,13 +399,13 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Delete a dashboard widget
 
-Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:243`.
+Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:234`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
 ```typescript
 type Params = z.infer<typeof dashboardWidgetParamsSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:66
-// Response: inline, src/transport/dashboard-widget.rest.ts:250
+// Response: inline, src/transport/dashboard-widget.rest.ts:241
 type Response = unknown;
 ```
 
@@ -413,7 +413,7 @@ type Response = unknown;
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/dashboard.rest.ts:28`         |
+| Declared at | `src/transport/dashboard.rest.ts:20`         |
 | Base URL    | `/api/dashboards`, twin `/api/v1/dashboards` |
 | Addressing  | dated                                        |
 | Credential  | project                                      |
@@ -423,7 +423,7 @@ type Response = unknown;
 
 List all dashboards for the project with graph counts
 
-Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:32`.
+Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:24`.
 
 Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
 
@@ -446,7 +446,7 @@ interface Response {
 
 Create a new dashboard
 
-Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:61`.
+Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:53`.
 
 Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
 
@@ -470,7 +470,7 @@ interface Response {
 
 Reorder dashboards by providing an ordered list of IDs
 
-Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:75`.
+Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:67`.
 
 Answers at `/api/dashboards/reorder`, `/api/v1/dashboards/reorder`; also, undocumented, `/api/dashboards/2026-08-07/reorder`, `/api/v1/dashboards/2026-08-07/reorder`, `/api/dashboards/latest/reorder`, `/api/v1/dashboards/latest/reorder`.
 
@@ -489,7 +489,7 @@ interface Response {
 
 Get a dashboard by its id, including its graphs
 
-Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:87`.
+Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:79`.
 
 Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
 
@@ -505,7 +505,7 @@ type Response = z.infer<typeof dashboardDetailResponseSchema>; // ../contract/sr
 
 Rename a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:101`.
+Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:93`.
 
 Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
 
@@ -519,7 +519,7 @@ type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dash
 
 Delete a dashboard and its graphs (hard delete, cascade)
 
-Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:118`.
+Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:110`.
 
 Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
 
@@ -536,7 +536,7 @@ interface Response {
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/graph.rest.ts:41`     |
+| Declared at | `src/transport/graph.rest.ts:33`     |
 | Base URL    | `/api/graphs`, twin `/api/v1/graphs` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -546,7 +546,7 @@ interface Response {
 
 List all custom graphs, optionally filtered by dashboard
 
-Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:45`.
+Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:37`.
 
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
@@ -562,7 +562,7 @@ type Response = z.infer<typeof graphListRestResponseSchema>; // ../contract/src/
 
 Get a custom graph by its ID
 
-Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:62`.
+Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:54`.
 
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
@@ -578,7 +578,7 @@ type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dash
 
 Create a custom graph on a dashboard
 
-Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:72`.
+Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:64`.
 
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
@@ -601,7 +601,7 @@ type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dash
 
 Update a custom graph's name, definition, or filters
 
-Permission `analytics:update`. Declared at `src/transport/graph.rest.ts:96`.
+Permission `analytics:update`. Declared at `src/transport/graph.rest.ts:88`.
 
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
@@ -620,7 +620,7 @@ type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dash
 
 Delete a custom graph
 
-Permission `analytics:manage`. Declared at `src/transport/graph.rest.ts:118`.
+Permission `analytics:manage`. Declared at `src/transport/graph.rest.ts:110`.
 
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
@@ -637,7 +637,7 @@ interface Response {
 
 |             |                                                   |
 | ----------- | ------------------------------------------------- |
-| Declared at | `src/transport/saved-workbench-chart.rest.ts:110` |
+| Declared at | `src/transport/saved-workbench-chart.rest.ts:101` |
 | Base URL    | none: each route's path is its address            |
 | Addressing  | literal                                           |
 | Credential  | project                                           |
@@ -646,7 +646,7 @@ interface Response {
 
 List saved workbench charts
 
-Permission `analytics:view`. Declared at `src/transport/saved-workbench-chart.rest.ts:115`.
+Permission `analytics:view`. Declared at `src/transport/saved-workbench-chart.rest.ts:106`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts`.
 
@@ -662,7 +662,7 @@ type Response = z.infer<typeof savedWorkbenchChartListSchema>; // ../contract/sr
 
 Save a workbench chart
 
-Permission `analytics:create`. Declared at `src/transport/saved-workbench-chart.rest.ts:141`.
+Permission `analytics:create`. Declared at `src/transport/saved-workbench-chart.rest.ts:132`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts`.
 
@@ -680,7 +680,7 @@ type Response = z.infer<typeof savedWorkbenchChartResourceSchema>; // ../contrac
 
 Get a saved workbench chart
 
-Permission `analytics:view`. Declared at `src/transport/saved-workbench-chart.rest.ts:177`.
+Permission `analytics:view`. Declared at `src/transport/saved-workbench-chart.rest.ts:168`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId`.
 
@@ -697,7 +697,7 @@ type Response = z.infer<typeof savedWorkbenchChartResourceSchema>; // ../contrac
 
 Update a saved workbench chart
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:207`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:198`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId`.
 
@@ -715,13 +715,13 @@ type Response = z.infer<typeof savedWorkbenchChartResourceSchema>; // ../contrac
 
 Delete a saved workbench chart
 
-Permission `analytics:delete`. Declared at `src/transport/saved-workbench-chart.rest.ts:244`.
+Permission `analytics:delete`. Declared at `src/transport/saved-workbench-chart.rest.ts:235`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId`.
 
 ```typescript
 type Params = z.infer<typeof savedWorkbenchChartParamsSchema>; // ../contract/src/saved-workbench-chart-rest.schemas.ts:87
-// Response: inline, src/transport/saved-workbench-chart.rest.ts:251
+// Response: inline, src/transport/saved-workbench-chart.rest.ts:242
 type Response = unknown;
 ```
 
@@ -729,7 +729,7 @@ type Response = unknown;
 
 Place a saved workbench chart on a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:269`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:260`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
@@ -750,13 +750,13 @@ type Response = z.infer<typeof savedWorkbenchChartResourceSchema>; // ../contrac
 
 Remove a saved workbench chart from its dashboard
 
-Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:301`.
+Permission `analytics:update`. Declared at `src/transport/saved-workbench-chart.rest.ts:292`.
 
 Answers at `/api/v1/projects/:projectId/analytics/charts/:chartId/placement`.
 
 ```typescript
 type Params = z.infer<typeof savedWorkbenchChartParamsSchema>; // ../contract/src/saved-workbench-chart-rest.schemas.ts:87
-// Response: inline, src/transport/saved-workbench-chart.rest.ts:308
+// Response: inline, src/transport/saved-workbench-chart.rest.ts:299
 type Response = unknown;
 ```
 

@@ -1,3 +1,4 @@
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 
 import { TraceDerivationSpanReaderRepository } from "../trace-derivation-span-reader.repository.ts";
@@ -30,11 +31,17 @@ export class MemoryTraceDerivationSpanRepository extends TraceDerivationSpanRead
     return typeof input.limit === "number" ? spans.slice(0, input.limit) : spans;
   }
 
-  async findDerivedEventsByTraceId(input: {
-    tenantId: string;
+  async findDerivedEventsByTraceId({
+    authorization,
+    ...input
+  }: {
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<DerivedTraceEvent[]> {
-    return this.#store.findDerivedEvents(input);
+    return this.#store.findDerivedEvents({
+      tenantId: ownProjectIdReadBy(authorization),
+      ...input,
+    });
   }
 }

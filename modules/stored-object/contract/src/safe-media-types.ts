@@ -20,12 +20,11 @@ export const SAFE_MEDIA_TYPES_EXACT = new Set(["application/pdf"]);
  * accepting one at ingest would silently break round-trip fidelity.
  */
 export function isReadbackSafe(mediaType: string): boolean {
+  const essence = (mediaType.split(";")[0] ?? "").trim().toLowerCase();
   // An XML picture (SVG) can carry script, so it never counts as a picture here.
-  if ((mediaType.split(";")[0] ?? "").trim().toLowerCase().endsWith("+xml")) return false;
+  if (essence.endsWith("+xml")) return false;
   if (SAFE_MEDIA_TYPES_EXACT.has(mediaType)) return true;
-  const hasSafePrefix = SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p));
-  if (hasSafePrefix) return true;
-  return false;
+  return SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p));
 }
 
 /**

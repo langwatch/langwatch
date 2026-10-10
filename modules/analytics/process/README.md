@@ -6,7 +6,7 @@ The server half of [analytics](../README.md). Analytics reads: timeseries, feedb
 
 ## Installation
 
-`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).provideMiddlewareBindings(…).withEventing(lwqlReconvergenceEventing).withMigrations(…)`, `src/analytics.module.ts:25`.
+`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).provideMiddlewareContext(…).withEventing(lwqlReconvergenceEventing).withMigrations(…)`, `src/analytics.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -232,7 +232,7 @@ resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatc
 
 |             |                                             |
 | ----------- | ------------------------------------------- |
-| Declared at | `src/transport/analytics-legacy.rest.ts:52` |
+| Declared at | `src/transport/analytics-legacy.rest.ts:43` |
 | Base URL    | none: each route's path is its address      |
 | Addressing  | literal                                     |
 | Credential  | project                                     |
@@ -241,19 +241,19 @@ resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatc
 
 Query analytics timeseries (legacy path)
 
-Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts:57`.
+Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts:48`.
 
 Answers at `/api/analytics`, `/api/v1/analytics`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:59)
+// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:50)
 ```
 
 ### `analyticsRest`
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/analytics.rest.ts:27`       |
+| Declared at | `src/transport/analytics.rest.ts:21`       |
 | Base URL    | `/api/analytics`, twin `/api/v1/analytics` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -263,7 +263,7 @@ Answers at `/api/analytics`, `/api/v1/analytics`.
 
 Query analytics timeseries data with metrics, aggregations, and filters
 
-Permission `analytics:view`. Declared at `src/transport/analytics.rest.ts:31`.
+Permission `analytics:view`. Declared at `src/transport/analytics.rest.ts:25`.
 
 Answers at `/api/analytics/timeseries`, `/api/v1/analytics/timeseries`; also, undocumented, `/api/analytics/2026-08-07/timeseries`, `/api/v1/analytics/2026-08-07/timeseries`, `/api/analytics/latest/timeseries`, `/api/v1/analytics/latest/timeseries`.
 
@@ -280,7 +280,7 @@ interface Response {
 
 |             |                                   |
 | ----------- | --------------------------------- |
-| Declared at | `src/transport/query.rest.ts:112` |
+| Declared at | `src/transport/query.rest.ts:103` |
 | Base URL    | `/api/v1/query`                   |
 | Addressing  | v1-only                           |
 | Credential  | api_key                           |
@@ -289,7 +289,7 @@ interface Response {
 
 Run a LangWatchQL query
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:119`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:110`.
 
 Answers at `/api/v1/query`.
 
@@ -312,7 +312,7 @@ type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.i
 
 Discover the queryable LangWatchQL schema
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:151`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:142`.
 
 Answers at `/api/v1/query/schema`.
 
@@ -324,7 +324,7 @@ type Response = z.infer<typeof lwqlSchemaSchema>; // ../contract/src/analytics.i
 
 Discover both query languages
 
-Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:175`.
+Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:166`.
 
 Answers at `/api/v1/query/reference`.
 

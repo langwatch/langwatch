@@ -11,10 +11,8 @@ import {
 } from "../roles.ts";
 
 /**
- * ADR-177, invariant "read grants never escalate": a project-reader grant
- * lets an aggregate project read its members' traces and analytics and
- * nothing else. The permission list is closed; every other registry
- * permission is denied through this role.
+ * ADR-177, "read grants never escalate": a project-reader grant lets an aggregate project read
+ * its members' traces and analytics and nothing else; every other permission is denied.
  */
 
 const ORG = "org_acme";
@@ -34,11 +32,11 @@ function grants(overrides?: Partial<CollectedGrants>): CollectedGrants {
 describe("project-reader role", () => {
   describe("when the permission list is read", () => {
     it("is exactly traces:view and analytics:view", () => {
-      expect([...builtinRolePermissions(PROJECT_READER_ROLE_KEY)].sort()).toEqual([
+      expect([...builtinRolePermissions(PROJECT_READER_ROLE_KEY)].toSorted()).toEqual([
         "analytics:view",
         "traces:view",
       ]);
-      expect([...PROJECT_READER_PERMISSIONS].sort()).toEqual(["analytics:view", "traces:view"]);
+      expect([...PROJECT_READER_PERMISSIONS].toSorted()).toEqual(["analytics:view", "traces:view"]);
     });
   });
 
@@ -61,7 +59,7 @@ describe("project-reader role", () => {
       const allowed = ALL_PERMISSIONS.filter((permission) =>
         builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission }),
       );
-      expect(allowed.sort()).toEqual(["analytics:view", "traces:view"]);
+      expect(allowed.toSorted()).toEqual(["analytics:view", "traces:view"]);
     });
   });
 

@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).provideMiddlewareBindings(…).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:22`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withDoors(…).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -442,14 +442,14 @@ getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/connect-host.rest.ts:61` |
+| Declared at | `src/transport/connect-host.rest.ts:47` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | licence_token                           |
 
 #### `POST /api/connect/v1/license/sync` · `recordLicenseSync`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:67`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:53`.
 
 Answers at `/api/connect/v1/license/sync`.
 
@@ -471,7 +471,7 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:76`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:62`.
 
 Answers at `/api/connect/v1/license/activate`.
 

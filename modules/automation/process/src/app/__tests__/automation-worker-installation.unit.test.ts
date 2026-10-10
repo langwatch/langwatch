@@ -48,6 +48,8 @@ const CONFIG: AutomationServerConfig = {
   persistDailyCapPaid: 500,
   persistDailyCapEnterprise: 5_000,
   publicBaseUrl: "https://app.langwatch.test",
+  slackApiBase: "https://slack.com/api",
+  slackWebhookBase: "https://hooks.slack.com",
 };
 
 function eventingFor(role: "api" | "worker"): EventSourcing {

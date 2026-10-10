@@ -5,8 +5,8 @@ import { cleanup, render } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const timeseriesInputs: Array<Record<string, unknown>> = [];
-const documentsInputs: Array<Record<string, unknown>> = [];
+const timeseriesInputs: Record<string, unknown>[] = [];
+const documentsInputs: Record<string, unknown>[] = [];
 
 const emptyQuery = {
   data: undefined,
@@ -52,7 +52,7 @@ vi.mock("../../../behavior/use-filter-params.ts", () => ({
       endDate: 1_000 + filterParamsCall++,
       filters: {},
     },
-    queryOpts: { enabled: true },
+    queryOpts: { enabled: true, refetchOnMount: false, refetchOnWindowFocus: false },
   }),
 }));
 
@@ -130,15 +130,15 @@ describe("documents section panels", () => {
   describe("when the summary and the table get the section's params", () => {
     /** @scenario The documents section sends one request per window */
     it("query with the same input, so they share one cached request", () => {
-      const params = {
+      const params: TopUsedDocumentsParams = {
         filterParams: {
           projectId: "project-1",
           startDate: 0,
           endDate: 42,
           filters: {},
         },
-        queryOpts: { enabled: true },
-      } as unknown as TopUsedDocumentsParams;
+        queryOpts: { enabled: true, refetchOnMount: false, refetchOnWindowFocus: false },
+      };
 
       renderWithHost(
         <Tabs.Root defaultValue="docs">

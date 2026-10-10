@@ -6,7 +6,7 @@ The server half of [api-key](../README.md). API keys: creating and updating them
 
 ## Installation
 
-`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyTrpcTransport).provideMiddlewareBindings(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:28`.
+`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyTrpcTransport).provideMiddlewareContext(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -356,7 +356,7 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 
 |             |                                                    |
 | ----------- | -------------------------------------------------- |
-| Declared at | `src/transport/api-key-organizations.rest.ts:37`   |
+| Declared at | `src/transport/api-key-organizations.rest.ts:29`   |
 | Base URL    | `/api/organizations`, twin `/api/v1/organizations` |
 | Addressing  | dated                                              |
 | Credential  | instance_admin                                     |
@@ -366,7 +366,7 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 
 Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.
 
-Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/api-key-organizations.rest.ts:42`.
+Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/api-key-organizations.rest.ts:34`.
 
 Answers at `/api/organizations`, `/api/v1/organizations`; also, undocumented, `/api/organizations/2026-08-07`, `/api/v1/organizations/2026-08-07`, `/api/organizations/latest`, `/api/v1/organizations/latest`.
 
@@ -384,7 +384,7 @@ type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // .
 
 |             |                                             |
 | ----------- | ------------------------------------------- |
-| Declared at | `src/transport/api-key-projects.rest.ts:79` |
+| Declared at | `src/transport/api-key-projects.rest.ts:85` |
 | Base URL    | none: each route's path is its address      |
 | Addressing  | literal                                     |
 | Credential  | organization                                |
@@ -393,7 +393,7 @@ type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // .
 
 List projects
 
-Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:85`.
+Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:91`.
 
 Answers at `/api/projects`.
 
@@ -410,7 +410,7 @@ type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-ke
 
 Create a project
 
-Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:112`.
+Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:118`.
 
 Answers at `/api/projects`.
 
@@ -442,7 +442,7 @@ interface Response {
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/api-key.rest.ts:275`      |
+| Declared at | `src/transport/api-key.rest.ts:270`      |
 | Base URL    | `/api/api-keys`, twin `/api/v1/api-keys` |
 | Addressing  | dated                                    |
 | Credential  | organization                             |
@@ -452,7 +452,7 @@ interface Response {
 
 List API keys
 
-Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:284`.
+Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:279`.
 
 Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-keys/2026-08-07`, `/api/v1/api-keys/2026-08-07`, `/api/api-keys/latest`, `/api/v1/api-keys/latest`.
 
@@ -464,7 +464,7 @@ type Response = z.infer<typeof apiKeyRestListSchema>; // ../contract/src/api-key
 
 Create an API key
 
-Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:320`.
+Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:315`.
 
 Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-keys/2026-08-07`, `/api/v1/api-keys/2026-08-07`, `/api/api-keys/latest`, `/api/v1/api-keys/latest`.
 
@@ -485,7 +485,7 @@ interface Response {
 
 Get an API key
 
-Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:388`.
+Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:383`.
 
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
@@ -501,7 +501,7 @@ type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-k
 
 Update an API key
 
-Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:423`.
+Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:418`.
 
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
@@ -526,7 +526,7 @@ type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-k
 
 Revoke an API key
 
-Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:480`.
+Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:475`.
 
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
@@ -542,7 +542,7 @@ interface Response {
 
 Create an ingestion API key
 
-Permission `traces:create`. Credential `project`. Declared at `src/transport/api-key.rest.ts:517`.
+Permission `traces:create`. Credential `project`. Declared at `src/transport/api-key.rest.ts:512`.
 
 Answers at `/api/api-keys/ingestion`, `/api/v1/api-keys/ingestion`; also, undocumented, `/api/api-keys/2026-08-07/ingestion`, `/api/v1/api-keys/2026-08-07/ingestion`, `/api/api-keys/latest/ingestion`, `/api/v1/api-keys/latest/ingestion`.
 
@@ -555,7 +555,7 @@ type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-k
 
 Create a full-access API key
 
-Permission `project:manage`. Credential `project`. Declared at `src/transport/api-key.rest.ts:560`.
+Permission `project:manage`. Credential `project`. Declared at `src/transport/api-key.rest.ts:555`.
 
 Answers at `/api/api-keys/full-access`, `/api/v1/api-keys/full-access`; also, undocumented, `/api/api-keys/2026-08-07/full-access`, `/api/v1/api-keys/2026-08-07/full-access`, `/api/api-keys/latest/full-access`, `/api/v1/api-keys/latest/full-access`.
 

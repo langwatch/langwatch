@@ -127,7 +127,9 @@ describe("strictestDataPrivacy", () => {
       const folded = strictestDataPrivacy([pii("custom", ["PERSON"]), pii("essential")]).pii;
 
       expect(folded.level).toBe("custom");
-      expect([...folded.entities].sort()).toEqual([...ESSENTIAL_PII_ENTITIES, "PERSON"].sort());
+      expect([...folded.entities].toSorted()).toEqual(
+        [...ESSENTIAL_PII_ENTITIES, "PERSON"].toSorted(),
+      );
     });
 
     it("unions the entities and keeps only the exceptions every member allows", () => {
@@ -148,7 +150,7 @@ describe("strictestDataPrivacy", () => {
         }),
       ]);
 
-      expect([...folded.pii.entities].sort()).toEqual(["EMAIL_ADDRESS", "PERSON"]);
+      expect([...folded.pii.entities].toSorted()).toEqual(["EMAIL_ADDRESS", "PERSON"]);
       expect(folded.pii.exceptPatterns).toEqual(["TKT-\\d{4}"]);
     });
   });
@@ -165,7 +167,10 @@ describe("strictestDataPrivacy", () => {
       ]);
 
       expect(folded.secrets.enabled).toBe(true);
-      expect([...folded.secrets.customPatterns].sort()).toEqual(["acme_[a-z]{8}", "tok_[0-9]{12}"]);
+      expect([...folded.secrets.customPatterns].toSorted()).toEqual([
+        "acme_[a-z]{8}",
+        "tok_[0-9]{12}",
+      ]);
     });
 
     it("leaves secrets off only when every member leaves them off", () => {
@@ -192,7 +197,10 @@ describe("strictestDataPrivacy", () => {
         }),
       ]);
 
-      expect(folded.customAttributes.map((rule) => rule.pattern).sort()).toEqual(["a.*", "b.*"]);
+      expect(folded.customAttributes.map((rule) => rule.pattern).toSorted()).toEqual([
+        "a.*",
+        "b.*",
+      ]);
     });
 
     // A drop acts only at ingestion and the read path hides only restricts,

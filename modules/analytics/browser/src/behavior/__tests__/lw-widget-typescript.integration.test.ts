@@ -139,7 +139,7 @@ export default function Widget() {
   describe("given widget code asking for React", () => {
     /** @scenario "React completes with its hooks" */
     it.each([
-      ['import { use } from "react";', 'import { use'.length],
+      ['import { use } from "react";', "import { use".length],
       ["export default () => React.", "export default () => React.".length],
     ])("offers React's hooks in %s", async (code, offset) => {
       const service = await languageService({ code });

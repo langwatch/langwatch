@@ -305,7 +305,6 @@ function ProjectEditDrawer({
               </Button>
               <Button
                 colorPalette="red"
-                autoFocus
                 onClick={() =>
                   revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: true })
                 }

@@ -145,7 +145,7 @@ type BorrowedProcedures = {
       query: {
         input: { organizationId: string };
         output: {
-          members: { user: { id: string; name: string | null } }[];
+          members: { user: { id: string; name: string | null; email: string | null } }[];
         } | null;
       };
     };

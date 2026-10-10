@@ -6,7 +6,7 @@ The server half of [prompt](../README.md). Prompts: versioned prompt configurati
 
 ## Installation
 
-`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withMigrations(…).provideMiddlewareBindings(…)`, `src/prompt.module.ts:17`.
+`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withMigrations(…).provideMiddlewareContext(…)`, `src/prompt.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -691,7 +691,7 @@ Contract `../contract/src/prompt.trpc.ts:48`, router `src/transport/prompt.trpc.
 interface Input {
   projectId: string;
 }
-// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:54)
+// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:55)
 
 // prompts.getCopies
 // Input: promptIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:24
@@ -699,7 +699,7 @@ interface Input {
   projectId: string;
   idOrHandle: string;
 }
-// Output: inline, ../contract/src/prompt.trpc.ts:59
+// Output: inline, ../contract/src/prompt.trpc.ts:60
 type Output = {
   id: string;
   handle: string;
@@ -748,7 +748,7 @@ interface Input {
   version?: number;
   tag?: string;
 }
-// Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:83)
+// Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:84)
 
 // prompts.checkHandleUniqueness
 // Input: promptHandleUniquenessTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:188
@@ -757,7 +757,7 @@ interface Input {
   projectId: string;
   scope: "PROJECT" | "ORGANIZATION";
 }
-// Output: inline, ../contract/src/prompt.trpc.ts:87
+// Output: inline, ../contract/src/prompt.trpc.ts:88
 type Output = boolean;
 
 // prompts.checkModifyPermission
@@ -770,7 +770,7 @@ interface Output {
 
 // prompts.getAllVersionsForPrompt
 type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:95)
+// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:96)
 
 // prompts.delete
 type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
@@ -808,7 +808,7 @@ interface Input {
   projectId: string;
   configId: string;
 }
-// Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:121)
+// Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:122)
 
 // prompts.assignTag
 // Input: promptAssignTagTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:211

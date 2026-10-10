@@ -6,7 +6,7 @@ The server half of [langy](../README.md). Langy, the in-product assistant: conve
 
 ## Installation
 
-`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).provideMiddlewareBindings(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:28`.
+`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).provideMiddlewareBindings(…).withDoors(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -610,43 +610,43 @@ interface Response {
 
 |             |                                                        |
 | ----------- | ------------------------------------------------------ |
-| Declared at | `src/transport/langy-local-control-connect.rest.ts:57` |
+| Declared at | `src/transport/langy-local-control-connect.rest.ts:77` |
 | Base URL    | ≈ namespace `langy`                                    |
 | Addressing  | literal                                                |
 | Credential  | project                                                |
 
 #### `POST ≈ `/api/langy/control${mount}/connect/register`` · `langyControlConnectRegister`
 
-Authenticated: a Langy session key is minted for one conversation and holds no RBAC permission; the key is the whole grant. Credential `session_key`. Declared at `src/transport/langy-local-control-connect.rest.ts:63`.
+Authenticated: a Langy session key is minted for one conversation and holds no RBAC permission; the key is the whole grant. Credential `session_key`. Declared at `src/transport/langy-local-control-connect.rest.ts:83`.
 
 ```typescript
 type Body = z.infer<typeof registerFrameSchema>; // ../contract/src/features/local-control/langy.local-control-protocol.ts:158
-// Response: inline, src/transport/langy-local-control-connect.rest.ts:72
+// Response: inline, src/transport/langy-local-control-connect.rest.ts:92
 type Response = unknown;
 ```
 
 #### `GET ≈ `/api/langy/control${mount}/connect/poll`` · `langyControlConnectPoll`
 
-Public: addressed by the pod-local instance token register handed out, as on main; the session key is checked once, at register. Declared at `src/transport/langy-local-control-connect.rest.ts:100`.
+Public: addressed by the pod-local instance token register handed out, as on main; the session key is checked once, at register. Declared at `src/transport/langy-local-control-connect.rest.ts:120`.
 
 ```typescript
 // Query: langyControlPollQuerySchema, ../contract/src/langy-rest.schemas.ts:148
 interface Query {
   inFlight?: string;
 }
-type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:54
-// Response: inline, src/transport/langy-local-control-connect.rest.ts:104
+type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:74
+// Response: inline, src/transport/langy-local-control-connect.rest.ts:124
 type Response = unknown;
 ```
 
 #### `POST ≈ `/api/langy/control${mount}/connect/frames`` · `langyControlConnectFrames`
 
-Public: addressed by the pod-local instance token register handed out, as on main; the session key is checked once, at register. Declared at `src/transport/langy-local-control-connect.rest.ts:131`.
+Public: addressed by the pod-local instance token register handed out, as on main; the session key is checked once, at register. Declared at `src/transport/langy-local-control-connect.rest.ts:151`.
 
 ```typescript
 type Body = z.infer<typeof langyControlFramesBodySchema>; // ../contract/src/langy-rest.schemas.ts:136
-type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:54
-// Response: inline, src/transport/langy-local-control-connect.rest.ts:135
+type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:74
+// Response: inline, src/transport/langy-local-control-connect.rest.ts:155
 type Response = unknown;
 ```
 
@@ -1351,7 +1351,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:283`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:282`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

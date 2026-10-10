@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareBindings(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing)`, `src/authz.module.ts:29`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareContext(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing)`, `src/authz.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -585,7 +585,7 @@ registeredMigrations(): readonly SystemMigration[];
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/authz-grant.rest.ts:41` |
+| Declared at | `src/transport/authz-grant.rest.ts:36` |
 | Base URL    | `/api/grants`, twin `/api/v1/grants`   |
 | Addressing  | dated                                  |
 | Credential  | organization                           |
@@ -595,7 +595,7 @@ registeredMigrations(): readonly SystemMigration[];
 
 List grants
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:46`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:41`.
 
 Answers at `/api/grants`, `/api/v1/grants`; also, undocumented, `/api/grants/2026-08-07`, `/api/v1/grants/2026-08-07`, `/api/grants/latest`, `/api/v1/grants/latest`.
 
@@ -619,7 +619,7 @@ type Response = z.infer<typeof grantPageSchema>; // ../contract/src/authz-grants
 
 Grant a role
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:62`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:57`.
 
 Answers at `/api/grants`, `/api/v1/grants`; also, undocumented, `/api/grants/2026-08-07`, `/api/v1/grants/2026-08-07`, `/api/grants/latest`, `/api/v1/grants/latest`.
 
@@ -644,7 +644,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Get a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:85`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:79`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -660,7 +660,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Change a grant's role
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:101`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:95`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -677,7 +677,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Revoke a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:124`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:117`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -694,7 +694,7 @@ interface Response {
 
 |             |                                                    |
 | ----------- | -------------------------------------------------- |
-| Declared at | `src/transport/authz-role-binding.rest.ts:71`      |
+| Declared at | `src/transport/authz-role-binding.rest.ts:66`      |
 | Base URL    | `/api/role-bindings`, twin `/api/v1/role-bindings` |
 | Addressing  | dated                                              |
 | Credential  | organization                                       |
@@ -705,7 +705,7 @@ interface Response {
 
 List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:83`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:78`.
 
 Answers at `/api/role-bindings`, `/api/v1/role-bindings`; also, undocumented, `/api/role-bindings/2026-08-07`, `/api/v1/role-bindings/2026-08-07`, `/api/role-bindings/latest`, `/api/v1/role-bindings/latest`.
 
@@ -727,7 +727,7 @@ type Response = z.infer<typeof roleBindingRestListSchema>; // ../contract/src/au
 
 Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:108`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:103`.
 
 Answers at `/api/role-bindings`, `/api/v1/role-bindings`; also, undocumented, `/api/role-bindings/2026-08-07`, `/api/v1/role-bindings/2026-08-07`, `/api/role-bindings/latest`, `/api/v1/role-bindings/latest`.
 
@@ -750,7 +750,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:152`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:146`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 
@@ -771,7 +771,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:177`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:170`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 

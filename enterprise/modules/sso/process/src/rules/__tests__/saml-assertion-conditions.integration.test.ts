@@ -69,7 +69,7 @@ function deployment() {
               idpMetadata: { entityID: IDP_ENTITY_ID },
               spMetadata: { entityID: SP_ENTITY_ID },
               wantAssertionsSigned: true,
-              mapping: { id: "nameID", email: "email" },
+              mapping: { email: "email" },
             },
           },
         ],

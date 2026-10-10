@@ -117,33 +117,9 @@ const EVAL_TIME_FILTER_START_END =
   "AND evaluation_runs.UpdatedAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY";
 
 /**
- * Returns a deduped FROM-clause expression for trace_summaries.
- *
- * trace_summaries uses ReplacingMergeTree(UpdatedAt) which can return
- * multiple versions of the same trace between merges, so every read keeps
- * only the latest version of each trace. Two forms:
- *
- *   - Narrow column list (every caller that passes `columns` without the whole
- *     `Attributes` map): the spillable `argMax` collapse of
- *     {@link latestVersionSubquery}. Analytics reads aggregate over every
- *     trace in range, and the IN-tuple form's hash set (one entry per trace,
- *     never spilled) is what drove those reads into MEMORY_LIMIT_EXCEEDED on
- *     high-volume tenants.
- *   - Wide rows (no column list, or the whole map): the IN-tuple form, whose
- *     outer read streams the wide columns instead of buffering one row per
- *     trace.
- *
- * The TenantId filter and the dateFilter apply to every version row before
- * the collapse, which enables partition pruning on toYearWeek(OccurredAt).
- *
- * @param alias - Table alias (e.g., "ts")
- * @param columns - Optional explicit column list. When omitted, selects all
- *   analytics columns (still excludes ComputedInput/ComputedOutput). Entries
- *   may be aliased projections (`map(...) AS Attributes`).
- * @param dateFilter - Optional SQL fragment for date range filtering
- *   (e.g., DATE_FILTER_CURRENT).
- *
- * @see dev/docs/best_practices/clickhouse-queries.md "Whole-range aggregates"
+ * Deduped trace_summaries FROM-clause keeping the latest version of each trace: narrow `columns`
+ * use the spillable argMax collapse of {@link latestVersionSubquery}, wide rows the IN-tuple form.
+ * See dev/docs/best_practices/clickhouse-queries.md "Whole-range aggregates".
  */
 function dedupedTraceSummaries(
   alias: string,
@@ -201,12 +177,9 @@ function referencedTraceColumns(
   const columns = [...TRACE_IDENTITY_COLUMNS, ...extractReferencedTraceColumns(expressions)];
   // A map read by literal keys only is carried as a map of those keys, which
   // keeps the deduped row narrow (see dedupedTraceSummaries).
-  const narrowedAttributes = columns.includes("Attributes")
-    ? narrowMapColumnProjection({ column: "Attributes", expressions })
-    : null;
-  return narrowedAttributes
-    ? columns.map((column) => (column === "Attributes" ? narrowedAttributes : column))
-    : columns;
+  return columns.map((column) =>
+    column === "Attributes" ? narrowMapColumnProjection({ column, expressions }) : column,
+  );
 }
 
 /**
@@ -608,18 +581,10 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
   const ts = tableAliases.trace_summaries;
   const smd = SPAN_MODEL_ALIAS;
   const contribution = (expr: string) => `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
-  // TraceSpanCount = spans of the trace visible to THIS scan, summed over the
-  // per-bucket groups BEFORE the zero-suppression filter (a suppressed
-  // model-less bucket still holds real spans, e.g. the root).
-  // spanModelPartitionMissExpr compares it against ts.SpanCount to detect an
-  // incomplete scan (spans outside the StartTime envelope) and fall back to
-  // whole-trace attribution instead of shipping a partial partition.
-  //
-  // The per-trace total comes from a second GROUP BY that collects the
-  // trace's buckets and ARRAY JOINs them back out, not from a window over the
-  // buckets: a window buffers every bucket row of the scan in memory, while
-  // both aggregations here spill to disk past
-  // max_bytes_before_external_group_by.
+  // TraceSpanCount = spans of the trace visible to THIS scan, summed before zero-suppression.
+  // spanModelPartitionMissExpr compares it with ts.SpanCount to detect an incomplete scan and
+  // fall back to whole-trace attribution. The per-trace total is a second GROUP BY, not a window:
+  // a window buffers every bucket row in memory, while both aggregations spill to disk.
   const bucketColumns = [
     "SpanModelCost",
     "SpanModelNonBilledCost",
@@ -873,13 +838,9 @@ interface BuiltQuery {
 }
 
 /**
- * Settings for a model-grouped query, which joins the deduped traces to the
- * span-model partition: one row per trace and model on the hash side, so a
- * plain hash join holds memory in proportion to the traces in range and
- * cannot spill. A grace hash join splits that side into buckets on disk past
- * `max_bytes_in_join`. Fewer threads bound the merge of the spilled span
- * aggregation, which takes memory per thread; the panel runs slower (about
- * 5s to 9s at 3M traces in range) instead of failing.
+ * Settings for a model-grouped query joining deduped traces to the span-model partition. A grace
+ * hash join spills the per-trace-and-model side to disk past `max_bytes_in_join`, and fewer
+ * threads bound the spilled merge: the panel runs slower (5s to 9s at 3M traces), not failing.
  */
 const SPAN_MODEL_PARTITION_SETTINGS = {
   join_algorithm: "grace_hash",
@@ -2104,17 +2065,6 @@ function buildArrayJoinTimeseriesQuery({
     !groupByHandlesUnknown && input.groupBy !== "evaluations.evaluation_passed"
       ? "HAVING group_key != ''"
       : "";
-
-  // Drop the per-trace passthroughs (trace_total_cost, trace_duration_ms, ...)
-  // that no outer expression reads. They are constant per trace and group key,
-  // so the CTE's DISTINCT / GROUP BY collapses the same rows without them, and
-  // carrying them widens the dedup state and the span partition join for a
-  // panel that only counts traces.
-  const cteSelectList = cteSelectExprs.filter((expr) => {
-    const alias = /\sAS\s+(trace_[a-z_]+)$/.exec(expr)?.[1];
-    if (!alias || alias === "trace_id") return true;
-    return outerSelectExprs.some((outer) => new RegExp(`\\b${alias}\\b`).test(outer));
-  });
 
   // Columns the dedup subquery must expose: everything the CTE's SELECT list
   // (which hardcodes per-trace passthroughs like ts.NonBilledCost regardless of

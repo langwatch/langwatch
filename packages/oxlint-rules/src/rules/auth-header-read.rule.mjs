@@ -28,7 +28,7 @@ function isNamedHeader(node) {
   return false;
 }
 
-// `.withPermission(..., { at: "header", header: "x-project-id" })` tells the door which header to read.
+// `.withPermission(..., { at: "header", header: "x-project-id" })` names the header to read.
 function isDeclaredScopeHeader(node) {
   const property = node.parent;
   if (property?.type !== "Property" || property.value !== node) return false;
@@ -41,7 +41,8 @@ function isDeclaredScopeHeader(node) {
 // `"authorization" in input` tests a field (an authz proof), unless the object tested is `headers`.
 function isFieldTest(node) {
   const test = node.parent;
-  if (test?.type !== "BinaryExpression" || test.operator !== "in" || test.left !== node) return false;
+  if (test?.type !== "BinaryExpression" || test.operator !== "in" || test.left !== node)
+    return false;
 
   return nameOf(test.right) !== "headers";
 }

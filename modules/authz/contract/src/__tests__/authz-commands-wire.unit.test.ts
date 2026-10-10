@@ -271,10 +271,8 @@ describe("the grants ledger's wire boundary", () => {
   });
 
   /**
-   * ADR-144: the one foreign placement a `project` principal may take, and
-   * every neighbour of it that must stay refused. Same-organisation
-   * placement is the writer's question (it needs storage); the wire checks
-   * shape only.
+   * ADR-144: the one foreign placement a `project` principal may take, and every neighbour of it
+   * that must stay refused. Same-organisation placement needs storage; the wire checks shape only.
    */
   describe("when a project reads another project (ADR-144)", () => {
     const SHARED_READ = {

@@ -6,7 +6,7 @@ The server half of [monitor](../README.md). Monitors: the checks that run an eva
 
 ## Installation
 
-`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:14`.
+`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).provideMiddlewareContext(…).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -168,7 +168,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Mo
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/monitor.rest.ts:68`       |
+| Declared at | `src/transport/monitor.rest.ts:73`       |
 | Base URL    | `/api/monitors`, twin `/api/v1/monitors` |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -178,19 +178,19 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Mo
 
 List all online evaluation monitors for the project
 
-Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:72`.
+Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:77`.
 
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
 ```typescript
-// Response: z.array(monitorRestResponseSchema) (inline, src/transport/monitor.rest.ts:74)
+// Response: z.array(monitorRestResponseSchema) (inline, src/transport/monitor.rest.ts:79)
 ```
 
 #### `GET /:id` · `getApiMonitorsById`
 
 Get a monitor by its ID
 
-Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:86`.
+Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:91`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
@@ -206,7 +206,7 @@ type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/mo
 
 Create a new online evaluation monitor
 
-Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:108`.
+Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:113`.
 
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
@@ -219,7 +219,7 @@ type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/mo
 
 Update a monitor (name, enabled state, settings, etc.)
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:140`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:145`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
@@ -233,7 +233,7 @@ type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/mo
 
 Enable or disable a monitor
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:162`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:167`.
 
 Answers at `/api/monitors/:id/toggle`, `/api/v1/monitors/:id/toggle`; also, undocumented, `/api/monitors/2026-08-07/:id/toggle`, `/api/v1/monitors/2026-08-07/:id/toggle`, `/api/monitors/latest/:id/toggle`, `/api/v1/monitors/latest/:id/toggle`.
 
@@ -254,7 +254,7 @@ interface Response {
 
 Delete a monitor
 
-Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:179`.
+Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:184`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 

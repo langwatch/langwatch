@@ -46,7 +46,8 @@ export type PromptCreateTrpcInput = z.infer<typeof promptCreateTrpcInputSchema>;
 export type PromptUpdateTrpcInput = z.infer<typeof promptUpdateTrpcInputSchema>;
 
 export const promptTrpc = defineTrpcContract("prompts")
-  // A prompt written, copied or synced elsewhere joins the list; updates and deletes have no fact yet.
+  // A prompt written, copied or synced elsewhere joins the list; updates and deletes have no
+  // fact yet.
   .query("getAllPromptsForProject", {
     invalidatedBy: [{ event: PROMPT_CREATED_EVENT_TYPE, scope: "projectId" }],
   })

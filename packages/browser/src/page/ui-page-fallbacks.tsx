@@ -3,16 +3,9 @@
  */
 
 import type { ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
-import {
-  Button,
-  Center,
-  Heading,
-  Spinner,
-  Stack,
-  Text,
-} from "@langwatch/design-system/primitives";
-import { ErrorActions } from "@langwatch/error-views";
+import { Button, Center, Heading, Spinner, Stack, Text } from "@langwatch/design-system/primitives";
 import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
+import { ErrorActions } from "@langwatch/error-views";
 
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {

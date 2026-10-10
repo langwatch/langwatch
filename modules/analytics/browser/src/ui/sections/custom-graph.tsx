@@ -608,7 +608,7 @@ function GraphContainer({
   // A row of figures draws its own compact error per figure (see SummaryGraph): it often sits
   // in a tab header or a small card.
   const failedOutright = Boolean(timeseries.error) && !timeseries.data && graphType !== "summary";
-  // A summary draws its own empty figures (see SummaryGraph); the chart placeholder overflows a tab header.
+  // A summary draws its own empty figures (see SummaryGraph); the placeholder overflows a tab.
   const showEmpty =
     isEmpty && graphType !== "monitor_graph" && (graphType !== "summary" || Boolean(emptyState));
   return (

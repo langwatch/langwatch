@@ -775,41 +775,10 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
             </HorizontalFormControl>
 
             {organization?.useCustomS3 && (
-              <HorizontalFormControl
-                label="S3 Storage"
-                helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
-              >
-                <VStack width="full" align="start" gap={3}>
-                  <Input
-                    width="full"
-                    type="text"
-                    placeholder="S3 Endpoint"
-                    {...register("s3Endpoint")}
-                  />
-                  <Input
-                    width="full"
-                    type="text"
-                    placeholder="Access Key ID"
-                    {...register("s3AccessKeyId")}
-                  />
-                  <Input
-                    width="full"
-                    type="password"
-                    placeholder={
-                      defaultValues.s3AccessKeyId
-                        ? "Stored; enter a new value to replace it"
-                        : "Secret Access Key"
-                    }
-                    {...register("s3SecretAccessKey")}
-                  />
-                  <Input
-                    width="full"
-                    type="text"
-                    placeholder="S3 Bucket Name"
-                    {...register("s3Bucket")}
-                  />
-                </VStack>
-              </HorizontalFormControl>
+              <ProjectS3Fields
+                register={register}
+                hasStoredAccessKey={!!defaultValues.s3AccessKeyId}
+              />
             )}
           </Card.Body>
         </Card.Root>
@@ -820,51 +789,94 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
         </HStack>
       </form>
 
-      <Dialog.Root
-        open={pendingSharingOff !== null}
-        onOpenChange={({ open }) => {
-          if (!open) setPendingSharingOff(null);
-        }}
-      >
-        <Dialog.Content>
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title>Turn off sharing</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack align="start" gap={2}>
-              <Text>{pendingSharingOff?.linkCount} share links exist for this project.</Text>
-              <Text fontSize="sm" color="fg.muted">
-                Paused links stop working while sharing is off and work again when you turn it back
-                on. Revoked links are gone for good.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack gap={2}>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  pendingSharingOff &&
-                  saveProject({ data: pendingSharingOff.data, revokeExistingLinks: false })
-                }
-              >
-                Keep links paused
-              </Button>
-              <Button
-                colorPalette="red"
-                autoFocus
-                onClick={() =>
-                  pendingSharingOff &&
-                  saveProject({ data: pendingSharingOff.data, revokeExistingLinks: true })
-                }
-              >
-                Revoke {pendingSharingOff?.linkCount} links
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+      <TurnOffSharingDialog
+        pending={pendingSharingOff}
+        onClose={() => setPendingSharingOff(null)}
+        onChoose={({ data, revokeExistingLinks }) => saveProject({ data, revokeExistingLinks })}
+      />
     </>
+  );
+}
+
+function ProjectS3Fields({
+  register,
+  hasStoredAccessKey,
+}: {
+  register: UseFormRegister<ProjectFormData>;
+  hasStoredAccessKey: boolean;
+}) {
+  return (
+    <HorizontalFormControl
+      label="S3 Storage"
+      helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
+    >
+      <VStack width="full" align="start" gap={3}>
+        <Input width="full" type="text" placeholder="S3 Endpoint" {...register("s3Endpoint")} />
+        <Input
+          width="full"
+          type="text"
+          placeholder="Access Key ID"
+          {...register("s3AccessKeyId")}
+        />
+        <Input
+          width="full"
+          type="password"
+          placeholder={
+            hasStoredAccessKey ? "Stored; enter a new value to replace it" : "Secret Access Key"
+          }
+          {...register("s3SecretAccessKey")}
+        />
+        <Input width="full" type="text" placeholder="S3 Bucket Name" {...register("s3Bucket")} />
+      </VStack>
+    </HorizontalFormControl>
+  );
+}
+
+function TurnOffSharingDialog({
+  pending,
+  onClose,
+  onChoose,
+}: {
+  pending: { data: ProjectFormData; linkCount: number } | null;
+  onClose: () => void;
+  onChoose: (choice: { data: ProjectFormData; revokeExistingLinks: boolean }) => void;
+}) {
+  const choose = (revokeExistingLinks: boolean) => {
+    if (pending) onChoose({ data: pending.data, revokeExistingLinks });
+  };
+
+  return (
+    <Dialog.Root
+      open={pending !== null}
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
+    >
+      <Dialog.Content>
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
+          <Dialog.Title>Turn off sharing</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <VStack align="start" gap={2}>
+            <Text>{pending?.linkCount} share links exist for this project.</Text>
+            <Text fontSize="sm" color="fg.muted">
+              Paused links stop working while sharing is off and work again when you turn it back
+              on. Revoked links are gone for good.
+            </Text>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack gap={2}>
+            <Button variant="outline" onClick={() => choose(false)}>
+              Keep links paused
+            </Button>
+            <Button colorPalette="red" onClick={() => choose(true)}>
+              Revoke {pending?.linkCount} links
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

@@ -6,7 +6,7 @@ The server half of [suite](../README.md). Suites (run plans): their definitions,
 
 ## Installation
 
-`defineProcessModule("suite").withRepositories(suiteRepositories).withApi(SuiteModule).withTransports(…, …, …, suiteTrpcTransport, testSuiteTrpcTransport).provideMiddlewareBindings(…).withEventing(suiteRunProcessingEventing).withMigrations(…)`, `src/suite.module.ts:22`.
+`defineProcessModule("suite").withRepositories(suiteRepositories).withApi(SuiteModule).withTransports(…, …, …, suiteTrpcTransport, testSuiteTrpcTransport).provideMiddlewareContext(…).withEventing(suiteRunProcessingEventing).withMigrations(…)`, `src/suite.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -212,7 +212,7 @@ platformUrl(input: { projectSlug: string; path: string }): string;
 
 |             |                                       |
 | ----------- | ------------------------------------- |
-| Declared at | `src/transport/run-plans.rest.ts:151` |
+| Declared at | `src/transport/run-plans.rest.ts:156` |
 | Base URL    | `/api/v1/run-plans`                   |
 | Addressing  | v1-only                               |
 | Credential  | project                               |
@@ -221,7 +221,7 @@ platformUrl(input: { projectSlug: string; path: string }): string;
 
 List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family.
 
-Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:156`.
+Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:161`.
 
 Answers at `/api/v1/run-plans`.
 
@@ -230,14 +230,14 @@ Answers at `/api/v1/run-plans`.
 interface Query {
   includeArchived?: string;
 }
-// Response: z.array(runPlanWireSchema) (inline, src/transport/run-plans.rest.ts:159)
+// Response: z.array(runPlanWireSchema) (inline, src/transport/run-plans.rest.ts:164)
 ```
 
 #### `POST /run` · `runRunPlan`
 
 Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against.
 
-Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:174`.
+Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:179`.
 
 Answers at `/api/v1/run-plans/run`.
 
@@ -250,7 +250,7 @@ type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-
 
 Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found.
 
-Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:195`.
+Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:200`.
 
 Answers at `/api/v1/run-plans/:id`.
 
@@ -266,7 +266,7 @@ type Response = z.infer<typeof runPlanWireSchema>; // ../contract/src/suite-rest
 
 Run a plan again
 
-Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:210`.
+Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:215`.
 
 Answers at `/api/v1/run-plans/:id/run`.
 
@@ -285,7 +285,7 @@ type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-
 
 Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.
 
-Permission `scenarios:manage`. Declared at `src/transport/run-plans.rest.ts:234`.
+Permission `scenarios:manage`. Declared at `src/transport/run-plans.rest.ts:239`.
 
 Answers at `/api/v1/run-plans/:id`.
 
@@ -302,7 +302,7 @@ interface Response {
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/suites-alias.rest.ts:407` |
+| Declared at | `src/transport/suites-alias.rest.ts:412` |
 | Base URL    | `/api/suites`, twin `/api/v1/suites`     |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -313,7 +313,7 @@ interface Response {
 
 List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.
 
-Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:413`.
+Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:418`.
 
 Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/2026-08-07`, `/api/v1/suites/2026-08-07`, `/api/suites/latest`, `/api/v1/suites/latest`.
 
@@ -322,14 +322,14 @@ Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/202
 interface Query {
   kind?: "custom" | "folder";
 }
-// Response: z.array(suiteResponseWithPlatformUrlSchema) (inline, src/transport/suites-alias.rest.ts:416)
+// Response: z.array(suiteResponseWithPlatformUrlSchema) (inline, src/transport/suites-alias.rest.ts:421)
 ```
 
 #### `GET /:id` · `getApiSuitesById`
 
 Get a suite (run plan) by its ID.
 
-Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:432`.
+Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:437`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
@@ -345,7 +345,7 @@ type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contra
 
 Create a new suite (run plan).
 
-Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:453`.
+Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:458`.
 
 Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/2026-08-07`, `/api/v1/suites/2026-08-07`, `/api/suites/latest`, `/api/v1/suites/latest`.
 
@@ -358,7 +358,7 @@ type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contra
 
 Update a suite (run plan).
 
-Permission `scenarios:update`. Declared at `src/transport/suites-alias.rest.ts:471`.
+Permission `scenarios:update`. Declared at `src/transport/suites-alias.rest.ts:476`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
@@ -372,7 +372,7 @@ type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contra
 
 Duplicate a suite (run plan).
 
-Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:489`.
+Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:494`.
 
 Answers at `/api/suites/:id/duplicate`, `/api/v1/suites/:id/duplicate`; also, undocumented, `/api/suites/2026-08-07/:id/duplicate`, `/api/v1/suites/2026-08-07/:id/duplicate`, `/api/suites/latest/:id/duplicate`, `/api/v1/suites/latest/:id/duplicate`.
 
@@ -387,7 +387,7 @@ type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contra
 
 Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.
 
-Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:509`.
+Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:514`.
 
 Answers at `/api/suites/:id/run`, `/api/v1/suites/:id/run`; also, undocumented, `/api/suites/2026-08-07/:id/run`, `/api/v1/suites/2026-08-07/:id/run`, `/api/suites/latest/:id/run`, `/api/v1/suites/latest/:id/run`.
 
@@ -401,7 +401,7 @@ type Response = z.infer<typeof suiteRunResultSchema>; // ../contract/src/suite-r
 
 Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.
 
-Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:533`.
+Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:538`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
@@ -418,7 +418,7 @@ interface Response {
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/test-suites.rest.ts:216` |
+| Declared at | `src/transport/test-suites.rest.ts:221` |
 | Base URL    | `/api/v1/test-suites`                   |
 | Addressing  | v1-only                                 |
 | Credential  | project                                 |
@@ -427,7 +427,7 @@ interface Response {
 
 List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:221`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:226`.
 
 Answers at `/api/v1/test-suites`.
 
@@ -436,14 +436,14 @@ Answers at `/api/v1/test-suites`.
 interface Query {
   includeArchived?: string;
 }
-// Response: z.array(testSuiteWireSchema) (inline, src/transport/test-suites.rest.ts:224)
+// Response: z.array(testSuiteWireSchema) (inline, src/transport/test-suites.rest.ts:229)
 ```
 
 #### `POST /` · `createTestSuite`
 
 Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start.
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:237`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:242`.
 
 Answers at `/api/v1/test-suites`.
 
@@ -456,7 +456,7 @@ type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.
 
 Read one test suite
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:261`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:266`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -472,7 +472,7 @@ type Response = z.infer<typeof testSuiteDetailWireSchema>; // src/rules/suite-wi
 
 Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.
 
-Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:282`.
+Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:287`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -486,7 +486,7 @@ type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.
 
 Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.
 
-Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:303`.
+Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:308`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -503,7 +503,7 @@ interface Response {
 
 Run a test suite
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:315`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:320`.
 
 Answers at `/api/v1/test-suites/:id/run`.
 

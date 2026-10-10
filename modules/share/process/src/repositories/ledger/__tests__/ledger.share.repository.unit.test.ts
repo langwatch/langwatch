@@ -238,7 +238,7 @@ describe("LedgerShareRepository", () => {
 
         const link = await repository.create(createParams);
 
-        expect(shareLinkSchema.safeParse(link).success).toBe(true);
+        expect(shareLinkSchema.validate(link)).toBe(true);
       });
 
       it("refuses to invent a row when the projection has not landed one", async () => {

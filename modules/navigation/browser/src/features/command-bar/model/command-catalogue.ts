@@ -814,10 +814,8 @@ export function filterCommandsByFeatureFlags({
 }
 
 /**
- * Drops the commands whose navigation section this project's navigation
- * does not show, so Quick Search offers an aggregate (ADR-177) what its
- * sidebar does and no way to create data under it. A command with no
- * section is always offered.
+ * Drops the commands whose navigation section this project does not show, so Quick Search offers
+ * an aggregate (ADR-177) what its sidebar does. A command with no section is always offered.
  */
 export function filterCommandsByProjectNavigation({
   commands,

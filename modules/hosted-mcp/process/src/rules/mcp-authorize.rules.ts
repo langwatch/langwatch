@@ -1,4 +1,3 @@
-import { AggregateProjectHasNoCredentialError } from "@langwatch/api-key-contract";
 import { postedApprovalFieldsSchema } from "@langwatch/hosted-mcp-contract";
 import type { z } from "zod";
 
@@ -25,7 +24,7 @@ export type McpApprovalOutcome =
   | Readonly<{ kind: "challenge-missing" }>
   | Readonly<{ kind: "challenge-method-unsupported" }>
   | Readonly<{ kind: "denied" }>
-  | Readonly<{ kind: "aggregate-project-has-no-credential" }>
+  | Readonly<{ kind: "aggregate-project-has-no-credential"; message: string; code: string }>
   | Readonly<{ kind: "unavailable" }>;
 
 /** The body every refusal carries, in the OAuth shape the consent page reads. */
@@ -53,8 +52,6 @@ type ApprovalRefusal = Readonly<{
   /** The registered handled-error code, where the refusal has one. */
   code?: string;
 }>;
-
-const aggregateRefusal = new AggregateProjectHasNoCredentialError();
 
 /**
  * Every refusal an approval can decide. The two with no description are raised before the
@@ -86,18 +83,15 @@ const APPROVAL_REFUSALS = {
     error: "access_denied",
     description: "Project not found or you don't have access",
   },
-  "aggregate-project-has-no-credential": {
-    status: 403,
-    error: "access_denied",
-    description: aggregateRefusal.message,
-    code: aggregateRefusal.code,
-  },
   unavailable: {
     status: 500,
     error: "server_error",
     description: "Authorization is temporarily unavailable",
   },
-} as const satisfies Record<Exclude<McpApprovalOutcome["kind"], "approved">, ApprovalRefusal>;
+} as const satisfies Record<
+  Exclude<McpApprovalOutcome["kind"], "approved" | "aggregate-project-has-no-credential">,
+  ApprovalRefusal
+>;
 
 /** The posted document's known fields, or nothing where the body was not a JSON object. */
 export function parsePostedApproval(raw: string): PostedApprovalFields | undefined {
@@ -145,7 +139,10 @@ export function buildAuthorizeAnswer({
     };
   }
 
-  const refusal: ApprovalRefusal = APPROVAL_REFUSALS[outcome.kind];
+  const refusal: ApprovalRefusal =
+    outcome.kind === "aggregate-project-has-no-credential"
+      ? { status: 403, error: "access_denied", description: outcome.message, code: outcome.code }
+      : APPROVAL_REFUSALS[outcome.kind];
   if (refusal.description === null) {
     return { status: refusal.status, body: { error: refusal.error } };
   }

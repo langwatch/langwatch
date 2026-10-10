@@ -13,11 +13,7 @@ import { RuntimeParametersField } from "../runtime-parameters-field.tsx";
 function FormValueProbe() {
   const methods = useFormContext<PromptConfigFormValues>();
   const parameters = useWatch({ control: methods.control, name: "version.parameters" });
-  return (
-    <output data-testid="parameters-value">
-      {JSON.stringify(parameters)}
-    </output>
-  );
+  return <output data-testid="parameters-value">{JSON.stringify(parameters)}</output>;
 }
 
 function renderField(initialParameters: Record<string, unknown> = {}) {

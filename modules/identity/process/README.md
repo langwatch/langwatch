@@ -174,7 +174,7 @@ None: this module declares no REST family.
 
 ### `identityLookup`
 
-Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/identity-lookup.trpc.ts:51`.
+Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/identity-lookup.trpc.ts:55`.
 
 | Procedure                              | Kind     | Gate                             | Input                   | Output                         |
 | -------------------------------------- | -------- | -------------------------------- | ----------------------- | ------------------------------ |
@@ -712,7 +712,7 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185
 
 | Kind   | Leaf                          | Environment variable           | Declared at                             |
 | ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:453`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:454`           |
 | config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
 | config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
 | config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |

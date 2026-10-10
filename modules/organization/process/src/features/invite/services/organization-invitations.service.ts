@@ -71,14 +71,14 @@ type OrganizationInvitationsStatusFacts = Readonly<{
 
 export interface OrganizationInvitations {
   create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated>;
-  findPendingForAddresses(
-    input: Readonly<{ addresses: readonly string[] }>,
-  ): Promise<{
+  findPendingForAddresses(input: Readonly<{ addresses: readonly string[] }>): Promise<
+    {
       inviteCode: string;
       organizationName: string;
       inviterName: string | null;
       role: OrganizationUserRole;
-    }[]>;
+    }[]
+  >;
   revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void>;
   /**
    * Throttled per INVITATION, because the thing protected is the recipient's
@@ -197,9 +197,7 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
    * The answer carries the invitation code, the secret from the mail, so the
    * caller hands in verified addresses only. One read per distinct address.
    */
-  async findPendingForAddresses({
-    addresses,
-  }: Readonly<{ addresses: readonly string[] }>): Promise<
+  async findPendingForAddresses({ addresses }: Readonly<{ addresses: readonly string[] }>): Promise<
     {
       inviteCode: string;
       organizationName: string;

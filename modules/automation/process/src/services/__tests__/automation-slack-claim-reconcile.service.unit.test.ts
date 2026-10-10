@@ -203,7 +203,11 @@ describe("AutomationSlackClaimReconcileService", () => {
         const service = AutomationSlackClaimReconcileService.create({
           slack: Object.assign(slack, {
             releaseConnection: ({ claimantId }: { claimantId: string }) => {
-              claims.splice(0, claims.length, ...claims.filter((c) => c.claimant.id !== claimantId));
+              claims.splice(
+                0,
+                claims.length,
+                ...claims.filter((c) => c.claimant.id !== claimantId),
+              );
               released.push(claimantId);
               return Promise.resolve();
             },

@@ -53,24 +53,55 @@ export class EventLogKeepForeverService {
       const name = target.organizationId ?? SHARED_TARGET;
       if (done.includes(name)) continue;
       if (signal.aborted) break;
-      const [latest] = await this.retroactive.findKeepForeverRewrites(target);
-      const running = latest !== undefined && !latest.isDone;
-      // A finished, unfailed rewrite already holds the target: nothing to start or wait for.
-      if (latest?.isDone && !latest.latestFailReason) {
-        done.push(name);
-        if (!dryRun) await onTargetDone({ done, wouldStart });
-        continue;
-      }
-      if (dryRun) {
-        if (!running) wouldStart.push(name);
-        continue;
-      }
-      if (!running) await this.retroactive.startKeepForeverRewrite(target);
-      if (!(await this.finished({ target, signal }))) break;
-      done.push(name);
-      await onTargetDone({ done, wouldStart });
+      const keepGoing = await this.rewriteTarget({
+        target,
+        name,
+        dryRun,
+        signal,
+        done,
+        wouldStart,
+        onTargetDone,
+      });
+      if (!keepGoing) break;
     }
     return { done, wouldStart };
+  }
+
+  /** Brings one target to a finished rewrite, recording it in `done`; false when aborted. */
+  private async rewriteTarget({
+    target,
+    name,
+    dryRun,
+    signal,
+    done,
+    wouldStart,
+    onTargetDone,
+  }: {
+    target: ClickHouseTarget;
+    name: string;
+    dryRun: boolean;
+    signal: AbortSignal;
+    done: string[];
+    wouldStart: string[];
+    onTargetDone: (progress: KeepForeverProgress) => Promise<void>;
+  }): Promise<boolean> {
+    const [latest] = await this.retroactive.findKeepForeverRewrites(target);
+    const running = latest !== undefined && !latest.isDone;
+    // A finished, unfailed rewrite already holds the target: nothing to start or wait for.
+    if (latest?.isDone && !latest.latestFailReason) {
+      done.push(name);
+      if (!dryRun) await onTargetDone({ done, wouldStart });
+      return true;
+    }
+    if (dryRun) {
+      if (!running) wouldStart.push(name);
+      return true;
+    }
+    if (!running) await this.retroactive.startKeepForeverRewrite(target);
+    if (!(await this.finished({ target, signal }))) return false;
+    done.push(name);
+    await onTargetDone({ done, wouldStart });
+    return true;
   }
 
   /** Polls the target's newest rewrite until it is done; false when aborted first. */

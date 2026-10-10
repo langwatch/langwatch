@@ -173,7 +173,10 @@ export function traceDrawerParams({
   };
 }
 
-/** The member to name for a trace owned by `ownerProjectId`, read from `projectId`: the owner when it is another project, else null. */
+/**
+ * The member to name for a trace owned by `ownerProjectId`, read from `projectId`: the owner when
+ * it is another project, else null.
+ */
 export function memberTenantOf({
   ownerProjectId,
   projectId,
