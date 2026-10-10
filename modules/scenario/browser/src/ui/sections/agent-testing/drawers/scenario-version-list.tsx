@@ -4,7 +4,8 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useState } from "react";
 
 import { useVersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";
@@ -44,11 +45,7 @@ export function ScenarioVersionList({
   const versionsQuery = useScenarioVersions({ scenarioId });
 
   if (versionsQuery.isLoading) {
-    return (
-      <HStack justify="center" paddingY={8}>
-        <Spinner />
-      </HStack>
-    );
+    return <SkeletonRows rows={5} />;
   }
 
   if (versionsQuery.isError) {

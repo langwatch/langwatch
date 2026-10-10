@@ -289,7 +289,7 @@ function CustomizeSection({
           <HStack gap={4} align="start">
             <Field.Root invalid={!!errors.maxTurns} flex={1}>
               <Text textStyle="bodySm" fontWeight="medium">
-                Max Turns
+                Max turns
               </Text>
               <Input
                 {...register("maxTurns", {
@@ -302,7 +302,7 @@ function CustomizeSection({
             </Field.Root>
             <Field.Root invalid={!!errors.minTurns} flex={1}>
               <Text textStyle="bodySm" fontWeight="medium">
-                Min Turns
+                Min turns
               </Text>
               <Input
                 {...register("minTurns", {

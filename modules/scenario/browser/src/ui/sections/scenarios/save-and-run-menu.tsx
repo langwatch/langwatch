@@ -200,7 +200,7 @@ export function SaveAndRunMenu({
                 onClick={handleCreateAgent}
               >
                 <Plus size={14} />
-                <Text fontSize="sm">Add New Agent</Text>
+                <Text fontSize="sm">Add new agent</Text>
               </HStack>
             </Box>
 
@@ -259,7 +259,7 @@ export function SaveAndRunMenu({
                 onClick={handleCreatePrompt}
               >
                 <Plus size={14} />
-                <Text fontSize="sm">Add New Prompt</Text>
+                <Text fontSize="sm">Add new prompt</Text>
               </HStack>
             </Box>
           </Box>

@@ -124,21 +124,22 @@ function SuiteEditorFields({ model }: { model: SuiteEditorModel }) {
 
 function SuiteEditorFooter({ model }: { model: SuiteEditorModel }) {
   return (
-    <Drawer.Footer>
-      <SmallButton onClick={model.close} data-testid="suite-editor-cancel">
-        Cancel
-      </SmallButton>
-      <SmallButton
-        variant="solid"
-        colorPalette="blue"
-        loading={model.isSaving}
-        disabled={model.isLoading}
-        onClick={model.save}
-        data-testid="suite-editor-save"
-      >
-        Save
-      </SmallButton>
-    </Drawer.Footer>
+    <Drawer.Actions
+      onCancel={model.close}
+      busy={model.isSaving}
+      primary={
+        <SmallButton
+          variant="solid"
+          colorPalette="orange"
+          loading={model.isSaving}
+          disabled={model.isLoading}
+          onClick={model.save}
+          data-testid="suite-editor-save"
+        >
+          Save
+        </SmallButton>
+      }
+    />
   );
 }
 
@@ -157,7 +158,7 @@ export function SuiteEditorDrawer(_props: SuiteEditorDrawerProps) {
       placement="end"
       size={CASE_EDITOR_DRAWER_SIZE}
     >
-      <Drawer.Content bg="bg.panel" data-testid="suite-editor">
+      <Drawer.Content data-testid="suite-editor">
         <SuiteEditorHeader storedName={model.storedName} />
         <Drawer.Body>
           <SuiteEditorFields model={model} />

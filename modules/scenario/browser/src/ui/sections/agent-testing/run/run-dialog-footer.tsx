@@ -60,7 +60,7 @@ export function RunDialogFooter({
   const runButton = (
     <SmallButton
       variant="solid"
-      colorPalette="blue"
+      colorPalette="orange"
       disabled={isRunBlocked}
       loading={controller.isBusy}
       onClick={onRun ?? (() => void controller.run())}

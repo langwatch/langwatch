@@ -23,7 +23,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
-              {isAgentTesting ? "Writing great scenarios" : "Writing Great Scenarios"}
+              {isAgentTesting ? "Writing great scenarios" : "Writing great scenarios"}
             </Text>
 
             <VStack align="stretch" gap={3}>
@@ -33,7 +33,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
                 </Icon>
                 <VStack align="start" gap={0}>
                   <Text fontSize="sm" fontWeight="medium">
-                    Define Success Clearly
+                    Define success clearly
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
                     What does &apos;good&apos; look like? Be specific about expected outcomes.
@@ -47,7 +47,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
                 </Icon>
                 <VStack align="start" gap={0}>
                   <Text fontSize="sm" fontWeight="medium">
-                    Consider Edge Cases
+                    Consider edge cases
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
                     What unusual situations should your agent handle?
@@ -61,7 +61,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
                 </Icon>
                 <VStack align="start" gap={0}>
                   <Text fontSize="sm" fontWeight="medium">
-                    Think About Personas
+                    Think about personas
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
                     Who are your users? Different users have different needs.
@@ -75,7 +75,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
                 </Icon>
                 <VStack align="start" gap={0}>
                   <Text fontSize="sm" fontWeight="medium">
-                    Conversation Flow
+                    Conversation flow
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
                     How should the conversation progress?
@@ -92,7 +92,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
-              Best Practices
+              Best practices
             </Text>
 
             <List.Root gap={2} listStyleType="none">

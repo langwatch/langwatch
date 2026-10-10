@@ -372,7 +372,7 @@ function ScenarioGenerationPrompt({
                 <Icon as={AlertTriangle} boxSize={4} />
               </Box>
               <Text fontWeight="semibold" fontSize="sm">
-                Model Provider Required
+                Model provider required
               </Text>
             </HStack>
 

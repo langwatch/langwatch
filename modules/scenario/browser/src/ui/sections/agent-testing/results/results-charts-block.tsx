@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
+import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
 
@@ -97,7 +98,7 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
               fontVariantNumeric="tabular-nums"
               color={bucket.isEmpty ? "fg.muted" : "fg"}
             >
-              {bucket.isEmpty ? "-" : formatPassRate(bucket.passRate)}
+              {bucket.isEmpty ? <EmptyValue label="No runs" /> : formatPassRate(bucket.passRate)}
             </Text>
             {/* An empty bucket is drawn as a gap, not as a bar of zero: a
                 zero-height bar reads as a run that failed completely. */}

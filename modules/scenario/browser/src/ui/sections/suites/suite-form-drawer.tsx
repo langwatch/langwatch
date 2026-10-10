@@ -113,7 +113,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   });
 
   const isEditMode = !!suiteId;
-  const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
+  const title = isEditMode ? "Edit run plan" : "New run plan";
 
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
@@ -160,7 +160,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
         placement="end"
         size="lg"
       >
-        <Drawer.Content bg="bg">
+        <Drawer.Content>
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
             <Drawer.CloseTrigger />
@@ -339,7 +339,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                         <ChevronRight size={14} />
                       )}
                       <Text fontSize="sm" fontWeight="medium">
-                        Execution Options
+                        Execution options
                       </Text>
                     </HStack>
                   </Collapsible.Trigger>
@@ -399,7 +399,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                 loading={isSaving}
               >
                 <Play size={14} />
-                Run Now
+                Run now
               </Button>
             </HStack>
           </Drawer.Footer>

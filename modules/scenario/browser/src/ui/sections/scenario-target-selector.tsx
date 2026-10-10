@@ -325,7 +325,7 @@ function ScenarioTargetAgentOptions({
         onClick={onCreate}
       >
         <Plus size={14} />
-        <Text fontSize="sm">Add New Agent</Text>
+        <Text fontSize="sm">Add new agent</Text>
       </HStack>
     </Box>
   );
@@ -490,7 +490,7 @@ function ScenarioTargetPromptOptions({
         onClick={onCreate}
       >
         <Plus size={14} />
-        <Text fontSize="sm">Add New Prompt</Text>
+        <Text fontSize="sm">Add new prompt</Text>
       </HStack>
     </Box>
   );

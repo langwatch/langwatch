@@ -1,6 +1,6 @@
 /**
  * Picker for selecting targets (agents and prompts) in a suite form: search
- * with inline "Add Target", a checkbox list with type indicators, and a
+ * with inline "Add target", a checkbox list with type indicators, and a
  * footer with count and select-all/clear buttons.
  */
 
@@ -39,7 +39,7 @@ export interface TargetPickerProps {
   searchQuery: string;
   /** Update the search query. */
   onSearchChange: (query: string) => void;
-  /** Handler for "Add Target" action (opens target creation drawer). */
+  /** Handler for "Add target" action (opens target creation drawer). */
   onAddTarget: () => void;
   /** Select all visible targets. */
   onSelectAll: () => void;
@@ -84,9 +84,9 @@ export function TargetPicker({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </Box>
-        <Tooltip content="Add Target">
+        <Tooltip content="Add target">
           <IconButton
-            aria-label="Add Target"
+            aria-label="Add target"
             size="sm"
             variant="ghost"
             onClick={onAddTarget}
@@ -188,7 +188,7 @@ export function TargetPicker({
         </Text>
         <HStack gap={2}>
           <Button size="xs" variant="ghost" onClick={onSelectAll}>
-            Select All
+            Select all
           </Button>
           <Button size="xs" variant="ghost" onClick={onClear}>
             Clear

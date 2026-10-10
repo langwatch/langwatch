@@ -25,7 +25,7 @@ export function ScenarioVersionHistoryDrawer({ open }: { open?: boolean }) {
       placement="end"
       size="md"
     >
-      <Drawer.Content bg="bg" data-testid="scenario-version-history">
+      <Drawer.Content data-testid="scenario-version-history">
         <Drawer.Header>
           <Drawer.Title>Version history</Drawer.Title>
           <Drawer.CloseTrigger />

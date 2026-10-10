@@ -37,7 +37,7 @@ export function CaseModal({
       placement="end"
       size={CASE_EDITOR_DRAWER_SIZE}
     >
-      <Drawer.Content bg="bg.panel" data-testid="case-modal">
+      <Drawer.Content data-testid="case-modal">
         <CaseModalHeader
           isEditing={!!scenarioId}
           scenarioId={scenarioId}

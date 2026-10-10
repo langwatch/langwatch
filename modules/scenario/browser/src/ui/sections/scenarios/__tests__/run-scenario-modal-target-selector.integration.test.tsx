@@ -121,7 +121,7 @@ describe("RunScenarioModal with TargetSelector", () => {
       expect(onClose).not.toHaveBeenCalled();
 
       // Dialog content is still visible
-      expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Run scenario")).toBeInTheDocument();
     });
   });
 
@@ -143,7 +143,7 @@ describe("RunScenarioModal with TargetSelector", () => {
 
       // Modal remains open
       expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Run scenario")).toBeInTheDocument();
     });
   });
 
@@ -171,7 +171,7 @@ describe("RunScenarioModal with TargetSelector", () => {
       await openDropdown();
 
       // Click the modal title text (inside modal, outside dropdown)
-      const modalTitle = screen.getByText("Run Scenario");
+      const modalTitle = screen.getByText("Run scenario");
       await user.click(modalTitle);
 
       // Dropdown closes
@@ -181,7 +181,7 @@ describe("RunScenarioModal with TargetSelector", () => {
 
       // Modal stays open
       expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Run scenario")).toBeInTheDocument();
     });
   });
 

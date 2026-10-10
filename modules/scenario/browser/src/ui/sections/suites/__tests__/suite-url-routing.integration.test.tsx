@@ -187,7 +187,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 }));
 
 vi.mock("../run-history-panel.tsx", () => ({
-  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All runs Panel</div>,
 }));
 
 vi.mock("../suite-detail-panel.tsx", () => ({
@@ -290,7 +290,7 @@ describe("Simulation Page URL Routing", () => {
       mockQuery = { project: "my-project", path: ["run-plans", "suite-a"] };
       const user = userEvent.setup();
       renderSimulationsPage();
-      await user.click(screen.getByText("All Runs"));
+      await user.click(screen.getByText("All runs"));
 
       expect(mockPush).toHaveBeenCalledWith("/my-project/simulations");
     });

@@ -586,7 +586,7 @@ function AllRunsHeader({
   return (
     <Box paddingX={6} paddingY={4}>
       <Text fontSize="xl" fontWeight="semibold">
-        All Runs
+        All runs
       </Text>
       {isLoading ? (
         <Skeleton height="20px" width="220px" marginTop={0.5} />

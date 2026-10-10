@@ -995,7 +995,7 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByRole("button", { name: "More actions for Checkout" }));
     await user.click(await screen.findByTestId("export-runs-button"));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Export Scenario Runs")).toBeInTheDocument();
+    expect(within(dialog).getByText("Export scenario runs")).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: /Export/i }));
 

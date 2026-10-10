@@ -1,4 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Download } from "lucide-react";
@@ -43,12 +44,12 @@ export function ScenarioRunExportDialog({
       <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title>Export Scenario Runs</Dialog.Title>
+          <Dialog.Title>Export scenario runs</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack align="stretch" gap={5}>
             <Text color="fg.muted" fontSize="sm">
-              {runCount.toLocaleString()} {runCount === 1 ? "run" : "runs"}
+              <FormattedNumber value={runCount} /> {runCount === 1 ? "run" : "runs"}
               {hasFiltersApplied ? " matching your filters" : ""}
             </Text>
 

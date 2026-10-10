@@ -250,7 +250,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   return (
     <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header>
           {/* Being pointed at a scenario is enough to be editing one. Keying
@@ -932,7 +932,7 @@ function ScenarioDrawerHeading({
           <CaseVersionChip version={version} />
         </HStack>
       ) : (
-        <Drawer.Title>{isEditing ? "Edit Scenario" : "Create Scenario"}</Drawer.Title>
+        <Drawer.Title>{isEditing ? "Edit scenario" : "Create scenario"}</Drawer.Title>
       )}
       {isAgentTesting && (
         <Drawer.Description>{AGENT_TESTING_EDITOR_DESCRIPTION}</Drawer.Description>

@@ -47,7 +47,7 @@ function ResultsHeader({
           a larger one reads as lifted off it. */}
       <HStack gap={2} alignItems="baseline" minWidth={0}>
         <Text textStyle="body" fontWeight="semibold" color="fg">
-          Test Runs
+          Test runs
         </Text>
         {executionCount !== undefined && (
           <Text textStyle="caption" color="fg.muted">

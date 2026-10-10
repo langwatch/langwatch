@@ -197,7 +197,7 @@ function HeaderActions({
       {onRunPlan && suiteId ? (
         <SmallButton
           variant="solid"
-          colorPalette="blue"
+          colorPalette="orange"
           height="32px"
           minHeight="32px"
           onClick={onRunPlan}

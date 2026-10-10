@@ -164,7 +164,7 @@ export function SuiteRunConfirmationDialog({
             {isLoading ? (
               <Spinner size="sm" />
             ) : (
-              `Run ${estimatedJobs} ${estimatedJobs === 1 ? "Job" : "Jobs"}`
+              `Run ${estimatedJobs} ${estimatedJobs === 1 ? "job" : "jobs"}`
             )}
           </Button>
         </Dialog.Footer>

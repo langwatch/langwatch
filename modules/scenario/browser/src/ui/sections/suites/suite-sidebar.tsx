@@ -3,6 +3,7 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
 import {
   getPassRateGradientColor,
@@ -54,7 +55,7 @@ type SuiteSidebarProps = {
   onSelectSuite: (slug: string) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
-  /** When set, the empty state offers a "New Run Plan" call to action. */
+  /** When set, the empty state offers a "New run plan" call to action. */
   onNewSuite?: () => void;
   isLoading?: boolean;
 };
@@ -117,9 +118,9 @@ export function SuiteSidebar({
       {/* All Runs button */}
       <Box paddingX={isCollapsed ? 6 : 2} paddingBottom={2}>
         {isCollapsed ? (
-          <Tooltip content="All Runs" positioning={{ placement: "right" }}>
+          <Tooltip content="All runs" positioning={{ placement: "right" }}>
             <IconButton
-              aria-label="All Runs"
+              aria-label="All runs"
               size="sm"
               width="full"
               variant={selectedSuiteSlug === ALL_RUNS_ID ? "solid" : "ghost"}
@@ -131,7 +132,7 @@ export function SuiteSidebar({
         ) : (
           <SidebarButton
             icon={<List size={14} />}
-            label="All Runs"
+            label="All runs"
             href={`/${projectSlug}/simulations`}
             isSelected={selectedSuiteSlug === ALL_RUNS_ID}
             onClick={() => onSelectSuite(ALL_RUNS_ID)}
@@ -478,7 +479,7 @@ function RunSummaryLine({
     <HStack gap={1} color="fg.muted">
       <PassRateCircle passRate={passRate} size="8px" />
       <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
-        {passRate === null ? "-" : `${Math.round(passRate)}%`}
+        {passRate === null ? <EmptyValue label="No pass rate" /> : `${Math.round(passRate)}%`}
       </Text>
       <Text fontSize="xs" color="fg.subtle">
         ·

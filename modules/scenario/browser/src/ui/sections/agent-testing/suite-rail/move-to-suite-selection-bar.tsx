@@ -38,7 +38,7 @@ export function MoveToSuiteSelectionBar({
       >
         <SmallButton
           variant="solid"
-          colorPalette="blue"
+          colorPalette="orange"
           onClick={() => setIsDialogOpen(true)}
           data-testid="cases-selection-move-to-suite"
         >
@@ -88,9 +88,7 @@ function MoveToSuiteDialog({
     >
       <Dialog.Content bg="bg.panel" maxWidth="420px" data-testid="cases-move-to-suite-dialog">
         <Dialog.Header borderBottomWidth="1px" borderColor="border" paddingX={5} paddingY={3.5}>
-          <Dialog.Title textStyle="body" fontWeight="semibold">
-            Move to test suite
-          </Dialog.Title>
+          <Dialog.Title>Move to test suite</Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body paddingX={5} paddingY={4}>

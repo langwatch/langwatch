@@ -34,7 +34,7 @@ import { SuiteRailMenu } from "./suite-rail-menu.tsx";
 export const SUITE_RAIL_WIDTH = SECTION_RAIL_WIDTH;
 
 /** What the section of the sets a code run writes into is called. */
-export const FROM_CODE_HEADING = "From Code";
+export const FROM_CODE_HEADING = "From code";
 
 /** What the archive dialog of a test suite says. */
 export const SUITE_ARCHIVE_TITLE = "Archive test suite?";
@@ -150,16 +150,16 @@ export function SuiteRail(props: SuiteRailProps) {
     </VStack>
   ) : undefined;
   const newSuite = canManage
-    ? { label: "New Test Suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
+    ? { label: "New test suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
     : undefined;
 
   return (
     <Box data-testid="agent-testing-suite-rail" display="flex" flexShrink={0}>
       <SectionNavigationRail
-        label="Agent Testing"
+        label="Agent testing"
         groups={[
           {
-            label: "Test Suites",
+            label: "Test suites",
             links: suiteEntries.map((entry) => entry.link),
             extra: loadingRows,
             add: newSuite,

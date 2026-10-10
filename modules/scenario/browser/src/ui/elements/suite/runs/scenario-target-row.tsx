@@ -83,7 +83,7 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {/* Total cost */}
         {scenarioRun.totalCost != null && (
           <HStack justify="space-between">
-            <Text color="fg.muted">Total Cost</Text>
+            <Text color="fg.muted">Total cost</Text>
             <Text fontWeight="medium">{formatCost(scenarioRun.totalCost)}</Text>
           </HStack>
         )}

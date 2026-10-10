@@ -5,13 +5,13 @@ import { ArrowRight, FlaskConical, RefreshCw } from "lucide-react";
 const capabilities = [
   {
     icon: FlaskConical,
-    title: "Automated Testing",
+    title: "Automated testing",
     description:
       "Define test scenarios that run automatically against your AI agent to verify it handles real-world situations correctly.",
   },
   {
     icon: RefreshCw,
-    title: "Regression Detection",
+    title: "Regression detection",
     description:
       "Catch regressions early by re-running scenarios after every change, ensuring your agent never breaks existing behavior.",
   },

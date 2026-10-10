@@ -503,7 +503,7 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
         </SmallButton>
         <SmallButton
           variant="solid"
-          colorPalette="blue"
+          colorPalette="orange"
           loading={editor.isSaving}
           disabled={!!editor.problem}
           title={editor.problem ?? undefined}
