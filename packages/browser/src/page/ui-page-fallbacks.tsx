@@ -4,17 +4,15 @@
 
 import type { ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
 import {
-  Box,
   Button,
   Center,
   Heading,
-  HStack,
   Spinner,
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
 import { ErrorActions } from "@langwatch/error-views";
-import { Lock } from "lucide-react";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {
@@ -41,35 +39,7 @@ export function UiPageNotFound() {
 
 /** When the page exists and the viewer is missing the grant it needs. */
 export function UiPageForbidden({ permission }: { permission: string }) {
-  return (
-    <Center minHeight="60vh" padding={8}>
-      <Box
-        role="note"
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        backgroundColor="bg.subtle"
-        paddingX={5}
-        paddingY={4}
-        maxWidth="520px"
-      >
-        <HStack gap={3} alignItems="flex-start">
-          <Box color="fg.muted" display="flex" flexShrink={0} marginTop="2px">
-            <Lock size={16} aria-hidden />
-          </Box>
-          <Stack gap={1}>
-            <Text fontWeight="medium">Access Restricted</Text>
-            <Text fontSize="sm" color="fg.muted">
-              Ask an organization admin to grant you the permission it needs.
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              Missing permission: {permission}
-            </Text>
-          </Stack>
-        </HStack>
-      </Box>
-    </Center>
-  );
+  return <RestrictedAccess permission={permission} />;
 }
 
 /**

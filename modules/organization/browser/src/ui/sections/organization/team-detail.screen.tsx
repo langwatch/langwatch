@@ -113,10 +113,7 @@ export default function TeamDetailScreen() {
     if (trpcErrorCode(error) === "UNAUTHORIZED") {
       return (
         <VStack gap={4} align="start">
-          <PermissionAlert
-            permission="team:view"
-            message="You don't have permission to view this team. Please contact your team administrator for access."
-          />
+          <PermissionAlert permission="team:view" area="this team" />
         </VStack>
       );
     }

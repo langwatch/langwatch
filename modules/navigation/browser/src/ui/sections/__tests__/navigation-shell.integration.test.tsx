@@ -301,8 +301,8 @@ describe("the seat gate on a page", () => {
         });
 
         expect(screen.queryByTestId("page-body")).toBeNull();
-        expect(screen.getByText("Access Restricted")).toBeInTheDocument();
-        expect(screen.getByText("Missing permission: virtualKeys:view")).toBeInTheDocument();
+        expect(screen.getByText(/You need access to/)).toBeInTheDocument();
+        expect(screen.getByText("virtualKeys:view")).toBeInTheDocument();
       });
     });
 
@@ -315,7 +315,7 @@ describe("the seat gate on a page", () => {
         });
 
         expect(screen.getByTestId("page-body")).toBeInTheDocument();
-        expect(screen.queryByText("Access Restricted")).toBeNull();
+        expect(screen.queryByText(/You need access to/)).toBeNull();
       });
     });
 

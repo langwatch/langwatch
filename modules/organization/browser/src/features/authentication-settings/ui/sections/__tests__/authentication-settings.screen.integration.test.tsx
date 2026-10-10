@@ -152,7 +152,7 @@ describe("given an administrator on the Authentication page", () => {
     it("says which permission the page needs rather than drawing it", () => {
       renderWithOrganizationHost(<AuthenticationSettingsScreen />, hostWith({ grants: [] }));
 
-      expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+      expect(screen.getByText(/You need access to/)).toBeInTheDocument();
       expect(screen.queryByTestId("organization-policy")).toBeNull();
     });
   });

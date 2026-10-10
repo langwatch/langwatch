@@ -331,7 +331,7 @@ describe("given a module declaring a screen that requires a grant", () => {
   it("shows the missing grant instead of the screen to a viewer without it", async () => {
     await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
-    expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
+    expect(screen.getByText("workflows:view")).toBeDefined();
     expect(screen.queryByText("the page")).toBeNull();
   });
 
@@ -343,10 +343,10 @@ describe("given a module declaring a screen that requires a grant", () => {
   });
 
   /** @scenario "A refused viewer reads main's Access Restricted notice" */
-  it("titles the refusal Access Restricted, as main's PermissionAlert did", async () => {
+  it("titles the refusal with the area the viewer needs access to", async () => {
     await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
-    expect(screen.getByText("Access Restricted")).toBeDefined();
+    expect(screen.getByText(/You need access to/)).toBeDefined();
   });
 
   /** @scenario "A declared screen behind a release flag that is off answers not found" */
