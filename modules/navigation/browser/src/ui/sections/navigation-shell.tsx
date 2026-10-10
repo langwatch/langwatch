@@ -205,20 +205,23 @@ function ShellContentRow({
             _dark={{
               borderColor: "border.muted",
             }}
-            // Clip composited sticky glass to the card, including its scrolled corners.
-            clipPath={
-              langyDockInset > 0
-                ? "inset(0 round var(--chakra-radii-xl) var(--chakra-radii-xl) 0 0)"
-                : "inset(0 round var(--chakra-radii-xl) 0 0 0)"
-            }
-            overflow="auto"
+            overflow="hidden"
             display="flex"
             minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             position="relative"
             data-tour="main-content"
           >
-            {children}
+            <Box
+              data-testid="shell-card-scroll"
+              width="full"
+              minWidth={0}
+              minHeight={0}
+              display="flex"
+              overflow="auto"
+            >
+              {children}
+            </Box>
           </Box>
         </Box>
       </HStack>

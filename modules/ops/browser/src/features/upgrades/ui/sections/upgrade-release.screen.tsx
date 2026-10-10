@@ -33,11 +33,11 @@ export default function UpgradeReleaseScreen() {
           <PageLayout.Heading>
             {release ? `Release ${release}` : "Unreleased steps"}
           </PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Track outstanding steps and inspect their execution details.
-          </PageLayout.Subtitle>
         </VStack>
       </PageLayout.Header>
+      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+        Track outstanding steps and inspect their execution details.
+      </PageLayout.Subtitle>
       <PageLayout.Container maxWidth="full">
         <UpgradeReadState read={steps} failedTitle="The release's steps could not load">
           {(page) => (

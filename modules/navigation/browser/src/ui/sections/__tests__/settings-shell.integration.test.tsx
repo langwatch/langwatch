@@ -116,14 +116,20 @@ afterEach(() => {
 
 describe("the settings shell in a new navigation mode", () => {
   describe("when Settings was entered from a Gateway page", () => {
-    /** @scenario The Settings sidebar opens with the way back */
-    it("opens with the back entry, then Quick Search", () => {
+    /** @scenario Settings keeps search first and Back immediately below it */
+    it("puts Quick Search first and the back target directly below it", () => {
       captureSettingsReturnPath({
         organizationId: ORGANIZATION.id,
         pathname: "/gateway/budgets",
       });
       renderSettingsSidebar();
 
+      expect(screen.getByTestId("sidebar-search-row").firstElementChild).toBe(
+        screen.getByRole("button", { name: "Quick Search" }),
+      );
+      expect(screen.getByTestId("sidebar-search-row").nextElementSibling).toBe(
+        screen.getByTestId("sidebar-back-row"),
+      );
       const back = screen.getByRole("link", { name: "Back to Gateway" });
       expect(back).toHaveAttribute("href", "/gateway/budgets");
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
@@ -249,7 +255,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(pills.length).toBeGreaterThanOrEqual(1);
       // The hairline border is pinned on the shared chip style itself:
       // model/__tests__/quiet-chip-style.unit.test.ts.
-      expect(pills[0]).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+      expect(pills[0]).toHaveStyle({ color: "var(--chakra-colors-fg-muted)" });
     });
 
     /** @scenario "The settings groups fold, and start open" */
@@ -282,34 +288,20 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
 
-    /** @scenario "A rule separates the way back from the pages below it" */
-    it("draws a rule under the way back entry", () => {
-      captureSettingsReturnPath({ organizationId: ORGANIZATION.id, pathname: "/gateway/budgets" });
+    /** @scenario Quick Search stays above the menu without a divider */
+    it("pins search outside the scrolling menu and draws no separator below it", () => {
       renderSettingsSidebar();
-
-      const backEntry = screen.getByRole("link", { name: /^Back/ });
-      expect(backEntry.parentElement).toHaveStyle({ borderBottomWidth: "1px" });
-    });
-
-    /** @scenario "The way back stays in place while the menu scrolls" */
-    it("keeps the way back out of the region the menu scrolls in", () => {
-      captureSettingsReturnPath({ organizationId: ORGANIZATION.id, pathname: "/gateway/budgets" });
-      renderSettingsSidebar();
-
-      const scrollRegion = screen.getByTestId("sidebar-scroll-region");
-      expect(scrollRegion).not.toContainElement(screen.getByRole("link", { name: /^Back/ }));
-      expect(scrollRegion).toContainElement(screen.getByRole("link", { name: "Directory" }));
-    });
-
-    /** @scenario "The pages are cut at the rule as they scroll under the way back" */
-    it("starts the scrolling part at the rule and keeps the gap inside it", () => {
-      captureSettingsReturnPath({ organizationId: ORGANIZATION.id, pathname: "/gateway/budgets" });
-      renderSettingsSidebar();
-
-      const backEntry = screen.getByRole("link", { name: /^Back/ });
-      expect(getComputedStyle(backEntry.parentElement!).marginBottom).toBe("0");
-      expect(getComputedStyle(screen.getByTestId("sidebar-scroll-region")).paddingTop).toBe(
-        "var(--chakra-spacing-1\\.5)",
+      const search = screen.getByRole("button", { name: "Quick Search" });
+      const row = screen.getByTestId("sidebar-search-row");
+      const region = screen.getByTestId("sidebar-scroll-region");
+      expect(row).toContainElement(search);
+      expect(region).not.toContainElement(search);
+      expect(region).toContainElement(screen.getByRole("link", { name: "Directory" }));
+      expect(getComputedStyle(row).borderBottomWidth).not.toBe("1px");
+      const back = screen.getByRole("link", { name: /^Back/ });
+      expect(region).not.toContainElement(back);
+      expect(getComputedStyle(screen.getByTestId("sidebar-back-row")).borderBottomWidth).not.toBe(
+        "1px",
       );
     });
 
@@ -348,8 +340,8 @@ describe("the settings shell in a new navigation mode", () => {
   });
 
   describe("when the settings top bar renders", () => {
-    /** @scenario The top bar shows a static Settings title */
-    it("shows a static Settings title, no product dropdown, and the organization", () => {
+    /** @scenario The top bar keeps a static Settings label */
+    it("shows the static Settings label, no product dropdown, and the organization", () => {
       renderSettingsTopBar();
 
       expect(screen.queryByRole("button", { name: "Switch product" })).not.toBeInTheDocument();

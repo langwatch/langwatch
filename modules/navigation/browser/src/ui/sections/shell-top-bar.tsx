@@ -59,7 +59,6 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
         <>
           {showDevelopmentIndicator && <DevBadge label={host.deployment().devIndicatorLabel} />}
           {accountMenu?.headerBanner}
-          {host.commandBar()?.trigger}
           <AppHeaderUserMenu />
         </>
       }

@@ -6,7 +6,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PageLayout } from "../src/components/layout/page-layout.tsx";
+import { PageHeaderSizeProvider, PageLayout } from "../src/components/layout/page-layout.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
@@ -89,5 +89,56 @@ describe("PageLayout", () => {
 
       expect(onClick).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("area-owned header geometry", () => {
+  it("keeps the large row and title box when pages request compact sizing or add actions", () => {
+    renderWithDesignSystem(
+      <PageHeaderSizeProvider size="lg">
+        {[0, 1, 5].map((count) => (
+          <PageLayout.Header
+            key={count}
+            size="sm"
+            data-testid={`row-${count}`}
+            actions={Array.from({ length: count }, (_, index) => (
+              <PageLayout.HeaderButton key={index}>Action {index}</PageLayout.HeaderButton>
+            ))}
+          >
+            <PageLayout.Heading>Title {count}</PageLayout.Heading>
+          </PageLayout.Header>
+        ))}
+      </PageHeaderSizeProvider>,
+    );
+    for (const count of [0, 1, 5]) {
+      const row = screen.getByTestId(`row-${count}`);
+      const style = getComputedStyle(row);
+      expect(row.dataset.headerSize).toBe("lg");
+      expect(style.height).toBe("var(--chakra-sizes-page-header-lg)");
+      expect(style.maxHeight).toBe(style.height);
+      expect(style.paddingInline).toBe("var(--chakra-spacing-6)");
+      expect(style.paddingTop).toBe("1px");
+      expect(style.flexWrap).toBe("nowrap");
+      const title = getComputedStyle(screen.getByRole("heading", { name: `Title ${count}` }));
+      expect(title.fontSize).toBe("20px");
+      expect(title.height).toBe("28px");
+      expect(title.lineHeight).toBe("28px");
+    }
+  });
+
+  it("allows compact sizing only outside the shell's large area", () => {
+    renderWithDesignSystem(
+      <PageHeaderSizeProvider size="sm">
+        <PageLayout.Header data-testid="tool">
+          <PageLayout.Heading>Tool</PageLayout.Heading>
+          <PageLayout.HeaderButton>Run</PageLayout.HeaderButton>
+        </PageLayout.Header>
+      </PageHeaderSizeProvider>,
+    );
+    expect(getComputedStyle(screen.getByTestId("tool")).height).toBe(
+      "var(--chakra-sizes-page-header-sm)",
+    );
+    expect(getComputedStyle(screen.getByRole("heading")).fontSize).toBe("15px");
+    expect(getComputedStyle(screen.getByRole("button")).height).toBe("28px");
   });
 });

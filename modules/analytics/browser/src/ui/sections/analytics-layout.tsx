@@ -90,9 +90,7 @@ export default function AnalyticsLayout({
         activeHref={activeHref}
         onNavigate={(href) => host.navigate(href)}
       >
-        <Box maxWidth={showFilters ? "1612px" : "1200px"} marginX="auto">
-          {children}
-        </Box>
+        <Box maxWidth={showFilters ? "1612px" : "1200px"}>{children}</Box>
       </SectionNavigationFrame>
     </SavedViewsScope>
   );

@@ -8,7 +8,7 @@ export const sectionNavigationRailRecipe = defineRecipe({
       display: { base: "none", md: "block" },
       position: "absolute",
       right: 0,
-      top: "calc({sizes.shellHeader} - 1px)",
+      top: "calc({sizes.pageHeader.lg} + 8px)",
       bottom: "16px",
       width: "1px",
       background: "border.muted",

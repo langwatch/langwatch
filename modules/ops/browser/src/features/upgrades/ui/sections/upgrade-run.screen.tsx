@@ -26,11 +26,11 @@ export default function UpgradeRunScreen() {
       >
         <VStack gap={1} align="start" minWidth={0}>
           <PageLayout.Heading>Upgrade run</PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Execution phases, release steps, and recorded reports.
-          </PageLayout.Subtitle>
         </VStack>
       </PageLayout.Header>
+      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+        Execution phases, release steps, and recorded reports.
+      </PageLayout.Subtitle>
       <PageLayout.Container maxWidth="full">
         <UpgradeReadState read={run} failedTitle="The upgrade run could not load">
           {(detail) => <UpgradeRunPhases run={detail} />}

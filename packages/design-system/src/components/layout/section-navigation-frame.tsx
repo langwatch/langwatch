@@ -8,11 +8,11 @@ import { Plus } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 
 import { isBrowserClick } from "./back-link.tsx";
-import { PageLayout } from "./page-layout.tsx";
+import { PageHeaderSizeProvider, PageLayout, type PageHeaderSize } from "./page-layout.tsx";
 import { useSectionNavigationIndicator } from "./use-section-navigation-indicator.ts";
 
 /** How wide the rail is, open and folded to its icons. */
-export const SECTION_RAIL_WIDTH = 176;
+export const SECTION_RAIL_WIDTH = 196;
 export const SECTION_RAIL_COLLAPSED_WIDTH = 56;
 
 /** One entry on the rail: where it goes and how it reads. */
@@ -196,9 +196,12 @@ export function SectionNavigationRail({
         height={SECTION_HEADER_HEIGHT}
         minHeight={SECTION_HEADER_HEIGHT}
         flexShrink={0}
-        paddingX={5}
-        fontSize="sm"
-        lineHeight="20px"
+        paddingTop="1px"
+        borderBottomWidth="1px"
+        borderBottomColor="transparent"
+        paddingX={6}
+        fontSize="20px"
+        lineHeight="28px"
         fontWeight="semibold"
         title={label}
         overflow="hidden"
@@ -213,7 +216,7 @@ export function SectionNavigationRail({
           direction={{ base: "row", md: "column" }}
           alignItems="stretch"
           gap={{ base: 1, md: 4 }}
-          paddingX={3}
+          paddingX={collapsed ? 3 : "22px"}
           paddingTop={2}
           paddingBottom={2}
           minWidth="full"
@@ -296,33 +299,37 @@ type SectionNavigationRailProps = {
   footer?: ReactNode;
 };
 
-const SECTION_HEADER_HEIGHT = "shellHeader";
+const SECTION_HEADER_HEIGHT = "pageHeader.lg";
 
 /** Both section title and sub-page header share this row geometry. */
-export function SectionNavigationHeader({ children }: { children: ReactNode }) {
+export function SectionNavigationHeader({
+  children,
+  size = "lg",
+  actions,
+}: {
+  children: ReactNode;
+  size?: PageHeaderSize;
+  actions?: ReactNode;
+}) {
   return (
     <PageLayout.Header
-      paddingY={0}
-      height={SECTION_HEADER_HEIGHT}
-      minHeight={SECTION_HEADER_HEIGHT}
+      size={size}
+      withBorder={false}
+      actions={actions}
       css={{
         borderBottomColor: "transparent",
-        "&[data-scrolled=true]": { borderBottomColor: "border.muted" },
-        "& h1": {
-          fontSize: "sm",
-          lineHeight: "20px",
-          fontWeight: "semibold",
-          whiteSpace: "nowrap",
+        _after: {
+          content: '""',
+          position: "absolute",
+          left: "8px",
+          right: 0,
+          bottom: 0,
+          height: "1px",
+          background: "border.muted",
+          opacity: 0,
+          pointerEvents: "none",
         },
-        "& .chakra-button": {
-          height: "28px",
-          minHeight: "28px",
-          paddingX: 2,
-          gap: 1.5,
-          fontSize: "xs",
-          "& p": { fontSize: "inherit" },
-          "& svg": { width: "14px", height: "14px" },
-        },
+        "&[data-scrolled=true]::after": { opacity: 1 },
       }}
     >
       {children}
@@ -345,45 +352,46 @@ export function SectionNavigationFrame({
   children: ReactNode;
 }) {
   return (
-    <Stack
-      data-section-frame
-      background="bg.surface"
-      overflow="hidden"
-      data-testid="section-navigation-layout"
-      direction={{ base: "column", md: "row" }}
-      alignItems="stretch"
-      gap={0}
-      width="full"
-      flex="1"
-      minWidth={0}
-      minHeight={0}
-    >
-      <SectionNavigationRail {...rail} />
-      <Box
-        position="relative"
-        flex={1}
+    <PageHeaderSizeProvider size="lg">
+      <Stack
+        data-section-frame
+        background="bg.surface"
+        overflow="hidden"
+        data-testid="section-navigation-layout"
+        direction={{ base: "column", md: "row" }}
+        alignItems="stretch"
+        gap={0}
+        width="full"
+        flex="1"
         minWidth={0}
         minHeight={0}
-        overflowY="auto"
-        overflowX="hidden"
       >
-        <Box position="sticky" top={0} zIndex={10} overflowX="auto" overscrollBehaviorX="contain">
-          {header ?? (
-            <SectionNavigationHeader>
-              <PageLayout.Heading>{pageTitle ?? "Overview"}</PageLayout.Heading>
-              {headerActions ? <Box marginLeft="auto">{headerActions}</Box> : null}
-            </SectionNavigationHeader>
-          )}
-        </Box>
+        <SectionNavigationRail {...rail} />
         <Box
-          data-testid="section-navigation-content"
-          paddingX={6}
-          paddingTop={4}
-          paddingBottom={16}
+          position="relative"
+          flex={1}
+          minWidth={0}
+          minHeight={0}
+          overflowY="auto"
+          overflowX="hidden"
         >
-          {children}
+          <Box position="sticky" top={0} zIndex={10} overflowX="auto" overscrollBehaviorX="contain">
+            {header ?? (
+              <SectionNavigationHeader actions={headerActions}>
+                <PageLayout.Heading>{pageTitle ?? "Overview"}</PageLayout.Heading>
+              </SectionNavigationHeader>
+            )}
+          </Box>
+          <Box
+            data-testid="section-navigation-content"
+            paddingX={6}
+            paddingTop={4}
+            paddingBottom={16}
+          >
+            {children}
+          </Box>
         </Box>
-      </Box>
-    </Stack>
+      </Stack>
+    </PageHeaderSizeProvider>
   );
 }

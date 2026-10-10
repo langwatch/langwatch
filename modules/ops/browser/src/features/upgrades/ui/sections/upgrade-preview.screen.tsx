@@ -26,11 +26,11 @@ export default function UpgradePreviewScreen() {
       >
         <VStack gap={1} align="start" minWidth={0}>
           <PageLayout.Heading>Upgrade preview{to ? ` to ${to}` : ""}</PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Review the plan and preflight checks before applying an upgrade.
-          </PageLayout.Subtitle>
         </VStack>
       </PageLayout.Header>
+      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+        Review the plan and preflight checks before applying an upgrade.
+      </PageLayout.Subtitle>
       <PageLayout.Container maxWidth="full">
         <UpgradeReadState
           read={{

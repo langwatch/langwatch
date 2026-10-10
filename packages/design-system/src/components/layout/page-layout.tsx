@@ -53,7 +53,26 @@ function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren
 }
 
 // Header component
+export type PageHeaderSize = "lg" | "sm";
+
+const PageHeaderAreaContext = createContext<PageHeaderSize | undefined>(void 0);
+const HeaderSizeContext = createContext<PageHeaderSize>("lg");
+
+/** An area owns its header geometry; nested pages cannot override it. */
+export function PageHeaderSizeProvider({
+  size,
+  children,
+}: PropsWithChildren<{ size: PageHeaderSize }>) {
+  const inherited = useContext(PageHeaderAreaContext);
+  return (
+    <PageHeaderAreaContext.Provider value={inherited ?? size}>
+      {children}
+    </PageHeaderAreaContext.Provider>
+  );
+}
+
 interface HeaderProps extends ChakraStackProps {
+  size?: PageHeaderSize;
   ref?: Ref<HTMLDivElement>;
   withBorder?: boolean;
   actions?: ReactNode;
@@ -62,10 +81,12 @@ interface HeaderProps extends ChakraStackProps {
 function Header({
   children,
   withBorder = true,
+  size: requestedSize = "lg",
   actions,
   ref,
   ...props
 }: PropsWithChildren<HeaderProps>) {
+  const size = useContext(PageHeaderAreaContext) ?? requestedSize;
   const headerRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
 
@@ -94,61 +115,79 @@ function Header({
   }, []);
 
   return (
-    <HStack
-      ref={mergeRefs(headerRef, ref)}
-      data-page-header
-      data-scrolled={scrolled ? "true" : "false"}
-      height="auto"
-      minHeight="shellHeader"
-      flexShrink={0}
-      paddingX={6}
-      paddingY={3}
-      alignItems="center"
-      width="full"
-      borderBottomWidth={withBorder ? "1px" : 0}
-      borderBottomStyle={withBorder ? "solid" : "none"}
-      borderBottomColor={withBorder && scrolled ? "border.card" : "transparent"}
-      transition="border-color 160ms ease"
-      _motionReduce={{ transition: "none" }}
-      gap={3}
-      position="sticky"
-      top={0}
-      zIndex={10}
-      background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
-      backdropFilter="var(--lw-backdrop-blur, blur(16px))"
-      {...props}
-    >
-      {children}
-      {actions && (
-        <HStack marginStart="auto" flexShrink={0} gap={2}>
-          {actions}
-        </HStack>
-      )}
-    </HStack>
+    <HeaderSizeContext.Provider value={size}>
+      <HStack
+        ref={mergeRefs(headerRef, ref)}
+        data-page-header
+        data-scrolled={scrolled ? "true" : "false"}
+        data-header-size={size}
+        flexShrink={0}
+        alignItems="center"
+        width="full"
+        borderBottomWidth={withBorder ? "1px" : 0}
+        borderBottomStyle={withBorder ? "solid" : "none"}
+        borderBottomColor={withBorder && scrolled ? "border.card" : "transparent"}
+        transition="border-color 160ms ease"
+        _motionReduce={{ transition: "none" }}
+        gap={3}
+        position="sticky"
+        top={0}
+        zIndex={10}
+        background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
+        backdropFilter="var(--lw-backdrop-blur, blur(16px))"
+        {...props}
+        height={`pageHeader.${size}`}
+        minHeight={`pageHeader.${size}`}
+        maxHeight={`pageHeader.${size}`}
+        paddingX={6}
+        paddingTop={withBorder ? "1px" : 0}
+        paddingBottom={0}
+        flexWrap="nowrap"
+        css={{
+          "& h1": {
+            fontSize: size === "lg" ? "20px" : "15px",
+            lineHeight: "28px",
+            height: "28px",
+            margin: 0,
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          },
+          "& .chakra-button": {
+            height: size === "lg" ? "36px" : "28px",
+            minHeight: size === "lg" ? "36px" : "28px",
+          },
+          ...props.css,
+        }}
+      >
+        {children}
+        {actions && (
+          <HStack data-header-actions marginStart="auto" minWidth={0} overflowX="auto" gap={2}>
+            {actions}
+          </HStack>
+        )}
+      </HStack>
+    </HeaderSizeContext.Provider>
   );
 }
 
-// Page titles render at the standard Heading size; callers never size one.
-// The shell mounts PageHeadingSizeProvider over account pages, which the route
-// table marks, so their title draws large. See dev/docs/best_practices/react.md.
-const PageHeadingSizeContext = createContext<"lg" | undefined>(undefined);
-
-export function PageHeadingSizeProvider({ size, children }: PropsWithChildren<{ size: "lg" }>) {
-  return <PageHeadingSizeContext.Provider value={size}>{children}</PageHeadingSizeContext.Provider>;
-}
+/** Kept for existing account-page wrappers; header sizing belongs to the area. */
+export const PageHeadingSizeProvider = PageHeaderSizeProvider;
 
 type HeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
 
 function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
-  const size = useContext(PageHeadingSizeContext);
+  const size = useContext(HeaderSizeContext);
   return (
     <ChakraHeading
       as="h1"
-      size={size}
+      fontSize={size === "lg" ? "20px" : "15px"}
+      lineHeight="28px"
+      height="28px"
+      flexShrink={0}
       fontWeight="semibold"
       letterSpacing="-0.01em"
       minWidth={0}
-      overflowWrap="anywhere"
+      truncate
       {...props}
     >
       {children}
@@ -178,10 +217,11 @@ function HeaderButton({
   primary = false,
   ...props
 }: PropsWithChildren<HeaderButtonProps>) {
+  const size = useContext(HeaderSizeContext);
   return (
     <Button
       variant="outline"
-      size="sm"
+      size={size === "lg" ? "md" : "xs"}
       flexShrink={0}
       {...(primary ? PRIMARY_PROPS : {})}
       {...props}

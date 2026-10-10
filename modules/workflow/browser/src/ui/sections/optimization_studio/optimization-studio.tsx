@@ -8,6 +8,7 @@ import {
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
   Button,
@@ -255,13 +256,7 @@ export default function OptimizationStudio() {
             <PostEventProvider>
               <WorkflowDragPreview />
               <VStack width="full" height="full" gap={0}>
-                <HStack
-                  width="full"
-                  background="bg"
-                  padding={2}
-                  borderBottom="1px solid"
-                  borderColor="border.emphasized"
-                >
+                <PageLayout.Header size="sm" background="bg" borderColor="border.emphasized">
                   <HStack width="full">
                     <Link href={`/${project?.slug}/workflows`}>
                       <LogoIcon height={24} forceColorMode="light" />
@@ -287,7 +282,7 @@ export default function OptimizationStudio() {
                     <Optimize />
                     <Publish isDisabled={socketStatus !== "connected"} />
                   </HStack>
-                </HStack>
+                </PageLayout.Header>
                 <Box width="full" height="full" position="relative">
                   <Flex width="full" height="full">
                     <StudioWorkflowNodeSelectionPanel

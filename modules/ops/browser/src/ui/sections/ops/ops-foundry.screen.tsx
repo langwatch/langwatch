@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Flex, HStack, Skeleton } from "@langwatch/design-system/primitives";
+import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -20,10 +20,9 @@ export default function OpsFoundryScreen() {
 
   return (
     <FoundryTransport includeProjects>
-      <PageLayout.Header height="auto" minHeight="56px" paddingY={2}>
-        <Flex align="center" justify="space-between" gap={3} wrap="wrap" w="full">
-          <PageLayout.Heading>Foundry</PageLayout.Heading>
-          <HStack gap={2} wrap="wrap">
+      <PageLayout.Header
+        actions={
+          <HStack gap={2}>
             <GenerateConversationDialog />
             <GenerateTraceDialog />
             <PresetPicker />
@@ -32,7 +31,9 @@ export default function OpsFoundryScreen() {
               Reset
             </PageLayout.HeaderButton>
           </HStack>
-        </Flex>
+        }
+      >
+        <PageLayout.Heading>Foundry</PageLayout.Heading>
       </PageLayout.Header>
       <Box
         height="calc(100dvh - 144px)"

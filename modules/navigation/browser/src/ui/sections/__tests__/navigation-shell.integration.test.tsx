@@ -166,8 +166,14 @@ describe("the content card beside the docked Langy panel", () => {
 
       expect(screen.getByTestId("shell-content-column")).toHaveStyle({ paddingRight: "404px" });
       const card = screen.getByTestId("page-body").closest("[data-tour='main-content']");
+      expect(screen.getByTestId("shell-card-scroll")).toHaveStyle({
+        display: "flex",
+        minHeight: "0",
+        overflow: "auto",
+      });
       expect(card).toHaveStyle({
         borderRightWidth: "1px",
+        overflow: "hidden",
       });
     });
   });
@@ -936,5 +942,17 @@ describe("a later navigation that makes the workspace read again", () => {
     expect(screen.queryByTestId("waiting")).toBeNull();
     expect(screen.queryByTestId("page-body")).toBeNull();
     expect(screen.getByTestId("product-sidebar")).toBeTruthy();
+  });
+});
+
+describe("one search entry in the shell", () => {
+  it("keeps the sidebar search and removes the top-bar trigger", () => {
+    renderShell({
+      readings: {
+        commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: <button>Top bar search</button> },
+      },
+    });
+    expect(screen.getAllByRole("button", { name: "Quick Search" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Top bar search" })).not.toBeInTheDocument();
   });
 });

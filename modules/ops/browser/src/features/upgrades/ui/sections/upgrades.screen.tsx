@@ -58,11 +58,11 @@ export default function UpgradesScreen() {
       >
         <VStack align="start" gap={1} minWidth={0}>
           <PageLayout.Heading>Upgrades</PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Installation readiness, release progress, and tenant migrations.
-          </PageLayout.Subtitle>
         </VStack>
       </PageLayout.Header>
+      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+        Installation readiness, release progress, and tenant migrations.
+      </PageLayout.Subtitle>
       <PageLayout.Container maxWidth="full">
         <UpgradeReadState read={status} failedTitle="The upgrade status could not load">
           {(current) => (

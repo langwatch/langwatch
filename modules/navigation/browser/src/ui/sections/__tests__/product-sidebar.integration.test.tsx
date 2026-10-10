@@ -61,7 +61,7 @@ function renderSidebar({
   isCompact = false,
   billedCostEnabled = true,
 }: {
-  surface: "me" | "llm-ops" | "gateway" | "governance";
+  surface: "me" | "llm-ops" | "gateway" | "governance" | "settings";
   pathname?: string;
   isCompact?: boolean;
   billedCostEnabled?: boolean;
@@ -593,7 +593,7 @@ describe("the product sidebar", () => {
       // The hairline border is pinned on the shared chip style itself,
       // which jsdom can read where a CSS variable it cannot resolve is
       // out of reach: quiet-chip-style.unit.test.ts.
-      expect(cap).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+      expect(cap).toHaveStyle({ color: "var(--chakra-colors-fg-muted)" });
     });
   });
 
@@ -615,4 +615,17 @@ describe("the product sidebar", () => {
       expect(menuColumn).not.toHaveStyle({ position: "absolute" });
     });
   });
+});
+
+describe("the shared first sidebar row", () => {
+  it.each(["llm-ops", "gateway", "governance", "me", "settings"] as const)(
+    "puts Quick Search first on %s and opens the same command bar",
+    async (surface) => {
+      renderSidebar({ surface });
+      const search = screen.getByRole("button", { name: "Quick Search" });
+      expect(screen.getByTestId("sidebar-search-row").firstElementChild).toBe(search);
+      await userEvent.click(search);
+      expect(commandBarOpenMock).toHaveBeenCalledTimes(1);
+    },
+  );
 });

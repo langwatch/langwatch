@@ -5,16 +5,15 @@ Feature: Settings shell
 
   The settings pages render inside the navigation-v2 shell. The top bar shows a static "Settings" title in place of the
   product dropdown (the icon rail marks its Settings tile instead), and
-  the organization control stays. The sidebar opens with a back entry
-  that returns to the product the user came from, then Quick Search,
+  the organization control stays. The sidebar opens with Quick Search,
+  then a back entry that returns to the product the user came from,
   then the settings menu regrouped with icons: YOU, ORGANIZATION,
   PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
   BACKOFFICE groups with their current gates. Enterprise-plan entries
   carry a quiet grey pill, since it marks a plan rather than asking to
   be read first. Every visibility gate keeps its current condition. The
-  back entry and its rule sit above the scroll region, so a long
-  settings menu never scrolls the way out of the column, and the
-  entries are cut at that rule as they pass under it.
+  search and back entries sit above the scroll region. No divider separates
+  them from the groups: the group labels provide that separation.
 
   YOU comes first and holds Profile and Security: the two pages that are
   about the person reading them rather than about the organization they
@@ -39,10 +38,10 @@ Feature: Settings shell
   how the reader themselves signs in is Security, under You.
 
   @integration
-  Scenario: The Settings sidebar opens with the way back
+  Scenario: Settings keeps search first and Back immediately below it
     Given I entered Settings from a Gateway page
-    Then the first sidebar entry goes back to that Gateway page
-    And Quick Search comes right after it
+    Then Quick Search is the first sidebar entry
+    And the next entry goes back to that Gateway page
 
   @integration
   Scenario: The settings menu is grouped with its gates kept
@@ -95,22 +94,11 @@ Feature: Settings shell
     And my choice is kept for the next time I open Settings
 
   @integration
-  Scenario: A rule separates the way back from the pages below it
-    Given I open Settings
-    Then a rule runs under the way back entry
-
-  @integration
-  Scenario: The way back stays in place while the menu scrolls
+  Scenario: Quick Search stays above the menu without a divider
     Given I open Settings
     When the settings menu scrolls
-    Then the way back entry stays where it is
-    And only the pages under the rule move
-
-  @integration
-  Scenario: The pages are cut at the rule as they scroll under the way back
-    Given I open Settings
-    Then the part that scrolls starts at the rule under the way back
-    And the space under that rule scrolls with the pages
+    Then Quick Search and the back entry stay in place
+    And no divider separates them from the groups
 
   @integration
   Scenario: API Keys sits under General

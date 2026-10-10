@@ -41,7 +41,7 @@ export type SidebarSurface = ProductId | "settings";
 
 /**
  * Quick Search as the first sidebar entry in the navigation-v2 shells,
- * opening the same command bar the header trigger and Cmd+K open
+ * opening the same command bar as Cmd+K
  * (product-sidebars.feature).
  */
 function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
@@ -80,7 +80,7 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 /**
  * The pinned utility block at the bottom of every sidebar: usage, Settings,
  * Support and the theme control. The Settings sidebar drops its own entry
- * since the back entry above already frames it.
+ * since the top bar already names it.
  */
 function SidebarBottomBlock({
   showExpanded,
@@ -145,22 +145,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   });
 
   return (
-    <Box
-      width="full"
-      paddingX={1}
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      height="shellHeader"
-      display="flex"
-      alignItems="center"
-    >
-      <SideMenuLink
-        icon={ArrowLeft}
-        label={target.label}
-        href={target.href}
-        showLabel={showLabel}
-      />
-    </Box>
+    <SideMenuLink icon={ArrowLeft} label={target.label} href={target.href} showLabel={showLabel} />
   );
 }
 
@@ -327,7 +312,7 @@ export function SidebarContent({
 
   return (
     <VStack
-      paddingTop={surface === "settings" ? 0 : 2}
+      paddingTop={2}
       paddingBottom={2}
       gap={0}
       height="100%"
@@ -335,10 +320,24 @@ export function SidebarContent({
       width={isFullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
-      {/* The way back out of Settings sits above the scroll region, so a
-          long settings menu never scrolls it out of the column. */}
+      <Box
+        data-testid="sidebar-search-row"
+        width="full"
+        paddingX={3}
+        paddingBottom={2}
+        flexShrink={0}
+      >
+        <QuickSearchMenuItem showLabel={showExpanded} />
+      </Box>
+
       {surface === "settings" && (
-        <Box width="full" paddingX={2}>
+        <Box
+          data-testid="sidebar-back-row"
+          width="full"
+          paddingX={3}
+          paddingBottom={2}
+          flexShrink={0}
+        >
           <SettingsBackEntry showLabel={showExpanded} />
         </Box>
       )}
@@ -352,7 +351,7 @@ export function SidebarContent({
         data-tour="sidebar"
         width="full"
         paddingX={3}
-        paddingTop={surface === "settings" ? 1.5 : 0}
+        paddingTop={0}
         paddingBottom={2}
         gap={0.5}
         align="start"
@@ -375,8 +374,6 @@ export function SidebarContent({
           "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
         }}
       >
-        <QuickSearchMenuItem showLabel={showExpanded} />
-        <Box height={2} width="full" flexShrink={0} />
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
       </VStack>
 

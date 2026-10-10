@@ -49,11 +49,11 @@ export default function OpsDashboardScreen() {
       >
         <VStack align="start" gap={1} minWidth={0}>
           <PageLayout.Heading>Ops dashboard</PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Throughput, queue health, and work that needs attention.
-          </PageLayout.Subtitle>
         </VStack>
       </PageLayout.Header>
+      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+        Throughput, queue health, and work that needs attention.
+      </PageLayout.Subtitle>
       <PageLayout.Container paddingY={5} maxWidth="full">
         {data && <OpsDashboardContent data={data} />}
         {!data && snapshot.isError && (

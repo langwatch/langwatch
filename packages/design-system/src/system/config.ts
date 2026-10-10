@@ -96,7 +96,7 @@ export const designSystemConfig = defineConfig({
       "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
     tokens: {
-      sizes: { shellHeader: { value: "48px" } },
+      sizes: { pageHeader: { lg: { value: "64px" }, sm: { value: "48px" } } },
       fonts: {
         heading: {
           value: interFontFamily,

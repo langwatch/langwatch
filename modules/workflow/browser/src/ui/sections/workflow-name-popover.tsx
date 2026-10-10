@@ -86,7 +86,7 @@ export function WorkflowNamePopover({
       <Popover.Trigger asChild>
         <HStack cursor="pointer" _hover={{ opacity: 0.8 }} gap={1.5}>
           <WorkflowIcon icon={icon} size="md" background="none" border="none" />
-          <Text lineClamp={1} fontSize="15px" wordBreak="break-all">
+          <Text lineClamp={1} fontSize="15px" fontWeight="semibold" wordBreak="break-all">
             {name}
           </Text>
         </HStack>

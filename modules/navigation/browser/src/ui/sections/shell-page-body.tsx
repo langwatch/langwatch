@@ -1,4 +1,5 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { PageHeaderSizeProvider } from "@langwatch/design-system/page-layout";
 /**
  * Shell page body: content card interior. Moved from platform/app.
  * Drawer/announcements/analytics moved or removed; the saved-views strip is analytics' own.
@@ -128,12 +129,10 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       minHeight={0}
       overflowY="auto"
       paddingBottom={16}
-      // The header's border spans the card; its title, actions and every block
-      // under it sit in one column of the measure, centred in the card.
+      // Bodies retain their reading measure; every header keeps the same inset.
       // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
       css={{
         "--page-inset": inset,
-        "& [data-page-header]": { paddingInline: "var(--page-inset)" },
         "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
           width: "calc(100% - 2 * var(--page-inset))",
           marginInline: "var(--page-inset)",
@@ -229,7 +228,9 @@ export const ShellPageBody = ({
     userIsPartOfTeam || isOrganizationLoading ? (
       <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
         <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
-          <PageMeasure pathname={pathname}>{children}</PageMeasure>
+          <PageHeaderSizeProvider size="lg">
+            <PageMeasure pathname={pathname}>{children}</PageMeasure>
+          </PageHeaderSizeProvider>
         </ErrorBoundary>
       </Box>
     ) : (
@@ -245,7 +246,7 @@ export const ShellPageBody = ({
     );
 
   return (
-    <VStack width="full" gap={0} {...props}>
+    <VStack width="full" flex={1} minHeight={0} gap={0} {...props}>
       {/* Banners are chrome: a positioned layer so a page's own zIndex or bleed (the home
           hero's bloom) cannot wash them out; `docked` stays under every portaled overlay. */}
       <VStack width="full" gap={0} position="relative" zIndex="docked" data-part="page-banners">

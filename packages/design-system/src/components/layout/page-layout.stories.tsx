@@ -1,7 +1,8 @@
 import { Badge, Box, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { PageHeadingSizeProvider, PageLayout } from "./page-layout.tsx";
+import { PageHeaderSizeProvider, PageHeadingSizeProvider, PageLayout } from "./page-layout.tsx";
+import { SectionNavigationFrame } from "./section-navigation-frame.tsx";
 
 const meta = {
   title: "Navigation and layout/Page layout",
@@ -175,5 +176,65 @@ export const ScrollingGlass: Story = {
         </Box>
       ))}
     </HStack>
+  ),
+};
+
+/** Real layout assertions: action count cannot change the title's position. */
+export const HeaderGeometry: Story = {
+  render: () => (
+    <PageHeaderSizeProvider size="lg">
+      <Stack width="1000px" gap={4}>
+        {[0, 1, 5].map((count) => (
+          <PageLayout.Header
+            key={count}
+            size="sm"
+            actions={Array.from({ length: count }, (_, index) => (
+              <PageLayout.HeaderButton key={index}>Action {index + 1}</PageLayout.HeaderButton>
+            ))}
+          >
+            <PageLayout.Heading>Same title</PageLayout.Heading>
+          </PageLayout.Header>
+        ))}
+        <SectionNavigationFrame
+          label="Section"
+          pageTitle="Same title"
+          activeHref=""
+          onNavigate={() => {}}
+        >
+          <Text>Content starts at the normal inset.</Text>
+        </SectionNavigationFrame>
+      </Stack>
+    </PageHeaderSizeProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await document.fonts.ready;
+    const headers = canvasElement.querySelectorAll<HTMLElement>("[data-page-header]");
+    if (headers.length !== 4) throw new Error("Expected four header variants");
+    for (const header of headers) {
+      const title = header.querySelector("h1");
+      if (!title) throw new Error("Missing title");
+      const row = header.getBoundingClientRect();
+      const box = title.getBoundingClientRect();
+      if (row.height !== 64 || box.left - row.left !== 24 || box.top - row.top !== 18) {
+        throw new Error(
+          `Header moved: ${row.height}, ${box.left - row.left}, ${box.top - row.top}`,
+        );
+      }
+      for (const button of header.querySelectorAll("button")) {
+        if (button.getBoundingClientRect().height !== 36) throw new Error("Header button resized");
+      }
+    }
+    const rail = canvasElement.querySelector('[data-testid="section-navigation-title"]');
+    if (!rail || rail.getBoundingClientRect().height !== 64) throw new Error("Rail title resized");
+  },
+};
+
+export const CompactTool: Story = {
+  render: () => (
+    <PageHeaderSizeProvider size="sm">
+      <PageLayout.Header actions={<PageLayout.HeaderButton>Run</PageLayout.HeaderButton>}>
+        <PageLayout.Heading>Workflow studio</PageLayout.Heading>
+      </PageLayout.Header>
+    </PageHeaderSizeProvider>
   ),
 };
