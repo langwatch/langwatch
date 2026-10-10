@@ -316,6 +316,12 @@ func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 	samples := append([]QueueSample(nil), cell.queue...)
 	cell.queueMu.Unlock()
 	summary := QueueSummary{Samples: samples, DrainedMs: -1, TopKeys: TopQueueKeys(ctx, cell.stores.RedisPort), ByKind: QueueByKind(ctx, cell.stores.RedisPort)}
+	cell.queueMu.Lock()
+	summary.CutJobs = len(cell.cutJobs)
+	cell.queueMu.Unlock()
+	if left, ok := cell.cutJobsStill(ctx); ok {
+		summary.Leftover = LeftByKind(left)
+	}
 	worker := cell.marks["headWorkerStarted"]
 	for _, sample := range samples {
 		if sample.AtMs < cell.marks["fromWorkerPaused"] {
@@ -324,7 +330,7 @@ func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 		if sample.Depth > summary.Peak {
 			summary.Peak, summary.PeakAtMs = sample.Depth, sample.AtMs
 		}
-		if summary.DrainedMs < 0 && sample.AtMs > max(worker, summary.PeakAtMs) && sample.Depth <= summary.Baseline {
+		if summary.DrainedMs < 0 && sample.AtMs > worker && sample.Left == 0 {
 			summary.DrainedMs = sample.AtMs - worker
 		}
 	}
@@ -334,7 +340,8 @@ func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 func (cell *run) queueVerdict() Verdict {
 	queue := cell.report.Queue
 	return verdict("N4", queue.DrainedMs >= 0,
-		fmt.Sprintf("baseline %d, peak %d at %d ms, drained %d ms after the worker started", queue.Baseline, queue.Peak, queue.PeakAtMs, queue.DrainedMs))
+		fmt.Sprintf("%d jobs at the cut; all gone %d ms after the worker started (-1: never); baseline depth %d, peak %d at %d ms; left by kind: %q",
+			queue.CutJobs, queue.DrainedMs, queue.Baseline, queue.Peak, queue.PeakAtMs, queue.Leftover))
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.
@@ -505,7 +512,7 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 
 // browserVerdict: the signed-in walk saw no console error and no failed request outside the accepted list.
 func (cell *run) browserVerdict() Verdict {
-	walks, expected, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"))
+	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"))
 	if err != nil || walks == 0 {
 		return Verdict{ID: "B1", Name: invariantNames["B1"], Result: "inconclusive", Detail: fmt.Sprintf("%d completed walks; %s", walks, errText(err))}
 	}
@@ -513,7 +520,7 @@ func (cell *run) browserVerdict() Verdict {
 	for _, each := range findings[:min(len(findings), 3)] {
 		first = append(first, fmt.Sprintf("%s %s %d %.120s at %s (%d ms, %s)", each.Kind, each.URL, each.Status, each.Text, each.Step, each.AtMs, PhaseAt(cell.report.Phases, each.AtMs)))
 	}
-	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run)", walks, len(findings), first, expected))
+	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run), other %v", walks, len(findings), first, expected, tolerated))
 }
 
 // readModelVerdict (I5): the projections an upgrade must leave filled. Any failed part fails it; a part

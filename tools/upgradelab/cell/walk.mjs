@@ -2,7 +2,8 @@
 // Ops > Upgrades, every `every` ms. Run with cwd = <head>/apps/ui; argv[2] is JSON
 // { url, email, password, runDir, originMs, every }. Stops when <runDir>/walk.stop exists.
 // Appends console errors, page errors and failed requests to <runDir>/browser.jsonl, and writes
-// shots/walk-<phase>.png on the first walk of each phase (phase.txt is written by the poller).
+// shots/walk-<phase>-<page>.png on the first real walk of each phase (phase.txt is written by the poller).
+// When <runDir>/operator.granted appears the walk signs in again, so ops:view is in the session.
 import { createRequire } from "node:module";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -19,6 +20,7 @@ const phase = () => {
   }
 };
 const stopped = () => existsSync(join(runDir, "walk.stop"));
+const dismissNudge = (page) => page.getByRole("button", { name: "Not now" }).click({ timeout: 1_000 }).catch(() => undefined);
 const nap = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function signIn(page) {
@@ -29,7 +31,7 @@ async function signIn(page) {
   await field.fill(password, { timeout: 30_000 });
   await page.locator('button[type="submit"]').first().click();
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
-  await page.getByRole("button", { name: "Not now" }).click({ timeout: 3_000 }).catch(() => undefined);
+  await dismissNudge(page);
 }
 
 const browser = await chromium.launch();
@@ -47,8 +49,14 @@ try {
 
   let project = "";
   const shot = new Set();
+  let granted = false;
   while (!stopped()) {
     try {
+      if (!granted && existsSync(join(runDir, "operator.granted"))) {
+        granted = true;
+        project = "";
+        await page.context().clearCookies();
+      }
       if (!project) {
         await signIn(page);
         project = new URL(page.url()).pathname.split("/")[1] ?? "";
@@ -64,7 +72,9 @@ try {
           await page.locator("tbody tr, [role=row]").nth(1).click({ timeout: 3_000 }).catch(() => undefined);
           await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
         }
-        if (!shot.has(`${phase()}/${name}`) && name !== "prompts" && name !== "experiments") {
+        await dismissNudge(page);
+        const denied = name === "upgrades" && (await page.getByText("Access Restricted").first().isVisible().catch(() => false));
+        if (!shot.has(`${phase()}/${name}`) && name !== "prompts" && name !== "experiments" && !denied) {
           shot.add(`${phase()}/${name}`);
           const file = `walk-${phase().replace(/[:/]/g, "-")}-${name}.png`;
           await page.screenshot({ path: join(runDir, "shots", file), fullPage: true }).catch(() => undefined);

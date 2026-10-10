@@ -71,7 +71,7 @@ type PhaseStatuses struct {
 	Statuses map[string]int `json:"statuses"`
 }
 
-// QueueSummary is the waiting work: its peak and how long it took to drain once head's worker started.
+// QueueSummary is the waiting work: its peak and how long the jobs present at the cut took to drain once head's worker started.
 type QueueSummary struct {
 	Samples   []QueueSample `json:"samples"`
 	Baseline  int           `json:"baseline"`
@@ -79,6 +79,8 @@ type QueueSummary struct {
 	PeakAtMs  int64         `json:"peakAtMs"`
 	DrainedMs int64         `json:"drainedAfterWorkerMs"` // -1: never drained
 	TopKeys   string        `json:"topKeysAtEnd"`
+	CutJobs   int           `json:"jobsAtCut"`
+	Leftover  string        `json:"cutJobsLeftByKindAtEnd"`
 	ByKind    string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
 }
 

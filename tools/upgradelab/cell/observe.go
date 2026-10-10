@@ -156,6 +156,7 @@ return total`
 type QueueSample struct {
 	AtMs  int64 `json:"atMs"`
 	Depth int   `json:"depth"`
+	Left  int   `json:"cutJobsLeft"` // jobs present at the cut still waiting; -1 unread
 }
 
 // QueueDepth reads the cell's Redis once.
@@ -165,6 +166,61 @@ func QueueDepth(ctx context.Context, port string) (int, error) {
 		return 0, fmt.Errorf("redis-cli EVAL: %w", err)
 	}
 	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
+
+// queueJobsScript is queueDepthScript's key filter, listing the waiting jobs where it counts them.
+var queueJobsScript = strings.NewReplacer(
+	"local total = 0", "local rows = {}",
+	"total = total + redis.call('ZCARD', key)", "for _, m in ipairs(redis.call('ZRANGE', key, 0, -1)) do table.insert(rows, key .. ' ' .. m) end",
+	"total = total + redis.call('LLEN', key)", "for i, m in ipairs(redis.call('LRANGE', key, 0, -1)) do table.insert(rows, key .. ' #' .. i .. m) end",
+	"total = total + redis.call('XLEN', key)", "for _, m in ipairs(redis.call('XRANGE', key, '-', '+')) do table.insert(rows, key .. ' ' .. m[1]) end",
+	"return total", "return rows",
+).Replace(queueDepthScript)
+
+// QueueJobs lists every waiting job as "key member", with the same exclusions as the depth.
+func QueueJobs(ctx context.Context, port string) (map[string]struct{}, error) {
+	out, err := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", queueJobsScript, "0").Output() // #nosec G204 -- fixed script.
+	if err != nil {
+		return nil, fmt.Errorf("redis-cli EVAL: %w", err)
+	}
+	jobs := map[string]struct{}{}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" {
+			jobs[line] = struct{}{}
+		}
+	}
+	return jobs, nil
+}
+
+// QueueLeft is the jobs of cut still waiting in now.
+func QueueLeft(cut, now map[string]struct{}) []string {
+	var left []string
+	for job := range cut {
+		if _, ok := now[job]; ok {
+			left = append(left, job)
+		}
+	}
+	return left
+}
+
+// LeftByKind counts leftover jobs per job kind: the group key without tenant and aggregate, else the key.
+func LeftByKind(left []string) string {
+	counts := map[string]int{}
+	for _, job := range left {
+		key, _, _ := strings.Cut(job, " ")
+		if at := strings.Index(key, ":gq:group:"); at >= 0 {
+			if parts := strings.Split(strings.TrimSuffix(key[at+len(":gq:group:"):], ":jobs"), "/"); len(parts) >= 3 {
+				key = strings.Join(parts[1:len(parts)-1], "/")
+			}
+		}
+		counts[key]++
+	}
+	rows := make([]string, 0, len(counts))
+	for key, count := range counts {
+		rows = append(rows, fmt.Sprintf("%s: %d", key, count))
+	}
+	slices.Sort(rows)
+	return strings.Join(rows, "; ")
 }
 
 // TopQueueKeys names the longest keys, so a report reader can judge what the depth counted.
@@ -404,15 +460,25 @@ func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
 		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
 }
 
-// acceptedBrowserNoise is the console errors and failed requests a round tolerates: url or text substrings. Empty on purpose.
-var acceptedBrowserNoise []string
+// browserNoise is a console error or failed request the lab tolerates: every Match substring in the
+// record's url or text. Reason is printed in the report; they are counted apart from findings.
+type browserNoise struct {
+	Match  []string
+	Reason string
+}
+
+var acceptedBrowserNoise = []browserNoise{
+	{[]string{"static.hotjar.com"}, "third-party analytics, same on main"},
+	{[]string{"static.reo.dev", "ERR_BLOCKED_BY_ORB"}, "third-party analytics, same on main"},
+}
 
 // BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
-func BrowserFindings(path string, switched, ready int64) (walks, expected int, findings []BrowserRecord, err error) {
+func BrowserFindings(path string, switched, ready int64) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
-		return 0, 0, nil, err
+		return 0, 0, nil, nil, err
 	}
+	tolerated = map[string]int{}
 	for _, line := range strings.Split(string(data), "\n") {
 		var record BrowserRecord
 		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &record) != nil {
@@ -423,16 +489,26 @@ func BrowserFindings(path string, switched, ready int64) (walks, expected int, f
 			walks++
 		case expectedWhileStepsRun(record, switched, ready):
 			expected++
-		case record.Kind == "walkerror" || accepted(record):
+		case record.Kind == "walkerror":
 		default:
+			if noise, ok := accepted(record); ok {
+				tolerated[noise.Match[0]+" ("+noise.Reason+")"]++
+				continue
+			}
 			findings = append(findings, record)
 		}
 	}
-	return walks, expected, findings, nil
+	return walks, expected, tolerated, findings, nil
 }
 
-func accepted(record BrowserRecord) bool {
-	return slices.ContainsFunc(acceptedBrowserNoise, func(noise string) bool {
-		return strings.Contains(record.URL, noise) || strings.Contains(record.Text, noise)
-	})
+func accepted(record BrowserRecord) (browserNoise, bool) {
+	for _, noise := range acceptedBrowserNoise {
+		if slices.ContainsFunc(noise.Match, func(part string) bool {
+			return !strings.Contains(record.URL, part) && !strings.Contains(record.Text, part)
+		}) {
+			continue
+		}
+		return noise, true
+	}
+	return browserNoise{}, false
 }

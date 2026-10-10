@@ -33,9 +33,10 @@ func TestResourcePeaksKeepsTheHighest(t *testing.T) {
 func TestBrowserFindingsCountsWalksAndHonoursTheAcceptedList(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "browser.jsonl")
 	_ = os.WriteFile(path, []byte(`{"kind":"walk"}`+"\n"+`{"kind":"console","text":"boom"}`+"\n"+`{"kind":"http","url":"http://x/ok-noise","status":503}`+"\n"+`{"kind":"walkerror"}`+"\n"), 0o600)
-	acceptedBrowserNoise = []string{"ok-noise"}
-	defer func() { acceptedBrowserNoise = nil }()
-	walks, _, findings, err := BrowserFindings(path, -1, -1)
+	saved := acceptedBrowserNoise
+	acceptedBrowserNoise = []browserNoise{{[]string{"ok-noise"}, "test"}}
+	defer func() { acceptedBrowserNoise = saved }()
+	walks, _, _, findings, err := BrowserFindings(path, -1, -1)
 	if err != nil || walks != 1 || len(findings) != 1 || findings[0].Text != "boom" {
 		t.Errorf("walks %d findings %+v err %v", walks, findings, err)
 	}
@@ -78,5 +79,17 @@ func TestExpectedWhileStepsRunNeedsCodeRetryAfterAndWindow(t *testing.T) {
 	}
 	if expectedWhileStepsRun(ok, 10, -1) {
 		t.Error("accepted before ready is known")
+	}
+}
+
+func TestBrowserFindingsCountsThirdPartyNoiseApart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	lines := `{"kind":"console","text":"Loading the script 'https://static.hotjar.com/c.js' violates the following Content Security Policy"}` + "\n" +
+		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_BLOCKED_BY_ORB"}` + "\n" +
+		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_FAILED"}` + "\n"
+	_ = os.WriteFile(path, []byte(lines), 0o600)
+	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1)
+	if err != nil || len(findings) != 1 || findings[0].Text != "net::ERR_FAILED" || len(tolerated) != 2 {
+		t.Errorf("findings %+v tolerated %v err %v", findings, tolerated, err)
 	}
 }

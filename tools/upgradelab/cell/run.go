@@ -68,6 +68,7 @@ type run struct {
 	poller             *Poller
 	queue              []QueueSample
 	queueMu            sync.Mutex
+	cutJobs            map[string]struct{} // jobs waiting when main's worker was paused (N4 judges these)
 	marks              map[string]int64
 	shotsWG            sync.WaitGroup
 	atReady            []LedgerRow
@@ -386,7 +387,7 @@ func (cell *run) seed(ctx context.Context) error {
 // useSeed points the cell's clients at the seed project, from a fresh seed or a restored one.
 func (cell *run) useSeed(session http.Header) error {
 	cell.client = Client{URL: cell.url(), APIKey: cell.seeder.Context.APIKey, Project: cell.seeder.Context.ProjectID,
-		Session: session, Seed: cell.options.Seed, BasePrompt: "upgradelab-base"}
+		Session: session, Seed: RunSeed(cell.options.Seed, cell.origin), BasePrompt: "upgradelab-base"}
 	if cell.client.APIKey == "" {
 		return errors.New("the seed project has no API key: product seeds never reached it")
 	}
@@ -455,10 +456,31 @@ func sleep(ctx context.Context, span time.Duration) error {
 
 func (cell *run) sampleQueueOnce(ctx context.Context) {
 	if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
+		left := cell.cutJobsLeft(ctx)
 		cell.queueMu.Lock()
-		cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
+		cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth, Left: left})
 		cell.queueMu.Unlock()
 	}
+}
+
+// cutJobsLeft counts the jobs present at the cut that still wait; -1 on a read error, 0 before the cut.
+func (cell *run) cutJobsLeft(ctx context.Context) int {
+	left, ok := cell.cutJobsStill(ctx)
+	if !ok {
+		return -1
+	}
+	return len(left)
+}
+
+func (cell *run) cutJobsStill(ctx context.Context) ([]string, bool) {
+	cell.queueMu.Lock()
+	cut := cell.cutJobs
+	cell.queueMu.Unlock()
+	now, err := QueueJobs(ctx, cell.stores.RedisPort)
+	if err != nil {
+		return nil, false
+	}
+	return QueueLeft(cut, now), true
 }
 
 func (cell *run) sampleQueue(ctx context.Context) {
@@ -476,6 +498,13 @@ func (cell *run) cut(ctx context.Context) error {
 	cell.mark("fromWorkerPaused")
 	if err := sleep(ctx, cell.options.AtCut); err != nil {
 		return err
+	}
+	if jobs, err := QueueJobs(ctx, cell.stores.RedisPort); err == nil {
+		cell.queueMu.Lock()
+		cell.cutJobs = jobs
+		cell.queueMu.Unlock()
+	} else {
+		cell.report.Notes = append(cell.report.Notes, "queue jobs at the cut: "+err.Error())
 	}
 	fingerprint, err := cell.fingerprint(ctx)
 	cell.before = fingerprint
@@ -676,7 +705,9 @@ func (cell *run) grantOperator(ctx context.Context) {
 	_ = os.WriteFile(cell.logPath("grant-operator"), out, 0o600)
 	if err != nil {
 		cell.report.Notes = append(cell.report.Notes, "grant-platform-operator: "+err.Error()+": "+tail(out))
+		return
 	}
+	_ = os.WriteFile(filepath.Join(cell.options.RunDir, "operator.granted"), nil, 0o600) // the walk signs in again
 }
 
 // assertOldWritersGone is the operator's act once the old release is stopped (rehearse.sh does the
@@ -716,8 +747,8 @@ func (cell *run) settle(ctx context.Context) error {
 	cell.mark("trafficStopped")
 	err := waitFor(ctx, cell.options.SettleWithin, func() bool {
 		rows, err := Ledger(ctx, cell.stores)
-		depth, depthErr := QueueDepth(ctx, cell.stores.RedisPort)
-		return err == nil && depthErr == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && depth == 0
+		left := cell.cutJobsLeft(ctx)
+		return err == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && left == 0
 	})
 	cell.mark("settled")
 	if cell.stopSampler != nil {
