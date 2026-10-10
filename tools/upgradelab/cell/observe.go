@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -404,6 +405,18 @@ func mainPageAcrossSwitch(record BrowserRecord, switched int64) bool {
 	return (asset || missing) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
+// mainClientOutdated: main's page, fetched just before the switch, sends head its old enveloped tRPC input
+// (`{"json": ...}`) and head answers 400 client_outdated, as packages/api/src/trpc/client-outdated.ts means
+// it to; its console line names no url. The WebSocket's own 404 is the http twin of mainTabAcrossSwitch.
+func mainClientOutdated(record BrowserRecord, switched int64) bool {
+	decoded, _ := url.QueryUnescape(record.URL)
+	enveloped := record.Kind == "http" && record.Status == http.StatusBadRequest && strings.Contains(record.URL, "/api/trpc/") &&
+		strings.Contains(decoded, `"json":`)
+	socket := record.Kind == "http" && record.Status == http.StatusNotFound && strings.Contains(record.URL, "/api/trpc-ws")
+	refused := record.Kind == "console" && strings.Contains(record.Text, "status of 400")
+	return (enveloped || socket || refused) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+}
+
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
 // record's url or text. Reason is printed in the report; they are counted apart from findings.
 type browserNoise struct {
@@ -438,6 +451,8 @@ func BrowserFindings(path string, switched, ready int64) (walks, expected int, t
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		case mainPageAcrossSwitch(record, switched):
 			tolerated["/assets/* 404 (main's page, fetched across the switch, ADR-086)"]++
+		case mainClientOutdated(record, switched):
+			tolerated["/api/trpc 400 client_outdated (main's page, fetched across the switch, told to reload)"]++
 		default:
 			if noise, ok := accepted(record); ok {
 				tolerated[noise.Match[0]+" ("+noise.Reason+")"]++

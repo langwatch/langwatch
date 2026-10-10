@@ -129,6 +129,14 @@ func (cell *run) legacyOrgVerdict(ctx context.Context, final []LedgerRow) []Verd
 // returns the page's text.
 func (cell *run) opsPage(ctx context.Context, name, path, open, expect string) (string, error) {
 	email, password := generate.SeedAccount(cell.options.Seed)
+	return cell.opsPageAs(ctx, opsPageInput{name: name, email: email, password: password, path: path, open: open, expect: expect})
+}
+
+type opsPageInput struct{ name, email, password, path, open, expect string }
+
+// opsPageAs screenshots one page signed in as any account and returns the page's text.
+func (cell *run) opsPageAs(ctx context.Context, input opsPageInput) (string, error) {
+	name, email, password, path, open, expect := input.name, input.email, input.password, input.path, input.open, input.expect
 	out := filepath.Join(cell.options.RunDir, "shots", name+".png")
 	args, _ := json.Marshal(map[string]any{"url": cell.url(), "email": email, "password": password, "out": out, "signIn": true,
 		"path": path, "open": open, "expect": expect})

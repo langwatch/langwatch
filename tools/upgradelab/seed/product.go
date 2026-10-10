@@ -316,6 +316,9 @@ func (seeder *Seeder) trpc(ctx context.Context, call trpcCall) error {
 			return err
 		}
 		wire.path = "/api/trpc/" + call.path + "?input=" + url.QueryEscape(string(encoded))
+		if seeder.PlainWire && call.input == nil { // a void procedure refuses a null input
+			wire.path = "/api/trpc/" + call.path
+		}
 	}
 	_, text, err := seeder.send(ctx, wire)
 	if err != nil || call.out == nil {

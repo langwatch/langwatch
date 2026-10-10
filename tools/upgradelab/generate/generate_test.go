@@ -180,6 +180,18 @@ func TestOldReleaseOrigin(t *testing.T) {
 	}
 }
 
+// A cell seeds main's checkout itself: a self-hosted shape from main@<sha> plans there, and the digest of a
+// request without Checkout is unchanged.
+func TestCheckoutAllowsSelfHostedFromMain(t *testing.T) {
+	plan, err := Build(Request{Shape: "sh-free", Release: "main@abc1234", Volume: "S", Seed: 1, Anchor: anchor, Checkout: true})
+	if err != nil {
+		t.Fatalf("a cell's self-hosted shape from main refused: %v", err)
+	}
+	if plan.Digest() == mustBuild(t, "sh-free", "3.20.1", 1).Digest() {
+		t.Errorf("main and a tag plan alike")
+	}
+}
+
 type fakeDoors struct {
 	failAt string
 	ran    []string

@@ -70,6 +70,7 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | cloud-sso | cloud-legacy-sso | hybrid | self-hosted | self-hosted-legacy-sso")
 	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S or M (L and XL wait for lane L4)")
 	flags.BoolVar(&options.NoAdminEmails, "no-admin-emails", false, "self-hosted-free boots without ADMIN_EMAILS")
+	flags.BoolVar(&options.Signups, "signups", false, "once head is ready, two people sign up through its door; P1 judges who may open Ops")
 	flags.StringVar(&options.Shape, "shape", "typical", "data shape: typical, or empty (a fresh install: no seed, no traffic)")
 	flags.Int64Var(&options.Seed, "seed", 1, "seed for every generated id and payload")
 	flags.StringVar(&options.FromDir, "from-dir", ".worktrees/upgradelab-main", "checkout of the release upgraded from (no .env)")

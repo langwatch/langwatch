@@ -44,6 +44,7 @@ type Options struct {
 	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
 	NoAdminEmails                    bool      // boot self-hosted-free without ADMIN_EMAILS
+	Signups                          bool      // two people sign up through head's door once it is ready (P1)
 	Stdout                           io.Writer // where the live origin lines go; nil prints nothing
 }
 
@@ -87,6 +88,11 @@ type run struct {
 	retention          retentionState
 	legacy             legacySeed
 	legacyOrg          legacyOrgSeed
+	signups            []signupResult
+	signupUsersBefore  int
+	signupUsersErr     error
+	signupSessions     map[string]*seed.Seeder // each sign-up signed in once
+	memberNotice       bool                    // the member notice showed while the retry drill's step was failed
 
 	stopTraffic, stopPoller, stopSampler context.CancelFunc
 	trafficDone                          chan struct{}
@@ -392,7 +398,7 @@ func waitFor(ctx context.Context, within time.Duration, done func() bool) error 
 func (cell *run) seed(ctx context.Context) error {
 	cell.anchor = time.Now().UTC().Truncate(24 * time.Hour)
 	plan, err := generate.Build(generate.Request{Shape: cell.profile.Shape, Release: cell.options.Release, Volume: cell.options.Tier,
-		Seed: cell.options.Seed, Anchor: cell.anchor})
+		Seed: cell.options.Seed, Anchor: cell.anchor, Checkout: true})
 	if err != nil {
 		return err
 	}
@@ -758,6 +764,9 @@ func (cell *run) awaitReady(ctx context.Context) error {
 		return errors.Join(err, cell.deathNote())
 	}
 	cell.mark("ready")
+	if cell.options.Signups {
+		cell.signUpTwo(ctx) // before the seed account exists, so an empty install's first user is a sign-up
+	}
 	if cell.emptyOrigin() {
 		cell.emptyAccount(ctx)
 	}

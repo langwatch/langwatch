@@ -125,6 +125,7 @@ var invariantNames = map[string]string{
 	"N3":  "no lost write: every 2xx write visible after settle",
 	"N4":  "queued work drains once head's worker runs",
 	"O1":  "Ops > Upgrades shows the right state",
+	"P1":  "the first sign-up of an empty self-hosted install operates; no later sign-up does",
 	"H3":  "a private organization reads its own trace and dataset through head",
 	"H4":  "objects land only in their tenant's S3: the private bucket holds the private project's, the shared none of them",
 	"H5":  "the shared tenant cannot read the private tenant's trace or dataset",

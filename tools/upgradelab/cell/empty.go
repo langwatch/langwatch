@@ -72,6 +72,7 @@ func (cell *run) emptyChecks(ctx context.Context) error {
 		cell.holdingVerdict(), ledgerVerdict(final), notNeededVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(),
 		cell.queueVerdict(), cell.opsVerdict(final), cell.storedEventsVerdict(ctx))
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	for index := range cell.report.Verdicts {
 		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]
 	}
