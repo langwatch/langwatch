@@ -52,7 +52,9 @@ vi.mock("../../../behavior/sso-api.ts", () => {
             },
           },
         },
+        ssoConnections: { invalidate: () => {} },
       }),
+      ssoConnections: { startLegacyMigration: mutation("operatorStartLegacyMigration") },
       ssoSetup: {
         getSetup: {
           useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
@@ -425,6 +427,17 @@ describe("the single sign-on setup page", () => {
       expect(within(form).getByLabelText("Issuer address")).toHaveValue("https://acme.okta.com");
       expect(within(form).getByLabelText("Client id")).toHaveValue("client_acme");
       expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
+    });
+
+    /** @scenario "A SAML connection registered from metadata alone still offers the edit" */
+    it("offers the edit on a SAML connection whose issuer was never recorded", () => {
+      state.view = setupView({ connection: connectionView({ type: "saml", issuer: null }) });
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(
+        within(screen.getByTestId("connection-issuer")).getByText("Not recorded"),
+      ).toBeTruthy();
+      expect(screen.getByTestId("identity-provider-edit")).toBeInTheDocument();
     });
 
     it("offers no edit on a live connection that is on its way out", () => {
