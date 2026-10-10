@@ -3,7 +3,7 @@
  * Enter or leaving it commits, Escape cancels.
  */
 
-import { Input, type InputProps } from "@chakra-ui/react";
+import { Input, type InputProps } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 export function InlineTextField({

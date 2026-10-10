@@ -2,7 +2,7 @@
  * Every `license.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the settings page has always called.
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { licenseRefreshOutcomeSchema } from "./connect-install.ts";
@@ -14,9 +14,14 @@ import {
   ssoGateStatusSchema,
 } from "./license.ts";
 
-export const licenseOrganizationQuerySchema = z.object({
+const licenseOrganizationQuerySchemaDefinition = z.object({
   organizationId: z.string().min(1),
 });
+export interface LicenseOrganizationQuerySchema extends Named<
+  typeof licenseOrganizationQuerySchemaDefinition
+> {}
+export const licenseOrganizationQuerySchema: LicenseOrganizationQuerySchema =
+  licenseOrganizationQuerySchemaDefinition;
 export type LicenseOrganizationQuery = z.infer<typeof licenseOrganizationQuerySchema>;
 
 export const licenseTrpc = defineTrpcContract("license")

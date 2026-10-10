@@ -1,9 +1,21 @@
 import { BackLink } from "@langwatch/design-system/back-link";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spinner,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { Users } from "lucide-react";
 import numeral from "numeral";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
@@ -41,27 +53,15 @@ function SortChip({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant={active ? "subtle" : "outline"}
+      colorPalette={active ? "accent" : "gray"}
       aria-pressed={active}
       onClick={onClick}
-      style={{
-        padding: "4px 12px",
-        borderRadius: 9999,
-        borderWidth: 1,
-        borderStyle: "solid",
-        borderColor: active
-          ? "var(--chakra-colors-orange-500)"
-          : "var(--chakra-colors-border-muted)",
-        backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
-        color: active ? "var(--chakra-colors-orange-700)" : "var(--chakra-colors-fg-muted)",
-        fontSize: 12,
-        fontWeight: 500,
-        cursor: "pointer",
-      }}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -181,29 +181,34 @@ function TeamSpendPanel({
         <HandledErrorAlert error={teamsQuery.error} fallbackTitle="Couldn't load team activity" />
       ) : null}
 
-      <VStack
-        align="stretch"
-        gap={0}
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        overflow="hidden"
-      >
-        <Header />
+      <Card.Root variant="showcase">
         {isLoading && (
           <Box padding={6}>
             <Spinner />
           </Box>
         )}
         {isEmpty && (
-          <Box padding={6} color="fg.muted" fontSize="sm">
-            {teamsQuery.error
-              ? "Team activity could not be read."
-              : "No team activity this window."}
-          </Box>
+          <NoDataInfoBlock
+            icon={<Users />}
+            title={
+              teamsQuery.error
+                ? "Team activity could not be read."
+                : "No team activity this window."
+            }
+            description="Team spend and requests appear here once connected sources report activity."
+          />
         )}
-        {hasRows && teams.map((t) => <Row key={t.teamId ?? "org-wide"} team={t} />)}
-      </VStack>
+        {hasRows && (
+          <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
+            <Header />
+            <Table.Body>
+              {teams.map((team) => (
+                <Row key={team.teamId ?? "org-wide"} team={team} />
+              ))}
+            </Table.Body>
+          </ListTable>
+        )}
+      </Card.Root>
       <Text fontSize="xs" color="fg.muted">
         {teams.length} team{teams.length === 1 ? "" : "s"} shown.
       </Text>
@@ -241,25 +246,15 @@ function SortChips({
 
 function Header() {
   return (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="xs"
-      fontWeight="semibold"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-      backgroundColor="bg.subtle"
-    >
-      <Box flex={3}>Team</Box>
-      <Box flex={2}>Spend</Box>
-      <Box flex={2}>Requests</Box>
-      <Box flex={2}>Last active</Box>
-      <Box flex={2}>Trend</Box>
-      <Box flex={2}>Sources</Box>
-    </HStack>
+    <Table.Header>
+      <Table.Row>
+        {["Team", "Spend", "Requests", "Last active", "Trend", "Sources"].map((label) => (
+          <Table.ColumnHeader key={label} whiteSpace="nowrap">
+            {label}
+          </Table.ColumnHeader>
+        ))}
+      </Table.Row>
+    </Table.Header>
   );
 }
 
@@ -277,66 +272,42 @@ function trendColorFor({
   pct: number;
 }): string {
   if (!hasPriorBaseline) return "fg.muted";
-  if (pct > 25) return "orange.500";
-  if (pct < -25) return "blue.500";
+  if (pct > 25) return "fg.warning";
+  if (pct < -25) return "fg.info";
   return "fg.muted";
 }
 
 function Row({ team }: { team: SpendByTeam }) {
   const isOrgWide = !team.teamId;
-  const dotColor = isOrgWide ? "#94a3b8" : getHexColorForString(team.teamName);
+  const dotColor = isOrgWide ? "fg.subtle" : getHexColorForString(team.teamName);
   const arrow = trendArrow(team.deltaPctVsPriorWindow);
   const trendColor = trendColorFor({
     hasPriorBaseline: team.hasPriorBaseline,
     pct: team.deltaPctVsPriorWindow,
   });
-  const inner = (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="sm"
-      _hover={isOrgWide ? undefined : { backgroundColor: "bg.subtle" }}
-      cursor={isOrgWide ? "default" : "pointer"}
-    >
-      <Box flex={3}>
-        <HStack gap={2}>
-          <Box
-            width="10px"
-            height="10px"
-            borderRadius="full"
-            backgroundColor={dotColor}
-            flexShrink={0}
-          />
-          <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
-            {team.teamName}
-          </Text>
-        </HStack>
-      </Box>
-      <Box flex={2}>{fmtUsd(team.spendUsd)}</Box>
-      <Box flex={2}>{numeral(team.requestCount).format("0,0")}</Box>
-      <Box flex={2} color="fg.muted">
-        {fmtRelative(team.lastActivityIso)}
-      </Box>
-      <Box flex={2} color={trendColor}>
-        {team.hasPriorBaseline ? `${arrow} ${fmtTrendPct(team.deltaPctVsPriorWindow)}` : "—"}
-      </Box>
-      <Box flex={2} color="fg.muted">
-        {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
-      </Box>
+  const name = (
+    <HStack gap={2}>
+      <Box boxSize="10px" borderRadius="full" backgroundColor={dotColor} flexShrink={0} />
+      <Text fontWeight="medium">{team.teamName}</Text>
     </HStack>
   );
-  if (isOrgWide) return inner;
   return (
-    <Link
-      href={`/governance/teams/${team.teamId}`}
-      display="block"
-      width="full"
-      _hover={{ textDecoration: "none" }}
-    >
-      {inner}
-    </Link>
+    <Table.Row>
+      <Table.Cell>
+        {isOrgWide ? name : <Link href={`/governance/teams/${team.teamId}`}>{name}</Link>}
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">{fmtUsd(team.spendUsd)}</Table.Cell>
+      <Table.Cell>{numeral(team.requestCount).format("0,0")}</Table.Cell>
+      <Table.Cell whiteSpace="nowrap" color="fg.muted">
+        {fmtRelative(team.lastActivityIso)}
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap" color={trendColor}>
+        {team.hasPriorBaseline ? `${arrow} ${fmtTrendPct(team.deltaPctVsPriorWindow)}` : "—"}
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap" color="fg.muted">
+        {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
+      </Table.Cell>
+    </Table.Row>
   );
 }
 

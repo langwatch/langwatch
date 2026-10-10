@@ -75,6 +75,10 @@ describe("given an administrator reading a connection's history", () => {
       }
       expect(history[1]?.summary).toContain("acme.com");
       expect(history[1]?.summary).toContain("the requester could not be reached at that domain");
+      expect(history.map((view) => view.eventType)).toEqual([
+        "lw.identity.domain_claimed",
+        "lw.identity.domain_claim_rejected",
+      ]);
     });
 
     /** @scenario "A connection carried over from an earlier configuration says so" */

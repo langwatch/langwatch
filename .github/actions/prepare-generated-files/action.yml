@@ -1,32 +1,19 @@
 name: Prepare generated files
 description: >-
-  Runs the repository root's `start:prepare:files`, reusing a cached result when
-  none of its inputs changed.
+  Runs the repository root's `start:prepare:files` and `ensure:built`, replayed
+  from the Nx cache when none of their inputs changed.
 
-# `start:prepare:files` is a chain of four generators — the langevals evaluator
-# types, the Prisma client, the langy skill catalogue and the setup-skill
-# bodies. `ensure:built` then builds the workspace packages that resolve a
-# bundle rather than their own source: the TypeScript SDK (whose prebuild also
-# writes the gitignored src/internal/generated files), the MCP server, ksuid
-# and mail.
-# It costs 30-35s and every test, build and check job in this workflow pays it.
-# Across the shards that was several runner-minutes per push spent regenerating
-# byte-identical output from byte-identical committed inputs.
+# `start:prepare:files` runs the generators (the Prisma client, the langevals
+# evaluator types, the langy skill catalogue, the feature map and the
+# setup-skill bodies). `ensure:built` then builds the workspace packages that
+# resolve a built `dist` rather than their own source: the TypeScript SDK (which
+# also writes its gitignored src/internal/generated files), the MCP server,
+# ksuid and mail.
 #
-# Every one of those generators is a pure function of files in the repo, so the
-# cache key is a hash of those files. Miss the inputs in the key and a job gets
-# stale generated code, so the key is deliberately broad: whole source trees
-# rather than the handful of files that seem to matter, because "seem to" is how
-# a generated-code cache goes wrong.
-#
-# `pnpm-lock.yaml` is in the key for the same reason, and it is the input most
-# easily forgotten: the GENERATORS themselves are dependencies. Bump Prisma or
-# the SDK's bundler with no source change and every hashed source file is
-# identical, so a key without the lockfile would restore artifacts built by the
-# previous toolchain and skip the regeneration that was the point of the bump.
-#
-# On a miss the generators run and the result is saved. On a hit nothing runs.
-# Either way the outputs exist afterwards, which is the action's whole contract.
+# Both are Nx targets with declared inputs and outputs (nx.json), so Nx is the
+# only cache: the restored Nx cache replays each unchanged task's outputs, and a
+# changed input reruns only that task. There is no second cache keyed by a hand
+# list of files here, because a hand list drifts and then serves stale output.
 
 runs:
   using: composite
@@ -34,68 +21,15 @@ runs:
     # Every job that prepares files also runs nx (ensure:built, lint:types).
     - uses: ./.github/actions/nx-cache
 
-    - name: Restore generated files
-      id: cache
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        # Everything `start:prepare:files` writes. The Prisma client is NOT in
-        # node_modules: @langwatch/prisma-client owns its generated source.
-        path: |
-          packages/prisma-client/src/generated
-          modules/evaluator/contract/src/evaluators.generated.ts
-          modules/langy/browser/src/model/shared/langy/langySkills.generated.json
-          modules/langy/process/src/rules/setup-skill-bodies.rules.ts
-          sdks/typescript/dist
-          sdks/typescript/src/internal/generated/types
-          sdks/typescript/src/internal/generated/cli
-          sdks/typescript/src/internal/generated/redaction
-          mcp/typescript/dist
-          packages/ksuid/dist
-          packages/mail/dist
-        key: >-
-          ${{ runner.os }}-prepared-files-${{ hashFiles(
-            'pnpm-lock.yaml',
-            'packages/prisma-client/prisma/schema.prisma',
-            'packages/prisma-client/prisma/schema/**',
-            'packages/prisma-client/package.json',
-            'package.json',
-            'modules/langy/browser/scripts/generate-langy-skills.ts',
-            'modules/langy/process/scripts/generate-setup-skill-bodies.ts',
-            'services/langevals/ts-integration/evaluators.generated.ts',
-            'sdks/typescript/src/**',
-            'sdks/typescript/package.json',
-            'sdks/typescript/tsup.config.ts',
-            'sdks/typescript/copy-types.sh',
-            'sdks/typescript/scripts/**',
-            'feature-map.json',
-            'modules/evaluator/contract/src/evaluators.native.ts',
-            'modules/model-provider/contract/src/catalog/model-catalog.json',
-            'modules/scenario/contract/src/suite-fields.ts',
-            'modules/trace/contract/src/trace-format.schemas.ts',
-            'packages/redaction/src/**',
-            'mcp/typescript/src/**',
-            'mcp/typescript/package.json',
-            'packages/ksuid/src/**',
-            'packages/ksuid/package.json',
-            'packages/mail/src/**',
-            'packages/mail/package.json',
-            'infra/docker/Dockerfile.langyagent',
-            'skills/**/SKILL.md'
-          ) }}
-
     - name: Generate files
-      if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      # `ensure:built` is the same hook the dev lanes run before they start, so
-      # the SDK and MCP bundles are produced by one mechanism rather than by a
-      # build step spelled out again here. It is scoped to the miss: a restored
-      # `dist` predates the checkout that wrote `src`, so on a hit the staleness
-      # comparison would rebuild exactly what the cache just handed back.
+      # `ensure:built` is the same script the dev lanes run before they start,
+      # so the bundles are produced by one mechanism, not a build spelled out here.
       run: pnpm start:prepare:files && pnpm ensure:built
 
-    # A cache hit is only useful if it actually produced the files. A key that
-    # silently stops covering a new generator would otherwise hand every job a
-    # missing module minutes later, in a stack trace pointing anywhere but here.
+    # A replay is only useful if it actually produced the files. A target whose
+    # outputs stop covering a file would otherwise hand every job a missing
+    # module minutes later, in a stack trace pointing anywhere but here.
     - name: Verify the generated files are present
       shell: bash
       run: bash .github/scripts/verify-generated-files.sh

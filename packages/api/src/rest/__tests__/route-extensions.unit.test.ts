@@ -112,6 +112,7 @@ describe("a route that requires several permissions together", () => {
       .withInput(z.object({ name: z.string() }))
       .withPermission(["workflows:create", "evaluations:view"])
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         ran.push("trigger");
 
@@ -178,6 +179,7 @@ describe("a route that requires several permissions together", () => {
         param: "projectId",
       })
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         ran.push("trigger");
 
@@ -264,6 +266,7 @@ describe("a route that chooses its permission from its parsed input", () => {
       .withInput(dispatchInput)
       .withPermission(BY_KIND)
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(({ target }) => {
         ran.push(target);
 
@@ -351,6 +354,7 @@ describe("a route that chooses its permission from its parsed input", () => {
           // @ts-expect-error the map names no permission for share
           permissionBy({ field: "kind", map: { view: "project:view", update: "project:update" } }),
         )
+        .withoutAudit("test route")
         .handle(handled),
     ).toThrow(/unnamed: share/);
 
@@ -363,6 +367,7 @@ describe("a route that chooses its permission from its parsed input", () => {
             view: { permission: "organization:manage", tier: "project", field: "kind" },
           },
         })
+        .withoutAudit("test route")
         .handle(handled),
     ).toThrow(/a tier that cannot grant it/);
 
@@ -386,6 +391,7 @@ describe("a route that chooses its permission from its parsed input", () => {
       .withInput(dispatchInput)
       .withPermission(BY_KIND)
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => ({ ran: true }))
       .build()
       .router();

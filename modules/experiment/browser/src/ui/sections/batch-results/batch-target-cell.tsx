@@ -4,11 +4,19 @@
  */
 
 import { formatCost } from "@langwatch/design-system/metric-value-formatters";
-import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
-import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
+import { LuCheck, LuCopy, LuListTree } from "react-icons/lu";
 
 import {
   COLLAPSED_CELL_HEIGHT_PX,
@@ -16,6 +24,7 @@ import {
   type RowHeight,
 } from "../../../model/batch-evaluation-results.row-height.ts";
 import { formatTargetOutput } from "../../../model/format-target-output.ts";
+import { EvaluatorResultCell } from "../../elements/evaluator/evaluator-result-cell.tsx";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 import {
   type BatchCellFailure,
@@ -32,6 +41,7 @@ const MAX_DISPLAY_CHARS = 10000;
 type BatchTargetCellProps = {
   /** Target output data for this row */
   targetOutput: BatchTargetOutput;
+  isEvaluator?: boolean;
   // Evaluator ids to skip (comparison evaluators show in Winner column)
   suppressedEvaluatorIds?: Set<string>;
   /** Whether to render the target's output (default true) */
@@ -135,29 +145,23 @@ const CellFailure = ({
   onExpand: () => void;
 }) => {
   const errorBox = (
-    <HStack
-      gap={2}
-      p={2}
-      bg="red.subtle"
-      borderRadius="md"
-      color="red.fg"
-      fontSize="13px"
+    <Alert.Root
+      status="error"
+      size="sm"
       cursor={expanded ? undefined : "pointer"}
       onClick={expanded ? undefined : onExpand}
       data-testid={`error-output-${targetId}`}
     >
-      <Box flexShrink={0}>
-        <LuCircleAlert size={16} />
-      </Box>
-      <VStack align="start" gap={0.5}>
-        <Text lineClamp={expanded ? undefined : 2}>{failure.title}</Text>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title lineClamp={expanded ? undefined : 2}>{failure.title}</Alert.Title>
         {failure.description && (
-          <Text fontSize="12px" color="fg.muted" lineClamp={expanded ? undefined : 2}>
+          <Alert.Description lineClamp={expanded ? undefined : 2}>
             {failure.description}
-          </Text>
+          </Alert.Description>
         )}
-      </VStack>
-    </HStack>
+      </Alert.Content>
+    </Alert.Root>
   );
   if (expanded) return errorBox;
 
@@ -457,15 +461,19 @@ const CellBody = (props: CellBodyProps) => {
           )}
         </HStack>
       )}
-      {showOutput && (
-        <CellOutput
-          failure={props.failure}
-          output={props.output}
-          targetId={targetOutput.targetId}
-          expanded={expanded}
-          rowHeight={props.rowHeight}
-          onExpand={props.onExpand}
-        />
+      {showOutput && props.isEvaluator && !props.failure && targetOutput.output != null ? (
+        <EvaluatorResultCell result={targetOutput.output} />
+      ) : (
+        showOutput && (
+          <CellOutput
+            failure={props.failure}
+            output={props.output}
+            targetId={targetOutput.targetId}
+            expanded={expanded}
+            rowHeight={props.rowHeight}
+            onExpand={props.onExpand}
+          />
+        )
       )}
       {showEvaluations && (
         <EvaluatorChips
@@ -547,7 +555,7 @@ export function BatchTargetCell({
             bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px color-mix(in srgb, var(--chakra-colors-bg-scrim) 15%, transparent)"
             zIndex={1001}
             display="flex"
             flexDirection="column"

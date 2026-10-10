@@ -1,4 +1,7 @@
-import { Badge, Box, Button, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Badge, Button, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Radio } from "lucide-react";
 
 import type { SubscriberHealthRow } from "../../model/subscriber-health.ts";
 
@@ -63,7 +66,7 @@ function SubscriberPauseAction({
 }) {
   return (
     <Button
-      size="2xs"
+      size="sm"
       variant="outline"
       colorPalette={row.isPaused ? "green" : "yellow"}
       onClick={() => onTogglePause(row, queueName)}
@@ -113,7 +116,7 @@ function SubscriberRow({
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={row.blocked > 0 ? "red.500" : "fg.muted"}>
+        <Text textStyle="xs" fontFamily="mono" color={row.blocked > 0 ? "fg.error" : "fg.muted"}>
           {row.blocked}
         </Text>
       </Table.Cell>
@@ -155,21 +158,27 @@ export function SubscribersCard({
   isPausePending?: (row: SubscriberHealthRow) => boolean;
 }) {
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
-            Event Subscribers
+            Event subscribers
           </Text>
         </HStack>
         {rows.length === 0 ? (
-          <Box padding={4}>
-            <Text textStyle="xs" color="fg.muted">
-              No event subscribers registered.
-            </Text>
-          </Box>
+          <NoDataInfoBlock
+            icon={<Radio />}
+            title="No event subscribers registered."
+            description="Registered subscribers and their delivery status appear here."
+          />
         ) : (
-          <Table.Root size="sm" variant="line">
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflowX: "auto" }}
+            size="sm"
+            variant="line"
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Subscriber</Table.ColumnHeader>
@@ -194,7 +203,7 @@ export function SubscribersCard({
                 />
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         )}
       </Card.Body>
     </Card.Root>

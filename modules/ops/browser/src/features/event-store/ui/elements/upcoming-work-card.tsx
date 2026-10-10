@@ -1,7 +1,7 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { OpsScheduledJob, ProcessWakeRow } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { useMemo } from "react";
 
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
@@ -63,7 +63,7 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
       <Table.Cell textAlign="end">
         <Text
           textStyle="xs"
-          color={overdue ? "orange.500" : "fg.muted"}
+          color={overdue ? "fg.warning" : "fg.muted"}
           fontWeight={overdue ? "medium" : undefined}
           whiteSpace="nowrap"
         >
@@ -88,7 +88,7 @@ export function UpcomingWorkCard({
   wakes: UpcomingProcessWake[];
   now?: number;
 }) {
-  const rows = useMemo(() => {
+  const rows = (() => {
     const merged: TimedWorkRow[] = [];
     for (const job of schedules) {
       if (!job.active || job.nextRunAt === null) continue;
@@ -111,14 +111,14 @@ export function UpcomingWorkCard({
     }
     merged.sort((left, right) => left.dueAtMs - right.dueAtMs);
     return merged.slice(0, VISIBLE_ROWS);
-  }, [schedules, wakes]);
+  })();
 
   if (rows.length === 0) return null;
 
   const overdueCount = rows.filter((row) => row.dueAtMs < now).length;
 
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack
           paddingX={4}
@@ -140,7 +140,13 @@ export function UpcomingWorkCard({
           )}
         </HStack>
         <Table.ScrollArea>
-          <Table.Root size="sm" variant="line">
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflowX: "auto" }}
+            size="sm"
+            variant="line"
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader width="130px">Kind</Table.ColumnHeader>
@@ -154,7 +160,7 @@ export function UpcomingWorkCard({
                 <TimedWorkRowView key={row.key} row={row} now={now} />
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         </Table.ScrollArea>
       </Card.Body>
     </Card.Root>

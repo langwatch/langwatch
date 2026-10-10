@@ -211,13 +211,13 @@ export function EvaluatorSelection({
                   justifyContent="center"
                   minHeight="200px"
                   _hover={{
-                    background: "gray.50",
+                    background: "bg.subtle",
                     textDecoration: "none",
                   }}
                 >
                   <VStack gap={3}>
                     <Box p={3} borderRadius="full" bg="bg.muted">
-                      <Plus size={24} color="gray" />
+                      <Plus size={24} color="var(--chakra-colors-fg-muted)" />
                     </Box>
                     <Text color="fg.muted">Create Custom Evaluator</Text>
                   </VStack>
@@ -255,7 +255,7 @@ function EvaluatorChoiceCard({
       width="full"
       padding={6}
       borderRadius={6}
-      boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
+      boxShadow="0px 4px 10px 0px color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent)"
       cursor={isDisabled ? "default" : "pointer"}
       textAlign="left"
       asChild
@@ -265,12 +265,12 @@ function EvaluatorChoiceCard({
         isDisabled
           ? undefined
           : {
-              background: "gray.200",
+              background: "bg.emphasized",
             }
       }
       onClick={choose}
-      color={isDisabled ? "gray.400" : undefined}
-      background={isDisabled ? "gray.50" : "white"}
+      color={isDisabled ? "fg.subtle" : undefined}
+      background={isDisabled ? "bg.subtle" : "bg.panel"}
     >
       <button type="button">
         <VStack align="start" gap={4} position="relative">
@@ -283,7 +283,7 @@ function EvaluatorChoiceCard({
                 position="absolute"
                 right="-12px"
                 top="-12px"
-                background="blue.100"
+                background="blue.subtle"
                 borderRadius="100%"
                 padding="4px"
               >
@@ -373,8 +373,8 @@ function EvaluatorChoiceCard({
                   >
                     <Badge
                       colorPalette="blue"
-                      backgroundColor="blue.50"
-                      color="blue.700"
+                      backgroundColor="blue.subtle"
+                      color="blue.fg"
                       whiteSpace="nowrap"
                     >
                       Requires Expected Output
@@ -397,8 +397,8 @@ function EvaluatorChoiceCard({
                   >
                     <Badge
                       colorPalette="purple"
-                      backgroundColor="purple.50"
-                      color="purple.700"
+                      backgroundColor="purple.subtle"
+                      color="purple.fg"
                       whiteSpace="nowrap"
                     >
                       Requires Expected Contexts

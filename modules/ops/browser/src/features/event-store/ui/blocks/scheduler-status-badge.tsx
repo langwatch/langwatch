@@ -39,7 +39,7 @@ export function SchedulerStatusBadge({
         {label}
       </Badge>
       {status === "overdue" && (
-        <Text textStyle="xs" color="red.500">
+        <Text textStyle="xs" color="red.fg">
           {formatDurationMs(latenessMs)} late
         </Text>
       )}

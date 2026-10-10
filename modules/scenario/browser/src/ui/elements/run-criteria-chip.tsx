@@ -76,7 +76,7 @@ export function RunCriteriaChip({
           {uncheckedCriteria.length > 0 && (
             <CriteriaList
               title="Could not check"
-              color="orange.500"
+              color="orange.fg"
               icon={CircleDashed}
               items={uncheckedCriteria}
             />

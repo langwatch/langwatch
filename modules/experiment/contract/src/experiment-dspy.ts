@@ -1,6 +1,7 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const experimentDspyExampleSchema = z.object({
+const experimentDspyExampleSchemaDefinition = z.object({
   hash: z.string(),
   example: z.record(z.string(), z.unknown()),
   pred: z.record(z.string(), z.unknown()),
@@ -15,8 +16,13 @@ export const experimentDspyExampleSchema = z.object({
     .nullable()
     .optional(),
 });
+export interface ExperimentDspyExampleSchema extends Named<
+  typeof experimentDspyExampleSchemaDefinition
+> {}
+export const experimentDspyExampleSchema: ExperimentDspyExampleSchema =
+  experimentDspyExampleSchemaDefinition;
 
-export const experimentDspyLlmCallSchema = z.object({
+const experimentDspyLlmCallSchemaDefinition = z.object({
   hash: z.string(),
   __class__: z.string(),
   response: z.record(z.string(), z.unknown()),
@@ -25,13 +31,23 @@ export const experimentDspyLlmCallSchema = z.object({
   completion_tokens: z.number().nullable().optional(),
   cost: z.number().nullable().optional(),
 });
+export interface ExperimentDspyLlmCallSchema extends Named<
+  typeof experimentDspyLlmCallSchemaDefinition
+> {}
+export const experimentDspyLlmCallSchema: ExperimentDspyLlmCallSchema =
+  experimentDspyLlmCallSchemaDefinition;
 
-export const experimentDspyPredictorSchema = z.object({
+const experimentDspyPredictorSchemaDefinition = z.object({
   name: z.string(),
   predictor: z.record(z.string(), z.unknown()),
 });
+export interface ExperimentDspyPredictorSchema extends Named<
+  typeof experimentDspyPredictorSchemaDefinition
+> {}
+export const experimentDspyPredictorSchema: ExperimentDspyPredictorSchema =
+  experimentDspyPredictorSchemaDefinition;
 
-export const experimentDspyStepSchema = z.object({
+const experimentDspyStepSchemaDefinition = z.object({
   tenantId: z.string(),
   experimentId: z.string(),
   runId: z.string(),
@@ -48,8 +64,13 @@ export const experimentDspyStepSchema = z.object({
   insertedAt: z.number(),
   updatedAt: z.number(),
 });
+export interface ExperimentDspyStepSchema extends Named<
+  typeof experimentDspyStepSchemaDefinition
+> {}
+export const experimentDspyStepSchema: ExperimentDspyStepSchema =
+  experimentDspyStepSchemaDefinition;
 
-export const experimentDspyStepSummarySchema = z.object({
+const experimentDspyStepSummarySchemaDefinition = z.object({
   ...experimentDspyStepSchema.pick({
     tenantId: true,
     experimentId: true,
@@ -65,18 +86,33 @@ export const experimentDspyStepSummarySchema = z.object({
   llmCallsTotalTokens: z.number(),
   llmCallsTotalCost: z.number(),
 });
+export interface ExperimentDspyStepSummarySchema extends Named<
+  typeof experimentDspyStepSummarySchemaDefinition
+> {}
+export const experimentDspyStepSummarySchema: ExperimentDspyStepSummarySchema =
+  experimentDspyStepSummarySchemaDefinition;
 
-export const experimentDspyStepLookupSchema = z.object({
+const experimentDspyStepLookupSchemaDefinition = z.object({
   tenantId: z.string(),
   experimentId: z.string(),
   runId: z.string(),
   stepIndex: z.string(),
 });
+export interface ExperimentDspyStepLookupSchema extends Named<
+  typeof experimentDspyStepLookupSchemaDefinition
+> {}
+export const experimentDspyStepLookupSchema: ExperimentDspyStepLookupSchema =
+  experimentDspyStepLookupSchemaDefinition;
 
-export const experimentDspyStepsLookupSchema = experimentDspyStepLookupSchema.pick({
+const experimentDspyStepsLookupSchemaDefinition = experimentDspyStepLookupSchema.pick({
   tenantId: true,
   experimentId: true,
 });
+export interface ExperimentDspyStepsLookupSchema extends Named<
+  typeof experimentDspyStepsLookupSchemaDefinition
+> {}
+export const experimentDspyStepsLookupSchema: ExperimentDspyStepsLookupSchema =
+  experimentDspyStepsLookupSchemaDefinition;
 
 export type ExperimentDspyExample = z.infer<typeof experimentDspyExampleSchema>;
 export type ExperimentDspyLlmCall = z.infer<typeof experimentDspyLlmCallSchema>;

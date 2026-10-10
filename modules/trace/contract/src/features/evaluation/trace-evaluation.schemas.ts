@@ -1,7 +1,8 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 // Duplicate of evaluation-contract's evaluationRunDataSchema (evaluation.ts); keep in step.
-export const evaluationRunDataSchema = z.object({
+const evaluationRunDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -25,9 +26,11 @@ export const evaluationRunDataSchema = z.object({
   completedAt: z.number().nullable(),
   costId: z.string().nullable(),
 });
+export interface EvaluationRunDataSchema extends Named<typeof evaluationRunDataSchemaDefinition> {}
+export const evaluationRunDataSchema: EvaluationRunDataSchema = evaluationRunDataSchemaDefinition;
 
 // Duplicate of evaluation-contract's evaluationSummarySchema (evaluation.ts); keep in step.
-export const evaluationSummarySchema = evaluationRunDataSchema.pick({
+const evaluationSummarySchemaDefinition = evaluationRunDataSchema.pick({
   evaluationId: true,
   evaluatorId: true,
   evaluatorType: true,
@@ -39,3 +42,5 @@ export const evaluationSummarySchema = evaluationRunDataSchema.pick({
   passed: true,
   label: true,
 });
+export interface EvaluationSummarySchema extends Named<typeof evaluationSummarySchemaDefinition> {}
+export const evaluationSummarySchema: EvaluationSummarySchema = evaluationSummarySchemaDefinition;

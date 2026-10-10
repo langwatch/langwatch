@@ -134,7 +134,7 @@ jobs:
           push: true
           platforms: ${{ matrix.platform }}
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=${{ matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report. Go_service and langwatch_nlp read VERSION,
           # langyagent reads SERVICE_VERSION; the other images ignore both.

@@ -55,7 +55,7 @@ export function PipelineTreeNode({
           fontWeight={depth === 0 ? "semibold" : "medium"}
           fontFamily={isLeaf ? "mono" : undefined}
           flex={1}
-          color={paused ? "orange.500" : undefined}
+          color={paused ? "orange.fg" : undefined}
         >
           {node.name}
         </Text>
@@ -89,7 +89,7 @@ export function PipelineTreeNode({
             {directlyPaused && (
               <Button
                 variant="ghost"
-                size="2xs"
+                size="sm"
                 colorPalette="green"
                 onClick={() => onUnpause(path)}
               >
@@ -97,12 +97,7 @@ export function PipelineTreeNode({
               </Button>
             )}
             {!directlyPaused && !paused && (
-              <Button
-                variant="ghost"
-                size="2xs"
-                colorPalette="orange"
-                onClick={() => onPause(path)}
-              >
+              <Button variant="ghost" size="sm" colorPalette="orange" onClick={() => onPause(path)}>
                 <Pause size={10} />
               </Button>
             )}

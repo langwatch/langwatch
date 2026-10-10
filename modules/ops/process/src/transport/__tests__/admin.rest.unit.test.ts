@@ -58,6 +58,7 @@ function mount(app: OpsApi) {
   });
 
   return createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: door,
     doors: { browser: door },

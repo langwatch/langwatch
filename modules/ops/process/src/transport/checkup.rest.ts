@@ -28,6 +28,7 @@ export const checkupRest = defineRestRouter(OpsApi)
   .handle(({ app, scope }) => app.getProjectCheckup({ projectId: scope.id }))
 
   .post("/api/checkup/run", "runCheckup")
+  .withoutAudit("run, not a change")
   .withInput(explicitCheckInputSchema)
   .withPermission("organization:manage")
   .withOutput(checkupResultSchema)

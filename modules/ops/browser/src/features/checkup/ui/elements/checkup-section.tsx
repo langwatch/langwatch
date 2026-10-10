@@ -1,7 +1,7 @@
-import { Box, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Card, Heading, HStack, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-/** One titled band of the checkup page: a hairline above, one line of description, an action. */
+/** One checkup section composed from the shared outline card. */
 export function CheckupSection({
   icon,
   title,
@@ -18,58 +18,41 @@ export function CheckupSection({
   children: ReactNode;
 }) {
   return (
-    <Box
-      as="section"
-      width="full"
-      borderTopWidth="1px"
-      borderColor="border.muted"
-      paddingY={{ base: 5, md: 6 }}
-      data-testid={testId}
-    >
-      <VStack width="full" align="stretch" gap={5}>
-        <VStack width="full" align="stretch" gap={1}>
-          <HStack width="full" gap={2} align="center">
+    <Card.Root as="section" variant="outline" width="full" data-testid={testId}>
+      <Card.Header>
+        <HStack justify="space-between" align="start" wrap="wrap" gap={3}>
+          <HStack minWidth={0} gap={2}>
             {icon ? (
-              <Box color="fg.muted" display="flex" flexShrink={0}>
+              <Box color="fg.muted" flexShrink={0}>
                 {icon}
               </Box>
             ) : null}
-            <Text fontSize="md" fontWeight={600} letterSpacing="-0.01em">
+            <Heading size="sm" overflowWrap="anywhere">
               {title}
-            </Text>
-            {action ? (
-              <>
-                <Spacer />
-                {action}
-              </>
-            ) : null}
+            </Heading>
           </HStack>
-          {description ? (
-            <Text fontSize="sm" lineHeight="1.55" color="fg.muted">
-              {description}
-            </Text>
-          ) : null}
-        </VStack>
-        {children}
-      </VStack>
-    </Box>
+          {action}
+        </HStack>
+        {description ? (
+          <Text textStyle="sm" color="fg.muted">
+            {description}
+          </Text>
+        ) : null}
+      </Card.Header>
+      <Card.Body gap={5}>{children}</Card.Body>
+    </Card.Root>
   );
 }
 
-/** One item in a band's list, outlined so the eye sees where one row ends. */
+/** A nested checkup item using the shared subtle card. */
 export function CheckupSectionRow({ testId, children }: { testId?: string; children: ReactNode }) {
   return (
-    <HStack
-      width="full"
-      gap={3}
-      paddingX={4}
-      paddingY={3}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="10px"
-      data-testid={testId}
-    >
-      {children}
-    </HStack>
+    <Card.Root variant="subtle" width="full" data-testid={testId}>
+      <Card.Body>
+        <HStack gap={3} align="start" minWidth={0} wrap="wrap">
+          {children}
+        </HStack>
+      </Card.Body>
+    </Card.Root>
   );
 }

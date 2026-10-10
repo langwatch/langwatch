@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareBindings(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…)`, `src/trace.module.ts:36`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…)`, `src/trace.module.ts:35`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1037,73 +1037,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:325` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:270` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:331`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:276`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:333)
-// Response: inline, src/transport/otlp-ingest.rest.ts:336
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1/traces` · `ingestOtlpTracesAlias`
-
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:355`.
-
-Answers at `/:otlpBase{.+}/v1/traces`.
-
-```typescript
-// Params: otlpTraceAliasParamsSchema, ../contract/src/features/ingest/otlp-ingest.rest.ts:11
-interface Params {
-  otlpBase: string;
-}
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:358)
-// Response: inline, src/transport/otlp-ingest.rest.ts:361
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1/traces/` · `ingestOtlpTracesAliasSlash`
-
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:371`.
-
-Answers at `/:otlpBase{.+}/v1/traces/`.
-
-```typescript
-type Params = z.infer<typeof otlpTraceAliasParamsSchema>; // ../contract/src/features/ingest/otlp-ingest.rest.ts:11
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:374)
-// Response: inline, src/transport/otlp-ingest.rest.ts:377
-type Response = unknown;
-```
-
-#### `POST /v1/traces` · `ingestOtlpTracesRootV1`
-
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:387`.
-
-Answers at `/v1/traces`.
-
-```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:389)
-// Response: inline, src/transport/otlp-ingest.rest.ts:392
-type Response = unknown;
-```
-
-#### `POST /v1/traces/` · `ingestOtlpTracesRootV1Slash`
-
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:402`.
-
-Answers at `/v1/traces/`.
-
-```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:404)
-// Response: inline, src/transport/otlp-ingest.rest.ts:407
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:278)
+// Response: inline, src/transport/otlp-ingest.rest.ts:281
 type Response = unknown;
 ```
 
@@ -1221,7 +1168,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:311`   |
+| Declared at | `src/transport/traces.rest.ts:306`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1231,13 +1178,13 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:315`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:310`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:111
-// Response: inline, src/transport/traces.rest.ts:318
+// Response: inline, src/transport/traces.rest.ts:313
 type Response = unknown;
 ```
 
@@ -1245,7 +1192,7 @@ type Response = unknown;
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:340`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:335`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1267,7 +1214,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:373`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:368`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1283,7 +1230,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:412`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:407`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1303,7 +1250,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:436`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:431`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 

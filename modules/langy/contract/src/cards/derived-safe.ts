@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The DERIVED-SAFE allowlist (ADR-060 §3-§6): shared card kinds Langy may
  * write, and their strict schemas. Closed list; widening is gated at compile
@@ -53,7 +54,7 @@ export type RenderedCardKind = (typeof RENDERED_CARD_KINDS)[number];
  * component. `explore`: a Trace Explorer query, rendered only if it validates.
  * `verify`: run the data as a real analytics query (derived-vs-measured bridge).
  */
-export const langyCardHintSchema = z.discriminatedUnion("type", [
+const langyCardHintSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("explore"),
     query: z.record(z.string(), z.unknown()),
@@ -63,6 +64,8 @@ export const langyCardHintSchema = z.discriminatedUnion("type", [
     query: z.record(z.string(), z.unknown()).optional(),
   }),
 ]);
+export interface LangyCardHintSchema extends Named<typeof langyCardHintSchemaDefinition> {}
+export const langyCardHintSchema: LangyCardHintSchema = langyCardHintSchemaDefinition;
 export type LangyCardHint = z.infer<typeof langyCardHintSchema>;
 
 /**
@@ -80,7 +83,7 @@ const derivedCardBase = {
  * measured schema's field names (same chart body); differs only in
  * tolerance: strict objects, non-empty series.
  */
-export const langyDerivedTimeseriesCardSchema = z.object({
+const langyDerivedTimeseriesCardSchemaDefinition = z.object({
   ...derivedCardBase,
   kind: z.literal("timeseries"),
   title: z.string().optional(),
@@ -95,22 +98,37 @@ export const langyDerivedTimeseriesCardSchema = z.object({
     .min(1),
   comparison: z.object(timeseriesComparisonFields).optional(),
 });
+export interface LangyDerivedTimeseriesCardSchema extends Named<
+  typeof langyDerivedTimeseriesCardSchemaDefinition
+> {}
+export const langyDerivedTimeseriesCardSchema: LangyDerivedTimeseriesCardSchema =
+  langyDerivedTimeseriesCardSchemaDefinition;
 export type LangyDerivedTimeseriesCard = z.infer<typeof langyDerivedTimeseriesCardSchema>;
 
 /** `table` — a generic derived table: named columns, rows of primitive cells. */
-export const langyDerivedTableCardSchema = z.object({
+const langyDerivedTableCardSchemaDefinition = z.object({
   ...derivedCardBase,
   kind: z.literal("table"),
   ...tableCardFields,
 });
+export interface LangyDerivedTableCardSchema extends Named<
+  typeof langyDerivedTableCardSchemaDefinition
+> {}
+export const langyDerivedTableCardSchema: LangyDerivedTableCardSchema =
+  langyDerivedTableCardSchemaDefinition;
 export type LangyDerivedTableCard = z.infer<typeof langyDerivedTableCardSchema>;
 
 /** `stats` — labelled key-value figures ("p95 latency: 812ms"). */
-export const langyDerivedStatsCardSchema = z.object({
+const langyDerivedStatsCardSchemaDefinition = z.object({
   ...derivedCardBase,
   kind: z.literal("stats"),
   ...statsCardFields,
 });
+export interface LangyDerivedStatsCardSchema extends Named<
+  typeof langyDerivedStatsCardSchemaDefinition
+> {}
+export const langyDerivedStatsCardSchema: LangyDerivedStatsCardSchema =
+  langyDerivedStatsCardSchemaDefinition;
 export type LangyDerivedStatsCard = z.infer<typeof langyDerivedStatsCardSchema>;
 
 /**
@@ -143,8 +161,13 @@ function refineUniqueOptionIds(
   }
 }
 
-export const langyDerivedChoicesCardSchema =
+const langyDerivedChoicesCardSchemaDefinition =
   choicesCardObjectSchema.superRefine(refineUniqueOptionIds);
+export interface LangyDerivedChoicesCardSchema extends Named<
+  typeof langyDerivedChoicesCardSchemaDefinition
+> {}
+export const langyDerivedChoicesCardSchema: LangyDerivedChoicesCardSchema =
+  langyDerivedChoicesCardSchemaDefinition;
 export type LangyDerivedChoicesCard = z.infer<typeof choicesCardObjectSchema>;
 
 /**
@@ -163,18 +186,23 @@ const DERIVED_SCHEMA_BY_KIND = {
  * The FENCE channel: a model-emitted card is exactly one of the allowlisted
  * kinds — the allowlist IS the schema, not a filter in front of it.
  */
-export const langyModelEmittedCardSchema = z.discriminatedUnion("kind", [
+const langyModelEmittedCardSchemaDefinition = z.discriminatedUnion("kind", [
   DERIVED_SCHEMA_BY_KIND.timeseries,
   DERIVED_SCHEMA_BY_KIND.table,
   DERIVED_SCHEMA_BY_KIND.stats,
 ]);
+export interface LangyModelEmittedCardSchema extends Named<
+  typeof langyModelEmittedCardSchemaDefinition
+> {}
+export const langyModelEmittedCardSchema: LangyModelEmittedCardSchema =
+  langyModelEmittedCardSchemaDefinition;
 export type LangyModelEmittedCard = z.infer<typeof langyModelEmittedCardSchema>;
 
 /**
  * The PART channel: every kind a stamped card part may carry, so the panel's
  * own `choices` card validates through the same module the relay stamps with.
  */
-export const langyDerivedCardSchema = z
+const langyDerivedCardSchemaDefinition = z
   .discriminatedUnion("kind", [
     DERIVED_SCHEMA_BY_KIND.timeseries,
     DERIVED_SCHEMA_BY_KIND.table,
@@ -184,6 +212,8 @@ export const langyDerivedCardSchema = z
   .superRefine((card, ctx) => {
     if (card.kind === "choices") refineUniqueOptionIds(card, ctx);
   });
+export interface LangyDerivedCardSchema extends Named<typeof langyDerivedCardSchemaDefinition> {}
+export const langyDerivedCardSchema: LangyDerivedCardSchema = langyDerivedCardSchemaDefinition;
 export type LangyDerivedCard = z.infer<typeof langyDerivedCardSchema>;
 
 /**

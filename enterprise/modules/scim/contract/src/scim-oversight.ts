@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The platform operator's view of directory sync across every customer
@@ -10,7 +11,7 @@ import { z } from "zod";
 export const DIRECTORY_IDENTITY_PAGE_SIZE = 100;
 
 /** One failure as the operator reads it: reason code, attempts and all. */
-export const oversightFailureSchema = z
+const oversightFailureSchemaDefinition = z
   .object({
     /** Identity's apply operation, e.g. `deactivate_user`. */
     op: z.string(),
@@ -22,9 +23,11 @@ export const oversightFailureSchema = z
     occurredAtMs: z.number().int(),
   })
   .strict();
+export interface OversightFailureSchema extends Named<typeof oversightFailureSchemaDefinition> {}
+export const oversightFailureSchema: OversightFailureSchema = oversightFailureSchemaDefinition;
 
 /** One connection's sync, on the cross-customer list. */
-export const oversightSyncSchema = z
+const oversightSyncSchemaDefinition = z
   .object({
     connectionId: z.string(),
     organizationId: z.string(),
@@ -37,15 +40,19 @@ export const oversightSyncSchema = z
     updatedAtMs: z.number().int(),
   })
   .strict();
+export interface OversightSyncSchema extends Named<typeof oversightSyncSchemaDefinition> {}
+export const oversightSyncSchema: OversightSyncSchema = oversightSyncSchemaDefinition;
 export type OversightSync = z.infer<typeof oversightSyncSchema>;
 
-export const oversightSyncListSchema = z
+const oversightSyncListSchemaDefinition = z
   .object({ syncs: oversightSyncSchema.array(), total: z.number().int() })
   .strict();
+export interface OversightSyncListSchema extends Named<typeof oversightSyncListSchemaDefinition> {}
+export const oversightSyncListSchema: OversightSyncListSchema = oversightSyncListSchemaDefinition;
 export type OversightSyncList = z.infer<typeof oversightSyncListSchema>;
 
 /** Which person the directory knows by which identifier, on one connection. */
-export const directoryIdentityRowSchema = z
+const directoryIdentityRowSchemaDefinition = z
   .object({
     connectionId: z.string(),
     externalId: z.string(),
@@ -54,26 +61,51 @@ export const directoryIdentityRowSchema = z
     updatedAtMs: z.number().int(),
   })
   .strict();
+export interface DirectoryIdentityRowSchema extends Named<
+  typeof directoryIdentityRowSchemaDefinition
+> {}
+export const directoryIdentityRowSchema: DirectoryIdentityRowSchema =
+  directoryIdentityRowSchemaDefinition;
 export type DirectoryIdentityRow = z.infer<typeof directoryIdentityRowSchema>;
 
-export const listOversightSyncsInputSchema = z.object({
+const listOversightSyncsInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(253).optional(),
 });
+export interface ListOversightSyncsInputSchema extends Named<
+  typeof listOversightSyncsInputSchemaDefinition
+> {}
+export const listOversightSyncsInputSchema: ListOversightSyncsInputSchema =
+  listOversightSyncsInputSchemaDefinition;
 export type ListOversightSyncsInput = z.infer<typeof listOversightSyncsInputSchema>;
 
-export const oversightConnectionInputSchema = z.object({ connectionId: z.string().min(1) });
+const oversightConnectionInputSchemaDefinition = z.object({ connectionId: z.string().min(1) });
+export interface OversightConnectionInputSchema extends Named<
+  typeof oversightConnectionInputSchemaDefinition
+> {}
+export const oversightConnectionInputSchema: OversightConnectionInputSchema =
+  oversightConnectionInputSchemaDefinition;
 export type OversightConnectionInput = z.infer<typeof oversightConnectionInputSchema>;
 
-export const redriveRetiredApplyInputSchema = z.object({
+const redriveRetiredApplyInputSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   /** Which dead letter, by the business time it was retired at. */
   retiredAtMs: z.number().int().nonnegative(),
 });
+export interface RedriveRetiredApplyInputSchema extends Named<
+  typeof redriveRetiredApplyInputSchemaDefinition
+> {}
+export const redriveRetiredApplyInputSchema: RedriveRetiredApplyInputSchema =
+  redriveRetiredApplyInputSchemaDefinition;
 export type RedriveRetiredApplyInput = z.infer<typeof redriveRetiredApplyInputSchema>;
 
-export const redriveRetiredApplyResultSchema = z.object({ applied: z.boolean() }).strict();
+const redriveRetiredApplyResultSchemaDefinition = z.object({ applied: z.boolean() }).strict();
+export interface RedriveRetiredApplyResultSchema extends Named<
+  typeof redriveRetiredApplyResultSchemaDefinition
+> {}
+export const redriveRetiredApplyResultSchema: RedriveRetiredApplyResultSchema =
+  redriveRetiredApplyResultSchemaDefinition;
 export type RedriveRetiredApplyResult = z.infer<typeof redriveRetiredApplyResultSchema>;
 
 /** The operator a surface authenticated; the impersonator where there is one. */

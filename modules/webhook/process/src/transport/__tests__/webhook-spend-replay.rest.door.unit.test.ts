@@ -45,6 +45,7 @@ function mount({ planIncludesBilling }: { planIncludesBilling: boolean }) {
   };
   const hono = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: door, identify: door },
     entitlements,
   }).mount(webhookSpendReplayRest.router(), {

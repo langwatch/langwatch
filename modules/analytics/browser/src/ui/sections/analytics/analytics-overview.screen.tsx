@@ -29,7 +29,7 @@ function AnalyticsContent() {
   const project = host.project();
 
   return (
-    <AnalyticsLayout title="Analytics" railEntry="overview">
+    <AnalyticsLayout title="Overview" railEntry="overview">
       {project && !project.hasFirstMessage && (
         <Alert.Root status="warning" marginBottom={6}>
           <Alert.Indicator />
@@ -119,7 +119,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
               width="full"
               cursor="pointer"
               borderColor="border"
-              _hover={{ borderColor: "orange.400", shadow: "sm" }}
+              _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
               transition="all 0.15s ease"
             >
               <Card.Body paddingX={4} paddingY={3}>

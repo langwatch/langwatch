@@ -1,8 +1,8 @@
 @setup @unit
 Feature: haven works with Nx
   Nx caches task results in one per-user cache every worktree shares (ADR-150).
-  haven keeps untrusted checkouts out of it, runs the affected typecheck under
-  the check slots, and keeps Nx daemons from outliving their worktree.
+  haven keeps untrusted checkouts out of it, runs the typecheck under a check
+  slot, and keeps Nx daemons from outliving their worktree.
 
   Scenario: A trusted worktree leaves the Nx cache location to Nx
     Given a stack from the developer's own worktree
@@ -17,15 +17,9 @@ Feature: haven works with Nx
     And the install, codegen, prepare and service lanes all carry it
 
   Scenario: An agent's typecheck is the affected one
-    Given an agent runs haven machine typecheck with no scope flag
-    Then it runs nx affected -t typecheck from the merge-base with the branch's upstream, or origin/main
-    And --all runs the whole-tree typecheck instead
-
-  Scenario: The affected typecheck holds one slot per parallel task
-    Given two check slots are free besides the one it waits for
-    When haven machine typecheck --affected runs
-    Then it holds three slots and sets NX_PARALLEL=3
-    And with no other slot free it still runs, with NX_PARALLEL=1
+    Given an agent runs haven machine typecheck --affected, or with no scope flag
+    Then it runs the root pnpm typecheck, one incremental tsc -b, under one check slot
+    And it sets no NX_PARALLEL, because no per-project Nx typecheck runs
 
   Scenario: down stops the worktree's Nx daemon and nobody else's
     Given Nx daemons run for this worktree and another

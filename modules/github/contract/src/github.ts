@@ -1,26 +1,42 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The signed webhook's JSON envelope; each GitHub event owns its inner definition. */
-export const githubWebhookEnvelopeSchema = z.record(z.string(), z.unknown());
+const githubWebhookEnvelopeSchemaDefinition = z.record(z.string(), z.unknown());
+export interface GithubWebhookEnvelopeSchema extends Named<
+  typeof githubWebhookEnvelopeSchemaDefinition
+> {}
+export const githubWebhookEnvelopeSchema: GithubWebhookEnvelopeSchema =
+  githubWebhookEnvelopeSchemaDefinition;
 export type GithubWebhookEnvelope = z.infer<typeof githubWebhookEnvelopeSchema>;
 
 /** The installation-start redirect's query; its permission is checked at `organizationId`. */
-export const githubInstallStartQuerySchema = z.object({
+const githubInstallStartQuerySchemaDefinition = z.object({
   organizationId: z.string(),
   account: z.string().optional(),
   installationId: z.string().optional(),
   mode: z.string().optional(),
   return: z.string().optional(),
 });
+export interface GithubInstallStartQuerySchema extends Named<
+  typeof githubInstallStartQuerySchemaDefinition
+> {}
+export const githubInstallStartQuerySchema: GithubInstallStartQuerySchema =
+  githubInstallStartQuerySchemaDefinition;
 
-export const githubRepositoryRefSchema = z.object({
+const githubRepositoryRefSchemaDefinition = z.object({
   id: z.string(),
   fullName: z.string(),
 });
+export interface GithubRepositoryRefSchema extends Named<
+  typeof githubRepositoryRefSchemaDefinition
+> {}
+export const githubRepositoryRefSchema: GithubRepositoryRefSchema =
+  githubRepositoryRefSchemaDefinition;
 
 export const githubRepositorySchema = githubRepositoryRefSchema;
 
-export const githubInstallationSchema = z.object({
+const githubInstallationSchemaDefinition = z.object({
   installationId: z.string(),
   organizationId: z.string(),
   accountLogin: z.string(),
@@ -32,21 +48,36 @@ export const githubInstallationSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface GithubInstallationSchema extends Named<
+  typeof githubInstallationSchemaDefinition
+> {}
+export const githubInstallationSchema: GithubInstallationSchema =
+  githubInstallationSchemaDefinition;
 
-export const githubPullRequestRefSchema = z.object({
+const githubPullRequestRefSchemaDefinition = z.object({
   repositoryHost: z.string().min(1),
   repositoryFullName: z.string().min(1),
   prNumber: z.number().int().positive(),
 });
+export interface GithubPullRequestRefSchema extends Named<
+  typeof githubPullRequestRefSchemaDefinition
+> {}
+export const githubPullRequestRefSchema: GithubPullRequestRefSchema =
+  githubPullRequestRefSchemaDefinition;
 
-export const githubPullRequestLiveStatusSchema = z.object({
+const githubPullRequestLiveStatusSchemaDefinition = z.object({
   ...githubPullRequestRefSchema.shape,
   status: z.enum(["open", "draft", "merged", "closed"]),
   source: z.enum(["live", "snapshot"]),
   mappedAt: z.date().nullable(),
 });
+export interface GithubPullRequestLiveStatusSchema extends Named<
+  typeof githubPullRequestLiveStatusSchemaDefinition
+> {}
+export const githubPullRequestLiveStatusSchema: GithubPullRequestLiveStatusSchema =
+  githubPullRequestLiveStatusSchemaDefinition;
 
-export const githubPullRequestSchema = z.object({
+const githubPullRequestSchemaDefinition = z.object({
   organizationId: z.string(),
   repositoryHost: z.string(),
   repositoryFullName: z.string(),
@@ -64,12 +95,16 @@ export const githubPullRequestSchema = z.object({
   mappedAt: z.date(),
   lastCheckedAt: z.date(),
 });
+export interface GithubPullRequestSchema extends Named<typeof githubPullRequestSchemaDefinition> {}
+export const githubPullRequestSchema: GithubPullRequestSchema = githubPullRequestSchemaDefinition;
 
-export const githubTurnTokenSchema = z.object({
+const githubTurnTokenSchemaDefinition = z.object({
   token: z.string().min(1),
   repoScopeKey: z.string().min(1),
   installationId: z.string().min(1),
 });
+export interface GithubTurnTokenSchema extends Named<typeof githubTurnTokenSchemaDefinition> {}
+export const githubTurnTokenSchema: GithubTurnTokenSchema = githubTurnTokenSchemaDefinition;
 
 export type GithubRepositoryRef = z.infer<typeof githubRepositoryRefSchema>;
 export type GithubRepository = z.infer<typeof githubRepositorySchema>;
@@ -109,7 +144,7 @@ export const GITHUB_LINKING_PULL_REQUEST_ACTIONS = [
   "closed",
 ] as const;
 
-export const githubInstallStatePayloadSchema = z
+const githubInstallStatePayloadSchemaDefinition = z
   .object({
     userId: z.string(),
     organizationId: z.string(),
@@ -130,6 +165,11 @@ export const githubInstallStatePayloadSchema = z
     expectedInstallationId: z.string().optional(),
   })
   .strict();
+export interface GithubInstallStatePayloadSchema extends Named<
+  typeof githubInstallStatePayloadSchemaDefinition
+> {}
+export const githubInstallStatePayloadSchema: GithubInstallStatePayloadSchema =
+  githubInstallStatePayloadSchemaDefinition;
 
 export type GithubInstallStatePayload = z.infer<typeof githubInstallStatePayloadSchema>;
 
@@ -146,12 +186,17 @@ export const GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE = "lw.github.installation_
 export const GITHUB_INSTALLATION_CONNECTED_EVENT_VERSION = "2026-10-07" as const;
 
 /** Ids only: a peer reads anything else through `GithubApi`, never the event. */
-export const githubInstallationConnectedEventDataSchema = z.object({
+const githubInstallationConnectedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   installationId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface GithubInstallationConnectedEventDataSchema extends Named<
+  typeof githubInstallationConnectedEventDataSchemaDefinition
+> {}
+export const githubInstallationConnectedEventDataSchema: GithubInstallationConnectedEventDataSchema =
+  githubInstallationConnectedEventDataSchemaDefinition;
 export type GithubInstallationConnectedEventData = z.infer<
   typeof githubInstallationConnectedEventDataSchema
 >;

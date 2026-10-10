@@ -4,6 +4,8 @@
  * watchdog and the phase logging each lived in only one of them.
  */
 
+import { nowInstant } from "@langwatch/time";
+
 export interface ShutdownPhase {
   /** Named so a phase that hangs is identifiable in the logs. */
   name: string;
@@ -27,6 +29,8 @@ export interface ShutdownPhase {
  * legitimately needs the whole budget overrides it.
  */
 const DEFAULT_PHASE_TIMEOUT_MS = 10_000;
+/** A phase slower than this is named in the log, so a long drain says where it went. */
+const SLOW_PHASE_MS = 1_000;
 
 /**
  * A phase that outran its budget, as distinct from one that threw. A phase that
@@ -195,6 +199,7 @@ export class GracefulShutdown {
   private async runPhase(phase: ShutdownPhase): Promise<unknown> {
     const phaseTimeoutMs = phase.timeoutMs ?? DEFAULT_PHASE_TIMEOUT_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = nowInstant().epochMilliseconds;
     try {
       await Promise.race([
         Promise.resolve().then(phase.run),
@@ -205,6 +210,9 @@ export class GracefulShutdown {
           );
         }),
       ]);
+      const ms = nowInstant().epochMilliseconds - startedAt;
+      if (ms >= SLOW_PHASE_MS)
+        this.logger.info({ phase: phase.name, ms }, "shutdown phase was slow");
       return undefined;
     } catch (error) {
       // Logged and stepped over, whether it threw or timed out. A websocket

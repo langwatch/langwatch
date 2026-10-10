@@ -227,7 +227,6 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "prompt_handle_generation_failed",
   "prompt_system_prompt_conflict",
   "prompt_system_prompt_required",
-  "prompt_tag_conflict",
   "prompt_tag_invalid",
   "prompt_tag_not_found",
   "prompt_tag_protected",

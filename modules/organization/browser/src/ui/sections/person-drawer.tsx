@@ -6,19 +6,10 @@
 
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
-import { Ban, Trash2, Undo2 } from "lucide-react";
+import { Ban, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
@@ -52,11 +43,9 @@ export function PersonDrawer({ open = true, userId }: UiPersonDrawerProps) {
         if (!isOpen) closeDrawer();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title textStyle="lg" fontWeight="semibold">
-            Person
-          </Drawer.Title>
+          <Drawer.Title>Person</Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>
         <Drawer.Body paddingBottom={8}>
@@ -142,11 +131,10 @@ function PersonDetail({
             ) : null}
           </>
         }
-        chips={<ProvenanceChip provenance={provenance.data?.[person.userId]} />}
       />
 
-      <Section title="How they sign in">
-        <VStack align="start" gap={3} width="full">
+      <SettingsSection title="How they sign in" icon={<KeyRound size={18} />} divided={false}>
+        <VStack align="start" gap={4} width="full">
           <Fact label="Address">
             <HStack gap={2}>
               <Text fontSize="sm">{person.user.email ?? "None on file"}</Text>
@@ -173,6 +161,7 @@ function PersonDetail({
             </Fact>
           ) : null}
           <Fact label="Why they are here">
+            <ProvenanceChip provenance={provenance.data?.[person.userId]} />
             {provenance.isError ? (
               <Text fontSize="sm" color="fg.muted">
                 We couldn&apos;t work that out just now.
@@ -182,9 +171,9 @@ function PersonDetail({
             )}
           </Fact>
         </VStack>
-      </Section>
+      </SettingsSection>
 
-      <Section title="What they can reach">
+      <SettingsSection title="What they can reach" icon={<ShieldCheck size={18} />} divided={false}>
         <MemberAccessEditor
           organizationId={organizationId}
           userId={person.userId}
@@ -192,7 +181,7 @@ function PersonDetail({
           canManage={canManage}
           isCurrentUser={isSelf}
         />
-      </Section>
+      </SettingsSection>
 
       {isSelf ? null : (
         <PersonActions
@@ -206,25 +195,15 @@ function PersonDetail({
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <VStack align="stretch" gap={3} width="full">
-      <Heading as="h3" size="sm">
-        {title}
-      </Heading>
-      <Separator />
-      {children}
-    </VStack>
-  );
-}
-
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <VStack align="start" gap={1} width="full">
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase">
+    <VStack align="start" gap={2} width="full">
+      <Text fontSize="sm" fontWeight="medium">
         {label}
       </Text>
-      <Box width="full">{children}</Box>
+      <VStack align="start" gap={2} width="full">
+        {children}
+      </VStack>
     </VStack>
   );
 }
@@ -267,9 +246,9 @@ function PersonActions({
 
   return (
     <>
-      <Section title="Actions">
-        <VStack align="start" gap={3} width="full">
-          <HStack gap={2}>
+      <SettingsSection title="Actions" icon={<UserCog size={18} />} divided={false}>
+        <VStack align="start" gap={4} width="full">
+          <HStack gap={2} flexWrap="wrap">
             <Button
               size="sm"
               variant="outline"
@@ -294,7 +273,7 @@ function PersonActions({
             membership of this organization; their account and everything they did stay.
           </Text>
         </VStack>
-      </Section>
+      </SettingsSection>
       <ConfirmDialog
         open={confirmingRemoval}
         onOpenChange={(isOpen) => {

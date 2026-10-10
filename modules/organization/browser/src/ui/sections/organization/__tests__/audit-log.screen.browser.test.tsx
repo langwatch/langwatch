@@ -64,6 +64,8 @@ function auditRow(overrides: Record<string, unknown> = {}) {
     after: null,
     actorUserId: null,
     actorUser: null,
+    channel: "app",
+    apiKeyId: null,
     ...overrides,
   };
 }

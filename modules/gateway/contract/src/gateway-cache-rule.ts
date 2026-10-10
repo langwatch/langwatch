@@ -1,8 +1,9 @@
 import { HandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
-export const gatewayCacheRuleMatchersSchema = z
+const gatewayCacheRuleMatchersSchemaDefinition = z
   .object({
     vk_id: z.string().optional(),
     vk_tags: z.array(z.string()).optional(),
@@ -12,19 +13,29 @@ export const gatewayCacheRuleMatchersSchema = z
     request_metadata: z.record(z.string(), z.string()).optional(),
   })
   .strict();
+export interface GatewayCacheRuleMatchersSchema extends Named<
+  typeof gatewayCacheRuleMatchersSchemaDefinition
+> {}
+export const gatewayCacheRuleMatchersSchema: GatewayCacheRuleMatchersSchema =
+  gatewayCacheRuleMatchersSchemaDefinition;
 
-export const gatewayCacheRuleActionSchema = z
+const gatewayCacheRuleActionSchemaDefinition = z
   .object({
     mode: z.enum(["respect", "force", "disable"]),
     ttl: z.number().int().min(0).max(86_400).optional(),
     salt: z.string().max(64).optional(),
   })
   .strict();
+export interface GatewayCacheRuleActionSchema extends Named<
+  typeof gatewayCacheRuleActionSchemaDefinition
+> {}
+export const gatewayCacheRuleActionSchema: GatewayCacheRuleActionSchema =
+  gatewayCacheRuleActionSchemaDefinition;
 
 export type GatewayCacheRuleMatchers = z.infer<typeof gatewayCacheRuleMatchersSchema>;
 export type GatewayCacheRuleAction = z.infer<typeof gatewayCacheRuleActionSchema>;
 
-export const gatewayCacheRuleResourceSchema = z.object({
+const gatewayCacheRuleResourceSchemaDefinition = z.object({
   id: z.string(),
   organizationId: z.string(),
   name: z.string(),
@@ -39,10 +50,15 @@ export const gatewayCacheRuleResourceSchema = z.object({
   updatedAt: z.date(),
   createdById: z.string(),
 });
+export interface GatewayCacheRuleResourceSchema extends Named<
+  typeof gatewayCacheRuleResourceSchemaDefinition
+> {}
+export const gatewayCacheRuleResourceSchema: GatewayCacheRuleResourceSchema =
+  gatewayCacheRuleResourceSchemaDefinition;
 
 export type GatewayCacheRuleResource = z.infer<typeof gatewayCacheRuleResourceSchema>;
 
-export const createGatewayCacheRuleInputSchema = z.object({
+const createGatewayCacheRuleInputSchemaDefinition = z.object({
   organizationId: z.string(),
   name: z.string().min(1).max(128),
   description: z.string().max(512).nullable().optional(),
@@ -52,19 +68,34 @@ export const createGatewayCacheRuleInputSchema = z.object({
   action: gatewayCacheRuleActionSchema,
   actorUserId: z.string(),
 });
+export interface CreateGatewayCacheRuleInputSchema extends Named<
+  typeof createGatewayCacheRuleInputSchemaDefinition
+> {}
+export const createGatewayCacheRuleInputSchema: CreateGatewayCacheRuleInputSchema =
+  createGatewayCacheRuleInputSchemaDefinition;
 
-export const updateGatewayCacheRuleInputSchema = z.object({
+const updateGatewayCacheRuleInputSchemaDefinition = z.object({
   ...createGatewayCacheRuleInputSchema.partial().shape,
   id: z.string(),
   organizationId: z.string(),
   actorUserId: z.string(),
 });
+export interface UpdateGatewayCacheRuleInputSchema extends Named<
+  typeof updateGatewayCacheRuleInputSchemaDefinition
+> {}
+export const updateGatewayCacheRuleInputSchema: UpdateGatewayCacheRuleInputSchema =
+  updateGatewayCacheRuleInputSchemaDefinition;
 
-export const archiveGatewayCacheRuleInputSchema = z.object({
+const archiveGatewayCacheRuleInputSchemaDefinition = z.object({
   id: z.string(),
   organizationId: z.string(),
   actorUserId: z.string(),
 });
+export interface ArchiveGatewayCacheRuleInputSchema extends Named<
+  typeof archiveGatewayCacheRuleInputSchemaDefinition
+> {}
+export const archiveGatewayCacheRuleInputSchema: ArchiveGatewayCacheRuleInputSchema =
+  archiveGatewayCacheRuleInputSchemaDefinition;
 
 export type CreateGatewayCacheRuleInput = z.infer<typeof createGatewayCacheRuleInputSchema>;
 export type UpdateGatewayCacheRuleInput = z.infer<typeof updateGatewayCacheRuleInputSchema>;

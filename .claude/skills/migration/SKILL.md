@@ -121,23 +121,23 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 
 ## Landed and not landed (checked 2026-10-08)
 
-| Piece                                                                      | State                                                                                                                 |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, floor       | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
-| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                                                        |
-| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen   | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
-| No ClickHouse configured refuses to serve                                  | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
-| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals     | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |
-| `migration-order` CI check, `migration-owners` policy                      | landed (`cmd/migrationorder/main.go`, `packages/architecture-enforcer/src/policies/index.ts`)                         |
-| `defineMigrationStep` and `.withMigrations` collection                     | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration/migration-steps.ts`)           |
-| The upgrade task running declared blocking steps                           | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
-| The worker running background steps after the serving roster allows it     | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
-| `.withUpcasts` read-time upcast, drain, one ledger step per upcast         | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                             |
-| Upcast rewrite step                                                        | **not landed** (three `@unimplemented` scenarios in `packages/eventing/specs/event-upcast.feature`)                   |
-| Drain-age lint (a drain older than one release)                            | **not landed** (record §9 names it; no rule or policy in `packages/oxlint-rules` or the enforcer)                     |
-| Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
-| No new foreign key or `@relation` (W-01)                                   | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
-| Projection replay steps and peer projections                               | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
+| Piece                                                                     | State                                                                                                                 |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, floor      | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
+| Stepping applier (one release's schema at a time) for multi-release jumps | landed (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                                                        |
+| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen  | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
+| No ClickHouse configured refuses to serve                                 | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
+| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals    | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |
+| `migration-order` CI check, `migration-owners` policy                     | landed (`cmd/migrationorder/main.go`, `packages/architecture-enforcer/src/policies/index.ts`)                         |
+| `defineMigrationStep` and `.withMigrations` collection                    | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration/migration-steps.ts`)           |
+| The upgrade task running declared blocking steps                          | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
+| The worker running background steps after the serving roster allows it    | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
+| `.withUpcasts` read-time upcast, drain, one ledger step per upcast        | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                             |
+| Upcast rewrite step                                                       | **not landed** (three `@unimplemented` scenarios in `packages/eventing/specs/event-upcast.feature`)                   |
+| Drain-age lint (a drain older than one release)                           | **not landed** (record §9 names it; no rule or policy in `packages/oxlint-rules` or the enforcer)                     |
+| Re-runnable migration policy and the runner's auto-resolve                | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
+| No new foreign key or `@relation` (W-01)                                  | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
+| Projection replay steps and peer projections                              | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
 
 ## Wrong first moves
 

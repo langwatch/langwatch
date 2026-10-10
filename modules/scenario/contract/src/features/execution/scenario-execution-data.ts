@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
@@ -21,7 +22,7 @@ import { callerVoiceConfigSchema } from "../../voice/caller-voice.config.ts";
  * Pre-fetched prompt configuration data for serialized execution.
  * Contains all data needed to execute prompt-based scenarios without DB access.
  */
-export const PromptConfigDataSchema = z.object({
+const PromptConfigDataSchemaDefinition = z.object({
   type: z.literal("prompt"),
   promptId: z.string(),
   systemPrompt: z.string(),
@@ -54,46 +55,58 @@ export const PromptConfigDataSchema = z.object({
   temperature: z.number().optional(),
   maxTokens: z.number().optional(),
 });
+export interface PromptConfigDataSchema extends Named<typeof PromptConfigDataSchemaDefinition> {}
+export const PromptConfigDataSchema: PromptConfigDataSchema = PromptConfigDataSchemaDefinition;
 export type PromptConfigData = z.infer<typeof PromptConfigDataSchema>;
 
 /**
  * Authentication configuration schemas using discriminated union.
  * Each auth type has its required fields enforced by the schema.
  */
-export const AuthConfigNoneSchema = z.object({
+const AuthConfigNoneSchemaDefinition = z.object({
   type: z.literal("none"),
 });
+export interface AuthConfigNoneSchema extends Named<typeof AuthConfigNoneSchemaDefinition> {}
+export const AuthConfigNoneSchema: AuthConfigNoneSchema = AuthConfigNoneSchemaDefinition;
 
-export const AuthConfigBearerSchema = z.object({
+const AuthConfigBearerSchemaDefinition = z.object({
   type: z.literal("bearer"),
   token: z.string(),
 });
+export interface AuthConfigBearerSchema extends Named<typeof AuthConfigBearerSchemaDefinition> {}
+export const AuthConfigBearerSchema: AuthConfigBearerSchema = AuthConfigBearerSchemaDefinition;
 
-export const AuthConfigApiKeySchema = z.object({
+const AuthConfigApiKeySchemaDefinition = z.object({
   type: z.literal("api_key"),
   header: z.string(),
   value: z.string(),
 });
+export interface AuthConfigApiKeySchema extends Named<typeof AuthConfigApiKeySchemaDefinition> {}
+export const AuthConfigApiKeySchema: AuthConfigApiKeySchema = AuthConfigApiKeySchemaDefinition;
 
-export const AuthConfigBasicSchema = z.object({
+const AuthConfigBasicSchemaDefinition = z.object({
   type: z.literal("basic"),
   username: z.string(),
   password: z.string().optional(),
 });
+export interface AuthConfigBasicSchema extends Named<typeof AuthConfigBasicSchemaDefinition> {}
+export const AuthConfigBasicSchema: AuthConfigBasicSchema = AuthConfigBasicSchemaDefinition;
 
-export const AuthConfigSchema = z.discriminatedUnion("type", [
+const AuthConfigSchemaDefinition = z.discriminatedUnion("type", [
   AuthConfigNoneSchema,
   AuthConfigBearerSchema,
   AuthConfigApiKeySchema,
   AuthConfigBasicSchema,
 ]);
+export interface AuthConfigSchema extends Named<typeof AuthConfigSchemaDefinition> {}
+export const AuthConfigSchema: AuthConfigSchema = AuthConfigSchemaDefinition;
 export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 
 /**
  * Pre-fetched HTTP agent configuration for serialized execution.
  * Contains all data needed to execute HTTP-based scenarios without DB access.
  */
-export const HttpAgentDataSchema = z.object({
+const HttpAgentDataSchemaDefinition = z.object({
   type: z.literal("http"),
   agentId: z.string(),
   url: z.string(),
@@ -122,13 +135,15 @@ export const HttpAgentDataSchema = z.object({
    */
   secrets: z.record(z.string(), z.string()).default({}),
 });
+export interface HttpAgentDataSchema extends Named<typeof HttpAgentDataSchemaDefinition> {}
+export const HttpAgentDataSchema: HttpAgentDataSchema = HttpAgentDataSchemaDefinition;
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
 /**
  * Pre-fetched code agent configuration: `code` is Python source, and inputs/outputs
  * define the data shape expected by the code execution engine (langwatch_nlp).
  */
-export const CodeAgentDataSchema = z.object({
+const CodeAgentDataSchemaDefinition = z.object({
   type: z.literal("code"),
   agentId: z.string(),
   code: z.string(),
@@ -165,6 +180,8 @@ export const CodeAgentDataSchema = z.object({
    */
   timeoutMs: z.number().int().positive().optional(),
 });
+export interface CodeAgentDataSchema extends Named<typeof CodeAgentDataSchemaDefinition> {}
+export const CodeAgentDataSchema: CodeAgentDataSchema = CodeAgentDataSchemaDefinition;
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
 /**
@@ -172,7 +189,7 @@ export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
  * execute_flow event — identical to code agents but with the user's own workflow DSL
  * (rather than a synthesized entry→code→end workflow).
  */
-export const WorkflowAgentDataSchema = z.object({
+const WorkflowAgentDataSchemaDefinition = z.object({
   type: z.literal("workflow"),
   agentId: z.string(),
   workflowId: z.string(),
@@ -202,6 +219,8 @@ export const WorkflowAgentDataSchema = z.object({
    */
   secrets: z.record(z.string(), z.string()).default({}),
 });
+export interface WorkflowAgentDataSchema extends Named<typeof WorkflowAgentDataSchemaDefinition> {}
+export const WorkflowAgentDataSchema: WorkflowAgentDataSchema = WorkflowAgentDataSchemaDefinition;
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
 /**
@@ -209,7 +228,7 @@ export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
  * route with the project key, so it only needs the agent id, platform address, and per-call
  * budget; declared parameters travel with the job as their declared type.
  */
-export const ConnectedAgentDataSchema = z.object({
+const ConnectedAgentDataSchemaDefinition = z.object({
   type: z.literal("connected"),
   agentId: z.string(),
   /** The platform's own address, the origin the relay route is posted to. */
@@ -217,11 +236,16 @@ export const ConnectedAgentDataSchema = z.object({
   /** Per-call budget in milliseconds, already capped by the platform. */
   timeoutMs: z.number().int().positive(),
 });
+export interface ConnectedAgentDataSchema extends Named<
+  typeof ConnectedAgentDataSchemaDefinition
+> {}
+export const ConnectedAgentDataSchema: ConnectedAgentDataSchema =
+  ConnectedAgentDataSchemaDefinition;
 export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
 
 // Voice run carries transport, agent id, and provider credential (never stored on agent).
 // When project lacks a key, child fails with a named reason instead of an empty credential.
-export const ElevenLabsVoiceTargetSchema = z.object({
+const ElevenLabsVoiceTargetSchemaDefinition = z.object({
   transport: z.literal("elevenlabs_convai"),
   agentId: z.string(),
   credential: z
@@ -232,7 +256,12 @@ export const ElevenLabsVoiceTargetSchema = z.object({
     })
     .nullable(),
 });
-export const PhoneVoiceTargetSchema = z.object({
+export interface ElevenLabsVoiceTargetSchema extends Named<
+  typeof ElevenLabsVoiceTargetSchemaDefinition
+> {}
+export const ElevenLabsVoiceTargetSchema: ElevenLabsVoiceTargetSchema =
+  ElevenLabsVoiceTargetSchemaDefinition;
+const PhoneVoiceTargetSchemaDefinition = z.object({
   transport: z.literal("phone"),
   agentId: z.string(),
   credential: z
@@ -250,14 +279,18 @@ export const PhoneVoiceTargetSchema = z.object({
    */
   callDirection: z.enum(["inbound", "outbound"]).default("outbound"),
 });
-export const VoiceTargetSchema = z.discriminatedUnion("transport", [
+export interface PhoneVoiceTargetSchema extends Named<typeof PhoneVoiceTargetSchemaDefinition> {}
+export const PhoneVoiceTargetSchema: PhoneVoiceTargetSchema = PhoneVoiceTargetSchemaDefinition;
+const VoiceTargetSchemaDefinition = z.discriminatedUnion("transport", [
   ElevenLabsVoiceTargetSchema,
   PhoneVoiceTargetSchema,
 ]);
+export interface VoiceTargetSchema extends Named<typeof VoiceTargetSchemaDefinition> {}
+export const VoiceTargetSchema: VoiceTargetSchema = VoiceTargetSchemaDefinition;
 export type VoiceTarget = z.infer<typeof VoiceTargetSchema>;
 
 /** Pre-fetched voice agent configuration for serialized execution. */
-export const VoiceAgentDataSchema = z.object({
+const VoiceAgentDataSchemaDefinition = z.object({
   type: z.literal("voice"),
   agentId: z.string(),
   voiceTarget: VoiceTargetSchema,
@@ -272,10 +305,12 @@ export const VoiceAgentDataSchema = z.object({
    */
   maxCallSeconds: z.number().int().positive().default(300),
 });
+export interface VoiceAgentDataSchema extends Named<typeof VoiceAgentDataSchemaDefinition> {}
+export const VoiceAgentDataSchema: VoiceAgentDataSchema = VoiceAgentDataSchemaDefinition;
 export type VoiceAgentData = z.infer<typeof VoiceAgentDataSchema>;
 
 /** Union type for all supported target adapter data */
-export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
+const TargetAdapterDataSchemaDefinition = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
@@ -283,6 +318,8 @@ export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   ConnectedAgentDataSchema,
   VoiceAgentDataSchema,
 ]);
+export interface TargetAdapterDataSchema extends Named<typeof TargetAdapterDataSchemaDefinition> {}
+export const TargetAdapterDataSchema: TargetAdapterDataSchema = TargetAdapterDataSchemaDefinition;
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
 // ============================================================================
@@ -294,12 +331,14 @@ export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
  * (AWS access keys) and Vertex (service account credentials) authenticate
  * through their own fields, which ride the catchall.
  */
-export const LiteLLMParamsSchema = z
+const LiteLLMParamsSchemaDefinition = z
   .object({
     api_key: z.string().optional(),
     model: z.string(),
   })
   .catchall(z.string());
+export interface LiteLLMParamsSchema extends Named<typeof LiteLLMParamsSchemaDefinition> {}
+export const LiteLLMParamsSchema: LiteLLMParamsSchema = LiteLLMParamsSchemaDefinition;
 export type LiteLLMParams = z.infer<typeof LiteLLMParamsSchema>;
 
 // ============================================================================
@@ -307,7 +346,7 @@ export type LiteLLMParams = z.infer<typeof LiteLLMParamsSchema>;
 // ============================================================================
 
 /** Scenario definition - what to test */
-export const ScenarioConfigSchema = z.object({
+const ScenarioConfigSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   situation: z.string(),
@@ -316,10 +355,12 @@ export const ScenarioConfigSchema = z.object({
   maxTurns: z.number().int().optional(),
   minTurns: z.number().int().optional(),
 });
+export interface ScenarioConfigSchema extends Named<typeof ScenarioConfigSchemaDefinition> {}
+export const ScenarioConfigSchema: ScenarioConfigSchema = ScenarioConfigSchemaDefinition;
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 
 /** Execution context - grouping and correlation */
-export const ExecutionContextSchema = z.object({
+const ExecutionContextSchemaDefinition = z.object({
   projectId: z.string(),
   scenarioId: z.string(),
   setId: z.string(),
@@ -328,47 +369,59 @@ export const ExecutionContextSchema = z.object({
    *  Optional during validation prefetch; required at execution time. */
   scenarioRunId: z.string().optional(),
 });
+export interface ExecutionContextSchema extends Named<typeof ExecutionContextSchemaDefinition> {}
+export const ExecutionContextSchema: ExecutionContextSchema = ExecutionContextSchemaDefinition;
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 
 /**
  * Where a child posts a code or workflow turn: straight to the one engine (self-hosted), or to
  * the control plane's relay with the project key (per-project engines). The parent chooses.
  */
-export const ExecuteSyncRouteSchema = z.discriminatedUnion("mode", [
+const ExecuteSyncRouteSchemaDefinition = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("direct"), nlpServiceUrl: z.string() }),
   z.object({ mode: z.literal("relay"), relayBaseUrl: z.string() }),
 ]);
+export interface ExecuteSyncRouteSchema extends Named<typeof ExecuteSyncRouteSchemaDefinition> {}
+export const ExecuteSyncRouteSchema: ExecuteSyncRouteSchema = ExecuteSyncRouteSchemaDefinition;
 export type ExecuteSyncRoute = z.infer<typeof ExecuteSyncRouteSchema>;
 
 /** Model configuration - LLM settings */
-export const ModelConfigSchema = z.object({
+const ModelConfigSchemaDefinition = z.object({
   defaultModel: z.string(),
   defaultParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),
 });
+export interface ModelConfigSchema extends Named<typeof ModelConfigSchemaDefinition> {}
+export const ModelConfigSchema: ModelConfigSchema = ModelConfigSchemaDefinition;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
 /** Telemetry configuration - where to send traces */
-export const TelemetryConfigSchema = z.object({
+const TelemetryConfigSchemaDefinition = z.object({
   endpoint: z.string(),
   apiKey: z.string(),
 });
+export interface TelemetryConfigSchema extends Named<typeof TelemetryConfigSchemaDefinition> {}
+export const TelemetryConfigSchema: TelemetryConfigSchema = TelemetryConfigSchemaDefinition;
 export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
-export const TargetConfigSchema = z.object({
+const TargetConfigSchemaDefinition = z.object({
   type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
   /** A suite prompt target's field mappings, pinned when the suite queued the run. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
+export interface TargetConfigSchema extends Named<typeof TargetConfigSchemaDefinition> {}
+export const TargetConfigSchema: TargetConfigSchema = TargetConfigSchemaDefinition;
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
 /** A suite plan's model picks for a run it queued, which win over the scenario's own. */
-export const runPlanModelsSchema = z.object({
+const runPlanModelsSchemaDefinition = z.object({
   simulatorModel: z.string().optional(),
   judgeModel: z.string().optional(),
 });
+export interface RunPlanModelsSchema extends Named<typeof runPlanModelsSchemaDefinition> {}
+export const runPlanModelsSchema: RunPlanModelsSchema = runPlanModelsSchemaDefinition;
 export type RunPlanModels = z.infer<typeof runPlanModelsSchema>;
 
 // ============================================================================
@@ -380,14 +433,19 @@ export type RunPlanModels = z.infer<typeof runPlanModelsSchema>;
  * result line, so the parent validates it against this schema — a line carrying no label,
  * or a label that isn't text, is not an instance.
  */
-export const ScenarioAgentInstanceSchema = z.object({
+const ScenarioAgentInstanceSchemaDefinition = z.object({
   hostname: z.string(),
   label: z.string().nullable(),
 });
+export interface ScenarioAgentInstanceSchema extends Named<
+  typeof ScenarioAgentInstanceSchemaDefinition
+> {}
+export const ScenarioAgentInstanceSchema: ScenarioAgentInstanceSchema =
+  ScenarioAgentInstanceSchemaDefinition;
 export type ScenarioAgentInstance = z.infer<typeof ScenarioAgentInstanceSchema>;
 
 /** Result of scenario execution */
-export const ScenarioExecutionResultSchema = z.object({
+const ScenarioExecutionResultSchemaDefinition = z.object({
   success: z.boolean(),
   runId: z.string().optional(),
   reasoning: z.string().optional(),
@@ -399,6 +457,11 @@ export const ScenarioExecutionResultSchema = z.object({
   /** A voice run LangWatch ended at VOICE_CALL_MAX_SECONDS (AC28). */
   isCutAtLimit: z.boolean().optional(),
 });
+export interface ScenarioExecutionResultSchema extends Named<
+  typeof ScenarioExecutionResultSchemaDefinition
+> {}
+export const ScenarioExecutionResultSchema: ScenarioExecutionResultSchema =
+  ScenarioExecutionResultSchemaDefinition;
 export type ScenarioExecutionResult = z.infer<typeof ScenarioExecutionResultSchema>;
 
 // ============================================================================
@@ -409,17 +472,19 @@ export type ScenarioExecutionResult = z.infer<typeof ScenarioExecutionResultSche
  * A run whose conversation is written down in advance. The user sends one
  * message, the agent answers, and the run succeeds when the answer arrives.
  */
-export const ScriptedRunSchema = z.object({
+const ScriptedRunSchemaDefinition = z.object({
   kind: z.literal("agent_test"),
   userMessage: z.string().min(1),
 });
+export interface ScriptedRunSchema extends Named<typeof ScriptedRunSchemaDefinition> {}
+export const ScriptedRunSchema: ScriptedRunSchema = ScriptedRunSchemaDefinition;
 export type ScriptedRun = z.infer<typeof ScriptedRunSchema>;
 
 // Complete job data for child process: everything needed to run without DB access.
 // Model params are optional per role (job/consumer may be on different builds);
 // refinement ensures all roles get a model.
 
-export const ChildProcessJobDataSchema = z
+const ChildProcessJobDataSchemaDefinition = z
   .object({
     context: ExecutionContextSchema,
     scenario: ScenarioConfigSchema,
@@ -485,13 +550,18 @@ export const ChildProcessJobDataSchema = z
       });
     }
   });
+export interface ChildProcessJobDataSchema extends Named<
+  typeof ChildProcessJobDataSchemaDefinition
+> {}
+export const ChildProcessJobDataSchema: ChildProcessJobDataSchema =
+  ChildProcessJobDataSchemaDefinition;
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;
 
 /**
  * One "test agent" turn, run in a scenario child like a simulation so the agent's adapter never
  * runs in the process that serves the request. The child answers with one AgentTestTurnAnswer line.
  */
-export const AgentTestTurnJobSchema = z.object({
+const AgentTestTurnJobSchemaDefinition = z.object({
   kind: z.literal("agent-test-turn"),
   adapterData: TargetAdapterDataSchema,
   /** Where a code or workflow agent's turn posts, chosen by the same rule as a simulation's. */
@@ -506,18 +576,30 @@ export const AgentTestTurnJobSchema = z.object({
     maxTimeoutMs: z.number().optional(),
   }),
 });
+export interface AgentTestTurnJobSchema extends Named<typeof AgentTestTurnJobSchemaDefinition> {}
+export const AgentTestTurnJobSchema: AgentTestTurnJobSchema = AgentTestTurnJobSchemaDefinition;
 export type AgentTestTurnJob = z.infer<typeof AgentTestTurnJobSchema>;
 
 /** What a scenario child reads off stdin: one agent-test turn, or a simulation. */
-export const ScenarioChildJobSchema = z.union([AgentTestTurnJobSchema, ChildProcessJobDataSchema]);
+const ScenarioChildJobSchemaDefinition = z.union([
+  AgentTestTurnJobSchema,
+  ChildProcessJobDataSchema,
+]);
+export interface ScenarioChildJobSchema extends Named<typeof ScenarioChildJobSchemaDefinition> {}
+export const ScenarioChildJobSchema: ScenarioChildJobSchema = ScenarioChildJobSchemaDefinition;
 export type ScenarioChildJob = z.infer<typeof ScenarioChildJobSchema>;
 
 /**
  * The last line a turn's child writes: the agent's output and how long the call took, or why it
  * did not answer. `timeoutMs` is present only when the call deadline elapsed.
  */
-export const AgentTestTurnAnswerSchema = z.union([
+const AgentTestTurnAnswerSchemaDefinition = z.union([
   z.object({ success: z.literal(true), output: z.unknown(), durationMs: z.number() }),
   z.object({ success: z.literal(false), error: z.string(), timeoutMs: z.number().optional() }),
 ]);
+export interface AgentTestTurnAnswerSchema extends Named<
+  typeof AgentTestTurnAnswerSchemaDefinition
+> {}
+export const AgentTestTurnAnswerSchema: AgentTestTurnAnswerSchema =
+  AgentTestTurnAnswerSchemaDefinition;
 export type AgentTestTurnAnswer = z.infer<typeof AgentTestTurnAnswerSchema>;

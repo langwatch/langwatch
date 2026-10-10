@@ -260,11 +260,11 @@ const renderGridItems = (
           <Card.Root>
             <Card.Header>
               <HStack gap={2}>
-                <BarChart2 color="orange" />
+                <BarChart2 color="var(--chakra-colors-orange-fg)" />
                 <Heading size="sm">{check.name}</Heading>
               </HStack>
               {!check.enabled && (
-                <Text color="gray" fontSize="sm">
+                <Text color="fg.muted" fontSize="sm">
                   (disabled)
                 </Text>
               )}
@@ -288,12 +288,12 @@ const renderGridItems = (
           <Card.Root>
             <Card.Header>
               <HStack gap={2}>
-                <BarChart2 color="orange" />
+                <BarChart2 color="var(--chakra-colors-orange-fg)" />
                 <Heading size="sm">{check.name}</Heading>
                 {traceCheck && <Text fontWeight={300}>- {traceCheck.name}</Text>}
               </HStack>
               {!check.enabled && (
-                <Text color="gray" fontSize="sm">
+                <Text color="fg.muted" fontSize="sm">
                   (disabled)
                 </Text>
               )}
@@ -321,7 +321,7 @@ const renderGridItems = (
             <Card.Root>
               <Card.Header>
                 <HStack gap={2}>
-                  <BarChart2 color="orange" />
+                  <BarChart2 color="var(--chakra-colors-orange-fg)" />
                   <Heading size="sm">{check.name} - Pass Rate Trend</Heading>
                 </HStack>
               </Card.Header>

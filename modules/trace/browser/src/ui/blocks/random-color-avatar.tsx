@@ -1,5 +1,5 @@
 import { type AvatarRootProps, UserAvatar } from "@langwatch/design-system/avatar";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getColorPaletteForString } from "@langwatch/design-system/rotating-colors";
 
 /**
  * Person avatar with a deterministic name-hashed background behind the initials
@@ -11,12 +11,13 @@ export function RandomColorAvatar({
   image,
   ...props
 }: AvatarRootProps & { name: string; image?: string | null }) {
+  const palette = getColorPaletteForString(name);
   return (
     <UserAvatar
       name={name}
       src={image}
-      color="white"
-      background={getColorForString("colors", name).color}
+      color={`${palette}.fg`}
+      background={`${palette}.subtle`}
       {...props}
     />
   );

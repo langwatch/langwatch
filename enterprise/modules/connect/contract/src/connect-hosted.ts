@@ -6,6 +6,7 @@
  */
 
 import { CONNECT_SERVICES } from "@langwatch/enterprise-licensing-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The `externalId` connect writes on the one gateway budget a customer's contract caps. */
@@ -22,12 +23,17 @@ export interface HostedCaller {
 }
 
 /** What the gateway sends: the resolved caller, and the caller's own JSON. */
-export const hostedServiceEnvelopeSchema = z.object({
+const hostedServiceEnvelopeSchemaDefinition = z.object({
   virtual_key_id: z.string().min(1),
   organization_id: z.string().min(1),
   project_id: z.string(),
   payload: z.unknown(),
 });
+export interface HostedServiceEnvelopeSchema extends Named<
+  typeof hostedServiceEnvelopeSchemaDefinition
+> {}
+export const hostedServiceEnvelopeSchema: HostedServiceEnvelopeSchema =
+  hostedServiceEnvelopeSchemaDefinition;
 
 /**
  * One question's answer, as the hosted route relays it. Mirrors the judge's
@@ -45,18 +51,25 @@ const hostedVerdictSchema = z.object({
  * The list price is what the customer is charged and all it is told. What the
  * judge cost LangWatch stays on the spend row.
  */
-export const hostedClassifyAnswerSchema = z.object({
+const hostedClassifyAnswerSchemaDefinition = z.object({
   verdicts: z.array(hostedVerdictSchema),
   skipped_reason: z.string().optional(),
   input_tokens: z.number(),
   is_text_truncated: z.boolean(),
   charged_usd: z.number(),
 });
+export interface HostedClassifyAnswerSchema extends Named<
+  typeof hostedClassifyAnswerSchemaDefinition
+> {}
+export const hostedClassifyAnswerSchema: HostedClassifyAnswerSchema =
+  hostedClassifyAnswerSchemaDefinition;
 
-export const hostedCapAnswerSchema = z.object({
+const hostedCapAnswerSchemaDefinition = z.object({
   cap_usd: z.number(),
   maximum_cap_usd: z.number(),
 });
+export interface HostedCapAnswerSchema extends Named<typeof hostedCapAnswerSchemaDefinition> {}
+export const hostedCapAnswerSchema: HostedCapAnswerSchema = hostedCapAnswerSchemaDefinition;
 
 const hostedBudgetSchema = z.object({
   id: z.string(),
@@ -80,13 +93,15 @@ const hostedContractSchema = z.object({
   term_ends_at: z.string().nullable(),
 });
 
-export const hostedUsageAnswerSchema = z.object({
+const hostedUsageAnswerSchemaDefinition = z.object({
   services: z.array(z.enum(CONNECT_SERVICES)),
   spend_available: z.boolean(),
   read_at: z.string(),
   contract: hostedContractSchema.nullable(),
   budgets: z.array(hostedBudgetSchema),
 });
+export interface HostedUsageAnswerSchema extends Named<typeof hostedUsageAnswerSchemaDefinition> {}
+export const hostedUsageAnswerSchema: HostedUsageAnswerSchema = hostedUsageAnswerSchemaDefinition;
 
 export type HostedBudgetWire = z.infer<typeof hostedBudgetSchema>;
 export type HostedContractWire = z.infer<typeof hostedContractSchema>;

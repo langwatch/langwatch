@@ -1,6 +1,5 @@
-import { Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
-import { LuCircleX } from "react-icons/lu";
 
 import type { ErrorSpanRanked } from "../../../../model/explorer/error-spans.ts";
 
@@ -44,31 +43,18 @@ export function ExceptionsContent({
     <VStack align="stretch" gap={isCompact ? 1.5 : 2}>
       {header}
       {error && (
-        <HStack
-          gap={2}
-          paddingX={isCompact ? 2 : 3}
-          paddingY={isCompact ? 1.5 : 2}
-          borderRadius="sm"
-          bg="red.subtle"
-          align="flex-start"
-        >
-          <Icon
-            as={LuCircleX}
-            boxSize={isCompact ? 3.5 : 4}
-            color="red.fg"
-            flexShrink={0}
-            marginTop={0.5}
-          />
-          <Text
-            textStyle="xs"
-            color="red.fg"
-            whiteSpace="pre-wrap"
-            maxHeight={isCompact ? "5lh" : undefined}
-            overflow={isCompact ? "hidden" : undefined}
-          >
-            {error}
-          </Text>
-        </HStack>
+        <Alert.Root status="error" size="sm">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description
+              whiteSpace="pre-wrap"
+              maxHeight={isCompact ? "5lh" : undefined}
+              overflow={isCompact ? "hidden" : undefined}
+            >
+              {error}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
       {errorSpans.length > 0 && (
         <HStack gap={1.5} flexWrap="wrap" align="center">

@@ -5,7 +5,6 @@
  * it is a list of its own beside the identity provider's page.
  */
 import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -36,11 +35,7 @@ export default function ConnectorsScreen() {
     <>
       <SectionNavigationFrame
         label="Authentication"
-        header={
-          <PageLayout.Header>
-            <PageLayout.Heading>Connectors</PageLayout.Heading>
-          </PageLayout.Header>
-        }
+        pageTitle="Connectors"
         links={AUTHENTICATION_LINKS}
         activeHref="/settings/authentication/connectors"
         onNavigate={(href) => navigation?.navigate(href)}

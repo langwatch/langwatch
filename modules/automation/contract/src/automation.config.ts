@@ -1,4 +1,5 @@
 import {
+  allowInsecureLocalUrls,
   Config,
   publicBaseUrl,
   slackApiBase,
@@ -27,6 +28,8 @@ export const automationServerConfig = Config.define((c) => ({
   /** Where Slack messages go (the shared leaves); haven points them at outboundsim. */
   slackApiBase,
   slackWebhookBase,
+  /** The dev switch (the shared leaf): a webhook automation may then use http or a port. */
+  allowInsecureLocalUrls,
 }));
 
 export type AutomationServerConfig = ConfigOf<typeof automationServerConfig>;

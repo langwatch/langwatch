@@ -210,6 +210,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .handle(async () => refuseBaseKeyToApiToken())
 
   .post("/:id/regenerate-api-key", "regenerateProjectApiKey")
+  .withoutAudit("always refused, writes nothing")
   .withParams(projectRestParamsSchema)
   .withInput(projectRestRegenerateApiKeyInputSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))

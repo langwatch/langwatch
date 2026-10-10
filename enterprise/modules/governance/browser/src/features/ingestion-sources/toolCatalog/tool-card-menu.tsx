@@ -50,7 +50,7 @@ export function ToolCardMenu({
         </Menu.Item>
         <Menu.Item
           value="remove"
-          color="red.500"
+          color="red.fg"
           onClick={(event) => {
             event.stopPropagation();
             onRemove(card);

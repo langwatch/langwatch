@@ -13,9 +13,9 @@ export function HealthLine({ errorClusterCount, anomalyCount, anomaliesKnown }: 
   if (errorClusterCount > 0 || anomalyCount > 0 || !anomaliesKnown) return null;
 
   return (
-    <Card.Root overflow="hidden">
+    <Card.Root overflow="hidden" borderColor="border.muted" boxShadow="none">
       <HStack paddingX={4} paddingY={2} gap={2} data-testid="ops-health-line">
-        <Icon color="green.500" boxSize={3.5}>
+        <Icon color="green.fg" boxSize={3.5}>
           <CheckCircle2 />
         </Icon>
         <Text textStyle="xs" color="fg.muted">

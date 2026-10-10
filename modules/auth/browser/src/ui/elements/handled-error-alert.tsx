@@ -2,6 +2,7 @@
 
 import { Alert, List, Text } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { explainErrorCode } from "../../model/error-presentation.ts";
 import {
@@ -15,8 +16,11 @@ const UNKNOWN_TITLE = "Something went wrong";
 const UNKNOWN_DESCRIPTION = "We've been notified. Try again in a moment.";
 
 export interface HandledErrorAlertProps {
-  /** Any error — handled or not. Renders nothing when null or undefined. */
-  error: unknown;
+  /** Any error — handled or not. Omit when passing resolved description copy. */
+  error?: unknown;
+  /** Copy already resolved by the auth model or form validation. */
+  description?: ReactNode;
+  testId?: string;
   /** Headline for a failure we have no specific copy for. */
   fallbackTitle?: string;
   /** Hard override of the title, registry entry or not. Rare. */
@@ -32,9 +36,11 @@ export function HandledErrorAlert({
   error,
   title,
   fallbackTitle,
+  description: resolvedDescription,
+  testId,
   showAllTips = true,
 }: HandledErrorAlertProps) {
-  if (error === null || error === void 0) return null;
+  if (error == null && resolvedDescription == null) return null;
 
   const handled = readHandledError(error);
   const registered = handled ? explainErrorCode(handled) : null;
@@ -42,13 +48,19 @@ export function HandledErrorAlert({
   // A procedure that wrote its own sentence for the customer is the one
   // channel below the registry: #5984 left a non-5xx `TRPCError`'s message
   // alone precisely so it could be read here.
-  const description = registered?.description ?? readAuthoredMessage(error) ?? UNKNOWN_DESCRIPTION;
-  const tips = handled?.tips ?? [];
+  const description =
+    resolvedDescription ??
+    registered?.description ??
+    readAuthoredMessage(error) ??
+    UNKNOWN_DESCRIPTION;
+  // A tip that only repeats the description says it twice; main's toasts drop it the same way.
+  const sentence = typeof description === "string" ? description.trim() : null;
+  const tips = (handled?.tips ?? []).filter((tip) => tip.trim() !== sentence);
   const traceId = readErrorTraceId(error);
 
   return (
     // The design system's compact status alert, read left to right: mark, title, sentence.
-    <Alert.Root status="error" role="alert" size="sm" alignItems="flex-start">
+    <Alert.Root status="error" role="alert" size="sm" alignItems="flex-start" data-testid={testId}>
       <Alert.Indicator marginTop="1px">
         <AlertCircle aria-hidden="true" />
       </Alert.Indicator>

@@ -7,8 +7,8 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { useCallback, useEffect, useMemo } from "react";
-import { Play } from "react-feather";
+import { Play } from "lucide-react";
+import { useEffect, useEffectEvent } from "react";
 import { Controller, type FieldErrors, useForm } from "react-hook-form";
 
 // Create a simplified field type that matches what we need
@@ -42,15 +42,14 @@ export const ExecutionInputPanel = ({
   title = "Inputs",
   buttonText = "Execute",
 }: InputPanelProps) => {
-  const defaultValues = useMemo(() => {
+  const defaultValues = (() => {
     return Object.fromEntries(
       fields.map((field) => [
         field.identifier,
         typeof field.value === "object" ? JSON.stringify(field.value) : (field.value ?? ""),
       ]),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(fields)]);
+  })();
 
   const form = useForm<Record<string, string>>({
     defaultValues: defaultValues as Record<string, string>,
@@ -74,33 +73,24 @@ export const ExecutionInputPanel = ({
     },
   });
 
-  useEffect(() => {
+  const defaultsSignature = JSON.stringify(defaultValues);
+  const syncDefaults = useEffectEvent(() => {
     // Read live: the React Compiler memoises a `form.watch()` made in render.
     const formIsStale = JSON.stringify(form.getValues()) !== JSON.stringify(defaultValues);
     if (formIsStale) {
       form.reset(defaultValues as Record<string, string>);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultValues]);
+  });
+  useEffect(() => syncDefaults(), [defaultsSignature]);
 
-  const onSubmit = useCallback(
-    (data: Record<string, string>) => {
-      onExecute(data);
-    },
-    [onExecute],
-  );
+  const onSubmit = (data: Record<string, string>) => {
+    onExecute(data);
+  };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)}>
       <VStack align="start" gap={3} width="full">
-        <Heading
-          as="h3"
-          fontSize="16px"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="fg.muted"
-          paddingBottom={4}
-        >
+        <Heading as="h3" textStyle="md" fontWeight="semibold" color="fg.muted" paddingBottom={1}>
           {title}
         </Heading>
         {fields.map((input) => {
@@ -119,7 +109,7 @@ export const ExecutionInputPanel = ({
                 control={form.control}
                 name={input.identifier}
                 render={({ field }) => (
-                  <Textarea {...field} placeholder={inputPlaceholder(input.type)} />
+                  <Textarea size="sm" {...field} placeholder={inputPlaceholder(input.type)} />
                 )}
               />
               <Field.ErrorText>{form.formState.errors[input.identifier]?.message}</Field.ErrorText>
@@ -129,7 +119,9 @@ export const ExecutionInputPanel = ({
         <HStack width="full" justify="end">
           <Button
             type="submit"
-            colorPalette="green"
+            variant="solid"
+            colorPalette="orange"
+            size="sm"
             loading={form.formState.isSubmitting}
             loadingText={buttonText}
           >

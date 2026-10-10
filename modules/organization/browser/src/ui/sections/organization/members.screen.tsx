@@ -141,7 +141,6 @@ function usePeopleListState({
   const { openDrawer } = useDrawer();
   const joinRequestsEnabled = host.isFeatureEnabled(FrontendFlags.join_requests);
   const { cut: addressCut, selectCut } = useCutFromAddress();
-  const cut = !joinRequestsEnabled && addressCut === "waiting" ? "all" : addressCut;
 
   const invitesFlow = useInviteFlow({ organization, activePlan });
   const removal = useMemberRemoval(organization.id);
@@ -151,6 +150,9 @@ function usePeopleListState({
     userId: session?.user?.id,
     pendingInvites: invitesFlow.pendingInvites,
   });
+  // Requests an SSO "ask" arrival queued exist whatever the flag says, so their cut does too.
+  const waitingShown = joinRequestsEnabled || reads.joinRequests.requests.length > 0;
+  const cut = !waitingShown && addressCut === "waiting" ? "all" : addressCut;
 
   return {
     canManage,

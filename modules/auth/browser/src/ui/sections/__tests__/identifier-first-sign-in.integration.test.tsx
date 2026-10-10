@@ -602,6 +602,10 @@ describe("given the identifier-first sign-in screen", () => {
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
       expect(await screen.findByText(/invalid email or password/i)).toBeTruthy();
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent("Couldn't log in");
+      expect(alert.querySelector("svg")).not.toBeNull();
+      expect(alert.parentElement?.firstElementChild).toBe(alert);
       expect(screen.queryByTestId("unknown-identifier")).toBeNull();
       expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
     });

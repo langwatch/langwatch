@@ -1,10 +1,11 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
  * What a flag is being resolved for; union ensures callers pass only the
  * identifiers their targeting rules can match.
  */
-export const authenticatedFeatureFlagTargetInputSchema = z.discriminatedUnion("kind", [
+const authenticatedFeatureFlagTargetInputSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("project"),
     projectId: z.string().min(1),
@@ -16,16 +17,31 @@ export const authenticatedFeatureFlagTargetInputSchema = z.discriminatedUnion("k
   }),
   z.object({ kind: z.literal("user") }),
 ]);
+export interface AuthenticatedFeatureFlagTargetInputSchema extends Named<
+  typeof authenticatedFeatureFlagTargetInputSchemaDefinition
+> {}
+export const authenticatedFeatureFlagTargetInputSchema: AuthenticatedFeatureFlagTargetInputSchema =
+  authenticatedFeatureFlagTargetInputSchemaDefinition;
 
-export const anonymousFeatureFlagTargetSchema = z.object({
+const anonymousFeatureFlagTargetSchemaDefinition = z.object({
   kind: z.literal("anonymous"),
   anonymousId: z.string().uuid(),
 });
+export interface AnonymousFeatureFlagTargetSchema extends Named<
+  typeof anonymousFeatureFlagTargetSchemaDefinition
+> {}
+export const anonymousFeatureFlagTargetSchema: AnonymousFeatureFlagTargetSchema =
+  anonymousFeatureFlagTargetSchemaDefinition;
 
-export const featureFlagTargetInputSchema = z.union([
+const featureFlagTargetInputSchemaDefinition = z.union([
   authenticatedFeatureFlagTargetInputSchema,
   anonymousFeatureFlagTargetSchema,
 ]);
+export interface FeatureFlagTargetInputSchema extends Named<
+  typeof featureFlagTargetInputSchemaDefinition
+> {}
+export const featureFlagTargetInputSchema: FeatureFlagTargetInputSchema =
+  featureFlagTargetInputSchemaDefinition;
 
 export type AuthenticatedFeatureFlagTargetInput = z.infer<
   typeof authenticatedFeatureFlagTargetInputSchema

@@ -78,9 +78,9 @@ is never edited and goes in `migration-safety.from-main.txt` instead.
 | `rename-in-place`                                  | `RENAME COLUMN`, `ALTER TABLE ... RENAME TO`                                       | add, backfill, dual-write, switch, retire                                                                       |
 | `new-foreign-key`                                  | `FOREIGN KEY` or a `REFERENCES <table>(...)` clause, on a new or an existing table | a plain column with an index (below); a new `@relation` fails the enforcer's relation ratchet                   |
 | `inline-dml-on-existing-table`                     | `UPDATE` or `DELETE FROM` on an existing table                                     | a batched, checkpointed background step (`migration-data-step`)                                                 |
-| `volatile-default-on-existing-table`               | `ADD COLUMN ... DEFAULT gen_random_uuid()`/`random()`/`nextval()`, or `SERIAL`     | nullable or a constant default, a background fill, the app sets it on insert; `now()` is fine                  |
-| `several-alters-on-one-table`                      | two `ALTER TABLE` statements on one existing table in one migration                | one `ALTER TABLE` with comma-separated actions, or a later migration                                           |
-| `lock-timeout-above-ceiling`                       | `SET lock_timeout` above 2 s, or 0                                                 | nothing: the runner sets 2 s and retries; split a migration that needs a longer wait                           |
+| `volatile-default-on-existing-table`               | `ADD COLUMN ... DEFAULT gen_random_uuid()`/`random()`/`nextval()`, or `SERIAL`     | nullable or a constant default, a background fill, the app sets it on insert; `now()` is fine                   |
+| `several-alters-on-one-table`                      | two `ALTER TABLE` statements on one existing table in one migration                | one `ALTER TABLE` with comma-separated actions, or a later migration                                            |
+| `lock-timeout-above-ceiling`                       | `SET lock_timeout` above 2 s, or 0                                                 | nothing: the runner sets 2 s and retries; split a migration that needs a longer wait                            |
 
 **The ops pre-build note.** `CONCURRENTLY` cannot run inside Prisma's transaction, so an index on an
 existing table carries a comment naming the statement an operator runs ahead; the migration's own

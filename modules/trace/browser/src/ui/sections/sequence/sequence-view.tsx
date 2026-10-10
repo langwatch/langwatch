@@ -377,8 +377,8 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
           userSelect: "none",
           backgroundImage:
             colorMode === "dark"
-              ? "radial-gradient(circle, rgba(82,82,91,0.18) 1px, transparent 1px)"
-              : "radial-gradient(circle, rgba(148,163,184,0.20) 1px, transparent 1px)",
+              ? "radial-gradient(circle, color-mix(in srgb, var(--chakra-colors-border) 18%, transparent) 1px, transparent 1px)"
+              : "radial-gradient(circle, color-mix(in srgb, var(--chakra-colors-border) 20%, transparent) 1px, transparent 1px)",
           backgroundSize: "16px 16px",
         }}
       >

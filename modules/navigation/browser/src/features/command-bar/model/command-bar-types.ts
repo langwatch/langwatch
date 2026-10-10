@@ -29,10 +29,8 @@ export interface Command {
    */
   featureFlag?: { flag: FrontendFeatureFlag; enabled: boolean };
   /**
-   * The navigation section the command belongs to. Quick Search offers it
-   * only on a project whose navigation shows that section, so the bar and
-   * the sidebar agree on what a project of each kind offers (ADR-177). A
-   * command with none, such as settings, is offered on every project.
+   * The navigation section the command belongs to. Quick Search offers it only on a project whose
+   * navigation shows that section (ADR-177); a command with none is offered on every project.
    */
   navigationSection?: ProjectNavigationSection;
 }

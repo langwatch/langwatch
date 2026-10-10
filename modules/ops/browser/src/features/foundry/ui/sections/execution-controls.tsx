@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, Flex, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Play } from "lucide-react";
 import { useState } from "react";
@@ -9,9 +9,9 @@ import { useTraceStore } from "../../behavior/trace.store.ts";
 import { useTargetProjectKey } from "../../behavior/use-target-project-key.ts";
 
 /** The mark each run outcome shows in the log; anything else reads as failed. */
-const LOG_STATUS_ICONS: Record<string, string> = {
-  pending: "⏳",
-  success: "✅",
+const LOG_STATUS_LABELS: Record<string, string> = {
+  pending: "Sending",
+  success: "Sent",
 };
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
@@ -65,12 +65,12 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <Box p={3}>
+    <Box p={4}>
       <Text
         fontSize="xs"
         fontWeight="medium"
-        textTransform="uppercase"
-        letterSpacing="wider"
+        textTransform="none"
+        letterSpacing="normal"
         color="fg.muted"
         mb={2}
       >
@@ -79,11 +79,12 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
       <Flex gap={2} mb={2}>
         <Box flex={1}>
           <Text fontSize="xs" color="fg.subtle" mb={1}>
-            Run N times
+            Trace count
           </Text>
           <Input
             size="sm"
             type="number"
+            aria-label="Trace count"
             value={batchCount}
             onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)}
             min={1}
@@ -98,6 +99,7 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
             <Input
               size="sm"
               type="number"
+              aria-label="Stagger in milliseconds"
               value={staggerMs}
               onChange={(e) => setStaggerMs(parseInt(e.target.value) || 0)}
               min={0}
@@ -109,17 +111,17 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
       <Button
         w="full"
         size="sm"
-        colorPalette="orange"
+        colorPalette="accent"
         onClick={handleSend}
         disabled={running || !project}
         loading={running}
         loadingText="Sending..."
       >
-        <Play size={14} /> Send Traces
+        <Play size={14} /> Send traces
       </Button>
       {!project && (
         <Text fontSize="xs" color="fg.muted" mt={1}>
-          Navigate to a project first
+          Select a target project above
         </Text>
       )}
       <ExecutionLog />
@@ -163,6 +165,8 @@ function LogEntry({
 }) {
   const [copied, setCopied] = useState(false);
   const canCopy = entry.status === "success";
+  const palettes: Record<string, string> = { success: "green", pending: "gray" };
+  const statusPalette = palettes[entry.status] ?? "red";
 
   return (
     <Flex
@@ -173,8 +177,8 @@ function LogEntry({
       fontSize="xs"
       rounded="sm"
       cursor={canCopy ? "pointer" : "default"}
-      bg={copied ? "green.500/10" : "transparent"}
-      _hover={canCopy ? { bg: copied ? "green.500/10" : "bg.subtle" } : undefined}
+      bg={copied ? "green.subtle" : "transparent"}
+      _hover={canCopy ? { bg: copied ? "green.subtle" : "bg.subtle" } : undefined}
       transition="background 0.15s"
       onClick={() => {
         if (!canCopy) return;
@@ -183,17 +187,17 @@ function LogEntry({
         setTimeout(() => setCopied(false), 2000);
       }}
     >
-      <Text flexShrink={0}>{LOG_STATUS_ICONS[entry.status] ?? "❌"}</Text>
+      <Badge colorPalette={statusPalette}>{LOG_STATUS_LABELS[entry.status] ?? "Failed"}</Badge>
       <Text flex={1} truncate fontFamily="mono" color="fg.muted">
         {entry.traceId}
       </Text>
       {canCopy && (
-        <Text fontSize="10px" color={copied ? "green.400" : "fg.muted"} flexShrink={0}>
+        <Text fontSize="10px" color={copied ? "green.fg" : "fg.muted"} flexShrink={0}>
           {copied ? "Copied!" : "Copy ID"}
         </Text>
       )}
       {entry.error && (
-        <Text color="red.400" title={entry.error} flexShrink={0}>
+        <Text color="fg.error" title={entry.error} flexShrink={0}>
           Failed
         </Text>
       )}

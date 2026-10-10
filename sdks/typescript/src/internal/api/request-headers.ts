@@ -4,7 +4,7 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
 } from "../constants";
-import { scopedSurface } from "../credentialContext";
+import { scopedProjectId, scopedSurface } from "../credentialContext";
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../surface";
 import { buildAuthHeaders, type LangWatchAuthHeadersInput } from "./auth";
 
@@ -21,11 +21,15 @@ export function buildSdkIdentityHeaders({
   };
 }
 
+/** A command that builds its own request still names the project the resolver chose (`--project`). */
 export function buildRequestHeaders(
   credentials: LangWatchAuthHeadersInput,
 ): Record<string, string> {
   return {
-    ...buildAuthHeaders(credentials),
+    ...buildAuthHeaders({
+      ...credentials,
+      projectId: credentials.projectId ?? scopedProjectId(),
+    }),
     ...buildSdkIdentityHeaders(),
   };
 }

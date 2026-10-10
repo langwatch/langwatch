@@ -8,6 +8,7 @@ import {
 } from "@langwatch/api-key-contract";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
+  Alert,
   Box,
   Button,
   HStack,
@@ -866,32 +867,20 @@ function CliManagementRequest({ management }: { management: ManagementRequest })
 /** The management permissions the key gets on top of everyday access. */
 function ManagementGrantList({ held }: { held: CliKeyManagementPermission[] }) {
   return (
-    <Box
-      data-testid="cli-auth-management-request"
-      borderWidth="1px"
-      borderColor="blue.muted"
-      borderRadius="lg"
-      bg="blue.subtle"
-      paddingX={5}
-      paddingY={4}
-    >
-      <HStack align="flex-start" gap={3}>
-        <Icon as={Info} boxSize={5} color="blue.fg" flexShrink={0} marginTop={0.5} />
-        <VStack align="stretch" gap={1} flex={1}>
-          <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
-            Management access requested
-          </Text>
-          <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-            The CLI asked for management access. The key also gets:
-          </Text>
-          <Box as="ul" paddingStart={4} textStyle="xs" color="fg.muted">
+    <Alert.Root status="info" data-testid="cli-auth-management-request">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Management access requested</Alert.Title>
+        <Alert.Description>
+          The CLI asked for management access. The key also gets:
+          <Box as="ul" paddingStart={4} marginTop={1}>
             {held.map((permission) => (
               <li key={permission}>{CLI_KEY_MANAGEMENT_PERMISSIONS[permission]}</li>
             ))}
           </Box>
-        </VStack>
-      </HStack>
-    </Box>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

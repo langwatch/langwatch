@@ -74,19 +74,21 @@ export function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () 
         borderRadius="full"
         display="grid"
         placeItems="center"
-        background="bg.surface"
+        background="bg.card"
         borderWidth="1px"
         borderStyle="solid"
         borderColor="border.emphasized"
-        boxShadow="0 1px 2px rgba(20,20,23,0.08), 0 8px 24px rgba(20,20,23,0.14)"
+        boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent), 0 8px 24px color-mix(in srgb, var(--chakra-colors-bg-scrim) 14%, transparent)"
         _dark={{
-          boxShadow: "0 1px 2px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)",
+          boxShadow:
+            "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 50%, transparent), 0 10px 30px color-mix(in srgb, var(--chakra-colors-bg-scrim) 55%, transparent)",
         }}
         cursor="pointer"
         transition="box-shadow 160ms ease, border-color 160ms ease"
         _hover={{
           borderColor: "orange.emphasized",
-          boxShadow: "0 2px 4px rgba(20,20,23,0.10), 0 12px 32px rgba(20,20,23,0.18)",
+          boxShadow:
+            "0 2px 4px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent), 0 12px 32px color-mix(in srgb, var(--chakra-colors-bg-scrim) 18%, transparent)",
         }}
       >
         {/* Warm proximity glow — bleeds out around the orb toward the cursor.

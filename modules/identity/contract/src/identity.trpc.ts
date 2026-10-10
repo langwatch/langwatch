@@ -1,6 +1,6 @@
 /** The `identity.*` procedures: the session user's own identity (D01).
  *  Spec: specs/identity/identifier-model.feature. */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -14,13 +14,18 @@ import { ssoTestArrivalStandingSchema } from "./features/sso-arrival/sso-admissi
 const emptyInputSchema = z.object({});
 
 /** Both proofs together: the emailed token and the PKCE verifier the starting browser kept. */
-export const completeVerificationInputSchema = z.object({
+const completeVerificationInputSchemaDefinition = z.object({
   identifierId: z.string().min(1),
   verificationId: z.string().min(1),
   token: z.string().min(1),
   // RFC 7636 §4.1: 43-128 characters from the unreserved set.
   codeVerifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
 });
+export interface CompleteVerificationInputSchema extends Named<
+  typeof completeVerificationInputSchemaDefinition
+> {}
+export const completeVerificationInputSchema: CompleteVerificationInputSchema =
+  completeVerificationInputSchemaDefinition;
 
 export const identityTrpc = defineTrpcContract("identity")
   .mutation("completeVerification")

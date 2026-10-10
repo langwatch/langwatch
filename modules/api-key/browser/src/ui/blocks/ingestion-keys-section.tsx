@@ -156,7 +156,7 @@ export function IngestionKeysSection({
                         <Menu.Content>
                           <Menu.Item
                             value="revoke"
-                            color="red.500"
+                            color="red.fg"
                             onClick={() => onRevoke(apiKey.id)}
                           >
                             Revoke

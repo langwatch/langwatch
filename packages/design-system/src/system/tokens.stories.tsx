@@ -1,4 +1,4 @@
-import { Badge, Box, Grid, Heading, HStack, Stack, Table, Text } from "@chakra-ui/react";
+import { Box, Grid, Heading, HStack, Stack, Table, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 
@@ -22,11 +22,13 @@ const isSemantic = ([name, token]: [string, Token]) =>
 const isScaleStep = ([name]: [string, Token]) => /^[a-z]+(Alpha)?\.\d+$/.test(name);
 
 /** `{colors.gray.600}` to the value it names, so a light or dark chip shows its real colour. */
-function resolveColour({ reference }: { reference: string }): string {
+function resolveColour({ reference, mode }: { reference: string; mode: "light" | "dark" }): string {
   return reference.replace(/\{colors\.([^}/]+)(?:\/(\d+))?\}/g, (whole, name: string, alpha) => {
-    const value = colours.find(([candidate]) => candidate === name)?.[1].value;
+    const token = colours.find(([candidate]) => candidate === name)?.[1];
+    const value = token ? (referenceOf({ token, mode }) ?? token.value) : void 0;
     if (typeof value !== "string") return whole;
-    return alpha ? `color-mix(in srgb, ${value} ${alpha}%, transparent)` : value;
+    const resolved = resolveColour({ reference: value, mode });
+    return alpha ? `color-mix(in srgb, ${resolved} ${alpha}%, transparent)` : resolved;
   });
 }
 
@@ -41,44 +43,97 @@ function TokenName({ name }: { name: string }) {
   );
 }
 
-function ModeChip({ mode, reference }: { mode: "light" | "dark"; reference?: string }) {
-  if (!reference) return null;
+const referenceOf = ({ token, mode }: { token: Token; mode: "light" | "dark" }) => {
+  const conditions = token.extensions.conditions;
+  return mode === "light" ? (conditions?._light ?? conditions?.base) : conditions?._dark;
+};
+
+const shortReference = (reference?: string) =>
+  reference ? reference.replace(/[{}]/g, "").replace(/^colors\./, "") : "—";
+
+/** Light on the left, dark on the right: both modes at a glance, whatever the toolbar says. */
+function SplitSwatch({ token }: { token: Token }) {
+  const half = (mode: "light" | "dark") => {
+    const reference = referenceOf({ token, mode }) ?? referenceOf({ token, mode: "light" });
+    return reference ? resolveColour({ reference, mode }) : "transparent";
+  };
   return (
-    <HStack gap={1.5} title={reference}>
-      <Box
-        width={3}
-        height={3}
-        borderRadius="full"
-        borderWidth="1px"
-        borderColor="border"
-        style={{ background: resolveColour({ reference }) }}
-      />
-      <Text fontSize="2xs" color="fg.subtle" fontFamily="mono" truncate>
-        {mode} {reference.replace(/[{}]/g, "").replace(/^colors\./, "")}
-      </Text>
+    <HStack
+      gap={0}
+      width={10}
+      height={6}
+      flexShrink={0}
+      borderRadius="sm"
+      borderWidth="1px"
+      borderColor="border"
+      overflow="hidden"
+      aria-hidden
+    >
+      <Box flex={1} height="full" style={{ background: half("light") }} />
+      <Box flex={1} height="full" style={{ background: half("dark") }} />
     </HStack>
   );
 }
 
-function ColourSwatch({ name, token }: { name: string; token: Token }) {
-  const conditions = token.extensions.conditions;
+/** One row per colour: swatch, name to copy, then its light and dark values in aligned columns. */
+function ColourRow({ name, token }: { name: string; token: Token }) {
   return (
-    <Stack gap={1.5} minWidth={0}>
-      <Box height={12} borderRadius="md" borderWidth="1px" borderColor="border.muted" bg={name} />
+    <Grid
+      templateColumns={ROW_COLUMNS}
+      gap={3}
+      alignItems="center"
+      paddingY={1}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+    >
+      <SplitSwatch token={token} />
       <TokenName name={name} />
-      <ModeChip mode="light" reference={conditions?._light ?? conditions?.base} />
-      <ModeChip mode="dark" reference={conditions?._dark} />
-    </Stack>
+      {(["light", "dark"] as const).map((mode) => (
+        <Text key={mode} fontSize="2xs" fontFamily="mono" color="fg.muted" truncate>
+          {shortReference(referenceOf({ token, mode }))}
+        </Text>
+      ))}
+    </Grid>
+  );
+}
+
+const ROW_COLUMNS = "2.5rem minmax(8rem, 1.2fr) 1fr 1fr";
+
+/** Column headings over each block; the swatch's left half is light, its right half dark. */
+function ColourHeadings() {
+  return (
+    <Grid templateColumns={ROW_COLUMNS} gap={3} paddingY={1} borderBottomWidth="1px">
+      {["Light | dark", "Token", "Light", "Dark"].map((heading) => (
+        <Text key={heading} fontSize="2xs" color="fg.muted" fontWeight="medium">
+          {heading}
+        </Text>
+      ))}
+    </Grid>
+  );
+}
+
+function ColourRows({ entries }: { entries: [string, Token][] }) {
+  return (
+    <Grid templateColumns="repeat(auto-fill, minmax(26rem, 1fr))" columnGap={8}>
+      <ColourHeadings />
+      {entries.map(([name, token]) => (
+        <ColourRow key={name} name={name} token={token} />
+      ))}
+    </Grid>
   );
 }
 
 function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
-    <Stack gap={3}>
-      <Stack gap={0.5}>
-        <Heading size="md">{title}</Heading>
-        {note ? <Text color="fg.muted">{note}</Text> : null}
-      </Stack>
+    <Stack gap={2}>
+      <HStack gap={2} align="baseline">
+        <Heading size="sm">{title}</Heading>
+        {note ? (
+          <Text textStyle="xs" color="fg.muted">
+            {note}
+          </Text>
+        ) : null}
+      </HStack>
       {children}
     </Stack>
   );
@@ -92,12 +147,12 @@ const SEMANTIC_GROUPS: { title: string; note: string; matches: (name: string) =>
   },
   {
     title: "Background",
-    note: "Surfaces, from the page to a scrim.",
+    note: "Four nested levels: bg.page, bg.panel, bg.muted, bg.emphasized.",
     matches: (n) => n === "bg" || n.startsWith("bg."),
   },
   {
     title: "Border",
-    note: "Hairlines and outlines.",
+    note: "Hairlines and outlines; border.strong distinguishes controls from their ground.",
     matches: (n) => n === "border" || n.startsWith("border."),
   },
   {
@@ -128,28 +183,18 @@ function SemanticColours() {
   const semantic = colours.filter(isSemantic);
   const placed = new Set<string>();
   return (
-    <Stack gap={8}>
+    <Stack gap={6}>
       {SEMANTIC_GROUPS.map(({ title, note, matches }) => {
         const group = semantic.filter(([name]) => !placed.has(name) && matches(name));
         group.forEach(([name]) => placed.add(name));
         return (
           <Section key={title} title={title} note={note}>
-            <Grid gap={4} templateColumns="repeat(auto-fill, minmax(11rem, 1fr))">
-              {group.map(([name, token]) => (
-                <ColourSwatch key={name} name={name} token={token} />
-              ))}
-            </Grid>
+            <ColourRows entries={group} />
           </Section>
         );
       })}
       <Section title="Everything else" note="Semantic colours outside the groups above.">
-        <Grid gap={4} templateColumns="repeat(auto-fill, minmax(11rem, 1fr))">
-          {semantic
-            .filter(([name]) => !placed.has(name))
-            .map(([name, token]) => (
-              <ColourSwatch key={name} name={name} token={token} />
-            ))}
-        </Grid>
+        <ColourRows entries={semantic.filter(([name]) => !placed.has(name))} />
       </Section>
     </Stack>
   );
@@ -376,20 +421,24 @@ export const Borders: Story = {
 export const FocusRing: Story = {
   name: "Focus ring",
   render: () => (
-    <HStack gap={6}>
+    <HStack gap={3} wrap="wrap">
       {["accent", "gray", "red", "blue"].map((palette) => (
-        <Stack key={palette} gap={2} align="center">
-          <Box
-            boxSize={10}
-            borderRadius="md"
-            bg="bg.panel"
-            outlineWidth="2px"
-            outlineStyle="solid"
-            outlineOffset="2px"
-            outlineColor={`${palette}.focusRing`}
-          />
-          <Badge variant="outline">{palette}.focusRing</Badge>
-        </Stack>
+        <Box
+          key={palette}
+          paddingX={3}
+          paddingY={1.5}
+          borderRadius="md"
+          borderWidth="1px"
+          borderColor="border"
+          outlineWidth="2px"
+          outlineStyle="solid"
+          outlineOffset="2px"
+          outlineColor={`${palette}.focusRing`}
+        >
+          <Text fontFamily="mono" fontSize="xs">
+            {palette}.focusRing
+          </Text>
+        </Box>
       ))}
     </HStack>
   ),

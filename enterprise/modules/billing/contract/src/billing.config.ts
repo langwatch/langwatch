@@ -1,5 +1,6 @@
 import { Config, isSaas, nodeEnvironment, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
@@ -65,9 +66,11 @@ export function assertBillingServerConfig(
 }
 
 /** All a browser learns: where a self-hosted licence is bought, if it is sold. */
-export const billingWebConfigSchema = z.strictObject({
+const billingWebConfigSchemaDefinition = z.strictObject({
   licensePaymentUrl: z.string().min(1).optional(),
 });
+export interface BillingWebConfigSchema extends Named<typeof billingWebConfigSchemaDefinition> {}
+export const billingWebConfigSchema: BillingWebConfigSchema = billingWebConfigSchemaDefinition;
 
 export type BillingWebConfig = z.infer<typeof billingWebConfigSchema>;
 

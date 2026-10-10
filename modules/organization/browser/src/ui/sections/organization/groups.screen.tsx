@@ -1,14 +1,13 @@
+import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 /**
  * Groups an organization grants access through: the Directory's Groups tab. A
  * SCIM-synced group's deletion here only holds until the next sync.
  * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */
-
-import { Lent } from "@langwatch/browser-host/lent";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import {
-  Alert,
   Badge,
   Box,
   Button,
@@ -22,7 +21,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -78,18 +76,14 @@ export default function GroupsScreen() {
   if (!isEnterprise) {
     return (
       <VStack gap={6} align="start" width="full">
-        <Alert.Root status="info">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Enterprise Feature</Alert.Title>
-            <Alert.Description>
-              Groups are available on Enterprise plans. Contact sales to upgrade.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-        <Box width="full">
-          <Lent of={ContactSalesToken} props={{}} />
-        </Box>
+        <UpgradeRequired
+          feature="Groups"
+          actions={
+            <Button asChild colorPalette="orange" size="sm">
+              <Link href="/settings/plans">Compare plans</Link>
+            </Button>
+          }
+        />
       </VStack>
     );
   }
@@ -197,7 +191,7 @@ export default function GroupsScreen() {
                               </Menu.Item>
                               <Menu.Item
                                 value="delete"
-                                color="red.500"
+                                color="red.fg"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setGroupToDelete(g);

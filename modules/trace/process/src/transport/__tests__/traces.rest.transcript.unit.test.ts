@@ -30,6 +30,7 @@ const transcript = {
 function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
   const stub = createApiFixture<TraceApi>({ readTraceTranscript });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

@@ -159,7 +159,34 @@ describe("given a connection part-way through its setup", () => {
       },
     ]);
     expect(view.claims).toEqual([
-      { domain: "acme.io", state: "CLAIMED", note: null, waitsForReview: true },
+      { domain: "acme.io", state: "CLAIMED", note: null, waitsForReview: false },
+    ]);
+  });
+
+  /** @scenario "A hosted administrator claims a domain and is given the record straight away" */
+  it("leaves a claim nobody else holds to the administrator, not to a reviewer", async () => {
+    const view = await scenario([connection({ claimedDomains: ["acme.io"] })]).getSetup({
+      organizationId: ORG,
+    });
+
+    expect(view.claims.map((claim) => claim.waitsForReview)).toEqual([false]);
+  });
+
+  /** @scenario "A claim on a domain another organization proved waits for a person" */
+  it("holds a claim on a domain another organization proved for a person", async () => {
+    const holder = connection({
+      connectionId: "local_ssoc_0005NmMMMX8uk3JfupN0JsNdW999z",
+      organizationId: "org_other",
+      state: "ACTIVE",
+      verifiedDomains: ["acme.com"],
+      domainVerifications: [DNS_PROOF],
+    });
+    const view = await scenario([holder, connection({ claimedDomains: ["acme.com"] })]).getSetup({
+      organizationId: ORG,
+    });
+
+    expect(view.claims).toEqual([
+      { domain: "acme.com", state: "CLAIMED", note: null, waitsForReview: true },
     ]);
   });
 

@@ -15,7 +15,7 @@ export const CARD = {
   // A restrained warm hairline, not a bright orange ring — a hint of Langy.
   accentBorder:
     "color-mix(in srgb, var(--chakra-colors-orange-solid) 16%, var(--chakra-colors-border-muted))",
-  bg: "bg.surface",
+  bg: "bg.card",
   // A whisper of warmth in the top-right corner of the lead card. Barely there.
   accentWash:
     "radial-gradient(130% 120% at 96% 0%, color-mix(in srgb, var(--chakra-colors-orange-solid) 6%, transparent), transparent 54%)",
@@ -25,13 +25,13 @@ export const CARD = {
 export const DOT = {
   good: "green.solid",
   bad: "red.solid",
-  attention: "#c98a2f",
+  attention: "yellow.fg",
 } as const;
 
 export const FG = {
   good: "green.fg",
   bad: "red.fg",
-  attention: "#c98a2f",
+  attention: "yellow.fg",
   neutral: "fg",
   muted: "fg.muted",
   subtle: "fg.subtle",
@@ -178,7 +178,7 @@ export const CARD_TAXONOMY = {
     weight: 5,
     inline: false,
     padding: { x: "18px", y: "16px" },
-    surface: "bg.surface",
+    surface: "bg.card",
     border: CARD.accentBorder,
     radius: "langyCard",
     accent: true,
@@ -192,7 +192,7 @@ export const CARD_TAXONOMY = {
 /**
  * ── HDR / Display-P3 accent (task #25) ──────────────────────────────────────
  */
-export const AI_ACCENT_P3 = "color(display-p3 0.929 0.537 0.149)" as const;
+export const AI_ACCENT_P3 = "var(--chakra-colors-accent-solid)" as const;
 
 /**
  * Emotion fallback-value pair: `[fallback, enhanced]`. Emotion emits both declarations

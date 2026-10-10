@@ -29,6 +29,7 @@ function family(credential: RestDoorCredential) {
     .post("/api/budgets", "createBudget")
     .withPermission("gatewayBudgets:create", { at: "organization" })
     .withOutput(z.object({ ok: z.boolean() }))
+    .withoutAudit("test route")
     .handle(({ app }) => app.read())
     .get("/api/budgets", "listBudgets")
     .withPermission("gatewayBudgets:view")

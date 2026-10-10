@@ -185,6 +185,7 @@ export function createAutomationRest(): Readonly<{
       // Creating asks for `triggers:create`; `:manage` still implies it, so no
       // existing caller changes and a viewer is declined as before.
       .post("/", "postApiTriggers")
+      .withAudit("automation.create")
       .withInput(automationRestCreateInputSchema)
       .withPermission("triggers:create")
       .withOutput(automationRestResponseSchema)
@@ -209,6 +210,7 @@ export function createAutomationRest(): Readonly<{
       })
 
       .patch("/:triggerId", "patchApiTriggersById")
+      .withAudit("automation.upsert")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestUpdateInputSchema)
       .withPermission("triggers:update")
@@ -239,6 +241,7 @@ export function createAutomationRest(): Readonly<{
 
       // Both verbs answer with the automation, so a caller sees the state it is in.
       .post("/:triggerId/enable", "postApiTriggersByIdEnable")
+      .withAudit("automation.toggleTrigger")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
       .withPermission("triggers:update")
@@ -263,6 +266,7 @@ export function createAutomationRest(): Readonly<{
       }))
 
       .post("/:triggerId/disable", "postApiTriggersByIdDisable")
+      .withAudit("automation.toggleTrigger")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
       .withPermission("triggers:update")
@@ -288,6 +292,7 @@ export function createAutomationRest(): Readonly<{
       // The destination is the automation's own saved one: a test fire proves
       // a configured automation delivers; it is no way to send anywhere.
       .post("/:triggerId/test-fire", "postApiTriggersByIdTestFire")
+      .withAudit("automation.testFireTemplate")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
       .withPermission("triggers:update")
@@ -311,6 +316,7 @@ export function createAutomationRest(): Readonly<{
 
       // Destruction deliberately stays at `:manage`.
       .delete("/:triggerId", "deleteApiTriggersById")
+      .withAudit("automation.deleteById")
       .withParams(automationRestIdParamsSchema)
       .withPermission("triggers:manage")
       .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })

@@ -8,7 +8,7 @@ export function ReapStrandedGroupsAction() {
   const reap = useReapStrandedGroups();
   return (
     <>
-      <Button variant="outline" size="2xs" colorPalette="orange" onClick={reap.open}>
+      <Button variant="outline" size="sm" colorPalette="orange" onClick={reap.open}>
         Clear stuck groups
       </Button>
       <ConfirmDialog

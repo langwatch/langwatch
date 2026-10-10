@@ -36,3 +36,7 @@ sdks/python/examples
 # Local worktrees and agent scratch: never build context.
 .worktrees
 .claude
+
+# Nx cache and workspace data are machine-local
+.nx
+**/.nx

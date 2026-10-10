@@ -152,7 +152,9 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
       paddingX={1}
       borderBottomWidth="1px"
       borderBottomColor="border"
-      paddingBottom={2.5}
+      height="shellHeader"
+      display="flex"
+      alignItems="center"
     >
       <SideMenuLink
         icon={ArrowLeft}
@@ -361,7 +363,7 @@ export function SidebarContent({
 
   return (
     <VStack
-      paddingTop={2}
+      paddingTop={surface === "settings" ? 0 : 2}
       paddingBottom={2}
       gap={0}
       height="100%"

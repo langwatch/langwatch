@@ -395,6 +395,7 @@ function createProjects(): ProjectApi {
             // model-provider paths distinguish personal projects.
             isPersonal: false,
             ownerUserId: null,
+            kind: project.kind,
           },
         ]),
       listIdsByOrganization: () => Promise.resolve([project.id]),
@@ -652,6 +653,9 @@ class Catalog extends ModelProviderCatalog {
   ): Promise<ModelProviderCredentialVerdict> {
     this.connectionChecks.push({ provider: providerId, customKeys });
     return Promise.resolve({ outcome: "verified", valid: true });
+  }
+  assertEndpointAllowed(_provider: string, _customKeys: Record<string, unknown>): Promise<void> {
+    return Promise.resolve();
   }
   pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;

@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Directory sync aggregate: one per SSO connection, recording pushes and lifecycle. Audit history
  * only; membership consequences dispatch to the grants ledger. See D08.
@@ -66,15 +67,20 @@ const syncIdentity = {
   organizationId: z.string().min(1),
 };
 
-export const scimTokenIssuedPayloadSchema = z.object({
+const scimTokenIssuedPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   /** The token ROW's id. Never the token, never its hash: this history is
    *  read by support surfaces, and a credential has no business in it. */
   tokenId: z.string().min(1),
   actor: ledgerActorSchema,
 });
+export interface ScimTokenIssuedPayloadSchema extends Named<
+  typeof scimTokenIssuedPayloadSchemaDefinition
+> {}
+export const scimTokenIssuedPayloadSchema: ScimTokenIssuedPayloadSchema =
+  scimTokenIssuedPayloadSchemaDefinition;
 
-export const scimUserPushedPayloadSchema = z.object({
+const scimUserPushedPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   userId: z.string().min(1),
   /** The directory's own identifier for the person, which is what survives
@@ -82,20 +88,30 @@ export const scimUserPushedPayloadSchema = z.object({
   externalId: z.string().min(1),
   op: scimUserOpSchema,
 });
+export interface ScimUserPushedPayloadSchema extends Named<
+  typeof scimUserPushedPayloadSchemaDefinition
+> {}
+export const scimUserPushedPayloadSchema: ScimUserPushedPayloadSchema =
+  scimUserPushedPayloadSchemaDefinition;
 
-export const scimGroupMappedPayloadSchema = z.object({
+const scimGroupMappedPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   groupId: z.string().min(1),
   /** The group's identifier in the directory, when the push carried one. */
   externalId: z.string().min(1).nullable(),
 });
+export interface ScimGroupMappedPayloadSchema extends Named<
+  typeof scimGroupMappedPayloadSchemaDefinition
+> {}
+export const scimGroupMappedPayloadSchema: ScimGroupMappedPayloadSchema =
+  scimGroupMappedPayloadSchemaDefinition;
 
 /**
  * An apply that failed. `errorCode` is a stable slug and `detail` is our own
  * short sentence — never a provider's raw message, which is where a token or
  * a hostname would arrive from.
  */
-export const scimApplyFailedPayloadSchema = z.object({
+const scimApplyFailedPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   op: scimApplyOpSchema,
   errorCode: z.string().min(1),
@@ -104,31 +120,46 @@ export const scimApplyFailedPayloadSchema = z.object({
   /** The person the failed apply was about, when it was about one. */
   userId: z.string().min(1).nullable(),
 });
+export interface ScimApplyFailedPayloadSchema extends Named<
+  typeof scimApplyFailedPayloadSchemaDefinition
+> {}
+export const scimApplyFailedPayloadSchema: ScimApplyFailedPayloadSchema =
+  scimApplyFailedPayloadSchemaDefinition;
 
-export const scimApplyRecoveredPayloadSchema = z.object({
+const scimApplyRecoveredPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   op: scimApplyOpSchema,
 });
+export interface ScimApplyRecoveredPayloadSchema extends Named<
+  typeof scimApplyRecoveredPayloadSchemaDefinition
+> {}
+export const scimApplyRecoveredPayloadSchema: ScimApplyRecoveredPayloadSchema =
+  scimApplyRecoveredPayloadSchemaDefinition;
 
 /**
  * The dead letter. A failure that will never succeed is retired HERE and
  * stays readable, because the alternative — dropping it — reports the
  * directory's requested state as reached when it was not.
  */
-export const scimApplyRetiredPayloadSchema = z.object({
+const scimApplyRetiredPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   op: scimApplyOpSchema,
   errorCode: z.string().min(1),
   attempts: z.number().int().nonnegative(),
   userId: z.string().min(1).nullable(),
 });
+export interface ScimApplyRetiredPayloadSchema extends Named<
+  typeof scimApplyRetiredPayloadSchemaDefinition
+> {}
+export const scimApplyRetiredPayloadSchema: ScimApplyRetiredPayloadSchema =
+  scimApplyRetiredPayloadSchemaDefinition;
 
 /**
  * The operator surface's one write (ADR-122): a retired apply sent through
  * again. Names WHICH dead letter by its retirement time; the operator rides
  * on the fact because a re-drive crosses a tenant boundary.
  */
-export const scimApplyRedrivenPayloadSchema = z.object({
+const scimApplyRedrivenPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   op: scimApplyOpSchema,
   errorCode: z.string().min(1),
@@ -138,19 +169,29 @@ export const scimApplyRedrivenPayloadSchema = z.object({
   /** The platform operator who sent it through again. */
   actor: ledgerActorSchema,
 });
+export interface ScimApplyRedrivenPayloadSchema extends Named<
+  typeof scimApplyRedrivenPayloadSchemaDefinition
+> {}
+export const scimApplyRedrivenPayloadSchema: ScimApplyRedrivenPayloadSchema =
+  scimApplyRedrivenPayloadSchemaDefinition;
 
-export const scimTokenRevokedPayloadSchema = z.object({
+const scimTokenRevokedPayloadSchemaDefinition = z.object({
   ...syncIdentity,
   tokenId: z.string().min(1).nullable(),
   cause: scimRevokeCauseSchema,
 });
+export interface ScimTokenRevokedPayloadSchema extends Named<
+  typeof scimTokenRevokedPayloadSchemaDefinition
+> {}
+export const scimTokenRevokedPayloadSchema: ScimTokenRevokedPayloadSchema =
+  scimTokenRevokedPayloadSchemaDefinition;
 
 /**
  * A sync fact as a command decides it. The framework envelope (aggregate,
  * tenant, ids, idempotency key) and `occurredAt` are stamped by whoever
  * appends.
  */
-export const scimSyncFactInputSchema = z.discriminatedUnion("type", [
+const scimSyncFactInputSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(SCIM_TOKEN_ISSUED_EVENT_TYPE),
     data: scimTokenIssuedPayloadSchema,
@@ -184,6 +225,8 @@ export const scimSyncFactInputSchema = z.discriminatedUnion("type", [
     data: scimTokenRevokedPayloadSchema,
   }),
 ]);
+export interface ScimSyncFactInputSchema extends Named<typeof scimSyncFactInputSchemaDefinition> {}
+export const scimSyncFactInputSchema: ScimSyncFactInputSchema = scimSyncFactInputSchemaDefinition;
 export type ScimSyncFactInput = z.infer<typeof scimSyncFactInputSchema>;
 
 /** A fact with its business time — what the reducer folds. */
@@ -195,7 +238,7 @@ export type ScimSyncFact = ScimSyncFactInput & { occurredAt: number };
  * The last thing that went wrong, as the failure surface reads it. Names the
  * connection, operation and reason code — never a token, secret, or hostname.
  */
-export const scimSyncFailureSchema = z.object({
+const scimSyncFailureSchemaDefinition = z.object({
   op: scimApplyOpSchema,
   errorCode: z.string(),
   /** How many failed applies have accumulated since the last recovery. */
@@ -208,6 +251,8 @@ export const scimSyncFailureSchema = z.object({
   /** Set once an operator re-drove the retired apply (ADR-122); rows before it carry none. */
   redrivenAtMs: z.number().nullable().default(null),
 });
+export interface ScimSyncFailureSchema extends Named<typeof scimSyncFailureSchemaDefinition> {}
+export const scimSyncFailureSchema: ScimSyncFailureSchema = scimSyncFailureSchemaDefinition;
 export type ScimSyncFailure = z.infer<typeof scimSyncFailureSchema>;
 
 /** One connection's directory sync as the projection knows it. */
@@ -416,11 +461,16 @@ export const SCIM_COST_CENTER_CHANGED_EVENT_TYPE = "lw.scim.cost_center_changed"
 export const SCIM_COST_CENTER_CHANGED_EVENT_VERSION = "2026-10-07" as const;
 
 /** `costCenter` is trimmed; null clears the member's department. */
-export const scimCostCenterChangedEventDataSchema = z.object({
+const scimCostCenterChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   userId: z.string().min(1),
   costCenter: z.string().min(1).nullable(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface ScimCostCenterChangedEventDataSchema extends Named<
+  typeof scimCostCenterChangedEventDataSchemaDefinition
+> {}
+export const scimCostCenterChangedEventDataSchema: ScimCostCenterChangedEventDataSchema =
+  scimCostCenterChangedEventDataSchemaDefinition;
 export type ScimCostCenterChangedEventData = z.infer<typeof scimCostCenterChangedEventDataSchema>;

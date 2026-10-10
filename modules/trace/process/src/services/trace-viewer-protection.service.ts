@@ -105,11 +105,12 @@ export class TraceViewerProtectionService {
       authorization?: Authorization;
     }>,
   ): Promise<Protections> {
-    const [canSeeCosts, isMember, isAdmin, isProjectOwner, { visibilityCutoffMs }] =
+    const [canSeeCosts, isMember, isAdmin, canWriteTraces, isProjectOwner, { visibilityCutoffMs }] =
       await Promise.all([
         this.permitted(input, "cost:view"),
         this.permitted(input, "traces:view"),
-        this.permitted(input, "project:update"),
+        this.permitted(input, "project:manage"),
+        this.permitted(input, "traces:update"),
         this.isProjectOwner(input),
         this.getVisibilityWindow(input.projectId),
       ]);
@@ -147,6 +148,7 @@ export class TraceViewerProtectionService {
       anonymous: input.publiclyShared || input.userId === undefined,
       isAdmin,
       isMember,
+      isMemberRole: canWriteTraces && !isAdmin,
       isProjectOwner,
     });
 
@@ -177,6 +179,7 @@ export class TraceViewerProtectionService {
     anonymous,
     isAdmin,
     isMember,
+    isMemberRole,
     isProjectOwner,
   }: {
     policy: ResolvedDataPrivacy;
@@ -185,6 +188,7 @@ export class TraceViewerProtectionService {
     anonymous: boolean;
     isAdmin: boolean;
     isMember: boolean;
+    isMemberRole: boolean;
     isProjectOwner: boolean;
   }): Promise<Protections["contentCategories"]> {
     const groupIds = anonymous ? [] : await this.groupIdsFor({ policy, projectId, userId });
@@ -200,8 +204,8 @@ export class TraceViewerProtectionService {
               : isContentVisible(resolved, {
                   isAdmin,
                   isMember,
-                  isMemberRole: isMember,
-                  isViewer: isMember && !isAdmin,
+                  isMemberRole,
+                  isViewer: isMember && !isAdmin && !isMemberRole,
                   isProjectOwner,
                   groupIds,
                 }),
@@ -268,7 +272,7 @@ export class TraceViewerProtectionService {
 
   private permitted(
     input: Readonly<{ projectId: string; userId: string | undefined }>,
-    permission: "cost:view" | "traces:view" | "project:update",
+    permission: "cost:view" | "traces:view" | "traces:update" | "project:manage",
   ): Promise<boolean> {
     if (input.userId === undefined) return Promise.resolve(false);
     return this.options.authz.hasPermission({

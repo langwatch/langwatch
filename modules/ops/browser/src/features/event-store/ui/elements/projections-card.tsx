@@ -1,4 +1,7 @@
-import { Badge, Box, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Layers } from "lucide-react";
 
 import type { ProjectionHealthRow } from "../../model/projection-health.ts";
 
@@ -31,7 +34,7 @@ function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={row.blocked > 0 ? "red.500" : "fg.muted"}>
+        <Text textStyle="xs" fontFamily="mono" color={row.blocked > 0 ? "fg.error" : "fg.muted"}>
           {row.blocked}
         </Text>
       </Table.Cell>
@@ -53,7 +56,7 @@ function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
 /** Every registered projection with its live queue health. */
 export function ProjectionsCard({ rows }: { rows: ProjectionHealthRow[] }) {
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
@@ -61,13 +64,19 @@ export function ProjectionsCard({ rows }: { rows: ProjectionHealthRow[] }) {
           </Text>
         </HStack>
         {rows.length === 0 ? (
-          <Box padding={4}>
-            <Text textStyle="xs" color="fg.muted">
-              No projections registered.
-            </Text>
-          </Box>
+          <NoDataInfoBlock
+            icon={<Layers />}
+            title="No projections registered."
+            description="Registered projections and their current work appear here."
+          />
         ) : (
-          <Table.Root size="sm" variant="line">
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflowX: "auto" }}
+            size="sm"
+            variant="line"
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Projection</Table.ColumnHeader>
@@ -87,7 +96,7 @@ export function ProjectionsCard({ rows }: { rows: ProjectionHealthRow[] }) {
                 />
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         )}
       </Card.Body>
     </Card.Root>

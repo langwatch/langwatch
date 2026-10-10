@@ -1,4 +1,5 @@
 import { NotFoundError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { PlatformToolSlug } from "./platform-tool-policy.ts";
@@ -32,7 +33,7 @@ export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<Record<AssistantKind, Platform
   github_copilot: "copilot",
 };
 
-export const codingAssistantConfigSchema = z.object({
+const codingAssistantConfigSchemaDefinition = z.object({
   assistantKind: assistantKindSchema.optional(),
   setupCommand: z.string().min(1).max(256),
   setupDocsUrl: z.string().url().max(2048).optional(),
@@ -41,21 +42,36 @@ export const codingAssistantConfigSchema = z.object({
   allowOtelDirect: z.boolean().optional(),
   bundledPlan: z.boolean().optional(),
 });
+export interface CodingAssistantConfigSchema extends Named<
+  typeof codingAssistantConfigSchemaDefinition
+> {}
+export const codingAssistantConfigSchema: CodingAssistantConfigSchema =
+  codingAssistantConfigSchemaDefinition;
 
-export const modelProviderToolConfigSchema = z.object({
+const modelProviderToolConfigSchemaDefinition = z.object({
   providerKey: z.string().min(1).max(64),
   suggestedRoutingPolicyId: z.string().min(1).optional(),
   defaultLabel: z.string().max(64).optional(),
   projectSuggestionText: z.string().max(512).optional(),
 });
+export interface ModelProviderToolConfigSchema extends Named<
+  typeof modelProviderToolConfigSchemaDefinition
+> {}
+export const modelProviderToolConfigSchema: ModelProviderToolConfigSchema =
+  modelProviderToolConfigSchemaDefinition;
 
-export const externalToolConfigSchema = z.object({
+const externalToolConfigSchemaDefinition = z.object({
   descriptionMarkdown: z.string().max(8192),
   linkUrl: z.string().url().max(2048),
   ctaLabel: z.string().max(64).optional(),
 });
+export interface ExternalToolConfigSchema extends Named<
+  typeof externalToolConfigSchemaDefinition
+> {}
+export const externalToolConfigSchema: ExternalToolConfigSchema =
+  externalToolConfigSchemaDefinition;
 
-export const aiToolConfigEnvelopeSchema = z.discriminatedUnion("type", [
+const aiToolConfigEnvelopeSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("coding_assistant"),
     config: codingAssistantConfigSchema,
@@ -69,12 +85,17 @@ export const aiToolConfigEnvelopeSchema = z.discriminatedUnion("type", [
     config: externalToolConfigSchema,
   }),
 ]);
+export interface AiToolConfigEnvelopeSchema extends Named<
+  typeof aiToolConfigEnvelopeSchemaDefinition
+> {}
+export const aiToolConfigEnvelopeSchema: AiToolConfigEnvelopeSchema =
+  aiToolConfigEnvelopeSchemaDefinition;
 export type AiToolConfigEnvelope = z.infer<typeof aiToolConfigEnvelopeSchema>;
 export type AiToolConfig = AiToolConfigEnvelope["config"];
 
 const configRecordSchema = z.record(z.string(), z.unknown());
 
-export const aiToolEntrySchema = z
+const aiToolEntrySchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -96,30 +117,44 @@ export const aiToolEntrySchema = z
     updatedById: z.string().nullable(),
   })
   .strict();
+export interface AiToolEntrySchema extends Named<typeof aiToolEntrySchemaDefinition> {}
+export const aiToolEntrySchema: AiToolEntrySchema = aiToolEntrySchemaDefinition;
 export type AiToolEntry = z.infer<typeof aiToolEntrySchema>;
 
-export const aiToolOrganizationInputSchema = z
+const aiToolOrganizationInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1) })
   .strict();
+export interface AiToolOrganizationInputSchema extends Named<
+  typeof aiToolOrganizationInputSchemaDefinition
+> {}
+export const aiToolOrganizationInputSchema: AiToolOrganizationInputSchema =
+  aiToolOrganizationInputSchemaDefinition;
 export type AiToolOrganizationInput = z.infer<typeof aiToolOrganizationInputSchema>;
 
-export const aiToolMemberInputSchema = z
+const aiToolMemberInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     userId: z.string().min(1),
   })
   .strict();
+export interface AiToolMemberInputSchema extends Named<typeof aiToolMemberInputSchemaDefinition> {}
+export const aiToolMemberInputSchema: AiToolMemberInputSchema = aiToolMemberInputSchemaDefinition;
 export type AiToolMemberInput = z.infer<typeof aiToolMemberInputSchema>;
 
-export const findAiToolEntryInputSchema = z
+const findAiToolEntryInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface FindAiToolEntryInputSchema extends Named<
+  typeof findAiToolEntryInputSchemaDefinition
+> {}
+export const findAiToolEntryInputSchema: FindAiToolEntryInputSchema =
+  findAiToolEntryInputSchemaDefinition;
 export type FindAiToolEntryInput = z.infer<typeof findAiToolEntryInputSchema>;
 
-export const createAiToolEntryInputSchema = z
+const createAiToolEntryInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     departmentIds: z.array(z.string().min(1)),
@@ -131,9 +166,14 @@ export const createAiToolEntryInputSchema = z
     actorUserId: z.string().nullable().optional(),
   })
   .strict();
+export interface CreateAiToolEntryInputSchema extends Named<
+  typeof createAiToolEntryInputSchemaDefinition
+> {}
+export const createAiToolEntryInputSchema: CreateAiToolEntryInputSchema =
+  createAiToolEntryInputSchemaDefinition;
 export type CreateAiToolEntryInput = z.infer<typeof createAiToolEntryInputSchema>;
 
-export const updateAiToolEntryInputSchema = z
+const updateAiToolEntryInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -147,21 +187,36 @@ export const updateAiToolEntryInputSchema = z
     actorUserId: z.string().nullable().optional(),
   })
   .strict();
+export interface UpdateAiToolEntryInputSchema extends Named<
+  typeof updateAiToolEntryInputSchemaDefinition
+> {}
+export const updateAiToolEntryInputSchema: UpdateAiToolEntryInputSchema =
+  updateAiToolEntryInputSchemaDefinition;
 export type UpdateAiToolEntryInput = z.infer<typeof updateAiToolEntryInputSchema>;
 
-export const reorderAiToolEntriesInputSchema = aiToolOrganizationInputSchema
+const reorderAiToolEntriesInputSchemaDefinition = aiToolOrganizationInputSchema
   .safeExtend({
     updates: z.array(z.object({ id: z.string().min(1), order: z.number().int() }).strict()),
   })
   .strict();
+export interface ReorderAiToolEntriesInputSchema extends Named<
+  typeof reorderAiToolEntriesInputSchemaDefinition
+> {}
+export const reorderAiToolEntriesInputSchema: ReorderAiToolEntriesInputSchema =
+  reorderAiToolEntriesInputSchemaDefinition;
 export type ReorderAiToolEntriesInput = z.infer<typeof reorderAiToolEntriesInputSchema>;
 
-export const seedAiToolStarterPackInputSchema = aiToolOrganizationInputSchema
+const seedAiToolStarterPackInputSchemaDefinition = aiToolOrganizationInputSchema
   .safeExtend({
     actorUserId: z.string().nullable().optional(),
     slugs: z.array(z.string().min(1)).optional(),
   })
   .strict();
+export interface SeedAiToolStarterPackInputSchema extends Named<
+  typeof seedAiToolStarterPackInputSchemaDefinition
+> {}
+export const seedAiToolStarterPackInputSchema: SeedAiToolStarterPackInputSchema =
+  seedAiToolStarterPackInputSchemaDefinition;
 export type SeedAiToolStarterPackInput = z.infer<typeof seedAiToolStarterPackInputSchema>;
 
 export type AiToolStarterTile = {
@@ -273,45 +328,75 @@ export type AiToolCliCatalog = {
 };
 
 /** One provider the admin drawer offers, and whether it is set up yet. */
-export const aiToolProviderOptionSchema = z
+const aiToolProviderOptionSchemaDefinition = z
   .object({
     providerKey: z.string(),
     displayName: z.string(),
     configured: z.boolean(),
   })
   .strict();
+export interface AiToolProviderOptionSchema extends Named<
+  typeof aiToolProviderOptionSchemaDefinition
+> {}
+export const aiToolProviderOptionSchema: AiToolProviderOptionSchema =
+  aiToolProviderOptionSchemaDefinition;
 export type AiToolProviderOption = z.infer<typeof aiToolProviderOptionSchema>;
 
 /** Which providers this member's organization has configured. */
-export const aiToolProviderAvailabilitySchema = z
+const aiToolProviderAvailabilitySchemaDefinition = z
   .object({ configuredProviders: z.array(z.string()) })
   .strict();
+export interface AiToolProviderAvailabilitySchema extends Named<
+  typeof aiToolProviderAvailabilitySchemaDefinition
+> {}
+export const aiToolProviderAvailabilitySchema: AiToolProviderAvailabilitySchema =
+  aiToolProviderAvailabilitySchemaDefinition;
 
 /**
  * The OTLP endpoint the Claude Code tile auto-fills, or null when no
  * `claude_code` source is published yet. Only the URL is disclosed — no
  * name, scope or secret — because the bearer token gates the write.
  */
-export const aiToolOtlpEndpointSchema = z.object({ endpoint: z.string().nullable() }).strict();
+const aiToolOtlpEndpointSchemaDefinition = z.object({ endpoint: z.string().nullable() }).strict();
+export interface AiToolOtlpEndpointSchema extends Named<
+  typeof aiToolOtlpEndpointSchemaDefinition
+> {}
+export const aiToolOtlpEndpointSchema: AiToolOtlpEndpointSchema =
+  aiToolOtlpEndpointSchemaDefinition;
 
 /** One tile of the starter pack, as the admin checklist renders it. */
-export const aiToolStarterTileChoiceSchema = z
+const aiToolStarterTileChoiceSchemaDefinition = z
   .object({ slug: z.string(), displayName: z.string(), type: aiToolTypeSchema })
   .strict();
+export interface AiToolStarterTileChoiceSchema extends Named<
+  typeof aiToolStarterTileChoiceSchemaDefinition
+> {}
+export const aiToolStarterTileChoiceSchema: AiToolStarterTileChoiceSchema =
+  aiToolStarterTileChoiceSchemaDefinition;
 
 /** One routing policy the admin drawer offers for a model-provider tile. */
-export const aiToolRoutingPolicyOptionSchema = z
+const aiToolRoutingPolicyOptionSchemaDefinition = z
   .object({ id: z.string(), name: z.string() })
   .strict();
+export interface AiToolRoutingPolicyOptionSchema extends Named<
+  typeof aiToolRoutingPolicyOptionSchemaDefinition
+> {}
+export const aiToolRoutingPolicyOptionSchema: AiToolRoutingPolicyOptionSchema =
+  aiToolRoutingPolicyOptionSchemaDefinition;
 
 /** What importing the starter pack did: per-slug, and never destructive. */
-export const aiToolStarterPackImportSchema = z
+const aiToolStarterPackImportSchemaDefinition = z
   .object({
     created: z.number().int().nonnegative(),
     updated: z.number().int().nonnegative(),
     skipped: z.number().int().nonnegative(),
   })
   .strict();
+export interface AiToolStarterPackImportSchema extends Named<
+  typeof aiToolStarterPackImportSchemaDefinition
+> {}
+export const aiToolStarterPackImportSchema: AiToolStarterPackImportSchema =
+  aiToolStarterPackImportSchemaDefinition;
 
 export type AiToolStarterTileChoice = z.infer<typeof aiToolStarterTileChoiceSchema>;
 

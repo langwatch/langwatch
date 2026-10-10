@@ -47,3 +47,11 @@ export function renderWithDesignSystem(
     ...options,
   });
 }
+
+/**
+ * The design system's own Chakra system around a test tree, for a harness that renders
+ * itself rather than through `renderWithDesignSystem`. Never Chakra's `defaultSystem`.
+ */
+export function DesignSystemTestProvider({ children }: { children: ReactNode }) {
+  return <ChakraProvider value={system}>{children}</ChakraProvider>;
+}

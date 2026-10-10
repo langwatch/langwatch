@@ -11,6 +11,7 @@ import {
   TriggerAction,
   webhookActionParamsSchema,
   webhookProvider as webhookShared,
+  webhookUrlSchema,
   type SharedDef,
 } from "@langwatch/automation-contract";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
@@ -60,8 +61,11 @@ interface ServerEntry {
 
 /** The five channels' secret handling, sealed and opened by the trigger repository. */
 export class AutomationProviderRegistryService {
-  static create(triggers: TriggerSecretSeal): AutomationProviderRegistryService {
-    return new AutomationProviderRegistryService(triggers);
+  static create(
+    triggers: TriggerSecretSeal,
+    { allowInsecureLocalUrls = false }: { allowInsecureLocalUrls?: boolean } = {},
+  ): AutomationProviderRegistryService {
+    return new AutomationProviderRegistryService(triggers, allowInsecureLocalUrls);
   }
 
   /** The webhook channel's secret capability, exposed for the two read paths. */
@@ -70,7 +74,11 @@ export class AutomationProviderRegistryService {
   private readonly slack: AutomationSlackSecretsService;
   private readonly providers: Record<TriggerAction, ServerEntry>;
 
-  private constructor(triggers: TriggerSecretSeal) {
+  private constructor(triggers: TriggerSecretSeal, allowInsecureLocalUrls: boolean) {
+    const webhookSchema = z.object({
+      ...webhookActionParamsSchema.shape,
+      url: webhookUrlSchema({ allowInsecureLocalUrls }),
+    });
     this.webhooks = AutomationWebhookSecretsService.create(triggers);
     this.slack = AutomationSlackSecretsService.create(triggers);
     this.providers = {
@@ -82,7 +90,10 @@ export class AutomationProviderRegistryService {
         shared: slackShared,
         server: this.slackServer(),
       },
-      [TriggerAction.SEND_WEBHOOK]: { shared: webhookShared, server: this.webhookServer() },
+      [TriggerAction.SEND_WEBHOOK]: {
+        shared: { ...webhookShared, actionParamsSchema: webhookSchema },
+        server: this.webhookServer(webhookSchema),
+      },
       [TriggerAction.ADD_TO_DATASET]: {
         shared: datasetShared,
         server: { action: TriggerAction.ADD_TO_DATASET },
@@ -150,12 +161,12 @@ export class AutomationProviderRegistryService {
     };
   }
 
-  private webhookServer(): ServerDef {
+  private webhookServer(schema: typeof webhookActionParamsSchema): ServerDef {
     const webhooks = this.webhooks;
     return {
       action: TriggerAction.SEND_WEBHOOK,
       persistActionParams: async ({ incoming, loadExisting }: PersistActionParamsArgs) => {
-        const params = webhookActionParamsSchema.parse(incoming);
+        const params = schema.parse(incoming);
         const needsExisting =
           Object.values(params.headers ?? {}).includes(WEBHOOK_HEADER_VALUE_KEPT) ||
           (params.signingSecret ?? null) !== null;

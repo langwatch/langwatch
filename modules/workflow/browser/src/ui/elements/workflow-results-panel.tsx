@@ -1,7 +1,7 @@
 import {
   Alert,
   Box,
-  Button,
+  IconButton,
   Center,
   EmptyState,
   HStack,
@@ -9,9 +9,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { X, SquareCheckBig } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { X } from "react-feather";
-import { LuSquareCheckBig } from "react-icons/lu";
 
 export function WorkflowResultsPanel({
   isCollapsed,
@@ -29,12 +28,13 @@ export function WorkflowResultsPanel({
       borderTop="2px solid"
       borderColor="border"
       width="full"
-      fontSize="14px"
+      textStyle="sm"
       height="full"
       align="start"
       position="relative"
     >
-      <Button
+      <IconButton
+        aria-label="Collapse results"
         variant="ghost"
         onClick={onCollapse}
         position="absolute"
@@ -44,7 +44,7 @@ export function WorkflowResultsPanel({
         zIndex={1}
       >
         <X size={16} />
-      </Button>
+      </IconButton>
       <Tabs.Root
         value="evaluations"
         width="full"
@@ -87,7 +87,7 @@ export function WorkflowEvaluationResultsLayout(props: WorkflowEvaluationResults
         <EmptyState.Root marginTop="-60px">
           <EmptyState.Content>
             <EmptyState.Indicator>
-              <LuSquareCheckBig />
+              <SquareCheckBig />
             </EmptyState.Indicator>
             <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
             <EmptyState.Description>

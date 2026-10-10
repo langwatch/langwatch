@@ -5,6 +5,7 @@
  * @see modules/insight/adrs/004-daily-run.md
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -27,10 +28,12 @@ const boardPointerShape = {
  * The board a run reads. Only a pointer: a stored board by its dashboard id, or a From
  * LangWatch board by its template id. A run checks that it exists, and as whom, when it runs.
  */
-export const insightRunBoardSchema = z.discriminatedUnion("kind", [
+const insightRunBoardSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("dashboard"), ...boardPointerShape }).strict(),
   z.object({ kind: z.literal("template"), ...boardPointerShape }).strict(),
 ]);
+export interface InsightRunBoardSchema extends Named<typeof insightRunBoardSchemaDefinition> {}
+export const insightRunBoardSchema: InsightRunBoardSchema = insightRunBoardSchemaDefinition;
 export type InsightRunBoard = z.infer<typeof insightRunBoardSchema>;
 
 /** How many findings one run may file; whatever Langy returns is cut to it. */
@@ -95,12 +98,14 @@ const insightLastRunSchema = z.object({
 });
 
 /** One person's run on one board, as they read it: the board and how the last run ended. */
-export const insightDailyRunSchema = z.object({
+const insightDailyRunSchemaDefinition = z.object({
   id: z.string(),
   board: insightRunBoardSchema,
   /** Null until a run settled. */
   lastRun: insightLastRunSchema.nullable(),
 });
+export interface InsightDailyRunSchema extends Named<typeof insightDailyRunSchemaDefinition> {}
+export const insightDailyRunSchema: InsightDailyRunSchema = insightDailyRunSchemaDefinition;
 export type InsightDailyRun = z.infer<typeof insightDailyRunSchema>;
 
 /** The hour of the day a schedule runs at, read in its own time zone. */
@@ -125,11 +130,16 @@ const insightRunTimezoneSchema = z
   .refine(isKnownTimezone, { message: "The time zone must be an IANA zone name." });
 
 /** What a person chose for a board's daily run: when it runs and how much it may file. */
-export const insightRunSettingsSchema = z.object({
+const insightRunSettingsSchemaDefinition = z.object({
   hour: insightRunHourSchema,
   timezone: insightRunTimezoneSchema,
   maxInsights: insightRunMaxInsightsSchema,
 });
+export interface InsightRunSettingsSchema extends Named<
+  typeof insightRunSettingsSchemaDefinition
+> {}
+export const insightRunSettingsSchema: InsightRunSettingsSchema =
+  insightRunSettingsSchemaDefinition;
 export type InsightRunSettings = z.infer<typeof insightRunSettingsSchema>;
 
 /** `undecided`: the person was never asked, or closed the offer without an answer. */
@@ -141,42 +151,67 @@ export type InsightScheduleState = z.infer<typeof insightScheduleStateSchema>;
  * One person's daily run setting on one board, as they alone read it. `settings` is what they
  * last chose, kept while the run is off, and null until they turned it on once.
  */
-export const insightDailyRunSettingSchema = z.object({
+const insightDailyRunSettingSchemaDefinition = z.object({
   state: insightScheduleStateSchema,
   settings: insightRunSettingsSchema.nullable(),
   /** Null until a run settled. */
   lastRun: insightLastRunSchema.nullable(),
 });
+export interface InsightDailyRunSettingSchema extends Named<
+  typeof insightDailyRunSettingSchemaDefinition
+> {}
+export const insightDailyRunSettingSchema: InsightDailyRunSettingSchema =
+  insightDailyRunSettingSchemaDefinition;
 export type InsightDailyRunSetting = z.infer<typeof insightDailyRunSettingSchema>;
 
 /** Which board's daily run a person reads: the pointer's kind and id, no name. */
-export const insightBoardDailyRunScopeSchema = z.object({
+const insightBoardDailyRunScopeSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   board: z.object({ kind: z.enum(["dashboard", "template"]), id: boardPointerShape.id }).strict(),
 });
+export interface InsightBoardDailyRunScopeSchema extends Named<
+  typeof insightBoardDailyRunScopeSchemaDefinition
+> {}
+export const insightBoardDailyRunScopeSchema: InsightBoardDailyRunScopeSchema =
+  insightBoardDailyRunScopeSchemaDefinition;
 export type InsightBoardDailyRunScope = z.infer<typeof insightBoardDailyRunScopeSchema>;
 
 /** Turns a board's daily run on, or changes when it runs and how much it may file. */
-export const configureInsightDailyRunInputSchema = z.object({
+const configureInsightDailyRunInputSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   board: insightRunBoardSchema,
   ...insightRunSettingsSchema.shape,
 });
+export interface ConfigureInsightDailyRunInputSchema extends Named<
+  typeof configureInsightDailyRunInputSchemaDefinition
+> {}
+export const configureInsightDailyRunInputSchema: ConfigureInsightDailyRunInputSchema =
+  configureInsightDailyRunInputSchemaDefinition;
 export type ConfigureInsightDailyRunInput = z.infer<typeof configureInsightDailyRunInputSchema>;
 
 /** Turns a board's daily run off; also what "No thanks" on the offer stores. */
-export const turnOffInsightDailyRunInputSchema = z.object({
+const turnOffInsightDailyRunInputSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   board: insightRunBoardSchema,
 });
+export interface TurnOffInsightDailyRunInputSchema extends Named<
+  typeof turnOffInsightDailyRunInputSchemaDefinition
+> {}
+export const turnOffInsightDailyRunInputSchema: TurnOffInsightDailyRunInputSchema =
+  turnOffInsightDailyRunInputSchemaDefinition;
 export type TurnOffInsightDailyRunInput = z.infer<typeof turnOffInsightDailyRunInputSchema>;
 
-export const requestInsightDailyRunInputSchema = z.object({
+const requestInsightDailyRunInputSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   userId: z.string().min(1),
   board: insightRunBoardSchema,
   maxInsights: insightRunMaxInsightsSchema.default(DEFAULT_INSIGHT_RUN_MAX_INSIGHTS),
 });
+export interface RequestInsightDailyRunInputSchema extends Named<
+  typeof requestInsightDailyRunInputSchemaDefinition
+> {}
+export const requestInsightDailyRunInputSchema: RequestInsightDailyRunInputSchema =
+  requestInsightDailyRunInputSchemaDefinition;
 export type RequestInsightDailyRunInput = z.input<typeof requestInsightDailyRunInputSchema>;
 
 /** The fence tag of the one block a run's answer ends with. */
@@ -193,7 +228,7 @@ export const INSIGHT_RUN_FINDING_BODY_MAX = 4_000;
  * One finding as Langy hands it back. Strict: a key that is not listed here refuses the whole
  * answer, so an answer cannot name an owner, a project or a board.
  */
-export const insightRunFindingSchema = z
+const insightRunFindingSchemaDefinition = z
   .object({
     title: insightTitleSchema.max(INSIGHT_RUN_FINDING_TITLE_MAX),
     body: insightBodySchema.max(INSIGHT_RUN_FINDING_BODY_MAX),
@@ -205,10 +240,17 @@ export const insightRunFindingSchema = z
     lwql: z.string().trim().min(1).max(20_000).optional(),
   })
   .strict();
+export interface InsightRunFindingSchema extends Named<typeof insightRunFindingSchemaDefinition> {}
+export const insightRunFindingSchema: InsightRunFindingSchema = insightRunFindingSchemaDefinition;
 export type InsightRunFinding = z.infer<typeof insightRunFindingSchema>;
 
-export const insightRunFindingsSchema = z
+const insightRunFindingsSchemaDefinition = z
   .object({
     findings: z.array(insightRunFindingSchema).max(INSIGHT_RUN_MAX_FINDINGS_IN_ANSWER),
   })
   .strict();
+export interface InsightRunFindingsSchema extends Named<
+  typeof insightRunFindingsSchemaDefinition
+> {}
+export const insightRunFindingsSchema: InsightRunFindingsSchema =
+  insightRunFindingsSchemaDefinition;

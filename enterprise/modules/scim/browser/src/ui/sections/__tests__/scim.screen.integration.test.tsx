@@ -568,7 +568,7 @@ describe("given a reader without sso:view", () => {
   it("says which permission the page needs and shows none of it", () => {
     renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["sso:view"] }));
 
-    expect(screen.getByText("sso:view")).toBeTruthy();
+    expect(screen.getByText("Missing permission: sso:view")).toBeTruthy();
     expect(screen.queryByText("Provisioning tokens")).toBeNull();
   });
 });

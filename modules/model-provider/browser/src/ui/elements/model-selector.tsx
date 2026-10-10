@@ -109,8 +109,8 @@ function selectedModelColor({
   isProviderMissing: boolean;
   isUnknown: boolean;
 }): string | undefined {
-  if (isProviderMissing) return "red.600";
-  if (isUnknown) return "gray.500";
+  if (isProviderMissing) return "red.fg";
+  if (isUnknown) return "fg.subtle";
 
   return undefined;
 }
@@ -175,7 +175,7 @@ function UpdateNeededMark({ size }: { size: SelectorSize }) {
   const isSmall = size === "sm";
 
   return (
-    <HStack gap={1} color="red.600" flexShrink={0}>
+    <HStack gap={1} color="red.fg" flexShrink={0}>
       <AlertTriangle size={isSmall ? 12 : 14} aria-hidden />
       <Text
         fontSize={isSmall ? "2xs" : "xs"}

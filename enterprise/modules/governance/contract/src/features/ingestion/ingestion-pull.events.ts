@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { governanceEventEnvelopeSchema } from "../../governance.ts";
@@ -110,18 +111,33 @@ export function isValidPullSchedule(cron: string): boolean {
 }
 
 const sourceEnvelopeSchema = z.object({ sourceId: z.string().min(1) }).strict();
-export const ingestionPullConfiguredEventDataSchema = sourceEnvelopeSchema.safeExtend({
+const ingestionPullConfiguredEventDataSchemaDefinition = sourceEnvelopeSchema.safeExtend({
   cron: z.string().min(1),
   configVersion: z.string().min(1),
   cursor: z.string().nullable(),
 });
-export const ingestionPullConfiguredCommandDataSchema =
+export interface IngestionPullConfiguredEventDataSchema extends Named<
+  typeof ingestionPullConfiguredEventDataSchemaDefinition
+> {}
+export const ingestionPullConfiguredEventDataSchema: IngestionPullConfiguredEventDataSchema =
+  ingestionPullConfiguredEventDataSchemaDefinition;
+const ingestionPullConfiguredCommandDataSchemaDefinition =
   ingestionPullConfiguredEventDataSchema.safeExtend({ cron: pullScheduleSchema });
-export const ingestionPullDisabledEventDataSchema = sourceEnvelopeSchema.safeExtend({
+export interface IngestionPullConfiguredCommandDataSchema extends Named<
+  typeof ingestionPullConfiguredCommandDataSchemaDefinition
+> {}
+export const ingestionPullConfiguredCommandDataSchema: IngestionPullConfiguredCommandDataSchema =
+  ingestionPullConfiguredCommandDataSchemaDefinition;
+const ingestionPullDisabledEventDataSchemaDefinition = sourceEnvelopeSchema.safeExtend({
   configVersion: z.string().min(1),
 });
+export interface IngestionPullDisabledEventDataSchema extends Named<
+  typeof ingestionPullDisabledEventDataSchemaDefinition
+> {}
+export const ingestionPullDisabledEventDataSchema: IngestionPullDisabledEventDataSchema =
+  ingestionPullDisabledEventDataSchemaDefinition;
 /** The optional fields are absent on history written before them; absent reads as unknown. */
-export const ingestionPullRunCompletedEventDataSchema = sourceEnvelopeSchema.safeExtend({
+const ingestionPullRunCompletedEventDataSchemaDefinition = sourceEnvelopeSchema.safeExtend({
   runId: z.string().min(1),
   scheduledFor: z.number(),
   nextCursor: z.string().nullable(),
@@ -131,8 +147,13 @@ export const ingestionPullRunCompletedEventDataSchema = sourceEnvelopeSchema.saf
   unreadPage: z.boolean().optional(),
   readThroughAt: z.number().nullable().optional(),
 });
+export interface IngestionPullRunCompletedEventDataSchema extends Named<
+  typeof ingestionPullRunCompletedEventDataSchemaDefinition
+> {}
+export const ingestionPullRunCompletedEventDataSchema: IngestionPullRunCompletedEventDataSchema =
+  ingestionPullRunCompletedEventDataSchemaDefinition;
 /** `retryAfterMs` is the wait a provider named; `replacedByRunId` is set on an abandonment only. */
-export const ingestionPullRunFailedEventDataSchema = sourceEnvelopeSchema.safeExtend({
+const ingestionPullRunFailedEventDataSchemaDefinition = sourceEnvelopeSchema.safeExtend({
   runId: z.string().min(1),
   scheduledFor: z.number(),
   error: z.string(),
@@ -141,6 +162,11 @@ export const ingestionPullRunFailedEventDataSchema = sourceEnvelopeSchema.safeEx
   retryAfterMs: z.number().nullable().optional(),
   replacedByRunId: z.string().optional(),
 });
+export interface IngestionPullRunFailedEventDataSchema extends Named<
+  typeof ingestionPullRunFailedEventDataSchemaDefinition
+> {}
+export const ingestionPullRunFailedEventDataSchema: IngestionPullRunFailedEventDataSchema =
+  ingestionPullRunFailedEventDataSchemaDefinition;
 
 /** One ask: a redelivery of one press carries the id it was minted with. */
 const listingEnvelopeSchema = sourceEnvelopeSchema.safeExtend({ requestId: z.string().min(1) });
@@ -151,18 +177,28 @@ const listingRefusalSchema = listingEnvelopeSchema.safeExtend({
   status: z.number().int().nullable(),
 });
 export const ingestionPullAgentsListingRequestedEventDataSchema = listingEnvelopeSchema;
-export const ingestionPullAgentsListedEventDataSchema = listingEnvelopeSchema.safeExtend({
+const ingestionPullAgentsListedEventDataSchemaDefinition = listingEnvelopeSchema.safeExtend({
   requestedAt: z.number(),
   agentCount: z.number().int().nonnegative(),
 });
+export interface IngestionPullAgentsListedEventDataSchema extends Named<
+  typeof ingestionPullAgentsListedEventDataSchemaDefinition
+> {}
+export const ingestionPullAgentsListedEventDataSchema: IngestionPullAgentsListedEventDataSchema =
+  ingestionPullAgentsListedEventDataSchemaDefinition;
 export const ingestionPullAgentsListingRefusedEventDataSchema = listingRefusalSchema;
 export const ingestionPullPeopleListingRequestedEventDataSchema = listingEnvelopeSchema;
 /** `withheldPersonCount` is a subset of `directoryPersonCount` and never leaves our own stores. */
-export const ingestionPullPeopleListedEventDataSchema = listingEnvelopeSchema.safeExtend({
+const ingestionPullPeopleListedEventDataSchemaDefinition = listingEnvelopeSchema.safeExtend({
   requestedAt: z.number(),
   directoryPersonCount: z.number().int().nonnegative(),
   withheldPersonCount: z.number().int().nonnegative(),
 });
+export interface IngestionPullPeopleListedEventDataSchema extends Named<
+  typeof ingestionPullPeopleListedEventDataSchemaDefinition
+> {}
+export const ingestionPullPeopleListedEventDataSchema: IngestionPullPeopleListedEventDataSchema =
+  ingestionPullPeopleListedEventDataSchemaDefinition;
 export const ingestionPullPeopleListingRefusedEventDataSchema = listingRefusalSchema;
 
 const event = governanceEventEnvelopeSchema.safeExtend({
@@ -220,7 +256,7 @@ export const ingestionPullPeopleListingRefusedEventSchema = event.safeExtend({
   data: ingestionPullPeopleListingRefusedEventDataSchema,
 });
 
-export const ingestionPullProcessingEventSchema = z.discriminatedUnion("type", [
+const ingestionPullProcessingEventSchemaDefinition = z.discriminatedUnion("type", [
   ingestionPullConfiguredEventSchema,
   ingestionPullDisabledEventSchema,
   ingestionPullRunCompletedEventSchema,
@@ -232,6 +268,11 @@ export const ingestionPullProcessingEventSchema = z.discriminatedUnion("type", [
   ingestionPullPeopleListedEventSchema,
   ingestionPullPeopleListingRefusedEventSchema,
 ]);
+export interface IngestionPullProcessingEventSchema extends Named<
+  typeof ingestionPullProcessingEventSchemaDefinition
+> {}
+export const ingestionPullProcessingEventSchema: IngestionPullProcessingEventSchema =
+  ingestionPullProcessingEventSchemaDefinition;
 
 export type IngestionPullConfiguredEventData = z.infer<
   typeof ingestionPullConfiguredEventDataSchema

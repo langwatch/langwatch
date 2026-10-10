@@ -70,6 +70,7 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identifyOptional: () =>

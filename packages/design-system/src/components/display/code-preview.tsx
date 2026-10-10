@@ -21,6 +21,7 @@ import {
   normalizeShikiLang,
   useShikiAdapter,
 } from "../../shiki-adapter.ts";
+import { type DiffLineKind, parseUnifiedDiff } from "../../unified-diff.ts";
 import { useCopyToClipboard } from "../../use-copy-to-clipboard.ts";
 import { toaster } from "../overlays/toaster.tsx";
 import { Tooltip } from "../overlays/tooltip.tsx";
@@ -32,7 +33,128 @@ interface CodePreviewProps {
   filename?: string;
   /** Caps a tall snippet and scrolls it, keeping the title bar in view. */
   maxHeight?: string;
+  /**
+   * Reads `code` as a unified diff: a `+`/`-` column, added and removed lines tinted,
+   * each line highlighted as `language`. Copy still writes the diff.
+   */
+  diff?: boolean;
+  /** A gutter of line numbers; a diff numbers its old and new lines side by side. */
+  lineNumbers?: boolean;
+  /** Light chrome for a detail panel: small title, quiet border, 12px soft-wrapped body. */
+  compact?: boolean;
+  /**
+   * Whether long lines wrap; defaults to `compact`. A wrapped line continues indented under
+   * its own start, so code keeps its shape. Off, the body scrolls sideways.
+   */
+  wrap?: boolean;
 }
+
+const COMPACT_BODY = {
+  "& pre": { margin: 0, padding: "8px 12px", fontSize: "12px", lineHeight: "18px" },
+} as const;
+
+/** Soft wrap with a hanging indent: a continuation sits under its line, never at column 0. */
+const wrappedBody = ({ guttered }: { guttered: boolean }) =>
+  ({
+    "& pre": { whiteSpace: "pre-wrap", wordBreak: "break-word" },
+    "& .line": {
+      display: "inline-block",
+      width: "100%",
+      paddingInlineStart: guttered ? "calc(16px + 4ch)" : "4ch",
+      textIndent: "-4ch",
+    },
+  }) as const;
+
+/** The window's frame: a full title bar, or a detail panel's quiet 28px strip. */
+const WINDOW_CHROME = {
+  root: { borderRadius: "xl", borderColor: "border.nested" },
+  strip: { paddingY: 1, borderBottomWidth: "1px" },
+  title: {},
+  copy: {},
+} as const;
+const COMPACT_CHROME = {
+  root: { borderRadius: "4px", borderColor: "border.muted" },
+  strip: { paddingY: 0, height: "28px", borderBottomWidth: 0 },
+  title: { lineHeight: "18px", fontWeight: "medium", color: "fg.muted" },
+  copy: { boxSize: "24px", minWidth: "24px" },
+} as const;
+
+/** One gutter string per line, drawn by CSS so selecting the code never takes it. */
+function gutters({
+  code,
+  diff,
+  lineNumbers,
+}: {
+  code: string;
+  diff: boolean;
+  lineNumbers: boolean;
+}): { body: string; lines: { kind: DiffLineKind; gutter: string }[] } {
+  if (!diff) {
+    const count = code.split("\n").length;
+    const width = String(count).length;
+    return {
+      body: code,
+      lines: Array.from({ length: count }, (_, index) => ({
+        kind: "context",
+        gutter: lineNumbers ? `${String(index + 1).padStart(width)}  ` : "",
+      })),
+    };
+  }
+  const parsed = parseUnifiedDiff(code);
+  const width = String(
+    Math.max(1, ...parsed.flatMap((line) => [line.oldLine ?? 0, line.newLine ?? 0])),
+  ).length;
+  const cell = (n: number | null) => (n === null ? "" : String(n)).padStart(width);
+  const mark = { add: "+", remove: "-", context: " ", hunk: " ", meta: " " } as const;
+  return {
+    body: parsed.map((line) => line.text).join("\n"),
+    lines: parsed.map((line) => ({
+      kind: line.kind,
+      gutter: `${lineNumbers ? `${cell(line.oldLine)} ${cell(line.newLine)} ` : ""}${mark[line.kind]} `,
+    })),
+  };
+}
+
+const GUTTERED = {
+  "& pre": { paddingInline: 0 },
+  "& pre code": { display: "inline-block", minWidth: "100%" },
+  "& .line": { display: "inline-block", width: "100%", paddingInline: "16px" },
+  "& .line::before": {
+    content: "attr(data-gutter)",
+    whiteSpace: "pre",
+    color: "fg.subtle",
+    userSelect: "none",
+  },
+  "& .line[data-diff=add]": { background: "green.subtle" },
+  "& .line[data-diff=add]::before": { color: "green.fg" },
+  "& .line[data-diff=remove]": { background: "red.subtle" },
+  "& .line[data-diff=remove]::before": { color: "red.fg" },
+  "& .line[data-diff=hunk]": { background: "blue.subtle" },
+  "& .line[data-diff=hunk] span, & .line[data-diff=meta] span": { color: "fg.muted !important" },
+} as const;
+
+/** The body's styles: the window's own ground, as SnippetPreview's, not the Shiki theme's. */
+const bodyCss = ({
+  compact,
+  wrap,
+  guttered,
+}: {
+  compact: boolean;
+  wrap: boolean;
+  guttered: boolean;
+}) => ({
+  "& pre": {
+    margin: 0,
+    padding: "12px 16px",
+    whiteSpace: "pre",
+    overflowX: "auto",
+    tabSize: 4,
+    background: "transparent !important",
+  },
+  ...(compact ? COMPACT_BODY : {}),
+  ...(guttered ? GUTTERED : {}),
+  ...(wrap ? wrappedBody({ guttered }) : {}),
+});
 
 /** One house window for every code sample: title bar, copy button, Shiki body. */
 export function CodePreview({
@@ -40,38 +162,55 @@ export function CodePreview({
   language,
   filename,
   maxHeight,
+  diff = false,
+  lineNumbers = false,
+  compact = false,
+  wrap = compact,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const { copied, copy } = useCopyToClipboard();
   const [highlighted, setHighlighted] = useState<{ key: string; html: string } | null>(null);
-  const key = `${colorMode}\u0000${language}\u0000${code}`;
+  const guttered = diff || lineNumbers;
+  const key = `${colorMode}\u0000${language}\u0000${diff}\u0000${lineNumbers}\u0000${code}`;
 
   useEffect(() => {
     let cancelled = false;
     const highlight = colorMode === "dark" ? codeToHtmlDark : codeToHtml;
-    void highlight({ code, lang: language }).then((html) => {
+    const { body, lines } = gutters({ code, diff, lineNumbers });
+    const lineData = guttered
+      ? (line: number) => {
+          const at = lines[line - 1];
+          return at ? { diff: at.kind, gutter: at.gutter } : undefined;
+        }
+      : undefined;
+    void highlight({ code: body, lang: language, lineData }).then((html) => {
       if (!cancelled) setHighlighted({ key, html });
     });
     return () => {
       cancelled = true;
     };
-  }, [code, language, colorMode, key]);
+  }, [code, language, colorMode, key, diff, lineNumbers, guttered]);
 
   if (!code) return null;
   const html = highlighted?.key === key ? highlighted.html : null;
+  const chrome = compact ? COMPACT_CHROME : WINDOW_CHROME;
 
   return (
     <Box
-      borderRadius="xl"
       border="1px solid"
-      borderColor="border.emphasized"
+      bg="bg.nested"
+      {...chrome.root}
       overflow="hidden"
       width="full"
+      minWidth={0}
     >
-      <HStack justify="space-between" paddingX={3} paddingY={1} borderBottomWidth="1px">
-        <Text fontSize="xs">{filename ?? language}</Text>
+      <HStack justify="space-between" paddingX={3} {...chrome.strip}>
+        <Text fontSize="xs" {...chrome.title}>
+          {filename ?? (diff ? `${language} diff` : language)}
+        </Text>
         <IconButton
           size="2xs"
+          {...chrome.copy}
           variant="ghost"
           aria-label={copied ? "Copied" : "Copy code"}
           onClick={() => copy(code)}
@@ -79,15 +218,18 @@ export function CodePreview({
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </IconButton>
       </HStack>
-      <Box
-        overflow="auto"
-        maxHeight={maxHeight}
-        css={{ "& pre": { margin: 0, padding: "12px 16px", whiteSpace: "pre", overflowX: "auto" } }}
-      >
+      <Box overflow="auto" maxHeight={maxHeight} css={bodyCss({ compact, wrap, guttered })}>
         {html ? (
           <Box display="contents" dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
-          <Box as="pre" margin={0} padding="12px 16px" whiteSpace="pre" overflowX="auto">
+          <Box
+            as="pre"
+            margin={0}
+            padding={compact ? "8px 12px" : "12px 16px"}
+            whiteSpace={wrap ? "pre-wrap" : "pre"}
+            overflowX="auto"
+            style={{ tabSize: 4 }}
+          >
             {code}
           </Box>
         )}
@@ -312,9 +454,8 @@ export function SnippetPreview({
             transition="all 0.3s ease"
             borderRadius="xl"
             border="1px solid"
-            borderColor="border.emphasized"
-            bg="bg.panel/60"
-            backdropFilter="blur(20px) saturate(1.3)"
+            borderColor="border.nested"
+            bg="bg.nested"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             {...layout.root}
             overflow="hidden"
@@ -322,7 +463,7 @@ export function SnippetPreview({
             <CodeBlock.Header
               display="flex"
               justifyContent="space-between"
-              borderColor="gray.200"
+              borderColor="border.nested"
               {...layout.header}
             >
               <CodeBlock.Title fontSize="xs" paddingTop={2}>

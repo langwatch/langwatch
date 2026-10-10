@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -8,10 +9,15 @@ import { managedBedrockConfigSchema } from "./managed-provider.api.ts";
  * organization is a key inside the value; the earlier `MANAGED_BEDROCK__<field>__<orgId>`
  * put it in the NAME, which only an enumerable source could ever read back.
  */
-export const managedBedrockDirectorySchema = z.record(
+const managedBedrockDirectorySchemaDefinition = z.record(
   z.string().min(1),
   managedBedrockConfigSchema,
 );
+export interface ManagedBedrockDirectorySchema extends Named<
+  typeof managedBedrockDirectorySchemaDefinition
+> {}
+export const managedBedrockDirectorySchema: ManagedBedrockDirectorySchema =
+  managedBedrockDirectorySchemaDefinition;
 
 export type ManagedBedrockDirectory = z.infer<typeof managedBedrockDirectorySchema>;
 

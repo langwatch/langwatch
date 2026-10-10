@@ -60,13 +60,12 @@ vi.mock("../../src/services/app-dir.ts", () => ({
 
 vi.mock("../../src/services/node-deps.ts", () => ({
   locateApiDir: () => join(appRootDir, "apps", "api"),
-  locateWorkerDir: () => join(appRootDir, "apps", "worker"),
+  locateBackendDir: () => join(appRootDir, "apps", "backend"),
   locateTasksDir: () => join(appRootDir, "apps", "tasks"),
   resolvePnpm: async () => ({ command: "pnpm", args: [] }),
 }));
 
 const { startLangwatch } = await import("../../src/services/langwatch.ts");
-const { startLangwatchWorkers } = await import("../../src/services/langwatch-workers.ts");
 const { startLangevals } = await import("../../src/services/langevals.ts");
 const { ensureTiktokenEncodings, ensureLangevalsTiktokenCache } =
   await import("../../src/services/offline-defaults.ts");
@@ -79,6 +78,7 @@ function ctx() {
     ports: {
       langwatch: 5560,
       langevals: 5562,
+      workerHealth: 5565,
       postgres: 6560,
       clickhouseHttp: 6562,
     },
@@ -106,7 +106,7 @@ beforeEach(() => {
   for (const key of Object.keys(spawnedEnvs)) delete spawnedEnvs[key];
   home = mkdtempSync(join(tmpdir(), "lw-offline-"));
   appRootDir = join(home, "app");
-  for (const app of ["api", "worker", "tasks"]) {
+  for (const app of ["api", "backend", "worker", "tasks"]) {
     mkdirSync(join(appRootDir, "apps", app, "node_modules"), {
       recursive: true,
     });
@@ -122,24 +122,20 @@ afterEach(() => {
 });
 
 describe("outbound defaults in the service env", () => {
+  // One process hosts the api and the workers, so one spawned env covers both.
   describe("when the launcher starts the app and the workers", () => {
     /** @scenario The app and the workers turn off Prisma's version check */
-    it("turns off Prisma's version check in each", async () => {
+    it("turns off Prisma's version check in the backend process", async () => {
       await startLangwatch(ctx(), bus, {});
-      await startLangwatchWorkers(ctx(), bus, {});
 
       expect(spawnedEnvs.langwatch?.CHECKPOINT_DISABLE).toBe("1");
-      expect(spawnedEnvs.workers?.CHECKPOINT_DISABLE).toBe("1");
     });
 
     /** @scenario The app and the workers read tokenizer files from disk */
-    it("points the app and the workers at the tokenizer cache", async () => {
+    it("points the backend process at the tokenizer cache", async () => {
       await startLangwatch(ctx(), bus, {});
-      await startLangwatchWorkers(ctx(), bus, {});
 
-      const expected = join(home, "cache", "tiktoken-encodings");
-      expect(spawnedEnvs.langwatch?.TIKTOKENS_PATH).toBe(expected);
-      expect(spawnedEnvs.workers?.TIKTOKENS_PATH).toBe(expected);
+      expect(spawnedEnvs.langwatch?.TIKTOKENS_PATH).toBe(join(home, "cache", "tiktoken-encodings"));
     });
   });
 
@@ -166,11 +162,9 @@ describe("outbound defaults in the service env", () => {
         RAGAS_DO_NOT_TRACK: "false",
       };
       await startLangwatch(ctx(), bus, userEnv);
-      await startLangwatchWorkers(ctx(), bus, userEnv);
       await startLangevals(ctx(), bus, userEnv);
 
       expect(spawnedEnvs.langwatch?.TIKTOKENS_PATH).toBe("/srv/tiktoken");
-      expect(spawnedEnvs.workers?.TIKTOKENS_PATH).toBe("/srv/tiktoken");
       expect(spawnedEnvs.langevals?.RAGAS_DO_NOT_TRACK).toBe("false");
     });
 
@@ -178,10 +172,8 @@ describe("outbound defaults in the service env", () => {
     it("keeps Prisma's version check off", async () => {
       const userEnv = { CHECKPOINT_DISABLE: "0" };
       await startLangwatch(ctx(), bus, userEnv);
-      await startLangwatchWorkers(ctx(), bus, userEnv);
 
       expect(spawnedEnvs.langwatch?.CHECKPOINT_DISABLE).toBe("1");
-      expect(spawnedEnvs.workers?.CHECKPOINT_DISABLE).toBe("1");
     });
   });
 });

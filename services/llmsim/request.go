@@ -321,6 +321,11 @@ func (s *Server) markovReply(req request, r *mrand.Rand, alwaysCall bool) reply 
 		return reply{Mode: "json", Text: string(b), Finish: "stop"}
 	case len(req.tools) > 0 && (req.forced != "" || (len(req.last().results) == 0 && (alwaysCall || r.IntN(2) == 0))):
 		return toolReply(req, g)
+	case req.jsonObject && promptObjectSchema(req.turns) != nil:
+		schema := promptObjectSchema(req.turns)
+		g.root = schema
+		b, _ := json.Marshal(g.value(schema, 0))
+		return reply{Mode: "json", Text: string(b), Finish: "stop"}
 	case req.jsonObject:
 		text, _ := s.chain.text(r, 8, 0)
 		b, _ := json.Marshal(map[string]string{"answer": text})

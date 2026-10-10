@@ -81,7 +81,7 @@ export function GrantsTable({ grants, canManage, onChangeRole, onRevoke }: Grant
                     </Menu.Item>
                     <Menu.Item
                       value="revoke"
-                      color="red.500"
+                      color="red.fg"
                       onClick={() => onRevoke(grant)}
                       data-testid="grant-revoke"
                     >

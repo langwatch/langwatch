@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** What a session proved and how organizations enforce MFA requirements. A membership condition
@@ -113,7 +114,7 @@ export interface SecondFactorEvidence {
  * Why a member reaches an organization's data, or does not. Named rather than
  * boolean: the enrollment gate must say WHAT would let them through.
  */
-export const secondFactorSatisfactionSchema = z.discriminatedUnion("by", [
+const secondFactorSatisfactionSchemaDefinition = z.discriminatedUnion("by", [
   /** The organization does not require one. */
   z.object({ satisfied: z.literal(true), by: z.literal("not_required") }),
   /** Set up on the person's own account. */
@@ -127,6 +128,11 @@ export const secondFactorSatisfactionSchema = z.discriminatedUnion("by", [
   /** Held at the enrollment gate for this organization alone. */
   z.object({ satisfied: z.literal(false), by: z.literal("none") }),
 ]);
+export interface SecondFactorSatisfactionSchema extends Named<
+  typeof secondFactorSatisfactionSchemaDefinition
+> {}
+export const secondFactorSatisfactionSchema: SecondFactorSatisfactionSchema =
+  secondFactorSatisfactionSchemaDefinition;
 export type SecondFactorSatisfaction = z.infer<typeof secondFactorSatisfactionSchema>;
 
 /** Evaluates whether a member satisfies the organization's MFA requirement at access time. Checks

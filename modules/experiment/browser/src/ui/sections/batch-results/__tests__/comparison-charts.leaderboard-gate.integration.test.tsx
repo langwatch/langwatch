@@ -157,9 +157,9 @@ describe("the comparison leaderboard's visibility gates", () => {
         column,
         rows: comparisonRows,
         targetColors: {
-          "target-1": "#3b82f6",
-          "target-2": "#dd6b20",
-          "target-3": "#38a169",
+          "target-1": "var(--chakra-colors-chart-2)",
+          "target-2": "var(--chakra-colors-chart-1)",
+          "target-3": "var(--chakra-colors-chart-3)",
         },
         modelByTargetId: {
           "target-1": null,

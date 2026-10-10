@@ -2,7 +2,6 @@
  * @vitest-environment jsdom
  * The register-agent drawer as `CurrentDrawer` mounts it. `AgentService.create` throws
  * `agent_register_only` (ADR-128), so it must show the snippet and assert that no fields exist.
- * `RenderCode` is mocked.
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -23,10 +22,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
     },
     goBack: vi.fn(),
   }),
-}));
-
-vi.mock("@langwatch/browser-host/markdown", () => ({
-  RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
 }));
 
 import { RegisterAgentDrawer } from "../register-agent-drawer";

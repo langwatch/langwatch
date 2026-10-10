@@ -1,4 +1,5 @@
 import { serializedHandledErrorSchema } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const MODEL_PROVIDER_FEATURE_ID = "model-provider" as const;
@@ -9,15 +10,20 @@ export const MODEL_PROVIDER_SCOPE_TYPES = ["ORGANIZATION", "TEAM", "PROJECT"] as
 export const modelProviderScopeTypeSchema = z.enum(MODEL_PROVIDER_SCOPE_TYPES);
 export type ModelProviderScopeType = z.infer<typeof modelProviderScopeTypeSchema>;
 
-export const modelProviderScopeSchema = z
+const modelProviderScopeSchemaDefinition = z
   .object({
     scopeType: modelProviderScopeTypeSchema,
     scopeId: z.string().min(1),
   })
   .strict();
+export interface ModelProviderScopeSchema extends Named<
+  typeof modelProviderScopeSchemaDefinition
+> {}
+export const modelProviderScopeSchema: ModelProviderScopeSchema =
+  modelProviderScopeSchemaDefinition;
 export type ModelProviderScope = z.infer<typeof modelProviderScopeSchema>;
 
-export const modelSchema = z
+const modelSchemaDefinition = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
@@ -27,10 +33,17 @@ export const modelSchema = z
     multimodalInputs: z.array(z.enum(["image", "file", "audio"])).optional(),
   })
   .strict();
+export interface ModelSchema extends Named<typeof modelSchemaDefinition> {}
+export const modelSchema: ModelSchema = modelSchemaDefinition;
 export type Model = z.infer<typeof modelSchema>;
 
-export const providerCredentialSchema = z.record(z.string(), z.unknown());
-export const modelProviderSchema = z
+const providerCredentialSchemaDefinition = z.record(z.string(), z.unknown());
+export interface ProviderCredentialSchema extends Named<
+  typeof providerCredentialSchemaDefinition
+> {}
+export const providerCredentialSchema: ProviderCredentialSchema =
+  providerCredentialSchemaDefinition;
+const modelProviderSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -64,9 +77,11 @@ export const modelProviderSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface ModelProviderSchema extends Named<typeof modelProviderSchemaDefinition> {}
+export const modelProviderSchema: ModelProviderSchema = modelProviderSchemaDefinition;
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
-export const modelProviderSummarySchema = modelProviderSchema
+const modelProviderSummarySchemaDefinition = modelProviderSchema
   .safeExtend({
     models: z.array(z.string()).nullable().optional(),
     embeddingsModels: z.array(z.string()).nullable().optional(),
@@ -77,10 +92,15 @@ export const modelProviderSummarySchema = modelProviderSchema
     embeddingsUnsupported: z.boolean().default(false),
   })
   .strict();
+export interface ModelProviderSummarySchema extends Named<
+  typeof modelProviderSummarySchemaDefinition
+> {}
+export const modelProviderSummarySchema: ModelProviderSummarySchema =
+  modelProviderSummarySchemaDefinition;
 export type ModelProviderSummary = z.infer<typeof modelProviderSummarySchema>;
 
 /** Server-only provider value used to build model execution parameters. */
-export const modelProviderExecutionSchema = modelProviderSchema
+const modelProviderExecutionSchemaDefinition = modelProviderSchema
   .safeExtend({
     models: z.array(z.string()).nullable(),
     embeddingsModels: z.array(z.string()).nullable(),
@@ -89,21 +109,36 @@ export const modelProviderExecutionSchema = modelProviderSchema
     embeddingsUnsupported: z.boolean(),
   })
   .strict();
+export interface ModelProviderExecutionSchema extends Named<
+  typeof modelProviderExecutionSchemaDefinition
+> {}
+export const modelProviderExecutionSchema: ModelProviderExecutionSchema =
+  modelProviderExecutionSchemaDefinition;
 export type ModelProviderExecution = z.infer<typeof modelProviderExecutionSchema>;
 
 /** Input for the server-side LiteLLM/NLP execution parameter preparation. */
-export const modelProviderExecutionPrepareInputSchema = z
+const modelProviderExecutionPrepareInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     model: z.string().min(1),
   })
   .strict();
+export interface ModelProviderExecutionPrepareInputSchema extends Named<
+  typeof modelProviderExecutionPrepareInputSchemaDefinition
+> {}
+export const modelProviderExecutionPrepareInputSchema: ModelProviderExecutionPrepareInputSchema =
+  modelProviderExecutionPrepareInputSchemaDefinition;
 export type ModelProviderExecutionPrepareInput = z.infer<
   typeof modelProviderExecutionPrepareInputSchema
 >;
 
 /** Portable key/value parameters consumed by LiteLLM-compatible runners. */
-export const modelProviderExecutionParametersSchema = z.record(z.string(), z.string());
+const modelProviderExecutionParametersSchemaDefinition = z.record(z.string(), z.string());
+export interface ModelProviderExecutionParametersSchema extends Named<
+  typeof modelProviderExecutionParametersSchemaDefinition
+> {}
+export const modelProviderExecutionParametersSchema: ModelProviderExecutionParametersSchema =
+  modelProviderExecutionParametersSchemaDefinition;
 export type ModelProviderExecutionParameters = z.infer<
   typeof modelProviderExecutionParametersSchema
 >;
@@ -136,7 +171,7 @@ export type ModelProviderTextGenerationInput = Readonly<{
   reasoningEffort?: "low" | "medium" | "high";
 }>;
 
-export const modelProviderTenantInputSchema = z
+const modelProviderTenantInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1).optional(),
     organizationId: z.string().min(1).optional(),
@@ -145,9 +180,14 @@ export const modelProviderTenantInputSchema = z
   .refine((value) => Boolean(value.projectId || value.organizationId), {
     message: "Either projectId or organizationId is required.",
   });
+export interface ModelProviderTenantInputSchema extends Named<
+  typeof modelProviderTenantInputSchemaDefinition
+> {}
+export const modelProviderTenantInputSchema: ModelProviderTenantInputSchema =
+  modelProviderTenantInputSchemaDefinition;
 export type ModelProviderTenantInput = z.infer<typeof modelProviderTenantInputSchema>;
 
-export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
+const modelProviderWriteInputSchemaDefinition = modelProviderTenantInputSchema
   .safeExtend({
     id: z.string().min(1).optional(),
     actorId: z.string().min(1).optional(),
@@ -172,38 +212,68 @@ export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
     providerConfig: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .strict();
+export interface ModelProviderWriteInputSchema extends Named<
+  typeof modelProviderWriteInputSchemaDefinition
+> {}
+export const modelProviderWriteInputSchema: ModelProviderWriteInputSchema =
+  modelProviderWriteInputSchemaDefinition;
 export type ModelProviderWriteInput = z.infer<typeof modelProviderWriteInputSchema>;
 
-export const modelProviderDeleteInputSchema = modelProviderTenantInputSchema
+const modelProviderDeleteInputSchemaDefinition = modelProviderTenantInputSchema
   .safeExtend({
     id: z.string().min(1).optional(),
     actorId: z.string().min(1).optional(),
     provider: z.string().min(1),
   })
   .strict();
+export interface ModelProviderDeleteInputSchema extends Named<
+  typeof modelProviderDeleteInputSchemaDefinition
+> {}
+export const modelProviderDeleteInputSchema: ModelProviderDeleteInputSchema =
+  modelProviderDeleteInputSchemaDefinition;
 export type ModelProviderDeleteInput = z.infer<typeof modelProviderDeleteInputSchema>;
 
-export const modelProviderListProjectInputSchema = z
+const modelProviderListProjectInputSchemaDefinition = z
   .object({ projectId: z.string().min(1) })
   .strict();
+export interface ModelProviderListProjectInputSchema extends Named<
+  typeof modelProviderListProjectInputSchemaDefinition
+> {}
+export const modelProviderListProjectInputSchema: ModelProviderListProjectInputSchema =
+  modelProviderListProjectInputSchemaDefinition;
 export type ModelProviderListProjectInput = z.infer<typeof modelProviderListProjectInputSchema>;
-export const modelDefaultSnapshotInputSchema = z
+const modelDefaultSnapshotInputSchemaDefinition = z
   .object({ projectId: z.string().min(1), actorId: z.string().min(1).optional() })
   .strict();
+export interface ModelDefaultSnapshotInputSchema extends Named<
+  typeof modelDefaultSnapshotInputSchemaDefinition
+> {}
+export const modelDefaultSnapshotInputSchema: ModelDefaultSnapshotInputSchema =
+  modelDefaultSnapshotInputSchemaDefinition;
 export type ModelDefaultSnapshotInput = z.infer<typeof modelDefaultSnapshotInputSchema>;
-export const modelProviderListOrganizationInputSchema = z
+const modelProviderListOrganizationInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1) })
   .strict();
+export interface ModelProviderListOrganizationInputSchema extends Named<
+  typeof modelProviderListOrganizationInputSchemaDefinition
+> {}
+export const modelProviderListOrganizationInputSchema: ModelProviderListOrganizationInputSchema =
+  modelProviderListOrganizationInputSchemaDefinition;
 export type ModelProviderListOrganizationInput = z.infer<
   typeof modelProviderListOrganizationInputSchema
 >;
 
-export const modelProviderTestConnectionInputSchema = modelProviderTenantInputSchema
+const modelProviderTestConnectionInputSchemaDefinition = modelProviderTenantInputSchema
   .safeExtend({
     actorId: z.string().min(1).optional(),
     modelProviderId: z.string().min(1),
   })
   .strict();
+export interface ModelProviderTestConnectionInputSchema extends Named<
+  typeof modelProviderTestConnectionInputSchemaDefinition
+> {}
+export const modelProviderTestConnectionInputSchema: ModelProviderTestConnectionInputSchema =
+  modelProviderTestConnectionInputSchemaDefinition;
 export type ModelProviderTestConnectionInput = z.infer<
   typeof modelProviderTestConnectionInputSchema
 >;
@@ -232,7 +302,7 @@ export type ModelProviderUncheckedReason = z.infer<typeof modelProviderUnchecked
  * type lives in the contract rather than behind the service that produces it.
  * no is a successful question, and ADR-045 reserves throwing for the absence
  */
-export const modelProviderCredentialVerdictSchema = z.discriminatedUnion("outcome", [
+const modelProviderCredentialVerdictSchemaDefinition = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("verified"), valid: z.literal(true) }).strict(),
   z
     .object({
@@ -249,16 +319,26 @@ export const modelProviderCredentialVerdictSchema = z.discriminatedUnion("outcom
     })
     .strict(),
 ]);
+export interface ModelProviderCredentialVerdictSchema extends Named<
+  typeof modelProviderCredentialVerdictSchemaDefinition
+> {}
+export const modelProviderCredentialVerdictSchema: ModelProviderCredentialVerdictSchema =
+  modelProviderCredentialVerdictSchemaDefinition;
 export type ModelProviderCredentialVerdict = z.infer<typeof modelProviderCredentialVerdictSchema>;
 
-export const modelProviderCodexStatusInputSchema = z
+const modelProviderCodexStatusInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
   })
   .strict();
+export interface ModelProviderCodexStatusInputSchema extends Named<
+  typeof modelProviderCodexStatusInputSchemaDefinition
+> {}
+export const modelProviderCodexStatusInputSchema: ModelProviderCodexStatusInputSchema =
+  modelProviderCodexStatusInputSchemaDefinition;
 export type ModelProviderCodexStatusInput = z.infer<typeof modelProviderCodexStatusInputSchema>;
 
-export const modelProviderCodexStatusSchema = z.discriminatedUnion("connected", [
+const modelProviderCodexStatusSchemaDefinition = z.discriminatedUnion("connected", [
   z.object({ connected: z.literal(false) }).strict(),
   z
     .object({
@@ -268,17 +348,27 @@ export const modelProviderCodexStatusSchema = z.discriminatedUnion("connected", 
     })
     .strict(),
 ]);
+export interface ModelProviderCodexStatusSchema extends Named<
+  typeof modelProviderCodexStatusSchemaDefinition
+> {}
+export const modelProviderCodexStatusSchema: ModelProviderCodexStatusSchema =
+  modelProviderCodexStatusSchemaDefinition;
 export type ModelProviderCodexStatus = z.infer<typeof modelProviderCodexStatusSchema>;
 
 /** Internal gateway recovery for a Codex provider credential. */
-export const modelProviderCodexGatewayRefreshInputSchema = z
+const modelProviderCodexGatewayRefreshInputSchemaDefinition = z
   .object({ providerRowId: z.string().min(1) })
   .strict();
+export interface ModelProviderCodexGatewayRefreshInputSchema extends Named<
+  typeof modelProviderCodexGatewayRefreshInputSchemaDefinition
+> {}
+export const modelProviderCodexGatewayRefreshInputSchema: ModelProviderCodexGatewayRefreshInputSchema =
+  modelProviderCodexGatewayRefreshInputSchemaDefinition;
 export type ModelProviderCodexGatewayRefreshInput = z.infer<
   typeof modelProviderCodexGatewayRefreshInputSchema
 >;
 
-export const modelProviderCodexGatewayRefreshSchema = z.discriminatedUnion("status", [
+const modelProviderCodexGatewayRefreshSchemaDefinition = z.discriminatedUnion("status", [
   z
     .object({
       status: z.literal("refreshed"),
@@ -289,28 +379,43 @@ export const modelProviderCodexGatewayRefreshSchema = z.discriminatedUnion("stat
   z.object({ status: z.literal("not_connected") }).strict(),
   z.object({ status: z.literal("session_expired") }).strict(),
 ]);
+export interface ModelProviderCodexGatewayRefreshSchema extends Named<
+  typeof modelProviderCodexGatewayRefreshSchemaDefinition
+> {}
+export const modelProviderCodexGatewayRefreshSchema: ModelProviderCodexGatewayRefreshSchema =
+  modelProviderCodexGatewayRefreshSchemaDefinition;
 export type ModelProviderCodexGatewayRefresh = z.infer<
   typeof modelProviderCodexGatewayRefreshSchema
 >;
 
-export const modelProviderApiKeyValidationInputSchema = modelProviderTenantInputSchema
+const modelProviderApiKeyValidationInputSchemaDefinition = modelProviderTenantInputSchema
   .safeExtend({
     provider: z.string().min(1),
     customKeys: providerCredentialSchema,
   })
   .strict();
+export interface ModelProviderApiKeyValidationInputSchema extends Named<
+  typeof modelProviderApiKeyValidationInputSchemaDefinition
+> {}
+export const modelProviderApiKeyValidationInputSchema: ModelProviderApiKeyValidationInputSchema =
+  modelProviderApiKeyValidationInputSchemaDefinition;
 export type ModelProviderApiKeyValidationInput = z.infer<
   typeof modelProviderApiKeyValidationInputSchema
 >;
 
-export const modelProviderApiKeyValidationSchema = z
+const modelProviderApiKeyValidationSchemaDefinition = z
   .object({ valid: z.boolean(), message: z.string().optional() })
   .strict();
+export interface ModelProviderApiKeyValidationSchema extends Named<
+  typeof modelProviderApiKeyValidationSchemaDefinition
+> {}
+export const modelProviderApiKeyValidationSchema: ModelProviderApiKeyValidationSchema =
+  modelProviderApiKeyValidationSchemaDefinition;
 export type ModelProviderApiKeyValidation = z.infer<typeof modelProviderApiKeyValidationSchema>;
 
 export const modelDefaultScopeSchema = modelProviderScopeSchema;
 export type ModelDefaultScope = ModelProviderScope;
-export const modelDefaultConfigSchema = z
+const modelDefaultConfigSchemaDefinition = z
   .object({
     id: z.string().min(1),
     config: z.record(z.string(), z.string()),
@@ -321,9 +426,14 @@ export const modelDefaultConfigSchema = z
     organizationId: z.string().min(1).optional(),
   })
   .strict();
+export interface ModelDefaultConfigSchema extends Named<
+  typeof modelDefaultConfigSchemaDefinition
+> {}
+export const modelDefaultConfigSchema: ModelDefaultConfigSchema =
+  modelDefaultConfigSchemaDefinition;
 export type ModelDefaultConfig = z.infer<typeof modelDefaultConfigSchema>;
 
-export const modelDefaultEffectiveSchema = z
+const modelDefaultEffectiveSchemaDefinition = z
   .object({
     model: z.string().min(1),
     source: z.enum(["feature_override", "role_default", "inferred"]),
@@ -331,9 +441,14 @@ export const modelDefaultEffectiveSchema = z
     inferredFromProvider: z.string().optional(),
   })
   .strict();
+export interface ModelDefaultEffectiveSchema extends Named<
+  typeof modelDefaultEffectiveSchemaDefinition
+> {}
+export const modelDefaultEffectiveSchema: ModelDefaultEffectiveSchema =
+  modelDefaultEffectiveSchemaDefinition;
 export type ModelDefaultEffective = z.infer<typeof modelDefaultEffectiveSchema>;
 
-export const modelDefaultConfigSnapshotSchema = z
+const modelDefaultConfigSnapshotSchemaDefinition = z
   .object({
     id: z.string().min(1),
     config: z.record(z.string(), z.string()),
@@ -351,18 +466,28 @@ export const modelDefaultConfigSnapshotSchema = z
     ),
   })
   .strict();
+export interface ModelDefaultConfigSnapshotSchema extends Named<
+  typeof modelDefaultConfigSnapshotSchemaDefinition
+> {}
+export const modelDefaultConfigSnapshotSchema: ModelDefaultConfigSnapshotSchema =
+  modelDefaultConfigSnapshotSchemaDefinition;
 export type ModelDefaultConfigSnapshot = z.infer<typeof modelDefaultConfigSnapshotSchema>;
 
-export const modelDefaultAvailableScopesSchema = z
+const modelDefaultAvailableScopesSchemaDefinition = z
   .object({
     organization: z.object({ id: z.string(), name: z.string() }).nullable(),
     teams: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
     projects: z.array(z.object({ id: z.string(), name: z.string(), teamId: z.string() }).strict()),
   })
   .strict();
+export interface ModelDefaultAvailableScopesSchema extends Named<
+  typeof modelDefaultAvailableScopesSchemaDefinition
+> {}
+export const modelDefaultAvailableScopesSchema: ModelDefaultAvailableScopesSchema =
+  modelDefaultAvailableScopesSchemaDefinition;
 export type ModelDefaultAvailableScopes = z.infer<typeof modelDefaultAvailableScopesSchema>;
 
-export const modelDefaultFeatureSchema = z
+const modelDefaultFeatureSchemaDefinition = z
   .object({
     key: z.string(),
     role: z.enum(["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"]),
@@ -370,9 +495,14 @@ export const modelDefaultFeatureSchema = z
     description: z.string(),
   })
   .strict();
+export interface ModelDefaultFeatureSchema extends Named<
+  typeof modelDefaultFeatureSchemaDefinition
+> {}
+export const modelDefaultFeatureSchema: ModelDefaultFeatureSchema =
+  modelDefaultFeatureSchemaDefinition;
 export type ModelDefaultFeature = z.infer<typeof modelDefaultFeatureSchema>;
 
-export const modelDefaultSnapshotSchema = z
+const modelDefaultSnapshotSchemaDefinition = z
   .object({
     projectId: z.string(),
     teamId: z.string().nullable(),
@@ -384,18 +514,28 @@ export const modelDefaultSnapshotSchema = z
     features: z.array(modelDefaultFeatureSchema),
   })
   .strict();
+export interface ModelDefaultSnapshotSchema extends Named<
+  typeof modelDefaultSnapshotSchemaDefinition
+> {}
+export const modelDefaultSnapshotSchema: ModelDefaultSnapshotSchema =
+  modelDefaultSnapshotSchemaDefinition;
 export type ModelDefaultSnapshot = z.infer<typeof modelDefaultSnapshotSchema>;
 
-export const modelDefaultResolveInputSchema = z
+const modelDefaultResolveInputSchemaDefinition = z
   .object({ projectId: z.string().min(1), featureKey: z.string().min(1) })
   .strict();
+export interface ModelDefaultResolveInputSchema extends Named<
+  typeof modelDefaultResolveInputSchemaDefinition
+> {}
+export const modelDefaultResolveInputSchema: ModelDefaultResolveInputSchema =
+  modelDefaultResolveInputSchemaDefinition;
 export type ModelDefaultResolveInput = z.infer<typeof modelDefaultResolveInputSchema>;
 
 export const modelProviderResolutionScopeSchema = z.enum(["project", "team", "organization"]);
 export type ModelProviderResolutionScope = z.infer<typeof modelProviderResolutionScopeSchema>;
 export const modelProviderResolutionSourceSchema = z.enum(["feature_override", "role_default"]);
 export type ModelProviderResolutionSource = z.infer<typeof modelProviderResolutionSourceSchema>;
-export const modelProviderResolutionFeatureSchema = z
+const modelProviderResolutionFeatureSchemaDefinition = z
   .object({
     key: z.string().min(1),
     role: z.enum(["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"]),
@@ -403,7 +543,12 @@ export const modelProviderResolutionFeatureSchema = z
     description: z.string(),
   })
   .strict();
-export const modelProviderResolutionSchema = z
+export interface ModelProviderResolutionFeatureSchema extends Named<
+  typeof modelProviderResolutionFeatureSchemaDefinition
+> {}
+export const modelProviderResolutionFeatureSchema: ModelProviderResolutionFeatureSchema =
+  modelProviderResolutionFeatureSchemaDefinition;
+const modelProviderResolutionSchemaDefinition = z
   .object({
     model: z.string().min(1),
     source: modelProviderResolutionSourceSchema,
@@ -411,10 +556,15 @@ export const modelProviderResolutionSchema = z
     feature: modelProviderResolutionFeatureSchema,
   })
   .strict();
+export interface ModelProviderResolutionSchema extends Named<
+  typeof modelProviderResolutionSchemaDefinition
+> {}
+export const modelProviderResolutionSchema: ModelProviderResolutionSchema =
+  modelProviderResolutionSchemaDefinition;
 export type ModelProviderResolution = z.infer<typeof modelProviderResolutionSchema>;
 export const modelProviderAlternateResolutionSchema = modelProviderResolutionSchema;
 export type ModelProviderAlternateResolution = ModelProviderResolution;
-export const modelDefaultAssignmentInputSchema = z
+const modelDefaultAssignmentInputSchemaDefinition = z
   .object({
     scope: modelDefaultScopeSchema,
     key: z.string().min(1),
@@ -423,8 +573,13 @@ export const modelDefaultAssignmentInputSchema = z
     actorId: z.string().min(1).optional(),
   })
   .strict();
+export interface ModelDefaultAssignmentInputSchema extends Named<
+  typeof modelDefaultAssignmentInputSchemaDefinition
+> {}
+export const modelDefaultAssignmentInputSchema: ModelDefaultAssignmentInputSchema =
+  modelDefaultAssignmentInputSchemaDefinition;
 export type ModelDefaultAssignmentInput = z.infer<typeof modelDefaultAssignmentInputSchema>;
-export const modelDefaultConfigWriteInputSchema = z
+const modelDefaultConfigWriteInputSchemaDefinition = z
   .object({
     id: z.string().min(1).optional(),
     config: z.record(z.string(), z.string()).optional(),
@@ -433,6 +588,11 @@ export const modelDefaultConfigWriteInputSchema = z
     actorId: z.string().min(1).optional(),
   })
   .strict();
+export interface ModelDefaultConfigWriteInputSchema extends Named<
+  typeof modelDefaultConfigWriteInputSchemaDefinition
+> {}
+export const modelDefaultConfigWriteInputSchema: ModelDefaultConfigWriteInputSchema =
+  modelDefaultConfigWriteInputSchemaDefinition;
 export type ModelDefaultConfigWriteInput = z.infer<typeof modelDefaultConfigWriteInputSchema>;
 
 /**
@@ -440,37 +600,57 @@ export type ModelDefaultConfigWriteInput = z.infer<typeof modelDefaultConfigWrit
  * scope restrictions intersected with what its owner may still do, which is
  * why the credential is carried instead of only the person behind it.
  */
-export const modelDefaultApiKeyPrincipalSchema = z
+const modelDefaultApiKeyPrincipalSchemaDefinition = z
   .object({
     apiKeyId: z.string().min(1),
     userId: z.string().nullable(),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface ModelDefaultApiKeyPrincipalSchema extends Named<
+  typeof modelDefaultApiKeyPrincipalSchemaDefinition
+> {}
+export const modelDefaultApiKeyPrincipalSchema: ModelDefaultApiKeyPrincipalSchema =
+  modelDefaultApiKeyPrincipalSchemaDefinition;
 export type ModelDefaultApiKeyPrincipal = z.infer<typeof modelDefaultApiKeyPrincipalSchema>;
 
-export const modelDefaultApiKeyScopeCheckSchema = z
+const modelDefaultApiKeyScopeCheckSchemaDefinition = z
   .object({
     apiKey: modelDefaultApiKeyPrincipalSchema,
     scopes: z.array(modelDefaultScopeSchema),
   })
   .strict();
+export interface ModelDefaultApiKeyScopeCheckSchema extends Named<
+  typeof modelDefaultApiKeyScopeCheckSchemaDefinition
+> {}
+export const modelDefaultApiKeyScopeCheckSchema: ModelDefaultApiKeyScopeCheckSchema =
+  modelDefaultApiKeyScopeCheckSchemaDefinition;
 export type ModelDefaultApiKeyScopeCheck = z.infer<typeof modelDefaultApiKeyScopeCheckSchema>;
 
-export const modelDefaultDeleteInputSchema = z
+const modelDefaultDeleteInputSchemaDefinition = z
   .object({ id: z.string().min(1), actorId: z.string().min(1).optional() })
   .strict();
+export interface ModelDefaultDeleteInputSchema extends Named<
+  typeof modelDefaultDeleteInputSchemaDefinition
+> {}
+export const modelDefaultDeleteInputSchema: ModelDefaultDeleteInputSchema =
+  modelDefaultDeleteInputSchemaDefinition;
 export type ModelDefaultDeleteInput = z.infer<typeof modelDefaultDeleteInputSchema>;
 
-export const modelDefaultInheritedValuesSchema = z
+const modelDefaultInheritedValuesSchemaDefinition = z
   .object({
     inherited: z.record(z.string(), modelDefaultEffectiveSchema.nullable()),
     referenceScope: modelDefaultScopeSchema,
   })
   .strict();
+export interface ModelDefaultInheritedValuesSchema extends Named<
+  typeof modelDefaultInheritedValuesSchemaDefinition
+> {}
+export const modelDefaultInheritedValuesSchema: ModelDefaultInheritedValuesSchema =
+  modelDefaultInheritedValuesSchemaDefinition;
 export type ModelDefaultInheritedValues = z.infer<typeof modelDefaultInheritedValuesSchema>;
 
-export const modelCostSchema = z
+const modelCostSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -488,10 +668,12 @@ export const modelCostSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface ModelCostSchema extends Named<typeof modelCostSchemaDefinition> {}
+export const modelCostSchema: ModelCostSchema = modelCostSchemaDefinition;
 export type ModelCost = z.infer<typeof modelCostSchema>;
 
 /** A catalog rate used to price one observed model invocation. */
-export const modelCostRateSchema = z
+const modelCostRateSchemaDefinition = z
   .object({
     model: z.string(),
     regex: z.string(),
@@ -513,20 +695,29 @@ export const modelCostRateSchema = z
     inputCostPerSecond: z.number().optional(),
   })
   .strict();
+export interface ModelCostRateSchema extends Named<typeof modelCostRateSchemaDefinition> {}
+export const modelCostRateSchema: ModelCostRateSchema = modelCostRateSchemaDefinition;
 export type ModelCostRate = z.infer<typeof modelCostRateSchema>;
 
 /** A catalogue rate listed beside the stored rules; `projectId: ""` is main's wire for it. */
-export const modelCostCatalogueRowSchema = modelCostRateSchema.safeExtend({
+const modelCostCatalogueRowSchemaDefinition = modelCostRateSchema.safeExtend({
   projectId: z.literal(""),
 });
+export interface ModelCostCatalogueRowSchema extends Named<
+  typeof modelCostCatalogueRowSchemaDefinition
+> {}
+export const modelCostCatalogueRowSchema: ModelCostCatalogueRowSchema =
+  modelCostCatalogueRowSchemaDefinition;
 export type ModelCostCatalogueRow = z.infer<typeof modelCostCatalogueRowSchema>;
 
 /** One row of the model-costs listing: a stored rule (with an id) or a catalogue rate (without). */
-export const modelCostListRowSchema = z.union([modelCostSchema, modelCostCatalogueRowSchema]);
+const modelCostListRowSchemaDefinition = z.union([modelCostSchema, modelCostCatalogueRowSchema]);
+export interface ModelCostListRowSchema extends Named<typeof modelCostListRowSchemaDefinition> {}
+export const modelCostListRowSchema: ModelCostListRowSchema = modelCostListRowSchemaDefinition;
 export type ModelCostListRow = z.infer<typeof modelCostListRowSchema>;
 
 /** Canonical inputs for the shared trace/gateway model-pricing cascade. */
-export const modelCostEstimateInputSchema = z
+const modelCostEstimateInputSchemaDefinition = z
   .object({
     attrs: z.record(z.string(), z.unknown()),
     model: z.string().optional(),
@@ -534,10 +725,20 @@ export const modelCostEstimateInputSchema = z
     completionTokens: z.number().nullable(),
   })
   .strict();
+export interface ModelCostEstimateInputSchema extends Named<
+  typeof modelCostEstimateInputSchemaDefinition
+> {}
+export const modelCostEstimateInputSchema: ModelCostEstimateInputSchema =
+  modelCostEstimateInputSchemaDefinition;
 export type ModelCostEstimateInput = z.infer<typeof modelCostEstimateInputSchema>;
-export const modelCostListInputSchema = z.object({ projectId: z.string().min(1) }).strict();
+const modelCostListInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface ModelCostListInputSchema extends Named<
+  typeof modelCostListInputSchemaDefinition
+> {}
+export const modelCostListInputSchema: ModelCostListInputSchema =
+  modelCostListInputSchemaDefinition;
 export type ModelCostListInput = z.infer<typeof modelCostListInputSchema>;
-export const modelCostWriteInputSchema = z
+const modelCostWriteInputSchemaDefinition = z
   .object({
     id: z.string().min(1).optional(),
     projectId: z.string().min(1),
@@ -553,21 +754,35 @@ export const modelCostWriteInputSchema = z
     cacheCreation1hCostPerToken: z.number().nullable().optional(),
   })
   .strict();
+export interface ModelCostWriteInputSchema extends Named<
+  typeof modelCostWriteInputSchemaDefinition
+> {}
+export const modelCostWriteInputSchema: ModelCostWriteInputSchema =
+  modelCostWriteInputSchemaDefinition;
 export type ModelCostWriteInput = z.infer<typeof modelCostWriteInputSchema>;
-export const modelCostDeleteInputSchema = z
+const modelCostDeleteInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     id: z.string().min(1),
     actorId: z.string().min(1).optional(),
   })
   .strict();
+export interface ModelCostDeleteInputSchema extends Named<
+  typeof modelCostDeleteInputSchemaDefinition
+> {}
+export const modelCostDeleteInputSchema: ModelCostDeleteInputSchema =
+  modelCostDeleteInputSchemaDefinition;
 export type ModelCostDeleteInput = z.infer<typeof modelCostDeleteInputSchema>;
 
-export const translateInputSchema = z
+const translateInputSchemaDefinition = z
   .object({ projectId: z.string().min(1), text: z.string().max(100_000) })
   .strict();
+export interface TranslateInputSchema extends Named<typeof translateInputSchemaDefinition> {}
+export const translateInputSchema: TranslateInputSchema = translateInputSchemaDefinition;
 export type TranslateInput = z.infer<typeof translateInputSchema>;
-export const translateOutputSchema = z.object({ translation: z.string() }).strict();
+const translateOutputSchemaDefinition = z.object({ translation: z.string() }).strict();
+export interface TranslateOutputSchema extends Named<typeof translateOutputSchemaDefinition> {}
+export const translateOutputSchema: TranslateOutputSchema = translateOutputSchemaDefinition;
 export type TranslateOutput = z.infer<typeof translateOutputSchema>;
 
 /** Whether any of a project's model providers is switched on. */
@@ -582,7 +797,7 @@ export const CODEX_OAUTH_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 export const CODEX_VERIFICATION_URL = `${CODEX_OAUTH_ISSUER}/codex/device`;
 export const CODEX_SIGN_IN_TTL_MS = 15 * 60 * 1000;
 
-export const codexTokenKeysSchema = z
+const codexTokenKeysSchemaDefinition = z
   .object({
     CODEX_ACCESS_TOKEN: z.string().min(1),
     CODEX_REFRESH_TOKEN: z.string().min(1),
@@ -593,4 +808,6 @@ export const codexTokenKeysSchema = z
     CODEX_TOKENS_SAVED_AT: z.string(),
   })
   .strict();
+export interface CodexTokenKeysSchema extends Named<typeof codexTokenKeysSchemaDefinition> {}
+export const codexTokenKeysSchema: CodexTokenKeysSchema = codexTokenKeysSchemaDefinition;
 export type CodexTokenKeys = z.infer<typeof codexTokenKeysSchema>;

@@ -1,4 +1,6 @@
 import { CopyButton } from "@langwatch/design-system/copy-button";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -6,7 +8,6 @@ import {
   Alert,
   Badge,
   Button,
-  Code,
   Heading,
   HStack,
   Skeleton,
@@ -16,7 +17,6 @@ import {
   Wrap,
 } from "@langwatch/design-system/primitives";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
-import { readableDate } from "@langwatch/time";
 import { DatabaseZap } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -87,7 +87,7 @@ function StateHeadline({ status }: { status: UpgradeStatusView }) {
       </HStack>
       {command && (
         <HStack gap={2}>
-          <Code>{command}</Code>
+          <InlineCode>{command}</InlineCode>
           <CopyButton value={command} label="Copy command" />
         </HStack>
       )}
@@ -99,16 +99,17 @@ function ReleaseStrip({ status }: { status: UpgradeStatusView }) {
   const lastRun = status.lastRun;
   return (
     <StatTileGrid columns={4}>
-      <StatTile label="Installed" data-testid="upgrade-installed">
+      <StatTile variant="elevated" label="Installed" data-testid="upgrade-installed">
         <StatTileFigure>{status.installed ?? "None recorded"}</StatTileFigure>
       </StatTile>
-      <StatTile label="Image" data-testid="upgrade-image">
+      <StatTile variant="elevated" label="Image" data-testid="upgrade-image">
         <StatTileFigure>{status.image}</StatTileFigure>
       </StatTile>
-      <StatTile label="LTS floor" data-testid="upgrade-floor">
+      <StatTile variant="elevated" label="LTS floor" data-testid="upgrade-floor">
         <StatTileFigure>{status.floor ?? "Not named"}</StatTileFigure>
       </StatTile>
       <StatTile
+        variant="elevated"
         label="Last run"
         hint={lastRun ? formatDuration(lastRun.startedAt, lastRun.finishedAt) : void 0}
         data-testid="upgrade-last-run"
@@ -214,7 +215,12 @@ function ReleasesTable({
   onOpenRelease: (release: string) => void;
 }) {
   return (
-    <ListTable data-testid="upgrade-releases">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-releases"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
@@ -272,7 +278,12 @@ function ReleasesTable({
 /** What this image still ships but retires, what replaces each and when it goes (ruling D8). */
 function DeprecationsTable({ deprecations }: { deprecations: UpgradeStatusView["deprecations"] }) {
   return (
-    <ListTable data-testid="upgrade-deprecations">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-deprecations"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Deprecated</Table.ColumnHeader>
@@ -313,7 +324,12 @@ function RunsTable({
     );
   }
   return (
-    <ListTable data-testid="upgrade-runs">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-runs"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Outcome</Table.ColumnHeader>
@@ -332,7 +348,7 @@ function RunsTable({
             <Table.Cell fontFamily="mono">{run.release ?? "Unreleased"}</Table.Cell>
             <Table.Cell textTransform="capitalize">{run.kind}</Table.Cell>
             <Table.Cell whiteSpace="nowrap">
-              {readableDate(run.startedAt).toLocaleString()}
+              <FormattedDate value={run.startedAt} />
             </Table.Cell>
             <Table.Cell textAlign="end" whiteSpace="nowrap">
               {formatDuration(run.startedAt, run.finishedAt)}
@@ -364,7 +380,12 @@ function PendingSteps({
     retry: onRetryStep !== void 0 && steps.some((step) => step.status === "failed"),
   };
   return (
-    <ListTable data-testid={`upgrade-${group}-steps`}>
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid={`upgrade-${group}-steps`}
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
@@ -452,7 +473,12 @@ function TenantSteps({
   onOpenStep: (stepId: string) => void;
 }) {
   return (
-    <ListTable data-testid="upgrade-tenant-steps">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-tenant-steps"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>

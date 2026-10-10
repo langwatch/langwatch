@@ -28,7 +28,9 @@ let pool: Pool | undefined;
 function getPool(): Pool {
   pool ??= new Pool({
     connectionString: DATABASE_URL,
-    ...(schema ? { options: `-c search_path="${schema}"` } : {}),
+    ...(schema
+      ? { options: `-c search_path="${schema}" -c TimeZone=UTC` }
+      : { options: "-c TimeZone=UTC" }),
     max: 2,
   });
   return pool;

@@ -59,6 +59,7 @@ export function mountPromptRest(options: {
   const organizationId = options.organizationId ?? PROMPT_TEST_ORGANIZATION;
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

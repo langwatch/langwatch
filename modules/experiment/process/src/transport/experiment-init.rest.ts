@@ -22,6 +22,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   .withInput(experimentInitBodySchema)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withPermission("experiments:manage")
+  .withAudit("experiments.saveExperiment")
   .withOutput(experimentInitResponseSchema)
   .withDocs({
     tags: ["Experiments"],

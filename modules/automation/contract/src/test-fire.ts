@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { AlertType } from "./trigger.ts";
@@ -59,7 +60,7 @@ export interface TestFireInput {
   report?: TestFireReport | null;
 }
 
-export const testFireResultSchema = z.object({
+const testFireResultSchemaDefinition = z.object({
   channel: testFireChannelSchema,
   recipientCount: z.number(),
   usedDefault: z.boolean(),
@@ -67,4 +68,6 @@ export const testFireResultSchema = z.object({
   errors: z.array(z.string()),
   httpStatus: z.number().optional(),
 });
+export interface TestFireResultSchema extends Named<typeof testFireResultSchemaDefinition> {}
+export const testFireResultSchema: TestFireResultSchema = testFireResultSchemaDefinition;
 export type TestFireResult = z.infer<typeof testFireResultSchema>;

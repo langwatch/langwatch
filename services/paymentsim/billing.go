@@ -379,7 +379,7 @@ func (s *Server) completeCheckout(sess *Session) *apiError {
 		}
 		items = append(items, p)
 	}
-	subID, invoiceID := s.st.id("sub"), fmt.Sprintf("in_sim%06d", s.st.counters["in"]+1)
+	subID, invoiceID := s.st.id("sub"), s.st.nextID("in")
 	sess.Status, sess.PaymentStatus, sess.Subscription, sess.Invoice = "complete", "paid", &subID, &invoiceID
 	s.emit("checkout.session.completed", sess, nil)
 	if _, _, err := s.newSubscription(subID, *sess.Customer, items, sess.subMeta, "charge_automatically", nil, sess.anchor); err != nil {

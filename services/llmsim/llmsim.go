@@ -156,7 +156,41 @@ func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request, path stri
 	if !ok {
 		return
 	}
+	if !holdForDelay(r, pc.rec.Model) {
+		pc.rec.Status, pc.rec.Error = statusClientClosedRequest, "caller hung up during the forced delay"
+		return
+	}
 	s.routeProvider(pc, r, body)
+}
+
+// statusClientClosedRequest is what the console records for a call whose
+// caller hung up before llmsim answered; nothing is written back.
+const statusClientClosedRequest = 499
+
+// maxForcedDelay caps a "delay-<ms>" model so a typo cannot park a call forever.
+const maxForcedDelay = 5 * time.Minute
+
+var delayInModel = regexp.MustCompile(`delay-(\d+)`)
+
+// holdForDelay waits the "delay-<ms>" a model name asks for before the first
+// byte, and reports false when the caller hung up while it waited.
+func holdForDelay(r *http.Request, model string) bool {
+	m := delayInModel.FindStringSubmatch(model)
+	if m == nil {
+		return true
+	}
+	ms, err := strconv.Atoi(m[1])
+	if err != nil {
+		return true
+	}
+	timer := time.NewTimer(min(time.Duration(ms)*time.Millisecond, maxForcedDelay))
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-r.Context().Done():
+		return false
+	}
 }
 
 // providerCall is one provider call in flight: its response, its dialect and

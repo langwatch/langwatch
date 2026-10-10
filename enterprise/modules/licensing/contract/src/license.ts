@@ -1,4 +1,5 @@
 import { planSchema } from "@langwatch/entitlement-contract";
+import type { Named } from "@langwatch/module";
 import {
   licenseResourceLimitsShape,
   licenseSeatsShape,
@@ -11,7 +12,7 @@ import type { LicenseError, PlanInfo } from "./license-constants.ts";
 /**
  * Plan limits embedded within a license (the signed payload).
  */
-export const licensePlanLimitsSchema = z.object({
+const licensePlanLimitsSchemaDefinition = z.object({
   type: z.string(),
   name: z.string(),
   ...licenseSeatsShape,
@@ -42,11 +43,13 @@ export const licensePlanLimitsSchema = z.object({
   // (not z.enum) for forward compatibility so future values won't break old deployments.
   usageUnit: z.string().optional(),
 });
+export interface LicensePlanLimitsSchema extends Named<typeof licensePlanLimitsSchemaDefinition> {}
+export const licensePlanLimitsSchema: LicensePlanLimitsSchema = licensePlanLimitsSchemaDefinition;
 
 export type LicensePlanLimits = z.infer<typeof licensePlanLimitsSchema>;
 
 /** Core license data structure (the payload that gets signed) */
-export const licenseDataSchema = z.object({
+const licenseDataSchemaDefinition = z.object({
   licenseId: z.string(),
   version: z.number(),
   organizationName: z.string(),
@@ -69,18 +72,22 @@ export const licenseDataSchema = z.object({
   // signed it (specs/licensing/license-signing-key.feature). Last for the same reason.
   devStack: z.literal(true).optional(),
 });
+export interface LicenseDataSchema extends Named<typeof licenseDataSchemaDefinition> {}
+export const licenseDataSchema: LicenseDataSchema = licenseDataSchemaDefinition;
 
 export type LicenseData = z.infer<typeof licenseDataSchema>;
 
 /** A license with its RSA signature */
-export const signedLicenseSchema = z.object({
+const signedLicenseSchemaDefinition = z.object({
   data: licenseDataSchema,
   signature: z.string(), // Base64-encoded RSA-SHA256 signature
 });
+export interface SignedLicenseSchema extends Named<typeof signedLicenseSchemaDefinition> {}
+export const signedLicenseSchema: SignedLicenseSchema = signedLicenseSchemaDefinition;
 
 export type SignedLicense = z.infer<typeof signedLicenseSchema>;
 
-export const platformLicenseInspectionSchema = z.discriminatedUnion("valid", [
+const platformLicenseInspectionSchemaDefinition = z.discriminatedUnion("valid", [
   z.object({
     source: z.enum(["instance", "organization"]),
     organizationId: z.string().optional(),
@@ -96,14 +103,24 @@ export const platformLicenseInspectionSchema = z.discriminatedUnion("valid", [
     expired: z.boolean(),
   }),
 ]);
+export interface PlatformLicenseInspectionSchema extends Named<
+  typeof platformLicenseInspectionSchemaDefinition
+> {}
+export const platformLicenseInspectionSchema: PlatformLicenseInspectionSchema =
+  platformLicenseInspectionSchemaDefinition;
 
-export const platformLicenseAccessSchema = z.object({
+const platformLicenseAccessSchemaDefinition = z.object({
   allowed: z.boolean(),
   inspections: z.array(platformLicenseInspectionSchema),
 });
+export interface PlatformLicenseAccessSchema extends Named<
+  typeof platformLicenseAccessSchemaDefinition
+> {}
+export const platformLicenseAccessSchema: PlatformLicenseAccessSchema =
+  platformLicenseAccessSchemaDefinition;
 
 /** Who the installation's licence speaks for when an SSO domain is claimed (D05 tier 2). */
-export const domainClaimLicenseAuthoritySchema = z.object({
+const domainClaimLicenseAuthoritySchemaDefinition = z.object({
   /** Self-hosted, and the frozen single sign-on gate found a genuine licence. */
   authorizesDomainClaims: z.boolean(),
   /** Self-hosted with at most one organization, so its administrator runs the installation. */
@@ -111,6 +128,11 @@ export const domainClaimLicenseAuthoritySchema = z.object({
   /** `sha256:` of the licence key that permits the platform; the key itself never leaves. */
   licenseDigests: z.array(z.string()),
 });
+export interface DomainClaimLicenseAuthoritySchema extends Named<
+  typeof domainClaimLicenseAuthoritySchemaDefinition
+> {}
+export const domainClaimLicenseAuthoritySchema: DomainClaimLicenseAuthoritySchema =
+  domainClaimLicenseAuthoritySchemaDefinition;
 
 export type DomainClaimLicenseAuthority = z.infer<typeof domainClaimLicenseAuthoritySchema>;
 
@@ -250,13 +272,15 @@ export const licenseStatusSchema: z.ZodType<LicenseStatus> = z.union([
 ]);
 
 /** Why a deployment configured for single sign-on is not using it. */
-export const ssoGateStatusSchema = z
+const ssoGateStatusSchemaDefinition = z
   .object({
     configuredProvider: z.string().nullable(),
     licensed: z.boolean(),
     mounted: z.boolean(),
   })
   .strict();
+export interface SsoGateStatusSchema extends Named<typeof ssoGateStatusSchemaDefinition> {}
+export const ssoGateStatusSchema: SsoGateStatusSchema = ssoGateStatusSchemaDefinition;
 
 /**
  * `mounted` is reported apart from `licensed` because the two are fixed in
@@ -266,11 +290,15 @@ export const ssoGateStatusSchema = z
 export type SsoGateStatus = z.infer<typeof ssoGateStatusSchema>;
 
 /** A pasted key was accepted, with the plan it resolved to. */
-export const licenseUploadedSchema = z
+const licenseUploadedSchemaDefinition = z
   .object({ success: z.literal(true), planInfo: planSchema })
   .strict();
+export interface LicenseUploadedSchema extends Named<typeof licenseUploadedSchemaDefinition> {}
+export const licenseUploadedSchema: LicenseUploadedSchema = licenseUploadedSchemaDefinition;
 
 /** A key was dropped, returning the organization to the free tier. */
-export const licenseRemovedSchema = z
+const licenseRemovedSchemaDefinition = z
   .object({ success: z.literal(true), removed: z.literal(true) })
   .strict();
+export interface LicenseRemovedSchema extends Named<typeof licenseRemovedSchemaDefinition> {}
+export const licenseRemovedSchema: LicenseRemovedSchema = licenseRemovedSchemaDefinition;

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Response schemas for scenario event API endpoints
  * Defines the structure of API responses for scenario runs, batches, and events.
@@ -35,7 +36,7 @@ const errorSchema = z.object({ error: z.string() });
  * Individual scenario run data schema
  * Contains complete information about a single scenario execution
  */
-export const runDataSchema = z.object({
+const runDataSchemaDefinition = z.object({
   scenarioId: scenarioIdSchema,
   batchRunId: batchRunIdSchema,
   scenarioRunId: scenarioRunIdSchema,
@@ -78,6 +79,8 @@ export const runDataSchema = z.object({
   roleCosts: z.record(z.string(), z.array(z.number())).optional(), // Per-role costs (one per trace)
   roleLatencies: z.record(z.string(), z.array(z.number())).optional(), // Per-role latencies
 });
+export interface RunDataSchema extends Named<typeof runDataSchemaDefinition> {}
+export const runDataSchema: RunDataSchema = runDataSchemaDefinition;
 
 /**
  * Collection of scenario runs response schema
@@ -95,12 +98,14 @@ const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
  * Scenario batch summary schema
  * Contains aggregated statistics for a batch of scenario runs
  */
-export const scenarioBatchSchema = z.object({
+const scenarioBatchSchemaDefinition = z.object({
   batchRunId: z.string(),
   scenarioCount: z.number(), // Total number of scenarios in this batch
   successRate: z.number(), // Percentage of successful runs (0-1)
   lastRunAt: z.number(), // Unix timestamp of most recent run in batch
 });
+export interface ScenarioBatchSchema extends Named<typeof scenarioBatchSchemaDefinition> {}
+export const scenarioBatchSchema: ScenarioBatchSchema = scenarioBatchSchemaDefinition;
 
 /**
  * Collection of scenario batches response schema
@@ -115,7 +120,7 @@ const batchesSchema = z.object({
  * set-scoped archives report the set id plus a remaining-runs flag;
  * run-scoped archives report the single run id.
  */
-export const archiveResponseSchema = z.union([
+const archiveResponseSchemaDefinition = z.union([
   z.object({
     archived: z.number().int().nonnegative(),
     failed: z.number().int().nonnegative(),
@@ -128,16 +133,23 @@ export const archiveResponseSchema = z.union([
     scenarioRunId: z.string(),
   }),
 ]);
+export interface ArchiveResponseSchema extends Named<typeof archiveResponseSchemaDefinition> {}
+export const archiveResponseSchema: ArchiveResponseSchema = archiveResponseSchemaDefinition;
 
 /**
  * Browser-tab handoff response schema
  * Returned by POST /api/scenario-events/browser-tab. `delivered` tells the SDK
  * whether a live simulations tab took the run, so it can skip opening one.
  */
-export const browserTabHandoffResponseSchema = z.object({
+const browserTabHandoffResponseSchemaDefinition = z.object({
   delivered: z.boolean(),
   url: z.string(),
 });
+export interface BrowserTabHandoffResponseSchema extends Named<
+  typeof browserTabHandoffResponseSchemaDefinition
+> {}
+export const browserTabHandoffResponseSchema: BrowserTabHandoffResponseSchema =
+  browserTabHandoffResponseSchemaDefinition;
 
 /**
  * Consolidated response schemas object

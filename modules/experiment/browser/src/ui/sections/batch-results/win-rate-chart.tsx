@@ -1,3 +1,4 @@
+import { Box, Text } from "@langwatch/design-system/primitives";
 /**
  * WinRateChart - Win-rate bar chart per comparison evaluator (#5100 dogfood
  * follow-up, generalized to N candidates in #5101).
@@ -17,8 +18,7 @@
  * inline alongside its own Total Cost / Avg Latency chart cards without a
  * visual break — same width, same header treatment, same chartHeight.
  */
-
-import { Box, Text } from "@langwatch/design-system/primitives";
+import { system } from "@langwatch/design-system/system";
 import {
   Bar,
   BarChart,
@@ -45,16 +45,16 @@ import { disambiguateNames } from "./presentation.tsx";
  * should read as one. Ties get their own gray.
  */
 export const VARIANT_COLORS = [
-  "#22C55E",
-  "#8B5CF6",
-  "#0EA5E9",
-  "#F59E0B",
-  "#EC4899",
-  "#14B8A6",
-  "#6366F1",
-  "#84CC16",
-];
-const TIE_COLOR = "#94A3B8";
+  "chart.3",
+  "chart.5",
+  "chart.2",
+  "chart.4",
+  "chart.8",
+  "chart.6",
+  "chart.7",
+  "chart.1",
+].map((token) => system.token.var(`colors.${token}`));
+const TIE_COLOR = system.token.var("colors.fg.subtle");
 
 /** Font size of the win count printed above each bar. */
 export const COUNT_LABEL_FONT_SIZE = 11;

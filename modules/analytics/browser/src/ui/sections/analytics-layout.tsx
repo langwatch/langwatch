@@ -33,11 +33,13 @@ export default function AnalyticsLayout({
   children,
   title,
   railEntry,
+  activeDashboardId,
   analyticsHeaderProps,
   extraHeaderButtons,
 }: PropsWithChildren<{
   title: string;
   railEntry?: AnalyticsRailEntry;
+  activeDashboardId?: string;
   analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
   extraHeaderButtons?: React.ReactNode;
 }>) {
@@ -64,7 +66,9 @@ export default function AnalyticsLayout({
     {
       label: "Custom",
       links: [],
-      extra: project?.slug ? <CustomDashboardsSection projectSlug={project.slug} /> : null,
+      extra: project?.slug ? (
+        <CustomDashboardsSection projectSlug={project.slug} activeDashboardId={activeDashboardId} />
+      ) : null,
     },
   ];
   const activeHref =
@@ -74,7 +78,6 @@ export default function AnalyticsLayout({
     <SavedViewsScope>
       <SectionNavigationFrame
         label="Analytics"
-        hideTitle
         header={
           <AnalyticsHeader
             title={title}

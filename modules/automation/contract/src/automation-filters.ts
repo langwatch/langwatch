@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const automationFilterFieldSchema = z.enum([
@@ -31,16 +32,23 @@ export const automationFilterFieldSchema = z.enum([
   "annotations.hasAnnotation",
 ]);
 
-export const automationFilterValueSchema = z.union([
+const automationFilterValueSchemaDefinition = z.union([
   z.array(z.string()),
   z.record(z.string(), z.array(z.string())),
   z.record(z.string(), z.record(z.string(), z.array(z.string()))),
 ]);
+export interface AutomationFilterValueSchema extends Named<
+  typeof automationFilterValueSchemaDefinition
+> {}
+export const automationFilterValueSchema: AutomationFilterValueSchema =
+  automationFilterValueSchemaDefinition;
 
-export const automationFiltersSchema = z.partialRecord(
+const automationFiltersSchemaDefinition = z.partialRecord(
   automationFilterFieldSchema,
   automationFilterValueSchema,
 );
+export interface AutomationFiltersSchema extends Named<typeof automationFiltersSchemaDefinition> {}
+export const automationFiltersSchema: AutomationFiltersSchema = automationFiltersSchemaDefinition;
 
 const permissiveAutomationFiltersSchema = z.record(z.string(), automationFilterValueSchema);
 

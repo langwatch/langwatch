@@ -113,6 +113,7 @@ import {
   type PricingModel,
   type OrganizationCurrency,
   type PendingInvitationForCaller,
+  type PendingInvitationsByEmail,
   type PendingInvitationsForCaller,
   type SignUpVerdict,
   type SignInSecurityPolicy,
@@ -550,6 +551,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: OrganizationCaller,
   ): Promise<PendingInvitationsForCaller> {
     return this.#invitationDoor.listPendingForCaller({ userId: by.id });
+  }
+
+  /** Every pending invitation on one address, in any organization: the operator's lookup. */
+  async findPendingInvitationsByEmail(
+    input: Readonly<{ email: string }>,
+  ): Promise<PendingInvitationsByEmail> {
+    return this.#invitationDoor.findPendingByEmail(input);
   }
 
   /** The invitation waiting for a caller who belongs to no organization yet. */

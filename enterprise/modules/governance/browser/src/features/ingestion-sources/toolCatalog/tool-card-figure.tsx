@@ -7,29 +7,7 @@ import { TileIcon } from "../../ai-tools/ui/elements/tile-icon.tsx";
 import { SourceTypeIconGlyph } from "../ui/elements/source-type-icon-glyph.tsx";
 import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./tool-cards";
 
-/**
- * The two pieces the grid card and the list table both draw: one figure, and
- * one vendor mark.
- *
- * Shared rather than written twice, because the honesty rule lives inside the
- * figure. A table that drew its own placeholder would be one edit away from drawing a
- * bare placeholder with no sentence behind it, and the sentence is the whole reason
- * the placeholder is acceptable.
- *
- * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
- */
-
-/**
- * One figure, wherever it is drawn.
- *
- * An absent value draws a quiet "No data" carrying the sentence that says why. Two
- * different sentences reach it — a row the tool has but nothing measures yet,
- * and a row the tool does not have at all — and the caller has already picked
- * which; see `toolCardMissingReason`. Rendering it as a `Tooltip`
- * trigger rather than a `title=` attribute is deliberate: the sentences are
- * the honest half of this screen and they have to survive on touch, where
- * `title` never opens.
- */
+/** Missing metrics keep a focusable explanation; a dash is never a measured zero. */
 export function ToolCardFigure({
   label,
   value,
@@ -38,7 +16,7 @@ export function ToolCardFigure({
 }: {
   label: string;
   value: string | number | undefined;
-  /** What "No data" says when `value` is absent. Never optional. */
+  /** Why the metric is missing when `value` is absent. Never optional. */
   emptyReason: string;
   align?: "start" | "end";
 }) {
@@ -55,10 +33,11 @@ export function ToolCardFigure({
           fontWeight="normal"
           color="fg.subtle"
           cursor="help"
+          tabIndex={0}
           textAlign={align}
           aria-label={`${label} not measured. ${emptyReason}`}
         >
-          No data
+          —
         </Text>
       </Tooltip>
     );

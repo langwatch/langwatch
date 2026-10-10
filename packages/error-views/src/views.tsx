@@ -102,7 +102,7 @@ export function HandledErrorAlert({
   );
 }
 
-/** The aggregate refusal's words, from the registry, so the notice and the server agree (ADR-177). */
+/** The aggregate refusal's words, from the registry, so notice and server agree (ADR-177). */
 const AGGREGATE_READ_ONLY_COPY = explainHandledError({
   code: "aggregate_project_is_read_only",
   meta: {},

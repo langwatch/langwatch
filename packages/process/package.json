@@ -27,6 +27,10 @@
       "types": "./dist/nlp-internal-secret.d.ts",
       "default": "./src/nlp-internal-secret.ts"
     },
+    "./backend-host": {
+      "types": "./dist/lifecycle/backend-host.d.ts",
+      "default": "./src/lifecycle/backend-host.ts"
+    },
     "./process-globals": {
       "types": "./dist/process-globals.d.ts",
       "default": "./src/process-globals.ts"

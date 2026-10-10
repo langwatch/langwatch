@@ -11,13 +11,19 @@ import type { DashboardScope } from "@langwatch/dashboard-contract";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { BOARD_UNAVAILABLE } from "../model/board-scope.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+
+// jsdom loads no stylesheet, so the theme colours a chart frame is handed have no value to read.
+vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRawColorValue: () => "#123456",
+}));
 
 type Input = Record<string, unknown>;
 type Project = { id: string; name: string; slug: string };

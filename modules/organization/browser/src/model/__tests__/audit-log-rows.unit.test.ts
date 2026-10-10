@@ -7,10 +7,10 @@ import {
   auditActor,
   auditChangeSummary,
   auditClient,
+  auditDayHeading,
   auditDayLabel,
   auditFeedDays,
   groupAuditRuns,
-  type AuditRun,
 } from "../audit-log-rows.ts";
 
 describe("given a recorded action slug", () => {
@@ -37,20 +37,57 @@ describe("given a row's actor fields", () => {
         user: { id: "u1", name: "Ada", email: "ada@x.test" },
         actorUserId: null,
         actorUser: null,
+        apiKeyId: null,
       }),
-    ).toEqual({ kind: "user", id: "u1", name: "Ada", email: "ada@x.test" });
+    ).toEqual({ kind: "user", viaKeyId: null, id: "u1", name: "Ada", email: "ada@x.test" });
+  });
+
+  /** @scenario Each kind of actor reads distinctly */
+  it("names a person who called through their own key, and a key acting as nobody", () => {
+    expect(
+      auditActor({
+        userId: "u1",
+        user: { id: "u1", name: "Ada", email: "ada@x.test" },
+        actorUserId: null,
+        actorUser: null,
+        apiKeyId: "key_123456789",
+      }),
+    ).toMatchObject({ kind: "user", viaKeyId: "key_123456789" });
+    expect(
+      auditActor({
+        userId: "apikey:key_9",
+        user: null,
+        actorUserId: null,
+        actorUser: null,
+        apiKeyId: "key_9",
+      }),
+    ).toEqual({ kind: "apiKey", id: "key_9" });
   });
 
   /** @scenario Each kind of actor reads distinctly */
   it("tells a background job, an unidentified caller and a vanished user apart", () => {
-    expect(auditActor({ userId: null, user: null, actorUserId: null, actorUser: null })).toEqual({
+    expect(
+      auditActor({ userId: null, user: null, actorUserId: null, actorUser: null, apiKeyId: null }),
+    ).toEqual({
       kind: "system",
     });
     expect(
-      auditActor({ userId: "anonymous", user: null, actorUserId: null, actorUser: null }),
+      auditActor({
+        userId: "anonymous",
+        user: null,
+        actorUserId: null,
+        actorUser: null,
+        apiKeyId: null,
+      }),
     ).toEqual({ kind: "anonymous" });
     expect(
-      auditActor({ userId: "u-gone", user: null, actorUserId: null, actorUser: null }),
+      auditActor({
+        userId: "u-gone",
+        user: null,
+        actorUserId: null,
+        actorUser: null,
+        apiKeyId: null,
+      }),
     ).toEqual({
       kind: "unresolved",
       id: "u-gone",
@@ -65,6 +102,7 @@ describe("given a row's actor fields", () => {
         user: { id: "u1", name: "Alice", email: "alice@x.test" },
         actorUserId: "op",
         actorUser: { id: "op", name: "Admin", email: "admin@x.test" },
+        apiKeyId: null,
       }),
     ).toEqual({
       kind: "impersonation",
@@ -84,6 +122,7 @@ const row = (id: string, overrides: Record<string, unknown> = {}) => ({
   projectId: null,
   error: null,
   source: "platform" as const,
+  createdAt: new Date(2026, 9, 10, 12),
   ...overrides,
 });
 
@@ -123,16 +162,18 @@ describe("given entries across several days", () => {
   });
 
   /** @scenario The feed reads by day */
+  it("pairs a relative day with its full date and spells older days out once", () => {
+    expect(auditDayHeading({ at: new Date(2026, 9, 10, 1, 0), now })).toBe("Today · Oct 10, 2026");
+    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now })).toBe("Oct 8, 2026");
+  });
+
+  /** @scenario The feed reads by day */
   it("keeps the runs of one day under one heading", () => {
-    const run = (id: string, at: Date): AuditRun<{ id: string; createdAt: Date }> => ({
-      id,
-      entries: [{ id, createdAt: at }],
-    });
     const days = auditFeedDays({
-      runs: [
-        run("a", new Date(2026, 9, 10, 9)),
-        run("b", new Date(2026, 9, 10, 8)),
-        run("c", new Date(2026, 9, 8, 8)),
+      rows: [
+        row("a", { createdAt: new Date(2026, 9, 10, 9), userId: "u1" }),
+        row("b", { createdAt: new Date(2026, 9, 10, 8), userId: "u2" }),
+        row("c", { createdAt: new Date(2026, 9, 8, 8) }),
       ],
       now,
     });
@@ -141,6 +182,18 @@ describe("given entries across several days", () => {
       ["Oct 8", ["c"]],
     ]);
   });
+
+  /** @scenario A burst of identical events by one actor reads as one row */
+  it("never folds a run across midnight", () => {
+    const days = auditFeedDays({
+      rows: [
+        row("a", { createdAt: new Date(2026, 9, 10, 0, 1) }),
+        row("b", { createdAt: new Date(2026, 9, 9, 23, 59) }),
+      ],
+      now,
+    });
+    expect(days.map((day) => day.runs.map((r) => r.entries.length))).toEqual([[1], [1]]);
+  });
 });
 
 describe("given a stored user agent", () => {
@@ -148,15 +201,15 @@ describe("given a stored user agent", () => {
   it.each([
     [
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-      "Chrome on macOS",
+      "Chrome 129 on macOS",
     ],
     [
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
-      "Firefox on Windows",
+      "Firefox 131 on Windows",
     ],
     [
       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
-      "Safari on iOS",
+      "Safari 17 on iOS",
     ],
     ["curl/8.7.1", "curl"],
     ["langwatch-sdk/0.9.1", "langwatch-sdk"],

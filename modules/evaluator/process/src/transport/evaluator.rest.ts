@@ -207,6 +207,7 @@ export function createEvaluatorRest(): Readonly<{
       // Creating asks for `evaluations:create`; `:manage` still implies it, so no
       // existing caller changes and a viewer is declined as before.
       .post("/", "postApiEvaluators")
+      .withAudit("evaluators.create")
       .withInput(createEvaluatorInputSchema)
       .withPermission("evaluations:create")
       .withOutput(evaluatorWireSchema)
@@ -217,6 +218,7 @@ export function createEvaluatorRest(): Readonly<{
       )
 
       .put("/:id", "putApiEvaluatorsById")
+      .withAudit("evaluators.update")
       .withParams(evaluatorIdParamsSchema)
       .withInput(updateEvaluatorInputSchema)
       .withPermission("evaluations:update")
@@ -232,6 +234,7 @@ export function createEvaluatorRest(): Readonly<{
 
       // Archiving deliberately stays at `:manage`.
       .delete("/:id", "deleteApiEvaluatorsById")
+      .withAudit("evaluators.delete")
       .withParams(evaluatorIdParamsSchema)
       .withPermission("evaluations:manage")
       .withOutput(archivedEvaluatorResponseSchema)

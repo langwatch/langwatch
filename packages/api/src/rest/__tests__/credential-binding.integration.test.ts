@@ -190,6 +190,7 @@ describe("permission targets in declared headers", () => {
         header: "x-project-id",
       })
       .withOutput(z.object({ ok: z.boolean() }))
+      .withoutAudit("test route")
       .handle(({ app }, headers) => {
         seen.push(headers["x-project-id"]);
 

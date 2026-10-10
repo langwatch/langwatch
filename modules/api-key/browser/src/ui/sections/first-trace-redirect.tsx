@@ -25,7 +25,7 @@ export function FirstTraceRedirect() {
   if (watchState === "waiting") {
     return (
       <HStack as="output" gap={2} aria-live="polite">
-        <Spinner size="sm" color="orange.400" />
+        <Spinner size="sm" color="orange.fg" />
         <Text textStyle="sm" color="fg.muted">
           Waiting for your first trace. We will take you there when it arrives.
         </Text>

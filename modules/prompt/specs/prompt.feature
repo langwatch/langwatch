@@ -91,6 +91,13 @@ Feature: Prompt service
     Then the body is refused as a validation error naming the field
     And no write reaches Postgres, which would answer 22021 as a 500
 
+  @unit
+  Scenario: The deploy dialog names a refused tag in words, never the code
+    Given a tag name that is already in use
+    When the deploy dialog is refused with prompt_tag_conflict
+    Then the add-tag field says the name already exists
+    And any other refusal shows its registry title, not its code
+
   @integration
   Scenario: a renamed prompt tag is listed under its new name
     Given the organization has a custom prompt tag

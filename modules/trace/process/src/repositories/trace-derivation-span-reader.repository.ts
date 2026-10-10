@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 
 /**
@@ -13,10 +14,11 @@ export abstract class TraceDerivationSpanReaderRepository {
   }): Promise<NormalizedSpan[]>;
 
   /**
-   * Trace span events flattened (span read deliberately returns them empty).
+   * Trace span events flattened (span read deliberately returns them empty), read in the
+   * proof's own project.
    */
   abstract findDerivedEventsByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<DerivedTraceEvent[]>;

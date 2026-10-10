@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * One vocabulary for every card shape: Measured (CLI-generated) and Derived
  * (Langy JSON inline) channels share it but differ in tolerance — measured
@@ -18,7 +19,7 @@ import {
  * once: `trace_id` on the raw search document, `traceId` on some serialisers.
  * Both are accepted and neither is invented.
  */
-export const traceSummarySchema = z.looseObject({
+const traceSummarySchemaDefinition = z.looseObject({
   trace_id: z.string().optional(),
   traceId: z.string().optional(),
   input: textValueSchema.optional(),
@@ -26,6 +27,8 @@ export const traceSummarySchema = z.looseObject({
   timestamps: z.looseObject({ started_at: z.number().optional() }).optional(),
   error: z.unknown().optional(),
 });
+export interface TraceSummarySchema extends Named<typeof traceSummarySchemaDefinition> {}
+export const traceSummarySchema: TraceSummarySchema = traceSummarySchemaDefinition;
 
 export type TraceSummary = z.infer<typeof traceSummarySchema>;
 
@@ -34,18 +37,20 @@ export const extractTraceId = (trace: TraceSummary): string | undefined =>
   trace.trace_id ?? trace.traceId;
 
 /** `trace search` / `trace export` — the traces card. */
-export const tracesCardSchema = z.looseObject({
+const tracesCardSchemaDefinition = z.looseObject({
   // A reduced result may carry an in-band "… N more truncated" string element;
   // tolerated here, skipped by readers (see `rowOrTruncationMarker`).
   traces: z.array(rowOrTruncationMarker(traceSummarySchema)),
   pagination: hitsPaginationSchema.optional(),
 });
+export interface TracesCardSchema extends Named<typeof tracesCardSchemaDefinition> {}
+export const tracesCardSchema: TracesCardSchema = tracesCardSchemaDefinition;
 
 /** `trace get` — one trace, in full. */
 export const traceCardSchema = traceSummarySchema;
 
 /** `dataset list`, `dataset records list` — the dataset card. */
-export const datasetCardSchema = z.union([
+const datasetCardSchemaDefinition = z.union([
   collectionSchema({
     key: "data",
     row: z.looseObject({
@@ -58,15 +63,19 @@ export const datasetCardSchema = z.union([
   }),
   collectionSchema({ key: "records", row: z.looseObject({}) }),
 ]);
+export interface DatasetCardSchema extends Named<typeof datasetCardSchemaDefinition> {}
+export const datasetCardSchema: DatasetCardSchema = datasetCardSchemaDefinition;
 
 /** `analytics query` — the metrics card, whose numbers roll up. */
-export const metricsCardSchema = z.looseObject({
+const metricsCardSchemaDefinition = z.looseObject({
   // The canonical CLI timeseries response. Requiring the discriminating key is
   // intentional: `{ value: "a previous tool result" }` must never become an
   // Analytics card merely because this schema tolerated every object.
   currentPeriod: z.array(z.looseObject({})),
   previousPeriod: z.array(z.looseObject({})).optional(),
 });
+export interface MetricsCardSchema extends Named<typeof metricsCardSchemaDefinition> {}
+export const metricsCardSchema: MetricsCardSchema = metricsCardSchemaDefinition;
 
 /*
  * ── THE SHARED SHAPE VOCABULARY ──────────────────────────────────────────
@@ -93,7 +102,9 @@ export const timeseriesComparisonFields = {
 } as const;
 
 /** A table cell is a JSON primitive — never a nested structure to render. */
-export const tableCellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const tableCellSchemaDefinition = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export interface TableCellSchema extends Named<typeof tableCellSchemaDefinition> {}
+export const tableCellSchema: TableCellSchema = tableCellSchemaDefinition;
 
 /**
  * `table` — named columns, rows of primitive cells. Row length is
@@ -163,7 +174,7 @@ export const choicesCardFields = {
  * derived from payload shape—the command that knows the question shapes this
  * payload (see `timeseriesShape.ts` in CLI and `timeseriesProbeSchema`).
  */
-export const timeseriesCardSchema = z.looseObject({
+const timeseriesCardSchemaDefinition = z.looseObject({
   series: z
     .array(
       z.looseObject({
@@ -178,12 +189,14 @@ export const timeseriesCardSchema = z.looseObject({
   /** A `CustomGraphInput`, when the agent has one worth saving. */
   graph: z.unknown().optional(),
 });
+export interface TimeseriesCardSchema extends Named<typeof timeseriesCardSchemaDefinition> {}
+export const timeseriesCardSchema: TimeseriesCardSchema = timeseriesCardSchemaDefinition;
 
 /**
  * Evidence of timeseries: named series with ≥2 points (one reading is not a
  * trend). See `spendProbeSchema` for why probe ≠ acceptance schema.
  */
-export const timeseriesProbeSchema = z.looseObject({
+const timeseriesProbeSchemaDefinition = z.looseObject({
   series: z
     .array(
       z.looseObject({
@@ -193,9 +206,11 @@ export const timeseriesProbeSchema = z.looseObject({
     )
     .min(1),
 });
+export interface TimeseriesProbeSchema extends Named<typeof timeseriesProbeSchemaDefinition> {}
+export const timeseriesProbeSchema: TimeseriesProbeSchema = timeseriesProbeSchemaDefinition;
 
 /** `experiment run|results`, `scenario run`, `suite run`, `agent run` — a run card. */
-export const evalRunCardSchema = z.looseObject({
+const evalRunCardSchemaDefinition = z.looseObject({
   id: z.string().optional(),
   runId: z.string().optional(),
   status: z.string().optional(),
@@ -204,27 +219,33 @@ export const evalRunCardSchema = z.looseObject({
   total: z.number().optional(),
   results: z.unknown().optional(),
 });
+export interface EvalRunCardSchema extends Named<typeof evalRunCardSchemaDefinition> {}
+export const evalRunCardSchema: EvalRunCardSchema = evalRunCardSchemaDefinition;
 
 /** `scenario list|get` — a scenario card. */
-export const scenarioCardSchema = z.looseObject({
+const scenarioCardSchemaDefinition = z.looseObject({
   id: z.string().optional(),
   name: z.string().optional(),
   status: z.string().optional(),
 });
+export interface ScenarioCardSchema extends Named<typeof scenarioCardSchemaDefinition> {}
+export const scenarioCardSchema: ScenarioCardSchema = scenarioCardSchemaDefinition;
 
 /** `prompt push|sync` — the diff card. */
-export const promptDiffCardSchema = z.looseObject({
+const promptDiffCardSchemaDefinition = z.looseObject({
   name: z.string().optional(),
   version: z.union([z.string(), z.number()]).optional(),
   changes: z.unknown().optional(),
 });
+export interface PromptDiffCardSchema extends Named<typeof promptDiffCardSchemaDefinition> {}
+export const promptDiffCardSchema: PromptDiffCardSchema = promptDiffCardSchemaDefinition;
 
 /**
  * The generic read: a collection under whichever key this endpoint chose, or a
  * single resource. This is what the long tail of `list`/`get` commands renders
  * as, and the reason the contract does not need ninety schemas.
  */
-export const resourceCardSchema = z.union([
+const resourceCardSchemaDefinition = z.union([
   z.array(z.unknown()),
   z.looseObject({
     data: z.array(z.unknown()).optional(),
@@ -234,6 +255,8 @@ export const resourceCardSchema = z.union([
     pagination: paginationSchema.optional(),
   }),
 ]);
+export interface ResourceCardSchema extends Named<typeof resourceCardSchemaDefinition> {}
+export const resourceCardSchema: ResourceCardSchema = resourceCardSchemaDefinition;
 
 /**
  * Keys whose value NAMES a resource. An id under any of the spellings the
@@ -285,9 +308,14 @@ const entryNamesResource = ({
  * narrower than {@link resourceCardSchema} on purpose: a payload naming
  * nothing must not parse as one, or the panel manufactures success from `[]`.
  */
-export const createdResourceCardSchema = resourceCardSchema.refine(namesCreatedResource, {
+const createdResourceCardSchemaDefinition = resourceCardSchema.refine(namesCreatedResource, {
   message: "a created-resource result must name the resource it created",
 });
+export interface CreatedResourceCardSchema extends Named<
+  typeof createdResourceCardSchemaDefinition
+> {}
+export const createdResourceCardSchema: CreatedResourceCardSchema =
+  createdResourceCardSchemaDefinition;
 
 /**
  * Spend card: cost is a dimension on keys, budgets, traces, filtered sets.
@@ -299,7 +327,7 @@ export const spendCardSchema = resourceCardSchema;
  * Probe (evidence) ≠ acceptance: acceptance permissive (floor), probe strict
  * (bar). See `spendCardSchema` for permissive version.
  */
-export const spendProbeSchema = z.union([
+const spendProbeSchemaDefinition = z.union([
   // A rolled-up total, however this endpoint spells it.
   z.looseObject({ totalCost: z.number() }),
   z.looseObject({ total_cost: z.number() }),
@@ -308,6 +336,8 @@ export const spendProbeSchema = z.union([
     traces: z.array(z.looseObject({ metrics: z.looseObject({ total_cost: z.number() }) })),
   }),
 ]);
+export interface SpendProbeSchema extends Named<typeof spendProbeSchemaDefinition> {}
+export const spendProbeSchema: SpendProbeSchema = spendProbeSchemaDefinition;
 
 /**
  * `evaluator get`, `monitor get` — the config card, discriminated on an
@@ -317,11 +347,16 @@ export const spendProbeSchema = z.union([
 export const evaluatorConfigCardSchema = resourceCardSchema;
 
 /** The evidence a payload is an evaluator's config — see `spendProbeSchema`. */
-export const evaluatorConfigProbeSchema = z.union([
+const evaluatorConfigProbeSchemaDefinition = z.union([
   z.looseObject({ enabled: z.boolean() }),
   z.looseObject({ evaluatorType: z.string() }),
   z.looseObject({ evaluator_type: z.string() }),
 ]);
+export interface EvaluatorConfigProbeSchema extends Named<
+  typeof evaluatorConfigProbeSchemaDefinition
+> {}
+export const evaluatorConfigProbeSchema: EvaluatorConfigProbeSchema =
+  evaluatorConfigProbeSchemaDefinition;
 
 /**
  * `dashboard get`, `graph get` — the one resource that genuinely IS a visual,
@@ -331,11 +366,13 @@ export const evaluatorConfigProbeSchema = z.union([
 export const dashboardCardSchema = resourceCardSchema;
 
 /** The evidence a payload is a dashboard/graph — see `spendProbeSchema`. */
-export const dashboardProbeSchema = z.union([
+const dashboardProbeSchemaDefinition = z.union([
   z.looseObject({ graphs: z.array(z.looseObject({})) }),
   z.looseObject({ panels: z.array(z.looseObject({})) }),
   z.looseObject({ graphType: z.string() }),
 ]);
+export interface DashboardProbeSchema extends Named<typeof dashboardProbeSchemaDefinition> {}
+export const dashboardProbeSchema: DashboardProbeSchema = dashboardProbeSchemaDefinition;
 
 /**
  * Every card the panel can draw, whichever channel wrote it. ONE list, so the

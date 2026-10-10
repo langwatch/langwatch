@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -54,7 +55,7 @@ export type InstantEvalQuestionResult =
   | { kind: "question"; instructions: string; criteria: [string, string] }
   | { kind: "filter"; query: string; reason: string };
 
-export const routeSearchInputSchema = z.object({
+const routeSearchInputSchemaDefinition = z.object({
   projectId: z.string(),
   /** The whole submitted text: bare words plus any explicit terms. */
   text: z.string().min(1).max(2000),
@@ -70,6 +71,8 @@ export const routeSearchInputSchema = z.object({
   /** Whether Instant Evals are open to this project, as Instant Eval's door said; absent, false. */
   isInstantEvalAvailable: z.boolean().optional(),
 });
+export interface RouteSearchInputSchema extends Named<typeof routeSearchInputSchemaDefinition> {}
+export const routeSearchInputSchema: RouteSearchInputSchema = routeSearchInputSchemaDefinition;
 
 export type RouteSearchInput = z.infer<typeof routeSearchInputSchema>;
 
@@ -84,7 +87,7 @@ const decidedBySchema = z.enum(SEARCH_ROUTE_DECIDERS);
 
 const modelTroubleSchema = z.enum(MODEL_TROUBLES);
 
-export const routeSearchResultSchema = z.discriminatedUnion("kind", [
+const routeSearchResultSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("filter"),
     /** The generated query merged with the explicit terms typed. */
@@ -127,5 +130,7 @@ export const routeSearchResultSchema = z.discriminatedUnion("kind", [
     decidedBy: decidedBySchema,
   }),
 ]);
+export interface RouteSearchResultSchema extends Named<typeof routeSearchResultSchemaDefinition> {}
+export const routeSearchResultSchema: RouteSearchResultSchema = routeSearchResultSchemaDefinition;
 
 export type RouteSearchResult = z.infer<typeof routeSearchResultSchema>;

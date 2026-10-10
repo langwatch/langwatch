@@ -13,6 +13,7 @@ import {
   type NavigationShellReadyState,
   type NavigationShellState,
 } from "../../behavior/use-navigation-shell-state.ts";
+import { useOrglessAddressRedirect } from "../../behavior/use-orgless-address-redirect.ts";
 import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
@@ -51,6 +52,7 @@ export function NavigationShell({
     isOrgScope: orgScope,
   });
   useProjectAddressRedirect();
+  useOrglessAddressRedirect({ personalScope });
   const lastReady = useRef<NavigationShellReadyState | null>(null);
   if (reading.status === "ready") lastReady.current = reading;
 
@@ -189,7 +191,7 @@ function ShellContentRow({
           <Box
             width="full"
             height="full"
-            background="bg.surface"
+            background="bg"
             borderTopLeftRadius="xl"
             borderTopWidth="1px"
             borderLeftWidth="1px"
@@ -201,7 +203,6 @@ function ShellContentRow({
             borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
             borderRightWidth={langyDockInset > 0 ? "1px" : 0}
             _dark={{
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
               borderColor: "border.muted",
             }}
             overflow="auto"

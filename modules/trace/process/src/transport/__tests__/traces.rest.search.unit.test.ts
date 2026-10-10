@@ -147,6 +147,7 @@ function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

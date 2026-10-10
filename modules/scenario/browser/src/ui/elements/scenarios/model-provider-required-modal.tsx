@@ -22,7 +22,7 @@ export function ModelProviderRequiredModal({
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} py={4} align="center" justify="center">
-            <Box p={3} borderRadius="full" bg="orange.100" color="orange.600">
+            <Box p={3} borderRadius="full" bg="orange.subtle" color="orange.fg">
               <Icon as={AlertTriangle} boxSize={6} />
             </Box>
             <Text color="fg.muted" fontSize="sm" textAlign="center">
@@ -42,7 +42,6 @@ export function ModelProviderRequiredModal({
                 href="/settings/model-providers"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "white" }}
               >
                 Configure model provider
               </a>

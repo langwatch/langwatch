@@ -74,7 +74,7 @@ describe("given a governed file", () => {
   });
 
   describe("when the file is a dev runtime entry", () => {
-    /** @scenario "The dev runtime's entries are exempt" */
+    /** @scenario "The dev runtime's entry is exempt" */
     it("reports nothing there and still reports its siblings", () => {
       const code = 'const entry = await import("./backend.entrypoint.main.ts");';
       const devRuntime = "tools/dev-runtime/src";

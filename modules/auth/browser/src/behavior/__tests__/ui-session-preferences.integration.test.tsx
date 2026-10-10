@@ -32,6 +32,8 @@ const signedInAs = (id: string): UiAuthClient => ({
 
 class SilentFeedback extends UiFeedback {
   succeeded(): void {}
+  warned(): void {}
+  informed(): void {}
   failed(): void {}
 }
 

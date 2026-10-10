@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -6,7 +7,7 @@ import { z } from "zod";
  * transport publishes it and the search bar reads it.
  */
 
-export const aiQueryResultSchema = z.union([
+const aiQueryResultSchemaDefinition = z.union([
   z.object({ ok: z.literal(true), query: z.string(), attempts: z.number() }),
   z.object({
     ok: z.literal(false),
@@ -15,6 +16,8 @@ export const aiQueryResultSchema = z.union([
     attempts: z.number(),
   }),
 ]);
+export interface AiQueryResultSchema extends Named<typeof aiQueryResultSchemaDefinition> {}
+export const aiQueryResultSchema: AiQueryResultSchema = aiQueryResultSchemaDefinition;
 
 export type AiQueryResult = z.infer<typeof aiQueryResultSchema>;
 
@@ -22,7 +25,7 @@ export type AiQueryResult = z.infer<typeof aiQueryResultSchema>;
  * The AI's higher-level surface: apply a query to the current view, or
  * create a saved lens, based on user intent ("save as" → `create_lens`).
  */
-export const aiActionResultSchema = z.union([
+const aiActionResultSchemaDefinition = z.union([
   z.object({ ok: z.literal(true), kind: z.literal("apply_query"), query: z.string() }),
   z.object({
     ok: z.literal(true),
@@ -31,6 +34,8 @@ export const aiActionResultSchema = z.union([
     query: z.string(),
   }),
 ]);
+export interface AiActionResultSchema extends Named<typeof aiActionResultSchemaDefinition> {}
+export const aiActionResultSchema: AiActionResultSchema = aiActionResultSchemaDefinition;
 
 export type AiActionResult = z.infer<typeof aiActionResultSchema>;
 

@@ -36,6 +36,7 @@ const handleEvent = vi.fn<StripeWebhookEvents["handleEvent"]>();
 
 function mounted() {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

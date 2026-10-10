@@ -480,7 +480,7 @@ function RunSummaryLine({
       <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
         {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
-      <Text fontSize="xs" color="gray.400">
+      <Text fontSize="xs" color="fg.subtle">
         ·
       </Text>
       <Text fontSize="xs" color="fg.subtle">

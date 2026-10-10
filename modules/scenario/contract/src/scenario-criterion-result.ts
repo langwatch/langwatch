@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** How the judge settled one criterion. @see specs/scenarios/judge-criterion-verdicts.feature */
@@ -5,7 +6,7 @@ export const SCENARIO_CRITERION_STATUSES = ["passed", "failed", "inconclusive"] 
 export type ScenarioCriterionStatus = (typeof SCENARIO_CRITERION_STATUSES)[number];
 
 /** One criterion as the judge settled it, with its own reasoning. */
-export const scenarioCriterionResultSchema = z.object({
+const scenarioCriterionResultSchemaDefinition = z.object({
   criterion: z.string(),
   /** The criterion restated as a positive requirement; absent from older SDKs. */
   requirement: z.string().optional(),
@@ -13,6 +14,11 @@ export const scenarioCriterionResultSchema = z.object({
   /** Why this status; for an inconclusive criterion, the evidence that was missing. */
   reasoning: z.string().default(""),
 });
+export interface ScenarioCriterionResultSchema extends Named<
+  typeof scenarioCriterionResultSchemaDefinition
+> {}
+export const scenarioCriterionResultSchema: ScenarioCriterionResultSchema =
+  scenarioCriterionResultSchemaDefinition;
 export type ScenarioCriterionResult = z.infer<typeof scenarioCriterionResultSchema>;
 
 /**

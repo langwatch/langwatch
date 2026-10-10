@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Spacer } from "@langwatch/design-system/primitives";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
@@ -48,14 +48,22 @@ export default function UpgradesScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Upgrades</PageLayout.Heading>
-        <Spacer />
-        <PageLayout.HeaderButton onClick={() => router.push("/ops/upgrades/preview")}>
-          Preview upgrade
-        </PageLayout.HeaderButton>
+      <PageLayout.Header
+        flexWrap="wrap"
+        actions={
+          <PageLayout.HeaderButton onClick={() => router.push("/ops/upgrades/preview")}>
+            Preview upgrade
+          </PageLayout.HeaderButton>
+        }
+      >
+        <VStack align="start" gap={1} minWidth={0}>
+          <PageLayout.Heading>Upgrades</PageLayout.Heading>
+          <PageLayout.Subtitle>
+            Installation readiness, release progress, and tenant migrations.
+          </PageLayout.Subtitle>
+        </VStack>
       </PageLayout.Header>
-      <PageLayout.Container>
+      <PageLayout.Container maxWidth="full">
         <UpgradeReadState read={status} failedTitle="The upgrade status could not load">
           {(current) => (
             <UpgradesTabs

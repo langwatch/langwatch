@@ -220,7 +220,7 @@ describe("the repo is a single pnpm workspace", () => {
   describe("when the package names are compared", () => {
     /** @scenario The application and the SDK no longer share a package name */
     it("gives each deployable the name the npx installer filters by, and the SDK its own", () => {
-      const deployables = ["apps/api", "apps/worker", "apps/ui", "apps/tasks"].map(
+      const deployables = ["apps/backend", "apps/ui", "apps/tasks"].map(
         (dir) => readJson(`${dir}/package.json`).name,
       );
       const sdk = readJson("sdks/typescript/package.json").name;
@@ -437,17 +437,15 @@ describe("the repo is a single pnpm workspace", () => {
   });
 
   describe("when the applications are started from a fresh clone", () => {
-    const ensureBuilt = "dev/scripts/devscripts.sh ensure-built";
-    const ensureBuiltSource = "tools/devscripts/ensurebuilt.go";
+    const ensureBuilt = "pnpm run ensure:built";
 
     /** @scenario A fresh clone starts the applications without a manual build step */
     it("hooks the bundle build onto every application's dev script", () => {
       for (const app of ["apps/ui", "apps/api", "apps/worker"]) {
         const scripts = readJson(`${app}/package.json`).scripts as Record<string, string>;
         expect(scripts.dev).toBeDefined();
-        expect(scripts.predev).toContain(ensureBuilt);
+        expect(scripts.predev).toBe("pnpm -w run ensure:built");
       }
-      expect(existsSync(join(repoRoot, "dev/scripts/devscripts.sh"))).toBe(true);
     });
 
     /** @scenario A fresh clone starts the applications without a manual build step */
@@ -459,32 +457,34 @@ describe("the repo is a single pnpm workspace", () => {
       // generator chain made a build a thing you had to know to run.
       expect(scripts["start:prepare:files"]).not.toMatch(/--filter\s+langwatch\s+build/);
       expect(scripts["start:prepare:files"]).not.toMatch(/mcp-server\s+build/);
-      expect(scripts["ensure:built"]).toContain(ensureBuilt);
+      expect(scripts["ensure:built"]).toMatch(
+        /nx run-many -t build -p langwatch,@langwatch\/mcp-server,@langwatch\/ksuid,@langwatch\/mail/,
+      );
     });
 
     /** @scenario A fresh worktree prepares its databases without a manual bundle build */
     it("builds every dist bundle before the root database preparation, which production does not run", () => {
       const scripts = readJson("package.json").scripts as Record<string, string>;
-      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^bash ${ensureBuilt} && `));
+      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^${ensureBuilt} && `));
       const apiScripts = readJson("apps/api/package.json").scripts as Record<string, string>;
-      expect(apiScripts["start:prepare:db"]).not.toContain("ensure-built");
+      expect(apiScripts["start:prepare:db"]).not.toContain("ensure:built");
     });
 
     /** @scenario A fresh worktree prepares its databases without a manual bundle build */
     it("builds the bundles before every root entry to the migration tasks, never in the tasks app", () => {
       const scripts = readJson("package.json").scripts as Record<string, string>;
       for (const name of ["task", "prisma:migrate", "clickhouse:migrate"]) {
-        expect(scripts[name]).toMatch(new RegExp(`^bash ${ensureBuilt} && `));
+        expect(scripts[name]).toMatch(new RegExp(`^${ensureBuilt} && `));
       }
       const tasksScripts = readJson("apps/tasks/package.json").scripts as Record<string, string>;
-      expect(JSON.stringify(tasksScripts)).not.toContain("ensure-built");
+      expect(JSON.stringify(tasksScripts)).not.toContain("ensure:built");
     });
 
     /** @scenario "The root migrate scripts are aliases of the upgrade command" */
     it("makes the root migrate scripts aliases of the upgrade command whose tasks no workflow runs", () => {
       const scripts = readJson("package.json").scripts as Record<string, string>;
       for (const name of ["prisma:migrate", "clickhouse:migrate"]) {
-        expect(scripts[name]).toMatch(new RegExp(`^bash ${ensureBuilt} && .*task upgrade$`));
+        expect(scripts[name]).toMatch(new RegExp(`^${ensureBuilt} && .*task upgrade$`));
         expect(scripts[name]).not.toMatch(/prisma-migrate|clickhouse-migrate/);
       }
       const workflows = join(repoRoot, ".github/workflows");
@@ -496,15 +496,24 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario A stale SDK build is rebuilt before the browser application starts */
     it("decides by comparing the bundle against the source it was built from", () => {
-      const source = readFileSync(join(repoRoot, ensureBuiltSource), "utf8");
+      const nx = z
+        .object({
+          targetDefaults: z.object({
+            build: z.array(
+              z.object({
+                filter: z.object({ projects: z.array(z.string()).optional() }).optional(),
+                outputs: z.array(z.string()).optional(),
+              }),
+            ),
+          }),
+        })
+        .parse(readJson("nx.json"));
 
-      // Named entry points, not directories: a half-written `dist` passes a
-      // directory check and fails minutes later inside a dependency scan.
-      expect(source).toContain("sdks/typescript");
-      expect(source).toContain("dist/index.mjs");
-      expect(source).toContain("mcp/typescript");
-      expect(source).toContain("dist/index.js");
-      expect(source).toMatch(/ModTime/);
+      // Nx's cache compares the build's inputs against the outputs it last produced.
+      const sdk = nx.targetDefaults.build.find((entry) =>
+        entry.filter?.projects?.includes("langwatch"),
+      );
+      expect(sdk?.outputs).toContain("{projectRoot}/dist");
     });
   });
 });

@@ -1,5 +1,6 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -23,7 +24,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 import { Archive, MoreVertical, Pencil, Plus, Shield } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
@@ -74,13 +75,13 @@ function GuardrailsPage() {
   );
   const utils = api.useUtils();
   const guardrailEvaluators = useGuardrailEvaluators({ projectId });
-  const evaluatorById = useMemo(() => {
+  const evaluatorById = (() => {
     const map = new Map<string, GuardrailEvaluator>();
     for (const e of guardrailEvaluators) {
       map.set(e.id, e);
     }
     return map;
-  }, [guardrailEvaluators]);
+  })();
 
   const archiveMutation = api.gatewayGuardrails.archive.useMutation({
     onSuccess: async () => {
@@ -232,8 +233,13 @@ function GuardrailsTable({
   onArchive: (row: GuardrailRow) => void;
 }) {
   return (
-    <Card.Root width="full" overflowX="auto">
-      <Table.Root size="md" variant="line" width="full">
+    <Card.Root variant="showcase" width="full" overflowX="auto">
+      <ListTable
+        containerProps={{ overflowX: "auto", maxWidth: "full" }}
+        size="md"
+        variant="line"
+        width="full"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -317,7 +323,7 @@ function GuardrailsTable({
             );
           })}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Card.Root>
   );
 }
@@ -540,21 +546,17 @@ function useGuardrailEvaluators({ projectId }: { projectId: string }) {
     { projectId },
     { enabled: !!projectId, refetchOnWindowFocus: false },
   );
-  return useMemo(
-    () =>
-      (monitorsQuery.data ?? [])
-        .filter(
-          (m) =>
-            m.enabled &&
-            m.executionMode === "AS_GUARDRAIL" &&
-            typeof m.evaluatorId === "string" &&
-            m.evaluatorId.length > 0,
-        )
-        .map((m) => ({
-          id: m.evaluatorId as string,
-          name: m.name as string,
-          slug: m.slug as string,
-        })),
-    [monitorsQuery.data],
-  );
+  return (monitorsQuery.data ?? [])
+    .filter(
+      (m) =>
+        m.enabled &&
+        m.executionMode === "AS_GUARDRAIL" &&
+        typeof m.evaluatorId === "string" &&
+        m.evaluatorId.length > 0,
+    )
+    .map((m) => ({
+      id: m.evaluatorId as string,
+      name: m.name as string,
+      slug: m.slug as string,
+    }));
 }

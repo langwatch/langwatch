@@ -12,8 +12,8 @@ API keys: creating and updating them, resolving a presented token to its caller,
 | Subjects       | api-key                                                                                              |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)          |
 | Api token      | `ApiKeyApi` = `moduleApi<ApiKeyApi>()("api-key")`, `contract/src/api-key.api.ts:280` (50 operations) |
-| Other token    | `ApiKeyOrganizationsDoorApi`, `process/src/transport/api-key-organizations.rest.ts:24`               |
-| Other token    | `ApiKeyProjectsDoorApi`, `process/src/transport/api-key-projects.rest.ts:58`                         |
+| Other token    | `ApiKeyOrganizationsDoorApi`, `process/src/transport/api-key-organizations.rest.ts:20`               |
+| Other token    | `ApiKeyProjectsDoorApi`, `process/src/transport/api-key-projects.rest.ts:64`                         |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                           |
 
 ## What api-key owns
@@ -35,6 +35,6 @@ Anything else api-key needs belongs to another module and is reached through its
 
 ## Who depends on api-key
 
-[auth](../auth/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [scenario](../scenario/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
+[auth](../auth/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [sample-agents](../sample-agents/README.md), [scenario](../scenario/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

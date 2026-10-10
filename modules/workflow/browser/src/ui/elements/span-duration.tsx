@@ -2,15 +2,15 @@ import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, toDate } from "@langwatch/time";
-import { Clock } from "react-feather";
+import { Clock } from "lucide-react";
 
 const RED_AFTER_MS = 30 * 1000;
 const YELLOW_AFTER_MS = 10 * 1000;
 
 function durationColor(duration: number): string {
-  if (duration > RED_AFTER_MS) return "red";
-  if (duration > YELLOW_AFTER_MS) return "yellow.600";
-  return "green";
+  if (duration > RED_AFTER_MS) return "red.fg";
+  if (duration > YELLOW_AFTER_MS) return "yellow.fg";
+  return "green.fg";
 }
 
 /** How long an execution ran, coloured as the trace explorer colours a span. */
@@ -36,7 +36,7 @@ export const SpanDuration = ({
         </>
       }
     >
-      <HStack gap={"6px"} color={span.error ? "red" : durationColor(duration)}>
+      <HStack gap={"6px"} color={span.error ? "red.fg" : durationColor(duration)}>
         <Clock width={12} />
         <Text>{formatMilliseconds(duration)}</Text>
       </HStack>

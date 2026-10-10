@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** The saved-workbench-chart REST family's wire shapes. Spec: lwql-saved-charts. */
 import { z } from "zod";
 
@@ -30,21 +31,31 @@ const chartDefinitionInputSchema = z.unknown().superRefine((definition, ctx) => 
   });
 });
 
-export const placeSavedWorkbenchChartSchema = z.object({
+const placeSavedWorkbenchChartSchemaDefinition = z.object({
   dashboardId: z.string().min(1),
   gridColumn: z.number().int().optional(),
   gridRow: z.number().int().optional(),
   colSpan: z.number().int().optional(),
   rowSpan: z.number().int().optional(),
 });
+export interface PlaceSavedWorkbenchChartSchema extends Named<
+  typeof placeSavedWorkbenchChartSchemaDefinition
+> {}
+export const placeSavedWorkbenchChartSchema: PlaceSavedWorkbenchChartSchema =
+  placeSavedWorkbenchChartSchemaDefinition;
 
 /** Optional on the wire as main published it; the service refuses a missing definition. */
-export const createSavedWorkbenchChartSchema = z.object({
+const createSavedWorkbenchChartSchemaDefinition = z.object({
   name: chartNameInputSchema,
   definition: chartDefinitionInputSchema.optional(),
 });
+export interface CreateSavedWorkbenchChartSchema extends Named<
+  typeof createSavedWorkbenchChartSchemaDefinition
+> {}
+export const createSavedWorkbenchChartSchema: CreateSavedWorkbenchChartSchema =
+  createSavedWorkbenchChartSchemaDefinition;
 
-export const updateSavedWorkbenchChartSchema = z
+const updateSavedWorkbenchChartSchemaDefinition = z
   .object({
     name: chartNameInputSchema.optional(),
     definition: chartDefinitionInputSchema.optional(),
@@ -54,6 +65,11 @@ export const updateSavedWorkbenchChartSchema = z
     "Provide a name, a definition, or both.",
   )
   .meta({ minProperties: 1 });
+export interface UpdateSavedWorkbenchChartSchema extends Named<
+  typeof updateSavedWorkbenchChartSchemaDefinition
+> {}
+export const updateSavedWorkbenchChartSchema: UpdateSavedWorkbenchChartSchema =
+  updateSavedWorkbenchChartSchemaDefinition;
 
 const chartDefinitionResourceSchema = z.object({
   version: z.number(),
@@ -62,7 +78,7 @@ const chartDefinitionResourceSchema = z.object({
   vegaLiteSpec: z.record(z.string(), z.any()).optional(),
 });
 
-export const savedWorkbenchChartResourceSchema = z.object({
+const savedWorkbenchChartResourceSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   definition: chartDefinitionResourceSchema,
@@ -75,16 +91,36 @@ export const savedWorkbenchChartResourceSchema = z.object({
   colSpan: z.number().int(),
   rowSpan: z.number().int(),
 });
+export interface SavedWorkbenchChartResourceSchema extends Named<
+  typeof savedWorkbenchChartResourceSchemaDefinition
+> {}
+export const savedWorkbenchChartResourceSchema: SavedWorkbenchChartResourceSchema =
+  savedWorkbenchChartResourceSchemaDefinition;
 
-export const savedWorkbenchChartListSchema = z.object({
+const savedWorkbenchChartListSchemaDefinition = z.object({
   data: z.array(savedWorkbenchChartResourceSchema),
 });
+export interface SavedWorkbenchChartListSchema extends Named<
+  typeof savedWorkbenchChartListSchemaDefinition
+> {}
+export const savedWorkbenchChartListSchema: SavedWorkbenchChartListSchema =
+  savedWorkbenchChartListSchemaDefinition;
 
-export const savedWorkbenchChartProjectParamsSchema = z.object({
+const savedWorkbenchChartProjectParamsSchemaDefinition = z.object({
   projectId: z.string().min(1),
 });
+export interface SavedWorkbenchChartProjectParamsSchema extends Named<
+  typeof savedWorkbenchChartProjectParamsSchemaDefinition
+> {}
+export const savedWorkbenchChartProjectParamsSchema: SavedWorkbenchChartProjectParamsSchema =
+  savedWorkbenchChartProjectParamsSchemaDefinition;
 
-export const savedWorkbenchChartParamsSchema = z.object({
+const savedWorkbenchChartParamsSchemaDefinition = z.object({
   ...savedWorkbenchChartProjectParamsSchema.shape,
   chartId: z.string().min(1),
 });
+export interface SavedWorkbenchChartParamsSchema extends Named<
+  typeof savedWorkbenchChartParamsSchemaDefinition
+> {}
+export const savedWorkbenchChartParamsSchema: SavedWorkbenchChartParamsSchema =
+  savedWorkbenchChartParamsSchemaDefinition;

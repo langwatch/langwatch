@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { LatencyWindowPercentiles, LatencyWindows } from "@langwatch/ops-contract";
 
@@ -35,7 +36,7 @@ export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null
   if (!windows) return null;
 
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack
           paddingX={4}
@@ -56,7 +57,13 @@ export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null
             {windows.allTime ? ` · ${formatCount(windows.allTime.count)} completions all time` : ""}
           </Text>
         </HStack>
-        <Table.Root size="sm" variant="line">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          size="sm"
+          variant="line"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Window</Table.ColumnHeader>
@@ -77,7 +84,7 @@ export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Card.Body>
     </Card.Root>
   );

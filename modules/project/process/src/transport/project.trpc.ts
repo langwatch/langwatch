@@ -141,14 +141,7 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
     .withPermission("project:update")
     .handle(async ({ app, input, actor }) => {
       await traceSharingStanding({ app, input, actor });
-      if (input.traceSharingEnabled !== undefined) {
-        await app.projects().setTraceSharing({
-          projectId: input.projectId,
-          enabled: input.traceSharingEnabled,
-          revokeExistingLinks: input.revokeExistingLinks ?? true,
-          by: { id: actor.id },
-        });
-      }
+      await applyTraceSharing({ app, input, actor });
 
       const updatedProject = await app.projects().updateSettings(
         {
@@ -187,7 +180,8 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
 
     /** The service refuses anyone but an organisation admin (ADR-177 decision 5). */
     .procedure("updateAggregateRule")
-    .withPermission("organization:manage")
+    // As main: the input names the aggregate, so the organisation is read through its project.
+    .withPermission({ kind: "permission", permission: "organization:manage", via: "projectId" })
     .handle(async ({ app, input, actor }) => {
       const members = await app.updateAggregateRule({
         projectId: input.projectId,
@@ -266,4 +260,28 @@ async function traceSharingStanding({
   });
 
   if (!permitted) throw new TraceSharingDeniedError();
+}
+
+/** Applies the form's trace-sharing switch when it carries one; other fields do not touch it. */
+async function applyTraceSharing({
+  app,
+  input,
+  actor,
+}: {
+  app: ProjectBrowserApi;
+  input: Readonly<{
+    projectId: string;
+    traceSharingEnabled?: boolean | undefined;
+    revokeExistingLinks?: boolean | undefined;
+  }>;
+  actor: Readonly<{ id: string }>;
+}): Promise<void> {
+  if (input.traceSharingEnabled === undefined) return;
+
+  await app.projects().setTraceSharing({
+    projectId: input.projectId,
+    enabled: input.traceSharingEnabled,
+    revokeExistingLinks: input.revokeExistingLinks ?? true,
+    by: { id: actor.id },
+  });
 }

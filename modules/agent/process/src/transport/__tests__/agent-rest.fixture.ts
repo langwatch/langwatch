@@ -80,6 +80,7 @@ export async function buildAgentApps(
   // Every request authenticates as the same project and person; a route's
   // declared permission is granted unless `denyPermission` names it.
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission, request }): RestCaller => {

@@ -244,7 +244,7 @@ export class AggregateProjectIsReadOnlyError extends HandledError {
   }
 }
 
-/** Someone not an organisation admin asked to create an aggregate or edit its rule (ADR-177 decision 5). */
+/** A non-admin asked to create an aggregate or edit its rule (ADR-177 decision 5). */
 export class AggregateProjectAdminOnlyError extends HandledError {
   declare readonly code: "aggregate_project_admin_only";
 

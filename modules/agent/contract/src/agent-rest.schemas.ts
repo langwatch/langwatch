@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { connectedParameterDefinitionSchema } from "./config/connected.ts";
@@ -5,16 +6,20 @@ import { agentTypeSchema } from "./config/index.ts";
 import { CONNECTED_AGENT_NOT_SELECTABLE_REASONS } from "./connected-agent.selectable.ts";
 import { connectedAgentInstanceSchema } from "./connected-agent.view.ts";
 
-export const agentRestParamsSchema = z.object({
+const agentRestParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The agent id."),
 });
+export interface AgentRestParamsSchema extends Named<typeof agentRestParamsSchemaDefinition> {}
+export const agentRestParamsSchema: AgentRestParamsSchema = agentRestParamsSchemaDefinition;
 
-export const agentRestQuerySchema = z.object({
+const agentRestQuerySchemaDefinition = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(1000).optional().default(50),
 });
+export interface AgentRestQuerySchema extends Named<typeof agentRestQuerySchemaDefinition> {}
+export const agentRestQuerySchema: AgentRestQuerySchema = agentRestQuerySchemaDefinition;
 
-export const agentResponseSchema = z.object({
+const agentResponseSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: agentTypeSchema.describe(
@@ -79,8 +84,10 @@ export const agentResponseSchema = z.object({
   updatedAt: z.date(),
   platformUrl: z.string().url(),
 });
+export interface AgentResponseSchema extends Named<typeof agentResponseSchemaDefinition> {}
+export const agentResponseSchema: AgentResponseSchema = agentResponseSchemaDefinition;
 
-export const agentListResponseSchema = z.object({
+const agentListResponseSchemaDefinition = z.object({
   data: z.array(agentResponseSchema),
   pagination: z.object({
     page: z.number().int(),
@@ -89,10 +96,14 @@ export const agentListResponseSchema = z.object({
     totalPages: z.number().int(),
   }),
 });
+export interface AgentListResponseSchema extends Named<typeof agentListResponseSchemaDefinition> {}
+export const agentListResponseSchema: AgentListResponseSchema = agentListResponseSchemaDefinition;
 
-export const archiveResultSchema = z.object({
+const archiveResultSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: agentTypeSchema,
   archivedAt: z.date().nullable(),
 });
+export interface ArchiveResultSchema extends Named<typeof archiveResultSchemaDefinition> {}
+export const archiveResultSchema: ArchiveResultSchema = archiveResultSchemaDefinition;

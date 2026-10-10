@@ -1,8 +1,8 @@
-import { Alert } from "@langwatch/design-system/primitives";
 import type { Control, FieldValues } from "react-hook-form";
 import { useFormState } from "react-hook-form";
 
 import { FORM_SERVER_ERROR_KEY } from "../../model/apply-handled-error-to-form.ts";
+import { HandledErrorAlert } from "./handled-error-alert.tsx";
 
 export interface FormServerErrorProps<TFieldValues extends FieldValues> {
   form: { control: Control<TFieldValues> };
@@ -24,16 +24,5 @@ export function FormServerError<TFieldValues extends FieldValues>({
   ]?.message;
   if (!message) return null;
 
-  return (
-    // Chakra v3's `Alert.Root` is a plain div, so without this a rejected Save
-    // is announced to nobody: the submit button stays put, the page doesn't
-    // move, and a screen-reader user gets silence. `<HandledErrorAlert>` sets
-    // the same role for the same reason.
-    <Alert.Root role="alert" status="error" size="sm">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>{message}</Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
-  );
+  return <HandledErrorAlert title="Check your details" description={message} />;
 }

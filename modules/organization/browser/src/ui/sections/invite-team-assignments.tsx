@@ -1,5 +1,5 @@
 import {
-  Box,
+  Alert,
   Button,
   Card,
   createListCollection,
@@ -102,18 +102,12 @@ function DeveloperNoTeamNotice() {
  */
 function LiteMemberNeedsTeamWarning() {
   return (
-    <Box
-      paddingX={4}
-      paddingY={3}
-      backgroundColor="orange.subtle"
-      borderRadius="xl"
-      width="100%"
-      data-testid="lite-member-needs-team-warning"
-    >
-      <Text fontSize="sm" color="fg">
-        {SEAT_TYPE_COPY.liteMemberNeedsTeamWarning}
-      </Text>
-    </Box>
+    <Alert.Root status="warning" width="100%" data-testid="lite-member-needs-team-warning">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>{SEAT_TYPE_COPY.liteMemberNeedsTeamWarning}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every served `ingestionSources.*` procedure, declared once, at main's wire names. */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { governanceIngestionSourceTypeSchema } from "./ingestion-source.commands.ts";
@@ -14,7 +14,7 @@ import { ottlValidationResultSchema } from "./ottl.ts";
 const organizationScope = z.object({ organizationId: z.string() });
 const sourceInOrganization = z.object({ ...organizationScope.shape, id: z.string() });
 
-export const ingestionSourceCreateInputSchema = z.object({
+const ingestionSourceCreateInputSchemaDefinition = z.object({
   ...organizationScope.shape,
   teamId: z.string().nullable().optional(),
   sourceType: governanceIngestionSourceTypeSchema,
@@ -25,9 +25,14 @@ export const ingestionSourceCreateInputSchema = z.object({
   pullSchedule: z.string().min(1).max(64).nullable().optional(),
   traceProjectId: z.string().min(1).nullable().optional(),
 });
+export interface IngestionSourceCreateInputSchema extends Named<
+  typeof ingestionSourceCreateInputSchemaDefinition
+> {}
+export const ingestionSourceCreateInputSchema: IngestionSourceCreateInputSchema =
+  ingestionSourceCreateInputSchemaDefinition;
 export type IngestionSourceCreateInput = z.infer<typeof ingestionSourceCreateInputSchema>;
 
-export const ingestionSourceUpdateInputSchema = z.object({
+const ingestionSourceUpdateInputSchemaDefinition = z.object({
   ...sourceInOrganization.shape,
   name: z.string().min(1).max(128).optional(),
   description: z.string().nullable().optional(),
@@ -37,12 +42,22 @@ export const ingestionSourceUpdateInputSchema = z.object({
   pullSchedule: z.string().min(1).max(64).nullable().optional(),
   traceProjectId: z.string().min(1).nullable().optional(),
 });
+export interface IngestionSourceUpdateInputSchema extends Named<
+  typeof ingestionSourceUpdateInputSchemaDefinition
+> {}
+export const ingestionSourceUpdateInputSchema: IngestionSourceUpdateInputSchema =
+  ingestionSourceUpdateInputSchemaDefinition;
 export type IngestionSourceUpdateInput = z.infer<typeof ingestionSourceUpdateInputSchema>;
 
 /** A create answers the secret once; a pull source has none, so it is null. */
-export const createdIngestionSourceSchema = z
+const createdIngestionSourceSchemaDefinition = z
   .object({ source: ingestionSourceDtoSchema, ingestSecret: z.string().nullable() })
   .strict();
+export interface CreatedIngestionSourceSchema extends Named<
+  typeof createdIngestionSourceSchemaDefinition
+> {}
+export const createdIngestionSourceSchema: CreatedIngestionSourceSchema =
+  createdIngestionSourceSchemaDefinition;
 
 export const ingestionSourcesTrpc = defineTrpcContract("ingestionSources")
   .query("list")

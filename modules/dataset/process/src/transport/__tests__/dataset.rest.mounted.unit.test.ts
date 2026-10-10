@@ -87,6 +87,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
 
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     rateLimiter: { check: async () => ({ allowed: true }) },
     identity: {
       authenticate: () => {

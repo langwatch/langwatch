@@ -348,7 +348,7 @@ function EvaluatorSummaryCard({
                 })}
               />
               {isNameAlreadyInUse && (
-                <Text color="red.500" fontSize="13px">
+                <Text color="red.fg" fontSize="13px">
                   An evaluation with the same name already exists, please choose a different name to
                   have a different slug identifier as well
                 </Text>

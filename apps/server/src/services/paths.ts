@@ -9,8 +9,8 @@ export type ServiceName =
   | "nlpgo"
   | "langevals"
   | "aigateway"
+  | "go"
   | "langwatch"
-  | "workers"
   | "langyagent";
 
 export type ServicePaths = {

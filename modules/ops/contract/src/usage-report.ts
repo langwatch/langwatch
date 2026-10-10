@@ -4,6 +4,7 @@
  * lives in ops' contract and the enterprise receiver imports it.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The event name the daily report travels under. */
@@ -567,7 +568,7 @@ const byOwnName = <T extends z.ZodType>(entry: T) =>
   z.record(z.string().max(200), entry).nullable();
 
 /** The upgrade ledger's summary: our own release names and counts, never a step id or tenant. */
-export const usageReportUpgradeSchema = z.object({
+const usageReportUpgradeSchemaDefinition = z.object({
   state: z.string().max(50).describe("The installation state the upgrade reader names."),
   release: z.string().max(100).nullable().describe("The release the ledger records as installed."),
   floor: z.string().max(100).nullable().describe("The oldest release this install may run."),
@@ -577,13 +578,18 @@ export const usageReportUpgradeSchema = z.object({
     .nullable()
     .describe("Organizations held on an error by an in-place migration. Null where unread."),
 });
+export interface UsageReportUpgradeSchema extends Named<
+  typeof usageReportUpgradeSchemaDefinition
+> {}
+export const usageReportUpgradeSchema: UsageReportUpgradeSchema =
+  usageReportUpgradeSchemaDefinition;
 export type UsageReportUpgrade = z.infer<typeof usageReportUpgradeSchema>;
 
 /**
  * The install's ops health: counts the ops dashboard, the process explorer and the
  * migrations page already read. Optional category; a null section is "could not read".
  */
-export const usageReportOpsHealthSchema = z.object({
+const usageReportOpsHealthSchemaDefinition = z.object({
   snapshot_at: z
     .string()
     .max(40)
@@ -621,6 +627,11 @@ export const usageReportOpsHealthSchema = z.object({
       "Where the install's release upgrade stands, for the one fleet page. Null where the upgrade ledger could not be read.",
     ),
 });
+export interface UsageReportOpsHealthSchema extends Named<
+  typeof usageReportOpsHealthSchemaDefinition
+> {}
+export const usageReportOpsHealthSchema: UsageReportOpsHealthSchema =
+  usageReportOpsHealthSchemaDefinition;
 export type UsageReportOpsHealth = z.infer<typeof usageReportOpsHealthSchema>;
 
 /** A rung of the onboarding ladder: the day first reached, or null on one never reached. */
@@ -628,7 +639,7 @@ const ladderDate = z.string().max(40).nullable().optional();
 
 // Every stat field is optional and an unknown one is stripped, not refused: a
 // sender at any version, older or newer than this receiver, has to land.
-export const usageReportBodySchema = z.object({
+const usageReportBodySchemaDefinition = z.object({
   event: z.literal(USAGE_REPORT_EVENT),
   // The one field that stays required. Without it there is no install to
   // attribute the report to, and recording it against nothing is worse than
@@ -756,6 +767,8 @@ export const usageReportBodySchema = z.object({
   // How the install's own machinery is doing: counts under our own names.
   ops_health: usageReportOpsHealthSchema.optional(),
 });
+export interface UsageReportBodySchema extends Named<typeof usageReportBodySchemaDefinition> {}
+export const usageReportBodySchema: UsageReportBodySchema = usageReportBodySchemaDefinition;
 
 export type UsageReportBody = z.infer<typeof usageReportBodySchema>;
 

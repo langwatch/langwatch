@@ -58,7 +58,9 @@ function describeHostAddress(url: string): HostAddress {
 }
 
 /** Whether a URL is admitted, or the sentence that says why not (without the caller's label). */
-type WebhookUrlVerdict = { admitted: true } | { admitted: false; reason: string; blocked?: "metadata_address" | "private_address" };
+type WebhookUrlVerdict =
+  | { admitted: true }
+  | { admitted: false; reason: string; blocked?: "metadata_address" | "private_address" };
 
 /**
  * Judges what the webhook channels refuse pre-connection: a failed shape

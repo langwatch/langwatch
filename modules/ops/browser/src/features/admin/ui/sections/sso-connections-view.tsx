@@ -7,7 +7,7 @@ import {
   Field,
   HStack,
   Input,
-  SimpleGrid,
+  Skeleton,
   Table,
   Text,
   Textarea,
@@ -15,7 +15,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import type { AdminSsoConnection, SsoSetupMigration } from "@langwatch/enterprise-sso-contract";
 import { MoreVertical } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -24,6 +24,14 @@ import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
+import {
+  ConnectionDomains,
+  ConnectionHeader,
+  ConnectionSummary,
+  METHOD_LABEL,
+  STATE_TONE,
+} from "./sso-connection-details.tsx";
+import { ConnectionHistory } from "./sso-connection-history.tsx";
 const PAGE_SIZE = 25;
 const COLUMN_COUNT = 6;
 
@@ -82,33 +90,7 @@ export default function SsoConnectionsView() {
   );
 }
 
-/** How far through the lifecycle a connection is, at a glance. Colour tracks
- *  whether it is serving traffic, not how far along it is: an operator
- *  scanning this list is looking for what is live and what is stopped. */
-const STATE_TONE: Record<string, string> = {
-  ACTIVE: "green",
-  SUSPENDED: "orange",
-  TEARDOWN_PENDING: "orange",
-  TORN_DOWN: "red",
-  REJECTED: "red",
-  DISCARDED: "gray",
-};
-
-const METHOD_LABEL: Record<string, string> = {
-  "dns-txt": "Published record",
-  "license-token": "License",
-  "operator-attested": "Attested by LangWatch",
-  "legacy-configuration": "Earlier configuration",
-};
-
 type ConnectionRow = AdminSsoConnection;
-
-/** The three answers in the words the customer's own screen uses. */
-const ARRIVAL_LABELS = {
-  admit: "Joins the organization",
-  request: "Asks to join, and waits for an administrator",
-  refuse: "Is turned away",
-} as const;
 
 function ConnectionsTable({
   connections,
@@ -582,6 +564,7 @@ function ConnectionDrawer({
     { enabled: !!connectionId, retry: false },
   );
   const held = connection.data;
+  const contentRef = useRef<HTMLDivElement>(null);
 
   return (
     <Drawer.Root
@@ -589,17 +572,32 @@ function ConnectionDrawer({
       onOpenChange={({ open }) => {
         if (!open) onClose();
       }}
-      size="xl"
+      size="2xl"
+      initialFocusEl={() => contentRef.current}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{held?.organizationName ?? "Single sign-on connection"}</Drawer.Title>
+      <Drawer.Content ref={contentRef} tabIndex={-1} width="calc(100vw - 16px)">
+        <Drawer.Header
+          borderBottomWidth="1px"
+          borderColor="border.muted"
+          padding={6}
+          paddingEnd={14}
+        >
+          {held ? (
+            <ConnectionHeader connection={held} />
+          ) : (
+            <Drawer.Title>SSO connection</Drawer.Title>
+          )}
         </Drawer.Header>
         <Drawer.CloseTrigger />
-        <Drawer.Body>
+        <Drawer.Body padding={6}>
+          {connection.isLoading && <Skeleton height="32" />}
+          {connection.error && <Text color="fg.error">This connection could not be loaded.</Text>}
+          {!connection.isLoading && !connection.error && !held && (
+            <Text color="fg.muted">This connection could not be found.</Text>
+          )}
           {held && (
             <VStack align="stretch" gap={6}>
-              <ConnectionFacts connection={held} />
+              <ConnectionSummary connection={held} />
               <ConnectionDomains connection={held} />
               {held.source === "legacy-grandfathered" && (
                 <MigrationInventory migration={migration.data ?? null} />
@@ -648,108 +646,6 @@ function MigrationInventory({ migration }: { migration: SsoSetupMigration | null
   );
 }
 
-/** What happened to this connection, newest first, in the words the organization's
- *  own page uses. */
-function ConnectionHistory({ connectionId }: { connectionId: string }) {
-  const history = api.ssoConnections.getHistory.useQuery({ connectionId });
-  const rows = history.data ?? [];
-
-  return (
-    <Box>
-      <Text fontWeight="semibold" marginBottom={2}>
-        History
-      </Text>
-      {history.isLoading && (
-        <Text color="fg.muted" fontSize="sm">
-          Loading…
-        </Text>
-      )}
-      {!history.isLoading && rows.length === 0 && (
-        <Text color="fg.muted" fontSize="sm">
-          Nothing has happened to this connection yet.
-        </Text>
-      )}
-      <VStack align="stretch" gap={1}>
-        {rows.map((entry) => (
-          <HStack key={entry.eventId} gap={3} fontSize="sm">
-            <Text color="fg.muted" minWidth="18ch" flexShrink={0}>
-              {formatDateTime(entry.occurredAtMs)}
-            </Text>
-            <Text>{entry.summary}</Text>
-            {entry.carriedOver && <Badge colorPalette="gray">carried over</Badge>}
-          </HStack>
-        ))}
-      </VStack>
-    </Box>
-  );
-}
-
-function ConnectionFacts({ connection }: { connection: ConnectionRow }) {
-  return (
-    <SimpleGrid columns={2} gap={3}>
-      <Fact label="State">{connection.state.replace(/_/g, " ").toLowerCase()}</Fact>
-      <Fact label="Protocol">{connection.type.toUpperCase()}</Fact>
-      <Fact label="Identity provider">{connection.providerId}</Fact>
-      <Fact label="Issuer">{connection.issuer ?? "not recorded"}</Fact>
-      <Fact label="Set up">
-        {connection.source === "legacy-grandfathered"
-          ? "Carried over from an earlier configuration"
-          : "In the back office"}
-      </Fact>
-      <Fact label="Somebody signing in who is not a member yet">
-        {ARRIVAL_LABELS[connection.arrivalPolicy]}
-      </Fact>
-    </SimpleGrid>
-  );
-}
-
-/**
- * Each domain and what proved it, naming the operator and the date for an
- * attested one — this is where a dispute about a domain is answered, and the
- * reason an attestation is allowed to stand indefinitely.
- */
-function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
-  return (
-    <Box>
-      <Text fontWeight="semibold" marginBottom={2}>
-        Domains
-      </Text>
-      {connection.domainVerifications.length === 0 && (
-        <Text color="fg.muted" fontSize="sm">
-          No domain has been proved yet.
-        </Text>
-      )}
-      <VStack align="stretch" gap={2}>
-        {connection.domainVerifications.map((entry) => (
-          <HStack key={entry.domain} gap={3}>
-            <Text>{entry.domain}</Text>
-            <Badge colorPalette="gray">{METHOD_LABEL[entry.method] ?? entry.method}</Badge>
-            <Text fontSize="sm" color="fg.muted">
-              {formatDateTime(entry.verifiedAtMs)}
-              {entry.actorId ? ` by ${entry.actorId}` : ""}
-            </Text>
-          </HStack>
-        ))}
-      </VStack>
-      {connection.claimedDomains.length > 0 && (
-        <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          Claimed, not yet proved: {connection.claimedDomains.join(", ")}
-        </Text>
-      )}
-      {connection.approvedDomains.length > 0 && (
-        <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          Approved, not yet proved: {connection.approvedDomains.join(", ")}
-        </Text>
-      )}
-      {connection.rejection && (
-        <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          {connection.rejection.domain} was turned down: {connection.rejection.note}
-        </Text>
-      )}
-    </Box>
-  );
-}
-
 /**
  * The last step, and the only one that still needs the customer: somebody
  * completing a test sign-in. The account that did it is named on the
@@ -788,17 +684,6 @@ function ActivationPanel({ connection }: { connection: ConnectionRow }) {
           Turn on
         </Button>
       </HStack>
-    </Box>
-  );
-}
-
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box>
-      <Text fontSize="xs" color="fg.muted">
-        {label}
-      </Text>
-      <Text fontSize="sm">{children}</Text>
     </Box>
   );
 }

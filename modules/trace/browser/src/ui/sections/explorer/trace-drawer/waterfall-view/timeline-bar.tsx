@@ -55,8 +55,12 @@ export const TimelineBar = memo(function TimelineBar({
   const barBorderWidth = isError ? "1.5px" : selectedBorderWidth;
   const selectedBorderColor = isSelected ? "border.emphasized" : undefined;
   const barBorderColor = isError ? "red.solid" : selectedBorderColor;
-  const hoverShadow = isHovered ? "0 1px 2px 0 rgba(0,0,0,0.06)" : undefined;
-  const barShadow = isSelected ? "0 1px 3px 0 rgba(0,0,0,0.1)" : hoverShadow;
+  const hoverShadow = isHovered
+    ? "0 1px 2px 0 color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent)"
+    : undefined;
+  const barShadow = isSelected
+    ? "0 1px 3px 0 color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
+    : hoverShadow;
   const isZeroDuration = duration === 0;
 
   const leftPct = rootDuration > 0 ? ((span.startTimeMs - rootStart) / rootDuration) * 100 : 0;
@@ -159,8 +163,8 @@ export const GroupTimelineBar = memo(function GroupTimelineBar({
               -45deg,
               transparent,
               transparent 3px,
-              rgba(255,255,255,0.15) 3px,
-              rgba(255,255,255,0.15) 6px
+              color-mix(in srgb, var(--chakra-colors-fg-inverted) 15%, transparent) 3px,
+              color-mix(in srgb, var(--chakra-colors-fg-inverted) 15%, transparent) 6px
             )`,
           }}
         />

@@ -458,6 +458,7 @@ export function createSuitesAliasRest(): Readonly<{
       .post("/", "postApiSuites")
       .withInput(createSuiteInputSchema)
       .withPermission("scenarios:create")
+      .withAudit("suites.create")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withStatus(201)
       .withDocs({ description: "Create a new suite (run plan)." })
@@ -477,6 +478,7 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withInput(updateSuiteInputSchema)
       .withPermission("scenarios:update")
+      .withAudit("suites.update")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withDocs({ description: "Update a suite (run plan).", responses: notFound })
       .withMiddlewareContext(projectRequestContext)
@@ -495,6 +497,7 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withInput(duplicateSuiteBodySchema)
       .withPermission("scenarios:create")
+      .withAudit("suites.duplicate")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withStatus(201)
       .withDocs({ description: "Duplicate a suite (run plan).", responses: notFound })
@@ -515,6 +518,7 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withInput(runSuiteInputSchema)
       .withPermission("scenarios:create")
+      .withoutAudit("run, not a change")
       .withOutput(suiteRunResultSchema)
       .withDocs({
         description:
@@ -538,6 +542,7 @@ export function createSuitesAliasRest(): Readonly<{
       .delete("/:id", "deleteApiSuitesById")
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:manage")
+      .withAudit("suites.archive")
       .withOutput(archivedSuiteSchema)
       .withDocs({
         description:

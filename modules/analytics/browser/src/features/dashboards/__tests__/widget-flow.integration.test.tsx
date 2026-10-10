@@ -12,7 +12,7 @@ import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AnalyticsHostProvider,
@@ -27,6 +27,12 @@ import { PICKER_QUESTIONS, pickerWidgets } from "../catalogue/index.ts";
 import { WIDGET_AGENT_DOCS_URL, widgetCreatePrompt } from "../model/widget-api.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+
+// jsdom loads no stylesheet, so the theme colours a chart frame is handed have no value to read.
+vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRawColorValue: () => "#123456",
+}));
 
 type Input = Record<string, unknown>;
 type Widget = {

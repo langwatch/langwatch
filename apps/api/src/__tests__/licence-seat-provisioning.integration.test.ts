@@ -1,6 +1,6 @@
 /**
- * Seats at SCIM provisioning (ruling of 2026-10-09), on the api booted wholly live over Postgres, Redis and
- * ClickHouse: the plan resolves from the organization's stored licence, as in production.
+ * Seats at SCIM provisioning (ruling of 2026-10-09), on the api booted wholly live over Postgres,
+ * Redis and ClickHouse: the plan resolves from the organization's stored licence, as in production.
  * @vitest-environment node
  * @see specs/licensing/seat-limit-at-provisioning.feature
  */

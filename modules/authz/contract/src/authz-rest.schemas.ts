@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The wire shapes of the `role-bindings` management REST family. A write's
  * answer is the row the list reports; only the create adds the
@@ -7,14 +8,19 @@ import { z } from "zod";
 
 import { grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
 
-export const roleBindingPrincipalSchema = z.object({
+const roleBindingPrincipalSchemaDefinition = z.object({
   type: z.enum(["user", "group", "apiKey"]),
   id: z.string(),
   name: z.string().nullable(),
 });
+export interface RoleBindingPrincipalSchema extends Named<
+  typeof roleBindingPrincipalSchemaDefinition
+> {}
+export const roleBindingPrincipalSchema: RoleBindingPrincipalSchema =
+  roleBindingPrincipalSchemaDefinition;
 export type RoleBindingPrincipal = z.infer<typeof roleBindingPrincipalSchema>;
 
-export const roleBindingRestSchema = z.object({
+const roleBindingRestSchemaDefinition = z.object({
   id: z.string(),
   principal: roleBindingPrincipalSchema,
   role: teamUserRoleSchema,
@@ -27,9 +33,11 @@ export const roleBindingRestSchema = z.object({
   /** When this binding stops granting, or null when it never does; listed past its date too. */
   expiresAt: z.date().nullable(),
 });
+export interface RoleBindingRestSchema extends Named<typeof roleBindingRestSchemaDefinition> {}
+export const roleBindingRestSchema: RoleBindingRestSchema = roleBindingRestSchemaDefinition;
 export type RoleBindingRest = z.infer<typeof roleBindingRestSchema>;
 
-export const roleBindingRestListQuerySchema = z.object({
+const roleBindingRestListQuerySchemaDefinition = z.object({
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
@@ -38,15 +46,25 @@ export const roleBindingRestListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
+export interface RoleBindingRestListQuerySchema extends Named<
+  typeof roleBindingRestListQuerySchemaDefinition
+> {}
+export const roleBindingRestListQuerySchema: RoleBindingRestListQuerySchema =
+  roleBindingRestListQuerySchemaDefinition;
 export type RoleBindingRestListQuery = z.infer<typeof roleBindingRestListQuerySchema>;
 
-export const roleBindingRestListSchema = z.object({
+const roleBindingRestListSchemaDefinition = z.object({
   bindings: z.array(roleBindingRestSchema),
   totalCount: z.number(),
 });
+export interface RoleBindingRestListSchema extends Named<
+  typeof roleBindingRestListSchemaDefinition
+> {}
+export const roleBindingRestListSchema: RoleBindingRestListSchema =
+  roleBindingRestListSchemaDefinition;
 export type RoleBindingRestList = z.infer<typeof roleBindingRestListSchema>;
 
-export const roleBindingRestCreateSchema = z.object({
+const roleBindingRestCreateSchemaDefinition = z.object({
   /** Exactly one of userId, groupId or apiKeyId; the service enforces it. */
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
@@ -58,16 +76,36 @@ export const roleBindingRestCreateSchema = z.object({
   /** Optional ISO-8601 end date, strictly in the future (`grant_expiry_in_past`, 422 otherwise). */
   expiresAt: z.coerce.date().optional(),
 });
+export interface RoleBindingRestCreateSchema extends Named<
+  typeof roleBindingRestCreateSchemaDefinition
+> {}
+export const roleBindingRestCreateSchema: RoleBindingRestCreateSchema =
+  roleBindingRestCreateSchemaDefinition;
 export type RoleBindingRestCreate = z.infer<typeof roleBindingRestCreateSchema>;
 
-export const roleBindingRestUpdateSchema = z.object({
+const roleBindingRestUpdateSchemaDefinition = z.object({
   role: teamUserRoleSchema,
   customRoleId: z.string().min(1).optional(),
 });
+export interface RoleBindingRestUpdateSchema extends Named<
+  typeof roleBindingRestUpdateSchemaDefinition
+> {}
+export const roleBindingRestUpdateSchema: RoleBindingRestUpdateSchema =
+  roleBindingRestUpdateSchemaDefinition;
 export type RoleBindingRestUpdate = z.infer<typeof roleBindingRestUpdateSchema>;
 
-export const roleBindingRestParamsSchema = z.object({ id: z.string().min(1) });
+const roleBindingRestParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface RoleBindingRestParamsSchema extends Named<
+  typeof roleBindingRestParamsSchemaDefinition
+> {}
+export const roleBindingRestParamsSchema: RoleBindingRestParamsSchema =
+  roleBindingRestParamsSchemaDefinition;
 export type RoleBindingRestParams = z.infer<typeof roleBindingRestParamsSchema>;
 
-export const roleBindingRestDeletedSchema = z.object({ success: z.literal(true) });
+const roleBindingRestDeletedSchemaDefinition = z.object({ success: z.literal(true) });
+export interface RoleBindingRestDeletedSchema extends Named<
+  typeof roleBindingRestDeletedSchemaDefinition
+> {}
+export const roleBindingRestDeletedSchema: RoleBindingRestDeletedSchema =
+  roleBindingRestDeletedSchemaDefinition;
 export type RoleBindingRestDeleted = z.infer<typeof roleBindingRestDeletedSchema>;

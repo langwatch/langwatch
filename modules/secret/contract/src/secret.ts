@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const SECRET_FEATURE_ID = "secret" as const;
@@ -37,10 +38,12 @@ export const secretValueSchema = z
   .min(1, "Secret value is required")
   .max(MAX_SECRET_VALUE_LENGTH, "Secret value is too long");
 
-export const secretActorSchema = z.object({ name: z.string().nullable() }).strict();
+const secretActorSchemaDefinition = z.object({ name: z.string().nullable() }).strict();
+export interface SecretActorSchema extends Named<typeof secretActorSchemaDefinition> {}
+export const secretActorSchema: SecretActorSchema = secretActorSchemaDefinition;
 
 /** Safe metadata. The encrypted value is deliberately absent. */
-export const secretSchema = z
+const secretSchemaDefinition = z
   .object({
     id: secretIdSchema,
     projectId: secretProjectIdSchema,
@@ -51,15 +54,24 @@ export const secretSchema = z
     updatedBy: secretActorSchema,
   })
   .strict();
+export interface SecretSchema extends Named<typeof secretSchemaDefinition> {}
+export const secretSchema: SecretSchema = secretSchemaDefinition;
 export type Secret = z.infer<typeof secretSchema>;
 
-export const listSecretsInputSchema = z.object({ projectId: secretProjectIdSchema }).strict();
+const listSecretsInputSchemaDefinition = z.object({ projectId: secretProjectIdSchema }).strict();
+export interface ListSecretsInputSchema extends Named<typeof listSecretsInputSchemaDefinition> {}
+export const listSecretsInputSchema: ListSecretsInputSchema = listSecretsInputSchemaDefinition;
 export type ListSecretsInput = z.infer<typeof listSecretsInputSchema>;
 
 /** Reads only the secrets a config names; a reserved name answers as an unknown one. */
-export const getSecretValuesByNameInputSchema = z
+const getSecretValuesByNameInputSchemaDefinition = z
   .object({ projectId: secretProjectIdSchema, names: z.array(storedSecretNameSchema) })
   .strict();
+export interface GetSecretValuesByNameInputSchema extends Named<
+  typeof getSecretValuesByNameInputSchemaDefinition
+> {}
+export const getSecretValuesByNameInputSchema: GetSecretValuesByNameInputSchema =
+  getSecretValuesByNameInputSchemaDefinition;
 export type GetSecretValuesByNameInput = z.infer<typeof getSecretValuesByNameInputSchema>;
 
 /** A `{{ secrets.NAME }}` reference, spelled as the workflow engine resolves it. */
@@ -83,12 +95,14 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-export const getSecretInputSchema = z
+const getSecretInputSchemaDefinition = z
   .object({ projectId: secretProjectIdSchema, id: secretIdSchema })
   .strict();
+export interface GetSecretInputSchema extends Named<typeof getSecretInputSchemaDefinition> {}
+export const getSecretInputSchema: GetSecretInputSchema = getSecretInputSchemaDefinition;
 export type GetSecretInput = z.infer<typeof getSecretInputSchema>;
 
-export const createSecretInputSchema = z
+const createSecretInputSchemaDefinition = z
   .object({
     projectId: secretProjectIdSchema,
     name: secretNameSchema,
@@ -96,10 +110,12 @@ export const createSecretInputSchema = z
     actorId: secretActorIdSchema,
   })
   .strict();
+export interface CreateSecretInputSchema extends Named<typeof createSecretInputSchemaDefinition> {}
+export const createSecretInputSchema: CreateSecretInputSchema = createSecretInputSchemaDefinition;
 export type CreateSecretInput = z.infer<typeof createSecretInputSchema>;
 
 /** A product-owned credential under a reserved name, written by the feature that owns it. */
-export const createReservedSecretInputSchema = z
+const createReservedSecretInputSchemaDefinition = z
   .object({
     projectId: secretProjectIdSchema,
     name: storedSecretNameSchema,
@@ -107,9 +123,14 @@ export const createReservedSecretInputSchema = z
     actorId: secretActorIdSchema,
   })
   .strict();
+export interface CreateReservedSecretInputSchema extends Named<
+  typeof createReservedSecretInputSchemaDefinition
+> {}
+export const createReservedSecretInputSchema: CreateReservedSecretInputSchema =
+  createReservedSecretInputSchemaDefinition;
 export type CreateReservedSecretInput = z.infer<typeof createReservedSecretInputSchema>;
 
-export const updateSecretInputSchema = z
+const updateSecretInputSchemaDefinition = z
   .object({
     projectId: secretProjectIdSchema,
     id: secretIdSchema,
@@ -117,10 +138,17 @@ export const updateSecretInputSchema = z
     actorId: secretActorIdSchema,
   })
   .strict();
+export interface UpdateSecretInputSchema extends Named<typeof updateSecretInputSchemaDefinition> {}
+export const updateSecretInputSchema: UpdateSecretInputSchema = updateSecretInputSchemaDefinition;
 export type UpdateSecretInput = z.infer<typeof updateSecretInputSchema>;
 
 export type DeleteSecretInput = GetSecretInput;
 
 /** What the tRPC write procedures answer with: the write landed. */
-export const secretWriteAcknowledgedSchema = z.object({ success: z.boolean() }).strict();
+const secretWriteAcknowledgedSchemaDefinition = z.object({ success: z.boolean() }).strict();
+export interface SecretWriteAcknowledgedSchema extends Named<
+  typeof secretWriteAcknowledgedSchemaDefinition
+> {}
+export const secretWriteAcknowledgedSchema: SecretWriteAcknowledgedSchema =
+  secretWriteAcknowledgedSchemaDefinition;
 export type SecretWriteAcknowledged = z.infer<typeof secretWriteAcknowledgedSchema>;

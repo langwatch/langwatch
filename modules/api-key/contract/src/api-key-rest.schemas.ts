@@ -4,6 +4,7 @@
  * and the other what it answers, and the published document derives both.
  */
 import { principalRefSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { API_KEY_PERMISSION_MODES, refineRestrictedPermissions } from "./api-key.permissions.ts";
@@ -37,9 +38,11 @@ const permissionModeSchema = z
   );
 
 /** The key named in the path of every by-id route. */
-export const apiKeyRestParamsSchema = z.object({ id: z.string().min(1) });
+const apiKeyRestParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface ApiKeyRestParamsSchema extends Named<typeof apiKeyRestParamsSchemaDefinition> {}
+export const apiKeyRestParamsSchema: ApiKeyRestParamsSchema = apiKeyRestParamsSchemaDefinition;
 
-export const apiKeyRestCreateSchema = z
+const apiKeyRestCreateSchemaDefinition = z
   .object({
     keyType: z
       .enum(["personal", "service"])
@@ -85,18 +88,25 @@ export const apiKeyRestCreateSchema = z
     },
   )
   .superRefine(refineRestrictedPermissions);
+export interface ApiKeyRestCreateSchema extends Named<typeof apiKeyRestCreateSchemaDefinition> {}
+export const apiKeyRestCreateSchema: ApiKeyRestCreateSchema = apiKeyRestCreateSchemaDefinition;
 export type ApiKeyRestCreate = z.infer<typeof apiKeyRestCreateSchema>;
 
 /** A person's own ingestion key on their session's project; `principal` is who the session is. */
-export const createIngestionKeyInputSchema = z.object({
+const createIngestionKeyInputSchemaDefinition = z.object({
   key: apiKeyRestCreateSchema,
   principal: principalRefSchema.nullable(),
   organizationId: z.string(),
   projectId: z.string(),
 });
+export interface CreateIngestionKeyInputSchema extends Named<
+  typeof createIngestionKeyInputSchemaDefinition
+> {}
+export const createIngestionKeyInputSchema: CreateIngestionKeyInputSchema =
+  createIngestionKeyInputSchemaDefinition;
 export type CreateIngestionKeyInput = z.infer<typeof createIngestionKeyInputSchema>;
 
-export const apiKeyRestUpdateSchema = z
+const apiKeyRestUpdateSchemaDefinition = z
   .object({
     name: z.string().min(1).max(100).optional(),
     description: z.string().max(500).nullish(),
@@ -112,14 +122,21 @@ export const apiKeyRestUpdateSchema = z
       ),
   })
   .superRefine(refineRestrictedPermissions);
+export interface ApiKeyRestUpdateSchema extends Named<typeof apiKeyRestUpdateSchemaDefinition> {}
+export const apiKeyRestUpdateSchema: ApiKeyRestUpdateSchema = apiKeyRestUpdateSchemaDefinition;
 
 /** `GET /api/projects`, served here at project's path: the page asked for. */
-export const projectRestPaginationQuerySchema = z.object({
+const projectRestPaginationQuerySchemaDefinition = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(1000).optional().default(50),
 });
+export interface ProjectRestPaginationQuerySchema extends Named<
+  typeof projectRestPaginationQuerySchemaDefinition
+> {}
+export const projectRestPaginationQuerySchema: ProjectRestPaginationQuerySchema =
+  projectRestPaginationQuerySchemaDefinition;
 
-export const projectRestCreateSchema = z
+const projectRestCreateSchemaDefinition = z
   .object({
     name: z.string().min(1, "name is required").max(255).describe("Project name"),
     teamId: z.string().min(1).optional().describe("Id of an existing team to put the project in"),
@@ -141,9 +158,11 @@ export const projectRestCreateSchema = z
   .refine((data) => data.teamId || data.newTeamName, {
     message: "Either teamId or newTeamName must be provided",
   });
+export interface ProjectRestCreateSchema extends Named<typeof projectRestCreateSchemaDefinition> {}
+export const projectRestCreateSchema: ProjectRestCreateSchema = projectRestCreateSchemaDefinition;
 
 /** `POST /api/organizations`, served by api-key at organization's path (R3, R10). */
-export const organizationsProvisioningRestCreateSchema = z.object({
+const organizationsProvisioningRestCreateSchemaDefinition = z.object({
   name: z.string().trim().min(1).max(255),
   slug: z
     .string()
@@ -154,8 +173,13 @@ export const organizationsProvisioningRestCreateSchema = z.object({
     .optional(),
   adminApiKeyName: z.string().trim().min(1).max(100).optional(),
 });
+export interface OrganizationsProvisioningRestCreateSchema extends Named<
+  typeof organizationsProvisioningRestCreateSchemaDefinition
+> {}
+export const organizationsProvisioningRestCreateSchema: OrganizationsProvisioningRestCreateSchema =
+  organizationsProvisioningRestCreateSchemaDefinition;
 
-export const organizationsProvisioningRestCreatedSchema = z.object({
+const organizationsProvisioningRestCreatedSchemaDefinition = z.object({
   organization: z.object({
     id: z.string().min(1),
     name: z.string(),
@@ -168,6 +192,11 @@ export const organizationsProvisioningRestCreatedSchema = z.object({
   }),
   adminApiKey: z.object({ id: z.string().min(1), token: z.string().min(1) }),
 });
+export interface OrganizationsProvisioningRestCreatedSchema extends Named<
+  typeof organizationsProvisioningRestCreatedSchemaDefinition
+> {}
+export const organizationsProvisioningRestCreatedSchema: OrganizationsProvisioningRestCreatedSchema =
+  organizationsProvisioningRestCreatedSchemaDefinition;
 
 export type OrganizationProvisioningRequest = z.infer<
   typeof organizationsProvisioningRestCreateSchema

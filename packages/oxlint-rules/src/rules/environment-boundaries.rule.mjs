@@ -9,6 +9,8 @@ const GOVERNED_SOURCE = /^(?:(?:packages|modules|enterprise)\/.+|apps\/(?!server
 const PROCESS_BOOT = /^apps\/[^/]+\/src\/config\.[cm]?tsx?$/;
 const TEST_PROCESS_BOOT = /^packages\/vitest-config\/src\//;
 const SECRETS_PACKAGE = /^packages\/secrets\//;
+// The image's instrumentation preload runs before any config parse (OTEL-PRELOAD, round 57).
+const TELEMETRY_PRELOAD = /^packages\/observability\/src\/register\.ts$/;
 const BENCHMARK = /(?:^|\/)(?:__bench__|benchmarks?)(?:\/|$)|\.bench\.[cm]?[jt]sx?$/;
 
 function readsEnvironmentLegitimately(file) {
@@ -18,6 +20,7 @@ function readsEnvironmentLegitimately(file) {
     PROCESS_BOOT.test(path) ||
     TEST_PROCESS_BOOT.test(path) ||
     SECRETS_PACKAGE.test(path) ||
+    TELEMETRY_PRELOAD.test(path) ||
     file.isTest ||
     BENCHMARK.test(path)
   );

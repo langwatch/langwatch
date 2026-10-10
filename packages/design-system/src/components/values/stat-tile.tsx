@@ -17,6 +17,7 @@ export interface StatTileMeter {
 
 export interface StatTileProps {
   label: string;
+  variant?: Card.RootProps["variant"];
   icon?: ReactNode;
   /** Under the figure, clamped to two lines. */
   hint?: string;
@@ -29,6 +30,7 @@ export interface StatTileProps {
 
 export function StatTile({
   label,
+  variant,
   icon,
   hint,
   meter,
@@ -36,7 +38,7 @@ export function StatTile({
   "data-testid": testId,
 }: StatTileProps) {
   return (
-    <Card.Root borderRadius="xl" minWidth={0} data-testid={testId}>
+    <Card.Root variant={variant} minWidth={0} data-testid={testId}>
       <Card.Body paddingX={4} paddingY={3}>
         <VStack align="start" gap={1.5} minWidth={0}>
           <HStack gap={1.5} color="fg.muted">

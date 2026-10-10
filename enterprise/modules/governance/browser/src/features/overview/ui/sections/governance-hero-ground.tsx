@@ -1,17 +1,13 @@
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
 /**
  * The lit ground the governance hero stands on, bleeding past its own box
  * on purpose — the hero is where the page is lit from, not an object on it.
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
-import { Box } from "@langwatch/design-system/primitives";
+import { Box, ClientOnly } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type { ReactNode } from "react";
-
-/** Langy's palette, resolved. The shader cannot read CSS variables. */
-const GROUND_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];
-const GROUND_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
 
 /** The lantern's own mesh, held still rather than morphed between slides. */
 const MESH = {
@@ -32,10 +28,6 @@ const BLEED_INLINE = { base: "-12%", md: "-30%" };
 const BLEED_BLOCK = { base: "-30%", md: "-45%" };
 
 export function GovernanceHeroGround({ children }: { children: ReactNode }) {
-  const reduceMotion = useReducedMotion();
-  const isDark = useColorModeValue(false, true);
-  const colors = isDark ? GROUND_COLORS_DARK : GROUND_COLORS;
-
   return (
     <Box position="relative" width="full">
       {/* Both bleed layers sit at zIndex -1, lighting the page from behind so the header row
@@ -57,19 +49,9 @@ export function GovernanceHeroGround({ children }: { children: ReactNode }) {
           WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
         }}
       >
-        <MeshGradient
-          colors={colors}
-          distortion={MESH.distortion}
-          swirl={MESH.swirl}
-          offsetX={MESH.offsetX}
-          offsetY={MESH.offsetY}
-          rotation={MESH.rotation}
-          grainMixer={0.12}
-          grainOverlay={0.12}
-          speed={reduceMotion ? 0 : 0.45}
-          scale={MESH.scale}
-          style={{ width: "100%", height: "100%" }}
-        />
+        <ClientOnly>
+          <HeroMesh />
+        </ClientOnly>
       </Box>
 
       {/* Light mode only: a white bloom keeps the middle clean so the
@@ -89,5 +71,27 @@ export function GovernanceHeroGround({ children }: { children: ReactNode }) {
         {children}
       </Box>
     </Box>
+  );
+}
+
+function HeroMesh() {
+  const reduceMotion = useReducedMotion();
+  const orange = useColorRawValue("orange.solid");
+  const warmth = useColorRawValue("orange.emphasized");
+  const purple = useColorRawValue("purple.solid");
+  return (
+    <MeshGradient
+      colors={[orange, warmth, purple]}
+      distortion={MESH.distortion}
+      swirl={MESH.swirl}
+      offsetX={MESH.offsetX}
+      offsetY={MESH.offsetY}
+      rotation={MESH.rotation}
+      grainMixer={0.12}
+      grainOverlay={0.12}
+      speed={reduceMotion ? 0 : 0.45}
+      scale={MESH.scale}
+      style={{ width: "100%", height: "100%" }}
+    />
   );
 }

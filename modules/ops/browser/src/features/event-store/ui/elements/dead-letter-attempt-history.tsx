@@ -35,7 +35,7 @@ export function DeadLetterAttemptHistory({
             >
               {row.attempt}
             </Badge>
-            <Text textStyle="xs" fontFamily="mono" color="red.500">
+            <Text textStyle="xs" fontFamily="mono" color="red.fg">
               {row.errorType}
             </Text>
             <Text textStyle="xs" color="fg.muted">

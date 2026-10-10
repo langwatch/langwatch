@@ -11,7 +11,11 @@ import { renderWithAnnotationHost } from "../../../testing.tsx";
 import { AnnotationQueueEditor } from "../annotation-queue-editor.tsx";
 
 const mocks = vi.hoisted(() => {
-  const state: { queue: unknown; saved: unknown[] } = { queue: undefined, saved: [] };
+  const state: {
+    queue: unknown;
+    saved: unknown[];
+    scores: { id: string; name: string }[] | undefined;
+  } = { queue: void 0, saved: [], scores: [] };
   return state;
 });
 
@@ -32,10 +36,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
     annotationScore: {
       getAllActive: {
         useQuery: () => ({
-          data: [
-            { id: "score-1", name: "Accuracy" },
-            { id: "score-2", name: "Tone" },
-          ],
+          data: mocks.scores,
         }),
       },
     },
@@ -73,6 +74,10 @@ function renderEditor(queueId?: string) {
 beforeEach(() => {
   mocks.queue = undefined;
   mocks.saved = [];
+  mocks.scores = [
+    { id: "score-1", name: "Accuracy" },
+    { id: "score-2", name: "Tone" },
+  ];
 });
 
 afterEach(() => cleanup());
@@ -163,5 +168,29 @@ describe("given a member whose account has no display name", () => {
     expect(
       await screen.findByRole("button", { name: /cy@example.com/, pressed: true }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("given no available score types", () => {
+  it("disables the picker and links the inline hint to score settings", async () => {
+    mocks.scores = [];
+    const user = userEvent.setup();
+    renderEditor();
+    const picker = screen.getByRole("button", { name: "Add Score Type" });
+    expect(picker).toBeDisabled();
+    expect(picker).toHaveAccessibleDescription(/No score types yet/);
+    expect(screen.getByRole("link", { name: "Create an annotation score" })).toHaveAttribute(
+      "href",
+      "/settings/annotation-scores",
+    );
+    await user.click(picker);
+    expect(screen.queryByTestId("annotation-queue-editor-score-option")).toBeNull();
+  });
+
+  it("does not mistake a pending read for an empty collection", () => {
+    mocks.scores = void 0;
+    renderEditor();
+    expect(screen.getByRole("button", { name: "Add Score Type" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Create an annotation score" })).toBeNull();
   });
 });

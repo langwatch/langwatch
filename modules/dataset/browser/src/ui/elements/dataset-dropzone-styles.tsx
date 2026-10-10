@@ -20,8 +20,8 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   borderRadius: "xl",
   borderWidth: "2px",
   borderStyle: "dashed" as const,
-  borderColor: isActive ? "blue.400" : "border",
-  bg: isActive ? "blue.500/10" : "transparent",
+  borderColor: isActive ? "blue.fg" : "border",
+  bg: isActive ? "blue.subtle" : "transparent",
   padding: 10,
   textAlign: "center" as const,
   cursor: "pointer",
@@ -31,8 +31,8 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   // transition animates the grow/shrink smoothly.
   "& .lw-dropzone-icon": isActive ? { transform: "scale(1.12)" } : {},
   _hover: {
-    borderColor: "blue.300",
-    bg: "blue.500/5",
+    borderColor: "border.info",
+    bg: "blue.subtle",
     "& .lw-dropzone-icon": { transform: "scale(1.12)" },
   },
 });
@@ -46,7 +46,7 @@ const lwRainbowScroll = keyframes`
 `;
 
 const LW_RAINBOW_GRADIENT =
-  "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)";
+  "linear-gradient(90deg, var(--chakra-colors-blue-fg) 0%, var(--chakra-colors-purple-fg) 24%, var(--chakra-colors-red-fg) 47%, var(--chakra-colors-orange-fg) 66%, var(--chakra-colors-yellow-fg) 83%, var(--chakra-colors-blue-fg) 100%)";
 
 export const RAINBOW_TEXT_CSS = {
   color: "transparent",
@@ -69,7 +69,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
     <VStack gap={2}>
       <Box
         className="lw-dropzone-icon"
-        color="blue.400"
+        color="blue.fg"
         transition="transform 0.2s ease"
         transformOrigin="center"
       >
@@ -77,7 +77,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
       </Box>
       <Text fontSize="md" color="fg">
         {multiple ? "Drag and drop files, or " : "Drag and drop file, or "}
-        <Text as="span" color="blue.500" fontWeight="medium">
+        <Text as="span" color="blue.fg" fontWeight="medium">
           click to browse
         </Text>
       </Text>

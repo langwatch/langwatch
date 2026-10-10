@@ -1,33 +1,40 @@
+import type { Named } from "@langwatch/module";
 /**
  * Reconciles pagination dialects once; loose schemas preserve unknown API fields.
  */
 import * as z from "zod";
 
 /** How the traces API counts: total hits for the query, regardless of page size. */
-export const hitsPaginationSchema = z.looseObject({
+const hitsPaginationSchemaDefinition = z.looseObject({
   totalHits: z.number(),
   scrollId: z.string().optional(),
 });
+export interface HitsPaginationSchema extends Named<typeof hitsPaginationSchemaDefinition> {}
+export const hitsPaginationSchema: HitsPaginationSchema = hitsPaginationSchemaDefinition;
 
 /** How the paged REST collections count: a total plus where you are in it. */
-export const pagePaginationSchema = z.looseObject({
+const pagePaginationSchemaDefinition = z.looseObject({
   total: z.number(),
   page: z.number().optional(),
   totalPages: z.number().optional(),
 });
+export interface PagePaginationSchema extends Named<typeof pagePaginationSchemaDefinition> {}
+export const pagePaginationSchema: PagePaginationSchema = pagePaginationSchemaDefinition;
 
 /**
  * Either dialect. Both keys are optional so a collection that reports neither
  * still parses — `resolveTotal` then falls back to counting the rows, which is
  * the honest answer for an endpoint that does not paginate.
  */
-export const paginationSchema = z.looseObject({
+const paginationSchemaDefinition = z.looseObject({
   totalHits: z.number().optional(),
   total: z.number().optional(),
   page: z.number().optional(),
   totalPages: z.number().optional(),
   scrollId: z.string().optional(),
 });
+export interface PaginationSchema extends Named<typeof paginationSchemaDefinition> {}
+export const paginationSchema: PaginationSchema = paginationSchemaDefinition;
 
 export type Pagination = z.infer<typeof paginationSchema>;
 
@@ -85,11 +92,13 @@ export const resolveTotal = ({
  * envelope (`{ value: "hello" }`). Normalised to the bare string so a card never
  * has to ask which one it got.
  */
-export const textValueSchema = z
+const textValueSchemaDefinition = z
   .union([z.string(), z.looseObject({ value: z.string() })])
   .transform((raw) => (typeof raw === "string" ? raw : raw.value))
   .transform((text) => text.trim())
   .pipe(z.string());
+export interface TextValueSchema extends Named<typeof textValueSchemaDefinition> {}
+export const textValueSchema: TextValueSchema = textValueSchemaDefinition;
 
 /**
  * Row or truncation marker: oversized outputs have in-band "… N more" strings in the array.
@@ -117,9 +126,11 @@ export const collectionSchema = <Key extends string, Row extends z.ZodType>({
   } as Record<Key, z.ZodType> & { pagination: z.ZodOptional<typeof paginationSchema> });
 
 /** An identifier, however the endpoint chose to spell it. */
-export const idSchema = z
+const idSchemaDefinition = z
   .looseObject({
     id: z.string().optional(),
     slug: z.string().optional(),
   })
   .transform((raw) => raw.id ?? raw.slug);
+export interface IdSchema extends Named<typeof idSchemaDefinition> {}
+export const idSchema: IdSchema = idSchemaDefinition;

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
@@ -8,12 +9,17 @@ export const SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE =
   "lw.licensing.self_hosted_customer_licensed" as const;
 
 /** An operator licensed a new self-hosted customer; organization creates its row under this id. */
-export const selfHostedCustomerLicensedEventDataSchema = z.object({
+const selfHostedCustomerLicensedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   name: z.string().min(1),
 });
+export interface SelfHostedCustomerLicensedEventDataSchema extends Named<
+  typeof selfHostedCustomerLicensedEventDataSchemaDefinition
+> {}
+export const selfHostedCustomerLicensedEventDataSchema: SelfHostedCustomerLicensedEventDataSchema =
+  selfHostedCustomerLicensedEventDataSchemaDefinition;
 export type SelfHostedCustomerLicensedEventData = z.infer<
   typeof selfHostedCustomerLicensedEventDataSchema
 >;
@@ -22,22 +28,32 @@ export const CONNECT_SERVICE_SWITCHED_EVENT_TYPE = "lw.licensing.connect_service
 export const LICENSE_SYNC_FINISHED_EVENT_TYPE = "lw.licensing.license_sync_finished" as const;
 
 /** An administrator switched one hosted service on or off; organization keeps the refusals. */
-export const connectServiceSwitchedEventDataSchema = z.object({
+const connectServiceSwitchedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   service: z.string().min(1),
   enabled: z.boolean(),
 });
+export interface ConnectServiceSwitchedEventDataSchema extends Named<
+  typeof connectServiceSwitchedEventDataSchemaDefinition
+> {}
+export const connectServiceSwitchedEventDataSchema: ConnectServiceSwitchedEventDataSchema =
+  connectServiceSwitchedEventDataSchemaDefinition;
 export type ConnectServiceSwitchedEventData = z.infer<typeof connectServiceSwitchedEventDataSchema>;
 
 /** A license sync ended at `occurredAt`: `error` names its code, null when it landed. */
-export const licenseSyncFinishedEventDataSchema = z.object({
+const licenseSyncFinishedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   error: z.string().min(1).nullable(),
 });
+export interface LicenseSyncFinishedEventDataSchema extends Named<
+  typeof licenseSyncFinishedEventDataSchemaDefinition
+> {}
+export const licenseSyncFinishedEventDataSchema: LicenseSyncFinishedEventDataSchema =
+  licenseSyncFinishedEventDataSchemaDefinition;
 export type LicenseSyncFinishedEventData = z.infer<typeof licenseSyncFinishedEventDataSchema>;
 
 export const LICENSE_STORED_EVENT_TYPE = "lw.licensing.license_stored" as const;
@@ -47,7 +63,7 @@ export const LICENSE_CLEARED_EVENT_TYPE = "lw.licensing.license_cleared" as cons
  * Licensing stored an organization's licence. The fact names the key by its sha256 hex
  * fingerprint, never the key; organization reads the key from licensing's row (C3-KEY-HASH).
  */
-export const licenseStoredEventDataSchema = z.object({
+const licenseStoredEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -55,43 +71,63 @@ export const licenseStoredEventDataSchema = z.object({
   expiresAt: z.number().int(),
   validatedAt: z.number().int().nullable(),
 });
+export interface LicenseStoredEventDataSchema extends Named<
+  typeof licenseStoredEventDataSchemaDefinition
+> {}
+export const licenseStoredEventDataSchema: LicenseStoredEventDataSchema =
+  licenseStoredEventDataSchemaDefinition;
 export type LicenseStoredEventData = z.infer<typeof licenseStoredEventDataSchema>;
 
 /** Licensing cleared an organization's licence; organization clears its columns. */
-export const licenseClearedEventDataSchema = z.object({
+const licenseClearedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
 });
+export interface LicenseClearedEventDataSchema extends Named<
+  typeof licenseClearedEventDataSchemaDefinition
+> {}
+export const licenseClearedEventDataSchema: LicenseClearedEventDataSchema =
+  licenseClearedEventDataSchemaDefinition;
 export type LicenseClearedEventData = z.infer<typeof licenseClearedEventDataSchema>;
 
 export const MANAGED_KEY_RETIRED_EVENT_TYPE = "lw.licensing.managed_key_retired" as const;
 export const MANAGED_KEY_INVALIDATED_EVENT_TYPE = "lw.licensing.managed_key_invalidated" as const;
 
 /** Licensing ended a licence's managed key for good; gateway revokes it, safe to repeat. */
-export const managedKeyRetiredEventDataSchema = z.object({
+const managedKeyRetiredEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   virtualKeyId: z.string().min(1),
   actorId: z.string().min(1),
 });
+export interface ManagedKeyRetiredEventDataSchema extends Named<
+  typeof managedKeyRetiredEventDataSchemaDefinition
+> {}
+export const managedKeyRetiredEventDataSchema: ManagedKeyRetiredEventDataSchema =
+  managedKeyRetiredEventDataSchemaDefinition;
 export type ManagedKeyRetiredEventData = z.infer<typeof managedKeyRetiredEventDataSchema>;
 
 /** Licensing changed what a managed key's licence resolves to; gateway tells every gateway. */
-export const managedKeyInvalidatedEventDataSchema = z.object({
+const managedKeyInvalidatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   virtualKeyId: z.string().min(1),
 });
+export interface ManagedKeyInvalidatedEventDataSchema extends Named<
+  typeof managedKeyInvalidatedEventDataSchemaDefinition
+> {}
+export const managedKeyInvalidatedEventDataSchema: ManagedKeyInvalidatedEventDataSchema =
+  managedKeyInvalidatedEventDataSchemaDefinition;
 export type ManagedKeyInvalidatedEventData = z.infer<typeof managedKeyInvalidatedEventDataSchema>;
 
 export const MANAGED_KEY_LICENSE_SET_EVENT_TYPE = "lw.licensing.managed_key_license_set" as const;
 export const MANAGED_KEY_SERVICES_SET_EVENT_TYPE = "lw.licensing.managed_key_services_set" as const;
 
 /** The licence a managed key serves, by its token's registry hash only; gateway rewrites it. */
-export const managedKeyLicenseSetEventDataSchema = z.object({
+const managedKeyLicenseSetEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -100,16 +136,26 @@ export const managedKeyLicenseSetEventDataSchema = z.object({
   instanceId: z.string().min(1).nullable(),
   expiresAt: z.number().int().nullable(),
 });
+export interface ManagedKeyLicenseSetEventDataSchema extends Named<
+  typeof managedKeyLicenseSetEventDataSchemaDefinition
+> {}
+export const managedKeyLicenseSetEventDataSchema: ManagedKeyLicenseSetEventDataSchema =
+  managedKeyLicenseSetEventDataSchemaDefinition;
 export type ManagedKeyLicenseSetEventData = z.infer<typeof managedKeyLicenseSetEventDataSchema>;
 
 /** The platform services a managed key may serve, replaced whole; gateway rewrites them. */
-export const managedKeyServicesSetEventDataSchema = z.object({
+const managedKeyServicesSetEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   virtualKeyId: z.string().min(1),
   services: z.array(z.string().min(1)),
 });
+export interface ManagedKeyServicesSetEventDataSchema extends Named<
+  typeof managedKeyServicesSetEventDataSchemaDefinition
+> {}
+export const managedKeyServicesSetEventDataSchema: ManagedKeyServicesSetEventDataSchema =
+  managedKeyServicesSetEventDataSchemaDefinition;
 export type ManagedKeyServicesSetEventData = z.infer<typeof managedKeyServicesSetEventDataSchema>;
 
 export const CONNECT_UPSTREAM_SET_EVENT_TYPE = "lw.licensing.connect_upstream_set" as const;
@@ -119,11 +165,16 @@ export const CONNECT_UPSTREAM_CLEARED_EVENT_TYPE = "lw.licensing.connect_upstrea
  * Licensing decided an organization's gateway reaches LangWatch-hosted models (set) or not
  * (cleared). Ids only: gateway pulls the token through `LicensingApi.findConnectUpstream`.
  */
-export const connectUpstreamChangedEventDataSchema = z.object({
+const connectUpstreamChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
 });
+export interface ConnectUpstreamChangedEventDataSchema extends Named<
+  typeof connectUpstreamChangedEventDataSchemaDefinition
+> {}
+export const connectUpstreamChangedEventDataSchema: ConnectUpstreamChangedEventDataSchema =
+  connectUpstreamChangedEventDataSchemaDefinition;
 export type ConnectUpstreamChangedEventData = z.infer<typeof connectUpstreamChangedEventDataSchema>;
 
 export const CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE =
@@ -133,7 +184,7 @@ export const CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE =
  * A licence's call found no managed key; gateway provisions one, writes these facts on it, then
  * records `lw.gateway.managed_key_provisioned`. Names the token by its registry hash, never a secret.
  */
-export const connectCredentialIssuedEventDataSchema = z.object({
+const connectCredentialIssuedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -144,6 +195,11 @@ export const connectCredentialIssuedEventDataSchema = z.object({
   expiresAt: z.number().int(),
   services: z.array(z.string().min(1)),
 });
+export interface ConnectCredentialIssuedEventDataSchema extends Named<
+  typeof connectCredentialIssuedEventDataSchemaDefinition
+> {}
+export const connectCredentialIssuedEventDataSchema: ConnectCredentialIssuedEventDataSchema =
+  connectCredentialIssuedEventDataSchemaDefinition;
 export type ConnectCredentialIssuedEventData = z.infer<
   typeof connectCredentialIssuedEventDataSchema
 >;
@@ -154,10 +210,15 @@ export const CONTRACT_TERMS_CHANGED_EVENT_TYPE = "lw.licensing.contract_terms_ch
  * A customer's contract terms may have moved (a licence issued, revoked, changed or linked);
  * connect brings the contract budget in line with the terms licensing answers now.
  */
-export const contractTermsChangedEventDataSchema = z.object({
+const contractTermsChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   operatorId: z.string().min(1),
 });
+export interface ContractTermsChangedEventDataSchema extends Named<
+  typeof contractTermsChangedEventDataSchemaDefinition
+> {}
+export const contractTermsChangedEventDataSchema: ContractTermsChangedEventDataSchema =
+  contractTermsChangedEventDataSchemaDefinition;
 export type ContractTermsChangedEventData = z.infer<typeof contractTermsChangedEventDataSchema>;

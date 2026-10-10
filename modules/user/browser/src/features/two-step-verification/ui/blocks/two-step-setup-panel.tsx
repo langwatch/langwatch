@@ -77,7 +77,7 @@ export function TwoStepSetupPanel({
           borderColor="border.muted"
           borderRadius="xl"
           padding={4}
-          background="white"
+          background="bg.card"
           data-testid="two-factor-scannable-code"
         >
           <SetupQrCode value={setupUri} />

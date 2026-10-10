@@ -19,7 +19,7 @@ export function ResolvedModelCaption({ model }: { model: string | null | undefin
         href="/settings/model-providers"
         target="_blank"
         rel="noopener noreferrer"
-        color="blue.500"
+        color="blue.fg"
         fontWeight="medium"
       >
         Change

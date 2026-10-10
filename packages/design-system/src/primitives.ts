@@ -51,6 +51,7 @@ export {
   Span,
   Spinner,
   Stack,
+  Stat,
   Status,
   Table,
   Tabs,

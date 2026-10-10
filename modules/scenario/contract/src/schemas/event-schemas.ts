@@ -3,6 +3,7 @@
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
 import { EventType } from "@ag-ui/core";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { runActorLabelSchema } from "../features/run/run-actor.ts";
@@ -64,7 +65,7 @@ const baseScenarioEventSchema = z.object({
  * Reserved namespace for platform-internal context injected by the suite runner.
  * Direct SDK users should not populate this.
  */
-export const langwatchMetadataSchema = z.object({
+const langwatchMetadataSchemaDefinition = z.object({
   targetReferenceId: z.string(),
   targetType: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   /**
@@ -135,20 +136,24 @@ export const langwatchMetadataSchema = z.object({
    */
   isCutAtLimit: z.boolean().optional(),
 });
+export interface LangwatchMetadataSchema extends Named<typeof langwatchMetadataSchemaDefinition> {}
+export const langwatchMetadataSchema: LangwatchMetadataSchema = langwatchMetadataSchemaDefinition;
 
 /** One run participant: agent, user simulator, or judge. Only `agent` role
  * names run target; lives in metadata, not langwatch namespace.
  */
-export const scenarioAgentSchema = z.object({
+const scenarioAgentSchemaDefinition = z.object({
   name: z.string(),
   role: z.enum(["agent", "user", "judge"]),
 });
+export interface ScenarioAgentSchema extends Named<typeof scenarioAgentSchemaDefinition> {}
+export const scenarioAgentSchema: ScenarioAgentSchema = scenarioAgentSchemaDefinition;
 
 /**
  * User-defined metadata fields pass through via `.passthrough()`; the
  * `langwatch` namespace is strictly validated.
  */
-export const scenarioRunStartedSchema = z.object({
+const scenarioRunStartedSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.RUN_STARTED),
   metadata: z
@@ -170,6 +175,11 @@ export const scenarioRunStartedSchema = z.object({
     })
     .passthrough(),
 });
+export interface ScenarioRunStartedSchema extends Named<
+  typeof scenarioRunStartedSchemaDefinition
+> {}
+export const scenarioRunStartedSchema: ScenarioRunStartedSchema =
+  scenarioRunStartedSchemaDefinition;
 
 export {
   SCENARIO_EVALUATION_STATUSES,
@@ -183,7 +193,7 @@ export {
  * Defines the structure for scenario evaluation results including verdict and criteria analysis.
  * Matches the Python dataclass structure used in the evaluation system.
  */
-export const scenarioResultsSchema = z.object({
+const scenarioResultsSchemaDefinition = z.object({
   verdict: z.nativeEnum(Verdict),
   reasoning: z.string().optional(),
   metCriteria: z.array(z.string()),
@@ -205,6 +215,8 @@ export const scenarioResultsSchema = z.object({
    */
   evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
+export interface ScenarioResultsSchema extends Named<typeof scenarioResultsSchemaDefinition> {}
+export const scenarioResultsSchema: ScenarioResultsSchema = scenarioResultsSchemaDefinition;
 export type ScenarioResults = z.infer<typeof scenarioResultsSchema>;
 
 /**
@@ -212,12 +224,17 @@ export type ScenarioResults = z.infer<typeof scenarioResultsSchema>;
  * Captures the completion of a scenario run with final status and evaluation results.
  * Status indicates success/failure, while results contain detailed evaluation outcomes.
  */
-export const scenarioRunFinishedSchema = z.object({
+const scenarioRunFinishedSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.RUN_FINISHED),
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
 });
+export interface ScenarioRunFinishedSchema extends Named<
+  typeof scenarioRunFinishedSchemaDefinition
+> {}
+export const scenarioRunFinishedSchema: ScenarioRunFinishedSchema =
+  scenarioRunFinishedSchemaDefinition;
 
 /** Voice `input_audio` part: validates both pre-extraction shape
  * `{ data, format }` and post-extraction `{ url, mimeType }`.
@@ -351,7 +368,7 @@ const scenarioAnthropicMessageSchema = z.object({
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
  */
-export const scenarioMessageSnapshotSchema = z.object({
+const scenarioMessageSnapshotSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
   messages: z.array(
@@ -369,24 +386,34 @@ export const scenarioMessageSnapshotSchema = z.object({
     ),
   ),
 });
+export interface ScenarioMessageSnapshotSchema extends Named<
+  typeof scenarioMessageSnapshotSchemaDefinition
+> {}
+export const scenarioMessageSnapshotSchema: ScenarioMessageSnapshotSchema =
+  scenarioMessageSnapshotSchemaDefinition;
 
 /**
  * Scenario Text Message Start Event Schema
  * Emitted when a message begins (placeholder). Persisted via event-sourcing.
  */
-export const scenarioTextMessageStartSchema = z.object({
+const scenarioTextMessageStartSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_START),
   messageId: z.string(),
   role: z.string(),
   messageIndex: z.number().optional(),
 });
+export interface ScenarioTextMessageStartSchema extends Named<
+  typeof scenarioTextMessageStartSchemaDefinition
+> {}
+export const scenarioTextMessageStartSchema: ScenarioTextMessageStartSchema =
+  scenarioTextMessageStartSchemaDefinition;
 
 /**
  * Scenario Text Message End Event Schema
  * Emitted when a message is complete with full content. Persisted via event-sourcing.
  */
-export const scenarioTextMessageEndSchema = z.object({
+const scenarioTextMessageEndSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_END),
   messageId: z.string(),
@@ -396,54 +423,79 @@ export const scenarioTextMessageEndSchema = z.object({
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
 });
+export interface ScenarioTextMessageEndSchema extends Named<
+  typeof scenarioTextMessageEndSchemaDefinition
+> {}
+export const scenarioTextMessageEndSchema: ScenarioTextMessageEndSchema =
+  scenarioTextMessageEndSchemaDefinition;
 
 /**
  * Scenario Text Message Content Event Schema (broadcast only)
  * Streaming delta for real-time UX, not persisted.
  */
-export const scenarioTextMessageContentSchema = z.object({
+const scenarioTextMessageContentSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_CONTENT),
   messageId: z.string(),
   delta: z.string(),
 });
+export interface ScenarioTextMessageContentSchema extends Named<
+  typeof scenarioTextMessageContentSchemaDefinition
+> {}
+export const scenarioTextMessageContentSchema: ScenarioTextMessageContentSchema =
+  scenarioTextMessageContentSchemaDefinition;
 
 /**
  * Scenario Tool Call Start Event Schema (broadcast only)
  */
-export const scenarioToolCallStartSchema = z.object({
+const scenarioToolCallStartSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TOOL_CALL_START),
   toolCallId: z.string(),
   toolCallName: z.string(),
   parentMessageId: z.string().optional(),
 });
+export interface ScenarioToolCallStartSchema extends Named<
+  typeof scenarioToolCallStartSchemaDefinition
+> {}
+export const scenarioToolCallStartSchema: ScenarioToolCallStartSchema =
+  scenarioToolCallStartSchemaDefinition;
 
 /**
  * Scenario Tool Call Args Event Schema (broadcast only)
  */
-export const scenarioToolCallArgsSchema = z.object({
+const scenarioToolCallArgsSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TOOL_CALL_ARGS),
   toolCallId: z.string(),
   delta: z.string(),
 });
+export interface ScenarioToolCallArgsSchema extends Named<
+  typeof scenarioToolCallArgsSchemaDefinition
+> {}
+export const scenarioToolCallArgsSchema: ScenarioToolCallArgsSchema =
+  scenarioToolCallArgsSchemaDefinition;
 
 /**
  * Scenario Tool Call End Event Schema (broadcast only)
  */
-export const scenarioToolCallEndSchema = z.object({
+const scenarioToolCallEndSchemaDefinition = z.object({
   ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TOOL_CALL_END),
   toolCallId: z.string(),
 });
+export interface ScenarioToolCallEndSchema extends Named<
+  typeof scenarioToolCallEndSchemaDefinition
+> {}
+export const scenarioToolCallEndSchema: ScenarioToolCallEndSchema =
+  scenarioToolCallEndSchemaDefinition;
 
 /**
  * Scenario Event Union Schema
  * Discriminated union of all possible scenario event types.
  * Enables type-safe handling of different event types based on the 'type' field.
  */
-export const scenarioEventSchema = z.discriminatedUnion("type", [
+const scenarioEventSchemaDefinition = z.discriminatedUnion("type", [
   scenarioRunStartedSchema,
   scenarioRunFinishedSchema,
   scenarioMessageSnapshotSchema,
@@ -454,3 +506,5 @@ export const scenarioEventSchema = z.discriminatedUnion("type", [
   scenarioToolCallArgsSchema,
   scenarioToolCallEndSchema,
 ]);
+export interface ScenarioEventSchema extends Named<typeof scenarioEventSchemaDefinition> {}
+export const scenarioEventSchema: ScenarioEventSchema = scenarioEventSchemaDefinition;

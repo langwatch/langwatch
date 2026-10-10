@@ -203,6 +203,15 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I dismiss the sheet instead of picking one
     Then nothing is said about it
 
+  # The client resolves a failure in this browser with the same 400 a refusal
+  # carries; only its code tells the two apart.
+  @integration
+  Scenario: A browser with no passkey never hears that a passkey failed
+    Given a passkey is being offered from the address field itself
+    And this browser holds no passkey, or cannot finish the request
+    When the request ends without any credential reaching the server
+    Then nothing is said about a passkey I never chose
+
   # The opposite of the castle's rule, and worth stating so nobody reads one
   # for the other: the snake is pinned ABSENT under reduced motion, and this
   # glyph is pinned PRESENT and STILL.

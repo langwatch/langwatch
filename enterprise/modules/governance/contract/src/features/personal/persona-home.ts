@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const governanceOrganizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
@@ -8,7 +9,7 @@ export type GovernanceOrganizationIntent = z.infer<typeof governanceOrganization
 export const personaSchema = z.enum(["personal_only", "mixed", "project_only", "governance_admin"]);
 export type Persona = z.infer<typeof personaSchema>;
 
-export const personaResolverInputSchema = z
+const personaResolverInputSchemaDefinition = z
   .object({
     organizationIntent: governanceOrganizationIntentSchema.nullable(),
     userLastHomePath: z.string().nullable(),
@@ -26,9 +27,14 @@ export const personaResolverInputSchema = z
     firstProjectSlug: z.string().nullable(),
   })
   .strict();
+export interface PersonaResolverInputSchema extends Named<
+  typeof personaResolverInputSchemaDefinition
+> {}
+export const personaResolverInputSchema: PersonaResolverInputSchema =
+  personaResolverInputSchemaDefinition;
 export type PersonaResolverInput = z.infer<typeof personaResolverInputSchema>;
 
-export const personaResolutionSchema = z
+const personaResolutionSchemaDefinition = z
   .object({
     persona: personaSchema,
     destination: z.string(),
@@ -43,6 +49,8 @@ export const personaResolutionSchema = z
     firstProjectSlug: z.string().nullable(),
   })
   .strict();
+export interface PersonaResolutionSchema extends Named<typeof personaResolutionSchemaDefinition> {}
+export const personaResolutionSchema: PersonaResolutionSchema = personaResolutionSchemaDefinition;
 export type PersonaResolution = z.infer<typeof personaResolutionSchema>;
 
 /** Pure home-routing policy. All I/O is resolved before this class is called. */

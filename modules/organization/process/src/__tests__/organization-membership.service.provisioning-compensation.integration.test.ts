@@ -104,6 +104,10 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
       const attempted: string[] = [];
       const failing = OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+        memberNotices: {
+          memberRemoved: () => Promise.resolve(),
+          memberDepartmentChanged: () => Promise.resolve(),
+        },
         repository: repo,
         creations: buildFailingPrompts(attempted),
         seats,
@@ -130,6 +134,10 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
 
       const retried = await OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+        memberNotices: {
+          memberRemoved: () => Promise.resolve(),
+          memberDepartmentChanged: () => Promise.resolve(),
+        },
         repository: repo,
         creations: buildWorkingPrompts(),
         seats,

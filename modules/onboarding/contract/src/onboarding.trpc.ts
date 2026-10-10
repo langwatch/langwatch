@@ -4,7 +4,7 @@
  * organizationId before any read or write.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -20,35 +20,66 @@ import {
 
 const organizationIdInputSchema = z.object({ organizationId: z.string() }).strict();
 
-export const recordPathsInputSchema = organizationIdInputSchema.safeExtend({
+const recordPathsInputSchemaDefinition = organizationIdInputSchema.safeExtend({
   paths: z.array(z.string()).min(1),
 });
-export const recordProviderInputSchema = organizationIdInputSchema.safeExtend({
+export interface RecordPathsInputSchema extends Named<typeof recordPathsInputSchemaDefinition> {}
+export const recordPathsInputSchema: RecordPathsInputSchema = recordPathsInputSchemaDefinition;
+const recordProviderInputSchemaDefinition = organizationIdInputSchema.safeExtend({
   provider: z.string().min(1),
   model: z.string().min(1),
 });
-export const recordVirtualKeyRevealInputSchema = organizationIdInputSchema.safeExtend({
+export interface RecordProviderInputSchema extends Named<
+  typeof recordProviderInputSchemaDefinition
+> {}
+export const recordProviderInputSchema: RecordProviderInputSchema =
+  recordProviderInputSchemaDefinition;
+const recordVirtualKeyRevealInputSchemaDefinition = organizationIdInputSchema.safeExtend({
   name: z.string().min(1),
   preview: z.string().min(1),
   revealId: z.string().min(1),
 });
-export const recordTourInputSchema = organizationIdInputSchema.safeExtend({
+export interface RecordVirtualKeyRevealInputSchema extends Named<
+  typeof recordVirtualKeyRevealInputSchemaDefinition
+> {}
+export const recordVirtualKeyRevealInputSchema: RecordVirtualKeyRevealInputSchema =
+  recordVirtualKeyRevealInputSchemaDefinition;
+const recordTourInputSchemaDefinition = organizationIdInputSchema.safeExtend({
   status: z.enum(["completed", "skipped", "replayed"]),
 });
-export const guidedPathInputSchema = organizationIdInputSchema.safeExtend({ path: z.string() });
-export const attachConversationInputSchema = organizationIdInputSchema.safeExtend({
+export interface RecordTourInputSchema extends Named<typeof recordTourInputSchemaDefinition> {}
+export const recordTourInputSchema: RecordTourInputSchema = recordTourInputSchemaDefinition;
+const guidedPathInputSchemaDefinition = organizationIdInputSchema.safeExtend({ path: z.string() });
+export interface GuidedPathInputSchema extends Named<typeof guidedPathInputSchemaDefinition> {}
+export const guidedPathInputSchema: GuidedPathInputSchema = guidedPathInputSchemaDefinition;
+const attachConversationInputSchemaDefinition = organizationIdInputSchema.safeExtend({
   conversationId: z.string().min(1),
 });
+export interface AttachConversationInputSchema extends Named<
+  typeof attachConversationInputSchemaDefinition
+> {}
+export const attachConversationInputSchema: AttachConversationInputSchema =
+  attachConversationInputSchemaDefinition;
 
 export const guidedStateOutputSchema = guidedOnboardingStateSchema;
-export const guidedStateWithInstanceOutputSchema = z.object({
+const guidedStateWithInstanceOutputSchemaDefinition = z.object({
   ...guidedOnboardingStateSchema.shape,
   gatewayUrl: z.string().optional(),
 });
-export const guidedStateWithVariantOutputSchema = z.object({
+export interface GuidedStateWithInstanceOutputSchema extends Named<
+  typeof guidedStateWithInstanceOutputSchemaDefinition
+> {}
+export const guidedStateWithInstanceOutputSchema: GuidedStateWithInstanceOutputSchema =
+  guidedStateWithInstanceOutputSchemaDefinition;
+const guidedStateWithVariantOutputSchemaDefinition = z.object({
   ...guidedStateWithInstanceOutputSchema.shape,
   variant: onboardingVariantSchema.nullable(),
 });
+export interface GuidedStateWithVariantOutputSchema extends Named<
+  typeof guidedStateWithVariantOutputSchemaDefinition
+> {}
+export const guidedStateWithVariantOutputSchema: GuidedStateWithVariantOutputSchema =
+  guidedStateWithVariantOutputSchemaDefinition;
 
 /**
  * The four keys the "pick your flavour" screen offers. The traits they map to
@@ -68,7 +99,7 @@ export type OnboardingIntegrationMethod = z.infer<typeof onboardingIntegrationMe
  * for rolling-deploy tolerance (ADR-038), and names the organization's intents
  * here because the organization's contract depends on this one.
  */
-export const onboardingInitializeOrganizationInputSchema = z.object({
+const onboardingInitializeOrganizationInputSchemaDefinition = z.object({
   orgName: z.string().optional(),
   phoneNumber: z.string().optional(),
   signUpData: signUpDataSchema.optional(),
@@ -80,6 +111,11 @@ export const onboardingInitializeOrganizationInputSchema = z.object({
   language: z.string().default("other"),
   framework: z.string().default("other"),
 });
+export interface OnboardingInitializeOrganizationInputSchema extends Named<
+  typeof onboardingInitializeOrganizationInputSchemaDefinition
+> {}
+export const onboardingInitializeOrganizationInputSchema: OnboardingInitializeOrganizationInputSchema =
+  onboardingInitializeOrganizationInputSchemaDefinition;
 export type OnboardingInitializeOrganizationInput = z.infer<
   typeof onboardingInitializeOrganizationInputSchema
 >;

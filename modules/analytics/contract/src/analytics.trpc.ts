@@ -3,7 +3,7 @@
  * cache keys. The shared inputs are the REST body's and the traces filter's too.
  * @see modules/analytics/specs/analytics-timeseries.feature
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { filterFieldsEnum } from "./analytics.filter-field.ts";
@@ -19,17 +19,27 @@ import {
  * The narrowing `dataForFilter` adds on top of the shared filters: which field
  * is being picked for, and the free text typed into the picker.
  */
-export const analyticsFilterSelectionSchema = z.object({
+const analyticsFilterSelectionSchemaDefinition = z.object({
   field: filterFieldsEnum,
   key: z.string().optional(),
   subkey: z.string().optional(),
   query: z.string().optional(),
 });
+export interface AnalyticsFilterSelectionSchema extends Named<
+  typeof analyticsFilterSelectionSchemaDefinition
+> {}
+export const analyticsFilterSelectionSchema: AnalyticsFilterSelectionSchema =
+  analyticsFilterSelectionSchemaDefinition;
 
-export const analyticsDataForFilterInputSchema = z.object({
+const analyticsDataForFilterInputSchemaDefinition = z.object({
   ...sharedFiltersInputSchema.shape,
   ...analyticsFilterSelectionSchema.shape,
 });
+export interface AnalyticsDataForFilterInputSchema extends Named<
+  typeof analyticsDataForFilterInputSchemaDefinition
+> {}
+export const analyticsDataForFilterInputSchema: AnalyticsDataForFilterInputSchema =
+  analyticsDataForFilterInputSchemaDefinition;
 
 export const analyticsTrpc = defineTrpcContract("analytics")
   .query("getTimeseries")

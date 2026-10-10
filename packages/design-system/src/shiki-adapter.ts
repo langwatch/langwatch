@@ -144,8 +144,16 @@ export function useShikiAdapter(colorMode: string) {
  * using `github-light` theme (settings UI is light-theme only). Exposed as a
  * named export so tests can `vi.spyOn(shikiAdapter, 'codeToHtml')`.
  */
-export async function codeToHtml({ code, lang }: { code: string; lang: string }): Promise<string> {
-  return codeToHtmlThemed({ code, lang, theme: "github-light" });
+export async function codeToHtml({
+  code,
+  lang,
+  lineData,
+}: {
+  code: string;
+  lang: string;
+  lineData?: LineData;
+}): Promise<string> {
+  return codeToHtmlThemed({ code, lang, theme: "github-light", lineData });
 }
 
 /**
@@ -156,25 +164,43 @@ export async function codeToHtml({ code, lang }: { code: string; lang: string })
 export async function codeToHtmlDark({
   code,
   lang,
+  lineData,
 }: {
   code: string;
   lang: string;
+  lineData?: LineData;
 }): Promise<string> {
-  return codeToHtmlThemed({ code, lang, theme: "github-dark" });
+  return codeToHtmlThemed({ code, lang, theme: "github-dark", lineData });
 }
+
+/** `data-*` attributes for a 1-based line's `<span class="line">`, e.g. a diff marker. */
+export type LineData = (line: number) => Record<string, string> | undefined;
 
 async function codeToHtmlThemed({
   code,
   lang,
   theme,
+  lineData,
 }: {
   code: string;
   lang: string;
   theme: "github-light" | "github-dark";
+  lineData?: LineData;
 }): Promise<string> {
   const canonical = normalizeShikiLang(lang);
   await ensureShikiLangLoaded(canonical);
   const highlighter = await getSharedHighlighter();
   ensureDisposeNeutered(highlighter);
-  return highlighter.codeToHtml(code, { lang: canonical, theme });
+  const transformers = lineData
+    ? [
+        {
+          line(node: { properties: Record<string, unknown> }, line: number) {
+            for (const [name, value] of Object.entries(lineData(line) ?? {})) {
+              node.properties[`data-${name}`] = value;
+            }
+          },
+        },
+      ]
+    : undefined;
+  return highlighter.codeToHtml(code, { lang: canonical, theme, transformers });
 }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { uiTokens } from "@langwatch/module";
+import { uiTokens, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const SCIM_FEATURE_ID = "scim" as const;
 
-export const scimUserSchema = z.object({
+const scimUserSchemaDefinition = z.object({
   schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:User")),
   id: z.string(),
   /** The identity provider's identifier, scoped to its SSO connection. */
@@ -28,6 +28,8 @@ export const scimUserSchema = z.object({
     lastModified: z.string(),
   }),
 });
+export interface ScimUserSchema extends Named<typeof scimUserSchemaDefinition> {}
+export const scimUserSchema: ScimUserSchema = scimUserSchemaDefinition;
 export type ScimUser = z.infer<typeof scimUserSchema>;
 
 /** One page of resources, in the shape every SCIM collection answers with. */
@@ -50,13 +52,15 @@ export type ScimListResponse<T> = Readonly<{
   Resources: T[];
 }>;
 
-export const scimErrorSchema = z.object({
+const scimErrorSchemaDefinition = z.object({
   schemas: z.array(z.literal("urn:ietf:params:scim:api:messages:2.0:Error")),
   status: z.string(),
   detail: z.string(),
   /** RFC 7644 §3.12's error type, when the refusal has one. */
   scimType: z.string().optional(),
 });
+export interface ScimErrorSchema extends Named<typeof scimErrorSchemaDefinition> {}
+export const scimErrorSchema: ScimErrorSchema = scimErrorSchemaDefinition;
 export type ScimError = z.infer<typeof scimErrorSchema>;
 
 /**
@@ -75,18 +79,25 @@ const scimPatchOpSchema = z.preprocess(
   z.enum(["replace", "add", "remove"]),
 );
 
-export const scimPatchOperationSchema = z.object({
+const scimPatchOperationSchemaDefinition = z.object({
   op: scimPatchOpSchema,
   path: z.string().optional(),
   value: z.unknown().optional(),
 });
+export interface ScimPatchOperationSchema extends Named<
+  typeof scimPatchOperationSchemaDefinition
+> {}
+export const scimPatchOperationSchema: ScimPatchOperationSchema =
+  scimPatchOperationSchemaDefinition;
 
 export type ScimPatchOperation = z.infer<typeof scimPatchOperationSchema>;
 
-export const scimPatchRequestSchema = z.object({
+const scimPatchRequestSchemaDefinition = z.object({
   schemas: z.array(z.string()),
   Operations: z.array(scimPatchOperationSchema),
 });
+export interface ScimPatchRequestSchema extends Named<typeof scimPatchRequestSchemaDefinition> {}
+export const scimPatchRequestSchema: ScimPatchRequestSchema = scimPatchRequestSchemaDefinition;
 
 export type ScimPatchRequest = z.infer<typeof scimPatchRequestSchema>;
 
@@ -114,7 +125,7 @@ const scimExternalId = z.preprocess(
   z.string().min(1).optional(),
 );
 
-export const scimCreateUserRequestSchema = z
+const scimCreateUserRequestSchemaDefinition = z
   .object({
     schemas: z.array(z.string()),
     externalId: scimExternalId,
@@ -138,12 +149,17 @@ export const scimCreateUserRequestSchema = z
     [SCIM_ENTERPRISE_USER_SCHEMA]: scimEnterpriseUserSchema.optional(),
   })
   .passthrough();
+export interface ScimCreateUserRequestSchema extends Named<
+  typeof scimCreateUserRequestSchemaDefinition
+> {}
+export const scimCreateUserRequestSchema: ScimCreateUserRequestSchema =
+  scimCreateUserRequestSchemaDefinition;
 
 export type ScimCreateUserRequest = z.infer<typeof scimCreateUserRequestSchema>;
 
 // SCIM Group types
 
-export const scimGroupSchema = z.object({
+const scimGroupSchemaDefinition = z.object({
   schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:Group")),
   id: z.string(),
   /** The identity provider's identifier, scoped to its SSO connection. */
@@ -163,28 +179,42 @@ export const scimGroupSchema = z.object({
     lastModified: z.string(),
   }),
 });
+export interface ScimGroupSchema extends Named<typeof scimGroupSchemaDefinition> {}
+export const scimGroupSchema: ScimGroupSchema = scimGroupSchemaDefinition;
 export type ScimGroup = z.infer<typeof scimGroupSchema>;
 
-export const scimGroupMemberSchema = z.object({
+const scimGroupMemberSchemaDefinition = z.object({
   value: z.string(),
   display: z.string().optional(),
 });
+export interface ScimGroupMemberSchema extends Named<typeof scimGroupMemberSchemaDefinition> {}
+export const scimGroupMemberSchema: ScimGroupMemberSchema = scimGroupMemberSchemaDefinition;
 
-export const scimCreateGroupRequestSchema = z.object({
+const scimCreateGroupRequestSchemaDefinition = z.object({
   schemas: z.array(z.string()),
   externalId: scimExternalId,
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
+export interface ScimCreateGroupRequestSchema extends Named<
+  typeof scimCreateGroupRequestSchemaDefinition
+> {}
+export const scimCreateGroupRequestSchema: ScimCreateGroupRequestSchema =
+  scimCreateGroupRequestSchemaDefinition;
 
 export type ScimCreateGroupRequest = z.infer<typeof scimCreateGroupRequestSchema>;
 
-export const scimReplaceGroupRequestSchema = z.object({
+const scimReplaceGroupRequestSchemaDefinition = z.object({
   schemas: z.array(z.string()),
   externalId: scimExternalId,
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
+export interface ScimReplaceGroupRequestSchema extends Named<
+  typeof scimReplaceGroupRequestSchemaDefinition
+> {}
+export const scimReplaceGroupRequestSchema: ScimReplaceGroupRequestSchema =
+  scimReplaceGroupRequestSchemaDefinition;
 
 export type ScimReplaceGroupRequest = z.infer<typeof scimReplaceGroupRequestSchema>;
 
@@ -235,7 +265,7 @@ const scimSchemaAttributeSchema: z.ZodType<{
     .optional(),
 });
 
-export const scimSchemaDefinitionSchema = z.object({
+const scimSchemaDefinitionSchemaDefinition = z.object({
   schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:Schema")),
   id: z.string(),
   name: z.string(),
@@ -243,9 +273,14 @@ export const scimSchemaDefinitionSchema = z.object({
   attributes: z.array(scimSchemaAttributeSchema),
   meta: z.object({ resourceType: z.literal("Schema"), location: z.string() }),
 });
+export interface ScimSchemaDefinitionSchema extends Named<
+  typeof scimSchemaDefinitionSchemaDefinition
+> {}
+export const scimSchemaDefinitionSchema: ScimSchemaDefinitionSchema =
+  scimSchemaDefinitionSchemaDefinition;
 export type ScimSchemaDefinition = z.infer<typeof scimSchemaDefinitionSchema>;
 
-export const scimResourceTypeSchema = z.object({
+const scimResourceTypeSchemaDefinition = z.object({
   schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:ResourceType")),
   id: z.string(),
   name: z.string(),
@@ -253,9 +288,11 @@ export const scimResourceTypeSchema = z.object({
   schema: z.string(),
   meta: z.object({ resourceType: z.literal("ResourceType"), location: z.string() }),
 });
+export interface ScimResourceTypeSchema extends Named<typeof scimResourceTypeSchemaDefinition> {}
+export const scimResourceTypeSchema: ScimResourceTypeSchema = scimResourceTypeSchemaDefinition;
 export type ScimResourceType = z.infer<typeof scimResourceTypeSchema>;
 
-export const scimServiceProviderConfigSchema = z.object({
+const scimServiceProviderConfigSchemaDefinition = z.object({
   schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig")),
   documentationUri: z.string(),
   patch: z.object({ supported: z.boolean() }),
@@ -272,6 +309,11 @@ export const scimServiceProviderConfigSchema = z.object({
     z.object({ type: z.string(), name: z.string(), description: z.string() }),
   ),
 });
+export interface ScimServiceProviderConfigSchema extends Named<
+  typeof scimServiceProviderConfigSchemaDefinition
+> {}
+export const scimServiceProviderConfigSchema: ScimServiceProviderConfigSchema =
+  scimServiceProviderConfigSchemaDefinition;
 export type ScimServiceProviderConfig = z.infer<typeof scimServiceProviderConfigSchema>;
 
 /**

@@ -14,15 +14,9 @@ import {
 import { ESSENTIAL_PII_ENTITIES } from "@langwatch/redaction";
 
 /**
- * The most restrictive of several resolved privacy policies (ADR-144
- * decision 9). An aggregate project reads traces owned by its members, each
- * under its own policy, and one list mixes them; rather than redact row by
- * row, the whole read applies the strictest policy any member it reads
- * holds, the way the query API already does.
- *
- * Pure: the caller resolves each project through the per-project cache and
- * folds here, so a member's rule change reaches the next aggregate read on
- * the member's own cache entry and no aggregate-keyed entry can go stale.
+ * The most restrictive of several resolved privacy policies (ADR-144 decision 9): an aggregate
+ * project reads its members' traces under one strictest policy. Pure: the caller resolves each
+ * project through the per-project cache, so no aggregate-keyed entry can go stale.
  */
 export function strictestDataPrivacy(
   policies: readonly ResolvedDataPrivacy[],
@@ -64,12 +58,9 @@ const DISPOSITION_STRICTNESS: Record<Disposition, number> = {
 };
 
 /**
- * The level that redacts everything any member redacts. Strict covers every
- * identifier, so any strict member makes the fold strict. A custom level
- * redacts only its own selection, so where the members mix custom with
- * essential the fold stays custom and selects every essential identifier
- * too; ranking either above the other would drop what the other redacts.
- * With neither strict nor custom, essential beats disabled.
+ * The level that redacts everything any member redacts: any strict member makes the fold strict;
+ * custom mixed with essential stays custom and selects every essential identifier too;
+ * otherwise essential beats disabled.
  */
 function strictestPii(
   settings: readonly ResolvedDataPrivacy["pii"][],
@@ -123,11 +114,9 @@ function strictestCategory(settings: readonly ResolvedCategory[]): ResolvedCateg
 }
 
 /**
- * Per pattern, the strictest rule any member holds. A drop acts only at
- * ingestion and the read path hides only restricts, so where one member drops
- * a pattern another restricts, a folded drop would show the restricting
- * member's stored value to everyone. For a read the strictest of the two is
- * a restriction to no one.
+ * Per pattern, the strictest rule any member holds. A drop acts only at ingestion and the read
+ * path hides only restricts, so a folded drop would show a restricting member's stored value
+ * to everyone; for a read the strictest of the two is a restriction to no one.
  */
 function strictestCustomAttributes(
   rules: readonly ResolvedCustomAttributeRule[],

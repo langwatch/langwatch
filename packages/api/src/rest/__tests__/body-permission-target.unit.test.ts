@@ -38,6 +38,7 @@ function mounted({ signedIn = true, granted = true, kind = "application" } = {})
       schema: z.object({ projectId: z.string() }),
     })
     .withOutput(z.object({ ran: z.boolean() }))
+    .withoutAudit("test route")
     .handle(({ app, raw }) => app.post({ raw: String(raw) }))
     .build()
     .router();

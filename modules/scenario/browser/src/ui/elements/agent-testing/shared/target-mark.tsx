@@ -20,9 +20,6 @@ const KIND_ICONS: Record<TargetKind, LucideIcon> = {
   unknown: Bot,
 };
 
-/** The tint of the square behind a coloured mark, as a hex alpha. */
-const TINT_ALPHA = "26";
-
 export function TargetMark({
   kind,
   color,
@@ -42,7 +39,7 @@ export function TargetMark({
       display="flex"
       alignItems="center"
       justifyContent="center"
-      backgroundColor={color ? `${color}${TINT_ALPHA}` : "bg.muted"}
+      backgroundColor={color ? `color-mix(in srgb, ${color} 15%, transparent)` : "bg.muted"}
       data-testid={testId}
       data-kind={kind}
       data-color={color}

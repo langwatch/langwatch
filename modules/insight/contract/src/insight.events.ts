@@ -3,6 +3,7 @@
  * `@langwatch/insight-process`, where the eventing dependency belongs.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -18,7 +19,7 @@ import {
  * `replay`, `board`, `filedVia` and `ownerUserId` came after the first filings, each with a
  * default: an old event reads as no window, no pointer, saved from a chat, owned by its filer.
  */
-export const insightFiledEventDataSchema = z.object({
+const insightFiledEventDataSchemaDefinition = z.object({
   insightId: z.string().min(1),
   title: z.string(),
   body: z.string(),
@@ -35,11 +36,21 @@ export const insightFiledEventDataSchema = z.object({
   /** The person who saved it; null when Langy filed it on a scheduled run. */
   filedByUserId: z.string().nullable(),
 });
+export interface InsightFiledEventDataSchema extends Named<
+  typeof insightFiledEventDataSchemaDefinition
+> {}
+export const insightFiledEventDataSchema: InsightFiledEventDataSchema =
+  insightFiledEventDataSchemaDefinition;
 export type InsightFiledEventData = z.infer<typeof insightFiledEventDataSchema>;
 
 /** The owner's act on their insight: seen, marked done, or kept as still relevant. */
-export const insightReaderEventDataSchema = z.object({
+const insightReaderEventDataSchemaDefinition = z.object({
   insightId: z.string().min(1),
   userId: z.string().min(1),
 });
+export interface InsightReaderEventDataSchema extends Named<
+  typeof insightReaderEventDataSchemaDefinition
+> {}
+export const insightReaderEventDataSchema: InsightReaderEventDataSchema =
+  insightReaderEventDataSchemaDefinition;
 export type InsightReaderEventData = z.infer<typeof insightReaderEventDataSchema>;

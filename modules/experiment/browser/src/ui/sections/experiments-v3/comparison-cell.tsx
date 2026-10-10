@@ -1,9 +1,17 @@
 import { Markdown } from "@langwatch/browser-host/markdown";
 import { RawPopover as Popover } from "@langwatch/design-system/popover";
-import { Box, HStack, Icon, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Box,
+  HStack,
+  Icon,
+  IconButton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { parseEvaluationResult, type ParsedEvaluationResult } from "@langwatch/evaluator-contract";
 import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
-import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
+import { Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
@@ -231,46 +239,40 @@ export function ComparisonCell({
   if (parsed.status === "error") {
     const { headline, hint, raw } = explainComparisonError(parsed);
     return withRunAction(
-      <Box p={2} bg="red.subtle" color="red.fg" borderRadius="md" fontSize="13px">
-        <HStack gap={1.5} align="start">
-          <Icon as={CircleAlert} boxSize="14px" marginTop="2px" />
-          <VStack align="stretch" gap={0.5}>
-            <Text fontWeight="medium">{headline}</Text>
-            {hint ? (
-              <Text fontSize="12px" color="fg.muted">
-                {hint}
-              </Text>
-            ) : null}
-            {raw ? (
-              <Popover.Root>
-                <Popover.Trigger asChild>
-                  <Box
-                    as="button"
-                    textAlign="left"
-                    color="fg.muted"
-                    textDecoration="underline"
-                    fontSize="11px"
+      <Alert.Root status="error" size="sm">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>{headline}</Alert.Title>
+          {hint ? <Alert.Description>{hint}</Alert.Description> : null}
+          {raw ? (
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <Box
+                  as="button"
+                  textAlign="left"
+                  color="fg.muted"
+                  textDecoration="underline"
+                  fontSize="11px"
+                >
+                  show details
+                </Box>
+              </Popover.Trigger>
+              <Popover.Positioner>
+                <Popover.Content maxWidth="460px">
+                  <Popover.Arrow />
+                  <Popover.Body
+                    fontSize="12px"
+                    whiteSpace="pre-wrap"
+                    data-testid="comparison-error-details"
                   >
-                    show details
-                  </Box>
-                </Popover.Trigger>
-                <Popover.Positioner>
-                  <Popover.Content maxWidth="460px">
-                    <Popover.Arrow />
-                    <Popover.Body
-                      fontSize="12px"
-                      whiteSpace="pre-wrap"
-                      data-testid="comparison-error-details"
-                    >
-                      {raw}
-                    </Popover.Body>
-                  </Popover.Content>
-                </Popover.Positioner>
-              </Popover.Root>
-            ) : null}
-          </VStack>
-        </HStack>
-      </Box>,
+                    {raw}
+                  </Popover.Body>
+                </Popover.Content>
+              </Popover.Positioner>
+            </Popover.Root>
+          ) : null}
+        </Alert.Content>
+      </Alert.Root>,
     );
   }
 

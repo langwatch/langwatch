@@ -29,11 +29,8 @@ export const PLATFORM_OPERATOR_ROLE_ID = "platform-operator" as const satisfies 
 export const PROJECT_READER_ROLE_KEY = "project-reader" as const;
 
 /**
- * ADR-177: everything a project-reader grant may do, and nothing else. An
- * aggregate project reads its members' traces and analytics; it never
- * manages, shares, annotates or sees prompts, datasets or secrets. The list
- * is closed on purpose - the matcher test proves every other permission is
- * denied through this role.
+ * ADR-177: everything a project-reader grant may do. An aggregate project reads its members'
+ * traces and analytics; the list is closed and the matcher test denies every other permission.
  */
 export const PROJECT_READER_PERMISSIONS: readonly AuthzPermission[] = [
   "traces:view",

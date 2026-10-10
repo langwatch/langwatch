@@ -1,7 +1,7 @@
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { Check, X } from "react-feather";
+import { Check, X } from "lucide-react";
+import { type RefObject, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
@@ -80,12 +80,12 @@ export function WorkflowAutosave({
   );
   const stateWorkflow = useWorkflowStore(useShallow((state) => state.getWorkflow()));
 
-  const clearScheduledSave = useCallback(() => {
+  const clearScheduledSave = useEffectEvent(() => {
     clearTimer(saveTimeoutRef);
     clearTimer(maxWaitTimeoutRef);
-  }, []);
+  });
 
-  const saveIfChanged = useCallback(async () => {
+  const saveIfChanged = useEffectEvent(async () => {
     clearScheduledSave();
     if (!isWorkflowReady) {
       return;
@@ -127,18 +127,7 @@ export function WorkflowAutosave({
     } finally {
       setIsSaving(false);
     }
-  }, [
-    clearScheduledSave,
-    getAutosavedWorkflow,
-    getWorkflow,
-    hasPendingChanges,
-    isWorkflowReady,
-    onRefreshVersions,
-    onSave,
-    setAutosavedWorkflow,
-    setCurrentVersionId,
-    setWorkflow,
-  ]);
+  });
 
   useEffect(() => {
     if (!isWorkflowReady) {
@@ -154,14 +143,14 @@ export function WorkflowAutosave({
     }
 
     return () => clearTimer(saveTimeoutRef);
-  }, [clearScheduledSave, isWorkflowReady, saveIfChanged, stateWorkflow]);
+  }, [isWorkflowReady, stateWorkflow]);
 
   useEffect(
     () => () => {
       clearScheduledSave();
       clearTimer(savedIndicatorTimeoutRef);
     },
-    [clearScheduledSave],
+    [],
   );
 
   return (

@@ -209,7 +209,7 @@ function DatasetTableBody({
                     )}
                     <Menu.Item
                       value="delete"
-                      color="red.600"
+                      color="fg.error"
                       onClick={(event) => {
                         event.stopPropagation();
                         onDelete({ id: dataset.id, name: dataset.name });

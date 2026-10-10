@@ -15,6 +15,7 @@ import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 function mount(updateTraceMetadata: TraceApi["updateTraceMetadata"]) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

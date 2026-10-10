@@ -543,7 +543,7 @@ function RetentionPolicyList({
                           <Menu.Item value="edit" onClick={() => onEdit(group)}>
                             <Pencil size={14} /> Edit
                           </Menu.Item>
-                          <Menu.Item value="remove" color="red.500" onClick={() => onRemove(group)}>
+                          <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(group)}>
                             <Trash2 size={14} /> Remove
                           </Menu.Item>
                         </Menu.Content>

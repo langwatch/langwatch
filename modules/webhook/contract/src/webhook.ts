@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -20,23 +21,33 @@ export type SqsCredentialMode = z.infer<typeof sqsCredentialModeSchema>;
 export const webhookDeliveryOutcomeSchema = z.enum(["success", "retryable", "terminal"]);
 export type WebhookDeliveryOutcome = z.infer<typeof webhookDeliveryOutcomeSchema>;
 
-export const webhookDeliveryControlsSchema = z.object({
+const webhookDeliveryControlsSchemaDefinition = z.object({
   maxBatchSize: z.number().int().min(1).max(100),
   maxBatchDelayMs: z.number().int().min(0).max(60_000),
   maxInFlight: z.number().int().min(1).max(8),
 });
+export interface WebhookDeliveryControlsSchema extends Named<
+  typeof webhookDeliveryControlsSchemaDefinition
+> {}
+export const webhookDeliveryControlsSchema: WebhookDeliveryControlsSchema =
+  webhookDeliveryControlsSchemaDefinition;
 export type WebhookDeliveryControls = z.infer<typeof webhookDeliveryControlsSchema>;
 
-export const sqsDestinationInputSchema = z.object({
+const sqsDestinationInputSchemaDefinition = z.object({
   queueUrl: z.string().min(1),
   roleArn: z.string().nullable().optional(),
   externalId: z.string().nullable().optional(),
   accessKeyId: z.string().nullable().optional(),
   secretAccessKey: z.string().nullable().optional(),
 });
+export interface SqsDestinationInputSchema extends Named<
+  typeof sqsDestinationInputSchemaDefinition
+> {}
+export const sqsDestinationInputSchema: SqsDestinationInputSchema =
+  sqsDestinationInputSchemaDefinition;
 export type SqsDestinationInput = z.infer<typeof sqsDestinationInputSchema>;
 
-export const sqsDestinationViewSchema = z.object({
+const sqsDestinationViewSchemaDefinition = z.object({
   queueUrl: z.string(),
   region: z.string(),
   accountId: z.string(),
@@ -46,9 +57,14 @@ export const sqsDestinationViewSchema = z.object({
   externalId: z.string().nullable(),
   accessKeyId: z.string().nullable(),
 });
+export interface SqsDestinationViewSchema extends Named<
+  typeof sqsDestinationViewSchemaDefinition
+> {}
+export const sqsDestinationViewSchema: SqsDestinationViewSchema =
+  sqsDestinationViewSchemaDefinition;
 export type SqsDestinationView = z.infer<typeof sqsDestinationViewSchema>;
 
-export const webhookEndpointViewSchema = z.object({
+const webhookEndpointViewSchemaDefinition = z.object({
   id: z.string().min(1),
   organizationId: z.string().min(1),
   destinationKind: webhookDestinationKindSchema,
@@ -69,18 +85,25 @@ export const webhookEndpointViewSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface WebhookEndpointViewSchema extends Named<
+  typeof webhookEndpointViewSchemaDefinition
+> {}
+export const webhookEndpointViewSchema: WebhookEndpointViewSchema =
+  webhookEndpointViewSchemaDefinition;
 export type WebhookEndpointView = z.infer<typeof webhookEndpointViewSchema>;
 
-export const webhookEnvelopeSchema = z.object({
+const webhookEnvelopeSchemaDefinition = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
   created: z.iso.datetime(),
   schema_version: z.literal("1"),
   data: z.record(z.string(), z.unknown()),
 });
+export interface WebhookEnvelopeSchema extends Named<typeof webhookEnvelopeSchemaDefinition> {}
+export const webhookEnvelopeSchema: WebhookEnvelopeSchema = webhookEnvelopeSchemaDefinition;
 export type WebhookEnvelope = z.infer<typeof webhookEnvelopeSchema>;
 
-export const webhookEndpointHealthSchema = z.object({
+const webhookEndpointHealthSchemaDefinition = z.object({
   status: z.enum(["ACTIVE", "DISABLED"]),
   disabledReason: z.string().nullable(),
   failingSince: z.date().nullable(),
@@ -92,6 +115,11 @@ export const webhookEndpointHealthSchema = z.object({
   successRate: z.number().min(0).max(1).nullable(),
   p95LatencyMs: z.number().min(0).nullable(),
 });
+export interface WebhookEndpointHealthSchema extends Named<
+  typeof webhookEndpointHealthSchemaDefinition
+> {}
+export const webhookEndpointHealthSchema: WebhookEndpointHealthSchema =
+  webhookEndpointHealthSchemaDefinition;
 export type WebhookEndpointHealth = z.infer<typeof webhookEndpointHealthSchema>;
 
 /**
@@ -99,12 +127,17 @@ export type WebhookEndpointHealth = z.infer<typeof webhookEndpointHealthSchema>;
  * client exactly here and in a roll, once each time; every read answers a view
  * with no secret material on it.
  */
-export const webhookEndpointWithSecretSchema = z
+const webhookEndpointWithSecretSchemaDefinition = z
   .object({ endpoint: webhookEndpointViewSchema, secret: z.string() })
   .strict();
+export interface WebhookEndpointWithSecretSchema extends Named<
+  typeof webhookEndpointWithSecretSchemaDefinition
+> {}
+export const webhookEndpointWithSecretSchema: WebhookEndpointWithSecretSchema =
+  webhookEndpointWithSecretSchemaDefinition;
 
 /** One delivery attempt, as the endpoint's activity list renders it. */
-export const webhookDeliveryAttemptSchema = z
+const webhookDeliveryAttemptSchemaDefinition = z
   .object({
     id: z.string(),
     dispatchId: z.string(),
@@ -117,14 +150,24 @@ export const webhookDeliveryAttemptSchema = z
     firedAt: z.date(),
   })
   .strict();
+export interface WebhookDeliveryAttemptSchema extends Named<
+  typeof webhookDeliveryAttemptSchemaDefinition
+> {}
+export const webhookDeliveryAttemptSchema: WebhookDeliveryAttemptSchema =
+  webhookDeliveryAttemptSchemaDefinition;
 
 /** One page of delivery attempts, newest first, with the cursor for the next. */
-export const webhookDeliveryPageSchema = z
+const webhookDeliveryPageSchemaDefinition = z
   .object({
     deliveries: z.array(webhookDeliveryAttemptSchema),
     nextCursor: z.object({ firedAt: z.date(), id: z.string() }).strict().nullable(),
   })
   .strict();
+export interface WebhookDeliveryPageSchema extends Named<
+  typeof webhookDeliveryPageSchemaDefinition
+> {}
+export const webhookDeliveryPageSchema: WebhookDeliveryPageSchema =
+  webhookDeliveryPageSchemaDefinition;
 
 /**
  * The same page as the application holds it: an instant, not the wire date the

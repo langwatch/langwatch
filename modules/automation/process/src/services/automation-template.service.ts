@@ -22,6 +22,7 @@ import {
   type TriggerTemplateDefaults,
 } from "@langwatch/automation-contract";
 import { renderTriggerEmail } from "@langwatch/automation-contract/templating";
+import { DispatchError } from "@langwatch/eventing";
 
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 
@@ -261,10 +262,17 @@ export class AutomationTemplateService {
     });
 
     if (input.botDestination) {
-      await this.delivery.sendSlackBot({
-        ...input.botDestination,
-        payload: rendered.payload,
-      });
+      try {
+        await this.delivery.sendSlackBot({
+          ...input.botDestination,
+          payload: rendered.payload,
+        });
+      } catch (error) {
+        if (error instanceof DispatchError && error.customerMessage) {
+          throw new TestFireUnavailableError("slack", error.customerMessage);
+        }
+        throw error;
+      }
     } else {
       if (!input.webhook) {
         throw new TestFireUnavailableError(

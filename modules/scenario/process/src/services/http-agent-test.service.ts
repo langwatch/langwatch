@@ -245,6 +245,7 @@ function toProxyResult(state: ExecutionState, fallbackDuration: number): HttpPro
     return {
       ...detail,
       success: false,
+      response: parseUpstreamBody(state.http?.response_body),
       errorCode: state.error_type,
       error: state.error ?? "The request failed",
     };
@@ -259,6 +260,15 @@ function toProxyResult(state: ExecutionState, fallbackDuration: number): HttpPro
     response: extracted,
     extractedOutput,
   };
+}
+
+function parseUpstreamBody(body: string | undefined): unknown {
+  if (!body) return void 0;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return body;
+  }
 }
 
 function stringifyOutput(value: unknown): string {

@@ -7,7 +7,7 @@
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import type { RestProjectCredentialPrincipal } from "@langwatch/authorization";
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
-import { defineMiddlewareContext } from "@langwatch/module";
+import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -23,16 +23,26 @@ import {
 /** A bound parameter's value: scalars only, as the query family publishes. */
 const parameterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
-export const instantEvalParametersSchema = z.record(z.string(), parameterValueSchema);
+const instantEvalParametersSchemaDefinition = z.record(z.string(), parameterValueSchema);
+export interface InstantEvalParametersSchema extends Named<
+  typeof instantEvalParametersSchemaDefinition
+> {}
+export const instantEvalParametersSchema: InstantEvalParametersSchema =
+  instantEvalParametersSchemaDefinition;
 
 /**
  * What a stored run reads back: scalars as a caller bound them, plus the one
  * list a run started from the explorer binds its resolved trace ids under.
  */
-export const instantEvalStoredParametersSchema = z.record(
+const instantEvalStoredParametersSchemaDefinition = z.record(
   z.string(),
   z.union([parameterValueSchema, z.array(z.string())]),
 );
+export interface InstantEvalStoredParametersSchema extends Named<
+  typeof instantEvalStoredParametersSchemaDefinition
+> {}
+export const instantEvalStoredParametersSchema: InstantEvalStoredParametersSchema =
+  instantEvalStoredParametersSchemaDefinition;
 
 const QUERY_BOOLEAN_SPELLINGS = ["true", "1", "yes", "false", "0", "no"] as const;
 const QUERY_BOOLEAN_TRUE: readonly string[] = ["true", "1", "yes"];
@@ -57,7 +67,7 @@ const written = (schema: z.ZodString) =>
   });
 
 /** One named option of a category question. */
-export const instantEvalShorthandOptionSchema = z.object({
+const instantEvalShorthandOptionSchemaDefinition = z.object({
   name: written(z.string().min(1).max(100)).describe(
     "What the column holds when this option is the answer.",
   ),
@@ -65,8 +75,13 @@ export const instantEvalShorthandOptionSchema = z.object({
     "What this option means, in your own words.",
   ),
 });
+export interface InstantEvalShorthandOptionSchema extends Named<
+  typeof instantEvalShorthandOptionSchemaDefinition
+> {}
+export const instantEvalShorthandOptionSchema: InstantEvalShorthandOptionSchema =
+  instantEvalShorthandOptionSchemaDefinition;
 
-export const instantEvalShorthandQuestionSchema = z.object({
+const instantEvalShorthandQuestionSchemaDefinition = z.object({
   id: z
     .string()
     .min(1)
@@ -114,10 +129,15 @@ export const instantEvalShorthandQuestionSchema = z.object({
     .optional()
     .describe("For a choice: the options to pick between."),
 });
+export interface InstantEvalShorthandQuestionSchema extends Named<
+  typeof instantEvalShorthandQuestionSchemaDefinition
+> {}
+export const instantEvalShorthandQuestionSchema: InstantEvalShorthandQuestionSchema =
+  instantEvalShorthandQuestionSchemaDefinition;
 
 export type InstantEvalShorthandQuestion = z.infer<typeof instantEvalShorthandQuestionSchema>;
 
-export const instantEvalShorthandSchema = z.object({
+const instantEvalShorthandSchemaDefinition = z.object({
   target: z
     .enum(INSTANT_EVAL_TARGETS)
     .describe("What one judged row is: a trace, a conversation, or one model call."),
@@ -146,10 +166,15 @@ export const instantEvalShorthandSchema = z.object({
     .max(INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS)
     .describe("What to ask of each row. One classification asks them all."),
 });
+export interface InstantEvalShorthandSchema extends Named<
+  typeof instantEvalShorthandSchemaDefinition
+> {}
+export const instantEvalShorthandSchema: InstantEvalShorthandSchema =
+  instantEvalShorthandSchemaDefinition;
 
 export type InstantEvalShorthandInput = z.infer<typeof instantEvalShorthandSchema>;
 
-export const instantEvalRunInputSchema = z.object({
+const instantEvalRunInputSchemaDefinition = z.object({
   // Never trimmed or rewritten: a run hands the statement back so an agent can
   // copy it, edit it and resubmit, which only works if it is the one sent.
   sql: z
@@ -205,17 +230,32 @@ export const instantEvalRunInputSchema = z.object({
       "Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap.",
     ),
 });
+export interface InstantEvalRunInputSchema extends Named<
+  typeof instantEvalRunInputSchemaDefinition
+> {}
+export const instantEvalRunInputSchema: InstantEvalRunInputSchema =
+  instantEvalRunInputSchemaDefinition;
 
 export type InstantEvalRunInputBody = z.infer<typeof instantEvalRunInputSchema>;
 
 /** A cancel takes no body: the run travels in the path. */
-export const cancelInstantEvalRunBodySchema = z.object({});
+const cancelInstantEvalRunBodySchemaDefinition = z.object({});
+export interface CancelInstantEvalRunBodySchema extends Named<
+  typeof cancelInstantEvalRunBodySchemaDefinition
+> {}
+export const cancelInstantEvalRunBodySchema: CancelInstantEvalRunBodySchema =
+  cancelInstantEvalRunBodySchemaDefinition;
 
-export const instantEvalIdParamsSchema = z.object({
+const instantEvalIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The run id."),
 });
+export interface InstantEvalIdParamsSchema extends Named<
+  typeof instantEvalIdParamsSchemaDefinition
+> {}
+export const instantEvalIdParamsSchema: InstantEvalIdParamsSchema =
+  instantEvalIdParamsSchemaDefinition;
 
-export const instantEvalListQuerySchema = z
+const instantEvalListQuerySchemaDefinition = z
   .object({
     limit: z.coerce
       .number()
@@ -253,8 +293,13 @@ export const instantEvalListQuerySchema = z
       message: `${missing} is required when ${given} is given: the two together are the list's cursor.`,
     });
   });
+export interface InstantEvalListQuerySchema extends Named<
+  typeof instantEvalListQuerySchemaDefinition
+> {}
+export const instantEvalListQuerySchema: InstantEvalListQuerySchema =
+  instantEvalListQuerySchemaDefinition;
 
-export const instantEvalResultsQuerySchema = z.object({
+const instantEvalResultsQuerySchemaDefinition = z.object({
   questionId: z.string().min(1).optional().describe("Only this question's judgements."),
   matched: optionalQueryBoolean.describe(
     "Only judgements that matched, or only those that did not. Omit for both.",
@@ -278,8 +323,13 @@ export const instantEvalResultsQuerySchema = z.object({
     .optional()
     .describe("The cursor the previous page answered with."),
 });
+export interface InstantEvalResultsQuerySchema extends Named<
+  typeof instantEvalResultsQuerySchemaDefinition
+> {}
+export const instantEvalResultsQuerySchema: InstantEvalResultsQuerySchema =
+  instantEvalResultsQuerySchemaDefinition;
 
-export const instantEvalSampleQuerySchema = z.object({
+const instantEvalSampleQuerySchemaDefinition = z.object({
   n: z.coerce
     .number()
     .int()
@@ -289,6 +339,11 @@ export const instantEvalSampleQuerySchema = z.object({
     .default(5)
     .describe("Rows to re-read, at most twenty five."),
 });
+export interface InstantEvalSampleQuerySchema extends Named<
+  typeof instantEvalSampleQuerySchemaDefinition
+> {}
+export const instantEvalSampleQuerySchema: InstantEvalSampleQuerySchema =
+  instantEvalSampleQuerySchemaDefinition;
 
 export type InstantEvalResultsQuery = z.infer<typeof instantEvalResultsQuerySchema>;
 export type InstantEvalSampleQuery = z.infer<typeof instantEvalSampleQuerySchema>;
@@ -314,7 +369,7 @@ const instantEvalRunQuestionSchema = z.object({
 
 export type InstantEvalRunQuestionWire = z.infer<typeof instantEvalRunQuestionSchema>;
 
-export const instantEvalRunSchema = z.object({
+const instantEvalRunSchemaDefinition = z.object({
   id: z.string().describe("The run id."),
   name: z.string().nullable().describe("What the run was called, if anything."),
   sql: z.string().describe("The statement, exactly as submitted."),
@@ -359,8 +414,10 @@ export const instantEvalRunSchema = z.object({
   startedAt: z.string().nullable().describe("When the run began reading rows."),
   finishedAt: z.string().nullable().describe("When the run ended."),
 });
+export interface InstantEvalRunSchema extends Named<typeof instantEvalRunSchemaDefinition> {}
+export const instantEvalRunSchema: InstantEvalRunSchema = instantEvalRunSchemaDefinition;
 
-export const instantEvalEstimateSchema = z.object({
+const instantEvalEstimateSchemaDefinition = z.object({
   rows: z.number().int().describe("Rows the statement matches, bounded by the run's limit."),
   isRowsCapped: z
     .boolean()
@@ -379,8 +436,13 @@ export const instantEvalEstimateSchema = z.object({
       "What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.",
     ),
 });
+export interface InstantEvalEstimateSchema extends Named<
+  typeof instantEvalEstimateSchemaDefinition
+> {}
+export const instantEvalEstimateSchema: InstantEvalEstimateSchema =
+  instantEvalEstimateSchemaDefinition;
 
-export const instantEvalJudgmentSchema = z.object({
+const instantEvalJudgmentSchemaDefinition = z.object({
   traceId: z.string().describe("The trace the judgement is about."),
   questionId: z.string().describe("The question it answers, named by its output column."),
   threadId: z.string().describe("The conversation the trace belongs to."),
@@ -403,20 +465,35 @@ export const instantEvalJudgmentSchema = z.object({
   error: z.string().nullable().describe("Why the judge could not answer, when it could not."),
   occurredAt: z.string().describe("When the judgement was made."),
 });
+export interface InstantEvalJudgmentSchema extends Named<
+  typeof instantEvalJudgmentSchemaDefinition
+> {}
+export const instantEvalJudgmentSchema: InstantEvalJudgmentSchema =
+  instantEvalJudgmentSchemaDefinition;
 
-export const instantEvalRunListSchema = z.object({
+const instantEvalRunListSchemaDefinition = z.object({
   runs: z.array(instantEvalRunSchema).describe("The project's runs, newest first."),
 });
+export interface InstantEvalRunListSchema extends Named<
+  typeof instantEvalRunListSchemaDefinition
+> {}
+export const instantEvalRunListSchema: InstantEvalRunListSchema =
+  instantEvalRunListSchemaDefinition;
 
-export const instantEvalResultsSchema = z.object({
+const instantEvalResultsSchemaDefinition = z.object({
   judgments: z.array(instantEvalJudgmentSchema).describe("One page of the run's judgements."),
   nextCursor: z
     .string()
     .optional()
     .describe("Pass as cursor to read the page after this one. Absent on the last page."),
 });
+export interface InstantEvalResultsSchema extends Named<
+  typeof instantEvalResultsSchemaDefinition
+> {}
+export const instantEvalResultsSchema: InstantEvalResultsSchema =
+  instantEvalResultsSchemaDefinition;
 
-export const instantEvalSampleSchema = z.object({
+const instantEvalSampleSchemaDefinition = z.object({
   rows: z
     .array(z.record(z.string(), z.any()))
     .describe(
@@ -424,6 +501,8 @@ export const instantEvalSampleSchema = z.object({
     ),
   judgments: z.array(instantEvalJudgmentSchema).describe("The verdicts those rows received."),
 });
+export interface InstantEvalSampleSchema extends Named<typeof instantEvalSampleSchemaDefinition> {}
+export const instantEvalSampleSchema: InstantEvalSampleSchema = instantEvalSampleSchemaDefinition;
 
 export type InstantEvalRunWire = z.infer<typeof instantEvalRunSchema>;
 export type InstantEvalJudgmentWire = z.infer<typeof instantEvalJudgmentSchema>;
@@ -476,10 +555,15 @@ export type SelfHostedInstantEvalOffer = z.infer<typeof selfHostedInstantEvalOff
  * switch (`enable`), a word with an organization admin (`ask_admin`), a word
  * with us (`contact_us`), or the reason a self-hosted install is not released.
  */
-export const instantEvalOptInOfferSchema = z.union([
+const instantEvalOptInOfferSchemaDefinition = z.union([
   z.enum(["enable", "ask_admin", "contact_us"]),
   selfHostedInstantEvalOfferSchema,
 ]);
+export interface InstantEvalOptInOfferSchema extends Named<
+  typeof instantEvalOptInOfferSchemaDefinition
+> {}
+export const instantEvalOptInOfferSchema: InstantEvalOptInOfferSchema =
+  instantEvalOptInOfferSchemaDefinition;
 export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
 
 /**
@@ -487,9 +571,14 @@ export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
  * whether the install judges through LangWatch (`viaConnect`), which is when the
  * "can't run right now" popover names the two addresses it needs (main #8416).
  */
-export const instantEvalOptInAccessSchema = z.object({
+const instantEvalOptInAccessSchemaDefinition = z.object({
   released: z.boolean(),
   offer: instantEvalOptInOfferSchema,
   viaConnect: z.boolean(),
 });
+export interface InstantEvalOptInAccessSchema extends Named<
+  typeof instantEvalOptInAccessSchemaDefinition
+> {}
+export const instantEvalOptInAccessSchema: InstantEvalOptInAccessSchema =
+  instantEvalOptInAccessSchemaDefinition;
 export type InstantEvalOptInAccess = z.infer<typeof instantEvalOptInAccessSchema>;

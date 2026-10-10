@@ -109,6 +109,7 @@ const keyOf = (userId: string): Actor => ({ type: "user", id: userId });
 function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | null = PROJECT_KEY) {
   const caller = { actor, scope: { tier: "project" as const, id: projectId } };
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });

@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Button,
@@ -9,7 +10,6 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
-import { useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 
@@ -21,10 +21,10 @@ export function AnomaliesCard() {
     onSuccess: () => query.refetch(),
   });
 
-  const anomalies = useMemo(() => query.data?.anomalies ?? [], [query.data?.anomalies]);
+  const anomalies = query.data?.anomalies ?? [];
   const hasAny = anomalies.length > 0;
   const hasError = query.isError && !query.isFetching;
-  const hardCount = useMemo(() => anomalies.filter((a) => a.tier === "hard").length, [anomalies]);
+  const hardCount = anomalies.filter((a) => a.tier === "hard").length;
 
   // Nothing to report collapses onto the dashboard's health line rather than
   // spending a whole card saying so. An ERROR still renders: "we could not
@@ -32,7 +32,7 @@ export function AnomaliesCard() {
   if (!hasAny && !hasError) return null;
 
   return (
-    <Card.Root borderColor={hardCount > 0 ? "red.300" : undefined}>
+    <Card.Root borderColor={hardCount > 0 ? "red.muted" : "border.muted"}>
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5}>
           <Text textStyle="sm" fontWeight="medium">
@@ -50,13 +50,19 @@ export function AnomaliesCard() {
           {query.isFetching && <Spinner size="xs" />}
         </HStack>
         {hasError && (
-          <Text paddingX={4} paddingBottom={3} color="red.500" textStyle="xs">
+          <Text paddingX={4} paddingBottom={3} color="fg.error" textStyle="xs">
             Could not load anomalies. Redis may be unavailable. Retrying every 30s. Do NOT interpret
             this as &ldquo;all clear&rdquo;.
           </Text>
         )}
         {hasAny && (
-          <Table.Root size="sm" variant="line">
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflow: "visible" }}
+            size="sm"
+            variant="line"
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Tenant</Table.ColumnHeader>
@@ -89,13 +95,13 @@ export function AnomaliesCard() {
                     <Text textStyle="xs">{formatAge(a.triggeredAt)}</Text>
                   </Table.Cell>
                   <Table.Cell maxW="320px">
-                    <Text textStyle="xs" color="gray.600" lineClamp={2}>
+                    <Text textStyle="xs" color="fg.muted" lineClamp={2}>
                       {a.reason}
                     </Text>
                   </Table.Cell>
                   <Table.Cell>
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="ghost"
                       onClick={() =>
                         dismiss.mutate({
@@ -110,7 +116,7 @@ export function AnomaliesCard() {
                 </Table.Row>
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         )}
       </Card.Body>
     </Card.Root>

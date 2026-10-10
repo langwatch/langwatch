@@ -44,6 +44,8 @@ function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
     after: { rateLimit: "500/m" },
     actorUserId: null,
     actorUser: null,
+    channel: "app",
+    apiKeyId: null,
     ...overrides,
   };
 }

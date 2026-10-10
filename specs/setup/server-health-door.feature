@@ -97,3 +97,11 @@ Feature: The process boundary's built-in health door
       And a hosted component whose drain never finishes
       When the server closes and the drain passes its budget
       Then the health door's port is free for the next generation to bind
+
+    @unit
+    Scenario: A server closed before it listened releases what was already live
+      Given a server whose boot was refused before it listened
+      And a hosted component with no start, live from the moment it was hosted
+      When the server closes
+      Then that component is stopped, so a retry in the same process can set it up again
+      And a component that waits for listen to start is not stopped

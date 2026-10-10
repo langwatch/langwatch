@@ -72,12 +72,9 @@ export function useTraceListEvents({
 }
 
 /**
- * Puts each row's rollup on the row. Shared with the conversation view, whose
- * turns are trace rows read outside the list and need the same merge.
- *
- * Rollups are keyed by project and trace id together, because on an aggregate
- * two members may hold the same trace id. A row is looked up under the project
- * it names, or under the project that read it when it names none.
+ * Puts each row's rollup on the row; shared with the conversation view. Rollups are keyed by
+ * project and trace id together (two aggregate members may share a trace id); a row is looked up
+ * under the project it names, else the project that read it.
  */
 export function mergeTraceEvents({
   rows,

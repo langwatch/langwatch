@@ -4,6 +4,7 @@
  * `organization.trpc-schemas.ts`, which carries the browser's own transport.
  */
 import { grantScopeTierSchema, teamUserRoleSchema } from "@langwatch/authz-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { organizationApiMemberRoleSchema } from "./organization.trpc-schemas.ts";
@@ -12,7 +13,7 @@ import { organizationIntentSchema, organizationSettingsSchema } from "./organiza
 /** What `GET /` and `PATCH /` answer: the canonical settings shape. */
 export const organizationManagementRestSettingsSchema = organizationSettingsSchema;
 
-export const organizationManagementRestUpdateSchema = z.object({
+const organizationManagementRestUpdateSchemaDefinition = z.object({
   name: z.string().trim().min(1).max(255).optional(),
   supportContact: z.string().max(255).nullable().optional(),
   presenceEnabled: z.boolean().optional(),
@@ -24,8 +25,13 @@ export const organizationManagementRestUpdateSchema = z.object({
   s3SecretAccessKey: z.string().max(1024).nullable().optional(),
   s3Bucket: z.string().max(1024).nullable().optional(),
 });
+export interface OrganizationManagementRestUpdateSchema extends Named<
+  typeof organizationManagementRestUpdateSchemaDefinition
+> {}
+export const organizationManagementRestUpdateSchema: OrganizationManagementRestUpdateSchema =
+  organizationManagementRestUpdateSchemaDefinition;
 
-export const organizationManagementRestMemberSchema = z.object({
+const organizationManagementRestMemberSchemaDefinition = z.object({
   userId: z.string(),
   role: organizationApiMemberRoleSchema,
   disabled: z.boolean(),
@@ -38,16 +44,26 @@ export const organizationManagementRestMemberSchema = z.object({
     email: z.string().nullable(),
   }),
 });
+export interface OrganizationManagementRestMemberSchema extends Named<
+  typeof organizationManagementRestMemberSchemaDefinition
+> {}
+export const organizationManagementRestMemberSchema: OrganizationManagementRestMemberSchema =
+  organizationManagementRestMemberSchemaDefinition;
 
-export const organizationManagementRestMemberTeamSchema = z.object({
+const organizationManagementRestMemberTeamSchemaDefinition = z.object({
   teamId: z.string(),
   teamName: z.string(),
   role: teamUserRoleSchema,
   customRoleId: z.string().nullable(),
   customRoleName: z.string().nullable(),
 });
+export interface OrganizationManagementRestMemberTeamSchema extends Named<
+  typeof organizationManagementRestMemberTeamSchemaDefinition
+> {}
+export const organizationManagementRestMemberTeamSchema: OrganizationManagementRestMemberTeamSchema =
+  organizationManagementRestMemberTeamSchemaDefinition;
 
-export const organizationManagementRestUpdateMemberSchema = z
+const organizationManagementRestUpdateMemberSchemaDefinition = z
   .object({
     role: organizationApiMemberRoleSchema.optional(),
     disabled: z.boolean().optional(),
@@ -61,22 +77,42 @@ export const organizationManagementRestUpdateMemberSchema = z
       });
     }
   });
+export interface OrganizationManagementRestUpdateMemberSchema extends Named<
+  typeof organizationManagementRestUpdateMemberSchemaDefinition
+> {}
+export const organizationManagementRestUpdateMemberSchema: OrganizationManagementRestUpdateMemberSchema =
+  organizationManagementRestUpdateMemberSchemaDefinition;
 
-export const organizationManagementRestMemberWithTeamsSchema = z.object({
+const organizationManagementRestMemberWithTeamsSchemaDefinition = z.object({
   ...organizationManagementRestMemberSchema.shape,
   teams: z.array(organizationManagementRestMemberTeamSchema),
 });
+export interface OrganizationManagementRestMemberWithTeamsSchema extends Named<
+  typeof organizationManagementRestMemberWithTeamsSchemaDefinition
+> {}
+export const organizationManagementRestMemberWithTeamsSchema: OrganizationManagementRestMemberWithTeamsSchema =
+  organizationManagementRestMemberWithTeamsSchemaDefinition;
 
-export const organizationManagementRestUpdatedMemberSchema = z.object({
+const organizationManagementRestUpdatedMemberSchemaDefinition = z.object({
   ...organizationManagementRestMemberSchema.shape,
   teamsLeftWithoutAdmin: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
 });
+export interface OrganizationManagementRestUpdatedMemberSchema extends Named<
+  typeof organizationManagementRestUpdatedMemberSchemaDefinition
+> {}
+export const organizationManagementRestUpdatedMemberSchema: OrganizationManagementRestUpdatedMemberSchema =
+  organizationManagementRestUpdatedMemberSchemaDefinition;
 
 /** What `GET /members` answers: the page of members plus how many there are in total. */
-export const organizationManagementRestMemberListSchema = z.object({
+const organizationManagementRestMemberListSchemaDefinition = z.object({
   members: z.array(organizationManagementRestMemberSchema),
   totalCount: z.number(),
 });
+export interface OrganizationManagementRestMemberListSchema extends Named<
+  typeof organizationManagementRestMemberListSchemaDefinition
+> {}
+export const organizationManagementRestMemberListSchema: OrganizationManagementRestMemberListSchema =
+  organizationManagementRestMemberListSchemaDefinition;
 
 const organizationManagementRestAccessBindingSchema = z.object({
   id: z.string(),
@@ -89,7 +125,7 @@ const organizationManagementRestAccessBindingSchema = z.object({
   cappedBySeat: z.boolean(),
 });
 
-export const organizationManagementRestAccessBreakdownSchema = z.object({
+const organizationManagementRestAccessBreakdownSchemaDefinition = z.object({
   user: z.object({
     id: z.string(),
     name: z.string().nullable(),
@@ -108,6 +144,11 @@ export const organizationManagementRestAccessBreakdownSchema = z.object({
   ),
   directBindings: z.array(organizationManagementRestAccessBindingSchema),
 });
+export interface OrganizationManagementRestAccessBreakdownSchema extends Named<
+  typeof organizationManagementRestAccessBreakdownSchemaDefinition
+> {}
+export const organizationManagementRestAccessBreakdownSchema: OrganizationManagementRestAccessBreakdownSchema =
+  organizationManagementRestAccessBreakdownSchemaDefinition;
 
 const organizationManagementRestInviteTeamSchema = z.object({
   teamId: z.string(),
@@ -115,7 +156,7 @@ const organizationManagementRestInviteTeamSchema = z.object({
   customRoleId: z.string().nullable(),
 });
 
-export const organizationManagementRestInviteSchema = z.object({
+const organizationManagementRestInviteSchemaDefinition = z.object({
   id: z.string(),
   email: z.string(),
   role: organizationApiMemberRoleSchema,
@@ -126,8 +167,13 @@ export const organizationManagementRestInviteSchema = z.object({
   teams: z.array(organizationManagementRestInviteTeamSchema),
   createdAt: z.date(),
 });
+export interface OrganizationManagementRestInviteSchema extends Named<
+  typeof organizationManagementRestInviteSchemaDefinition
+> {}
+export const organizationManagementRestInviteSchema: OrganizationManagementRestInviteSchema =
+  organizationManagementRestInviteSchemaDefinition;
 
-export const organizationManagementRestCreateInvitesSchema = z.object({
+const organizationManagementRestCreateInvitesSchemaDefinition = z.object({
   invites: z
     .array(
       z
@@ -161,19 +207,34 @@ export const organizationManagementRestCreateInvitesSchema = z.object({
     .min(1)
     .max(50),
 });
+export interface OrganizationManagementRestCreateInvitesSchema extends Named<
+  typeof organizationManagementRestCreateInvitesSchemaDefinition
+> {}
+export const organizationManagementRestCreateInvitesSchema: OrganizationManagementRestCreateInvitesSchema =
+  organizationManagementRestCreateInvitesSchemaDefinition;
 
-export const organizationManagementRestCreatedInvitesSchema = z.object({
+const organizationManagementRestCreatedInvitesSchemaDefinition = z.object({
   invites: z.array(
     z.object({ ...organizationManagementRestInviteSchema.shape, emailNotSent: z.boolean() }),
   ),
 });
+export interface OrganizationManagementRestCreatedInvitesSchema extends Named<
+  typeof organizationManagementRestCreatedInvitesSchemaDefinition
+> {}
+export const organizationManagementRestCreatedInvitesSchema: OrganizationManagementRestCreatedInvitesSchema =
+  organizationManagementRestCreatedInvitesSchemaDefinition;
 
 /** What `GET /invites` answers: the pending invites, each with its acceptance link. */
-export const organizationManagementRestInviteListSchema = z.object({
+const organizationManagementRestInviteListSchemaDefinition = z.object({
   invites: z.array(organizationManagementRestInviteSchema),
 });
+export interface OrganizationManagementRestInviteListSchema extends Named<
+  typeof organizationManagementRestInviteListSchemaDefinition
+> {}
+export const organizationManagementRestInviteListSchema: OrganizationManagementRestInviteListSchema =
+  organizationManagementRestInviteListSchemaDefinition;
 
-export const organizationManagementRestListMembersQuerySchema = z.object({
+const organizationManagementRestListMembersQuerySchemaDefinition = z.object({
   includeDisabled: z
     .enum(["true", "false"])
     .transform((value) => value === "true")
@@ -181,21 +242,48 @@ export const organizationManagementRestListMembersQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
+export interface OrganizationManagementRestListMembersQuerySchema extends Named<
+  typeof organizationManagementRestListMembersQuerySchemaDefinition
+> {}
+export const organizationManagementRestListMembersQuerySchema: OrganizationManagementRestListMembersQuerySchema =
+  organizationManagementRestListMembersQuerySchemaDefinition;
 
-export const organizationManagementRestUserIdParamsSchema = z.object({ userId: z.string().min(1) });
-export const organizationManagementRestInviteIdParamsSchema = z.object({
+const organizationManagementRestUserIdParamsSchemaDefinition = z.object({
+  userId: z.string().min(1),
+});
+export interface OrganizationManagementRestUserIdParamsSchema extends Named<
+  typeof organizationManagementRestUserIdParamsSchemaDefinition
+> {}
+export const organizationManagementRestUserIdParamsSchema: OrganizationManagementRestUserIdParamsSchema =
+  organizationManagementRestUserIdParamsSchemaDefinition;
+const organizationManagementRestInviteIdParamsSchemaDefinition = z.object({
   inviteId: z.string().min(1),
 });
+export interface OrganizationManagementRestInviteIdParamsSchema extends Named<
+  typeof organizationManagementRestInviteIdParamsSchemaDefinition
+> {}
+export const organizationManagementRestInviteIdParamsSchema: OrganizationManagementRestInviteIdParamsSchema =
+  organizationManagementRestInviteIdParamsSchemaDefinition;
 
-export const organizationManagementRestSuccessSchema = z.object({ success: z.literal(true) });
+const organizationManagementRestSuccessSchemaDefinition = z.object({ success: z.literal(true) });
+export interface OrganizationManagementRestSuccessSchema extends Named<
+  typeof organizationManagementRestSuccessSchemaDefinition
+> {}
+export const organizationManagementRestSuccessSchema: OrganizationManagementRestSuccessSchema =
+  organizationManagementRestSuccessSchemaDefinition;
 
 /**
  * One stored team assignment on an invite row. `Array.isArray` proves nothing
  * about the list's members, so malformed entries are dropped rather than
  * failing the read - the invite is still worth reporting.
  */
-export const organizationManagementRestStoredTeamAssignmentSchema = z.object({
+const organizationManagementRestStoredTeamAssignmentSchemaDefinition = z.object({
   teamId: z.string().min(1),
   role: z.string().min(1),
   customRoleId: z.string().nullish(),
 });
+export interface OrganizationManagementRestStoredTeamAssignmentSchema extends Named<
+  typeof organizationManagementRestStoredTeamAssignmentSchemaDefinition
+> {}
+export const organizationManagementRestStoredTeamAssignmentSchema: OrganizationManagementRestStoredTeamAssignmentSchema =
+  organizationManagementRestStoredTeamAssignmentSchemaDefinition;

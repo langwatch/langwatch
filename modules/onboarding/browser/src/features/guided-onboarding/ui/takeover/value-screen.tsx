@@ -110,7 +110,8 @@ export function ValueScreen({
               transition="all 0.15s ease"
               _hover={{
                 transform: "translateY(-2px)",
-                boxShadow: "0 8px 28px rgba(26, 26, 46, 0.10)",
+                boxShadow:
+                  "0 8px 28px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)",
                 borderColor: picked ? "orange.muted" : "fg",
               }}
             >
@@ -126,7 +127,7 @@ export function ValueScreen({
                 border="1px solid"
                 borderColor={picked ? "orange.solid" : "border.emphasized"}
                 bg={picked ? "orange.solid" : "bg.panel"}
-                color={picked ? "white" : "transparent"}
+                color={picked ? "orange.contrast" : "transparent"}
                 fontSize="10.5px"
                 fontWeight="600"
                 transition="all 0.15s ease"

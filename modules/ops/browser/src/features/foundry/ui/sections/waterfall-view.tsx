@@ -26,15 +26,15 @@ function flattenSpans(spans: SpanConfig[], depth: number, parentStartMs: number)
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  llm: "blue.500",
-  agent: "purple.500",
-  tool: "green.500",
-  rag: "teal.500",
-  chain: "orange.500",
-  prompt: "yellow.500",
-  guardrail: "red.500",
-  workflow: "blue.600",
-  span: "gray.500",
+  llm: "blue.solid",
+  agent: "purple.solid",
+  tool: "green.solid",
+  rag: "teal.solid",
+  chain: "orange.solid",
+  prompt: "yellow.solid",
+  guardrail: "red.solid",
+  workflow: "blue.solid",
+  span: "gray.solid",
 };
 
 export function WaterfallView() {
@@ -83,7 +83,9 @@ export function WaterfallView() {
           const width = Math.max((item.span.durationMs / totalDuration) * 100, 0.5);
           const isSelected = selectedSpanId === item.span.id;
           const barColor =
-            item.span.status === "error" ? "red.500" : (TYPE_COLORS[item.span.type] ?? "gray.500");
+            item.span.status === "error"
+              ? "red.solid"
+              : (TYPE_COLORS[item.span.type] ?? "gray.solid");
 
           return (
             <Flex
@@ -91,8 +93,8 @@ export function WaterfallView() {
               align="center"
               cursor="pointer"
               rounded="sm"
-              bg={isSelected ? "orange.500/10" : "transparent"}
-              _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
+              bg={isSelected ? "orange.subtle" : "transparent"}
+              _hover={{ bg: isSelected ? "orange.subtle" : "bg.subtle" }}
               onClick={() => selectSpan(item.span.id)}
             >
               <Flex
@@ -123,7 +125,7 @@ export function WaterfallView() {
                   minW="4px"
                   opacity={isSelected ? 1 : 0.8}
                   ring={isSelected ? "1px" : undefined}
-                  ringColor={isSelected ? "orange.400" : undefined}
+                  ringColor={isSelected ? "orange.focusRing" : undefined}
                 />
               </Box>
               <Text

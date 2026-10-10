@@ -1,16 +1,22 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const voiceTransportSchema = z.enum(["elevenlabs_convai", "phone"]);
 export type VoiceTransport = z.infer<typeof voiceTransportSchema>;
 
-export const elevenLabsConvaiTransportSchema = z.object({
+const elevenLabsConvaiTransportSchemaDefinition = z.object({
   transport: z.literal("elevenlabs_convai"),
   agentId: z.string().trim().min(1, "Agent id is required").max(128),
 });
+export interface ElevenLabsConvaiTransportSchema extends Named<
+  typeof elevenLabsConvaiTransportSchemaDefinition
+> {}
+export const elevenLabsConvaiTransportSchema: ElevenLabsConvaiTransportSchema =
+  elevenLabsConvaiTransportSchemaDefinition;
 
 export const E164_PHONE_PATTERN = /^\+[1-9]\d{1,14}$/;
 
-export const phoneTransportSchema = z.object({
+const phoneTransportSchemaDefinition = z.object({
   transport: z.literal("phone"),
   phoneNumber: z
     .string()
@@ -23,6 +29,8 @@ export const phoneTransportSchema = z.object({
    */
   callDirection: z.enum(["inbound", "outbound"]).default("outbound"),
 });
+export interface PhoneTransportSchema extends Named<typeof phoneTransportSchemaDefinition> {}
+export const phoneTransportSchema: PhoneTransportSchema = phoneTransportSchemaDefinition;
 
 const voiceAgentConfigUnion = z.discriminatedUnion("transport", [
   elevenLabsConvaiTransportSchema,

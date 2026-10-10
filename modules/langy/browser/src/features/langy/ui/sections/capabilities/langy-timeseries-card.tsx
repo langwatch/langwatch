@@ -2,7 +2,7 @@
  * The plotted answer.
  */
 
-import { useChart } from "@chakra-ui/charts";
+import { useChart } from "@langwatch/design-system/charts";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { RawMenu as Menu } from "@langwatch/design-system/menu";

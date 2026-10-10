@@ -151,9 +151,7 @@ describe("LwqlEditor", () => {
       it("offers completion against that schema", async () => {
         mount({ schema: SCHEMA, value: "SELECT 1 FROM " });
         await screen.findByTestId("lwql-input");
-        await waitFor(() =>
-          expect(completionLabels()).toEqual(["traces", "spans"]),
-        );
+        await waitFor(() => expect(completionLabels()).toEqual(["traces", "spans"]));
       });
     });
   });

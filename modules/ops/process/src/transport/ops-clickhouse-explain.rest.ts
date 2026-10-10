@@ -37,6 +37,7 @@ export const opsClickHouseExplainRest = defineRestRouter(OpsApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/ops/clickhouse/explain", "explainClickHouseQuery")
+  .withoutAudit("read sent as a POST")
   .withInput(opsExplainRequestSchema)
   .withDocs({
     summary: "Explain a ClickHouse query as the read-only operator account",

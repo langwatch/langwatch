@@ -186,9 +186,9 @@ var envHelpText = `Environment variables.
     LANGWATCH_GO_WATCH=0         Keep the Go watcher off even under haven up --watch
                                  or --hmr (where haven rebuilds and swaps the Go
                                  child on a change).
-    LANGWATCH_DEV_ONE_PROCESS=0  Split both defaults: the app lane (ui + api +
-                                 worker, ADR-168) into ui and api lanes, and the
-                                 go lane (data plane + sims) into go and sims.
+    LANGWATCH_DEV_ONE_PROCESS=0  Split the go lane (data plane + sims) into go and
+                                 sims. The Node lanes do not read it: --hmr always
+                                 runs Vite as its own ui lane (ADR-168).
                                  haven up --force switches a running stack.
                                  LANGWATCH_GO_ONE_PROCESS is a deprecated alias,
                                  refused when it disagrees.

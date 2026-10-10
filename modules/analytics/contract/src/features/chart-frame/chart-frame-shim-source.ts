@@ -29,6 +29,14 @@ export function buildShimScript(): string {
   var resolveReady;
   var ready = new Promise(function (resolve) { resolveReady = resolve; });
 
+  function applyColors(context) {
+    LW.theme = context.theme;
+    if (typeof document === "undefined" || !document.documentElement) return;
+    Object.keys(context.colors || {}).forEach(function (name) {
+      document.documentElement.style.setProperty("--chakra-colors-" + name.split(".").join("-"), context.colors[name]);
+    });
+  }
+
   function post(message) {
     if (port) { port.postMessage(message); } else { buffered.push(message); }
   }
@@ -301,6 +309,7 @@ export function buildShimScript(): string {
       if (failed) { delete pending[data.requestId]; failed.reject(data.error); }
     } else if (data.type === "lw:dashboard-context-change") {
       LW.dashboardContext = data.dashboardContext;
+      applyColors(data.dashboardContext);
       dashboardContextCallbacks.forEach(function (callback) {
         try { callback(data.dashboardContext); } catch (callbackError) { LW.error(callbackError); }
       });
@@ -334,6 +343,7 @@ export function buildShimScript(): string {
     port = event.ports[0];
     port.onmessage = onPortMessage;
     LW.dashboardContext = data.dashboardContext;
+    applyColors(data.dashboardContext);
     LW.params = data.params;
     LW.theme = data.dashboardContext.theme;
     // The widget source rides on init (the frame document carries none), where

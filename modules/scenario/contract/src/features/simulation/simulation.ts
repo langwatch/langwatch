@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
@@ -35,15 +36,17 @@ export enum SimulationVerdict {
 export const simulationVerdictSchema = z.nativeEnum(SimulationVerdict);
 
 /** A stored message deliberately keeps its provider-specific fields. */
-export const simulationMessageSchema = z.looseObject({
+const simulationMessageSchemaDefinition = z.looseObject({
   role: z.string().optional(),
   content: z.unknown().optional(),
   id: z.string().optional(),
   trace_id: z.string().optional(),
 });
+export interface SimulationMessageSchema extends Named<typeof simulationMessageSchemaDefinition> {}
+export const simulationMessageSchema: SimulationMessageSchema = simulationMessageSchemaDefinition;
 export type SimulationMessage = z.infer<typeof simulationMessageSchema>;
 
-export const simulationRunResultSchema = z.object({
+const simulationRunResultSchemaDefinition = z.object({
   verdict: simulationVerdictSchema,
   reasoning: z.string().optional(),
   metCriteria: z.array(z.string()),
@@ -62,10 +65,15 @@ export const simulationRunResultSchema = z.object({
    */
   evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
+export interface SimulationRunResultSchema extends Named<
+  typeof simulationRunResultSchemaDefinition
+> {}
+export const simulationRunResultSchema: SimulationRunResultSchema =
+  simulationRunResultSchemaDefinition;
 export type SimulationRunResult = z.infer<typeof simulationRunResultSchema>;
 
 /** Platform metadata carried with runs started by a simulation suite. */
-export const simulationRunMetadataSchema = z
+const simulationRunMetadataSchemaDefinition = z
   .looseObject({
     name: z.string().optional(),
     description: z.string().optional(),
@@ -109,9 +117,14 @@ export const simulationRunMetadataSchema = z
   })
   .nullable()
   .optional();
+export interface SimulationRunMetadataSchema extends Named<
+  typeof simulationRunMetadataSchemaDefinition
+> {}
+export const simulationRunMetadataSchema: SimulationRunMetadataSchema =
+  simulationRunMetadataSchemaDefinition;
 export type SimulationRunMetadata = z.infer<typeof simulationRunMetadataSchema>;
 
-export const simulationRunDataSchema = z.object({
+const simulationRunDataSchemaDefinition = z.object({
   scenarioId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
@@ -133,24 +146,33 @@ export const simulationRunDataSchema = z.object({
   roleCosts: z.record(z.string(), z.array(z.number())).optional(),
   roleLatencies: z.record(z.string(), z.array(z.number())).optional(),
 });
+export interface SimulationRunDataSchema extends Named<typeof simulationRunDataSchemaDefinition> {}
+export const simulationRunDataSchema: SimulationRunDataSchema = simulationRunDataSchemaDefinition;
 export type SimulationRunData = z.infer<typeof simulationRunDataSchema>;
 
 /** Complete run record used by the paged CSV export. */
-export const simulationExportRunSchema = z.object({
+const simulationExportRunSchemaDefinition = z.object({
   ...simulationRunDataSchema.shape,
   scenarioSetId: z.string(),
   traceIds: z.array(z.string()),
 });
+export interface SimulationExportRunSchema extends Named<
+  typeof simulationExportRunSchemaDefinition
+> {}
+export const simulationExportRunSchema: SimulationExportRunSchema =
+  simulationExportRunSchemaDefinition;
 export type SimulationExportRun = z.infer<typeof simulationExportRunSchema>;
 
-export const simulationSetDataSchema = z.object({
+const simulationSetDataSchemaDefinition = z.object({
   scenarioSetId: z.string(),
   scenarioCount: z.number(),
   lastRunAt: z.number(),
 });
+export interface SimulationSetDataSchema extends Named<typeof simulationSetDataSchemaDefinition> {}
+export const simulationSetDataSchema: SimulationSetDataSchema = simulationSetDataSchemaDefinition;
 export type SimulationSetData = z.infer<typeof simulationSetDataSchema>;
 
-export const simulationBatchSummarySchema = z.object({
+const simulationBatchSummarySchemaDefinition = z.object({
   batchRunId: z.string(),
   totalCount: z.number(),
   passCount: z.number(),
@@ -169,9 +191,14 @@ export const simulationBatchSummarySchema = z.object({
    */
   startedBy: z.object({ id: z.string(), label: runActorLabelSchema }).nullable(),
 });
+export interface SimulationBatchSummarySchema extends Named<
+  typeof simulationBatchSummarySchemaDefinition
+> {}
+export const simulationBatchSummarySchema: SimulationBatchSummarySchema =
+  simulationBatchSummarySchemaDefinition;
 export type SimulationBatchSummary = z.infer<typeof simulationBatchSummarySchema>;
 
-export const simulationLastResultSummarySchema = z.object({
+const simulationLastResultSummarySchemaDefinition = z.object({
   scenarioId: z.string(),
   status: simulationRunStatusSchema,
   metCriteriaCount: z.number(),
@@ -182,9 +209,14 @@ export const simulationLastResultSummarySchema = z.object({
   durationInMs: z.number().nullable(),
   totalCost: z.number().nullable(),
 });
+export interface SimulationLastResultSummarySchema extends Named<
+  typeof simulationLastResultSummarySchemaDefinition
+> {}
+export const simulationLastResultSummarySchema: SimulationLastResultSummarySchema =
+  simulationLastResultSummarySchemaDefinition;
 export type SimulationLastResultSummary = z.infer<typeof simulationLastResultSummarySchema>;
 
-export const simulationBatchHistoryItemSchema = z.object({
+const simulationBatchHistoryItemSchemaDefinition = z.object({
   ...simulationBatchSummarySchema.shape,
   items: z.array(
     z.object({
@@ -197,18 +229,28 @@ export const simulationBatchHistoryItemSchema = z.object({
     }),
   ),
 });
+export interface SimulationBatchHistoryItemSchema extends Named<
+  typeof simulationBatchHistoryItemSchemaDefinition
+> {}
+export const simulationBatchHistoryItemSchema: SimulationBatchHistoryItemSchema =
+  simulationBatchHistoryItemSchemaDefinition;
 export type SimulationBatchHistoryItem = z.infer<typeof simulationBatchHistoryItemSchema>;
 
-export const simulationBatchHistorySchema = z.object({
+const simulationBatchHistorySchemaDefinition = z.object({
   batches: z.array(simulationBatchHistoryItemSchema),
   nextCursor: z.string().optional(),
   hasMore: z.boolean(),
   lastUpdatedAt: z.number(),
   totalCount: z.number(),
 });
+export interface SimulationBatchHistorySchema extends Named<
+  typeof simulationBatchHistorySchemaDefinition
+> {}
+export const simulationBatchHistorySchema: SimulationBatchHistorySchema =
+  simulationBatchHistorySchemaDefinition;
 export type SimulationBatchHistory = z.infer<typeof simulationBatchHistorySchema>;
 
-export const simulationBatchRunDataSchema = z.discriminatedUnion("changed", [
+const simulationBatchRunDataSchemaDefinition = z.discriminatedUnion("changed", [
   z.object({ changed: z.literal(false), lastUpdatedAt: z.number() }),
   z.object({
     changed: z.literal(true),
@@ -216,10 +258,15 @@ export const simulationBatchRunDataSchema = z.discriminatedUnion("changed", [
     runs: z.array(simulationRunDataSchema),
   }),
 ]);
+export interface SimulationBatchRunDataSchema extends Named<
+  typeof simulationBatchRunDataSchemaDefinition
+> {}
+export const simulationBatchRunDataSchema: SimulationBatchRunDataSchema =
+  simulationBatchRunDataSchemaDefinition;
 export type SimulationBatchRunData = z.infer<typeof simulationBatchRunDataSchema>;
 
 /** Conditional run-history page for every suite in a project. */
-export const simulationAllSuitesRunDataSchema = z.discriminatedUnion("changed", [
+const simulationAllSuitesRunDataSchemaDefinition = z.discriminatedUnion("changed", [
   z.object({ changed: z.literal(false), lastUpdatedAt: z.number() }),
   z.object({
     changed: z.literal(true),
@@ -230,39 +277,69 @@ export const simulationAllSuitesRunDataSchema = z.discriminatedUnion("changed", 
     hasMore: z.boolean(),
   }),
 ]);
+export interface SimulationAllSuitesRunDataSchema extends Named<
+  typeof simulationAllSuitesRunDataSchemaDefinition
+> {}
+export const simulationAllSuitesRunDataSchema: SimulationAllSuitesRunDataSchema =
+  simulationAllSuitesRunDataSchemaDefinition;
 export type SimulationAllSuitesRunData = z.infer<typeof simulationAllSuitesRunDataSchema>;
 
-export const simulationExternalSetSummarySchema = z.object({
+const simulationExternalSetSummarySchemaDefinition = z.object({
   scenarioSetId: z.string(),
   passedCount: z.number(),
   failedCount: z.number(),
   totalCount: z.number(),
   lastRunTimestamp: z.number(),
 });
+export interface SimulationExternalSetSummarySchema extends Named<
+  typeof simulationExternalSetSummarySchemaDefinition
+> {}
+export const simulationExternalSetSummarySchema: SimulationExternalSetSummarySchema =
+  simulationExternalSetSummarySchemaDefinition;
 export type SimulationExternalSetSummary = z.infer<typeof simulationExternalSetSummarySchema>;
 
 /** One page of a single suite's runs. */
-export const simulationScenarioSetRunDataSchema = z.object({
+const simulationScenarioSetRunDataSchemaDefinition = z.object({
   runs: z.array(simulationRunDataSchema),
   nextCursor: z.string().optional(),
   hasMore: z.boolean(),
 });
+export interface SimulationScenarioSetRunDataSchema extends Named<
+  typeof simulationScenarioSetRunDataSchemaDefinition
+> {}
+export const simulationScenarioSetRunDataSchema: SimulationScenarioSetRunDataSchema =
+  simulationScenarioSetRunDataSchemaDefinition;
 
 /** The cheap freshness probe the run-history views poll. */
-export const simulationRunFreshnessSchema = z.object({ lastUpdatedAt: z.number() });
+const simulationRunFreshnessSchemaDefinition = z.object({ lastUpdatedAt: z.number() });
+export interface SimulationRunFreshnessSchema extends Named<
+  typeof simulationRunFreshnessSchemaDefinition
+> {}
+export const simulationRunFreshnessSchema: SimulationRunFreshnessSchema =
+  simulationRunFreshnessSchemaDefinition;
 
 /** How many batch runs a suite has in the window. */
-export const simulationBatchRunCountSchema = z.object({ count: z.number() });
+const simulationBatchRunCountSchemaDefinition = z.object({ count: z.number() });
+export interface SimulationBatchRunCountSchema extends Named<
+  typeof simulationBatchRunCountSchemaDefinition
+> {}
+export const simulationBatchRunCountSchema: SimulationBatchRunCountSchema =
+  simulationBatchRunCountSchemaDefinition;
 
 /**
  * One frame of the simulation stream. The envelope is what the client parses;
  * the event itself is the broadcast payload, carried as the JSON text the
  * publisher wrote.
  */
-export const simulationStreamFrameSchema = z.object({
+const simulationStreamFrameSchemaDefinition = z.object({
   event: z.unknown(),
   timestamp: z.number().optional(),
 });
+export interface SimulationStreamFrameSchema extends Named<
+  typeof simulationStreamFrameSchemaDefinition
+> {}
+export const simulationStreamFrameSchema: SimulationStreamFrameSchema =
+  simulationStreamFrameSchemaDefinition;
 
 export type SimulationStreamFrame = z.infer<typeof simulationStreamFrameSchema>;
 
@@ -272,15 +349,22 @@ export type SimulationStreamFrame = z.infer<typeof simulationStreamFrameSchema>;
  * same definition. Extensible as the platform grows a new type.
  */
 
-export const simulationTargetSchema = z.object({
+const simulationTargetSchemaDefinition = z.object({
   type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
 });
+export interface SimulationTargetSchema extends Named<typeof simulationTargetSchemaDefinition> {}
+export const simulationTargetSchema: SimulationTargetSchema = simulationTargetSchemaDefinition;
 
 export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 
 /** A queued run's target, with the field mappings a suite's prompt target pins on it. */
-export const simulationQueuedTargetSchema = z.object({
+const simulationQueuedTargetSchemaDefinition = z.object({
   ...simulationTargetSchema.shape,
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
+export interface SimulationQueuedTargetSchema extends Named<
+  typeof simulationQueuedTargetSchemaDefinition
+> {}
+export const simulationQueuedTargetSchema: SimulationQueuedTargetSchema =
+  simulationQueuedTargetSchemaDefinition;

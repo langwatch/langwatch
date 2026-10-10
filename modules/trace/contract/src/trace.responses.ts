@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What the trace feature's tRPC transports answer, stated once in the
  * contract via `withOutput` rather than implied by a handler's return.
@@ -32,7 +33,7 @@ const traceEditOverlayAuthorSchema = z
   .strict();
 
 /** One trace's stored correction, as every reader of it receives it. */
-export const traceEditOverlayDtoSchema = z
+const traceEditOverlayDtoSchemaDefinition = z
   .object({
     traceId: z.string(),
     patch: traceEditOverlayPatchSchema,
@@ -42,15 +43,27 @@ export const traceEditOverlayDtoSchema = z
     updatedAt: z.instanceof(Temporal.Instant),
   })
   .strict();
+export interface TraceEditOverlayDtoSchema extends Named<
+  typeof traceEditOverlayDtoSchemaDefinition
+> {}
+export const traceEditOverlayDtoSchema: TraceEditOverlayDtoSchema =
+  traceEditOverlayDtoSchemaDefinition;
 
 /** `getByTraceId`: no correction stored yet answers `null`, not a 404. */
-export const traceEditOverlayOrNullSchema = traceEditOverlayDtoSchema.nullable();
+const traceEditOverlayOrNullSchemaDefinition = traceEditOverlayDtoSchema.nullable();
+export interface TraceEditOverlayOrNullSchema extends Named<
+  typeof traceEditOverlayOrNullSchemaDefinition
+> {}
+export const traceEditOverlayOrNullSchema: TraceEditOverlayOrNullSchema =
+  traceEditOverlayOrNullSchemaDefinition;
 
 /** One trace's spans, in the waterfall order the application resolved. */
-export const spansForTraceSchema = z.array(langWatchSpanSchema);
+const spansForTraceSchemaDefinition = z.array(langWatchSpanSchema);
+export interface SpansForTraceSchema extends Named<typeof spansForTraceSchemaDefinition> {}
+export const spansForTraceSchema: SpansForTraceSchema = spansForTraceSchemaDefinition;
 
 /** One LLM span reshaped for the prompt studio. */
-export const promptStudioSpanSchema = z
+const promptStudioSpanSchemaDefinition = z
   .object({
     spanId: z.string(),
     traceId: z.string(),
@@ -85,6 +98,8 @@ export const promptStudioSpanSchema = z
     promptVariables: z.record(z.string(), z.string()).nullable(),
   })
   .strict();
+export interface PromptStudioSpanSchema extends Named<typeof promptStudioSpanSchemaDefinition> {}
+export const promptStudioSpanSchema: PromptStudioSpanSchema = promptStudioSpanSchemaDefinition;
 
 // ---------------------------------------------------------------------------
 // The trace explorer (`traces.*`)
@@ -103,13 +118,15 @@ const redactionFlagsShape = {
 } as const;
 
 /** `list`: one page of the grid, redacted for the viewer. */
-export const tracesListPageSchema = z.object({
+const tracesListPageSchemaDefinition = z.object({
   ...traceListPageSchema.shape,
   items: z.array(z.object({ ...traceListViewItemSchema.shape, ...redactionFlagsShape })),
 });
+export interface TracesListPageSchema extends Named<typeof tracesListPageSchemaDefinition> {}
+export const tracesListPageSchema: TracesListPageSchema = tracesListPageSchemaDefinition;
 
 /** `sessions`: one page of the Sessions lens, cost- and title-gated. */
-export const tracesSessionsPageSchema = z.object({
+const tracesSessionsPageSchemaDefinition = z.object({
   ...sessionGroupsResultSchema.shape,
   sessions: z.array(
     z.object({
@@ -124,19 +141,30 @@ export const tracesSessionsPageSchema = z.object({
     }),
   ),
 });
+export interface TracesSessionsPageSchema extends Named<
+  typeof tracesSessionsPageSchemaDefinition
+> {}
+export const tracesSessionsPageSchema: TracesSessionsPageSchema =
+  tracesSessionsPageSchemaDefinition;
 export type TracesSessionsPage = z.infer<typeof tracesSessionsPageSchema>;
 
 /** `listEvents`: the events column's rollups, keyed by trace id. */
-export const tracesListEventsSchema = z.record(z.string(), traceEventRollupSchema);
+const tracesListEventsSchemaDefinition = z.record(z.string(), traceEventRollupSchema);
+export interface TracesListEventsSchema extends Named<typeof tracesListEventsSchemaDefinition> {}
+export const tracesListEventsSchema: TracesListEventsSchema = tracesListEventsSchemaDefinition;
 
 /** `newCount`: how many traces arrived since the grid last painted. */
-export const tracesNewCountSchema = z.object({ count: z.number() });
+const tracesNewCountSchemaDefinition = z.object({ count: z.number() });
+export interface TracesNewCountSchema extends Named<typeof tracesNewCountSchemaDefinition> {}
+export const tracesNewCountSchema: TracesNewCountSchema = tracesNewCountSchemaDefinition;
 
 /** `suggest`: the typeahead's values for one field. */
-export const tracesSuggestSchema = z.object({ values: z.array(z.string()) });
+const tracesSuggestSchemaDefinition = z.object({ values: z.array(z.string()) });
+export interface TracesSuggestSchema extends Named<typeof tracesSuggestSchemaDefinition> {}
+export const tracesSuggestSchema: TracesSuggestSchema = tracesSuggestSchemaDefinition;
 
 /** `conversationContext`: the turns either side of the open trace. */
-export const tracesConversationContextSchema = z.object({
+const tracesConversationContextSchemaDefinition = z.object({
   conversationId: z.string(),
   turns: z.array(
     z.object({
@@ -154,57 +182,96 @@ export const tracesConversationContextSchema = z.object({
   ),
   total: z.number(),
 });
+export interface TracesConversationContextSchema extends Named<
+  typeof tracesConversationContextSchemaDefinition
+> {}
+export const tracesConversationContextSchema: TracesConversationContextSchema =
+  tracesConversationContextSchemaDefinition;
 export type TracesConversationContext = z.infer<typeof tracesConversationContextSchema>;
 
 /** `changeName`: the trace and the name it now carries. */
-export const tracesChangedNameSchema = z.object({ traceId: z.string(), newName: z.string() });
+const tracesChangedNameSchemaDefinition = z.object({ traceId: z.string(), newName: z.string() });
+export interface TracesChangedNameSchema extends Named<typeof tracesChangedNameSchemaDefinition> {}
+export const tracesChangedNameSchema: TracesChangedNameSchema = tracesChangedNameSchemaDefinition;
 
 /** `spansPaginated`: one page of a trace's full spans, protections applied. */
-export const tracesSpansPageSchema = z.object({
+const tracesSpansPageSchemaDefinition = z.object({
   spans: z.array(langWatchSpanSchema),
   total: z.number(),
 });
+export interface TracesSpansPageSchema extends Named<typeof tracesSpansPageSchemaDefinition> {}
+export const tracesSpansPageSchema: TracesSpansPageSchema = tracesSpansPageSchemaDefinition;
 
 /** `spansDelta`: the spans of a live trace newer than a start-time mark. */
-export const tracesSpansDeltaSchema = z.array(langWatchSpanSchema);
+const tracesSpansDeltaSchemaDefinition = z.array(langWatchSpanSchema);
+export interface TracesSpansDeltaSchema extends Named<typeof tracesSpansDeltaSchemaDefinition> {}
+export const tracesSpansDeltaSchema: TracesSpansDeltaSchema = tracesSpansDeltaSchemaDefinition;
 
 /** `evals`: the evaluation runs recorded against one trace. */
-export const tracesEvaluationRunsSchema = z.array(evaluationRunDataSchema);
+const tracesEvaluationRunsSchemaDefinition = z.array(evaluationRunDataSchema);
+export interface TracesEvaluationRunsSchema extends Named<
+  typeof tracesEvaluationRunsSchemaDefinition
+> {}
+export const tracesEvaluationRunsSchema: TracesEvaluationRunsSchema =
+  tracesEvaluationRunsSchemaDefinition;
 
 /** `spanTree` / `spanTreeDelta`: waterfall nodes, per-span spend gated. */
-export const tracesSpanTreeNodesSchema = z.array(spanTreeNodeSchema);
+const tracesSpanTreeNodesSchemaDefinition = z.array(spanTreeNodeSchema);
+export interface TracesSpanTreeNodesSchema extends Named<
+  typeof tracesSpanTreeNodesSchemaDefinition
+> {}
+export const tracesSpanTreeNodesSchema: TracesSpanTreeNodesSchema =
+  tracesSpanTreeNodesSchemaDefinition;
 
 /** `spanLangwatchSignals`: the instrumentation badges, per span. */
-export const tracesSpanLangwatchSignalsSchema = z.array(spanLangwatchSignalsSchema);
+const tracesSpanLangwatchSignalsSchemaDefinition = z.array(spanLangwatchSignalsSchema);
+export interface TracesSpanLangwatchSignalsSchema extends Named<
+  typeof tracesSpanLangwatchSignalsSchemaDefinition
+> {}
+export const tracesSpanLangwatchSignalsSchema: TracesSpanLangwatchSignalsSchema =
+  tracesSpanLangwatchSignalsSchemaDefinition;
 
 /** `spansFull`: every span of a trace, mapped and redacted. */
-export const tracesSpanDetailsSchema = z.array(spanDetailSchema);
+const tracesSpanDetailsSchemaDefinition = z.array(spanDetailSchema);
+export interface TracesSpanDetailsSchema extends Named<typeof tracesSpanDetailsSchemaDefinition> {}
+export const tracesSpanDetailsSchema: TracesSpanDetailsSchema = tracesSpanDetailsSchemaDefinition;
 
 /**
  * Trace-level event shape, derived from a span's OTel events. Read from
  * stored_spans on demand (`getTraceEventsByTraceId`), not hoisted onto the
  * fold — that made folding O(n^2).
  */
-export const derivedTraceEventSchema = z.object({
+const derivedTraceEventSchemaDefinition = z.object({
   spanId: z.string(),
   timestamp: z.number(),
   name: z.string(),
   attributes: z.record(z.string(), z.string()),
 });
+export interface DerivedTraceEventSchema extends Named<typeof derivedTraceEventSchemaDefinition> {}
+export const derivedTraceEventSchema: DerivedTraceEventSchema = derivedTraceEventSchemaDefinition;
 
 export type DerivedTraceEvent = z.infer<typeof derivedTraceEventSchema>;
 
 /** `traceEvents`: the drawer's timeline, protections applied. */
-export const tracesTraceEventsSchema = z.array(derivedTraceEventSchema);
+const tracesTraceEventsSchemaDefinition = z.array(derivedTraceEventSchema);
+export interface TracesTraceEventsSchema extends Named<typeof tracesTraceEventsSchemaDefinition> {}
+export const tracesTraceEventsSchema: TracesTraceEventsSchema = tracesTraceEventsSchemaDefinition;
 
 /** `traceLogs`: the trace's correlated log records, visibility-gated. */
-export const tracesTraceLogsSchema = z.array(traceLogRecordDtoSchema);
+const tracesTraceLogsSchemaDefinition = z.array(traceLogRecordDtoSchema);
+export interface TracesTraceLogsSchema extends Named<typeof tracesTraceLogsSchemaDefinition> {}
+export const tracesTraceLogsSchema: TracesTraceLogsSchema = tracesTraceLogsSchemaDefinition;
 
 /** `getFieldRedactionStatus`: whether this reader may see captured input and output, and who. */
-export const tracesFieldRedactionStatusSchema = z
+const tracesFieldRedactionStatusSchemaDefinition = z
   .object({
     isRedacted: z.object({ input: z.boolean(), output: z.boolean() }).strict(),
     visibleTo: z.object({ input: z.string().nullable(), output: z.string().nullable() }).strict(),
   })
   .strict();
+export interface TracesFieldRedactionStatusSchema extends Named<
+  typeof tracesFieldRedactionStatusSchemaDefinition
+> {}
+export const tracesFieldRedactionStatusSchema: TracesFieldRedactionStatusSchema =
+  tracesFieldRedactionStatusSchemaDefinition;
 export type TracesFieldRedactionStatus = z.infer<typeof tracesFieldRedactionStatusSchema>;

@@ -18,6 +18,8 @@ const teamUpdateMany = vi.fn();
 const projectUpdateMany = vi.fn();
 const roleBindingFindMany = vi.fn();
 const queryRaw = vi.fn();
+const groupMembershipDeleteMany = vi.fn();
+const teamUserDeleteMany = vi.fn();
 
 const transactionScript = {
   organizationUser: {
@@ -30,6 +32,8 @@ const transactionScript = {
   team: { findMany: teamFindMany, updateMany: teamUpdateMany },
   project: { updateMany: projectUpdateMany },
   roleBinding: { findMany: roleBindingFindMany },
+  groupMembership: { deleteMany: groupMembershipDeleteMany },
+  teamUser: { deleteMany: teamUserDeleteMany },
   $queryRaw: queryRaw,
 };
 
@@ -64,6 +68,8 @@ beforeEach(() => {
   teamUpdateMany.mockResolvedValue({ count: 0 });
   projectUpdateMany.mockResolvedValue({ count: 0 });
   roleBindingFindMany.mockResolvedValue([]);
+  groupMembershipDeleteMany.mockResolvedValue({ count: 0 });
+  teamUserDeleteMany.mockResolvedValue({ count: 0 });
   queryRaw.mockResolvedValue([{ userId: "user_a" }, { userId: "user_b" }]);
   attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
   changeBindingRole.mockResolvedValue(undefined);
@@ -100,6 +106,24 @@ describe("given a member whose removal is under way", () => {
       });
 
       expect(order).toEqual(["deleteMembership", "revokeGrants"]);
+    });
+
+    /** @scenario Removing a member drops their group and team memberships in that organization only */
+    it("drops their group and team rows in that organization inside the removal", async () => {
+      memberFindUnique.mockResolvedValue({ role: OrganizationUserRole.MEMBER, disabledAt: null });
+
+      await repository.deleteMember({
+        organizationId: "org_1",
+        userId: "user_a",
+        actingUserId: "user_b",
+      });
+
+      expect(groupMembershipDeleteMany).toHaveBeenCalledWith({
+        where: { userId: "user_a", group: { organizationId: "org_1" } },
+      });
+      expect(teamUserDeleteMany).toHaveBeenCalledWith({
+        where: { userId: "user_a", team: { organizationId: "org_1" } },
+      });
     });
   });
 

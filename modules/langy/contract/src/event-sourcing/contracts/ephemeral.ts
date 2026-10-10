@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "../../constants.ts";
@@ -8,16 +9,18 @@ import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "../../constants.ts";
  * ADR-046.
  */
 
-export const langyStatusSignalSchema = z.object({
+const langyStatusSignalSchemaDefinition = z.object({
   type: z.literal(LANGY_EPHEMERAL_SIGNAL_TYPES.STATUS_REPORTED),
   conversationId: z.string(),
   turnId: z.string().optional(),
   status: z.string(),
   occurredAt: z.number(),
 });
+export interface LangyStatusSignalSchema extends Named<typeof langyStatusSignalSchemaDefinition> {}
+export const langyStatusSignalSchema: LangyStatusSignalSchema = langyStatusSignalSchemaDefinition;
 export type LangyStatusSignal = z.infer<typeof langyStatusSignalSchema>;
 
-export const langyProgressSignalSchema = z.object({
+const langyProgressSignalSchemaDefinition = z.object({
   type: z.literal(LANGY_EPHEMERAL_SIGNAL_TYPES.PROGRESS_REPORTED),
   conversationId: z.string(),
   turnId: z.string().optional(),
@@ -25,12 +28,22 @@ export const langyProgressSignalSchema = z.object({
   progress: z.number().optional(),
   occurredAt: z.number(),
 });
+export interface LangyProgressSignalSchema extends Named<
+  typeof langyProgressSignalSchemaDefinition
+> {}
+export const langyProgressSignalSchema: LangyProgressSignalSchema =
+  langyProgressSignalSchemaDefinition;
 export type LangyProgressSignal = z.infer<typeof langyProgressSignalSchema>;
 
-export const langyEphemeralSignalSchema = z.discriminatedUnion("type", [
+const langyEphemeralSignalSchemaDefinition = z.discriminatedUnion("type", [
   langyStatusSignalSchema,
   langyProgressSignalSchema,
 ]);
+export interface LangyEphemeralSignalSchema extends Named<
+  typeof langyEphemeralSignalSchemaDefinition
+> {}
+export const langyEphemeralSignalSchema: LangyEphemeralSignalSchema =
+  langyEphemeralSignalSchemaDefinition;
 export type LangyEphemeralSignal = z.infer<typeof langyEphemeralSignalSchema>;
 
 /**

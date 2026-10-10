@@ -11,7 +11,7 @@ SCIM provisioning: directory connections, their tokens, and syncing users from a
 | Classification | enterprise (`modules/catalogue.json`)                                                       |
 | Subjects       | scim, scim-sync                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client) |
-| Api token      | `ScimApi` = `moduleApi<ScimApi>()("scim")`, `contract/src/scim.api.ts:293` (34 operations)  |
+| Api token      | `ScimApi` = `moduleApi<ScimApi>()("scim")`, `contract/src/scim.api.ts:294` (34 operations)  |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                  |
 
 ## What scim owns

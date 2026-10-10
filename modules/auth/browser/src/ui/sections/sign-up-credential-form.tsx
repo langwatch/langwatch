@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -170,6 +170,12 @@ export function SignUpCredentialForm({
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="10px">
+        <FormServerError form={form} />
+        <HandledErrorAlert
+          description={submitError}
+          title="Your account was created, but we couldn't log you in"
+        />
+        <HandledErrorAlert error={registerError} fallbackTitle="Couldn't create your account" />
         {/* Every failure shows in one place, at the top. The marker below is a
             false positive, not an exemption: `onSubmit`'s local assigned from
             `?.message` taints a literal title, which the raw-message scanner
@@ -251,22 +257,6 @@ export function SignUpCredentialForm({
               />
             )}
           </FrontDoorField>
-        ) : null}
-        <FormServerError form={form} />
-        {submitError ? (
-          <Alert.Root
-            status="error"
-            variant="outline"
-            borderStartWidth="4px"
-            borderStartColor={"frontDoor.danger"}
-          >
-            <Alert.Content>
-              <Alert.Description color={"frontDoor.danger"}>{submitError}</Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-        ) : null}
-        {registerError ? (
-          <HandledErrorAlert error={registerError} fallbackTitle="Couldn't create your account" />
         ) : null}
         {/* Arrives with the confirmation. Before that the passkey button IS
             the call to action, and a second primary button under an empty

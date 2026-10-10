@@ -9,7 +9,7 @@
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
@@ -18,6 +18,12 @@ import {
   renderDashboards,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
 import DashboardBoardScreen from "../../ui/sections/dashboard-board.screen.tsx";
+
+// jsdom loads no stylesheet, so the theme colours a chart frame is handed have no value to read.
+vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRawColorValue: () => "#123456",
+}));
 
 const BOARD = {
   ...HOME_BOARD,

@@ -2,7 +2,6 @@
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Heading } from "@langwatch/design-system/primitives";
 import type { UiCreateProjectDrawerProps } from "@langwatch/organization-contract";
 import {
   isAggregateProjectRouteRefused,
@@ -166,7 +165,7 @@ export function CreateProjectDrawer({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={handleClose} />
-          <Heading>Create New Project</Heading>
+          <Drawer.Title>Create New Project</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           <ProjectForm

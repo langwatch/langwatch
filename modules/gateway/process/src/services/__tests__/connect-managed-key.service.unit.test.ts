@@ -55,8 +55,12 @@ class RecordingWrites implements ConnectManagedKeyWrites {
   }
 }
 
+/** Refuses a query that does not name the kind, as the project module's own schema does. */
 const home: ConnectManagedKeyHome = {
-  ensureInternal: async () => ({ id: "project-governance" }),
+  ensureInternal: async ({ kind }) => {
+    if (kind !== "internal_governance") throw new Error("the project query must name its kind");
+    return { id: "project-governance" };
+  },
 };
 
 function harness(): { writes: RecordingWrites; service: ConnectManagedKeyService } {

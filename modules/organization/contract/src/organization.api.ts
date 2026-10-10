@@ -53,6 +53,7 @@ import type {
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
+  PendingInvitationsByEmail,
   PendingInvitationsForCaller,
   InviteLanding,
   OrganizationDirectoryCounts,
@@ -268,6 +269,13 @@ export interface OrganizationApi {
    * organization (ADR-171 v6). Carries the invitation code, so verified addresses only.
    */
   listPendingInvitationsForCaller(by: OrganizationCaller): Promise<PendingInvitationsForCaller>;
+  /**
+   * Every pending invitation on one address, in any organization (main's operator read). An
+   * operator-scope read: only the identity lookup, behind its own operator gate, asks it.
+   */
+  findPendingInvitationsByEmail(
+    input: Readonly<{ email: string }>,
+  ): Promise<PendingInvitationsByEmail>;
   deleteMember(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
@@ -413,10 +421,9 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts): a
-   * MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER or Lite
-   * (EXTERNAL) row is the whole admission, held `pending` when no seat is free. `seat` is the row's
-   * role; `"already-present"` is a concurrent callback or a retry, answered from the row there.
+   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts).
+   * A MEMBER's grant lands now or resumes on SSO arrival; a DEVELOPER or Lite row is the whole
+   * admission, held `pending` when no seat is free. `"already-present"` answers a retry.
    */
   createMembership(
     input: Readonly<{

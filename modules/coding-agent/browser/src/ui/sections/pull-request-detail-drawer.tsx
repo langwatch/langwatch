@@ -2,15 +2,7 @@ import { formatCost, formatTokens } from "@langwatch/design-system/display-forma
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { GitHubIcon } from "@langwatch/design-system/icons";
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import numeral from "numeral";
 import type React from "react";
@@ -90,7 +82,7 @@ export function PullRequestDetailDrawer({
                   />
                 ) : null}
               </HStack>
-              <Heading size="md">{detail?.pullRequest.title || repositoryFullName}</Heading>
+              <Drawer.Title>{detail?.pullRequest.title || repositoryFullName}</Drawer.Title>
               <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
                 {repositoryFullName}
               </Text>
@@ -99,9 +91,9 @@ export function PullRequestDetailDrawer({
               <Button
                 asChild
                 flexShrink={0}
-                bg={{ base: "gray.900", _dark: "gray.100" }}
-                color={{ base: "white", _dark: "gray.900" }}
-                _hover={{ bg: { base: "gray.800", _dark: "gray.200" } }}
+                bg="fg"
+                color="fg.inverted"
+                _hover={{ bg: "fg.muted" }}
               >
                 <a href={detail.pullRequest.htmlUrl} target="_blank" rel="noopener noreferrer">
                   <GitHubIcon size={16} />

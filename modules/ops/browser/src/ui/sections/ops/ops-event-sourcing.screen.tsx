@@ -3,7 +3,7 @@ import { EventSourcingLayout } from "../../../ui/sections/event-sourcing-layout.
 
 export default function OpsEventSourcingScreen() {
   return (
-    <EventSourcingLayout pageTitle="Event Sourcing">
+    <EventSourcingLayout pageTitle="Event sourcing">
       <EventSourcingOverview />
     </EventSourcingLayout>
   );

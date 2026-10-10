@@ -817,7 +817,7 @@ export function UploadCSVForm({
             variant="plain"
             colorPalette="gray"
             fontWeight="normal"
-            color="blue.700"
+            color="blue.fg"
             onClick={onCreateFromScratch}
             disabled={isUploading}
           >
@@ -1094,16 +1094,16 @@ function jsonToCSV(jsonContents: object[]): string {
 type DatasetFileStatus = "selected" | "uploading" | "ready" | "error";
 
 function DatasetFileStatusIcon({ status }: { status: DatasetFileStatus }) {
-  if (status === "uploading") return <Spinner size="sm" color="blue.500" />;
+  if (status === "uploading") return <Spinner size="sm" color="blue.fg" />;
   if (status === "ready")
     return (
-      <Box color="green.500" display="flex">
+      <Box color="fg.success" display="flex">
         <CheckCircle size={20} />
       </Box>
     );
   if (status === "error")
     return (
-      <Box color="red.500" display="flex">
+      <Box color="fg.error" display="flex">
         <XCircle size={20} />
       </Box>
     );
@@ -1144,7 +1144,7 @@ function DatasetFileRow({
       padding={3}
       borderWidth="1px"
       borderRadius="lg"
-      borderColor={isError ? "red.400" : "border"}
+      borderColor={isError ? "border.error" : "border"}
       bg="bg"
     >
       <DatasetFileStatusIcon status={status} />
@@ -1164,7 +1164,7 @@ function DatasetFileRow({
             {sizeLabel && meta && <Text color="border">|</Text>}
             {meta && (
               <Text
-                color={isError ? "red.500" : "fg.muted"}
+                color={isError ? "fg.error" : "fg.muted"}
                 data-testid={isError ? "upload-error" : undefined}
               >
                 {meta}
@@ -1185,7 +1185,7 @@ function RemoveFileButton({ onRemove }: { onRemove: () => void }) {
       as="button"
       color="fg.muted"
       display="flex"
-      _hover={{ color: "red.500" }}
+      _hover={{ color: "fg.error" }}
       aria-label="Remove file"
       onClick={(event: React.MouseEvent) => {
         // Prevent a wrapping label from re-opening the file picker on remove.
@@ -1206,7 +1206,7 @@ function CancelUploadButton({ onCancel }: { onCancel: () => void }) {
       as="button"
       color="fg.muted"
       display="flex"
-      _hover={{ color: "red.500" }}
+      _hover={{ color: "fg.error" }}
       aria-label="Cancel upload"
       onClick={(event: React.MouseEvent) => {
         event.preventDefault();
@@ -1272,7 +1272,7 @@ function CSVReaderBox({
               as="button"
               color="fg.muted"
               display="flex"
-              _hover={{ color: "red.500" }}
+              _hover={{ color: "fg.error" }}
               aria-label="Remove file"
               {...getRemoveFileProps()}
             >

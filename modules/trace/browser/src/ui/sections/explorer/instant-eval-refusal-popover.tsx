@@ -1,10 +1,10 @@
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 /**
  * The refusal an Instant Eval met, anchored under the search bar: what the eval would have found,
  * why it did not run, and the one thing that lifts it. Closable every way.
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
-
-import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { AccessState } from "@langwatch/design-system/access-state";
 import {
   PopoverAnchor,
   PopoverArrow,
@@ -134,7 +134,7 @@ export function instantEvalRefusalCopy(
     return {
       title: "Your free Instant Evals quota is used up",
       body: `${what} Upgrade to keep judging. ${meanwhile}`,
-      action: { label: "Upgrade", href: UPGRADE_HREF },
+      action: { label: "Compare plans", href: UPGRADE_HREF },
       dismiss: "Skip",
     };
   }
@@ -207,72 +207,90 @@ export function InstantEvalRefusalPopover({
       <PopoverContent maxWidth="360px" data-testid="instant-eval-refusal">
         <PopoverArrow />
         <PopoverBody>
-          {copy && (
-            <VStack align="stretch" gap={3}>
-              <HStack gap={2}>
-                <Box
-                  width="28px"
-                  height="28px"
-                  borderRadius="full"
-                  bg="orange.subtle"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  color="orange.fg"
-                >
-                  <Sparkles size={14} />
-                </Box>
-                <Text textStyle="sm" fontWeight="semibold">
-                  {copy.title}
-                </Text>
-              </HStack>
-              <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-                {copy.body}
-              </Text>
-              <HStack gap={2}>
-                {action && actionHref === undefined && (
-                  <Button
-                    size="xs"
-                    flex={1}
-                    bg="orange.solid"
-                    color="white"
-                    _hover={{ bg: "orange.fg" }}
-                    onClick={onEnable}
-                    loading={isEnabling}
-                  >
-                    {action.label}
+          {copy &&
+          actionHref &&
+          (refusal?.kind === "budget" || refusal?.kind === "not_in_license") ? (
+            <AccessState
+              kind="upgrade"
+              compact
+              title={copy.title}
+              description={copy.body}
+              actions={
+                <>
+                  <Button asChild size="sm" colorPalette="orange">
+                    <RoutedLink href={actionHref}>{action?.label}</RoutedLink>
                   </Button>
-                )}
-                {action && actionHref !== undefined && (
-                  <RoutedLink
-                    href={actionHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ display: "block", flex: 1 }}
+                  <Button size="sm" variant="outline" onClick={onClose}>
+                    {copy.dismiss}
+                  </Button>
+                  {copy.more && (
+                    <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
+                      {copy.more.label}
+                    </RoutedLink>
+                  )}
+                </>
+              }
+            />
+          ) : (
+            copy && (
+              <VStack align="stretch" gap={3}>
+                <HStack gap={2}>
+                  <Box
+                    width="28px"
+                    height="28px"
+                    borderRadius="full"
+                    bg="orange.subtle"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    color="orange.fg"
                   >
+                    <Sparkles size={14} />
+                  </Box>
+                  <Text textStyle="sm" fontWeight="semibold">
+                    {copy.title}
+                  </Text>
+                </HStack>
+                <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+                  {copy.body}
+                </Text>
+                <HStack gap={2}>
+                  {action && actionHref === undefined && (
                     <Button
                       size="xs"
-                      width="full"
-                      bg="orange.solid"
-                      color="white"
-                      _hover={{ bg: "orange.fg" }}
+                      flex={1}
+                      colorPalette="orange"
+                      onClick={onEnable}
+                      loading={isEnabling}
                     >
                       {action.label}
                     </Button>
-                  </RoutedLink>
-                )}
-                {copy.more && (
-                  <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
-                    <Button size="xs" variant="outline">
-                      {copy.more.label}
-                    </Button>
-                  </RoutedLink>
-                )}
-                <Button size="xs" variant="ghost" onClick={onClose}>
-                  {copy.dismiss}
-                </Button>
-              </HStack>
-            </VStack>
+                  )}
+                  {action && actionHref !== undefined && (
+                    <RoutedLink
+                      href={actionHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "block", flex: 1 }}
+                    >
+                      <Button size="xs" width="full" colorPalette="orange">
+                        {action.label}
+                      </Button>
+                    </RoutedLink>
+                  )}
+                  {copy.more && (
+                    <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
+                      <Button size="xs" variant="outline">
+                        {copy.more.label}
+                      </Button>
+                    </RoutedLink>
+                  )}
+                  <Button size="xs" variant="ghost" onClick={onClose}>
+                    {copy.dismiss}
+                  </Button>
+                </HStack>
+              </VStack>
+            )
           )}
         </PopoverBody>
       </PopoverContent>

@@ -1,3 +1,4 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
   Center,
@@ -96,7 +97,7 @@ function AggregateSearchScreen({
         onSearch={onSearch}
         isLoading={searchLoading}
       />
-      <Box paddingX={6} paddingY={4} w="full">
+      <Box paddingY={4} w="full">
         <VStack align="stretch" gap={4}>
           {searchLookbackDays !== null && (
             <Box
@@ -150,11 +151,11 @@ function AggregateSearchScreen({
           )}
 
           {!hasSearched && (
-            <Center paddingY={10}>
-              <Text textStyle="sm" color="fg.muted">
-                Search for an aggregate ID to get started.
-              </Text>
-            </Center>
+            <NoDataInfoBlock
+              icon={<Eye />}
+              title="Inspect an event history"
+              description="Search for an aggregate ID to get started."
+            />
           )}
 
           {searchResults && searchResults.length > 0 && (

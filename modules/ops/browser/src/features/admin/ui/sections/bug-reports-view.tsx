@@ -1,4 +1,6 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -10,7 +12,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { TimeInput } from "@langwatch/time";
-import { Copy, Download } from "lucide-react";
+import { Copy, Download, Inbox } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -61,7 +63,7 @@ export default function BugReportsView() {
   return (
     <>
       <AdminTable
-        title="Bug Reports"
+        title="Bug reports"
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search title, summary, agent, contact, project"
@@ -102,7 +104,13 @@ function BugReportsTable({
   onOpen: (reportId: string) => void;
 }) {
   return (
-    <Table.Root size="sm" variant="line">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      size="sm"
+      variant="line"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Received</Table.ColumnHeader>
@@ -118,10 +126,11 @@ function BugReportsTable({
         {reports?.length === 0 && (
           <Table.Row>
             <Table.Cell colSpan={7}>
-              <Text color="fg.muted" paddingY={6} textAlign="center">
-                No reports yet. They arrive here when a customer's coding agent runs `langwatch
-                report`.
-              </Text>
+              <NoDataInfoBlock
+                icon={<Inbox />}
+                title="No reports yet"
+                description="Reports arrive when a customer’s coding agent runs langwatch report."
+              />
             </Table.Cell>
           </Table.Row>
         )}
@@ -161,7 +170,7 @@ function BugReportsTable({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 
@@ -212,7 +221,7 @@ function BugReportDrawer({ reportId, onClose }: { reportId: string | null; onClo
         <Drawer.CloseTrigger />
         <Drawer.Body>
           {report.error && (
-            <Text color="red.500" fontSize="sm">
+            <Text color="fg.error" fontSize="sm">
               {report.error.message}
             </Text>
           )}
@@ -251,10 +260,10 @@ function BugReportDrawer({ reportId, onClose }: { reportId: string | null; onClo
                 <Box>
                   <HStack marginBottom={2}>
                     <Text fontWeight="semibold">Session transcript</Text>
-                    <Button size="xs" variant="outline" onClick={copyTranscript}>
+                    <Button size="sm" variant="outline" onClick={copyTranscript}>
                       <Copy size={12} /> Copy
                     </Button>
-                    <Button size="xs" variant="outline" onClick={downloadTranscript}>
+                    <Button size="sm" variant="outline" onClick={downloadTranscript}>
                       <Download size={12} /> Download .jsonl
                     </Button>
                   </HStack>

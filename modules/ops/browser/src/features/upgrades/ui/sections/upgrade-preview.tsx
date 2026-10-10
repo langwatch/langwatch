@@ -1,8 +1,8 @@
 import { CopyButton } from "@langwatch/design-system/copy-button";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Alert,
-  Code,
   Heading,
   HStack,
   Stack,
@@ -10,6 +10,7 @@ import {
   Text,
   Wrap,
 } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 
 import { modeLabel, preflightLabel } from "../../model/upgrade-labels.ts";
 import type { UpgradePreviewView } from "../../model/upgrade-view.ts";
@@ -25,7 +26,12 @@ const STEP_GROUPS = ["schema", "blocking", "background", "operator"] as const;
 function PlannedReleases({ releases }: { releases: readonly PlannedRelease[] }) {
   if (releases.length === 0) return <Text color="fg.muted">Nothing to apply.</Text>;
   return (
-    <ListTable data-testid="upgrade-preview-releases">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-preview-releases"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
@@ -42,9 +48,7 @@ function PlannedReleases({ releases }: { releases: readonly PlannedRelease[] }) 
               <Table.Cell key={group}>
                 <Wrap gap={1}>
                   {release[group].map((stepId) => (
-                    <Code key={stepId} size="sm">
-                      {stepId}
-                    </Code>
+                    <InlineCode key={stepId}>{stepId}</InlineCode>
                   ))}
                 </Wrap>
               </Table.Cell>
@@ -58,13 +62,18 @@ function PlannedReleases({ releases }: { releases: readonly PlannedRelease[] }) 
 
 function Preflight({ rows }: { rows: UpgradePreviewView["preflight"] }) {
   return (
-    <ListTable data-testid="upgrade-preflight">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-preflight"
+    >
       <Table.Body>
         {rows.map((row) => (
           <Table.Row key={row.id} data-testid={`upgrade-preflight-${row.id}`}>
             <Table.Cell>
               <Stack gap={1}>
-                <HStack justify="space-between">
+                <HStack justify="space-between" wrap="wrap">
                   <Text fontWeight="medium">{row.name}</Text>
                   <UpgradeStatusBadge label={preflightLabel(row.outcome)} />
                 </HStack>
@@ -88,9 +97,19 @@ export function UpgradePreview({ preview }: { preview: UpgradePreviewView }) {
   const plan = preview.plan;
   return (
     <Stack gap={6}>
-      <Text textStyle="sm" data-testid="upgrade-preview-installed">
-        Installed: {preview.installed ?? "None recorded"}
-      </Text>
+      <StatTileGrid columns={3}>
+        <StatTile variant="elevated" label="Installed" data-testid="upgrade-preview-installed">
+          <StatTileFigure>{preview.installed ?? "None recorded"}</StatTileFigure>
+        </StatTile>
+        <StatTile variant="elevated" label="Planned releases">
+          <StatTileFigure>
+            {plan.outcome === "planned" ? plan.releases.length : "Unavailable"}
+          </StatTileFigure>
+        </StatTile>
+        <StatTile variant="elevated" label="Preflight checks">
+          <StatTileFigure>{preview.preflight.length}</StatTileFigure>
+        </StatTile>
+      </StatTileGrid>
       {plan.outcome === "refused" ? (
         <Alert.Root status="error" data-testid="upgrade-preview-refused" data-code={plan.code}>
           <Alert.Indicator />
@@ -99,7 +118,7 @@ export function UpgradePreview({ preview }: { preview: UpgradePreviewView }) {
             {plan.stopAt && (
               <Alert.Description>
                 <HStack gap={2}>
-                  <Code>{plan.stopAt}</Code>
+                  <InlineCode>{plan.stopAt}</InlineCode>
                   <CopyButton value={plan.stopAt} label="Copy release" />
                 </HStack>
               </Alert.Description>

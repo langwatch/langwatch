@@ -3,6 +3,7 @@
   "apps/server/dist/",
   "apps/server/src/",
   "apps/api/",
+  "apps/backend/",
   "apps/ui/",
   "apps/worker/",
   "apps/tasks/",

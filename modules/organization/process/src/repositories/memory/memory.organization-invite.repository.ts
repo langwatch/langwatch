@@ -8,6 +8,7 @@ import {
   type OrganizationInvite,
   type OrganizationJsonValue,
   type OrganizationUser,
+  type PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
 import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -256,6 +257,26 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     );
     if (!invite) throw new InviteNotFoundError();
     return inviteOfRow(invite);
+  }
+
+  async findPendingInvitesForAddress(input: {
+    address: string;
+  }): Promise<PendingInvitationsByEmail> {
+    return [...this.memory.invites.values()]
+      .filter(
+        (candidate) =>
+          sameAddress(candidate.email, input.address) && candidate.status === "PENDING",
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
+      .map((invite) => ({
+        inviteId: invite.id,
+        email: invite.email,
+        organizationId: invite.organizationId,
+        organizationName: this.memory.organizations.get(invite.organizationId)?.name ?? null,
+        invitedByName:
+          (invite.requestedBy && this.memory.users.get(invite.requestedBy)?.name) || null,
+        expiresAtMs: invite.expiration?.epochMilliseconds ?? null,
+      }));
   }
 
   async findOldestPendingInviteForAddress(input: { address: string }): Promise<{

@@ -222,6 +222,7 @@ function mountCli(world: World = {}) {
 
   // As composed: governance's door with main's CLI refusal wire, auth's plan port behind it.
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: CliTokenIdentity.create({
       verify: world.verify ?? (() => Promise.resolve(HOLDER)),

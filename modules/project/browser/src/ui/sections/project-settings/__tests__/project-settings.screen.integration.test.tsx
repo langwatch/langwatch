@@ -59,8 +59,8 @@ describe("given an organization with a shared project", () => {
   it("offers both halves of the address", () => {
     renderWithProjectHost(<ProjectSettingsScreen />);
 
-    expect(screen.getByText("Organization Settings")).toBeTruthy();
-    expect(screen.getByText("Project-level Settings")).toBeTruthy();
+    expect(screen.getByText("Organization settings")).toBeTruthy();
+    expect(screen.getByText("Project settings")).toBeTruthy();
   });
 });
 
@@ -76,8 +76,8 @@ describe("given the project in scope is somebody's personal workspace", () => {
       new FakeProjectHost({ project: aProject({ isPersonal: true }) }),
     );
 
-    expect(screen.getByText("Organization Settings")).toBeTruthy();
-    expect(screen.queryByText("Project-level Settings")).toBeNull();
+    expect(screen.getByText("Organization settings")).toBeTruthy();
+    expect(screen.queryByText("Project settings")).toBeNull();
   });
 });
 
@@ -85,8 +85,8 @@ describe("given a governance-intent organization with no project at all", () => 
   it("still serves its organization settings", () => {
     renderWithProjectHost(<ProjectSettingsScreen />, new FakeProjectHost({ project: null }));
 
-    expect(screen.getByText("Organization Settings")).toBeTruthy();
-    expect(screen.queryByText("Project-level Settings")).toBeNull();
+    expect(screen.getByText("Organization settings")).toBeTruthy();
+    expect(screen.queryByText("Project settings")).toBeNull();
   });
 });
 
@@ -119,7 +119,7 @@ describe("when the reader holds the lite membership seat", () => {
   it("takes the organization form's save away and leaves the project's", () => {
     renderWithProjectHost(<ProjectSettingsScreen />, new FakeProjectHost({ isLiteMember: true }));
 
-    expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Save changes" })).toHaveLength(1);
   });
 });
 
@@ -127,7 +127,7 @@ describe("when the reader may manage the organization and holds a full seat", ()
   it("offers a save on each half", () => {
     renderWithProjectHost(<ProjectSettingsScreen />);
 
-    expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Save changes" })).toHaveLength(2);
   });
 });
 
@@ -174,7 +174,7 @@ describe("when the organization form is saved with the name cleared", () => {
     renderWithProjectHost(<ProjectSettingsScreen />);
 
     fireEvent.change(screen.getByDisplayValue("Acme"), { target: { value: "" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Save Changes" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Save changes" })[0]!);
 
     expect(await screen.findByText("Name is required")).toBeTruthy();
     expect(calls.updateOrganization).not.toHaveBeenCalled();

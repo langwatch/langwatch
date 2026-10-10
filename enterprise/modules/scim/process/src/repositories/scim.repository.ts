@@ -310,7 +310,7 @@ export abstract class ScimRepository {
     organizationId: string;
     userId: string;
   }): Promise<string[]>;
-  /** Whom these connections' directories have claimed, one row per person. */
+  /** Whom these connections' directories claim and have not deactivated, one row per person. */
   abstract findDirectoryOwnership(input: {
     connectionIds: string[];
   }): Promise<ScimDirectoryOwnership[]>;

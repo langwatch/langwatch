@@ -128,7 +128,9 @@ beforeEach(() => {
     sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
       listBrowserSessions: async () => [],
     }),
-    invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+    invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({
+      findPendingInvitationsByEmail: async () => [],
+    }),
     auditLog,
     rateLimiter: noopRateLimiter(),
   });
@@ -497,7 +499,9 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
         listBrowserSessions: async () => [],
       }),
-      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({
+        findPendingInvitationsByEmail: async () => [],
+      }),
     });
   }
 
@@ -636,14 +640,14 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
   /** @scenario "Outstanding invitations are listed with what is left of them" */
   it("lists an unaccepted invitation with organization, sender and expiry, and flags one past its expiry", async () => {
     reads.users.set("user_sam", { userId: "user_sam", name: "Sam", email: "sam@acme.com" });
-    reads.invitations.push(
+    const asked: string[] = [];
+    const pending = [
       {
         inviteId: "inv_live",
         email: "sam@acme.com",
         organizationId: "org_acme",
         organizationName: "Acme",
         invitedByName: "Riley",
-        status: "PENDING",
         expiresAtMs: 5_000,
       },
       {
@@ -652,10 +656,9 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
         organizationId: "org_globex",
         organizationName: "Globex",
         invitedByName: "Jo",
-        status: "PENDING",
         expiresAtMs: 500,
       },
-    );
+    ];
     const lookup = IdentityLookupService.create({
       reads,
       history: new EmptyIdentityHistory(),
@@ -665,7 +668,12 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
         listBrowserSessions: async () => [],
       }),
-      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({
+        findPendingInvitationsByEmail: async ({ email }: { email: string }) => {
+          asked.push(email);
+          return pending;
+        },
+      }),
       auditLog,
       rateLimiter: noopRateLimiter(),
       now: () => 1_000,
@@ -693,6 +701,7 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
         isExpired: true,
       }),
     ]);
+    expect(asked).toEqual(["sam@acme.com"]);
   });
 });
 
@@ -733,7 +742,9 @@ describe("identity lookup, detaching a sign-in method", () => {
       identity: () => identity,
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
-      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({
+        findPendingInvitationsByEmail: async () => [],
+      }),
       auditLog,
       rateLimiter: noopRateLimiter(),
     });
@@ -786,7 +797,9 @@ describe("identity lookup, detaching a sign-in method", () => {
       identity: () => identity,
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
-      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({
+        findPendingInvitationsByEmail: async () => [],
+      }),
       auditLog,
       rateLimiter: noopRateLimiter(),
     });

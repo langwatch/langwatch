@@ -9,7 +9,7 @@ import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { Button, Field, Heading, Input, Text } from "@langwatch/design-system/primitives";
+import { Button, Field, Input, Text } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { FormServerError } from "@langwatch/error-views";
 import { useState } from "react";
@@ -17,6 +17,7 @@ import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { useDebounce } from "use-debounce";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { formatRate, parseRate } from "../../model/cost-rate-text.ts";
 import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { ruleVerdict } from "../../model/regex-rule.ts";
@@ -28,11 +29,11 @@ import {
 
 interface LLMModelCostFormValues {
   model: string;
-  inputCostPerToken: number;
-  outputCostPerToken: number;
-  cacheReadCostPerToken?: number;
-  cacheCreationCostPerToken?: number;
-  cacheCreation1hCostPerToken?: number;
+  inputCostPerToken: string;
+  outputCostPerToken: string;
+  cacheReadCostPerToken: string;
+  cacheCreationCostPerToken: string;
+  cacheCreation1hCostPerToken: string;
   regex: string;
 }
 
@@ -73,23 +74,8 @@ function initialScope({
   return projectId ? [{ scopeType: "PROJECT", scopeId: projectId }] : [];
 }
 
-/**
- * Rates pass through a finite-number gate because react-hook-form yields NaN
- * or an empty string while a numeric field is being edited.
- */
-function finiteOrUndefined(value: unknown): number | undefined {
-  const num = typeof value === "string" ? Number(value) : (value as number);
-  const usable = typeof num === "number" && Number.isFinite(num) && num >= 0;
-
-  return usable ? num : undefined;
-}
-
-function optionalRate(value: number | undefined): number | undefined {
-  return value == null || isNaN(value) ? undefined : value;
-}
-
-function optionalNumberValue(value: unknown): number | undefined {
-  return value === "" || value == null ? undefined : Number(value);
+function nonNegative(value: number | undefined): number | undefined {
+  return value !== undefined && value >= 0 ? value : undefined;
 }
 
 /**
@@ -151,7 +137,7 @@ export function LLMModelCostDrawer({
     <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading>{drawerTitle({ id, cloneModel })}</Heading>
+          <Drawer.Title>{drawerTitle({ id, cloneModel })}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -208,11 +194,11 @@ function LLMModelCostForm({
   const form = useForm<LLMModelCostFormValues>({
     defaultValues: {
       model: currentLLMModelCost?.model ?? prefillModel,
-      inputCostPerToken: currentLLMModelCost?.inputCostPerToken,
-      outputCostPerToken: currentLLMModelCost?.outputCostPerToken,
-      cacheReadCostPerToken: currentLLMModelCost?.cacheReadCostPerToken,
-      cacheCreationCostPerToken: currentLLMModelCost?.cacheCreationCostPerToken,
-      cacheCreation1hCostPerToken: currentLLMModelCost?.cacheCreation1hCostPerToken,
+      inputCostPerToken: formatRate(currentLLMModelCost?.inputCostPerToken),
+      outputCostPerToken: formatRate(currentLLMModelCost?.outputCostPerToken),
+      cacheReadCostPerToken: formatRate(currentLLMModelCost?.cacheReadCostPerToken),
+      cacheCreationCostPerToken: formatRate(currentLLMModelCost?.cacheCreationCostPerToken),
+      cacheCreation1hCostPerToken: formatRate(currentLLMModelCost?.cacheCreation1hCostPerToken),
       regex: currentLLMModelCost?.regex ?? prefillRegex,
     },
   });
@@ -232,11 +218,13 @@ function LLMModelCostForm({
   const previewInput: MatchingSpansPreviewInput = {
     regex: debouncedValues.regex ?? "",
     model: debouncedValues.model || undefined,
-    inputCostPerToken: finiteOrUndefined(debouncedValues.inputCostPerToken),
-    outputCostPerToken: finiteOrUndefined(debouncedValues.outputCostPerToken),
-    cacheReadCostPerToken: finiteOrUndefined(debouncedValues.cacheReadCostPerToken),
-    cacheCreationCostPerToken: finiteOrUndefined(debouncedValues.cacheCreationCostPerToken),
-    cacheCreation1hCostPerToken: finiteOrUndefined(debouncedValues.cacheCreation1hCostPerToken),
+    inputCostPerToken: nonNegative(parseRate(debouncedValues.inputCostPerToken)),
+    outputCostPerToken: nonNegative(parseRate(debouncedValues.outputCostPerToken)),
+    cacheReadCostPerToken: nonNegative(parseRate(debouncedValues.cacheReadCostPerToken)),
+    cacheCreationCostPerToken: nonNegative(parseRate(debouncedValues.cacheCreationCostPerToken)),
+    cacheCreation1hCostPerToken: nonNegative(
+      parseRate(debouncedValues.cacheCreation1hCostPerToken),
+    ),
   };
 
   const [sample, setSample] = useState("");
@@ -255,11 +243,11 @@ function LLMModelCostForm({
         id,
         model: data.model,
         regex: data.regex,
-        inputCostPerToken: data.inputCostPerToken,
-        outputCostPerToken: data.outputCostPerToken,
-        cacheReadCostPerToken: optionalRate(data.cacheReadCostPerToken),
-        cacheCreationCostPerToken: optionalRate(data.cacheCreationCostPerToken),
-        cacheCreation1hCostPerToken: optionalRate(data.cacheCreation1hCostPerToken),
+        inputCostPerToken: parseRate(data.inputCostPerToken) ?? 0,
+        outputCostPerToken: parseRate(data.outputCostPerToken) ?? 0,
+        cacheReadCostPerToken: parseRate(data.cacheReadCostPerToken),
+        cacheCreationCostPerToken: parseRate(data.cacheCreationCostPerToken),
+        cacheCreation1hCostPerToken: parseRate(data.cacheCreation1hCostPerToken),
         projectId,
         scopeType: selectedScope?.scopeType,
         scopeId: selectedScope?.scopeId,
@@ -380,8 +368,7 @@ function LLMModelCostForm({
               placeholder="0.00"
               required
               {...register("inputCostPerToken", {
-                valueAsNumber: true,
-                validate: (value) => !isNaN(value),
+                validate: (value) => parseRate(value) !== undefined,
               })}
             />
           </InputGroup>
@@ -397,8 +384,7 @@ function LLMModelCostForm({
               placeholder="0.00"
               required
               {...register("outputCostPerToken", {
-                valueAsNumber: true,
-                validate: (value) => !isNaN(value),
+                validate: (value) => parseRate(value) !== undefined,
               })}
             />
           </InputGroup>
@@ -413,7 +399,7 @@ function LLMModelCostForm({
             <Input
               placeholder="0.00"
               {...register("cacheReadCostPerToken", {
-                setValueAs: optionalNumberValue,
+                validate: (value) => value.trim() === "" || parseRate(value) !== undefined,
               })}
             />
           </InputGroup>
@@ -428,7 +414,7 @@ function LLMModelCostForm({
             <Input
               placeholder="0.00"
               {...register("cacheCreationCostPerToken", {
-                setValueAs: optionalNumberValue,
+                validate: (value) => value.trim() === "" || parseRate(value) !== undefined,
               })}
             />
           </InputGroup>
@@ -443,7 +429,7 @@ function LLMModelCostForm({
             <Input
               placeholder="0.00"
               {...register("cacheCreation1hCostPerToken", {
-                setValueAs: optionalNumberValue,
+                validate: (value) => value.trim() === "" || parseRate(value) !== undefined,
               })}
             />
           </InputGroup>

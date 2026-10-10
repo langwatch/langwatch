@@ -2,7 +2,8 @@
 
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
-import { Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import {
   type GovernanceSeatLane,
   type GovernanceSeatPool,
@@ -111,15 +112,7 @@ export function CostLanePanel({
   const otherCurrencies = (currencyTotals ?? []).filter((total) => total.currencyCode !== "USD");
   const footNote = cellsWithoutAmount > 0 ? laneWithheldTotalNote() : belowTotalNote;
   return (
-    <Box
-      data-testid={testId}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="xl"
-      backgroundColor="bg.panel"
-      boxShadow="md"
-      padding={4}
-    >
+    <Card.Root variant="showcase" data-testid={testId} padding={4}>
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
           <Heading size="sm">{label}</Heading>
@@ -136,9 +129,7 @@ export function CostLanePanel({
           <SampleMark shown={sample} />
         </HStack>
         <HStack gap={2} alignItems="baseline">
-          <Text fontSize="2xl" fontWeight="semibold" fontVariantNumeric="tabular-nums">
-            {formatLaneUsd(amountUsd)}
-          </Text>
+          <StatTileFigure>{formatLaneUsd(amountUsd)}</StatTileFigure>
           {/* Deliberately uncoloured. Spend rising is a fact about a window,
               not a fault, and a red arrow on it would have this card judging
               an organization's AI programme by whether it grew. The sentence
@@ -185,7 +176,7 @@ export function CostLanePanel({
           </Text>
         ) : null}
       </VStack>
-    </Box>
+    </Card.Root>
   );
 }
 
@@ -219,13 +210,9 @@ export function SeatLanePanel({
 }) {
   const reported = seats.status === "reported";
   return (
-    <Box
+    <Card.Root
+      variant="showcase"
       data-testid={testId}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="xl"
-      backgroundColor="bg.panel"
-      boxShadow="md"
       borderStyle={reported ? "solid" : "dashed"}
       padding={4}
     >
@@ -245,7 +232,7 @@ export function SeatLanePanel({
           <SeatLaneWithoutCounts status={seats.status} />
         )}
       </VStack>
-    </Box>
+    </Card.Root>
   );
 }
 

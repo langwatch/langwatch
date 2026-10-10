@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -301,12 +302,24 @@ func classifyPath(urlPath string) (domain.RequestType, string) {
 	}
 }
 
+// dispatchFailure is the herr a failed dispatch answers with. A refusal the
+// dispatcher itself made of the caller (a rate limit, a budget, a model not
+// allowed) keeps its own 4xx so the caller reads the reason; anything else is
+// the gateway being unavailable.
+func dispatchFailure(ctx context.Context, err error, reason string) herr.E {
+	var refusal herr.E
+	if errors.As(err, &refusal) {
+		if status := herr.HTTPStatus(refusal); status >= 400 && status < 500 {
+			return refusal
+		}
+	}
+	return herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{"reason": reason}, err)
+}
+
 func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	resp, err := proxy.Dispatch(ctx, req)
 	if err != nil {
-		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
-			"reason": "dispatcher_error",
-		}, err))
+		writeHandlerError(ctx, w, dispatchFailure(ctx, err, "dispatcher_error"))
 		return
 	}
 	// Forward the upstream content-type so the playground sees JSON as JSON.
@@ -334,9 +347,7 @@ func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProx
 func handleStream(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	iter, err := proxy.DispatchStream(ctx, req)
 	if err != nil {
-		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
-			"reason": "dispatcher_stream_error",
-		}, err))
+		writeHandlerError(ctx, w, dispatchFailure(ctx, err, "dispatcher_stream_error"))
 		return
 	}
 	defer func() { _ = iter.Close() }()

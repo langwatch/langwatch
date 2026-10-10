@@ -10,9 +10,9 @@ import {
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import type { ShareApi } from "@langwatch/share-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";

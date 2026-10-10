@@ -39,7 +39,7 @@ anything; the process mounts every installed module's declarations.
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
-7a. **Every route serves while the installation upgrades; nothing is declared** (NO-HOLDS, Alex
+   7a. **Every route serves while the installation upgrades; nothing is declared** (NO-HOLDS, Alex
    2026-10-09). A query the Postgres schema is not ready for answers the handled
    `upgrade_in_progress` (503, Retry-After) on REST, tRPC and SSE alike, mapped once in
    `promoteStoreFailure` (`packages/api/src/errors.ts`); never catch it per route (`upgrade` skill).
@@ -77,17 +77,17 @@ anything; the process mounts every installed module's declarations.
    the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 11. **What a route needs beyond its input is middleware context its own module provides** (record §8,
-   Alex 2026-10-10). Declare it `defineMiddlewareContext("name", schema)`, name it on the route with
-   `.withMiddlewareContext(name)` (the handler gets the parsed value after its arguments), and supply
-   every one in the module installer: `.provideMiddlewareContext({ name: (request, { app, dependencies })
+    Alex 2026-10-10). Declare it `defineMiddlewareContext("name", schema)`, name it on the route with
+    `.withMiddlewareContext(name)` (the handler gets the parsed value after its arguments), and supply
+    every one in the module installer: `.provideMiddlewareContext({ name: (request, { app, dependencies })
    => value })`. A missing key, an extra key or a value of the wrong type does not compile, and a module
-   whose routes need context it never provides does not publish. No process supplies it: a value several
-   modules need is a shared helper (`projectRequestContext: projectRequestContextOf`). `.withHeaders(...)`
-   values bind themselves. A tRPC procedure uses the same `.withMiddlewareContext(x)`; its mount binds it
-   with `bindTrpcMiddlewareContext(x, (ctx) => value)` or `bindTrpcHeader`. Anything else a module binds by
-   hand (tRPC, websocket, the API door) goes in `.provideMiddlewareBindings(() => [...])`, type-checked the
-   same way. Need the browser session the door resolved? `.withMiddlewareContext(browserSessionContext)`,
-   provided by `browserSession: browserSessionOfRequest`; never verify the cookie again.
+    whose routes need context it never provides does not publish. No process supplies it: a value several
+    modules need is a shared helper (`projectRequestContext: projectRequestContextOf`). `.withHeaders(...)`
+    values bind themselves. A tRPC procedure uses the same `.withMiddlewareContext(x)`; its mount binds it
+    with `bindTrpcMiddlewareContext(x, (ctx) => value)` or `bindTrpcHeader`. Anything else a module binds by
+    hand (tRPC, websocket, the API door) goes in `.provideMiddlewareBindings(() => [...])`, type-checked the
+    same way. Need the browser session the door resolved? `.withMiddlewareContext(browserSessionContext)`,
+    provided by `browserSession: browserSessionOfRequest`; never verify the cookie again.
 
 ## Worked example: one contract, one tRPC binding, one REST route
 

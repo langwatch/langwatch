@@ -177,7 +177,7 @@ export function WorkflowCodeEditorModal({
               left: 0,
               right: 0,
               height: "2px",
-              bg: "blue.400",
+              bg: "blue.solid",
             }}
           >
             <LuFileCode size={14} />

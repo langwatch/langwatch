@@ -1,21 +1,14 @@
-import { getRawColorValue } from "@langwatch/design-system/color-mode";
+import { system } from "@langwatch/design-system";
 import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
 
+const SERIES_ROLES = ["solid", "fg", "emphasized", "muted"] as const;
+type ChartRole = "solid" | "fg" | "subtle" | "muted";
+
 export const useGetRotatingColorForCharts = () => {
-  return (set: RotatingColorSet, index: number, adjustment = 0) => {
+  return (set: RotatingColorSet, index: number, role?: ChartRole) => {
     const colorSet = rotatingColors[set];
-    if (!colorSet || colorSet.length === 0) {
-      return getRawColorValue("gray.400");
-    }
-    const color = colorSet[index % colorSet.length]?.color ?? "gray.400";
-    const [name, suffix] = color.split(".");
-
-    // Semantic tokens (e.g. "green.emphasized") don't support numeric adjustment
-    const numericValue = parseInt(suffix ?? "0");
-    if (isNaN(numericValue)) {
-      return getRawColorValue(color);
-    }
-
-    return getRawColorValue(`${name}.${Math.max(Math.min(numericValue + adjustment, 900), 50)}`);
+    const palette = colorSet[index % colorSet.length]?.color.split(".")[0] ?? "gray";
+    const seriesRole = set.endsWith("Tones") ? SERIES_ROLES[index % SERIES_ROLES.length] : "solid";
+    return system.token.var(`colors.${palette}.${role ?? seriesRole}`);
   };
 };

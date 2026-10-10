@@ -242,6 +242,7 @@ export function createTestSuitesRest(): Readonly<{
     .post("/", "createTestSuite")
     .withInput(testSuiteCreateInputSchema)
     .withPermission("scenarios:create")
+    .withAudit("suites.testSuites.create")
     .withOutput(testSuiteWireSchema)
     .withStatus(201)
     .withDocs({
@@ -288,6 +289,7 @@ export function createTestSuitesRest(): Readonly<{
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteUpdateInputSchema)
     .withPermission("scenarios:update")
+    .withAudit("suites.testSuites.update")
     .withOutput(testSuiteWireSchema)
     .withDocs({
       tags: ["Test Suites"],
@@ -308,6 +310,7 @@ export function createTestSuitesRest(): Readonly<{
     .delete("/:id", "archiveTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:manage")
+    .withAudit("suites.testSuites.archive")
     .withOutput(testSuiteArchiveResultSchema)
     .withDocs({
       tags: ["Test Suites"],
@@ -321,6 +324,7 @@ export function createTestSuitesRest(): Readonly<{
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)
     .withPermission("scenarios:create")
+    .withoutAudit("run, not a change")
     .withOutput(runPlanRunResultSchema)
     .withDocs({
       tags: ["Test Suites"],

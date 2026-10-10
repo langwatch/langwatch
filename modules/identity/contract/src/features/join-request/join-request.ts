@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Join-request vocabulary: states, events, and reducer for the request lifecycle. Isomorphic and
@@ -30,11 +31,13 @@ export const DOMAIN_AUTO_JOIN_POLICY_ID = "domain-auto" as const;
 /** The policy id a single sign-on arrival's recorded admission resolves with. */
 export const SSO_ARRIVAL_POLICY_ID = "sso-arrival" as const;
 
-export const joinResolverSchema = z.object({
+const joinResolverSchemaDefinition = z.object({
   type: joinResolverTypeSchema,
   /** The admin's user id, the policy id, or the invitation id. */
   id: z.string().min(1),
 });
+export interface JoinResolverSchema extends Named<typeof joinResolverSchemaDefinition> {}
+export const joinResolverSchema: JoinResolverSchema = joinResolverSchemaDefinition;
 export type JoinResolver = z.infer<typeof joinResolverSchema>;
 
 /**
@@ -80,7 +83,7 @@ export type JoinRequestEventType = (typeof JOIN_REQUEST_EVENT_TYPES)[number];
 
 export const JOIN_REQUEST_EVENT_VERSION_LATEST = "2026-08-24" as const;
 
-export const joinRequestedPayloadSchema = z.object({
+const joinRequestedPayloadSchemaDefinition = z.object({
   joinRequestId: z.string().min(1),
   userId: z.string().min(1),
   organizationId: z.string().min(1),
@@ -104,35 +107,60 @@ export const joinRequestedPayloadSchema = z.object({
   connectionId: z.string().min(1).nullable().default(null),
   actor: ledgerActorSchema,
 });
+export interface JoinRequestedPayloadSchema extends Named<
+  typeof joinRequestedPayloadSchemaDefinition
+> {}
+export const joinRequestedPayloadSchema: JoinRequestedPayloadSchema =
+  joinRequestedPayloadSchemaDefinition;
 export type JoinRequestedPayload = z.infer<typeof joinRequestedPayloadSchema>;
 
-export const joinApprovedPayloadSchema = z.object({
+const joinApprovedPayloadSchemaDefinition = z.object({
   joinRequestId: z.string().min(1),
   resolvedBy: joinResolverSchema,
   actor: ledgerActorSchema,
 });
+export interface JoinApprovedPayloadSchema extends Named<
+  typeof joinApprovedPayloadSchemaDefinition
+> {}
+export const joinApprovedPayloadSchema: JoinApprovedPayloadSchema =
+  joinApprovedPayloadSchemaDefinition;
 export type JoinApprovedPayload = z.infer<typeof joinApprovedPayloadSchema>;
 
 /** No reason field, on purpose: rejection is silent-ish, and a reason is a
  *  thing an admin would then be asked to justify. */
-export const joinRejectedPayloadSchema = z.object({
+const joinRejectedPayloadSchemaDefinition = z.object({
   joinRequestId: z.string().min(1),
   resolvedBy: joinResolverSchema,
   actor: ledgerActorSchema,
 });
+export interface JoinRejectedPayloadSchema extends Named<
+  typeof joinRejectedPayloadSchemaDefinition
+> {}
+export const joinRejectedPayloadSchema: JoinRejectedPayloadSchema =
+  joinRejectedPayloadSchemaDefinition;
 export type JoinRejectedPayload = z.infer<typeof joinRejectedPayloadSchema>;
 
-export const joinExpiredPayloadSchema = z.object({
+const joinExpiredPayloadSchemaDefinition = z.object({
   joinRequestId: z.string().min(1),
   actor: ledgerActorSchema,
 });
+export interface JoinExpiredPayloadSchema extends Named<
+  typeof joinExpiredPayloadSchemaDefinition
+> {}
+export const joinExpiredPayloadSchema: JoinExpiredPayloadSchema =
+  joinExpiredPayloadSchemaDefinition;
 export type JoinExpiredPayload = z.infer<typeof joinExpiredPayloadSchema>;
 
-export const joinWithdrawnPayloadSchema = z.object({
+const joinWithdrawnPayloadSchemaDefinition = z.object({
   joinRequestId: z.string().min(1),
   cause: joinWithdrawalCauseSchema,
   actor: ledgerActorSchema,
 });
+export interface JoinWithdrawnPayloadSchema extends Named<
+  typeof joinWithdrawnPayloadSchemaDefinition
+> {}
+export const joinWithdrawnPayloadSchema: JoinWithdrawnPayloadSchema =
+  joinWithdrawnPayloadSchemaDefinition;
 export type JoinWithdrawnPayload = z.infer<typeof joinWithdrawnPayloadSchema>;
 
 export type JoinRequestFactInput =
@@ -142,7 +170,7 @@ export type JoinRequestFactInput =
   | { type: typeof JOIN_EXPIRED_EVENT_TYPE; data: JoinExpiredPayload }
   | { type: typeof JOIN_WITHDRAWN_EVENT_TYPE; data: JoinWithdrawnPayload };
 
-export const joinRequestFactInputSchema = z.discriminatedUnion("type", [
+const joinRequestFactInputSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(JOIN_REQUESTED_EVENT_TYPE),
     data: joinRequestedPayloadSchema,
@@ -164,6 +192,11 @@ export const joinRequestFactInputSchema = z.discriminatedUnion("type", [
     data: joinWithdrawnPayloadSchema,
   }),
 ]);
+export interface JoinRequestFactInputSchema extends Named<
+  typeof joinRequestFactInputSchemaDefinition
+> {}
+export const joinRequestFactInputSchema: JoinRequestFactInputSchema =
+  joinRequestFactInputSchemaDefinition;
 
 /** A fact with its business time — what the reducer folds. */
 export type JoinRequestFact = JoinRequestFactInput & { occurredAt: number };

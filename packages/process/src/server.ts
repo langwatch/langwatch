@@ -204,16 +204,16 @@ export class Server {
     return this.livenessThread?.address ?? this.healthListener.address();
   }
 
-  /**
-   * Opens the health door ahead of `listen`, off the main loop, so liveness answers while a
-   * slow boot stage (the voice tunnel mint) is still running. `listen` finds it open.
-   * Spec: specs/server/worker-liveness-probe.feature.
-   */
   /** An application will be served: until then a product request is told to retry, not 404. */
   expectApplication(): void {
     this.applicationExpected = true;
   }
 
+  /**
+   * Opens the health door ahead of `listen`, off the main loop, so liveness answers while a
+   * slow boot stage (the voice tunnel mint) is still running. `listen` finds it open.
+   * Spec: specs/server/worker-liveness-probe.feature.
+   */
   openLiveness(): Promise<void> {
     this.livenessOffLoop = true;
     return this.openHealth();
@@ -522,9 +522,17 @@ export class Server {
     this.started = true;
   }
 
-  /** A door opened by `openLiveness` whose `listen` never came has no phase to close it. */
+  /**
+   * A server whose `listen` never came has no phases, yet a component with no `start` (the
+   * telemetry the preamble set up) and an opened door are live already: release them.
+   */
   private async closeUnlistened(): Promise<void> {
-    if (this.listening === undefined && this.healthOpening !== undefined) {
+    if (this.listening !== undefined) return;
+    await this.stopStarted(
+      this.components.filter((component) => component !== this.health && !component.start),
+    );
+    await this.resources.close();
+    if (this.healthOpening !== undefined) {
       await this.healthOpening.catch(() => void 0);
       await this.health?.stop();
     }

@@ -17,9 +17,36 @@ declare module "monaco-editor/esm/vs/language/typescript/lib/typescriptServices.
     readFile(fileName: string): string | undefined;
   }
 
+  interface SymbolDisplayPart {
+    readonly text: string;
+    readonly kind: string;
+  }
+
+  interface CompletionInfo {
+    readonly entries: readonly { readonly name: string }[];
+  }
+
+  interface CompletionEntryDetails {
+    readonly displayParts: SymbolDisplayPart[];
+  }
+
   interface LanguageService {
     getSemanticDiagnostics(fileName: string): Diagnostic[];
     getSyntacticDiagnostics(fileName: string): Diagnostic[];
+    getCompletionsAtPosition(
+      fileName: string,
+      position: number,
+      options: object | undefined,
+    ): CompletionInfo | undefined;
+    getCompletionEntryDetails(
+      fileName: string,
+      position: number,
+      entryName: string,
+      formatOptions: object | undefined,
+      source: string | undefined,
+      preferences: object | undefined,
+      data: unknown,
+    ): CompletionEntryDetails | undefined;
   }
 
   export const typescript: {
@@ -30,6 +57,7 @@ declare module "monaco-editor/esm/vs/language/typescript/lib/typescriptServices.
     ScriptSnapshot: { fromString(text: string): unknown };
     createLanguageService(host: LanguageServiceHost): LanguageService;
     flattenDiagnosticMessageText(messageText: Diagnostic["messageText"], newLine: string): string;
+    displayPartsToString(displayParts: readonly SymbolDisplayPart[] | undefined): string;
   };
 }
 

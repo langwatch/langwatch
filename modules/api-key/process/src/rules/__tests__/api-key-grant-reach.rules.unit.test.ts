@@ -14,6 +14,7 @@ const project: ProjectIdentity = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 describe("bindingsReachProject", () => {

@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
+    "predev": "pnpm -w run ensure:built",
     "dev": "vite --configLoader runner",
     "build": "NODE_ENV=production vite build --configLoader runner",
     "build:local": "NODE_ENV=production LANGWATCH_UI_LOCAL_BUILD=1 vite build --configLoader runner --outDir dist/client.local",

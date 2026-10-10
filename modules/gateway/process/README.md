@@ -6,7 +6,7 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…)`, `src/gateway.module.ts:52`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…)`, `src/gateway.module.ts:46`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -993,7 +993,7 @@ type Body = z.infer<typeof gatewayCreateVirtualKeySchema>; // ../contract/src/ga
 
 Get virtual key
 
-Permission `virtualKeys:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:349`.
+Permission `virtualKeys:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:348`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id`.
 
@@ -1002,14 +1002,14 @@ Answers at `/api/gateway/v1/virtual-keys/:id`.
 interface Params {
   id: string;
 }
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:353)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:352)
 ```
 
 #### `GET /virtual-keys/:id/spend` · `getApiGatewayV1VirtualKeysByIdSpend`
 
 Read a virtual key's spend
 
-Permission `gatewayUsage:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:366`.
+Permission `gatewayUsage:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:365`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/spend`.
 
@@ -1036,21 +1036,21 @@ interface Response {
 
 Update virtual key
 
-Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:404`.
+Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:403`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
 type Body = z.infer<typeof gatewayUpdateVirtualKeySchema>; // ../contract/src/gateway-platform.schemas.ts:249
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:409)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:408)
 ```
 
 #### `POST /virtual-keys/:id/rotate` · `postApiGatewayV1VirtualKeysByIdRotate`
 
 Rotate virtual key secret
 
-Permission `virtualKeys:rotate`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:449`.
+Permission `virtualKeys:rotate`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:447`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/rotate`.
 
@@ -1058,14 +1058,14 @@ Answers at `/api/gateway/v1/virtual-keys/:id/rotate`.
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
 // Body: gatewayRotateVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:329
 type Body = Record<string, unknown>;
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }) (inline, src/transport/gateway-platform.rest.ts:454)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }) (inline, src/transport/gateway-platform.rest.ts:452)
 ```
 
 #### `POST /virtual-keys/:id/disable` · `postApiGatewayV1VirtualKeysByIdDisable`
 
 Disable virtual key
 
-Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:480`.
+Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:477`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/disable`.
 
@@ -1075,14 +1075,14 @@ type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-
 interface Body {
   reason?: string;
 }
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:485)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:482)
 ```
 
 #### `POST /virtual-keys/:id/enable` · `postApiGatewayV1VirtualKeysByIdEnable`
 
 Enable virtual key
 
-Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:511`.
+Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:507`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/enable`.
 
@@ -1090,14 +1090,14 @@ Answers at `/api/gateway/v1/virtual-keys/:id/enable`.
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
 // Body: gatewayEnableVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:332
 type Body = Record<string, unknown>;
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:516)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:512)
 ```
 
 #### `POST /virtual-keys/:id/revoke` · `postApiGatewayV1VirtualKeysByIdRevoke`
 
 Revoke virtual key
 
-Permission `virtualKeys:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:536`.
+Permission `virtualKeys:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:531`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/revoke`.
 
@@ -1105,14 +1105,14 @@ Answers at `/api/gateway/v1/virtual-keys/:id/revoke`.
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
 // Body: gatewayRevokeVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:335
 type Body = Record<string, unknown>;
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:541)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:536)
 ```
 
 #### `GET /budgets` · `getApiGatewayV1Budgets`
 
 List budgets
 
-Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:563`.
+Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:557`.
 
 Answers at `/api/gateway/v1/budgets`.
 
@@ -1124,40 +1124,40 @@ interface Query {
   scope_type?: string;
   external_id?: string;
 }
-// Response: z.object({ data: z.array(gatewayPlatformBudgetDtoSchema), spend_available: z.boolean(), n… (inline, src/transport/gateway-platform.rest.ts:568)
+// Response: z.object({ data: z.array(gatewayPlatformBudgetDtoSchema), spend_available: z.boolean(), n… (inline, src/transport/gateway-platform.rest.ts:562)
 ```
 
 #### `GET /budgets/:id` · `getApiGatewayV1BudgetsById`
 
 Get budget
 
-Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:607`.
+Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:601`.
 
 Answers at `/api/gateway/v1/budgets/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }) (inline, src/transport/gateway-platform.rest.ts:611)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }) (inline, src/transport/gateway-platform.rest.ts:605)
 ```
 
 #### `POST /budgets` · `postApiGatewayV1Budgets`
 
 Create budget
 
-Permission `gatewayBudgets:create`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:624`.
+Permission `gatewayBudgets:create`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:618`.
 
 Answers at `/api/gateway/v1/budgets`.
 
 ```typescript
 type Body = z.infer<typeof gatewayCreateBudgetSchema>; // ../contract/src/gateway-platform.schemas.ts:271
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:629)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:623)
 ```
 
 #### `PATCH /budgets/:id` · `patchApiGatewayV1BudgetsById`
 
 Update budget
 
-Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:669`.
+Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:663`.
 
 Answers at `/api/gateway/v1/budgets/:id`.
 
@@ -1173,27 +1173,27 @@ interface Body {
   external_id?: string | null;
   metadata?: Record<string, string>;
 }
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:674)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:668)
 ```
 
 #### `DELETE /budgets/:id` · `deleteApiGatewayV1BudgetsById`
 
 Archive budget
 
-Permission `gatewayBudgets:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:700`.
+Permission `gatewayBudgets:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:694`.
 
 Answers at `/api/gateway/v1/budgets/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:704)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:698)
 ```
 
 #### `POST /budgets/:id/reset` · `postApiGatewayV1BudgetsByIdReset`
 
 Reset budget period
 
-Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:718`.
+Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:712`.
 
 Answers at `/api/gateway/v1/budgets/:id/reset`.
 
@@ -1207,14 +1207,14 @@ interface Query {
 interface Body {
   reason?: string;
 }
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:724)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:718)
 ```
 
 #### `GET /cache-rules` · `getApiGatewayV1CacheRules`
 
 List cache-control rules
 
-Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:752`.
+Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:746`.
 
 Answers at `/api/gateway/v1/cache-rules`.
 
@@ -1224,72 +1224,72 @@ interface Query {
   cursor?: string;
   limit?: number;
 }
-// Response: z.object({ data: z.array(gatewayPlatformCacheRuleDtoSchema), next_cursor: gatewayNextCurs… (inline, src/transport/gateway-platform.rest.ts:756)
+// Response: z.object({ data: z.array(gatewayPlatformCacheRuleDtoSchema), next_cursor: gatewayNextCurs… (inline, src/transport/gateway-platform.rest.ts:750)
 ```
 
 #### `GET /cache-rules/:id` · `getApiGatewayV1CacheRulesById`
 
 Get a cache rule
 
-Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:784`.
+Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:778`.
 
 Answers at `/api/gateway/v1/cache-rules/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:787)
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:781)
 ```
 
 #### `POST /cache-rules` · `postApiGatewayV1CacheRules`
 
 Create a cache rule
 
-Permission `gatewayCacheRules:create`. Declared at `src/transport/gateway-platform.rest.ts:799`.
+Permission `gatewayCacheRules:create`. Declared at `src/transport/gateway-platform.rest.ts:793`.
 
 Answers at `/api/gateway/v1/cache-rules`.
 
 ```typescript
 type Body = z.infer<typeof gatewayCreateCacheRuleSchema>; // ../contract/src/gateway-platform.schemas.ts:308
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:803)
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:797)
 ```
 
 #### `PATCH /cache-rules/:id` · `patchApiGatewayV1CacheRulesById`
 
 Update a cache rule
 
-Permission `gatewayCacheRules:update`. Declared at `src/transport/gateway-platform.rest.ts:832`.
+Permission `gatewayCacheRules:update`. Declared at `src/transport/gateway-platform.rest.ts:826`.
 
 Answers at `/api/gateway/v1/cache-rules/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
 type Body = z.infer<typeof gatewayUpdateCacheRuleSchema>; // ../contract/src/gateway-platform.schemas.ts:317
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:836)
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:830)
 ```
 
 #### `DELETE /cache-rules/:id` · `deleteApiGatewayV1CacheRulesById`
 
 Archive a cache rule
 
-Permission `gatewayCacheRules:delete`. Declared at `src/transport/gateway-platform.rest.ts:865`.
+Permission `gatewayCacheRules:delete`. Declared at `src/transport/gateway-platform.rest.ts:859`.
 
 Answers at `/api/gateway/v1/cache-rules/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:868)
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:862)
 ```
 
 #### `GET /providers` · `getApiGatewayV1Providers`
 
 List provider bindings
 
-Permission `gatewayProviders:view`. Declared at `src/transport/gateway-platform.rest.ts:892`.
+Permission `gatewayProviders:view`. Declared at `src/transport/gateway-platform.rest.ts:886`.
 
 Answers at `/api/gateway/v1/providers`.
 
 ```typescript
-// Response: inline, src/transport/gateway-platform.rest.ts:894
+// Response: inline, src/transport/gateway-platform.rest.ts:888
 type Response = unknown;
 ```
 
@@ -1297,14 +1297,14 @@ type Response = unknown;
 
 Bind a model provider to the gateway
 
-Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:907`.
+Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:901`.
 
 Answers at `/api/gateway/v1/providers`.
 
 ```typescript
 // Body: gatewayRetiredProviderBindingBodySchema, ../contract/src/gateway-platform.schemas.ts:338
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/gateway-platform.rest.ts:910
+// Response: inline, src/transport/gateway-platform.rest.ts:904
 type Response = unknown;
 ```
 
@@ -1312,14 +1312,14 @@ type Response = unknown;
 
 Update provider binding
 
-Permission `gatewayProviders:update`. Declared at `src/transport/gateway-platform.rest.ts:923`.
+Permission `gatewayProviders:update`. Declared at `src/transport/gateway-platform.rest.ts:917`.
 
 Answers at `/api/gateway/v1/providers/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
 type Body = z.infer<typeof gatewayRetiredProviderBindingBodySchema>; // ../contract/src/gateway-platform.schemas.ts:338
-// Response: inline, src/transport/gateway-platform.rest.ts:927
+// Response: inline, src/transport/gateway-platform.rest.ts:921
 type Response = unknown;
 ```
 
@@ -1327,13 +1327,13 @@ type Response = unknown;
 
 Disable provider binding
 
-Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:939`.
+Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:933`.
 
 Answers at `/api/gateway/v1/providers/:id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: inline, src/transport/gateway-platform.rest.ts:942
+// Response: inline, src/transport/gateway-platform.rest.ts:936
 type Response = unknown;
 ```
 
@@ -1630,7 +1630,7 @@ type Output = z.infer<typeof gatewayVirtualKeyUsageSummarySchema>; // ../contrac
 
 ### `virtualKeys`
 
-Contract `../contract/src/virtual-key.trpc.ts:24`, router `src/transport/virtual-key.trpc.ts:34`.
+Contract `../contract/src/virtual-key.trpc.ts:24`, router `src/transport/virtual-key.trpc.ts:38`.
 
 | Procedure                       | Kind     | Gate                                                                                                                                                                                                                                                                                                                  | Input                                       | Output                              |
 | ------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------- |

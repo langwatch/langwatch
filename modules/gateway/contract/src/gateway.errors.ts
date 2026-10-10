@@ -407,7 +407,7 @@ export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
   }
 }
 
-/** A key named an aggregate project as its trace destination; it owns no traces (ADR-177 decision 7). */
+/** A key named an aggregate project as its trace destination; it owns no traces (ADR-177 #7). */
 export class GatewayTraceProjectNotADestinationError extends HandledError {
   declare readonly code: "gateway_trace_project_not_a_destination";
 

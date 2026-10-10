@@ -78,6 +78,7 @@ function mountInit({
   const app = stubExperimentApi(stubs);
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {

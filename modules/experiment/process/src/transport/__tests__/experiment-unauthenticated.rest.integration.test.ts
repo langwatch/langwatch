@@ -21,6 +21,7 @@ import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts"
 /** The key door as it answers a request carrying neither header it reads. */
 function keyDoorOver(app: Partial<ExperimentV3RestApi>) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request }) => {
@@ -99,6 +100,7 @@ describe("given the experiment doors behind an identity door that finds no crede
         throw new UnauthorizedError("Please log in");
       };
       const runtime = createRestRuntime({
+        audit: { record: () => {} },
         authorization: restTestAuthorization(),
         identity: { identify: noSession, authenticate: noSession, authorize: noSession },
       });

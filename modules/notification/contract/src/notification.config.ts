@@ -1,5 +1,6 @@
 import { Config, outboundProxy, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { NotificationService } from "./notification.api.ts";
@@ -32,7 +33,12 @@ export const notificationConfig = Config.define((c) => ({
 export type NotificationServerConfig = ConfigOf<typeof notificationConfig>;
 
 /** All a browser learns: whether this deployment can send mail at all. */
-export const notificationWebConfigSchema = z.strictObject({ email: z.boolean() });
+const notificationWebConfigSchemaDefinition = z.strictObject({ email: z.boolean() });
+export interface NotificationWebConfigSchema extends Named<
+  typeof notificationWebConfigSchemaDefinition
+> {}
+export const notificationWebConfigSchema: NotificationWebConfigSchema =
+  notificationWebConfigSchemaDefinition;
 
 export type NotificationWebConfig = z.infer<typeof notificationWebConfigSchema>;
 

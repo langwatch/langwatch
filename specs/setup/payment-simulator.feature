@@ -203,3 +203,9 @@ Feature: paymentsim, a local stand-in for Stripe
     Scenario: Reported usage reaches the meter exactly once
       When the usage reporting run sends a month's billable events
       Then paymentsim's usage total equals the events counted and a rerun adds nothing
+
+    @integration
+    Scenario: A seat change previewed with always_invoice bills exactly what the preview showed
+      Given a subscription with two seats half way through its period
+      When a preview of four seats with proration_behavior always_invoice is taken and the same change is then applied
+      Then the preview's amount due is the prorated credit and charge and the change creates one paid invoice for that amount

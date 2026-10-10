@@ -15,9 +15,9 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Entry } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckSquare } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { ComponentProps } from "react";
-import { CheckSquare } from "react-feather";
 import {
   Controller,
   type ControllerRenderProps,
@@ -183,26 +183,25 @@ export function EvaluateModalContent({
   );
   const testCount = test.length;
   const trainCount = train.length;
-  const splitOptions = useMemo(
-    () =>
-      buildSplitOptions({ datasetName, isPercentage, testSize, trainSize, testCount, trainCount }),
-    [datasetName, isPercentage, testSize, trainSize, testCount, trainCount],
-  );
+  const splitOptions = buildSplitOptions({
+    datasetName,
+    isPercentage,
+    testSize,
+    trainSize,
+    testCount,
+    trainCount,
+  });
 
   useEffect(() => {
     if (!evaluateOn) form.setValue("evaluateOn", defaultSplitOption(total, splitOptions));
   }, [form, total, evaluateOn, splitOptions]);
 
-  const estimatedTotal = useMemo(
-    () =>
-      estimatedEntries({
-        split: evaluateOn?.value,
-        total,
-        trainCount: train.length,
-        testCount: test.length,
-      }),
-    [evaluateOn, total, train.length, test.length],
-  );
+  const estimatedTotal = estimatedEntries({
+    split: evaluateOn?.value,
+    total,
+    trainCount: train.length,
+    testCount: test.length,
+  });
 
   const canSave = checkCanCommitNewVersion();
   const trpc = workflowApi.useUtils();
@@ -220,58 +219,43 @@ export function EvaluateModalContent({
     }
   }, [evaluationState?.status, hasStarted, onClose, deselectAllNodes, setOpenResultsPanelRequest]);
 
-  const onSubmit = useCallback(
-    async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
-      if (!project || !workflowId) return;
+  const onSubmit = async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
+    if (!project || !workflowId) return;
 
-      if (!estimatedTotal || !evaluateOn || !confirmEntryCount(estimatedTotal)) return;
+    if (!estimatedTotal || !evaluateOn || !confirmEntryCount(estimatedTotal)) return;
 
-      const versionId = canSave
-        ? await commitEvaluatedVersion(async () => {
-            const versionResponse = await commitVersion.mutateAsync({
-              projectId: project.id,
-              workflowId,
-              commitMessage,
-              dsl: { ...getWorkflow(), version },
-            });
-            setLastCommittedWorkflow(getWorkflow());
-            setCurrentVersionId(versionResponse.id);
-            return versionResponse.id;
-          })
-        : currentVersionId;
+    const versionId = canSave
+      ? await commitEvaluatedVersion(async () => {
+          const versionResponse = await commitVersion.mutateAsync({
+            projectId: project.id,
+            workflowId,
+            commitMessage,
+            dsl: { ...getWorkflow(), version },
+          });
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionResponse.id);
+          return versionResponse.id;
+        })
+      : currentVersionId;
 
-      if (!versionId) {
-        toaster.create({
-          title: "Version ID not found for evaluation",
-          type: "error",
-          duration: 5000,
-        });
-        return;
-      }
-
-      void trpc.workflow.getVersions.invalidate();
-
-      startEvaluationExecution({
-        workflow_version_id: versionId,
-        evaluate_on: evaluateOn.value,
-        dataset_entry: evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+    if (!versionId) {
+      toaster.create({
+        title: "Version ID not found for evaluation",
+        type: "error",
+        duration: 5000,
       });
-      setHasStarted(true);
-    },
-    [
-      canSave,
-      commitVersion,
-      currentVersionId,
-      estimatedTotal,
-      getWorkflow,
-      project,
-      setCurrentVersionId,
-      setLastCommittedWorkflow,
-      startEvaluationExecution,
-      trpc.workflow.getVersions,
-      workflowId,
-    ],
-  );
+      return;
+    }
+
+    void trpc.workflow.getVersions.invalidate();
+
+    startEvaluationExecution({
+      workflow_version_id: versionId,
+      evaluate_on: evaluateOn.value,
+      dataset_entry: evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+    });
+    setHasStarted(true);
+  };
 
   const isRunning = evaluationState?.status === "running";
 
@@ -296,7 +280,7 @@ export function EvaluateModalContent({
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
-        borderTopColor="green.400"
+        borderTopColor="green.emphasized"
       >
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>

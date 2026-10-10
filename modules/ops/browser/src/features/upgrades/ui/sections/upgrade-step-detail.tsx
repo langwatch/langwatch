@@ -1,32 +1,17 @@
+import { CodePreview } from "@langwatch/design-system/code-preview";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Alert, Heading, HStack, Stack, Table, Text } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
+import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { modeLabel, statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepDetailView, UpgradeTargetView } from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <HStack gap={2} align="start">
-      <Text textStyle="sm" color="fg.muted" minWidth="100px">
-        {label}
-      </Text>
-      <Text textStyle="sm" fontFamily="mono" wordBreak="break-all">
-        {value}
-      </Text>
-    </HStack>
-  );
-}
-
-function moment(value: string | null): string {
-  return value ? readableDate(value).toLocaleString() : "Not yet";
-}
-
 function TargetsTable({ targets }: { targets: readonly UpgradeTargetView[] }) {
   return (
-    <ListTable>
+    <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Target</Table.ColumnHeader>
@@ -57,7 +42,7 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetView[] }) {
 export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
   return (
     <Stack gap={5} data-testid="upgrade-step-detail">
-      <HStack gap={2}>
+      <HStack gap={2} wrap="wrap">
         <UpgradeStatusBadge
           label={{ label: step.statusLabel, tone: statusTone(step.status) }}
           size="md"
@@ -67,16 +52,22 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
         </Text>
       </HStack>
       {step.description && <Text textStyle="sm">{step.description}</Text>}
-      <Stack gap={1}>
-        <Fact label="Step" value={step.id} />
-        <Fact label="Kind" value={step.kind} />
-        <Fact label="Mode" value={modeLabel(step.mode)} />
-        <Fact label="Release" value={step.release ?? "Unreleased"} />
-        {step.finishBy && <Fact label="Finish by" value={step.finishBy} />}
-        <Fact label="Owner" value={step.owner ?? "Unattributed"} />
-        <Fact label="Started" value={moment(step.startedAt)} />
-        <Fact label="Finished" value={moment(step.finishedAt)} />
-      </Stack>
+      <SummaryList>
+        <SummaryListItem label="Step">
+          <InlineCode>{step.id}</InlineCode>
+        </SummaryListItem>
+        <SummaryListItem label="Kind">{step.kind}</SummaryListItem>
+        <SummaryListItem label="Mode">{modeLabel(step.mode)}</SummaryListItem>
+        <SummaryListItem label="Release">{step.release ?? "Unreleased"}</SummaryListItem>
+        {step.finishBy && <SummaryListItem label="Finish by">{step.finishBy}</SummaryListItem>}
+        <SummaryListItem label="Owner">{step.owner ?? "Unattributed"}</SummaryListItem>
+        <SummaryListItem label="Started">
+          {step.startedAt ? <FormattedDate value={step.startedAt} /> : "Not yet"}
+        </SummaryListItem>
+        <SummaryListItem label="Finished">
+          {step.finishedAt ? <FormattedDate value={step.finishedAt} /> : "Not yet"}
+        </SummaryListItem>
+      </SummaryList>
       {step.lastError && (
         <Alert.Root status="error" data-testid="upgrade-step-error">
           <Alert.Indicator />
@@ -89,7 +80,14 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
       {step.report !== null && (
         <Stack gap={2}>
           <Heading size="xs">Checkpoint report</Heading>
-          <JsonViewer data={step.report} maxHeight="320px" />
+          <CodePreview
+            code={JSON.stringify(step.report, null, 2)}
+            language="json"
+            filename="Checkpoint report"
+            lineNumbers
+            compact
+            maxHeight="320px"
+          />
         </Stack>
       )}
       {step.targets.length > 0 && (

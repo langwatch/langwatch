@@ -234,7 +234,7 @@ export class ScimModule implements ScimApiContract {
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
-  static readonly operatorReads = scimOperatorReads;
+  static readonly operatorReads: Readonly<Record<string, unknown>> = scimOperatorReads;
 
   readonly #scim: Pick<ScimService, keyof ScimService>;
   readonly #connections: ScimConnectionsService;

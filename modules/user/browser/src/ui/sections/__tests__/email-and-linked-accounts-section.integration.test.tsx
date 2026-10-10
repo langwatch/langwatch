@@ -56,6 +56,10 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       completeVerification: mutation(() => ({ verified: true })),
     },
     auth: {
+      unlinkAccount: mutation((input) => {
+        calls.unlinkAccount(input);
+        return { ok: true };
+      }),
       myAddressConfirmation: {
         useQuery: () => ({
           data: { email: "carol@acme.example", confirmed: true, canSendConfirmation: true },
@@ -68,10 +72,6 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       getLinkedAccounts: {
         useQuery: () => ({ data: state.linkedAccounts, isLoading: state.accountsLoading }),
       },
-      unlinkAccount: mutation((input) => {
-        calls.unlinkAccount(input);
-        return { ok: true };
-      }),
     },
   };
   return { personalWorkspaceApi: api, api };

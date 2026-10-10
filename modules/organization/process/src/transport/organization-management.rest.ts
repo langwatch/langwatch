@@ -268,7 +268,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
   .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
-  .withAudit("management.organization.update-member-role")
+  .withAudit("management.member.update")
   .handle(async ({ app, input, scope, actor }, key) =>
     updatedMemberWire(
       await app.updateMember(
@@ -293,7 +293,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
       "Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
-  .withAudit("management.organization.delete-member")
+  .withAudit("management.member.delete")
   .handle(async ({ app, input, scope, actor }) => {
     await app.deleteMember({ organizationId: scope.id, userId: input.userId }, deriveCaller(actor));
 
@@ -327,7 +327,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
   .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
-  .withAudit("management.invite.create-invites")
+  .withAudit("management.invite.create")
   .handle(async ({ app, input, scope, actor }, key) => {
     const created = await app.createInvitations(
       {
@@ -370,7 +370,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
       "Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
-  .withAudit("management.invite.delete-invite")
+  .withAudit("management.invite.delete")
   .handle(async ({ app, input, scope }) => {
     await app.revokeInvitation({ organizationId: scope.id, inviteId: input.inviteId });
 

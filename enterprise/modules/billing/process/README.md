@@ -138,7 +138,7 @@ interface Response {
 
 ### `connectedBilling`
 
-Contract `../contract/src/connected-billing.trpc.ts:21`, router `src/transport/connected-billing.trpc.ts:39`.
+Contract `../contract/src/connected-billing.trpc.ts:21`, router `src/transport/connected-billing.trpc.ts:43`.
 
 | Procedure                               | Kind     | Gate                             | Input                             | Output                              |
 | --------------------------------------- | -------- | -------------------------------- | --------------------------------- | ----------------------------------- |
@@ -206,7 +206,7 @@ type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/c
 
 ### `currency`
 
-Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.trpc.ts:42`.
+Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.trpc.ts:46`.
 
 | Procedure                 | Kind  | Gate                                                                                                                                     | Input                       | Output                   |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------ |
@@ -225,7 +225,7 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:81`.
+Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:88`.
 
 | Procedure                            | Kind     | Gate                             | Input                     | Output                           |
 | ------------------------------------ | -------- | -------------------------------- | ------------------------- | -------------------------------- |

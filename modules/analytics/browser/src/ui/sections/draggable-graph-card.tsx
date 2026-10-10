@@ -132,12 +132,7 @@ function GraphCardBody({
   const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
 
   return (
-    <Card.Root
-      height="full"
-      minWidth={0}
-      borderRadius="xl"
-      boxShadow="0 1px 2px rgba(16,16,32,0.04)"
-    >
+    <Card.Root height="full" minWidth={0} borderRadius="xl" boxShadow="xs">
       <Card.Body
         height="full"
         display="flex"

@@ -388,3 +388,14 @@ export const { slackApiBase, slackWebhookBase } = Config.define((c) => ({
     z.string().url().default("https://hooks.slack.com"),
   ),
 }));
+
+/** The dev switch that lets a webhook URL be http or carry a port (webhook and automation). */
+export const { allowInsecureLocalUrls } = Config.define((c) => ({
+  allowInsecureLocalUrls: c.env(
+    "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS",
+    z
+      .union([z.boolean(), z.literal("1"), z.literal("0"), z.literal("")])
+      .optional()
+      .transform((value) => value === true || value === "1"),
+  ),
+}));

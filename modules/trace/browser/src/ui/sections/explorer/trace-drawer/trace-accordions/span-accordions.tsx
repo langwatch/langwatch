@@ -1,7 +1,7 @@
 import {
+  Alert,
   Box,
   HStack,
-  Icon,
   Skeleton,
   Spinner,
   Text,
@@ -9,7 +9,6 @@ import {
 } from "@langwatch/design-system/primitives";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
-import { LuCircleX } from "react-icons/lu";
 
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
@@ -546,19 +545,12 @@ function exceptionsSection(ctx: SpanSectionContext): ReactNode {
     >
       {ctx.detail?.error ? (
         <VStack align="stretch" gap={2}>
-          <HStack
-            gap={2}
-            paddingX={3}
-            paddingY={2}
-            borderRadius="sm"
-            bg="red.subtle"
-            align="flex-start"
-          >
-            <Icon as={LuCircleX} boxSize={4} color="red.fg" flexShrink={0} marginTop={0.5} />
-            <Text textStyle="xs" color="red.fg" whiteSpace="pre-wrap" fontWeight="semibold">
-              {ctx.detail.error.message}
-            </Text>
-          </HStack>
+          <Alert.Root status="error" size="sm">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title whiteSpace="pre-wrap">{ctx.detail.error.message}</Alert.Title>
+            </Alert.Content>
+          </Alert.Root>
           {ctx.detail.error.stacktrace.length > 0 && (
             <Box
               bg="bg.subtle"

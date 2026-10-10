@@ -5,6 +5,7 @@ import {
   organizationRoleSchema,
   shareableResourceKindSchema,
 } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
@@ -44,11 +45,16 @@ const organizationScopeRefSchema = z
   .object({ type: z.literal("organization"), id: z.string() })
   .strict();
 
-export const grantableAuthzScopeRefSchema = z.discriminatedUnion("type", [
+const grantableAuthzScopeRefSchemaDefinition = z.discriminatedUnion("type", [
   projectScopeRefSchema,
   teamScopeRefSchema,
   organizationScopeRefSchema,
 ]);
+export interface GrantableAuthzScopeRefSchema extends Named<
+  typeof grantableAuthzScopeRefSchemaDefinition
+> {}
+export const grantableAuthzScopeRefSchema: GrantableAuthzScopeRefSchema =
+  grantableAuthzScopeRefSchemaDefinition;
 export type GrantableAuthzScopeRef = z.infer<typeof grantableAuthzScopeRefSchema>;
 
 const resourceParentSchema = z
@@ -68,39 +74,47 @@ const resourceScopeRefSchema = z
   })
   .strict();
 
-export const authzScopeRefSchema = z.discriminatedUnion("type", [
+const authzScopeRefSchemaDefinition = z.discriminatedUnion("type", [
   projectScopeRefSchema,
   teamScopeRefSchema,
   organizationScopeRefSchema,
   resourceScopeRefSchema,
 ]);
+export interface AuthzScopeRefSchema extends Named<typeof authzScopeRefSchemaDefinition> {}
+export const authzScopeRefSchema: AuthzScopeRefSchema = authzScopeRefSchemaDefinition;
 export type AuthzScopeRef = z.infer<typeof authzScopeRefSchema>;
 
 /** The tenant and scope id every PLATFORM-tier grant is stored under; never a KSUID org id. */
 export const PLATFORM_TENANT_ID = "platform" as const;
 
 /** The installation itself: asked only of `can`, answered only from PLATFORM-tier grants. */
-export const platformScopeRefSchema = z.object({ type: z.literal("platform") }).strict();
+const platformScopeRefSchemaDefinition = z.object({ type: z.literal("platform") }).strict();
+export interface PlatformScopeRefSchema extends Named<typeof platformScopeRefSchemaDefinition> {}
+export const platformScopeRefSchema: PlatformScopeRefSchema = platformScopeRefSchemaDefinition;
 export type PlatformScopeRef = z.infer<typeof platformScopeRefSchema>;
 
 /** Where `can` may be asked: every organization-rooted scope, or the platform. */
-export const authzCanScopeRefSchema = z.discriminatedUnion("type", [
+const authzCanScopeRefSchemaDefinition = z.discriminatedUnion("type", [
   projectScopeRefSchema,
   teamScopeRefSchema,
   organizationScopeRefSchema,
   resourceScopeRefSchema,
   platformScopeRefSchema,
 ]);
+export interface AuthzCanScopeRefSchema extends Named<typeof authzCanScopeRefSchemaDefinition> {}
+export const authzCanScopeRefSchema: AuthzCanScopeRefSchema = authzCanScopeRefSchemaDefinition;
 export type AuthzCanScopeRef = z.infer<typeof authzCanScopeRefSchema>;
 
-export const authzPrincipalRefSchema = z.discriminatedUnion("type", [
+const authzPrincipalRefSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user"), id: z.string() }).strict(),
   z.object({ type: z.literal("apiKey"), id: z.string() }).strict(),
   z.object({ type: z.literal("anonymous") }).strict(),
 ]);
+export interface AuthzPrincipalRefSchema extends Named<typeof authzPrincipalRefSchemaDefinition> {}
+export const authzPrincipalRefSchema: AuthzPrincipalRefSchema = authzPrincipalRefSchemaDefinition;
 export type AuthzPrincipalRef = z.infer<typeof authzPrincipalRefSchema>;
 
-export const grantAudienceSchema = z.discriminatedUnion("kind", [
+const grantAudienceSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("user"), id: z.string() }).strict(),
   z.object({ kind: z.literal("apiKey"), id: z.string() }).strict(),
   z.object({ kind: z.literal("group"), id: z.string() }).strict(),
@@ -109,9 +123,11 @@ export const grantAudienceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("organization"), id: z.string() }).strict(),
   z.object({ kind: z.literal("anyone") }).strict(),
 ]);
+export interface GrantAudienceSchema extends Named<typeof grantAudienceSchemaDefinition> {}
+export const grantAudienceSchema: GrantAudienceSchema = grantAudienceSchemaDefinition;
 export type GrantAudience = z.infer<typeof grantAudienceSchema>;
 
-export const resourceGrantSchema = z
+const resourceGrantSchemaDefinition = z
   .object({
     kind: shareableResourceKindSchema,
     id: z.string(),
@@ -121,6 +137,8 @@ export const resourceGrantSchema = z
     audience: grantAudienceSchema,
   })
   .strict();
+export interface ResourceGrantSchema extends Named<typeof resourceGrantSchemaDefinition> {}
+export const resourceGrantSchema: ResourceGrantSchema = resourceGrantSchemaDefinition;
 export type ResourceGrant = z.infer<typeof resourceGrantSchema>;
 
 /** Role keys currently enforced by organization, team and project grants. */
@@ -140,7 +158,7 @@ export const bindingRoleKeySchema = z.custom<BindingRoleKey>(
 export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
 const sharedRoleKeySchema = z.custom<SharedRoleKey>((value) => value === PROJECT_READER_ROLE_KEY);
 
-export const collectedBindingSchema = z
+const collectedBindingSchemaDefinition = z
   .object({
     roleKey: bindingRoleKeySchema.or(sharedRoleKeySchema),
     scopeType: grantScopeTierSchema,
@@ -151,6 +169,8 @@ export const collectedBindingSchema = z
     expiresAtMs: z.number().int().nullable().optional(),
   })
   .strict();
+export interface CollectedBindingSchema extends Named<typeof collectedBindingSchemaDefinition> {}
+export const collectedBindingSchema: CollectedBindingSchema = collectedBindingSchemaDefinition;
 export type CollectedBinding = z.infer<typeof collectedBindingSchema>;
 
 /** The one place a stored `(role, customRoleId)` pair becomes a role key. */
@@ -171,7 +191,7 @@ const customRolePermissionsSchema = z
   .map(z.string(), z.array(z.string()).readonly())
   .transform((permissions): ReadonlyMap<string, readonly string[]> => permissions);
 
-export const collectedGrantsSchema = z
+const collectedGrantsSchemaDefinition = z
   .object({
     principal: authzPrincipalRefSchema,
     organizationId: z.string(),
@@ -182,6 +202,8 @@ export const collectedGrantsSchema = z
     customRolePermissions: customRolePermissionsSchema,
   })
   .strict();
+export interface CollectedGrantsSchema extends Named<typeof collectedGrantsSchemaDefinition> {}
+export const collectedGrantsSchema: CollectedGrantsSchema = collectedGrantsSchemaDefinition;
 export type CollectedGrants = z.infer<typeof collectedGrantsSchema>;
 
 export const authzGrantViaSchema = z.enum([
@@ -192,7 +214,7 @@ export const authzGrantViaSchema = z.enum([
 ]);
 export type AuthzGrantVia = z.infer<typeof authzGrantViaSchema>;
 
-export const authzDecisionSchema = z
+const authzDecisionSchemaDefinition = z
   .object({
     allowed: z.boolean(),
     // Kept as string for exact compatibility with decisions over legacy rows.
@@ -205,6 +227,8 @@ export const authzDecisionSchema = z
     audience: z.enum(["member", "public"]),
   })
   .strict();
+export interface AuthzDecisionSchema extends Named<typeof authzDecisionSchemaDefinition> {}
+export const authzDecisionSchema: AuthzDecisionSchema = authzDecisionSchemaDefinition;
 export type AuthzDecision = z.infer<typeof authzDecisionSchema>;
 
 /**

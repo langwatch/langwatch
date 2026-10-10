@@ -568,10 +568,14 @@ describe("given sam, a delegated viewer, opens the People page", () => {
     it("says three people, two departments, two unmatched and two without a department", () => {
       renderPage();
 
-      expect(figure("people")).toHaveTextContent(/^3people/);
-      expect(figure("departments")).toHaveTextContent(/^2departments/);
-      expect(figure("unmatched")).toHaveTextContent(/^2unmatched/);
-      expect(figure("unassigned")).toHaveTextContent(/^2without a department/);
+      expect(within(figure("people")).getByText("3")).toBeInTheDocument();
+      expect(within(figure("people")).getByText("people")).toBeInTheDocument();
+      expect(within(figure("departments")).getByText("2")).toBeInTheDocument();
+      expect(within(figure("departments")).getByText("departments")).toBeInTheDocument();
+      expect(within(figure("unmatched")).getByText("2")).toBeInTheDocument();
+      expect(within(figure("unmatched")).getByText("unmatched")).toBeInTheDocument();
+      expect(within(figure("unassigned")).getByText("2")).toBeInTheDocument();
+      expect(within(figure("unassigned")).getByText("without a department")).toBeInTheDocument();
     });
 
     /** @scenario "The summary strip sits above the tabs" */
@@ -592,8 +596,10 @@ describe("given sam, a delegated viewer, opens the People page", () => {
       harness.data["activityMonitor.spendByUser"] = [spend({})];
       renderPage();
 
-      expect(figure("departments")).toHaveTextContent(/^—departments/);
-      expect(figure("people")).toHaveTextContent(/^1people/);
+      expect(within(figure("departments")).getByText("—")).toBeInTheDocument();
+      expect(within(figure("departments")).getByText("departments")).toBeInTheDocument();
+      expect(within(figure("people")).getByText("1")).toBeInTheDocument();
+      expect(within(figure("people")).getByText("people")).toBeInTheDocument();
     });
   });
 
@@ -603,10 +609,12 @@ describe("given sam, a delegated viewer, opens the People page", () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderPage();
 
-      expect(figure("people")).toHaveTextContent(new RegExp(`^${samplePeopleRows().length}people`));
-      expect(figure("departments")).toHaveTextContent(
-        new RegExp(`^${SAMPLE_DEPARTMENTS.length}departments`),
-      );
+      expect(
+        within(figure("people")).getByText(String(samplePeopleRows().length)),
+      ).toBeInTheDocument();
+      expect(
+        within(figure("departments")).getByText(String(SAMPLE_DEPARTMENTS.length)),
+      ).toBeInTheDocument();
       const order = screen
         .getByRole("status")
         .compareDocumentPosition(screen.getByTestId("people-summary-strip"));

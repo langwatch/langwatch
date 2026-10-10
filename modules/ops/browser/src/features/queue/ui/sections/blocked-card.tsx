@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Box,
   Button,
@@ -16,7 +17,7 @@ import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 const BLOCKED_VIEWPORT_HEIGHT = 360;
-const BLOCKED_ROW_HEIGHT = 36;
+const BLOCKED_ROW_HEIGHT = 49;
 
 export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const showErrorToast = useShowErrorToast();
@@ -100,7 +101,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
 
   return (
     <>
-      <Card.Root>
+      <Card.Root borderColor="border.muted" boxShadow="none">
         <Card.Body padding={0}>
           <HStack
             paddingX={4}
@@ -110,7 +111,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
             gap={2}
             flexWrap="wrap"
           >
-            <Text textStyle="sm" fontWeight="medium" color="red.500">
+            <Text textStyle="sm" fontWeight="medium" color="fg.error">
               Blocked: {blocked.totalBlocked} groups, {clusters.length} error patterns
             </Text>
             <Spacer />
@@ -120,7 +121,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                   <Button
                     key={q.name}
                     variant="outline"
-                    size="2xs"
+                    size="sm"
                     colorPalette="orange"
                     onClick={() => setUnblockAllTarget(q.name)}
                   >
@@ -131,7 +132,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                   <Button
                     key={`dlq-${q.name}`}
                     variant="outline"
-                    size="2xs"
+                    size="sm"
                     colorPalette="red"
                     onClick={() => setMoveToDlqTarget(q.name)}
                   >
@@ -143,7 +144,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                     Canary:
                   </Text>
                   <Input
-                    size="xs"
+                    size="sm"
                     type="number"
                     value={canaryCount}
                     onChange={(e) =>
@@ -155,7 +156,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                     <Button
                       key={`c-${q.name}`}
                       variant="ghost"
-                      size="2xs"
+                      size="sm"
                       onClick={() => setCanaryQueueTarget(q.name)}
                     >
                       Go
@@ -167,10 +168,12 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
           </HStack>
 
           <Box ref={scrollContainerRef} maxHeight={`${BLOCKED_VIEWPORT_HEIGHT}px`} overflowY="auto">
-            <Table.Root
+            <ListTable
+              density="compact"
+              columnRules={false}
+              containerProps={{ overflow: "visible" }}
               size="sm"
               variant="line"
-              css={{ "& tr:last-child td": { borderBottom: "none" } }}
             >
               <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                 <Table.Row>
@@ -179,7 +182,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                   </Table.ColumnHeader>
                   <Table.ColumnHeader>Error</Table.ColumnHeader>
                   <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                  <Table.ColumnHeader>Sample Groups</Table.ColumnHeader>
+                  <Table.ColumnHeader>Sample groups</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px">Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -198,12 +201,12 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                     const rowKey = `${cluster.queueName}::${cluster.normalizedMessage}`;
                     return (
                       <Table.Row key={rowKey}>
-                        <Table.Cell textAlign="end">
-                          <Text color="red.500" fontWeight="medium" textStyle="xs">
+                        <Table.Cell height="49px" textAlign="end">
+                          <Text color="fg.error" fontWeight="medium" textStyle="xs">
                             {cluster.count}
                           </Text>
                         </Table.Cell>
-                        <Table.Cell>
+                        <Table.Cell height="49px">
                           <Text
                             textStyle="xs"
                             truncate
@@ -213,12 +216,12 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                             {cluster.sampleMessage}
                           </Text>
                         </Table.Cell>
-                        <Table.Cell>
+                        <Table.Cell height="49px">
                           <Text textStyle="xs" color="fg.muted">
                             {cluster.pipelineName ?? "—"}
                           </Text>
                         </Table.Cell>
-                        <Table.Cell>
+                        <Table.Cell height="49px">
                           <Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">
                             {cluster.sampleGroupIds.slice(0, 2).join(", ")}
                             {cluster.sampleGroupIds.length > 2
@@ -226,11 +229,11 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                               : ""}
                           </Text>
                         </Table.Cell>
-                        <Table.Cell>
+                        <Table.Cell height="49px">
                           {cluster.sampleGroupIds[0] && (
                             <Button
                               variant="outline"
-                              size="2xs"
+                              size="sm"
                               colorPalette="red"
                               onClick={() =>
                                 setDrainTarget({
@@ -248,7 +251,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                   }}
                 />
               </Table.Body>
-            </Table.Root>
+            </ListTable>
           </Box>
         </Card.Body>
       </Card.Root>

@@ -290,7 +290,7 @@ const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
     height="18px"
     justifyContent="center"
     fontVariantNumeric="tabular-nums"
-    boxShadow="0 1px 2px rgba(220,38,38,0.25)"
+    boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-red-solid) 25%, transparent)"
   >
     {count > 99 ? "99+" : count}
   </Box>

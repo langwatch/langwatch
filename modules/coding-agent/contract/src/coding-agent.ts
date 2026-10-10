@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const countByNameSchema = z.record(z.string(), z.number());
@@ -13,7 +14,7 @@ const legacyPageLimitSchema = z.union([
 /** The service never asks persistence for more events than this. */
 export const MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE = 1000;
 
-export const codingAgentMetricSeriesRowSchema = z
+const codingAgentMetricSeriesRowSchemaDefinition = z
   .object({
     seriesId: z.string(),
     metricName: z.string(),
@@ -23,13 +24,18 @@ export const codingAgentMetricSeriesRowSchema = z
     value: z.number(),
   })
   .strict();
+export interface CodingAgentMetricSeriesRowSchema extends Named<
+  typeof codingAgentMetricSeriesRowSchemaDefinition
+> {}
+export const codingAgentMetricSeriesRowSchema: CodingAgentMetricSeriesRowSchema =
+  codingAgentMetricSeriesRowSchemaDefinition;
 
 /**
  * What a session spent under one declared working context: the repository and branch a model call
  * was stamped with, and the tokens and computed cost of every call stamped the same way. Never a
  * share: the amounts are the calls' own, and the pull-request split divides them (migration 00099).
  */
-export const codingAgentSessionContextUsageSchema = z
+const codingAgentSessionContextUsageSchemaDefinition = z
   .object({
     repositoryHost: z.string(),
     repositoryOwner: z.string(),
@@ -42,10 +48,15 @@ export const codingAgentSessionContextUsageSchema = z
     costUsd: z.number(),
   })
   .strict();
+export interface CodingAgentSessionContextUsageSchema extends Named<
+  typeof codingAgentSessionContextUsageSchemaDefinition
+> {}
+export const codingAgentSessionContextUsageSchema: CodingAgentSessionContextUsageSchema =
+  codingAgentSessionContextUsageSchemaDefinition;
 export type CodingAgentSessionContextUsage = z.infer<typeof codingAgentSessionContextUsageSchema>;
 
 /** The complete durable `coding_agent_sessions` read row. */
-export const codingAgentSessionSchema = z
+const codingAgentSessionSchemaDefinition = z
   .object({
     tenantId: z.string(),
     sessionId: z.string(),
@@ -148,8 +159,13 @@ export const codingAgentSessionSchema = z
     lastEventOccurredAt: z.number(),
   })
   .strict();
+export interface CodingAgentSessionSchema extends Named<
+  typeof codingAgentSessionSchemaDefinition
+> {}
+export const codingAgentSessionSchema: CodingAgentSessionSchema =
+  codingAgentSessionSchemaDefinition;
 
-export const codingAgentSessionEventSchema = z
+const codingAgentSessionEventSchemaDefinition = z
   .object({
     sessionId: z.string(),
     timeUnixMs: z.number(),
@@ -202,14 +218,24 @@ export const codingAgentSessionEventSchema = z
     branch: z.string(),
   })
   .strict();
+export interface CodingAgentSessionEventSchema extends Named<
+  typeof codingAgentSessionEventSchemaDefinition
+> {}
+export const codingAgentSessionEventSchema: CodingAgentSessionEventSchema =
+  codingAgentSessionEventSchemaDefinition;
 
 /** One durable row in the ordered coding-agent session-event read model. */
-export const codingAgentSessionEventRecordSchema = codingAgentSessionEventSchema
+const codingAgentSessionEventRecordSchemaDefinition = codingAgentSessionEventSchema
   .safeExtend({ tenantId: z.string() })
   .strict();
+export interface CodingAgentSessionEventRecordSchema extends Named<
+  typeof codingAgentSessionEventRecordSchemaDefinition
+> {}
+export const codingAgentSessionEventRecordSchema: CodingAgentSessionEventRecordSchema =
+  codingAgentSessionEventRecordSchemaDefinition;
 
 /** One durable trace-to-session mapping written by the projection. */
-export const codingAgentTraceSessionRecordSchema = z
+const codingAgentTraceSessionRecordSchemaDefinition = z
   .object({
     tenantId: z.string(),
     traceId: z.string(),
@@ -217,9 +243,14 @@ export const codingAgentTraceSessionRecordSchema = z
     occurredAtMs: z.number(),
   })
   .strict();
+export interface CodingAgentTraceSessionRecordSchema extends Named<
+  typeof codingAgentTraceSessionRecordSchemaDefinition
+> {}
+export const codingAgentTraceSessionRecordSchema: CodingAgentTraceSessionRecordSchema =
+  codingAgentTraceSessionRecordSchemaDefinition;
 
 /** One converged session metric unit written by the projection. */
-export const codingAgentSessionMetricSeriesRecordSchema = z
+const codingAgentSessionMetricSeriesRecordSchemaDefinition = z
   .object({
     tenantId: z.string(),
     sessionId: z.string(),
@@ -233,9 +264,14 @@ export const codingAgentSessionMetricSeriesRecordSchema = z
     asOfUnixMs: z.number(),
   })
   .strict();
+export interface CodingAgentSessionMetricSeriesRecordSchema extends Named<
+  typeof codingAgentSessionMetricSeriesRecordSchemaDefinition
+> {}
+export const codingAgentSessionMetricSeriesRecordSchema: CodingAgentSessionMetricSeriesRecordSchema =
+  codingAgentSessionMetricSeriesRecordSchemaDefinition;
 
 /** The bounded, content-free session fact read for pull-request aggregation. */
-export const codingAgentSessionBranchRecordSchema = z
+const codingAgentSessionBranchRecordSchemaDefinition = z
   .object({
     sessionId: z.string(),
     tenantId: z.string(),
@@ -256,12 +292,22 @@ export const codingAgentSessionBranchRecordSchema = z
     title: z.string(),
   })
   .strict();
+export interface CodingAgentSessionBranchRecordSchema extends Named<
+  typeof codingAgentSessionBranchRecordSchemaDefinition
+> {}
+export const codingAgentSessionBranchRecordSchema: CodingAgentSessionBranchRecordSchema =
+  codingAgentSessionBranchRecordSchemaDefinition;
 
-export const codingAgentSessionCursorSchema = z
+const codingAgentSessionCursorSchemaDefinition = z
   .object({ timeUnixMs: z.number(), recordId: z.string() })
   .strict();
+export interface CodingAgentSessionCursorSchema extends Named<
+  typeof codingAgentSessionCursorSchemaDefinition
+> {}
+export const codingAgentSessionCursorSchema: CodingAgentSessionCursorSchema =
+  codingAgentSessionCursorSchemaDefinition;
 
-export const codingAgentSessionEventsInputSchema = z
+const codingAgentSessionEventsInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     sessionId: z.string(),
@@ -271,6 +317,11 @@ export const codingAgentSessionEventsInputSchema = z
     limit: legacyPageLimitSchema,
   })
   .strict();
+export interface CodingAgentSessionEventsInputSchema extends Named<
+  typeof codingAgentSessionEventsInputSchemaDefinition
+> {}
+export const codingAgentSessionEventsInputSchema: CodingAgentSessionEventsInputSchema =
+  codingAgentSessionEventsInputSchemaDefinition;
 
 /** Every event kind the session-events read model can report. */
 export const CODING_AGENT_SESSION_EVENT_KINDS = [
@@ -289,19 +340,24 @@ export const CODING_AGENT_SESSION_EVENT_KINDS = [
 export const CODING_AGENT_SESSION_EVENTS_DEFAULT_PAGE_SIZE = 500;
 
 /** `GET .../sessions/:sessionId/events` path param. */
-export const codingAgentSessionEventsRestParamsSchema = z.object({
+const codingAgentSessionEventsRestParamsSchemaDefinition = z.object({
   sessionId: z
     .string()
     .min(1)
     .describe("The agent's own session id (session.id / conversation id)."),
 });
+export interface CodingAgentSessionEventsRestParamsSchema extends Named<
+  typeof codingAgentSessionEventsRestParamsSchemaDefinition
+> {}
+export const codingAgentSessionEventsRestParamsSchema: CodingAgentSessionEventsRestParamsSchema =
+  codingAgentSessionEventsRestParamsSchemaDefinition;
 
 /**
  * Query parsing that REFUSES what it cannot honour. `cursor` stays an opaque
  * string: decoding it needs `Buffer`, absent from this platform-neutral
  * package — the transport decodes it and throws on a bad value.
  */
-export const codingAgentSessionEventsRestQuerySchema = z.object({
+const codingAgentSessionEventsRestQuerySchemaDefinition = z.object({
   limit: z.coerce
     .number()
     .int()
@@ -335,11 +391,21 @@ export const codingAgentSessionEventsRestQuerySchema = z.object({
     .optional()
     .describe("Opaque keyset cursor from the previous response's nextCursor."),
 });
+export interface CodingAgentSessionEventsRestQuerySchema extends Named<
+  typeof codingAgentSessionEventsRestQuerySchemaDefinition
+> {}
+export const codingAgentSessionEventsRestQuerySchema: CodingAgentSessionEventsRestQuerySchema =
+  codingAgentSessionEventsRestQuerySchemaDefinition;
 
-export const codingAgentSessionEventsRestResponseSchema = z.object({
+const codingAgentSessionEventsRestResponseSchemaDefinition = z.object({
   events: z.array(codingAgentSessionEventSchema),
   nextCursor: z.string().nullable(),
 });
+export interface CodingAgentSessionEventsRestResponseSchema extends Named<
+  typeof codingAgentSessionEventsRestResponseSchemaDefinition
+> {}
+export const codingAgentSessionEventsRestResponseSchema: CodingAgentSessionEventsRestResponseSchema =
+  codingAgentSessionEventsRestResponseSchemaDefinition;
 
 /** One page of a session's events as the REST door asks for it: its query and whose session. */
 export type CodingAgentSessionEventsPageInput = z.output<
@@ -350,19 +416,29 @@ export type CodingAgentSessionEventsPage = z.infer<
   typeof codingAgentSessionEventsRestResponseSchema
 >;
 
-export const codingAgentSessionLookupInputSchema = z
+const codingAgentSessionLookupInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     sessionId: z.string(),
     startedAtMs: z.number().optional(),
   })
   .strict();
+export interface CodingAgentSessionLookupInputSchema extends Named<
+  typeof codingAgentSessionLookupInputSchemaDefinition
+> {}
+export const codingAgentSessionLookupInputSchema: CodingAgentSessionLookupInputSchema =
+  codingAgentSessionLookupInputSchemaDefinition;
 
-export const codingAgentTraceSessionLookupInputSchema = z
+const codingAgentTraceSessionLookupInputSchemaDefinition = z
   .object({ projectId: z.string(), traceId: z.string() })
   .strict();
+export interface CodingAgentTraceSessionLookupInputSchema extends Named<
+  typeof codingAgentTraceSessionLookupInputSchemaDefinition
+> {}
+export const codingAgentTraceSessionLookupInputSchema: CodingAgentTraceSessionLookupInputSchema =
+  codingAgentTraceSessionLookupInputSchemaDefinition;
 
-export const codingAgentRecentSessionsInputSchema = z
+const codingAgentRecentSessionsInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     userId: z.string().optional(),
@@ -371,13 +447,23 @@ export const codingAgentRecentSessionsInputSchema = z
     limit: z.number().optional(),
   })
   .strict();
+export interface CodingAgentRecentSessionsInputSchema extends Named<
+  typeof codingAgentRecentSessionsInputSchemaDefinition
+> {}
+export const codingAgentRecentSessionsInputSchema: CodingAgentRecentSessionsInputSchema =
+  codingAgentRecentSessionsInputSchemaDefinition;
 
 /** Requests bounded pull-request mapping for recent session branches. */
-export const codingAgentPullRequestMappingBackfillInputSchema = z
+const codingAgentPullRequestMappingBackfillInputSchemaDefinition = z
   .object({ organizationId: z.string() })
   .strict();
+export interface CodingAgentPullRequestMappingBackfillInputSchema extends Named<
+  typeof codingAgentPullRequestMappingBackfillInputSchemaDefinition
+> {}
+export const codingAgentPullRequestMappingBackfillInputSchema: CodingAgentPullRequestMappingBackfillInputSchema =
+  codingAgentPullRequestMappingBackfillInputSchemaDefinition;
 
-export const codingAgentUsageTotalsSchema = z
+const codingAgentUsageTotalsSchemaDefinition = z
   .object({
     sessionCount: z.number(),
     costUsd: z.number(),
@@ -389,8 +475,13 @@ export const codingAgentUsageTotalsSchema = z
     pullRequests: z.number(),
   })
   .strict();
+export interface CodingAgentUsageTotalsSchema extends Named<
+  typeof codingAgentUsageTotalsSchemaDefinition
+> {}
+export const codingAgentUsageTotalsSchema: CodingAgentUsageTotalsSchema =
+  codingAgentUsageTotalsSchemaDefinition;
 
-export const codingAgentUsageTotalsInputSchema = z
+const codingAgentUsageTotalsInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     userId: z.string().optional(),
@@ -398,13 +489,23 @@ export const codingAgentUsageTotalsInputSchema = z
     toMs: z.number(),
   })
   .strict();
+export interface CodingAgentUsageTotalsInputSchema extends Named<
+  typeof codingAgentUsageTotalsInputSchemaDefinition
+> {}
+export const codingAgentUsageTotalsInputSchema: CodingAgentUsageTotalsInputSchema =
+  codingAgentUsageTotalsInputSchemaDefinition;
 
-export const codingAgentSessionListPullRequestSchema = z
+const codingAgentSessionListPullRequestSchemaDefinition = z
   .object({ number: z.number(), url: z.string(), title: z.string() })
   .strict();
+export interface CodingAgentSessionListPullRequestSchema extends Named<
+  typeof codingAgentSessionListPullRequestSchemaDefinition
+> {}
+export const codingAgentSessionListPullRequestSchema: CodingAgentSessionListPullRequestSchema =
+  codingAgentSessionListPullRequestSchemaDefinition;
 
 /** The exact row returned by the sessions screen. */
-export const codingAgentSessionListRowSchema = z
+const codingAgentSessionListRowSchemaDefinition = z
   .object({
     sessionId: z.string(),
     title: z.string().nullable(),
@@ -434,18 +535,33 @@ export const codingAgentSessionListRowSchema = z
     pullRequests: z.array(codingAgentSessionListPullRequestSchema),
   })
   .strict();
+export interface CodingAgentSessionListRowSchema extends Named<
+  typeof codingAgentSessionListRowSchemaDefinition
+> {}
+export const codingAgentSessionListRowSchema: CodingAgentSessionListRowSchema =
+  codingAgentSessionListRowSchemaDefinition;
 
-export const codingAgentSessionsListInputSchema = z.object({ projectId: z.string() }).strict();
+const codingAgentSessionsListInputSchemaDefinition = z.object({ projectId: z.string() }).strict();
+export interface CodingAgentSessionsListInputSchema extends Named<
+  typeof codingAgentSessionsListInputSchemaDefinition
+> {}
+export const codingAgentSessionsListInputSchema: CodingAgentSessionsListInputSchema =
+  codingAgentSessionsListInputSchemaDefinition;
 
-export const codingAgentContributorProjectSchema = z
+const codingAgentContributorProjectSchemaDefinition = z
   .object({
     slug: z.string(),
     contributorLabel: z.string(),
     isLinkable: z.boolean(),
   })
   .strict();
+export interface CodingAgentContributorProjectSchema extends Named<
+  typeof codingAgentContributorProjectSchemaDefinition
+> {}
+export const codingAgentContributorProjectSchema: CodingAgentContributorProjectSchema =
+  codingAgentContributorProjectSchemaDefinition;
 
-export const codingAgentPullRequestIdentitySchema = z
+const codingAgentPullRequestIdentitySchemaDefinition = z
   .object({
     repositoryHost: z.string(),
     repositoryFullName: z.string(),
@@ -460,16 +576,26 @@ export const codingAgentPullRequestIdentitySchema = z
     prMergedAtMs: z.number().nullable(),
   })
   .strict();
+export interface CodingAgentPullRequestIdentitySchema extends Named<
+  typeof codingAgentPullRequestIdentitySchemaDefinition
+> {}
+export const codingAgentPullRequestIdentitySchema: CodingAgentPullRequestIdentitySchema =
+  codingAgentPullRequestIdentitySchemaDefinition;
 
-export const codingAgentCostSplitSchema = z
+const codingAgentCostSplitSchemaDefinition = z
   .object({
     costUsd: z.number().nullable(),
     billedCostUsd: z.number().nullable(),
     nonBilledCostUsd: z.number().nullable(),
   })
   .strict();
+export interface CodingAgentCostSplitSchema extends Named<
+  typeof codingAgentCostSplitSchemaDefinition
+> {}
+export const codingAgentCostSplitSchema: CodingAgentCostSplitSchema =
+  codingAgentCostSplitSchemaDefinition;
 
-export const codingAgentModelUsageSchema = z
+const codingAgentModelUsageSchemaDefinition = z
   .object({
     model: z.string(),
     inputTokens: z.number(),
@@ -481,6 +607,11 @@ export const codingAgentModelUsageSchema = z
     tokensKnown: z.boolean(),
   })
   .strict();
+export interface CodingAgentModelUsageSchema extends Named<
+  typeof codingAgentModelUsageSchemaDefinition
+> {}
+export const codingAgentModelUsageSchema: CodingAgentModelUsageSchema =
+  codingAgentModelUsageSchemaDefinition;
 
 const codingAgentContributorIdentityShape = {
   projectId: z.string(),
@@ -489,7 +620,7 @@ const codingAgentContributorIdentityShape = {
   contributorIsProject: z.boolean(),
 };
 
-export const codingAgentPullRequestUsageRowSchema = z
+const codingAgentPullRequestUsageRowSchemaDefinition = z
   .object({
     ...codingAgentContributorIdentityShape,
     agent: z.string(),
@@ -505,8 +636,13 @@ export const codingAgentPullRequestUsageRowSchema = z
     nonBilledCostUsd: z.number().nullable(),
   })
   .strict();
+export interface CodingAgentPullRequestUsageRowSchema extends Named<
+  typeof codingAgentPullRequestUsageRowSchemaDefinition
+> {}
+export const codingAgentPullRequestUsageRowSchema: CodingAgentPullRequestUsageRowSchema =
+  codingAgentPullRequestUsageRowSchemaDefinition;
 
-export const codingAgentPullRequestUsageTotalsSchema = z
+const codingAgentPullRequestUsageTotalsSchemaDefinition = z
   .object({
     sessionsCount: z.number(),
     inputTokens: z.number(),
@@ -519,8 +655,13 @@ export const codingAgentPullRequestUsageTotalsSchema = z
     nonBilledCostUsd: z.number().nullable(),
   })
   .strict();
+export interface CodingAgentPullRequestUsageTotalsSchema extends Named<
+  typeof codingAgentPullRequestUsageTotalsSchemaDefinition
+> {}
+export const codingAgentPullRequestUsageTotalsSchema: CodingAgentPullRequestUsageTotalsSchema =
+  codingAgentPullRequestUsageTotalsSchemaDefinition;
 
-export const codingAgentPullRequestUsageSchema = z
+const codingAgentPullRequestUsageSchemaDefinition = z
   .object({
     pullRequest: codingAgentPullRequestIdentitySchema,
     rows: z.array(codingAgentPullRequestUsageRowSchema),
@@ -528,12 +669,22 @@ export const codingAgentPullRequestUsageSchema = z
     modelBreakdown: z.array(codingAgentModelUsageSchema),
   })
   .strict();
+export interface CodingAgentPullRequestUsageSchema extends Named<
+  typeof codingAgentPullRequestUsageSchemaDefinition
+> {}
+export const codingAgentPullRequestUsageSchema: CodingAgentPullRequestUsageSchema =
+  codingAgentPullRequestUsageSchemaDefinition;
 
-export const codingAgentContributorSummarySchema = z
+const codingAgentContributorSummarySchemaDefinition = z
   .object({ ...codingAgentContributorIdentityShape, sessionsCount: z.number() })
   .strict();
+export interface CodingAgentContributorSummarySchema extends Named<
+  typeof codingAgentContributorSummarySchemaDefinition
+> {}
+export const codingAgentContributorSummarySchema: CodingAgentContributorSummarySchema =
+  codingAgentContributorSummarySchemaDefinition;
 
-export const codingAgentPersonalPullRequestRowSchema = z
+const codingAgentPersonalPullRequestRowSchemaDefinition = z
   .object({
     ...codingAgentPullRequestIdentitySchema.shape,
     title: z.string(),
@@ -551,8 +702,13 @@ export const codingAgentPersonalPullRequestRowSchema = z
     contributorsSummary: z.array(codingAgentContributorSummarySchema),
   })
   .strict();
+export interface CodingAgentPersonalPullRequestRowSchema extends Named<
+  typeof codingAgentPersonalPullRequestRowSchemaDefinition
+> {}
+export const codingAgentPersonalPullRequestRowSchema: CodingAgentPersonalPullRequestRowSchema =
+  codingAgentPersonalPullRequestRowSchemaDefinition;
 
-export const codingAgentUnlinkedBranchRollupSchema = z
+const codingAgentUnlinkedBranchRollupSchemaDefinition = z
   .object({
     repositoryHost: z.string(),
     repositoryFullName: z.string(),
@@ -567,15 +723,25 @@ export const codingAgentUnlinkedBranchRollupSchema = z
     repoCovered: z.boolean(),
   })
   .strict();
+export interface CodingAgentUnlinkedBranchRollupSchema extends Named<
+  typeof codingAgentUnlinkedBranchRollupSchemaDefinition
+> {}
+export const codingAgentUnlinkedBranchRollupSchema: CodingAgentUnlinkedBranchRollupSchema =
+  codingAgentUnlinkedBranchRollupSchemaDefinition;
 
-export const codingAgentPersonalPullRequestUsageSchema = z
+const codingAgentPersonalPullRequestUsageSchemaDefinition = z
   .object({
     rows: z.array(codingAgentPersonalPullRequestRowSchema),
     unlinked: z.array(codingAgentUnlinkedBranchRollupSchema),
   })
   .strict();
+export interface CodingAgentPersonalPullRequestUsageSchema extends Named<
+  typeof codingAgentPersonalPullRequestUsageSchemaDefinition
+> {}
+export const codingAgentPersonalPullRequestUsageSchema: CodingAgentPersonalPullRequestUsageSchema =
+  codingAgentPersonalPullRequestUsageSchemaDefinition;
 
-export const codingAgentPullRequestSessionFactSchema = z
+const codingAgentPullRequestSessionFactSchemaDefinition = z
   .object({
     ...codingAgentContributorIdentityShape,
     sessionId: z.string(),
@@ -586,8 +752,13 @@ export const codingAgentPullRequestSessionFactSchema = z
     title: z.string().nullable(),
   })
   .strict();
+export interface CodingAgentPullRequestSessionFactSchema extends Named<
+  typeof codingAgentPullRequestSessionFactSchemaDefinition
+> {}
+export const codingAgentPullRequestSessionFactSchema: CodingAgentPullRequestSessionFactSchema =
+  codingAgentPullRequestSessionFactSchemaDefinition;
 
-export const codingAgentPullRequestDetailSchema = z
+const codingAgentPullRequestDetailSchemaDefinition = z
   .object({
     pullRequest: z
       .object({ ...codingAgentPullRequestIdentitySchema.shape, title: z.string() })
@@ -598,6 +769,11 @@ export const codingAgentPullRequestDetailSchema = z
     sessions: z.array(codingAgentPullRequestSessionFactSchema),
   })
   .strict();
+export interface CodingAgentPullRequestDetailSchema extends Named<
+  typeof codingAgentPullRequestDetailSchemaDefinition
+> {}
+export const codingAgentPullRequestDetailSchema: CodingAgentPullRequestDetailSchema =
+  codingAgentPullRequestDetailSchemaDefinition;
 
 const codingAgentCallerScopeShape = {
   permittedProjectIds: z.array(z.string()),
@@ -605,7 +781,7 @@ const codingAgentCallerScopeShape = {
   projects: z.record(z.string(), codingAgentContributorProjectSchema),
 };
 
-export const codingAgentPullRequestUsageInputSchema = z
+const codingAgentPullRequestUsageInputSchemaDefinition = z
   .object({
     ...codingAgentCallerScopeShape,
     organizationId: z.string(),
@@ -614,10 +790,20 @@ export const codingAgentPullRequestUsageInputSchema = z
     prNumber: z.number(),
   })
   .strict();
+export interface CodingAgentPullRequestUsageInputSchema extends Named<
+  typeof codingAgentPullRequestUsageInputSchemaDefinition
+> {}
+export const codingAgentPullRequestUsageInputSchema: CodingAgentPullRequestUsageInputSchema =
+  codingAgentPullRequestUsageInputSchemaDefinition;
 
-export const codingAgentPersonalPullRequestUsageInputSchema = z
+const codingAgentPersonalPullRequestUsageInputSchemaDefinition = z
   .object({ ...codingAgentCallerScopeShape, projectId: z.string() })
   .strict();
+export interface CodingAgentPersonalPullRequestUsageInputSchema extends Named<
+  typeof codingAgentPersonalPullRequestUsageInputSchemaDefinition
+> {}
+export const codingAgentPersonalPullRequestUsageInputSchema: CodingAgentPersonalPullRequestUsageInputSchema =
+  codingAgentPersonalPullRequestUsageInputSchemaDefinition;
 
 export type CodingAgentSession = z.infer<typeof codingAgentSessionSchema>;
 export type CodingAgentSessionEvent = z.infer<typeof codingAgentSessionEventSchema>;
@@ -655,9 +841,14 @@ export type CodingAgentPersonalPullRequestUsage = z.infer<
 export type CodingAgentPullRequestDetail = z.infer<typeof codingAgentPullRequestDetailSchema>;
 
 /** Whether GitHub is connected for an organization, and where to connect it. */
-export const codingAgentGithubConnectionSchema = z
+const codingAgentGithubConnectionSchemaDefinition = z
   .object({ connected: z.boolean(), installUrl: z.string().nullable() })
   .strict();
+export interface CodingAgentGithubConnectionSchema extends Named<
+  typeof codingAgentGithubConnectionSchemaDefinition
+> {}
+export const codingAgentGithubConnectionSchema: CodingAgentGithubConnectionSchema =
+  codingAgentGithubConnectionSchemaDefinition;
 export type CodingAgentGithubConnection = z.infer<typeof codingAgentGithubConnectionSchema>;
 
 /**
@@ -665,7 +856,12 @@ export type CodingAgentGithubConnection = z.infer<typeof codingAgentGithubConnec
  * GitHub is connected — all three at once, because the page needs all three to
  * decide what to render.
  */
-export const codingAgentPersonalPullRequestUsageWithConnectionSchema =
+const codingAgentPersonalPullRequestUsageWithConnectionSchemaDefinition =
   codingAgentPersonalPullRequestUsageSchema.safeExtend({
     connection: codingAgentGithubConnectionSchema,
   });
+export interface CodingAgentPersonalPullRequestUsageWithConnectionSchema extends Named<
+  typeof codingAgentPersonalPullRequestUsageWithConnectionSchemaDefinition
+> {}
+export const codingAgentPersonalPullRequestUsageWithConnectionSchema: CodingAgentPersonalPullRequestUsageWithConnectionSchema =
+  codingAgentPersonalPullRequestUsageWithConnectionSchemaDefinition;

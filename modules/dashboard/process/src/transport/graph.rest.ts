@@ -67,6 +67,7 @@ export const graphRest = defineRestRouter(DashboardApi)
 
   // Creating asks for `analytics:create`; `:manage` still implies it.
   .post("/", "postApiGraphs")
+  .withAudit("graphs.create")
   .withInput(graphRestCreateSchema)
   .withPermission("analytics:create")
   .withOutput(graphRestResponseSchema)
@@ -92,6 +93,7 @@ export const graphRest = defineRestRouter(DashboardApi)
   )
 
   .patch("/:id", "patchApiGraphsById")
+  .withAudit("graphs.updateById")
   .withParams(graphRestParamsSchema)
   .withInput(graphRestUpdateSchema)
   .withPermission("analytics:update")
@@ -115,6 +117,7 @@ export const graphRest = defineRestRouter(DashboardApi)
 
   // Destruction deliberately stays at `:manage`.
   .delete("/:id", "deleteApiGraphsById")
+  .withAudit("graphs.delete")
   .withParams(graphRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(graphDeletedResponseSchema)

@@ -97,12 +97,18 @@ export function auditActionPhrase(action: string): string {
   return sentence([...noun, ...verbWords]);
 }
 
-type ActorFields = Pick<EnrichedAuditLog, "userId" | "user" | "actorUserId" | "actorUser">;
+type ActorFields = Pick<
+  EnrichedAuditLog,
+  "userId" | "user" | "actorUserId" | "actorUser" | "apiKeyId"
+>;
 type Person = { id: string; name: string; email: string | null };
 
-/** Who a row names. The wire carries no credential kind yet, so these are all it can tell apart. */
+/**
+ * Who a row names: a person (maybe through their key), an operator as someone, a key, the system.
+ */
 export type AuditActor =
-  | ({ kind: "user" } & Person)
+  | ({ kind: "user"; viaKeyId: string | null } & Person)
+  | { kind: "apiKey"; id: string }
   | { kind: "impersonation"; operator: Person; subject: Person }
   | { kind: "unresolved"; id: string }
   | { kind: "anonymous" }
@@ -123,8 +129,11 @@ export function auditActor(log: ActorFields): AuditActor {
       subject: person(log.user, log.userId),
     };
   }
-  if (log.user) return { kind: "user", ...person(log.user, log.user.id) };
+  if (log.user) {
+    return { kind: "user", viaKeyId: log.apiKeyId ?? null, ...person(log.user, log.user.id) };
+  }
   if (!log.userId) return { kind: "system" };
+  if (log.apiKeyId && log.userId.startsWith("apikey:")) return { kind: "apiKey", id: log.apiKeyId };
   // The REST door records a caller it could not identify under this literal.
   if (log.userId === "anonymous") return { kind: "anonymous" };
   return { kind: "unresolved", id: log.userId };
@@ -159,7 +168,7 @@ function runKey(log: RunFields): string {
   ]);
 }
 
-/** Folds back-to-back identical events into one run, so a burst of ten reads as "×10". */
+/** Folds back-to-back identical events into one run, so a burst of ten reads as "10 events". */
 export function groupAuditRuns<T extends RunFields>(rows: readonly T[]): AuditRun<T>[] {
   const runs: AuditRun<T>[] = [];
   let previousKey: string | undefined;
@@ -182,12 +191,13 @@ export function auditDayLabel({ at, now }: { at: TimeInput; now: TimeInput }): s
     : format(at, "MMM d, yyyy");
 }
 
+/** A browser's pattern captures its major version; a tool's carries none. */
 const BROWSERS: readonly [RegExp, string][] = [
-  [/Edg\//, "Edge"],
-  [/OPR\//, "Opera"],
-  [/Firefox\//, "Firefox"],
-  [/Chrome\//, "Chrome"],
-  [/Version\/[\d.]+.*Safari\//, "Safari"],
+  [/Edg\/(\d+)/, "Edge"],
+  [/OPR\/(\d+)/, "Opera"],
+  [/Firefox\/(\d+)/, "Firefox"],
+  [/Chrome\/(\d+)/, "Chrome"],
+  [/Version\/(\d+)[\d.]*.*Safari\//, "Safari"],
   [/^curl\//, "curl"],
   [/python-requests|python-httpx|aiohttp/, "Python"],
   [/Go-http-client/, "Go"],
@@ -202,10 +212,14 @@ const SYSTEMS: readonly [RegExp, string][] = [
   [/Linux/, "Linux"],
 ];
 
-/** "Chrome on macOS" from a stored user agent; the first token when nothing is recognised. */
+/** "Chrome 129 on macOS" from a stored user agent; the first token when nothing is recognised. */
 export function auditClient(userAgent: string | null): string | null {
   if (!userAgent) return null;
-  const browser = BROWSERS.find(([pattern]) => pattern.test(userAgent))?.[1];
+  const browser = BROWSERS.flatMap(([pattern, name]) => {
+    const match = pattern.exec(userAgent);
+    if (!match) return [];
+    return [match[1] ? `${name} ${match[1]}` : name];
+  })[0];
   const system = SYSTEMS.find(([pattern]) => pattern.test(userAgent))?.[1];
   if (browser && system) return `${browser} on ${system}`;
   return browser ?? system ?? userAgent.split(/[\s/]/)[0] ?? null;
@@ -250,20 +264,36 @@ export function auditChangeSummary({
   };
 }
 
-/** Runs under their day heading, in the order they came (newest first). */
-export function auditFeedDays<T extends { createdAt: TimeInput }>({
-  runs,
+export type AuditFeedDay<T> = { label: string; heading: string; runs: AuditRun<T>[] };
+
+/** "Today · Oct 10, 2026" for the two relative days; else the full date alone. */
+export function auditDayHeading({ at, now }: { at: TimeInput; now: TimeInput }): string {
+  const label = auditDayLabel({ at, now });
+  const full = format(at, "MMM d, yyyy");
+  return label === "Today" || label === "Yesterday" ? `${label} · ${full}` : full;
+}
+
+/**
+ * Rows split by day first, then folded into runs within each day, so a run never
+ * straddles midnight. Newest first, in the order the rows came.
+ */
+export function auditFeedDays<T extends RunFields & { createdAt: TimeInput }>({
+  rows,
   now,
 }: {
-  runs: readonly AuditRun<T>[];
+  rows: readonly T[];
   now: TimeInput;
-}): { label: string; runs: AuditRun<T>[] }[] {
-  const days: { label: string; runs: AuditRun<T>[] }[] = [];
-  for (const run of runs) {
-    const label = auditDayLabel({ at: run.entries[0].createdAt, now });
+}): AuditFeedDay<T>[] {
+  const days: { label: string; heading: string; rows: T[] }[] = [];
+  for (const row of rows) {
+    const label = auditDayLabel({ at: row.createdAt, now });
     const day = days.at(-1);
-    if (day?.label === label) day.runs.push(run);
-    else days.push({ label, runs: [run] });
+    if (day?.label === label) day.rows.push(row);
+    else days.push({ label, heading: auditDayHeading({ at: row.createdAt, now }), rows: [row] });
   }
-  return days;
+  return days.map(({ label, heading, rows: dayRows }) => ({
+    label,
+    heading,
+    runs: groupAuditRuns(dayRows),
+  }));
 }

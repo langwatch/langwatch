@@ -139,11 +139,21 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
           animation: "tracesRowNew 3s ease-out",
         },
         "@keyframes tracesRowNew": {
-          "0%": { backgroundColor: "rgba(59, 130, 246, 0.22)" },
-          "18%": { backgroundColor: "rgba(59, 130, 246, 0.06)" },
-          "36%": { backgroundColor: "rgba(59, 130, 246, 0.18)" },
-          "54%": { backgroundColor: "rgba(59, 130, 246, 0.05)" },
-          "72%": { backgroundColor: "rgba(59, 130, 246, 0.12)" },
+          "0%": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-solid) 22%, transparent)",
+          },
+          "18%": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-solid) 6%, transparent)",
+          },
+          "36%": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-solid) 18%, transparent)",
+          },
+          "54%": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-solid) 5%, transparent)",
+          },
+          "72%": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-solid) 12%, transparent)",
+          },
           "100%": { backgroundColor: "transparent" },
         },
       }),
@@ -158,8 +168,14 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
             animation: "tracesRowPulse 1.2s ease-out",
           },
           "@keyframes tracesRowPulse": {
-            "0%": { backgroundColor: "rgba(59, 130, 246, 0.14)" },
-            "40%": { backgroundColor: "rgba(59, 130, 246, 0.06)" },
+            "0%": {
+              backgroundColor:
+                "color-mix(in srgb, var(--chakra-colors-blue-solid) 14%, transparent)",
+            },
+            "40%": {
+              backgroundColor:
+                "color-mix(in srgb, var(--chakra-colors-blue-solid) 6%, transparent)",
+            },
             "100%": { backgroundColor: "transparent" },
           },
         }),

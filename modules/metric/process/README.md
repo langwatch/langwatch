@@ -6,13 +6,13 @@ The server half of [metric](../README.md). Metrics: receiving OTLP metrics, cano
 
 ## Installation
 
-`defineProcessModule("metric").withRepositories(metricRepositories).withApi(MetricModule).withTransports(otlpMetricsRest).withEventing(metricEventing)`, `src/metric.module.ts:10`.
+`defineProcessModule("metric").withRepositories(metricRepositories).withApi(MetricModule).withTransports(otlpMetricsRest).withEventing(metricEventing).withDoors(…)`, `src/metric.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`MetricApi`)
 
-Peers call these through the token, declared at `../contract/src/metric.api.ts:51`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/metric.api.ts:48`; nothing else in this package is public.
 
 #### `prepareMetricDataPoints`
 
@@ -22,10 +22,10 @@ prepareMetricDataPoints(input: { tenantId: string; organizationId: string; reque
 
 #### `receiveOtlpMetrics`
 
-One exporter request at the metrics door: key, allowance, parse, then collection.
+One exporter request the metrics door verified: allowance, parse, then collection.
 
 ```typescript
-receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult>;
+receiveOtlpMetrics(input: { request: OtlpDoorRequest; credential: OtlpIngestCredential; }): Promise<MetricOtlpDoorResult>;
 ```
 
 #### `collectOtlpMetrics`
@@ -48,88 +48,22 @@ recordCanonicalMetricDataPoints(points: readonly CanonicalMetricDataPoint[]): Pr
 
 ### `otlpMetricsRest`
 
-|             |                                         |
-| ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-metrics.rest.ts:26` |
-| Base URL    | none: each route's path is its address  |
-| Addressing  | literal                                 |
-| Credential  | project                                 |
+|             |                                          |
+| ----------- | ---------------------------------------- |
+| Declared at | `src/transport/otlp-metrics.rest.ts:115` |
+| Base URL    | none: each route's path is its address   |
+| Addressing  | literal                                  |
+| Credential  | otlp_ingest                              |
 
 #### `POST /api/otel/v1/metrics` · `ingestOtlpMetrics`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:31`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:121`.
 
 Answers at `/api/otel/v1/metrics`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:32)
-// Response: inline, src/transport/otlp-metrics.rest.ts:35
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1/metrics` · `ingestOtlpMetricsAlias`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:51`.
-
-Answers at `/:otlpBase{.+}/v1/metrics`.
-
-```typescript
-// Params: otlpMetricAliasParamsSchema, ../contract/src/metric.api.ts:41
-interface Params {
-  otlpBase: string;
-}
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:53)
-// Response: inline, src/transport/otlp-metrics.rest.ts:56
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1/metrics/` · `ingestOtlpMetricsAliasSlash`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:70`.
-
-Answers at `/:otlpBase{.+}/v1/metrics/`.
-
-```typescript
-type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:72)
-// Response: inline, src/transport/otlp-metrics.rest.ts:75
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1//metrics` · `ingestOtlpMetricsAliasDoubled`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:90`.
-
-Answers at `/:otlpBase{.+}/v1//metrics`.
-
-```typescript
-type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:92)
-// Response: inline, src/transport/otlp-metrics.rest.ts:95
-type Response = unknown;
-```
-
-#### `POST /v1/metrics` · `ingestOtlpMetricsRootV1`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:109`.
-
-Answers at `/v1/metrics`.
-
-```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:110)
-// Response: inline, src/transport/otlp-metrics.rest.ts:113
-type Response = unknown;
-```
-
-#### `POST /v1/metrics/` · `ingestOtlpMetricsRootV1Slash`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:127`.
-
-Answers at `/v1/metrics/`.
-
-```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:128)
-// Response: inline, src/transport/otlp-metrics.rest.ts:131
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:123)
+// Response: inline, src/transport/otlp-metrics.rest.ts:126
 type Response = unknown;
 ```
 

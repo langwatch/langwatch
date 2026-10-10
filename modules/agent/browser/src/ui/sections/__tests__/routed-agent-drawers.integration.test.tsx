@@ -111,10 +111,6 @@ vi.mock("../workflow/optimization_studio/properties/modals/emoji-picker-modal.ts
   EmojiPickerModal: () => null,
 }));
 
-vi.mock("../workflow/code/render-code.tsx", () => ({
-  RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
-}));
-
 vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));
@@ -138,6 +134,8 @@ vi.mock("@langwatch/design-system/shiki", () => ({
       () =>
       ({ code }: { code: string }) => ({ highlighted: false, code }),
   }),
+  codeToHtml: ({ code }: { code: string }) => Promise.resolve(`<pre>${code}</pre>`),
+  codeToHtmlDark: ({ code }: { code: string }) => Promise.resolve(`<pre>${code}</pre>`),
 }));
 
 // This package runs without isolation: start from fresh modules, and leave none behind.

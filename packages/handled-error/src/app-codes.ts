@@ -610,6 +610,7 @@ export const APP_ERROR_CODES = [
   "prompt_not_a_copy",
   "prompt_not_found",
   "prompt_playground_chat_unavailable",
+  "prompt_tag_conflict",
   "prompt_version_conflict",
   "protocol_invalid",
   "provider_endpoint_redirected",

@@ -97,7 +97,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   if (timestamps?.finishedAt) {
     return (
       <>
-        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-500)" />
+        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
         <Text fontSize="sm">Completed</Text>
       </>
     );
@@ -105,7 +105,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   if (timestamps?.stoppedAt) {
     return (
       <>
-        <LuCircleX size={14} color="var(--chakra-colors-red-500)" />
+        <LuCircleX size={14} color="var(--chakra-colors-red-fg)" />
         <Text fontSize="sm">Stopped</Text>
       </>
     );
@@ -122,7 +122,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   if (runsSummary.count > 0) {
     return (
       <>
-        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-500)" />
+        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
         <Text fontSize="sm">Completed</Text>
       </>
     );
@@ -226,7 +226,7 @@ const ExperimentActionsMenu = ({
       {permissions.canDelete && (
         <Menu.Item
           value="delete"
-          color="red.500"
+          color="red.fg"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -417,7 +417,7 @@ export function ExperimentsPage() {
       )}
       {pageState === "error" && (
         <PageLayout.Container>
-          <Text color="red.500">Error loading experiments</Text>
+          <Text color="red.fg">Error loading experiments</Text>
         </PageLayout.Container>
       )}
       {pageState === "empty" && (
@@ -425,7 +425,7 @@ export function ExperimentsPage() {
           title="No experiments yet"
           description="Test prompts, models, and agents against a dataset before shipping changes."
           icon={<LuSquareCheckBig size={24} />}
-          color="green.500"
+          color="green.fg"
           docsInfo={
             <Text>
               To learn more about experiments, visit the{" "}

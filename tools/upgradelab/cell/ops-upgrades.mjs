@@ -8,10 +8,16 @@ const { url, email, password, out, signIn } = JSON.parse(process.argv[2]);
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds the page.
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.fulfill({ contentType: "text/css", body: "" }));
+  // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds
+  // the page.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ contentType: "text/css", body: "" }),
+  );
   if (signIn) {
-    await page.goto(`${url}/auth/signin?callbackUrl=%2Fops%2Fupgrades`, { timeout: 30_000, waitUntil: "domcontentloaded" });
+    await page.goto(`${url}/auth/signin?callbackUrl=%2Fops%2Fupgrades`, {
+      timeout: 30_000,
+      waitUntil: "domcontentloaded",
+    });
     // Identifier first: the email, Continue, then the password appears.
     await page
       .locator('input[type="email"], input[name="email"]:not([type="hidden"])')

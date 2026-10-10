@@ -336,6 +336,13 @@ Feature: Shared organization service
     And it records "lw.organization.personal_workspace_archived" with the archived team ids, awaited, so an unrecorded removal fails loudly
 
   @unit
+  Scenario: Removing a member drops their group and team memberships in that organization only
+    Given a member who belongs to a group and a team in the organization, and to a group in another organization
+    When an administrator removes the member
+    Then the member belongs to no group or team of that organization, so a later rejoin brings back no access
+    And their group in the other organization keeps them
+
+  @unit
   Scenario: Ensuring a returning member's workspace records its revival for project
     Given a returning member whose archived personal team organization has revived
     When the user's personal workspace is ensured and answers pending

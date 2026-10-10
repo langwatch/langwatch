@@ -1,6 +1,8 @@
 /** Edits a queue through the annotation feature API. */
 
+import { Link } from "@langwatch/browser-host/link";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { EmptyOptionsHint, OptionItem } from "@langwatch/design-system/option-list";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Button,
@@ -16,7 +18,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
 import {
@@ -53,6 +55,18 @@ function togglePicked(list: Picked[], entry: Picked): Picked[] {
   return list.some((picked) => picked.id === entry.id)
     ? list.filter((picked) => picked.id !== entry.id)
     : [...list, entry];
+}
+
+function participantNames(
+  participants: Picked[],
+  members: { user: { id: string; name: string | null; email?: string | null } }[],
+): Picked[] {
+  return participants.map((participant) => ({
+    ...participant,
+    name:
+      participant.name ??
+      memberName(members.find((member) => member.user.id === participant.id)?.user),
+  }));
 }
 
 /** A pick list's trigger: the picked names as tags, or the placeholder when none. */
@@ -163,7 +177,11 @@ export function AnnotationQueueEditor({
     },
   });
 
-  const members = useMemo(() => organization.data?.members ?? [], [organization.data?.members]);
+  const members = organization.data?.members ?? [];
+  const scoreHintId = useId();
+  const participantHintId = useId();
+  const noScores = scores.data?.length === 0;
+  const noMembers = organization.data?.members.length === 0;
 
   const submit = () => {
     if (!projectId) return;
@@ -196,15 +214,15 @@ export function AnnotationQueueEditor({
         if (!open) onClose();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <HStack>
             <Drawer.CloseTrigger onClick={onClose} />
           </HStack>
           <HStack>
-            <Text paddingTop={5} fontSize="2xl">
+            <Drawer.Title>
               {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
-            </Text>
+            </Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
@@ -224,42 +242,32 @@ export function AnnotationQueueEditor({
               <Field.Root>
                 <Field.Label>Participants</Field.Label>
                 <Popover.Root
-                  open={participantsOpen}
+                  open={participantsOpen && !noMembers}
                   onOpenChange={({ open }) => setParticipantsOpen(open)}
                   positioning={{ placement: "bottom-start" }}
                 >
                   <Popover.Trigger asChild>
                     <PickedTrigger
-                      picked={participants.map((participant) => ({
-                        ...participant,
-                        name:
-                          participant.name ??
-                          memberName(
-                            members.find((member) => member.user.id === participant.id)?.user,
-                          ),
-                      }))}
+                      picked={participantNames(participants, members)}
+                      disabled={!organization.data || noMembers}
+                      aria-describedby={noMembers ? participantHintId : void 0}
                       placeholder="Add Participants"
                       data-testid="annotation-queue-editor-participants"
                     />
                   </Popover.Trigger>
                   <Popover.Content width="300px">
-                    <Popover.Body>
-                      <VStack align="start" gap={1}>
+                    <Popover.Body padding={1}>
+                      <VStack align="start" gap={0} maxHeight="min(320px, 50vh)" overflowY="auto">
                         {members.map((member) => {
                           const isPicked = participants.some(
                             (participant) => participant.id === member.user.id,
                           );
 
                           return (
-                            <Button
+                            <OptionItem
+                              type="button"
                               key={member.user.id}
                               data-testid="annotation-queue-editor-participant-option"
-                              variant="ghost"
-                              width="full"
-                              justifyContent="flex-start"
-                              padding={1}
-                              height="auto"
-                              fontWeight="normal"
                               aria-pressed={isPicked}
                               onClick={() =>
                                 setParticipants((current) =>
@@ -270,19 +278,21 @@ export function AnnotationQueueEditor({
                                 )
                               }
                             >
-                              <Check size={16} color={isPicked ? "green" : "transparent"} />
                               <ReviewerAvatar size="2xs" name={memberName(member.user)} />
                               <Text fontSize="sm">{memberName(member.user)}</Text>
-                            </Button>
+                              <Check
+                                size={16}
+                                aria-hidden
+                                style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
+                              />
+                            </OptionItem>
                           );
                         })}
                       </VStack>
                     </Popover.Body>
                   </Popover.Content>
                 </Popover.Root>
-                <Field.HelperText>
-                  Select the participants for this annotation queue
-                </Field.HelperText>
+                <ParticipantOptionsHint empty={noMembers} id={participantHintId} />
               </Field.Root>
 
               <Field.Root invalid={!!problems.name} width="full">
@@ -314,35 +324,32 @@ export function AnnotationQueueEditor({
               <Field.Root>
                 <Field.Label>Score Type</Field.Label>
                 <Popover.Root
-                  open={scoreTypesOpen}
+                  open={scoreTypesOpen && !noScores}
                   onOpenChange={({ open }) => setScoreTypesOpen(open)}
                   positioning={{ placement: "bottom-start" }}
                 >
                   <Popover.Trigger asChild>
                     <PickedTrigger
                       picked={scoreTypes}
+                      disabled={!scores.data || noScores}
+                      aria-describedby={noScores ? scoreHintId : void 0}
                       placeholder="Add Score Type"
                       data-testid="annotation-queue-editor-score-types"
                     />
                   </Popover.Trigger>
                   <Popover.Content width="300px">
-                    <Popover.Body>
-                      <VStack align="start" gap={1} maxHeight="250px" overflowY="auto">
+                    <Popover.Body padding={1}>
+                      <VStack align="start" gap={0} maxHeight="250px" overflowY="auto">
                         {(scores.data ?? []).map((score) => {
                           const isPicked = scoreTypes.some(
                             (scoreType) => scoreType.id === score.id,
                           );
 
                           return (
-                            <Button
+                            <OptionItem
+                              type="button"
                               key={score.id}
                               data-testid="annotation-queue-editor-score-option"
-                              variant="ghost"
-                              width="full"
-                              justifyContent="flex-start"
-                              padding={1}
-                              height="auto"
-                              fontWeight="normal"
                               aria-pressed={isPicked}
                               onClick={() =>
                                 setScoreTypes((current) =>
@@ -350,21 +357,20 @@ export function AnnotationQueueEditor({
                                 )
                               }
                             >
-                              <Check size={16} color={isPicked ? "green" : "transparent"} />
                               <Text fontSize="sm">{score.name}</Text>
-                            </Button>
+                              <Check
+                                size={16}
+                                aria-hidden
+                                style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
+                              />
+                            </OptionItem>
                           );
                         })}
-                        {(scores.data ?? []).length === 0 && (
-                          <Text padding={2} fontSize="sm" color="fg.muted">
-                            No score types yet. Define one in Settings, under Annotation Scores.
-                          </Text>
-                        )}
                       </VStack>
                     </Popover.Body>
                   </Popover.Content>
                 </Popover.Root>
-                <Field.HelperText>Select the score type for this annotation queue</Field.HelperText>
+                <ScoreOptionsHint empty={noScores} id={scoreHintId} />
               </Field.Root>
 
               <HStack width="full">
@@ -384,5 +390,28 @@ export function AnnotationQueueEditor({
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function ScoreOptionsHint({ empty, id }: { empty: boolean; id: string }) {
+  if (!empty)
+    return <Field.HelperText>Select the score type for this annotation queue</Field.HelperText>;
+  return (
+    <EmptyOptionsHint
+      id={id}
+      action={<Link href="/settings/annotation-scores">Create an annotation score</Link>}
+    >
+      No score types yet. Create one to use in this queue.
+    </EmptyOptionsHint>
+  );
+}
+
+function ParticipantOptionsHint({ empty, id }: { empty: boolean; id: string }) {
+  if (!empty)
+    return <Field.HelperText>Select the participants for this annotation queue</Field.HelperText>;
+  return (
+    <EmptyOptionsHint id={id} action={<Link href="/settings/directory">Invite participants</Link>}>
+      No participants yet. Invite someone to your organization first.
+    </EmptyOptionsHint>
   );
 }

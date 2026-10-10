@@ -146,7 +146,8 @@ export function HttpTestPanel({
       {outputPath && (
         <Box fontSize="sm" color="fg.muted">
           <Text>
-            Output is extracted using JSONPath <HttpJsonPathText path={outputPath} shape={shape} anyIndex={shapeIsSample} />
+            Output is extracted using JSONPath{" "}
+            <HttpJsonPathText path={outputPath} shape={shape} anyIndex={shapeIsSample} />
             {onEditOutputPath && (
               <>
                 {". "}
@@ -177,7 +178,13 @@ export function HttpTestPanel({
         </Button>
       </HStack>
 
-      {result && <HttpTestResponseDisplay result={result} explainError={explainError} outputPath={outputPath} />}
+      {result && (
+        <HttpTestResponseDisplay
+          result={result}
+          explainError={explainError}
+          outputPath={outputPath}
+        />
+      )}
     </VStack>
   );
 }

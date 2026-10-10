@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -37,7 +38,7 @@ const agentViewRecordSchema = agentRecordSchema.pick({
   updatedAt: true,
 });
 
-export const agentSchema = z.discriminatedUnion("type", [
+const agentSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     ...agentRecordSchema.shape,
     type: z.literal("signature"),
@@ -69,8 +70,10 @@ export const agentSchema = z.discriminatedUnion("type", [
     config: voiceAgentConfigSchema,
   }),
 ]);
+export interface AgentSchema extends Named<typeof agentSchemaDefinition> {}
+export const agentSchema: AgentSchema = agentSchemaDefinition;
 
-export const agentViewSchema = z.discriminatedUnion("type", [
+const agentViewSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     ...agentViewRecordSchema.shape,
     type: z.literal("signature"),
@@ -102,14 +105,20 @@ export const agentViewSchema = z.discriminatedUnion("type", [
     config: voiceAgentConfigSchema,
   }),
 ]);
+export interface AgentViewSchema extends Named<typeof agentViewSchemaDefinition> {}
+export const agentViewSchema: AgentViewSchema = agentViewSchemaDefinition;
 
-export const agentFieldsSchema = z.object({
+const agentFieldsSchemaDefinition = z.object({
   inputFields: z.array(fieldSchema),
   outputFields: z.array(fieldSchema),
   fieldsResolved: z.boolean(),
 });
+export interface AgentFieldsSchema extends Named<typeof agentFieldsSchemaDefinition> {}
+export const agentFieldsSchema: AgentFieldsSchema = agentFieldsSchemaDefinition;
 
-export const agentWithFieldsSchema = z.intersection(agentSchema, agentFieldsSchema);
+const agentWithFieldsSchemaDefinition = z.intersection(agentSchema, agentFieldsSchema);
+export interface AgentWithFieldsSchema extends Named<typeof agentWithFieldsSchemaDefinition> {}
+export const agentWithFieldsSchema: AgentWithFieldsSchema = agentWithFieldsSchemaDefinition;
 
 export type AgentId = z.infer<typeof agentIdSchema>;
 export type Agent = z.infer<typeof agentSchema>;
@@ -131,10 +140,15 @@ export function findLinkedWorkflowIds(agent: Pick<Agent, "workflowId" | "config"
 export const AGENT_ARCHIVED_EVENT_TYPE = "lw.agent.archived" as const;
 
 /** An agent was archived, and the linked graph the archive cascades to, if any. */
-export const agentArchivedEventDataSchema = z.object({
+const agentArchivedEventDataSchemaDefinition = z.object({
   agentId: z.string(),
   projectId: z.string(),
   cascadedWorkflowId: z.string().nullable(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface AgentArchivedEventDataSchema extends Named<
+  typeof agentArchivedEventDataSchemaDefinition
+> {}
+export const agentArchivedEventDataSchema: AgentArchivedEventDataSchema =
+  agentArchivedEventDataSchemaDefinition;
 export type AgentArchivedEventData = z.infer<typeof agentArchivedEventDataSchema>;

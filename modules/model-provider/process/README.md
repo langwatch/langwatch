@@ -6,7 +6,7 @@ The server half of [model-provider](../README.md). Model providers: the provider
 
 ## Installation
 
-`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).provideMiddlewareBindings(…).withTasks(…).withMigrations(…)`, `src/model-provider.module.ts:30`.
+`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).provideMiddlewareContext(…).withTasks(…).withMigrations(…)`, `src/model-provider.module.ts:26`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:194`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:195`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -281,7 +281,7 @@ findModelLimits(input: { model: string }): ModelLimits | null;
 What a cost rule the caller is still typing would match, over the recent window.
 
 ```typescript
-previewCostRuleMatchingSpans(input: ModelCostPreviewRequest): Promise<CostRuleMatchingSpansPreview>;
+previewCostRuleMatchingSpans(input: ModelCostPreviewRequest, options?: { authorization?: Authorization }): Promise<CostRuleMatchingSpansPreview>;
 ```
 
 #### `upsertCost`

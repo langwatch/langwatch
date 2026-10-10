@@ -95,6 +95,7 @@ const annotations = defineRestRouter(AnnotationApi)
   .withParams(z.object({ id: z.string() }))
   .withPermission("annotations:manage")
   .withDocs({ summary: "Delete an annotation in the caller’s project" })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.remove({ id: input.id }))
   .build();
 
@@ -155,6 +156,7 @@ const secrets = defineRestRouter(SecretApi)
   .withPermission("secrets:manage")
   .withOutput(z.object({ id: z.string() }))
   .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.create({ name: input.name }))
   .build();
 
@@ -723,6 +725,7 @@ const roles = defineRestRouter(RoleApi)
   .withInput(z.object({ organizationId: z.string(), name: z.string() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope }) =>
     app.createRole({ organizationId: scope.id, name: input.name }),
   )
@@ -1528,6 +1531,7 @@ const hooks = defineRestRouter(HookApi)
   .withPermission("annotations:manage")
   .withOutput(z.object({ digest: z.string(), length: z.number() }))
   .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withoutAudit("test route")
   .handle(({ raw }) => ({ digest: new TextDecoder().decode(raw), length: raw.length }))
 
   .post("/text/:id", "recordHookText")
@@ -1535,6 +1539,7 @@ const hooks = defineRestRouter(HookApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("annotations:manage")
   .withOutput(z.object({ id: z.string(), body: z.string() }))
+  .withoutAudit("test route")
   .handle(({ input, raw }) => ({ id: input.id, body: raw }))
   .build();
 
@@ -1857,12 +1862,14 @@ const runRunner = defineRestRouter(RunApi)
   .withInput(z.object({ name: z.string() }))
   .withPermission("experiments:manage")
   .withOutput(z.object({ started: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.execute({ name: input.name }))
 
   .post("/:slug/abort", "abortRun")
   .withParams(z.object({ slug: z.string() }))
   .withPermission("experiments:manage")
   .withOutput(z.object({ aborted: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.abort({ slug: input.slug }))
   .build();
 
@@ -2001,6 +2008,7 @@ const uploads = defineRestRouter(UploadApi)
   .withInput(z.object({ name: z.string() }))
   .withPermission("datasets:manage")
   .withOutput(createdUpload)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => {
     const found = await app.create({ name: input.name });
 
@@ -2100,6 +2108,7 @@ const evaluationsLegacy = defineRestRouter(EvaluationsApi)
   .withParams(z.object({ evaluator: z.string() }))
   .withPermission("evaluations:manage")
   .withOutput(z.object({ status: z.string() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.evaluate({ evaluator: input.evaluator }))
   .build();
 
@@ -2370,6 +2379,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
   .withPermission("datasets:manage")
   .withOutput(z.object({ id: z.string(), name: z.string(), size: z.number() }))
   .withDocs({ summary: "Upload a dataset file" })
+  .withoutAudit("test route")
   .handle(async ({ app, input, files: parts, scope }) => {
     const bytes = await parts.file.text();
     const stored = await app.store({ name: input.name, bytes });
@@ -2383,6 +2393,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
   .withPermission("datasets:manage")
   .responds({ 200: datasetRecord, 201: datasetRecord })
   .withDocs({ summary: "Create or replace one dataset record" })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => {
     const { created } = await app.upsert({ id: input.recordId, bytes: input.bytes });
 
@@ -2540,6 +2551,7 @@ const bugReports = defineRestRouter(BugReportApi)
   .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
   .withStatus(201)
   .withDocs({ summary: "File an issue report" })
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope, actor }) => {
     const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
 
@@ -2635,6 +2647,7 @@ const anonymousBugReports = defineRestRouter(BugReportApi)
   .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
   .withStatus(201)
   .withDocs({ summary: "File an issue report" })
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope }) => {
     const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
 
@@ -2714,6 +2727,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
   .withInput(z.object({ name: z.string() }))
   .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
   .withOutput(z.object({ id: z.string(), scope: z.null() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input, scope, actor }) => {
     instanceSetupHanded.push({ actor });
 
@@ -3110,6 +3124,7 @@ const waitlist = defineRestRouter(WaitlistApi)
   .post("/", "joinWaitlist")
   .withAccess(publicRoute({ reason: "waitlist sign-up; reads no project data" }))
   .withInput(z.object({ email: z.string().email() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.join({ email: input.email }))
   .build();
 

@@ -179,9 +179,9 @@ function ensureParamStyles(): void {
   const style = document.createElement("style");
   style.id = PARAM_STYLES_ID;
   style.textContent = `
-    .lw-sql-param-reserved { color: #3182CE; font-weight: 600; }
-    .lw-sql-param-declared { color: #805AD5; font-weight: 600; }
-    .lw-sql-param-undeclared { color: #DD6B20; font-weight: 600; text-decoration: underline wavy; }
+    .lw-sql-param-reserved { color: var(--chakra-colors-blue-fg); font-weight: 600; }
+    .lw-sql-param-declared { color: var(--chakra-colors-purple-fg); font-weight: 600; }
+    .lw-sql-param-undeclared { color: var(--chakra-colors-orange-fg); font-weight: 600; text-decoration: underline wavy; }
   `;
   document.head.appendChild(style);
 }

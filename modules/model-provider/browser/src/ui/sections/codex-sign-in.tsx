@@ -156,8 +156,8 @@ function PendingApprovalPanel({
             href={pending.verificationUrl}
             target="_blank"
             rel="noopener noreferrer"
-            color="white"
-            _hover={{ textDecoration: "none", color: "white" }}
+            color="orange.contrast"
+            _hover={{ textDecoration: "none", color: "orange.contrast" }}
             {...langyFirstPartyLinkProps}
           >
             Open openai.com <ExternalLink size={13} />
@@ -304,8 +304,8 @@ function GuidedPendingCode({
             href={pending.verificationUrl}
             target="_blank"
             rel="noopener noreferrer"
-            color="white"
-            _hover={{ textDecoration: "none", color: "white" }}
+            color="orange.contrast"
+            _hover={{ textDecoration: "none", color: "orange.contrast" }}
             {...langyFirstPartyLinkProps}
           >
             Open openai.com

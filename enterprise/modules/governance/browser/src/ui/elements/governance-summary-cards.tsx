@@ -1,6 +1,6 @@
 /** Summary cards for varied-shape summaries; composable, non-querying. */
 
-import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren, ReactNode } from "react";
 
 import { GOVERNANCE_SUMMARY_UNMEASURED } from "./governance-summary-bar.tsx";
@@ -15,7 +15,7 @@ export type GovernanceSummaryTone = "good" | "attention" | "bad" | "neutral";
  */
 const TONE_DOT: Record<GovernanceSummaryTone, string> = {
   good: "green.solid",
-  attention: "#c98a2f",
+  attention: "fg.warning",
   bad: "red.solid",
   neutral: "fg.subtle",
 };
@@ -51,16 +51,12 @@ export function GovernanceSummaryCard({
   testId?: string;
 }>) {
   return (
-    <Box
+    <Card.Root
+      variant="showcase"
       data-testid={testId}
       // Grows with its siblings, never narrower than a readable card.
       flex="1 1 220px"
       minWidth="200px"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="xl"
-      backgroundColor="bg.panel"
-      boxShadow="md"
       padding={4}
     >
       <VStack align="stretch" gap={2}>
@@ -69,7 +65,7 @@ export function GovernanceSummaryCard({
         </Text>
         {children}
       </VStack>
-    </Box>
+    </Card.Root>
   );
 }
 

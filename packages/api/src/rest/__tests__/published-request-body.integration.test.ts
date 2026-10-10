@@ -27,6 +27,7 @@ const widgets = defineRestRouter(WidgetApi)
   .withInput(z.object({}))
   .withPermission("organization:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.act(input))
 
   .post("/:id/pause", "pauseWidget")
@@ -34,12 +35,14 @@ const widgets = defineRestRouter(WidgetApi)
   .withInput(z.object({ reason: z.string().optional() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.act(input))
 
   .post("/", "createWidget")
   .withInput(z.object({ name: z.string() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.act(input))
   .build();
 

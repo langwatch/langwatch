@@ -172,7 +172,7 @@ function ProviderRow({
                 </Menu.Item>
                 <Menu.Item
                   value="delete"
-                  color="red"
+                  color="red.fg"
                   data-testid="model-provider-row-delete"
                   onClick={(event) => {
                     event.stopPropagation();

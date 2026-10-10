@@ -71,10 +71,10 @@ describe("<GlobalUpgradeModal/>", () => {
         useUpgradeModalStore.getState().open("members", 5, 5);
       });
 
-      expect(await screen.findByText("Upgrade Required")).toBeInTheDocument();
+      expect(await screen.findByText("Upgrade required")).toBeInTheDocument();
       expect(screen.getByText(/team members/i)).toBeInTheDocument();
       expect(screen.getByText("Current usage: 5 / 5")).toBeInTheDocument();
-      const link = screen.getByRole("link", { name: "Upgrade Plan" });
+      const link = screen.getByRole("link", { name: "Compare plans" });
       expect(link).toHaveAttribute("href", "/settings/subscription");
     });
 
@@ -101,7 +101,7 @@ describe("<GlobalUpgradeModal/>", () => {
         useUpgradeModalStore.getState().open("members", 5, 5);
       });
 
-      const link = await screen.findByRole("link", { name: "Upgrade License" });
+      const link = await screen.findByRole("link", { name: "Manage license" });
       expect(link).toHaveAttribute("href", "/settings/license");
     });
   });
@@ -119,10 +119,10 @@ describe("<GlobalUpgradeModal/>", () => {
 
     /** @scenario "Restriction modal uses role-based messaging" */
     it("explains the role limit without mentioning plans, billing or upgrades", async () => {
-      expect(await screen.findByText("Feature Not Available")).toBeInTheDocument();
+      expect(await screen.findByText("Access required")).toBeInTheDocument();
       expect(
         screen.getAllByText(
-          "This feature is not available for your current role. Contact your organization admin for access.",
+          "Your role doesn't include this action. Ask an organization admin to give you access.",
         ).length,
       ).toBeGreaterThan(0);
       expect(screen.queryByText(/plan/i)).toBeNull();
@@ -133,11 +133,11 @@ describe("<GlobalUpgradeModal/>", () => {
 
     /** @scenario Restriction modal offers "Contact Admin" not "Upgrade your plan" */
     it("offers no way to buy a bigger plan out of it", async () => {
-      expect(await screen.findByText("Feature Not Available")).toBeInTheDocument();
+      expect(await screen.findByText("Access required")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /upgrade/i })).toBeNull();
       expect(screen.queryByRole("link", { name: /upgrade/i })).toBeNull();
       expect(screen.queryByRole("button", { name: /manage plan/i })).toBeNull();
-      expect(screen.getAllByRole("button", { name: "Dismiss" }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole("button", { name: "Go back" }).length).toBeGreaterThan(0);
     });
   });
 

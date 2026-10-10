@@ -1,22 +1,25 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const retentionScopeTypes = ["ORGANIZATION", "TEAM", "PROJECT"] as const;
 export const retentionScopeSchema = z.enum(retentionScopeTypes);
 export type RetentionScopeType = z.infer<typeof retentionScopeSchema>;
 
-export const scopeAssignmentSchema = z
+const scopeAssignmentSchemaDefinition = z
   .object({
     scopeType: retentionScopeSchema,
     scopeId: z.string().min(1),
   })
   .strict();
+export interface ScopeAssignmentSchema extends Named<typeof scopeAssignmentSchemaDefinition> {}
+export const scopeAssignmentSchema: ScopeAssignmentSchema = scopeAssignmentSchemaDefinition;
 export type ScopeAssignment = z.infer<typeof scopeAssignmentSchema>;
 
 export const retentionCategories = ["traces", "scenarios", "experiments"] as const;
 export const retentionCategorySchema = z.enum(retentionCategories);
 export type RetentionCategory = z.infer<typeof retentionCategorySchema>;
 
-export const retroactiveMutationProgressSchema = z
+const retroactiveMutationProgressSchemaDefinition = z
   .object({
     mutationId: z.string(),
     table: z.string(),
@@ -26,6 +29,11 @@ export const retroactiveMutationProgressSchema = z
     category: retentionCategorySchema.nullable(),
   })
   .strict();
+export interface RetroactiveMutationProgressSchema extends Named<
+  typeof retroactiveMutationProgressSchemaDefinition
+> {}
+export const retroactiveMutationProgressSchema: RetroactiveMutationProgressSchema =
+  retroactiveMutationProgressSchemaDefinition;
 export type RetroactiveMutationProgress = z.infer<typeof retroactiveMutationProgressSchema>;
 
 export type RetentionChangeKind = "expansion" | "contraction" | "noop";
@@ -52,7 +60,7 @@ export const pinSources = ["manual", "share"] as const;
 export const pinSourceSchema = z.enum(pinSources);
 export type PinSource = z.infer<typeof pinSourceSchema>;
 
-export const pinnedTraceSchema = z
+const pinnedTraceSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -63,9 +71,11 @@ export const pinnedTraceSchema = z
     createdAt: z.date(),
   })
   .strict();
+export interface PinnedTraceSchema extends Named<typeof pinnedTraceSchemaDefinition> {}
+export const pinnedTraceSchema: PinnedTraceSchema = pinnedTraceSchemaDefinition;
 export type PinnedTrace = z.infer<typeof pinnedTraceSchema>;
 
-export const pinTraceInputSchema = z
+const pinTraceInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     traceId: z.string().min(1),
@@ -73,14 +83,18 @@ export const pinTraceInputSchema = z
     reason: z.string().nullable().optional(),
   })
   .strict();
+export interface PinTraceInputSchema extends Named<typeof pinTraceInputSchemaDefinition> {}
+export const pinTraceInputSchema: PinTraceInputSchema = pinTraceInputSchemaDefinition;
 export type PinTraceInput = z.infer<typeof pinTraceInputSchema>;
 
-export const unpinTraceInputSchema = z
+const unpinTraceInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     traceId: z.string().min(1),
   })
   .strict();
+export interface UnpinTraceInputSchema extends Named<typeof unpinTraceInputSchemaDefinition> {}
+export const unpinTraceInputSchema: UnpinTraceInputSchema = unpinTraceInputSchemaDefinition;
 export type UnpinTraceInput = z.infer<typeof unpinTraceInputSchema>;
 
 export const RETENTION_WEEK_DAYS = 7;
@@ -127,42 +141,72 @@ export const retentionDaysSchema = z
     },
   );
 
-export const retentionDaysInputSchema = z.union([
+const retentionDaysInputSchemaDefinition = z.union([
   z.literal(INDEFINITE_RETENTION_DAYS),
   retentionDaysSchema,
 ]);
+export interface RetentionDaysInputSchema extends Named<
+  typeof retentionDaysInputSchemaDefinition
+> {}
+export const retentionDaysInputSchema: RetentionDaysInputSchema =
+  retentionDaysInputSchemaDefinition;
 
-export const retroactiveRetentionUpdateInputSchema = z
+const retroactiveRetentionUpdateInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     category: retentionCategorySchema,
     newRetentionDays: retentionDaysInputSchema,
   })
   .strict();
+export interface RetroactiveRetentionUpdateInputSchema extends Named<
+  typeof retroactiveRetentionUpdateInputSchemaDefinition
+> {}
+export const retroactiveRetentionUpdateInputSchema: RetroactiveRetentionUpdateInputSchema =
+  retroactiveRetentionUpdateInputSchemaDefinition;
 export type RetroactiveRetentionUpdateInput = z.infer<typeof retroactiveRetentionUpdateInputSchema>;
 
-export const retroactiveMutationProjectInputSchema = z
+const retroactiveMutationProjectInputSchemaDefinition = z
   .object({ projectId: z.string().min(1) })
   .strict();
+export interface RetroactiveMutationProjectInputSchema extends Named<
+  typeof retroactiveMutationProjectInputSchemaDefinition
+> {}
+export const retroactiveMutationProjectInputSchema: RetroactiveMutationProjectInputSchema =
+  retroactiveMutationProjectInputSchemaDefinition;
 export type RetroactiveMutationProjectInput = z.infer<typeof retroactiveMutationProjectInputSchema>;
 
-export const storageMeterTenantInputSchema = z.object({ tenantId: z.string().min(1) }).strict();
+const storageMeterTenantInputSchemaDefinition = z.object({ tenantId: z.string().min(1) }).strict();
+export interface StorageMeterTenantInputSchema extends Named<
+  typeof storageMeterTenantInputSchemaDefinition
+> {}
+export const storageMeterTenantInputSchema: StorageMeterTenantInputSchema =
+  storageMeterTenantInputSchemaDefinition;
 export type StorageMeterTenantInput = z.infer<typeof storageMeterTenantInputSchema>;
 
-export const storageMeterTenantsInputSchema = z
+const storageMeterTenantsInputSchemaDefinition = z
   .object({ tenantIds: z.array(z.string().min(1)) })
   .strict();
+export interface StorageMeterTenantsInputSchema extends Named<
+  typeof storageMeterTenantsInputSchemaDefinition
+> {}
+export const storageMeterTenantsInputSchema: StorageMeterTenantsInputSchema =
+  storageMeterTenantsInputSchemaDefinition;
 export type StorageMeterTenantsInput = z.infer<typeof storageMeterTenantsInputSchema>;
 
-export const killRetroactiveMutationInputSchema = z
+const killRetroactiveMutationInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     mutationId: z.string().min(1),
   })
   .strict();
+export interface KillRetroactiveMutationInputSchema extends Named<
+  typeof killRetroactiveMutationInputSchemaDefinition
+> {}
+export const killRetroactiveMutationInputSchema: KillRetroactiveMutationInputSchema =
+  killRetroactiveMutationInputSchemaDefinition;
 export type KillRetroactiveMutationInput = z.infer<typeof killRetroactiveMutationInputSchema>;
 
-export const retentionPolicySchema = z
+const retentionPolicySchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -174,9 +218,11 @@ export const retentionPolicySchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface RetentionPolicySchema extends Named<typeof retentionPolicySchemaDefinition> {}
+export const retentionPolicySchema: RetentionPolicySchema = retentionPolicySchemaDefinition;
 export type RetentionPolicy = z.infer<typeof retentionPolicySchema>;
 
-export const retentionRowSchema = z
+const retentionRowSchemaDefinition = z
   .object({
     scopeType: retentionScopeSchema,
     scopeId: z.string().min(1),
@@ -184,24 +230,33 @@ export const retentionRowSchema = z
     retentionDays: retentionDaysInputSchema,
   })
   .strict();
+export interface RetentionRowSchema extends Named<typeof retentionRowSchemaDefinition> {}
+export const retentionRowSchema: RetentionRowSchema = retentionRowSchemaDefinition;
 export type RetentionRow = z.infer<typeof retentionRowSchema>;
 
-export const resolvedRetentionSchema = z
+const resolvedRetentionSchemaDefinition = z
   .object({
     traces: z.number().int().nonnegative(),
     scenarios: z.number().int().nonnegative(),
     experiments: z.number().int().nonnegative(),
   })
   .strict();
+export interface ResolvedRetentionSchema extends Named<typeof resolvedRetentionSchemaDefinition> {}
+export const resolvedRetentionSchema: ResolvedRetentionSchema = resolvedRetentionSchemaDefinition;
 export type ResolvedRetention = z.infer<typeof resolvedRetentionSchema>;
 
-export const projectScopeContextSchema = z
+const projectScopeContextSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     teamId: z.string().min(1),
     projectId: z.string().min(1),
   })
   .strict();
+export interface ProjectScopeContextSchema extends Named<
+  typeof projectScopeContextSchemaDefinition
+> {}
+export const projectScopeContextSchema: ProjectScopeContextSchema =
+  projectScopeContextSchemaDefinition;
 export type ProjectScopeContext = z.infer<typeof projectScopeContextSchema>;
 
 export function resolveScopeChain(context: ProjectScopeContext): ScopeAssignment[] {
@@ -246,9 +301,14 @@ export function resolveRetention(input: {
  * retention the cascade actually resolved — which can differ from the value
  * the form named when a closer override still wins.
  */
-export const retroactiveRetentionUpdateResultSchema = z
+const retroactiveRetentionUpdateResultSchemaDefinition = z
   .object({
     tables: z.array(z.string()),
     appliedRetentionDays: z.number(),
   })
   .strict();
+export interface RetroactiveRetentionUpdateResultSchema extends Named<
+  typeof retroactiveRetentionUpdateResultSchemaDefinition
+> {}
+export const retroactiveRetentionUpdateResultSchema: RetroactiveRetentionUpdateResultSchema =
+  retroactiveRetentionUpdateResultSchemaDefinition;

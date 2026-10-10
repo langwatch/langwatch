@@ -34,8 +34,8 @@ describe("Feature: gateway list pages for a viewer without the grant", () => {
     it("names the grant to ask for and offers no retry", () => {
       renderPanel(refusal("gatewayBudgets:view"));
 
-      expect(screen.getByText("You don't have permission to do this")).toBeInTheDocument();
-      expect(screen.getByText(/grant you "gatewayBudgets:view"/)).toBeInTheDocument();
+      expect(screen.getByText("You don't have access to this panel")).toBeInTheDocument();
+      expect(screen.getByText(/Missing permission: gatewayBudgets:view/)).toBeInTheDocument();
       expect(screen.queryByText("Failed to load budgets")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     });

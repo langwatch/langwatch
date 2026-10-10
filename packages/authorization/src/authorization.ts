@@ -1,19 +1,7 @@
 /**
- * ADR-166 / ADR-177: the `Authorization` proof.
- *
- * Minted at the door by `authz.authorize`, sealed here, and carried by hand
- * as the named parameter `authorization` from route to service to
- * repository. It is the union of every grant one call may touch, so it is
- * not itself a grant: one `own` grant for the project the caller holds
- * permissions on, and one `shared` grant per project that has been shared
- * with it, each naming the ledger grant it came through and the window it
- * opens. A store client applies it; nothing below the door evaluates
- * permissions again.
- *
- * Sealed means: the only object the client accepts is one this module
- * returned from `sealAuthorization`. A proof assembled by hand, however
- * well shaped, is refused as forged. The seal is a module-private set, not
- * a field, so it cannot be copied or spread onto another object.
+ * ADR-166 / ADR-177: the `Authorization` proof, minted at the door and carried by hand as
+ * `authorization` from route to service to repository. It unions every grant one call may touch.
+ * Sealed: only an object `sealAuthorization` returned is accepted; a hand-built one is forged.
  */
 import { z } from "zod";
 
@@ -66,13 +54,9 @@ export const authorizationConditionSchema = z
 export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema>;
 
 /**
- * ADR-177 / ADR-166: the same window as the ledger stores it on a SHARED
- * grant, the one shape both the event wire and the projection reader parse.
- * `type` names the store resource the window applies to; `where` is an OTTL
- * slot nothing compiles in v1 (the wire's shape refinement refuses a
- * non-empty one); `from` and `until` are ISO instants bounding the rows by
- * their occurrence time. An own grant carries no condition. The minter turns
- * this into an {@link AuthorizationCondition}.
+ * ADR-177 / ADR-166: the window as the ledger stores it on a SHARED grant. `type` names the
+ * store resource, `where` is an unused OTTL slot, `from`/`until` are ISO instants; an own grant
+ * has none. The minter turns this into an {@link AuthorizationCondition}.
  */
 export const grantConditionSchema = z.object({
   type: z.enum(AUTHORIZATION_CONDITION_TYPES),
@@ -129,12 +113,8 @@ export const authorizationSchema = z
     expiresAt: z.number().int(),
     purpose: authorizationPurposeSchema,
     /**
-     * The one project of the grants this proof reads, when it has been
-     * narrowed to it (ADR-177 block F). A detail page opened from an
-     * aggregate's list reads one member's trace, and two members may hold
-     * the same trace id, so every read behind that page is narrowed to the
-     * member the trace was found in. Absent: the proof reads every project
-     * its grants name. Set only by {@link narrowAuthorization}.
+     * The one project this proof reads, once narrowed (ADR-177 block F), so a detail page
+     * cannot read a same-id trace of another member. Absent: every project its grants name.
      */
     narrowedTo: z.string().min(1).optional(),
   })
@@ -182,17 +162,9 @@ export function isSealedAuthorization(value: unknown): value is Authorization {
 }
 
 /**
- * The same proof, narrowed to one of the projects its grants name. A proof
- * can be narrowed and never widened: the result keeps only the own grant,
- * which names the project every read is sent through, and the grants on the
- * narrowed project, so nothing reading the grants later can widen it back to
- * a project it was cut away from. The expiry and the purpose are copied
- * unchanged, and `narrowedTo` marks the cut for the store client's fence. A
- * project the proof does not name returns `null`, so the caller says what
- * that means at its own door (a detail route answers not found).
- *
- * Only a sealed proof is narrowed; a forged one is refused here as it would
- * be by the store client.
+ * The same proof, narrowed to one project its grants name; never widened. It keeps the own grant
+ * and that project's, and marks the cut with `narrowedTo`. A project it does not name returns
+ * `null`. Only a sealed proof is narrowed; a forged one is refused.
  */
 export function narrowAuthorization({
   authorization,

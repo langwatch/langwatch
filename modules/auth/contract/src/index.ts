@@ -7,6 +7,7 @@ export {
   type CliSessionTokens,
   type CliTokenRecordEntry,
   type LegacySsoAccessQuery,
+  type CliAccessSessionSchema,
 } from "./auth.api.ts";
 export * from "./auth.errors.ts";
 export * from "./federated-password.ts";

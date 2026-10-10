@@ -1,5 +1,5 @@
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
-import { Button, Heading, HStack } from "@langwatch/design-system/primitives";
+import { Button, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -138,9 +138,9 @@ export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelector
     view.step === "editor" ? (
       <EvaluatorEditorHeading controller={editorController} />
     ) : (
-      <Heading>
+      <Drawer.Title>
         {view.step === "type" ? categoryNames[view.category] : "Choose Evaluator Category"}
-      </Heading>
+      </Drawer.Title>
     );
 
   return (
@@ -229,7 +229,7 @@ export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelector
             )}
           </AnimatePresence>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           {view.step === "editor" ? (
             <EvaluatorEditorFooter controller={editorController} onCancel={onClose} />
           ) : (

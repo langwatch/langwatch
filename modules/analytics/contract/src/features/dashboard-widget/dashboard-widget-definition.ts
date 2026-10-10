@@ -4,6 +4,7 @@
  * (reserved dashboard-context params: ADR-130). Versioned like `workbenchChartDefinition.ts`.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { MAX_LWQL_LENGTH } from "../lwql/langwatch-ql-limits.ts";
@@ -115,7 +116,7 @@ const queryParameterDeclarationSchema = z
     }
   });
 
-export const dashboardWidgetQuerySchema = z.object({
+const dashboardWidgetQuerySchemaDefinition = z.object({
   name: z
     .string()
     .min(1)
@@ -127,6 +128,11 @@ export const dashboardWidgetQuerySchema = z.object({
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: z.array(queryParameterDeclarationSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
 });
+export interface DashboardWidgetQuerySchema extends Named<
+  typeof dashboardWidgetQuerySchemaDefinition
+> {}
+export const dashboardWidgetQuerySchema: DashboardWidgetQuerySchema =
+  dashboardWidgetQuerySchemaDefinition;
 
 /**
  * The bounded request-shape pieces every write surface (tRPC router, REST routes) shares,
@@ -135,9 +141,14 @@ export const dashboardWidgetQuerySchema = z.object({
  */
 export const dashboardWidgetNameSchema = z.string().min(1).max(MAX_WIDGET_NAME_LENGTH);
 export const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
-export const dashboardWidgetQueriesSchema = z
+const dashboardWidgetQueriesSchemaDefinition = z
   .array(dashboardWidgetQuerySchema)
   .max(MAX_QUERIES_PER_WIDGET);
+export interface DashboardWidgetQueriesSchema extends Named<
+  typeof dashboardWidgetQueriesSchemaDefinition
+> {}
+export const dashboardWidgetQueriesSchema: DashboardWidgetQueriesSchema =
+  dashboardWidgetQueriesSchemaDefinition;
 /** Optional on every definition: widgets saved before it existed carry none. */
 export const dashboardWidgetDescriptionSchema = z
   .string()
@@ -149,14 +160,19 @@ export const dashboardWidgetPromptSchema = z.string().min(1).max(MAX_WIDGET_PROM
  * Where a widget came from: a catalogue template, Langy, the code editor, or the REST/MCP API.
  * Optional like the description: widgets saved before it carry none.
  */
-export const dashboardWidgetSourceSchema = z.discriminatedUnion("kind", [
+const dashboardWidgetSourceSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("catalogue"), catalogueId: z.string().min(1).max(200) }),
   z.object({ kind: z.literal("langy") }),
   z.object({ kind: z.literal("code") }),
   z.object({ kind: z.literal("api") }),
 ]);
+export interface DashboardWidgetSourceSchema extends Named<
+  typeof dashboardWidgetSourceSchemaDefinition
+> {}
+export const dashboardWidgetSourceSchema: DashboardWidgetSourceSchema =
+  dashboardWidgetSourceSchemaDefinition;
 
-export const dashboardWidgetDefinitionSchema = z.object({
+const dashboardWidgetDefinitionSchemaDefinition = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
@@ -164,6 +180,11 @@ export const dashboardWidgetDefinitionSchema = z.object({
   prompt: dashboardWidgetPromptSchema.optional(),
   source: dashboardWidgetSourceSchema.optional(),
 });
+export interface DashboardWidgetDefinitionSchema extends Named<
+  typeof dashboardWidgetDefinitionSchemaDefinition
+> {}
+export const dashboardWidgetDefinitionSchema: DashboardWidgetDefinitionSchema =
+  dashboardWidgetDefinitionSchemaDefinition;
 
 export type DashboardWidgetQueryParameterDeclaration = z.infer<
   typeof queryParameterDeclarationSchema

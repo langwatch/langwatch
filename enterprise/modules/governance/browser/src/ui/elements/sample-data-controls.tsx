@@ -27,7 +27,7 @@ export const SampleDataToggle: React.FC<{
       aria-label={label}
       aria-pressed={active}
     >
-      <Icon boxSize={3.5} color={{ base: "orange.500", _dark: "orange.fg" }}>
+      <Icon boxSize={3.5} color={{ base: "orange.fg", _dark: "orange.fg" }}>
         {active ? <Tent /> : <Compass />}
       </Icon>
       {label}

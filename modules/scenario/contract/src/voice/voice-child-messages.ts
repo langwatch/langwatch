@@ -4,6 +4,7 @@
  * them, so they live here; the sending and receiving code stays with each side.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Discriminates the child's registration request from other IPC messages. */
@@ -19,37 +20,52 @@ export const VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE = "voice:media-upgrade-refused"
 export const VOICE_MEDIA_SOCKET_MESSAGE = "voice:twilio-media-socket" as const;
 
 /** Child -> parent: register `nonce` against the sending child. */
-export const voiceNonceRegisterMessageSchema = z.object({
+const voiceNonceRegisterMessageSchemaDefinition = z.object({
   type: z.literal(VOICE_NONCE_REGISTER_MESSAGE),
   /** Correlates the ack to this request, so a stray or duplicate ack resolves no other wait. */
   requestId: z.string(),
   nonce: z.string(),
 });
+export interface VoiceNonceRegisterMessageSchema extends Named<
+  typeof voiceNonceRegisterMessageSchemaDefinition
+> {}
+export const voiceNonceRegisterMessageSchema: VoiceNonceRegisterMessageSchema =
+  voiceNonceRegisterMessageSchemaDefinition;
 export type VoiceNonceRegisterMessage = z.infer<typeof voiceNonceRegisterMessageSchema>;
 
 /** Parent -> child: the outcome of one registration request. */
-export const voiceNonceRegisterAckMessageSchema = z.object({
+const voiceNonceRegisterAckMessageSchemaDefinition = z.object({
   type: z.literal(VOICE_NONCE_REGISTER_ACK_MESSAGE),
   requestId: z.string(),
   ok: z.boolean(),
   /** Present only when `ok` is false. It reaches the child's own error message, never a browser. */
   error: z.string().optional(),
 });
+export interface VoiceNonceRegisterAckMessageSchema extends Named<
+  typeof voiceNonceRegisterAckMessageSchemaDefinition
+> {}
+export const voiceNonceRegisterAckMessageSchema: VoiceNonceRegisterAckMessageSchema =
+  voiceNonceRegisterAckMessageSchemaDefinition;
 export type VoiceNonceRegisterAckMessage = z.infer<typeof voiceNonceRegisterAckMessageSchema>;
 
 /** Parent -> child: the listener refused Twilio's dial-back, so the child fails fast. */
-export const voiceMediaUpgradeRefusedMessageSchema = z.object({
+const voiceMediaUpgradeRefusedMessageSchemaDefinition = z.object({
   type: z.literal(VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE),
   /** Human-readable cause, e.g. "nonce expired"; it dies inside the run's own error message. */
   reason: z.string(),
 });
+export interface VoiceMediaUpgradeRefusedMessageSchema extends Named<
+  typeof voiceMediaUpgradeRefusedMessageSchemaDefinition
+> {}
+export const voiceMediaUpgradeRefusedMessageSchema: VoiceMediaUpgradeRefusedMessageSchema =
+  voiceMediaUpgradeRefusedMessageSchemaDefinition;
 export type VoiceMediaUpgradeRefusedMessage = z.infer<typeof voiceMediaUpgradeRefusedMessageSchema>;
 
 /**
  * Parent -> child, beside the socket handle: everything the child needs to finish the WebSocket
  * handshake itself. The head bytes travel as base64, since IPC JSON cannot carry a Buffer intact.
  */
-export const voiceMediaSocketMessageSchema = z.object({
+const voiceMediaSocketMessageSchemaDefinition = z.object({
   type: z.literal(VOICE_MEDIA_SOCKET_MESSAGE),
   /** The nonce the upgrade authenticated with, for the child's own logging. */
   nonce: z.string(),
@@ -62,6 +78,11 @@ export const voiceMediaSocketMessageSchema = z.object({
   /** Base64 of the bytes read off the socket during the upgrade (the head). */
   headBase64: z.string(),
 });
+export interface VoiceMediaSocketMessageSchema extends Named<
+  typeof voiceMediaSocketMessageSchemaDefinition
+> {}
+export const voiceMediaSocketMessageSchema: VoiceMediaSocketMessageSchema =
+  voiceMediaSocketMessageSchemaDefinition;
 export type VoiceMediaSocketMessage = z.infer<typeof voiceMediaSocketMessageSchema>;
 
 /** Narrows an arbitrary IPC message to the nonce registration request. */

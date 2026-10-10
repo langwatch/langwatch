@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Langy's verdict on the news, written out on the card rather than left to a colour. */
@@ -15,10 +16,12 @@ export const insightValidDaysSchema = z.number().int().min(1).max(90);
 export const DEFAULT_INSIGHT_VALID_DAYS = 7;
 
 /** The Langy answer an insight was saved from, so "Chat about it" can find its way back. */
-export const insightSourceSchema = z.object({
+const insightSourceSchemaDefinition = z.object({
   conversationId: z.string().min(1),
   messageId: z.string().min(1),
 });
+export interface InsightSourceSchema extends Named<typeof insightSourceSchemaDefinition> {}
+export const insightSourceSchema: InsightSourceSchema = insightSourceSchemaDefinition;
 export type InsightSource = z.infer<typeof insightSourceSchema>;
 
 /** How an insight was filed: a person saving a Langy answer, or a scheduled run. */
@@ -34,11 +37,13 @@ const pointerNameSchema = z.string().trim().min(1).max(200);
  * exists, and the names are kept as filed, so the card still says where it came from once
  * the board or the widget is gone.
  */
-export const insightBoardSchema = z.object({
+const insightBoardSchemaDefinition = z.object({
   id: pointerIdSchema,
   name: pointerNameSchema,
   widget: z.object({ id: pointerIdSchema, name: pointerNameSchema }).nullable(),
 });
+export interface InsightBoardSchema extends Named<typeof insightBoardSchemaDefinition> {}
+export const insightBoardSchema: InsightBoardSchema = insightBoardSchemaDefinition;
 export type InsightBoard = z.infer<typeof insightBoardSchema>;
 
 const MAX_REPLAY_PARAMETERS = 32;
@@ -53,7 +58,7 @@ const replayParameterValueSchema = z.union([
  * and the values in force when the insight was filed. A relative period would slide, and
  * the chart would stop matching the text.
  */
-export const insightReplaySchema = z
+const insightReplaySchemaDefinition = z
   .object({
     /** Epoch milliseconds. The window is half-open: `[start, end)`. */
     start: z.number().int().nonnegative(),
@@ -73,10 +78,12 @@ export const insightReplaySchema = z
     path: ["end"],
     error: "The window must end after it starts",
   });
+export interface InsightReplaySchema extends Named<typeof insightReplaySchemaDefinition> {}
+export const insightReplaySchema: InsightReplaySchema = insightReplaySchemaDefinition;
 export type InsightReplay = z.infer<typeof insightReplaySchema>;
 
 /** One insight as its owner sees it: the record plus their own seen, done and kept state. */
-export const insightEntrySchema = z.object({
+const insightEntrySchemaDefinition = z.object({
   id: z.string(),
   title: z.string(),
   body: z.string(),
@@ -100,11 +107,18 @@ export const insightEntrySchema = z.object({
   archivedAt: z.number().nullable(),
   keptAt: z.number().nullable(),
 });
+export interface InsightEntrySchema extends Named<typeof insightEntrySchemaDefinition> {}
+export const insightEntrySchema: InsightEntrySchema = insightEntrySchemaDefinition;
 export type InsightEntry = z.infer<typeof insightEntrySchema>;
 
-export const insightProjectScopeSchema = z.object({ projectId: z.string().min(1) });
+const insightProjectScopeSchemaDefinition = z.object({ projectId: z.string().min(1) });
+export interface InsightProjectScopeSchema extends Named<
+  typeof insightProjectScopeSchemaDefinition
+> {}
+export const insightProjectScopeSchema: InsightProjectScopeSchema =
+  insightProjectScopeSchemaDefinition;
 
-export const fileInsightInputSchema = z
+const fileInsightInputSchemaDefinition = z
   .object({
     ...insightProjectScopeSchema.shape,
     title: insightTitleSchema,
@@ -121,17 +135,26 @@ export const fileInsightInputSchema = z
     path: ["replay"],
     error: "A window needs the query it replays",
   });
+export interface FileInsightInputSchema extends Named<typeof fileInsightInputSchemaDefinition> {}
+export const fileInsightInputSchema: FileInsightInputSchema = fileInsightInputSchemaDefinition;
 export type FileInsightInput = z.infer<typeof fileInsightInputSchema>;
 
-export const insightScopeSchema = z.object({
+const insightScopeSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   insightId: z.string().min(1),
 });
+export interface InsightScopeSchema extends Named<typeof insightScopeSchemaDefinition> {}
+export const insightScopeSchema: InsightScopeSchema = insightScopeSchemaDefinition;
 export type InsightScope = z.infer<typeof insightScopeSchema>;
 
 /** A folder visit marks what it shows; capped so one call stays one small batch. */
-export const markInsightsSeenInputSchema = z.object({
+const markInsightsSeenInputSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   insightIds: z.array(z.string().min(1)).min(1).max(200),
 });
+export interface MarkInsightsSeenInputSchema extends Named<
+  typeof markInsightsSeenInputSchemaDefinition
+> {}
+export const markInsightsSeenInputSchema: MarkInsightsSeenInputSchema =
+  markInsightsSeenInputSchemaDefinition;
 export type MarkInsightsSeenInput = z.infer<typeof markInsightsSeenInputSchema>;

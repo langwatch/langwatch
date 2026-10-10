@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What the `/api/ingest` receivers read off the path. An exporter is
@@ -6,9 +7,14 @@
  */
 import { z } from "zod";
 
-export const governanceIngestSourceParamsSchema = z.object({ sourceId: z.string().min(1) });
+const governanceIngestSourceParamsSchemaDefinition = z.object({ sourceId: z.string().min(1) });
+export interface GovernanceIngestSourceParamsSchema extends Named<
+  typeof governanceIngestSourceParamsSchemaDefinition
+> {}
+export const governanceIngestSourceParamsSchema: GovernanceIngestSourceParamsSchema =
+  governanceIngestSourceParamsSchemaDefinition;
 
-export const governanceIngestReceiptSchema = z.object({
+const governanceIngestReceiptSchemaDefinition = z.object({
   accepted: z.literal(true),
   bytes: z.number(),
   events: z.number().optional(),
@@ -24,13 +30,23 @@ export const governanceIngestReceiptSchema = z.object({
     .object({ rejectedDataPoints: z.number(), errorMessage: z.string().optional() })
     .optional(),
 });
-export const governanceIngestHeadersSchema = z.object({
+export interface GovernanceIngestReceiptSchema extends Named<
+  typeof governanceIngestReceiptSchemaDefinition
+> {}
+export const governanceIngestReceiptSchema: GovernanceIngestReceiptSchema =
+  governanceIngestReceiptSchemaDefinition;
+const governanceIngestHeadersSchemaDefinition = z.object({
   authorization: z.string().optional(),
   "content-type": z.string().optional(),
   "content-encoding": z.string().optional(),
   "x-forwarded-for": z.string().optional(),
   "x-real-ip": z.string().optional(),
 });
+export interface GovernanceIngestHeadersSchema extends Named<
+  typeof governanceIngestHeadersSchemaDefinition
+> {}
+export const governanceIngestHeadersSchema: GovernanceIngestHeadersSchema =
+  governanceIngestHeadersSchemaDefinition;
 
 export type GovernanceIngestHeaders = z.infer<typeof governanceIngestHeadersSchema>;
 export type GovernanceIngestReceipt = z.infer<typeof governanceIngestReceiptSchema>;

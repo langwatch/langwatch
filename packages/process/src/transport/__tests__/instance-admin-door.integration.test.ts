@@ -28,6 +28,7 @@ const provisioning = defineRestRouter(ProvisioningApi)
   .withInput(z.object({ name: z.string().min(1) }))
   .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.provision(input))
   .build();
 

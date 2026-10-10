@@ -27,6 +27,7 @@ function family(actor: typeof OWNER | null, router = langyLocalControlRest) {
     })),
   };
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ actor, scope: { tier: "project", id: "project-1" } }) },
   }).mount(router.router(), {

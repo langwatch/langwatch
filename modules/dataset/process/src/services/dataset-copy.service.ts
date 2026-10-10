@@ -43,11 +43,8 @@ export class DatasetCopyService {
       name,
       columnTypes: source.columnTypes,
     });
-    if (
-      source.contentLayout === "s3_jsonl" &&
-      target.contentLayout === "s3_jsonl" &&
-      options.content
-    ) {
+    if (source.contentLayout === "s3_jsonl" && options.content) {
+      // A new dataset starts inline; the content copy moves it to the chunk layout.
       await options.content.copyDataset({
         source,
         sourceProjectId: parsed.sourceProjectId,
@@ -55,7 +52,10 @@ export class DatasetCopyService {
         targetProjectId: parsed.targetProjectId,
       });
 
-      return target;
+      return this.deps.getBySlugOrId({
+        projectId: parsed.targetProjectId,
+        slugOrId: target.id,
+      });
     }
 
     // Every row, one batch in memory at a time.

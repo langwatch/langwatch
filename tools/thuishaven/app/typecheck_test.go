@@ -94,10 +94,9 @@ func TestTypecheckDefaultUsesTheSharedCapacityPolicy(t *testing.T) {
 	}
 }
 
-// An affected run holds every slot free right now and tells Nx to use exactly
-// that many, so its parallel tasks are each one counted slot.
-// @scenario "The affected typecheck holds one slot per parallel task"
-func TestTypecheckAffectedHoldsTheFreeSlotsAndSetsNxParallel(t *testing.T) {
+// --affected is the same root `pnpm typecheck`: one slot, no Nx fan-out.
+// @scenario "An agent's typecheck is the affected one"
+func TestTypecheckAffectedRunsTheRootTypecheckOnOneSlot(t *testing.T) {
 	sup := &fakeSupervisor{}
 	sem := &fakeSemaphore{free: 2}
 	orch := &Orchestrator{cfg: Config{IsAgent: true}, sup: sup, sys: &fakeSystem{}, sem: sem, log: zap.NewNop()}
@@ -105,25 +104,15 @@ func TestTypecheckAffectedHoldsTheFreeSlotsAndSetsNxParallel(t *testing.T) {
 	if err := orch.Typecheck(context.Background(), TypecheckRun{RepoDir: "/repo", ExtraArgs: []string{"--verbose"}, SlotsOverride: 4, Affected: true}); err != nil {
 		t.Fatalf("Typecheck: %v", err)
 	}
-	if sem.acquired != 3 || sem.released != 3 {
-		t.Fatalf("want 1 waited-for + 2 free slots taken and released, got %d/%d", sem.acquired, sem.released)
+	if sem.acquired != 1 || sem.released != 1 {
+		t.Fatalf("want one slot taken and released, got %d/%d", sem.acquired, sem.released)
 	}
-	if !slices.Contains(sup.envs[0], "NX_PARALLEL=3") {
-		t.Fatalf("want NX_PARALLEL=3, got env %v", sup.envs[0])
-	}
-	shell := sup.shells[0]
-	if !strings.HasPrefix(shell, "pnpm exec nx affected -t typecheck --base=") || !strings.HasSuffix(shell, "--head=HEAD '--verbose'") {
+	if shell := sup.shells[0]; shell != "pnpm typecheck '--verbose'" {
 		t.Fatalf("unexpected shell %q", shell)
 	}
-}
-
-func TestTypecheckAffectedStillRunsWithNoSlotFree(t *testing.T) {
-	sup := &fakeSupervisor{}
-	orch := &Orchestrator{cfg: Config{IsAgent: true}, sup: sup, sys: &fakeSystem{}, sem: &fakeSemaphore{}, log: zap.NewNop()}
-	if err := orch.Typecheck(context.Background(), TypecheckRun{RepoDir: "/repo", SlotsOverride: 4, Affected: true}); err != nil {
-		t.Fatalf("Typecheck: %v", err)
-	}
-	if !slices.Contains(sup.envs[0], "NX_PARALLEL=1") {
-		t.Fatalf("want the minimum NX_PARALLEL=1, got env %v", sup.envs[0])
+	for _, e := range sup.envs[0] {
+		if strings.HasPrefix(e, "NX_PARALLEL=") {
+			t.Fatalf("want no NX_PARALLEL, got env %v", sup.envs[0])
+		}
 	}
 }

@@ -43,6 +43,7 @@ const licenceRoutes = defineRestRouter(Api)
   .withInput(z.object({ count: z.number() }))
   .withAccess(anyAuthenticated({ reason: "the licence token door fixture" }))
   .withOutput(z.object({ scopeId: z.string(), holder: z.string(), count: z.number() }))
+  .withoutAudit("test route")
   .handle(({ app, input, scope, session }) =>
     app.record({ scopeId: scope.id, holder: session.holder, count: input.count }),
   )
@@ -58,6 +59,7 @@ const otlpRoutes = defineRestRouter(Api)
   .withInput(z.object({ count: z.number() }))
   .withAccess(anyAuthenticated({ reason: "the OTLP ingest door fixture" }))
   .withOutput(z.object({ scopeId: z.string(), holder: z.string(), count: z.number() }))
+  .withoutAudit("test route")
   .handle(({ app, input, scope, session }) =>
     app.record({ scopeId: scope.id, holder: session.holder, count: input.count }),
   )

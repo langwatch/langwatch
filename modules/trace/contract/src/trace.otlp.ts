@@ -1,9 +1,12 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const longBitsSchema = z.object({
+const longBitsSchemaDefinition = z.object({
   low: z.number(),
   high: z.number(),
 });
+export interface LongBitsSchema extends Named<typeof longBitsSchemaDefinition> {}
+export const longBitsSchema: LongBitsSchema = longBitsSchemaDefinition;
 
 export type OtlpAnyValue = {
   stringValue?: string | null;
@@ -28,7 +31,9 @@ export type OtlpKeyValueList = {
   values: OtlpKeyValue[];
 };
 
-export const fixed64Schema = z.union([longBitsSchema, z.string(), z.number()]);
+const fixed64SchemaDefinition = z.union([longBitsSchema, z.string(), z.number()]);
+export interface Fixed64Schema extends Named<typeof fixed64SchemaDefinition> {}
+export const fixed64Schema: Fixed64Schema = fixed64SchemaDefinition;
 
 export const bytesSchema = z.instanceof(Uint8Array);
 
@@ -108,18 +113,25 @@ export const keyValueListSchema: z.ZodType<OtlpKeyValueList> = z.object({
   values: z.array(keyValueSchema).optional().default([]),
 });
 
-export const resourceSchema = z.object({
+const resourceSchemaDefinition = z.object({
   attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
   schemaUrl: z.string().optional().nullable(),
 });
+export interface ResourceSchema extends Named<typeof resourceSchemaDefinition> {}
+export const resourceSchema: ResourceSchema = resourceSchemaDefinition;
 
-export const instrumentationScopeSchema = z.object({
+const instrumentationScopeSchemaDefinition = z.object({
   name: z.string(),
   version: z.string().optional().nullable(),
   attributes: z.array(keyValueSchema).optional().nullable(),
   droppedAttributesCount: z.number().optional().nullable(),
 });
+export interface InstrumentationScopeSchema extends Named<
+  typeof instrumentationScopeSchemaDefinition
+> {}
+export const instrumentationScopeSchema: InstrumentationScopeSchema =
+  instrumentationScopeSchemaDefinition;
 
 const STATUS_CODE_SET = {
   0: true,
@@ -128,7 +140,7 @@ const STATUS_CODE_SET = {
 } as const;
 
 /** OTLP uses numeric span kinds in binary and symbolic names in JSON. */
-export const eSpanKindSchema = z.union([
+const eSpanKindSchemaDefinition = z.union([
   z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   z.enum([
     "SPAN_KIND_UNSPECIFIED",
@@ -139,6 +151,8 @@ export const eSpanKindSchema = z.union([
     "SPAN_KIND_CONSUMER",
   ]),
 ]);
+export interface ESpanKindSchema extends Named<typeof eSpanKindSchemaDefinition> {}
+export const eSpanKindSchema: ESpanKindSchema = eSpanKindSchemaDefinition;
 
 export const eStatusCodeSchema = z
   .number()
@@ -147,21 +161,25 @@ export const eStatusCodeSchema = z
     message: "Invalid EStatusCode",
   });
 
-export const statusSchema = z.object({
+const statusSchemaDefinition = z.object({
   message: z.string().optional().nullable(),
   code: eStatusCodeSchema.optional().nullable(),
 });
+export interface StatusSchema extends Named<typeof statusSchemaDefinition> {}
+export const statusSchema: StatusSchema = statusSchemaDefinition;
 
 // ProtoJSON omits default-valued fields (zero counts, empty lists), so every
 // such field must accept absence or spec-compliant OTLP/JSON spans are dropped.
-export const eventSchema = z.object({
+const eventSchemaDefinition = z.object({
   timeUnixNano: fixed64Schema,
   name: z.string(),
   attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
 });
+export interface EventSchema extends Named<typeof eventSchemaDefinition> {}
+export const eventSchema: EventSchema = eventSchemaDefinition;
 
-export const linkSchema = z.object({
+const linkSchemaDefinition = z.object({
   traceId: idSchema,
   spanId: idSchema,
   traceState: z.string().optional().nullable(),
@@ -169,8 +187,10 @@ export const linkSchema = z.object({
   droppedAttributesCount: z.number().optional().nullable().default(0),
   flags: z.number().optional().nullable(),
 });
+export interface LinkSchema extends Named<typeof linkSchemaDefinition> {}
+export const linkSchema: LinkSchema = linkSchemaDefinition;
 
-export const spanSchema = z.object({
+const spanSchemaDefinition = z.object({
   traceId: idSchema,
   spanId: idSchema,
   traceState: z.string().nullable().optional(),
@@ -193,22 +213,33 @@ export const spanSchema = z.object({
   droppedEventsCount: z.number().optional().nullable().default(0),
   droppedLinksCount: z.number().optional().nullable().default(0),
 });
+export interface SpanSchema extends Named<typeof spanSchemaDefinition> {}
+export const spanSchema: SpanSchema = spanSchemaDefinition;
 
-export const scopeSpansSchema = z.object({
+const scopeSpansSchemaDefinition = z.object({
   scope: instrumentationScopeSchema.optional(),
   spans: z.array(spanSchema).optional(),
   schemaUrl: z.string().nullable().optional(),
 });
+export interface ScopeSpansSchema extends Named<typeof scopeSpansSchemaDefinition> {}
+export const scopeSpansSchema: ScopeSpansSchema = scopeSpansSchemaDefinition;
 
-export const resourceSpansSchema = z.object({
+const resourceSpansSchemaDefinition = z.object({
   resource: resourceSchema.optional(),
   scopeSpans: z.array(scopeSpansSchema).optional().default([]),
   schemaUrl: z.string().optional(),
 });
+export interface ResourceSpansSchema extends Named<typeof resourceSpansSchemaDefinition> {}
+export const resourceSpansSchema: ResourceSpansSchema = resourceSpansSchemaDefinition;
 
-export const exportTraceServiceRequestSchema = z.object({
+const exportTraceServiceRequestSchemaDefinition = z.object({
   resourceSpans: z.array(resourceSpansSchema).optional(),
 });
+export interface ExportTraceServiceRequestSchema extends Named<
+  typeof exportTraceServiceRequestSchemaDefinition
+> {}
+export const exportTraceServiceRequestSchema: ExportTraceServiceRequestSchema =
+  exportTraceServiceRequestSchemaDefinition;
 
 export type OtlpSpan = z.infer<typeof spanSchema>;
 export type OtlpResource = z.infer<typeof resourceSchema>;

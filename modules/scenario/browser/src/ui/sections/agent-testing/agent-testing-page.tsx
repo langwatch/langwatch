@@ -55,8 +55,9 @@ export function AgentTestingPage() {
   const { casesCount, plansCount } = useTabCounts(project?.id ?? "");
   const openPlanTitle = useAgentTestingStore((state) => state.openPlanTitle);
 
-  const header = (
+  const header = (title?: string) => (
     <AgentTestingHeader
+      title={title}
       tab={routing.tab}
       onTabChange={routing.setTab}
       casesCount={casesCount}
@@ -73,7 +74,7 @@ export function AgentTestingPage() {
         </Box>
       ) : (
         <VStack width="full" height="full" gap={0}>
-          {header}
+          {header()}
           <Box flex={1} width="full" minHeight={0} overflow="hidden">
             <ResultsTab isSseConnected={isSseConnected} />
           </Box>

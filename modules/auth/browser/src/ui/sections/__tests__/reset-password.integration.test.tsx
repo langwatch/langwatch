@@ -198,11 +198,28 @@ describe("ResetPassword page", () => {
         confirm: "newsecret123",
       });
 
-      expect(await screen.findByText(/reset link/i)).toBeTruthy();
+      expect(await screen.findByText("That password reset link no longer works")).toBeTruthy();
       const retry = screen.getByRole("link", {
         name: /request a new reset link/i,
       });
       expect(retry.getAttribute("href")).toBe("/auth/forgot-password");
+    });
+  });
+
+  describe("when the server answers identity_reset_link_invalid", () => {
+    /** @scenario An invalid or expired token surfaces an error and a way to retry */
+    it("says the link no longer works in the registry's words, not the unknown-failure line", async () => {
+      mockResetPassword.mockResolvedValueOnce({
+        data: null,
+        error: { code: "identity_reset_link_invalid", status: 400 },
+      });
+      setToken("tok_spent");
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      expect(await screen.findByText("That password reset link no longer works")).toBeTruthy();
+      expect(screen.queryByText(/we've been notified/i)).toBeNull();
+      expect(screen.getByRole("link", { name: /request a new reset link/i })).toBeTruthy();
     });
   });
 

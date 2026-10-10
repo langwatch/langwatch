@@ -3,7 +3,7 @@ Feature: A dev stack that got loose is cleared
   I want a stack that holds a port I need to be cleared properly
   So that an abandoned stack never makes the next one take the next slot
 
-  # `pnpm dev` and `pnpm dev:one` run in the foreground, so Ctrl-C ends them; haven
+  # `pnpm dev` and `pnpm dev:hmr` run in the foreground, so Ctrl-C ends them; haven
   # supervises its own lanes and tears them down with the stack. The old launcher
   # supervisor (dev-supervisor.mjs) is gone: ADR-168, amendment 2026-10-10.
 

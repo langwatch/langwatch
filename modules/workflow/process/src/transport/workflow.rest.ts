@@ -103,6 +103,7 @@ export function createWorkflowRest(): Readonly<{
       // Editing metadata on a workflow that already exists is an `:update`.
       // `:manage` still implies it, so no existing caller changes.
       .patch("/:id", "patchApiWorkflowsById")
+      .withAudit("workflow.update")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestUpdateSchema)
       .withPermission("workflows:update")
@@ -123,6 +124,7 @@ export function createWorkflowRest(): Readonly<{
 
       // Archiving deliberately stays at `:manage`.
       .delete("/:id", "deleteApiWorkflowsById")
+      .withAudit("workflow.archive")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:manage")
       .withOutput(workflowRestArchivedSchema)

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const GOVERNANCE_INGESTION_SOURCE_TYPES = [
@@ -36,7 +37,7 @@ export function isPushSourceType({ sourceType }: { sourceType: string }): boolea
   return PUSH_SOURCE_TYPES.has(sourceType);
 }
 
-export const governanceIngestionSourceSchema = z
+const governanceIngestionSourceSchemaDefinition = z
   .object({
     id: z.string(),
     organizationId: z.string(),
@@ -61,9 +62,14 @@ export const governanceIngestionSourceSchema = z
     createdById: z.string().nullable(),
   })
   .strict();
+export interface GovernanceIngestionSourceSchema extends Named<
+  typeof governanceIngestionSourceSchemaDefinition
+> {}
+export const governanceIngestionSourceSchema: GovernanceIngestionSourceSchema =
+  governanceIngestionSourceSchemaDefinition;
 export type GovernanceIngestionSource = z.infer<typeof governanceIngestionSourceSchema>;
 
-export const createGovernanceIngestionSourceCommandSchema = z
+const createGovernanceIngestionSourceCommandSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     teamId: z.string().nullable().optional(),
@@ -77,11 +83,16 @@ export const createGovernanceIngestionSourceCommandSchema = z
     actorUserId: z.string().min(1),
   })
   .strict();
+export interface CreateGovernanceIngestionSourceCommandSchema extends Named<
+  typeof createGovernanceIngestionSourceCommandSchemaDefinition
+> {}
+export const createGovernanceIngestionSourceCommandSchema: CreateGovernanceIngestionSourceCommandSchema =
+  createGovernanceIngestionSourceCommandSchemaDefinition;
 export type CreateGovernanceIngestionSourceCommand = z.infer<
   typeof createGovernanceIngestionSourceCommandSchema
 >;
 
-export const updateGovernanceIngestionSourceCommandSchema = z
+const updateGovernanceIngestionSourceCommandSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -94,11 +105,16 @@ export const updateGovernanceIngestionSourceCommandSchema = z
     pullSchedule: z.string().nullable().optional(),
   })
   .strict();
+export interface UpdateGovernanceIngestionSourceCommandSchema extends Named<
+  typeof updateGovernanceIngestionSourceCommandSchemaDefinition
+> {}
+export const updateGovernanceIngestionSourceCommandSchema: UpdateGovernanceIngestionSourceCommandSchema =
+  updateGovernanceIngestionSourceCommandSchemaDefinition;
 export type UpdateGovernanceIngestionSourceCommand = z.infer<
   typeof updateGovernanceIngestionSourceCommandSchema
 >;
 
-export const createdGovernanceIngestionSourceSchema = z
+const createdGovernanceIngestionSourceSchemaDefinition = z
   .object({
     source: governanceIngestionSourceSchema,
     /**
@@ -109,6 +125,11 @@ export const createdGovernanceIngestionSourceSchema = z
     ingestSecret: z.string().nullable(),
   })
   .strict();
+export interface CreatedGovernanceIngestionSourceSchema extends Named<
+  typeof createdGovernanceIngestionSourceSchemaDefinition
+> {}
+export const createdGovernanceIngestionSourceSchema: CreatedGovernanceIngestionSourceSchema =
+  createdGovernanceIngestionSourceSchemaDefinition;
 export type CreatedGovernanceIngestionSource = z.infer<
   typeof createdGovernanceIngestionSourceSchema
 >;

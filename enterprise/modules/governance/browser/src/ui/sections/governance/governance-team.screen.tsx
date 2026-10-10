@@ -1,8 +1,9 @@
 import { BackLink } from "@langwatch/design-system/back-link";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
-  Heading,
+  Card,
   HStack,
   SimpleGrid,
   Spinner,
@@ -10,9 +11,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { findLandingProjects } from "@langwatch/project-contract";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { Users } from "lucide-react";
 import numeral from "numeral";
 
 import { api } from "../../../behavior/governance-api.ts";
@@ -112,12 +115,13 @@ function GovernanceTeamDetailPage() {
           )}
           {activityView === "loading" && <Spinner />}
           {activityView === "missing" && (
-            <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
-              <Text fontSize="sm" color="fg.muted">
-                No spend data for this team in the last 30 days. The team may not have any
-                associated ingestion sources reporting activity yet.
-              </Text>
-            </Box>
+            <Card.Root variant="showcase" padding={5}>
+              <NoDataInfoBlock
+                icon={<Users />}
+                title="No spend data for this team in the last 30 days"
+                description="The team may not have any associated ingestion sources reporting activity yet."
+              />
+            </Card.Root>
           )}
           {activityView === "ready" && team && (
             <>
@@ -131,7 +135,7 @@ function GovernanceTeamDetailPage() {
                 />
               </SimpleGrid>
 
-              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+              <Card.Root variant="showcase" padding={4}>
                 <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                   Detail metrics
                 </Text>
@@ -143,7 +147,7 @@ function GovernanceTeamDetailPage() {
                   <>
                     <Link
                       href={`/${teamProjectSlug}/traces`}
-                      color="blue.600"
+                      color="accent.fg"
                       fontSize="sm"
                       fontWeight="medium"
                     >
@@ -154,13 +158,13 @@ function GovernanceTeamDetailPage() {
                     </Text>
                   </>
                 )}
-                <Link href="/governance" color="blue.600" fontSize="sm" fontWeight="medium">
+                <Link href="/governance" color="accent.fg" fontSize="sm" fontWeight="medium">
                   See this team in the bird's-eye chart →
                 </Link>
                 <Text fontSize="xs" color="fg.subtle" marginTop={1}>
                   The chart's {`'By team'`} view shows this team's spend next to every other team's.
                 </Text>
-              </Box>
+              </Card.Root>
             </>
           )}
         </VStack>
@@ -171,20 +175,9 @@ function GovernanceTeamDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
-      >
-        {label}
-      </Text>
-      <Heading as="span" size="sm" marginTop={1}>
-        {value}
-      </Heading>
-    </Box>
+    <StatTile variant="showcase" label={label}>
+      <StatTileFigure>{value}</StatTileFigure>
+    </StatTile>
   );
 }
 

@@ -42,6 +42,7 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/unsubscribe", "confirmOneClickUnsubscribe")
+  .withAudit("emailSuppression.confirmUnsubscribe")
   .withQuery(unsubscribeQuery)
   .withAccess(publicRoute({ reason: ONE_CLICK_IS_TOKEN_AUTHORIZED }))
   .withOutput(unsubscribeRestAcknowledgedSchema)

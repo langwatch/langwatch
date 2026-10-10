@@ -47,7 +47,7 @@ function isUpgradeInProgress(error: unknown): boolean {
   return readHandledError(error)?.code === "upgrade_in_progress";
 }
 
-/** The personal workspace is still being created: eventual consistency, so the read waits, never fails. */
+/** The personal workspace is still being created: the read waits, never fails. */
 function isPersonalWorkspacePending(error: unknown): boolean {
   return readHandledError(error)?.code === "personal_workspace_pending";
 }
@@ -69,6 +69,18 @@ function httpStatusOf(error: unknown): unknown {
   return (error as { data?: { httpStatus?: number } } | undefined)?.data?.httpStatus;
 }
 
+function hintedDelayMs({
+  afterMs,
+  afterSeconds,
+}: {
+  afterMs: number;
+  afterSeconds: number;
+}): number {
+  if (afterMs > 0) return afterMs;
+  if (afterSeconds > 0) return afterSeconds * 1000;
+  return 0;
+}
+
 /**
  * Wait before retry number `failureCount`. A 429 honours the server's `retryAfterMs` or
  * `retryAfterSeconds`, else backs off 5 s, 10 s, 20 s, 40 s; both capped at 60 s. Anything
@@ -81,7 +93,7 @@ export function queryRetryDelay(failureCount: number, error: unknown): number {
   const meta = readHandledError(error)?.meta;
   const afterMs = Number(meta?.retryAfterMs);
   const afterSeconds = Number(meta?.retryAfterSeconds);
-  const hinted = afterMs > 0 ? afterMs : afterSeconds > 0 ? afterSeconds * 1000 : 0;
+  const hinted = hintedDelayMs({ afterMs, afterSeconds });
   const delay = hinted || THROTTLE_BACKOFF_BASE_MS * 2 ** failureCount;
 
   return Math.min(delay, THROTTLE_BACKOFF_CAP_MS);

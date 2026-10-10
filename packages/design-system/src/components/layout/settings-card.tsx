@@ -3,7 +3,7 @@
  * name and a chip in the header, the facts as name-left/value-right rows, and
  * the actions under them. Presentational only: no fetching, no module words.
  */
-import { Badge, Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Card, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 export type SettingsTone = "ok" | "warning" | "bad" | "neutral";
@@ -36,7 +36,13 @@ export function SettingsCard({
   "data-testid"?: string;
 }) {
   return (
-    <Card.Root width="full" height="full" data-testid={testId}>
+    <Card.Root
+      width="full"
+      height="full"
+      bg="bg.card"
+      borderColor="border.card"
+      data-testid={testId}
+    >
       <Card.Body paddingX={4} paddingY={3.5}>
         <VStack align="stretch" gap={2} height="full">
           <VStack align="stretch" gap={0.5}>
@@ -133,13 +139,37 @@ export function SettingList({
       align="stretch"
       gap={0}
       width="full"
-      separator={<Box height="1px" background="border.muted" />}
+      separator={<Box height="1px" background="border.nested" />}
       data-testid={testId}
     >
       {children}
     </VStack>
   );
 }
+
+/** A record inside a SettingList; interactive rows share the same spacing and focus ring. */
+export const SettingItem = chakra("div", {
+  base: {
+    width: "full",
+    minWidth: 0,
+    minHeight: "16",
+    paddingY: "3",
+    paddingX: "2",
+    textAlign: "start",
+    color: "fg",
+    background: "transparent",
+    borderRadius: "sm",
+    "&:is(button, a)": {
+      cursor: "pointer",
+      _hover: { background: "bg.hover" },
+      _focusVisible: {
+        outline: "2px solid",
+        outlineColor: "blue.fg",
+        outlineOffset: "-2px",
+      },
+    },
+  },
+});
 
 const DOT_COLOR: Record<SettingsTone, string> = {
   ok: "green.solid",

@@ -25,8 +25,6 @@ export abstract class IdentityLookupRepository {
     userIds: readonly string[];
   }): Promise<readonly LookupMembershipRow[]>;
 
-  abstract findInvitations(input: { email: string }): Promise<readonly LookupInvitationRow[]>;
-
   abstract findConnectionForDomain(input: { domain: string }): Promise<LookupConnectionRow | null>;
 
   /** The claims naming any of these domains, longest wait first. */
@@ -70,16 +68,6 @@ export interface LookupMembershipRow {
   organizationId: string;
   organizationName: string | null;
   role: string;
-}
-
-export interface LookupInvitationRow {
-  inviteId: string;
-  email: string;
-  organizationId: string;
-  organizationName: string | null;
-  invitedByName: string | null;
-  status: string;
-  expiresAtMs: number | null;
 }
 
 export interface LookupConnectionRow {

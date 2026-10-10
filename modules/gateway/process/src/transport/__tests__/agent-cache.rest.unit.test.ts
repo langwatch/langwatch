@@ -23,6 +23,7 @@ function mountedAgentCache() {
   });
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "api-key-1" },

@@ -180,6 +180,7 @@ export function createScenarioRest(): Readonly<{
       .post("/", "postApiScenarios")
       .withInput(scenarioRestCreateSchema)
       .withPermission("scenarios:create")
+      .withAudit("scenarios.create")
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
       .withStatus(201)
       .withDocs({ description: "Create a new scenario" })
@@ -227,6 +228,7 @@ export function createScenarioRest(): Readonly<{
       .withParams(scenarioRestIdParamsSchema)
       .withInput(scenarioRestUpdateSchema)
       .withPermission("scenarios:update")
+      .withAudit("scenarios.update")
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
       .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
       .withMiddlewareContext(projectRequestContext, scenarioRestSurface)
@@ -257,6 +259,7 @@ export function createScenarioRest(): Readonly<{
       .withParams(scenarioRestIdParamsSchema)
       .withInput(scenarioRestUpdateSchema)
       .withPermission("scenarios:update")
+      .withAudit("scenarios.update")
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
       .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
       .withMiddlewareContext(projectRequestContext, scenarioRestSurface)
@@ -289,6 +292,7 @@ export function createScenarioRest(): Readonly<{
       .delete("/:id", "deleteApiScenariosById")
       .withParams(scenarioRestIdParamsSchema)
       .withPermission("scenarios:manage")
+      .withAudit("scenarios.archive")
       .withOutput(scenarioRestArchivedSchema)
       .withDocs({
         description: "Archive (soft-delete) a scenario",

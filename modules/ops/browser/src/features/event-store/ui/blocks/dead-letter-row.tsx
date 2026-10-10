@@ -88,7 +88,7 @@ export function DeadLetterRow({
           {canManage && (
             <HStack gap={1} justify="end">
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 loading={isRedriving}
                 data-testid={`dead-redrive-${message.messageKey}`}
@@ -101,7 +101,7 @@ export function DeadLetterRow({
                 Redrive
               </Button>
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 colorPalette="red"
                 loading={isDiscarding}

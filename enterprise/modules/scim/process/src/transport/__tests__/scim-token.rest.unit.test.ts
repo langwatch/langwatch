@@ -40,6 +40,7 @@ function mount(
 ) {
   const { app, audited, findPermissionsBeyondCaller } = scimTestApp({ scim, minterLacks });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

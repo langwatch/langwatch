@@ -1,15 +1,21 @@
 import { evaluatorSchema } from "@langwatch/evaluator-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const monitorExecutionModeSchema = z.enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"]);
 export type MonitorExecutionMode = z.infer<typeof monitorExecutionModeSchema>;
 
-export const monitorMappingStateSchema = z
+const monitorMappingStateSchemaDefinition = z
   .object({
     mapping: z.record(z.string(), z.unknown()),
     expansions: z.array(z.string()),
   })
   .strict();
+export interface MonitorMappingStateSchema extends Named<
+  typeof monitorMappingStateSchemaDefinition
+> {}
+export const monitorMappingStateSchema: MonitorMappingStateSchema =
+  monitorMappingStateSchemaDefinition;
 export type MonitorMappingState = z.infer<typeof monitorMappingStateSchema>;
 
 /** Legacy `{}`/malformed mappings are persisted as a safe empty mapping. */
@@ -33,21 +39,31 @@ const monitorPreconditionSchema = z
  * The preconditions the monitor editors write: rule objects, or the legacy
  * `{}` some monitors persisted. Exported for browser wire parsing.
  */
-export const structuredMonitorPreconditionsSchema = z.union([
+const structuredMonitorPreconditionsSchemaDefinition = z.union([
   z.array(monitorPreconditionSchema),
   z.record(z.string(), z.unknown()),
 ]);
+export interface StructuredMonitorPreconditionsSchema extends Named<
+  typeof structuredMonitorPreconditionsSchemaDefinition
+> {}
+export const structuredMonitorPreconditionsSchema: StructuredMonitorPreconditionsSchema =
+  structuredMonitorPreconditionsSchemaDefinition;
 
 /**
  * What a monitor stores: any JSON list, as main's `/api/monitors` accepted, or
  * the legacy `{}`. The evaluation reads the rule objects it understands.
  */
-export const monitorPreconditionsSchema = z.union([
+const monitorPreconditionsSchemaDefinition = z.union([
   z.array(z.unknown()),
   z.record(z.string(), z.unknown()),
 ]);
+export interface MonitorPreconditionsSchema extends Named<
+  typeof monitorPreconditionsSchemaDefinition
+> {}
+export const monitorPreconditionsSchema: MonitorPreconditionsSchema =
+  monitorPreconditionsSchemaDefinition;
 
-export const monitorSchema = z
+const monitorSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -68,14 +84,21 @@ export const monitorSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface MonitorSchema extends Named<typeof monitorSchemaDefinition> {}
+export const monitorSchema: MonitorSchema = monitorSchemaDefinition;
 export type Monitor = z.infer<typeof monitorSchema>;
 
-export const monitorWithEvaluatorSchema = monitorSchema.safeExtend({
+const monitorWithEvaluatorSchemaDefinition = monitorSchema.safeExtend({
   evaluator: evaluatorSchema.nullable(),
 });
+export interface MonitorWithEvaluatorSchema extends Named<
+  typeof monitorWithEvaluatorSchemaDefinition
+> {}
+export const monitorWithEvaluatorSchema: MonitorWithEvaluatorSchema =
+  monitorWithEvaluatorSchemaDefinition;
 export type MonitorWithEvaluator = z.infer<typeof monitorWithEvaluatorSchema>;
 
-export const monitorSummarySchema = z
+const monitorSummarySchemaDefinition = z
   .object({
     id: z.string().min(1),
     checkType: z.string().min(1),
@@ -84,9 +107,11 @@ export const monitorSummarySchema = z
     evaluator: z.object({ name: z.string() }).nullable(),
   })
   .strict();
+export interface MonitorSummarySchema extends Named<typeof monitorSummarySchemaDefinition> {}
+export const monitorSummarySchema: MonitorSummarySchema = monitorSummarySchemaDefinition;
 export type MonitorSummary = z.infer<typeof monitorSummarySchema>;
 
-export const enabledGuardrailMonitorSchema = z
+const enabledGuardrailMonitorSchemaDefinition = z
   .object({
     id: z.string().min(1),
     evaluatorId: z.string().min(1),
@@ -94,19 +119,31 @@ export const enabledGuardrailMonitorSchema = z
     parameters: z.json(),
   })
   .strict();
+export interface EnabledGuardrailMonitorSchema extends Named<
+  typeof enabledGuardrailMonitorSchemaDefinition
+> {}
+export const enabledGuardrailMonitorSchema: EnabledGuardrailMonitorSchema =
+  enabledGuardrailMonitorSchemaDefinition;
 export type EnabledGuardrailMonitor = z.infer<typeof enabledGuardrailMonitorSchema>;
 
-export const monitorEnabledGuardrailInputSchema = z
+const monitorEnabledGuardrailInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     evaluatorIds: z.array(z.string().min(1)),
   })
   .strict();
+export interface MonitorEnabledGuardrailInputSchema extends Named<
+  typeof monitorEnabledGuardrailInputSchemaDefinition
+> {}
+export const monitorEnabledGuardrailInputSchema: MonitorEnabledGuardrailInputSchema =
+  monitorEnabledGuardrailInputSchemaDefinition;
 export type MonitorEnabledGuardrailInput = z.infer<typeof monitorEnabledGuardrailInputSchema>;
 
-export const monitorSettingsSchema = z.record(z.string(), z.json());
+const monitorSettingsSchemaDefinition = z.record(z.string(), z.json());
+export interface MonitorSettingsSchema extends Named<typeof monitorSettingsSchemaDefinition> {}
+export const monitorSettingsSchema: MonitorSettingsSchema = monitorSettingsSchemaDefinition;
 
-export const monitorCreateInputSchema = z
+const monitorCreateInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     name: z.string().min(1),
@@ -121,9 +158,14 @@ export const monitorCreateInputSchema = z
     threadIdleTimeout: z.number().int().positive().nullable().optional(),
   })
   .strict();
+export interface MonitorCreateInputSchema extends Named<
+  typeof monitorCreateInputSchemaDefinition
+> {}
+export const monitorCreateInputSchema: MonitorCreateInputSchema =
+  monitorCreateInputSchemaDefinition;
 export type MonitorCreateInput = z.infer<typeof monitorCreateInputSchema>;
 
-export const monitorUpdateInputSchema = z
+const monitorUpdateInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -140,6 +182,11 @@ export const monitorUpdateInputSchema = z
     threadIdleTimeout: z.number().int().positive().nullable().optional(),
   })
   .strict();
+export interface MonitorUpdateInputSchema extends Named<
+  typeof monitorUpdateInputSchemaDefinition
+> {}
+export const monitorUpdateInputSchema: MonitorUpdateInputSchema =
+  monitorUpdateInputSchemaDefinition;
 export type MonitorUpdateInput = z.infer<typeof monitorUpdateInputSchema>;
 
 /**
@@ -147,7 +194,7 @@ export type MonitorUpdateInput = z.infer<typeof monitorUpdateInputSchema>;
  * backward compatibility; only mappings is canonicalized to prevent evaluator
  * crashes.
  */
-export const monitorExperimentUpsertInputSchema = z
+const monitorExperimentUpsertInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     experimentId: z.string().min(1),
@@ -162,25 +209,42 @@ export const monitorExperimentUpsertInputSchema = z
     executionMode: z.string().min(1),
   })
   .strict();
+export interface MonitorExperimentUpsertInputSchema extends Named<
+  typeof monitorExperimentUpsertInputSchemaDefinition
+> {}
+export const monitorExperimentUpsertInputSchema: MonitorExperimentUpsertInputSchema =
+  monitorExperimentUpsertInputSchemaDefinition;
 export type MonitorExperimentUpsertInput = z.infer<typeof monitorExperimentUpsertInputSchema>;
 
-export const monitorToggleInputSchema = z
+const monitorToggleInputSchemaDefinition = z
   .object({ id: z.string().min(1), projectId: z.string().min(1), enabled: z.boolean() })
   .strict();
+export interface MonitorToggleInputSchema extends Named<
+  typeof monitorToggleInputSchemaDefinition
+> {}
+export const monitorToggleInputSchema: MonitorToggleInputSchema =
+  monitorToggleInputSchemaDefinition;
 export type MonitorToggleInput = z.infer<typeof monitorToggleInputSchema>;
 
-export const monitorIdInputSchema = z
+const monitorIdInputSchemaDefinition = z
   .object({ id: z.string().min(1), projectId: z.string().min(1) })
   .strict();
+export interface MonitorIdInputSchema extends Named<typeof monitorIdInputSchemaDefinition> {}
+export const monitorIdInputSchema: MonitorIdInputSchema = monitorIdInputSchemaDefinition;
 export type MonitorIdInput = z.infer<typeof monitorIdInputSchema>;
 
-export const monitorNameAvailabilityInputSchema = z
+const monitorNameAvailabilityInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     name: z.string().min(1),
     checkId: z.string().min(1).optional(),
   })
   .strict();
+export interface MonitorNameAvailabilityInputSchema extends Named<
+  typeof monitorNameAvailabilityInputSchemaDefinition
+> {}
+export const monitorNameAvailabilityInputSchema: MonitorNameAvailabilityInputSchema =
+  monitorNameAvailabilityInputSchemaDefinition;
 export type MonitorNameAvailabilityInput = z.infer<typeof monitorNameAvailabilityInputSchema>;
 
 /**
@@ -188,7 +252,7 @@ export type MonitorNameAvailabilityInput = z.infer<typeof monitorNameAvailabilit
  * present, is copied by the caller's canonical Evaluator service first and its
  * new id is then supplied here.
  */
-export const monitorReplicationInputSchema = z
+const monitorReplicationInputSchemaDefinition = z
   .object({
     sourceMonitorId: z.string().min(1),
     sourceProjectId: z.string().min(1),
@@ -196,6 +260,11 @@ export const monitorReplicationInputSchema = z
     evaluatorId: z.string().min(1).nullable(),
   })
   .strict();
+export interface MonitorReplicationInputSchema extends Named<
+  typeof monitorReplicationInputSchemaDefinition
+> {}
+export const monitorReplicationInputSchema: MonitorReplicationInputSchema =
+  monitorReplicationInputSchemaDefinition;
 export type MonitorReplicationInput = z.infer<typeof monitorReplicationInputSchema>;
 
 /**
@@ -203,7 +272,7 @@ export type MonitorReplicationInput = z.infer<typeof monitorReplicationInputSche
  * and backing workflow included. The actor is named because the copied
  * workflow's first saved version is recorded against whoever asked for it.
  */
-export const monitorCopyInputSchema = z
+const monitorCopyInputSchemaDefinition = z
   .object({
     monitorId: z.string().min(1),
     sourceProjectId: z.string().min(1),
@@ -211,13 +280,15 @@ export const monitorCopyInputSchema = z
     actor: z.object({ id: z.string().min(1) }).strict(),
   })
   .strict();
+export interface MonitorCopyInputSchema extends Named<typeof monitorCopyInputSchemaDefinition> {}
+export const monitorCopyInputSchema: MonitorCopyInputSchema = monitorCopyInputSchemaDefinition;
 export type MonitorCopyInput = z.infer<typeof monitorCopyInputSchema>;
 
 /**
  * A partial change to a monitor: every field left out keeps the value the
  * monitor already has, which is the one description of that rule.
  */
-export const monitorPatchInputSchema = z
+const monitorPatchInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -238,10 +309,17 @@ export const monitorPatchInputSchema = z
       .strict(),
   })
   .strict();
+export interface MonitorPatchInputSchema extends Named<typeof monitorPatchInputSchemaDefinition> {}
+export const monitorPatchInputSchema: MonitorPatchInputSchema = monitorPatchInputSchemaDefinition;
 export type MonitorPatchInput = z.infer<typeof monitorPatchInputSchema>;
 
 /** A check as a caller proposed it, before the monitor holding it is written. */
-export const monitorRunnableCheckInputSchema = z
+const monitorRunnableCheckInputSchemaDefinition = z
   .object({ checkType: z.string().min(1), parameters: z.unknown() })
   .strict();
+export interface MonitorRunnableCheckInputSchema extends Named<
+  typeof monitorRunnableCheckInputSchemaDefinition
+> {}
+export const monitorRunnableCheckInputSchema: MonitorRunnableCheckInputSchema =
+  monitorRunnableCheckInputSchemaDefinition;
 export type MonitorRunnableCheckInput = z.infer<typeof monitorRunnableCheckInputSchema>;

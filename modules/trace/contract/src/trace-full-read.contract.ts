@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { traceRecordValueSchema } from "./trace-record.ts";
@@ -53,7 +54,7 @@ export type TraceFullRecordEvent = z.infer<typeof traceFullRecordEventSchema>;
  * Trace-owned full capture for internal readers: process-owned visibility,
  * not a browser DTO — never supply it with caller-selected protections.
  */
-export const traceFullRecordSchema = z.looseObject({
+const traceFullRecordSchemaDefinition = z.looseObject({
   trace_id: z.string(),
   project_id: z.string(),
   metadata: z.record(z.string(), traceRecordValueSchema),
@@ -74,26 +75,38 @@ export const traceFullRecordSchema = z.looseObject({
   spans: z.array(traceFullRecordSpanSchema),
   events: z.array(traceFullRecordEventSchema).optional(),
 });
+export interface TraceFullRecordSchema extends Named<typeof traceFullRecordSchemaDefinition> {}
+export const traceFullRecordSchema: TraceFullRecordSchema = traceFullRecordSchemaDefinition;
 
 export type TraceFullRecord = z.infer<typeof traceFullRecordSchema>;
 
 /** Exact identity plus an optional storage-anchor hint for a full Trace read. */
-export const traceFullReadInputSchema = z
+const traceFullReadInputSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     traceId: z.string().min(1),
     occurredAtMs: z.number().int().nonnegative().optional(),
   })
   .strict();
+export interface TraceFullReadInputSchema extends Named<
+  typeof traceFullReadInputSchemaDefinition
+> {}
+export const traceFullReadInputSchema: TraceFullReadInputSchema =
+  traceFullReadInputSchemaDefinition;
 
 export type TraceFullReadInput = z.infer<typeof traceFullReadInputSchema>;
 
 /** Thread reads are complete captures and return chronological traces. */
-export const traceFullThreadReadInputSchema = z
+const traceFullThreadReadInputSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     threadId: z.string().min(1),
   })
   .strict();
+export interface TraceFullThreadReadInputSchema extends Named<
+  typeof traceFullThreadReadInputSchemaDefinition
+> {}
+export const traceFullThreadReadInputSchema: TraceFullThreadReadInputSchema =
+  traceFullThreadReadInputSchemaDefinition;
 
 export type TraceFullThreadReadInput = z.infer<typeof traceFullThreadReadInputSchema>;

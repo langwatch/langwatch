@@ -275,6 +275,15 @@ Feature: Unified Audit Log
     When she exports it
     Then the export asks for the same filters the table is reading with
 
+  @integration
+  Scenario: An export asks how much history to take, keeping every other filter
+    When alice exports
+    Then she chooses the current view, the last 24 hours, 7, 30 or 90 days, all time
+      or a custom range of days
+    And the user, action, project and target filters on screen still apply, and the
+      dialog names them
+    And "All time" reads from the first row ever recorded
+
   @unit
   Scenario: An export walks the whole filtered history, not just the first batch
     Given the filtered history is longer than one batch

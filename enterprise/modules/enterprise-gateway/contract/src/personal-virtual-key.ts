@@ -1,14 +1,20 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
-export const personalVirtualKeyScopeSchema = z
+const personalVirtualKeyScopeSchemaDefinition = z
   .object({
     scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
     scopeId: z.string().min(1),
   })
   .strict();
+export interface PersonalVirtualKeyScopeSchema extends Named<
+  typeof personalVirtualKeyScopeSchemaDefinition
+> {}
+export const personalVirtualKeyScopeSchema: PersonalVirtualKeyScopeSchema =
+  personalVirtualKeyScopeSchemaDefinition;
 
-export const personalVirtualKeySchema = z
+const personalVirtualKeySchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -24,9 +30,14 @@ export const personalVirtualKeySchema = z
     scopes: z.array(personalVirtualKeyScopeSchema),
   })
   .strict();
+export interface PersonalVirtualKeySchema extends Named<
+  typeof personalVirtualKeySchemaDefinition
+> {}
+export const personalVirtualKeySchema: PersonalVirtualKeySchema =
+  personalVirtualKeySchemaDefinition;
 export type PersonalVirtualKey = z.infer<typeof personalVirtualKeySchema>;
 
-export const issuedPersonalVirtualKeySchema = z
+const issuedPersonalVirtualKeySchemaDefinition = z
   .object({
     virtualKey: personalVirtualKeySchema,
     secret: z.string().min(1),
@@ -36,6 +47,11 @@ export const issuedPersonalVirtualKeySchema = z
     label: z.string().min(1),
   })
   .strict();
+export interface IssuedPersonalVirtualKeySchema extends Named<
+  typeof issuedPersonalVirtualKeySchemaDefinition
+> {}
+export const issuedPersonalVirtualKeySchema: IssuedPersonalVirtualKeySchema =
+  issuedPersonalVirtualKeySchemaDefinition;
 export type IssuedPersonalVirtualKey = z.infer<typeof issuedPersonalVirtualKeySchema>;
 
 /**
@@ -43,7 +59,7 @@ export type IssuedPersonalVirtualKey = z.infer<typeof issuedPersonalVirtualKeySc
  * exists on the wire. Nothing stores it and no read returns it again, so a
  * caller who loses it revokes and issues another.
  */
-export const issuedPersonalVirtualKeyAnswerSchema = z
+const issuedPersonalVirtualKeyAnswerSchemaDefinition = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
@@ -53,9 +69,14 @@ export const issuedPersonalVirtualKeyAnswerSchema = z
     routingPolicyId: z.string().nullable(),
   })
   .strict();
+export interface IssuedPersonalVirtualKeyAnswerSchema extends Named<
+  typeof issuedPersonalVirtualKeyAnswerSchemaDefinition
+> {}
+export const issuedPersonalVirtualKeyAnswerSchema: IssuedPersonalVirtualKeyAnswerSchema =
+  issuedPersonalVirtualKeyAnswerSchemaDefinition;
 export type IssuedPersonalVirtualKeyAnswer = z.infer<typeof issuedPersonalVirtualKeyAnswerSchema>;
 
-export const ensureDefaultPersonalVirtualKeyInputSchema = z
+const ensureDefaultPersonalVirtualKeyInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
@@ -63,11 +84,16 @@ export const ensureDefaultPersonalVirtualKeyInputSchema = z
     displayEmail: z.string().nullable().optional(),
   })
   .strict();
+export interface EnsureDefaultPersonalVirtualKeyInputSchema extends Named<
+  typeof ensureDefaultPersonalVirtualKeyInputSchemaDefinition
+> {}
+export const ensureDefaultPersonalVirtualKeyInputSchema: EnsureDefaultPersonalVirtualKeyInputSchema =
+  ensureDefaultPersonalVirtualKeyInputSchemaDefinition;
 export type EnsureDefaultPersonalVirtualKeyInput = z.infer<
   typeof ensureDefaultPersonalVirtualKeyInputSchema
 >;
 
-export const issuePersonalVirtualKeyInputSchema = z
+const issuePersonalVirtualKeyInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
@@ -77,31 +103,51 @@ export const issuePersonalVirtualKeyInputSchema = z
     routingPolicyId: z.string().nullable().optional(),
   })
   .strict();
+export interface IssuePersonalVirtualKeyInputSchema extends Named<
+  typeof issuePersonalVirtualKeyInputSchemaDefinition
+> {}
+export const issuePersonalVirtualKeyInputSchema: IssuePersonalVirtualKeyInputSchema =
+  issuePersonalVirtualKeyInputSchemaDefinition;
 export type IssuePersonalVirtualKeyInput = z.infer<typeof issuePersonalVirtualKeyInputSchema>;
 
-export const listPersonalVirtualKeysInputSchema = z
+const listPersonalVirtualKeysInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     userId: z.string().min(1).optional(),
   })
   .strict();
+export interface ListPersonalVirtualKeysInputSchema extends Named<
+  typeof listPersonalVirtualKeysInputSchemaDefinition
+> {}
+export const listPersonalVirtualKeysInputSchema: ListPersonalVirtualKeysInputSchema =
+  listPersonalVirtualKeysInputSchemaDefinition;
 export type ListPersonalVirtualKeysInput = z.infer<typeof listPersonalVirtualKeysInputSchema>;
 
-export const revokePersonalVirtualKeyInputSchema = z
+const revokePersonalVirtualKeyInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
     virtualKeyId: z.string().min(1),
   })
   .strict();
+export interface RevokePersonalVirtualKeyInputSchema extends Named<
+  typeof revokePersonalVirtualKeyInputSchemaDefinition
+> {}
+export const revokePersonalVirtualKeyInputSchema: RevokePersonalVirtualKeyInputSchema =
+  revokePersonalVirtualKeyInputSchemaDefinition;
 export type RevokePersonalVirtualKeyInput = z.infer<typeof revokePersonalVirtualKeyInputSchema>;
 
-export const revokeAllPersonalVirtualKeysInputSchema = z
+const revokeAllPersonalVirtualKeysInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     actorUserId: z.string().min(1),
   })
   .strict();
+export interface RevokeAllPersonalVirtualKeysInputSchema extends Named<
+  typeof revokeAllPersonalVirtualKeysInputSchemaDefinition
+> {}
+export const revokeAllPersonalVirtualKeysInputSchema: RevokeAllPersonalVirtualKeysInputSchema =
+  revokeAllPersonalVirtualKeysInputSchemaDefinition;
 export type RevokeAllPersonalVirtualKeysInput = z.infer<
   typeof revokeAllPersonalVirtualKeysInputSchema
 >;

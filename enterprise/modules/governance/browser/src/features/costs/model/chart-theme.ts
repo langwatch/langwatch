@@ -91,8 +91,7 @@ export const CHART_SPARK_STROKE = "var(--chakra-colors-blue-solid)";
  * difference is then the idle spend, which is what the panel is on the screen
  * for.
  *
- * The slate is not a palette hue and is not meant to be. It is the same ink the
- * forecast draws its projection in, and it means the same thing in both places:
+ * The neutral contract uses the emphasized gray role in both modes:
  * a quantity that is not a measurement of what happened.
  *
  * ONE SPELLING, for both. The recharts series needs a raw SVG attribute and the
@@ -118,4 +117,4 @@ export const CHART_SEAT_FILL = "var(--chakra-colors-teal-solid)";
  * suite — measured, not reasoned. A mark colour whose name the guard cannot
  * read is not guarded at all.
  */
-export const CHART_SEAT_CONTRACT_FILL = "#94a3b8";
+export const CHART_SEAT_CONTRACT_FILL = "var(--chakra-colors-gray-emphasized)";

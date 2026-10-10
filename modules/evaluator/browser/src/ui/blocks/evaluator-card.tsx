@@ -67,6 +67,7 @@ export function EvaluatorCard({
       variant="elevated"
       onClick={onClick}
       cursor="pointer"
+      _hover={{ boxShadow: "lg" }}
       height="142px"
       transition="all 0.2s ease-in-out"
       data-testid={`evaluator-card-${evaluator.id}`}
@@ -127,7 +128,7 @@ export function EvaluatorCard({
                   </Menu.Item>
                 )}
                 {onDelete && (
-                  <Menu.Item value="delete" color="red.500" onClick={stop(onDelete)}>
+                  <Menu.Item value="delete" color="red.fg" onClick={stop(onDelete)}>
                     <LuTrash2 size={14} /> Delete
                   </Menu.Item>
                 )}

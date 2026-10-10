@@ -30,7 +30,7 @@ function sendButtonAppearance({
   if (isStopping) {
     return {
       background: "red.solid",
-      color: "white",
+      color: "red.contrast",
       cursor: "pointer",
       _hover: { filter: "brightness(1.08)" },
     } as const;
@@ -45,7 +45,7 @@ function sendButtonAppearance({
   }
   return {
     background: "orange.solid",
-    color: "white",
+    color: "accent.contrast",
     cursor: "pointer",
     _hover: { filter: "brightness(1.08)" },
   } as const;

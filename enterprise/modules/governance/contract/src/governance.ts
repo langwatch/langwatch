@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const GOVERNANCE_FEATURE_ID = "governance" as const;
@@ -23,7 +24,7 @@ export const NON_ENTERPRISE_INGESTION_SOURCE_CAP = 3 as const;
 export const governanceSourceTypeSchema = z.enum(GOVERNANCE_SOURCE_TYPES);
 export type GovernanceSourceType = z.infer<typeof governanceSourceTypeSchema>;
 
-export const governanceEventEnvelopeSchema = z
+const governanceEventEnvelopeSchemaDefinition = z
   .object({
     id: z.string().min(1),
     aggregateId: z.string().min(1),
@@ -38,8 +39,13 @@ export const governanceEventEnvelopeSchema = z
     idempotencyKey: z.string().min(1).optional(),
   })
   .strict();
+export interface GovernanceEventEnvelopeSchema extends Named<
+  typeof governanceEventEnvelopeSchemaDefinition
+> {}
+export const governanceEventEnvelopeSchema: GovernanceEventEnvelopeSchema =
+  governanceEventEnvelopeSchemaDefinition;
 
-export const governanceSetupStateSchema = z
+const governanceSetupStateSchemaDefinition = z
   .object({
     hasPersonalVKs: z.boolean(),
     hasRoutingPolicies: z.boolean(),
@@ -50,6 +56,11 @@ export const governanceSetupStateSchema = z
     governanceActive: z.boolean(),
   })
   .strict();
+export interface GovernanceSetupStateSchema extends Named<
+  typeof governanceSetupStateSchemaDefinition
+> {}
+export const governanceSetupStateSchema: GovernanceSetupStateSchema =
+  governanceSetupStateSchemaDefinition;
 export type GovernanceSetupState = z.infer<typeof governanceSetupStateSchema>;
 
 export const GOVERNANCE_ORIGIN_KIND_VALUE = "ingestion_source" as const;

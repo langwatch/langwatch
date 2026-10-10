@@ -38,12 +38,12 @@ blur on `Dialog.Content`; never build a dialog from a fixed-position `Box`.
 
 ### One dialog
 
-| Part   | Standard                                                                                   |
-| ------ | ------------------------------------------------------------------------------------------ |
-| Shell  | `Dialog` from `@langwatch/design-system/dialog`; width by `size` or one `maxWidth`, nothing else on `Content`. |
-| Header | `Dialog.Title` in sentence case, recipe style (no `fontSize`/`fontWeight`); optional `Dialog.Description` in `fg.muted`. |
-| Close  | `<Dialog.CloseTrigger />` on every dismissible dialog. Only a takeover, a command palette or a must-acknowledge reveal (`role="alertdialog"`) goes without. |
-| Body   | Field labels in sentence case (`Field.Label`, never an uppercase `SmallLabel` in a form).  |
+| Part   | Standard                                                                                                                                                                                                                                  |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell  | `Dialog` from `@langwatch/design-system/dialog`; width by `size` or one `maxWidth`, nothing else on `Content`.                                                                                                                            |
+| Header | `Dialog.Title` in sentence case, recipe style (no `fontSize`/`fontWeight`); optional `Dialog.Description` in `fg.muted`.                                                                                                                  |
+| Close  | `<Dialog.CloseTrigger />` on every dismissible dialog. Only a takeover, a command palette or a must-acknowledge reveal (`role="alertdialog"`) goes without.                                                                               |
+| Body   | Field labels in sentence case (`Field.Label`, never an uppercase `SmallLabel` in a form).                                                                                                                                                 |
 | Footer | Right-aligned in `Dialog.Footer`: `variant="outline"` Cancel, then one solid primary: `colorPalette="orange"` (the product primary, as `PageLayout.HeaderButton primary`), `red` when it destroys. Never a full-width button in the body. |
 
 A plain confirmation is `ConfirmDialog`; a type-to-confirm delete is `DeleteConfirmationDialog`.

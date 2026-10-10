@@ -69,9 +69,8 @@ function step({
     typeof node === "object" &&
     !Array.isArray(node)
   ) {
-    return Object.hasOwn(node, key)
-      ? { found: true, next: Reflect.get(node, key) }
-      : { found: false };
+    const own = Object.getOwnPropertyDescriptor(node, key);
+    return own ? { found: true, next: own.value } : { found: false };
   }
   return { found: false };
 }
@@ -152,43 +151,50 @@ export function locateJsonPathNode({ value, path }: { value: unknown; path: stri
   range?: { start: number; end: number };
 } {
   const keys = pathKeys({ path, value });
-  let range: { start: number; end: number } | undefined;
+  const found: { range?: { start: number; end: number } } = {};
+  const text = writeJsonNode({ node: value, indent: "", remaining: keys, at: 0, found });
+  return found.range ? { text, range: found.range } : { text };
+}
 
-  const write = (
-    node: unknown,
-    indent: string,
-    remaining: (string | number)[] | undefined,
-    at: number,
-  ) => {
-    const marked = remaining?.length === 0;
-    let out = "";
-    if (node !== null && typeof node === "object") {
-      const entries: [string | number, unknown][] = Array.isArray(node)
-        ? node.map((item, index) => [index, item])
-        : Object.entries(node);
-      const [open, close] = Array.isArray(node) ? ["[", "]"] : ["{", "}"];
-      if (entries.length === 0) out = open + close;
-      else {
-        out = `${open}\n`;
-        entries.forEach(([key, child], index) => {
-          const prefix = `${indent}  ${Array.isArray(node) ? "" : `${JSON.stringify(key)}: `}`;
-          const onPath = remaining !== undefined && remaining[0] === key;
-          out += prefix;
-          out += write(
-            child,
-            `${indent}  `,
-            onPath ? remaining?.slice(1) : undefined,
-            at + out.length,
-          );
-          out += index < entries.length - 1 ? ",\n" : "\n";
-        });
-        out += `${indent}${close}`;
-      }
-    } else out = JSON.stringify(node) ?? "null";
-    if (marked && !range) range = { start: at, end: at + out.length };
-    return out;
-  };
+type JsonWriteInput = {
+  node: unknown;
+  indent: string;
+  remaining: (string | number)[] | undefined;
+  at: number;
+  found: { range?: { start: number; end: number } };
+};
 
-  const text = write(value, "", keys, 0);
-  return range ? { text, range } : { text };
+function writeJsonNode({ node, indent, remaining, at, found }: JsonWriteInput): string {
+  const out = isContainer(node)
+    ? writeContainer({ node, indent, remaining, at, found })
+    : (JSON.stringify(node) ?? "null");
+  if (remaining?.length === 0 && !found.range) found.range = { start: at, end: at + out.length };
+  return out;
+}
+
+function isContainer(node: unknown): node is object {
+  return node !== null && typeof node === "object";
+}
+
+function writeContainer({ node, indent, remaining, at, found }: JsonWriteInput & { node: object }) {
+  const isArray = Array.isArray(node);
+  const entries: [string | number, unknown][] = isArray
+    ? node.map((item, index) => [index, item])
+    : Object.entries(node);
+  const [open, close] = isArray ? ["[", "]"] : ["{", "}"];
+  if (entries.length === 0) return open + close;
+  let out = `${open}\n`;
+  entries.forEach(([key, child], index) => {
+    out += `${indent}  ${isArray ? "" : `${JSON.stringify(key)}: `}`;
+    const onPath = remaining !== undefined && remaining[0] === key;
+    out += writeJsonNode({
+      node: child,
+      indent: `${indent}  `,
+      remaining: onPath ? remaining?.slice(1) : undefined,
+      at: at + out.length,
+      found,
+    });
+    out += index < entries.length - 1 ? ",\n" : "\n";
+  });
+  return `${out}${indent}${close}`;
 }

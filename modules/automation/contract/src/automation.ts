@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { triggerActionSchema, triggerKindSchema, triggerSchema } from "./trigger.ts";
@@ -15,7 +16,7 @@ export type Automation = Trigger;
 export type AutomationAction = TriggerAction;
 export type AutomationKind = TriggerKind;
 
-export const emailSuppressionSchema = z.object({
+const emailSuppressionSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   email: z.string().email(),
@@ -23,9 +24,11 @@ export const emailSuppressionSchema = z.object({
   reason: z.string(),
   createdAt: z.date(),
 });
+export interface EmailSuppressionSchema extends Named<typeof emailSuppressionSchemaDefinition> {}
+export const emailSuppressionSchema: EmailSuppressionSchema = emailSuppressionSchemaDefinition;
 export type EmailSuppression = z.infer<typeof emailSuppressionSchema>;
 
-export const triggerFireSchema = z.object({
+const triggerFireSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   triggerId: z.string(),
@@ -33,27 +36,41 @@ export const triggerFireSchema = z.object({
   createdAt: z.date(),
   status: z.string().optional(),
 });
+export interface TriggerFireSchema extends Named<typeof triggerFireSchemaDefinition> {}
+export const triggerFireSchema: TriggerFireSchema = triggerFireSchemaDefinition;
 
 /** The masked recipient and names behind an unsubscribe token. */
-export const unsubscribeViewSchema = z.object({
+const unsubscribeViewSchemaDefinition = z.object({
   projectName: z.string(),
   triggerName: z.string().nullable(),
   email: z.string(),
 });
+export interface UnsubscribeViewSchema extends Named<typeof unsubscribeViewSchemaDefinition> {}
+export const unsubscribeViewSchema: UnsubscribeViewSchema = unsubscribeViewSchemaDefinition;
 export type UnsubscribeView = z.infer<typeof unsubscribeViewSchema>;
 
 /**
  * One suppression row as the operator table renders it: the stored row minus
  * the project id the caller already named, plus its automation's name.
  */
-export const emailSuppressionRowSchema = z.object({
+const emailSuppressionRowSchemaDefinition = z.object({
   ...emailSuppressionSchema.omit({ projectId: true }).shape,
   triggerName: z.string().nullable(),
 });
+export interface EmailSuppressionRowSchema extends Named<
+  typeof emailSuppressionRowSchemaDefinition
+> {}
+export const emailSuppressionRowSchema: EmailSuppressionRowSchema =
+  emailSuppressionRowSchemaDefinition;
 export type EmailSuppressionRow = z.infer<typeof emailSuppressionRowSchema>;
 
 /** What the email-suppression writes answer with: the write landed. */
-export const emailSuppressionAcknowledgedSchema = z.object({ ok: z.boolean() }).strict();
+const emailSuppressionAcknowledgedSchemaDefinition = z.object({ ok: z.boolean() }).strict();
+export interface EmailSuppressionAcknowledgedSchema extends Named<
+  typeof emailSuppressionAcknowledgedSchemaDefinition
+> {}
+export const emailSuppressionAcknowledgedSchema: EmailSuppressionAcknowledgedSchema =
+  emailSuppressionAcknowledgedSchemaDefinition;
 
 /** The public unsubscribe view masks both the address and its local-part
  * length. This pure contract helper is shared by server and web surfaces. */

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { organizationTeamMemberInputSchema } from "./team.ts";
@@ -8,10 +9,12 @@ import { organizationTeamMemberInputSchema } from "./team.ts";
  */
 
 /** A team addressed by its slug within an organization. */
-export const teamApiSlugSchema = z.object({
+const teamApiSlugSchemaDefinition = z.object({
   organizationId: z.string(),
   slug: z.string(),
 });
+export interface TeamApiSlugSchema extends Named<typeof teamApiSlugSchemaDefinition> {}
+export const teamApiSlugSchema: TeamApiSlugSchema = teamApiSlugSchemaDefinition;
 export type TeamApiSlug = z.infer<typeof teamApiSlugSchema>;
 
 /**
@@ -19,31 +22,53 @@ export type TeamApiSlug = z.infer<typeof teamApiSlugSchema>;
  * because the two procedures that take it were published with the keys in this
  * order, and an input shape is what a client is typed against.
  */
-export const teamApiSlugWithOrganizationSchema = z.object({
+const teamApiSlugWithOrganizationSchemaDefinition = z.object({
   slug: z.string(),
   organizationId: z.string(),
 });
+export interface TeamApiSlugWithOrganizationSchema extends Named<
+  typeof teamApiSlugWithOrganizationSchemaDefinition
+> {}
+export const teamApiSlugWithOrganizationSchema: TeamApiSlugWithOrganizationSchema =
+  teamApiSlugWithOrganizationSchemaDefinition;
 export type TeamApiSlugWithOrganization = z.infer<typeof teamApiSlugWithOrganizationSchema>;
 
-export const teamApiUpdateInputSchema = z.object({
+const teamApiUpdateInputSchemaDefinition = z.object({
   teamId: z.string(),
   name: z.string(),
   members: z.array(organizationTeamMemberInputSchema),
 });
+export interface TeamApiUpdateInputSchema extends Named<
+  typeof teamApiUpdateInputSchemaDefinition
+> {}
+export const teamApiUpdateInputSchema: TeamApiUpdateInputSchema =
+  teamApiUpdateInputSchemaDefinition;
 export type TeamApiUpdateInput = z.infer<typeof teamApiUpdateInputSchema>;
 
-export const teamApiCreateWithMembersInputSchema = z.object({
+const teamApiCreateWithMembersInputSchemaDefinition = z.object({
   organizationId: z.string(),
   name: z.string(),
   members: z.array(organizationTeamMemberInputSchema),
 });
+export interface TeamApiCreateWithMembersInputSchema extends Named<
+  typeof teamApiCreateWithMembersInputSchemaDefinition
+> {}
+export const teamApiCreateWithMembersInputSchema: TeamApiCreateWithMembersInputSchema =
+  teamApiCreateWithMembersInputSchemaDefinition;
 export type TeamApiCreateWithMembersInput = z.infer<typeof teamApiCreateWithMembersInputSchema>;
 
-export const teamApiTeamScopeSchema = z.object({ teamId: z.string() });
+const teamApiTeamScopeSchemaDefinition = z.object({ teamId: z.string() });
+export interface TeamApiTeamScopeSchema extends Named<typeof teamApiTeamScopeSchemaDefinition> {}
+export const teamApiTeamScopeSchema: TeamApiTeamScopeSchema = teamApiTeamScopeSchemaDefinition;
 export type TeamApiTeamScope = z.infer<typeof teamApiTeamScopeSchema>;
 
-export const teamApiRemoveMemberInputSchema = z.object({
+const teamApiRemoveMemberInputSchemaDefinition = z.object({
   teamId: z.string(),
   userId: z.string(),
 });
+export interface TeamApiRemoveMemberInputSchema extends Named<
+  typeof teamApiRemoveMemberInputSchemaDefinition
+> {}
+export const teamApiRemoveMemberInputSchema: TeamApiRemoveMemberInputSchema =
+  teamApiRemoveMemberInputSchemaDefinition;
 export type TeamApiRemoveMemberInput = z.infer<typeof teamApiRemoveMemberInputSchema>;

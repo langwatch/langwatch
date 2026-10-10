@@ -1,4 +1,5 @@
 import { flexibleDateSchema } from "@langwatch/api/dates";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { filterFieldsEnum } from "./analytics.filter-field.ts";
@@ -53,7 +54,7 @@ export const pipelineAggregationTypesEnum = z.enum(["sum", "avg", "min", "max"])
 
 export type PipelineAggregationTypes = z.infer<typeof pipelineAggregationTypesEnum>;
 
-export const sharedFiltersInputSchema = z.object({
+const sharedFiltersInputSchemaDefinition = z.object({
   projectId: z.string(),
   startDate: z.number().positive(),
   endDate: z.number().positive(),
@@ -77,13 +78,18 @@ export const sharedFiltersInputSchema = z.object({
    */
   excludeOrigins: z.array(z.string()).optional(),
 });
+export interface SharedFiltersInputSchema extends Named<
+  typeof sharedFiltersInputSchemaDefinition
+> {}
+export const sharedFiltersInputSchema: SharedFiltersInputSchema =
+  sharedFiltersInputSchemaDefinition;
 
 export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;
 
 /**
  * One series a chart asks for: which metric, aggregated how, narrowed by what.
  */
-export const seriesInputSchema = z.object({
+const seriesInputSchemaDefinition = z.object({
   metric: z.string().min(1),
   key: z.optional(z.string()),
   subkey: z.optional(z.string()),
@@ -106,13 +112,15 @@ export const seriesInputSchema = z.object({
   ),
   asPercent: z.optional(z.boolean()),
 });
+export interface SeriesInputSchema extends Named<typeof seriesInputSchemaDefinition> {}
+export const seriesInputSchema: SeriesInputSchema = seriesInputSchemaDefinition;
 
 export type SeriesInput = z.infer<typeof seriesInputSchema>;
 
 /**
  * The full timeseries request: the shared filters plus the series to compute.
  */
-export const timeseriesInputSchema = z.object({
+const timeseriesInputSchemaDefinition = z.object({
   ...sharedFiltersInputSchema.shape,
   series: z.array(seriesInputSchema),
   groupBy: z.optional(z.string().min(1)),
@@ -122,6 +130,8 @@ export const timeseriesInputSchema = z.object({
   /** Leave the previous period out of the scan; `previousPeriod` then comes back empty. */
   shouldSkipPreviousPeriod: z.optional(z.boolean()),
 });
+export interface TimeseriesInputSchema extends Named<typeof timeseriesInputSchemaDefinition> {}
+export const timeseriesInputSchema: TimeseriesInputSchema = timeseriesInputSchemaDefinition;
 
 export type TimeseriesInput = z.infer<typeof timeseriesInputSchema>;
 
@@ -161,21 +171,36 @@ export type TopDocumentsResult = AnalyticsTopDocumentsResult;
  */
 export type FeedbacksResult = AnalyticsFeedbacksResult;
 
-export const analyticsTimeseriesRestBodySchema = z.object({
+const analyticsTimeseriesRestBodySchemaDefinition = z.object({
   ...timeseriesInputSchema.omit({ projectId: true }).shape,
   startDate: flexibleDateSchema,
   endDate: flexibleDateSchema,
 });
+export interface AnalyticsTimeseriesRestBodySchema extends Named<
+  typeof analyticsTimeseriesRestBodySchemaDefinition
+> {}
+export const analyticsTimeseriesRestBodySchema: AnalyticsTimeseriesRestBodySchema =
+  analyticsTimeseriesRestBodySchemaDefinition;
 
-export const analyticsTimeseriesResponseSchema = z.object({
+const analyticsTimeseriesResponseSchemaDefinition = z.object({
   currentPeriod: z.array(z.record(z.string(), z.any())),
   previousPeriod: z.array(z.record(z.string(), z.any())),
 });
+export interface AnalyticsTimeseriesResponseSchema extends Named<
+  typeof analyticsTimeseriesResponseSchemaDefinition
+> {}
+export const analyticsTimeseriesResponseSchema: AnalyticsTimeseriesResponseSchema =
+  analyticsTimeseriesResponseSchemaDefinition;
 
-export const legacySentenceErrorSchema = z.object({
+const legacySentenceErrorSchemaDefinition = z.object({
   message: z.string().optional().describe("Set when the request was rejected before validation"),
   error: z.string().optional().describe("Set when the body parsed and then failed validation"),
 });
+export interface LegacySentenceErrorSchema extends Named<
+  typeof legacySentenceErrorSchemaDefinition
+> {}
+export const legacySentenceErrorSchema: LegacySentenceErrorSchema =
+  legacySentenceErrorSchemaDefinition;
 
 export const lwqlResultSchema = langWatchQLQueryResultSchema;
 

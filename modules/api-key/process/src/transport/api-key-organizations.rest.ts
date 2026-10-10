@@ -9,10 +9,7 @@ import {
  * key, self-hosted instance administrators only. Served by api-key, which mints
  * the key, at organization's published path (ARCHITECTURE.md §8, R3, R10).
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 
 /** What the organization provisioning door reaches; `ApiKeyModule` serves it. */

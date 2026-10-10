@@ -77,7 +77,8 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           zIndex: 30,
           minHeight: "38px",
           borderTopLeftRadius: "var(--chakra-radii-lg)",
-          boxShadow: "0 4px 12px rgba(237,137,38,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+          boxShadow:
+            "0 4px 12px color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent), 0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent)",
         }}
         initial={{ opacity: 0, filter: "blur(10px)" }}
         animate={{ opacity: 1, filter: "blur(0px)" }}
@@ -91,7 +92,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           left="1.5px"
           right="1.5px"
           bottom="1.5px"
-          bg="bg.surface/92"
+          bg="bg.card/92"
           borderTopLeftRadius="lg"
           borderTopRightRadius={0}
           borderBottomLeftRadius={0}
@@ -150,7 +151,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
                   borderRadius="md"
                   paddingX={2}
                   paddingY={1}
-                  boxShadow="0 2px 6px rgba(0,0,0,0.1)"
+                  boxShadow="0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
                 >
                   <Icon color="yellow.fg" boxSize="11px" flexShrink={0}>
                     <Lightbulb />

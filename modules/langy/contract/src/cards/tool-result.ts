@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Langy CLI result value: discriminated union so all layers carry same typed value.
  */
@@ -56,11 +57,13 @@ const cliCardResultSchema = z.discriminatedUnion("card", [
   cardResult("resourceRemoved", resourceCardSchema),
 ]);
 
-export const cliToolResultSchema = z.union([
+const cliToolResultSchemaDefinition = z.union([
   cliCardResultSchema,
   z.object({ kind: z.literal("json"), payload: z.json() }),
   z.object({ kind: z.literal("text"), text: z.string() }),
 ]);
+export interface CliToolResultSchema extends Named<typeof cliToolResultSchemaDefinition> {}
+export const cliToolResultSchema: CliToolResultSchema = cliToolResultSchemaDefinition;
 
 export type CliToolResult = z.infer<typeof cliToolResultSchema>;
 

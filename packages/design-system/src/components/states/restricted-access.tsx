@@ -1,14 +1,18 @@
-import { Button, Center, Circle, HStack, Heading, Stack, Text } from "@chakra-ui/react";
-import { Check, Copy, Lock } from "lucide-react";
+import { Button, Center, Text } from "@chakra-ui/react";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { toaster } from "../overlays/toaster.tsx";
+import { AccessState } from "./access-state.tsx";
 
 export type RestrictedAccessProps = {
   /** The permission the viewer is missing, as `resource:action`. */
-  permission: string;
+  permission?: string;
   /** What the viewer cannot open, as a noun phrase: "this page", "directory provisioning". */
   area?: string;
+  compact?: boolean;
+  detail?: string;
+  description?: string;
+  onBack?: () => void;
   /** Who is asking, written into the copied request when known. */
   requesterName?: string;
   "data-testid"?: string;
@@ -17,8 +21,12 @@ export type RestrictedAccessProps = {
 /** `datasets:view` reads "view datasets"; `model-providers:manage`, "manage model providers". */
 export function describePermission(permission: string): string {
   const [resource = permission, action] = permission.split(":");
-  const subject = resource.replace(/[-_]/g, " ");
-  return action ? `${action} ${subject}` : subject;
+  const subject = resource
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]/g, " ")
+    .toLowerCase();
+  const readableSubject = resource === "sso" ? "single sign-on" : subject;
+  return action ? `${action} ${readableSubject}` : readableSubject;
 }
 
 /** The words an admin needs to grant the access: who, what, and where. */
@@ -28,14 +36,14 @@ export function accessRequestText({
   requesterName,
   link,
 }: {
-  permission: string;
+  permission?: string;
   area: string;
   requesterName?: string;
   link: string;
 }): string {
   return [
     `${requesterName ?? "I"} need${requesterName ? "s" : ""} access to ${area}.`,
-    `Missing permission: ${permission}`,
+    ...(permission ? [`Missing permission: ${permission}`] : []),
     `Page: ${link}`,
   ].join("\n");
 }
@@ -45,51 +53,80 @@ export function RestrictedAccess({
   permission,
   area = "this page",
   requesterName,
+  compact = false,
+  detail,
+  description,
+  onBack,
   "data-testid": testId,
 }: RestrictedAccessProps) {
   const [copied, setCopied] = useState(false);
-  const copyRequest = () => {
-    const text = accessRequestText({
-      permission,
-      area,
-      link: window.location.href,
-      ...(requesterName ? { requesterName } : {}),
-    });
-    void navigator.clipboard.writeText(text).then(
-      () => {
-        setCopied(true);
-        toaster.create({ type: "success", title: "Access request copied" });
-      },
-      () => toaster.create({ type: "error", title: "Could not copy the request" }),
-    );
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copyRequest = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        accessRequestText({ permission, area, requesterName, link: window.location.href }),
+      );
+      setCopied(true);
+      setCopyFailed(false);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+    }
   };
 
   return (
-    <Center minHeight="60vh" padding={8} data-testid={testId}>
-      <Stack gap={5} align="center" maxWidth="520px" textAlign="center">
-        <Circle size={12} background="orange.subtle" color="orange.fg">
-          <Lock size={20} aria-hidden />
-        </Circle>
-        <Stack gap={2} align="center">
-          <Heading size="lg">You don't have access to {area}</Heading>
-          <Text color="fg.muted">
-            Your role doesn't let you {describePermission(permission)}. An admin of your
-            organization can give you access.
+    <Center
+      minHeight={compact ? void 0 : "50vh"}
+      width="full"
+      padding={compact ? 0 : { base: 4, md: 8 }}
+    >
+      <AccessState
+        kind="permission"
+        title={`You don't have access to ${area}`}
+        description={
+          description ??
+          (permission
+            ? `Your role doesn't let you ${describePermission(permission)}. Ask an organization admin to give you access.`
+            : "Your role doesn't include this action. Ask an organization admin to give you access.")
+        }
+        compact={compact}
+        data-testid={testId}
+        actions={
+          <>
+            <Button size="sm" colorPalette="orange" onClick={() => void copyRequest()}>
+              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied ? "Request copied" : "Copy access request"}
+            </Button>
+            {(!compact || onBack) && (
+              <Button size="sm" variant="outline" onClick={onBack ?? (() => window.history.back())}>
+                Go back
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detail && (
+          <Text color="fg.muted" fontSize="sm">
+            {detail}
           </Text>
-        </Stack>
-        <HStack gap={2} justify="center" flexWrap="wrap">
-          <Button size="sm" variant="solid" colorPalette="orange" onClick={copyRequest}>
-            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-            {copied ? "Request copied" : "Copy access request"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => window.history.back()}>
-            Go back
-          </Button>
-        </HStack>
-        <Text fontSize="xs" color="fg.subtle">
-          Missing permission: {permission}
-        </Text>
-      </Stack>
+        )}
+        {permission && (
+          <Text fontSize="xs" color="fg.subtle" overflowWrap="anywhere">
+            Missing permission: {permission}
+          </Text>
+        )}
+        {copyFailed && (
+          <Text role="alert" fontSize="sm" color="fg.muted">
+            Couldn't copy the request. Send this page's address
+            {permission ? ` and the permission ${permission}` : ""} to an organization admin.
+          </Text>
+        )}
+        {copied && (
+          <Text as="output" fontSize="sm" color="fg.muted">
+            Send the copied request to an organization admin.
+          </Text>
+        )}
+      </AccessState>
     </Center>
   );
 }

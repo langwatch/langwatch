@@ -1,4 +1,5 @@
-import { Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
+import { Button } from "@langwatch/design-system/primitives";
 import { Copy, ExternalLink } from "lucide-react";
 
 export function GroupDrawerHeader({
@@ -13,10 +14,7 @@ export function GroupDrawerHeader({
   onCopyGroupId: () => void;
 }) {
   return (
-    <HStack width="full" gap={2} align="start">
-      <Text textStyle="sm" fontFamily="mono" wordBreak="break-all" flexShrink={1}>
-        {groupId}
-      </Text>
+    <DetailDrawerHeader kind="Queue group" title={groupId}>
       <Button
         size="2xs"
         variant="ghost"
@@ -26,7 +24,6 @@ export function GroupDrawerHeader({
       >
         <Copy size={12} />
       </Button>
-      <Spacer />
       {tracesUrl && (
         <Button size="2xs" variant="outline" asChild flexShrink={0}>
           <a href={tracesUrl} target="_blank" rel="noreferrer">
@@ -41,6 +38,6 @@ export function GroupDrawerHeader({
           </a>
         </Button>
       )}
-    </HStack>
+    </DetailDrawerHeader>
   );
 }

@@ -117,6 +117,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
   )
+  .withAudit("dashboardWidgets.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetProjectParamsSchema)
   .withInput(createDashboardWidgetSchema)
@@ -184,6 +185,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .withAudit("dashboardWidgets.update")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withInput(updateDashboardWidgetSchema)
@@ -222,6 +224,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard",
   )
+  .withAudit("dashboardWidgets.assignDashboard")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withInput(assignDashboardWidgetToDashboardSchema)
@@ -255,6 +258,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .withAudit("dashboardWidgets.delete")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withPermission("analytics:delete")

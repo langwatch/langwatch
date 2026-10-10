@@ -1,5 +1,6 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -250,7 +251,7 @@ function BudgetsPage() {
                   </Alert.Content>
                 </Alert.Root>
               )}
-              <Card.Root width="full" overflow="hidden">
+              <Card.Root variant="showcase" width="full" overflow="hidden">
                 {/* The card clips; the body scrolls. Without this the
                     right-hand columns are simply unreachable on a narrow
                     window instead of scrolling into view. Focusable so the
@@ -263,7 +264,12 @@ function BudgetsPage() {
                   tabIndex={0}
                   aria-label="Budgets table"
                 >
-                  <Table.Root variant="line" size="md" width="full">
+                  <ListTable
+                    containerProps={{ overflowX: "auto", maxWidth: "full" }}
+                    variant="line"
+                    size="md"
+                    width="full"
+                  >
                     <Table.Header>
                       <Table.Row>
                         <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -300,7 +306,7 @@ function BudgetsPage() {
                         />
                       ))}
                     </Table.Body>
-                  </Table.Root>
+                  </ListTable>
                 </Card.Body>
               </Card.Root>
             </VStack>

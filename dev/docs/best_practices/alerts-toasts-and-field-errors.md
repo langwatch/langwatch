@@ -21,21 +21,21 @@ Rules of thumb:
 
 ## How an alert looks
 
-New notices use `Banner` (`@langwatch/design-system/banner`; guidelines §2). Existing
-`Alert` call sites keep the recipe below until they move; never restyle one. The design system's recipe
-(`packages/design-system/src/system/alert.recipe.ts`) gives every alert the
-card material with a faint wash of its status colour, a hairline in that colour
-and a status-coloured icon, with the text in the ordinary foreground colours.
-The wash is a tint, never a fill: 12 percent of the status colour into
-`bg.surface` in light, 16 percent into `bg.panel` in dark, enough that a warning
-reads orange in both modes (ruled by Alex, 2026-09-28).
+Use `Banner` for page or section notices and `Alert` for a message local to a form
+or task. Both carry a status icon as well as colour. The shared recipe uses two
+broad, low-opacity washes of the same status hue over an opaque tint. It never
+mixes a dark foreground step into the mesh. Body text uses the full foreground.
 
-| `variant`          | Looks like                                                | Use it for                                                 |
-| ------------------ | --------------------------------------------------------- | ---------------------------------------------------------- |
-| `subtle` (default) | Tinted card material, status hairline.                    | Almost everything.                                         |
-| `surface`          | Card material, neutral hairline, status edge on the left. | A page-level notice or empty state that heads a page.      |
-| `outline`          | No ground of its own, status hairline.                    | An alert on a surface that paints its own ground (glass).  |
-| `solid`            | Filled.                                                   | Rare: the one thing on the screen that must not be missed. |
+Banners are lightest, toasts sit between, and default alerts are strongest. Dark
+mode uses a little more colour over `bg.panel` so statuses remain distinguishable.
+The mesh adds texture, not a spotlight; no glow, blur or hue drift.
+
+| `variant`          | Looks like                                 | Use it for                                   |
+| ------------------ | ------------------------------------------ | -------------------------------------------- |
+| `solid`            | Deep status fill with a very quiet mesh.   | Rare: the one thing that must not be missed. |
+| `surface`          | Stronger status tint and hairline.         | A prominent local warning.                   |
+| `subtle` (default) | Soft status tint and hairline.             | Most form and task messages.                 |
+| `outline`          | Almost plain ground and a status hairline. | The quietest local message.                  |
 
 `status` is one of `info`, `success`, `warning`, `error`, `neutral`. Set the
 status, not a `colorPalette`; a palette alone is for a brand accent that is not
@@ -61,11 +61,10 @@ Sonner does (ruled by Alex, 2026-09-28):
   it, each a little smaller. Nothing beyond three shows.
 - Hovering or focusing the stack fans it out so every toast can be read, and
   every timer holds while it is fanned out.
-- One toast shows alone; two and three show as peeking cards; more than three
-  add a "+N more" chip to the front card.
-- A toast with a lifetime draws a thin bar that drains as it runs and holds with
-  its timer. A loading or persistent toast draws none.
-- Under reduced motion the stack does not animate and no bar is drawn.
+- Each visible card behind the front one darkens gently with its depth. Its text
+  is hidden until expansion, which restores the unshaded surface and readable text.
+- One toast shows alone; at most three cards are visible in the collapsed stack.
+- Reduced motion removes the entrance and stack transitions and keeps a brief exit fade.
 
 Raise toasts through `toaster.create`; never render a second toaster or a
 floating box of your own.

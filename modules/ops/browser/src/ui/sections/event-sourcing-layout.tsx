@@ -1,7 +1,6 @@
 /** Frame for /ops/event-sourcing/* pages; title bar, section rail and content column. */
 
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, HStack } from "@langwatch/design-system/primitives";
+import { Badge } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -21,7 +20,7 @@ import type { PropsWithChildren } from "react";
 import { api } from "../../behavior/ops-api.ts";
 import { useOpsRouter } from "../../behavior/ops-router.ts";
 
-const SECTION_LABEL = "Event Sourcing";
+const SECTION_LABEL = "Event sourcing";
 
 export function EventSourcingLayout({
   children,
@@ -30,14 +29,10 @@ export function EventSourcingLayout({
   const items: SectionNavigationLink[] = [
     { label: "Overview", href: "/ops/event-sourcing", icon: <Activity size={14} /> },
     {
-      label: "Dead Letters",
+      label: "Dead letters",
       href: "/ops/event-sourcing/dead-letters",
-      icon: (
-        <HStack gap={1}>
-          <Skull size={14} />
-          <DeadLetterBadge />
-        </HStack>
-      ),
+      icon: <Skull size={14} />,
+      badge: <DeadLetterBadge />,
     },
     { label: "Processes", href: "/ops/event-sourcing/processes", icon: <Workflow size={14} /> },
     { label: "Projections", href: "/ops/event-sourcing/projections", icon: <Layers size={14} /> },
@@ -66,13 +61,7 @@ export function EventSourcingLayout({
   return (
     <SectionNavigationFrame
       label={SECTION_LABEL}
-      header={
-        pageTitle && (
-          <PageLayout.Header>
-            <PageLayout.Heading>{pageTitle}</PageLayout.Heading>
-          </PageLayout.Header>
-        )
-      }
+      pageTitle={pageTitle === SECTION_LABEL ? "Overview" : pageTitle}
       links={items}
       activeHref={activeHref}
       onNavigate={(href) => router.push(href)}
@@ -85,7 +74,7 @@ export function EventSourcingLayout({
 /**
  * The dead total, in the navigation, on every page of this section. Absent
  * when zero - a permanent "0" beside a link trains the reader to stop
- * seeing it. Zero IS shown on the Dead Letters page itself (ops-dashboard.md).
+ * seeing it. Zero IS shown on the Dead letters page itself (ops-dashboard.md).
  */
 function DeadLetterBadge() {
   const counts = api.ops.listDeadLetterCounts.useQuery(undefined, {});

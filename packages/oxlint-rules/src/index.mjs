@@ -20,6 +20,7 @@ import {
   isCommentScannedPath,
 } from "./rules/comment-block-size.rule.mjs";
 import { conditionShapeRule } from "./rules/condition-shape.rule.mjs";
+import { contractSchemaNamedRule } from "./rules/contract-schema-named.rule.mjs";
 import { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mjs";
 import { effectDerivesStateRule } from "./rules/effect-derives-state.rule.mjs";
 import { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
@@ -110,6 +111,7 @@ const HOUSE_RULES = [
   cognitiveComplexityRule,
   commentBlockSizeRule,
   conditionShapeRule,
+  contractSchemaNamedRule,
   conditionalTypeDepthRule,
   emDashInCopyRule,
   environmentBoundariesRule,
@@ -210,6 +212,7 @@ export {
   cognitiveComplexityRule,
   commentBlockSizeRule,
   conditionShapeRule,
+  contractSchemaNamedRule,
   conditionalTypeDepthRule,
   emDashInCopyRule,
   environmentBoundariesRule,

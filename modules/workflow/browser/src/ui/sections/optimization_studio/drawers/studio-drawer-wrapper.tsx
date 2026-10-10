@@ -1,14 +1,14 @@
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack } from "@langwatch/design-system/primitives";
+import { Box, IconButton, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
+import { Columns, Copy, MoreHorizontal, Trash2, X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Columns, Copy, MoreHorizontal, Trash2, X } from "react-feather";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 
@@ -122,8 +122,8 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
         <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="lg" />
         <HoverableBigText
           lineClamp={2}
-          fontSize="15px"
-          fontWeight={500}
+          textStyle="md"
+          fontWeight="medium"
           overflow="hidden"
           textOverflow="ellipsis"
           expandable={false}
@@ -149,23 +149,24 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
               openDelay={0}
               closeDelay={0}
             >
-              <Button
+              <IconButton
                 variant="ghost"
                 size="sm"
                 color="fg.muted"
+                aria-label="Toggle input and output panels"
                 onClick={() => setPropertiesExpanded(!propertiesExpanded)}
               >
                 <Columns size={16} />
-              </Button>
+              </IconButton>
             </Tooltip>
           </>
         )}
         {isExpandableNode(node) && (
           <Menu.Root positioning={{ placement: "bottom-end" }}>
             <Menu.Trigger asChild>
-              <Button variant="ghost" size="sm" color="fg.muted" aria-label="Node actions">
+              <IconButton variant="ghost" size="sm" color="fg.muted" aria-label="Node actions">
                 <MoreHorizontal size={16} />
-              </Button>
+              </IconButton>
             </Menu.Trigger>
             <Menu.Content>
               <Menu.Item value="duplicate" onClick={() => duplicateNode(node.id)}>
@@ -187,9 +188,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
             </Menu.Content>
           </Menu.Root>
         )}
-        <Button variant="ghost" size="sm" color="fg.muted" onClick={handleClose}>
-          <X size={16} />
-        </Button>
+        <StudioDrawerClose expanded={propertiesExpanded} onClose={handleClose} />
       </HStack>
     </HStack>
   ) : null;
@@ -207,21 +206,13 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
         modal={false}
       >
         <Drawer.Content bg="bg" marginTop="56px">
-          {node && (
-            <Drawer.Header paddingTop={4} paddingBottom={3} paddingLeft={4} paddingRight={3}>
-              {headerContent}
-            </Drawer.Header>
-          )}
+          {node && <Drawer.Header>{headerContent}</Drawer.Header>}
 
           <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>
             {children}
           </Drawer.Body>
 
-          {effectiveFooter && (
-            <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
-              {effectiveFooter}
-            </Drawer.Footer>
-          )}
+          {effectiveFooter && <Drawer.Footer>{effectiveFooter}</Drawer.Footer>}
         </Drawer.Content>
       </Drawer.Root>
 
@@ -244,14 +235,14 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
                 height: `${fullPanelHeight}px`,
                 marginTop: 0,
                 borderRadius: 0,
-                boxShadow: "0 0 0 rgba(0,0,0,0)",
+                boxShadow: "0 0 0 transparent",
               }}
               animate={{
                 right: `${middlePoint}px`,
                 height: `${fullPanelHeight - 40}px`,
                 marginTop: "20px",
                 borderRadius: "8px",
-                boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+                boxShadow: "var(--chakra-shadows-md)",
               }}
               transition={{ duration: 0.4, ease: "easeInOut", delay: 0.1 }}
               style={{
@@ -306,7 +297,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
               left={0}
               height="100%"
               width="100%"
-              background="rgba(0,0,0,0.1)"
+              background="bg.scrim"
               zIndex={98}
               onClick={() => setPropertiesExpanded(false)}
             />
@@ -378,5 +369,21 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
           document.body,
         )}
     </>
+  );
+}
+
+/** Expanded canvas panels sit outside the drawer context. */
+function StudioDrawerClose({ expanded, onClose }: { expanded: boolean; onClose: () => void }) {
+  if (!expanded) return <Drawer.CloseTrigger />;
+  return (
+    <IconButton
+      variant="ghost"
+      size="sm"
+      color="fg.muted"
+      aria-label="Close drawer"
+      onClick={onClose}
+    >
+      <X size={16} />
+    </IconButton>
   );
 }

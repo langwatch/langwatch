@@ -40,6 +40,7 @@ const endBrowserSession = vi.fn<AuthApi["endBrowserSession"]>();
 const deactivateAccount = vi.fn<AuthApi["deactivateAccount"]>();
 const setOwnFirstPassword = vi.fn<AuthApi["setOwnFirstPassword"]>();
 const changeOwnPassword = vi.fn<AuthApi["changeOwnPassword"]>();
+const unlinkOwnAccount = vi.fn<AuthApi["unlinkOwnAccount"]>();
 const registerCredentialAccount = vi.fn<AuthApi["registerCredentialAccount"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
@@ -99,6 +100,7 @@ const door: AuthApi = {
   deactivateAccount,
   setOwnFirstPassword,
   changeOwnPassword,
+  unlinkOwnAccount,
   registerCredentialAccount,
   changeUserEmail: () => unreached("changeUserEmail"),
 };
@@ -148,6 +150,7 @@ describe("the signed-out front door", () => {
         "sendMyAddressConfirmation",
         "setPassword",
         "signUpEnrollment",
+        "unlinkAccount",
       ]);
     });
 
@@ -173,6 +176,7 @@ describe("the signed-out front door", () => {
         endBrowserSession: "mutation",
         setPassword: "mutation",
         changePassword: "mutation",
+        unlinkAccount: "mutation",
         register: "mutation",
       });
     });
@@ -240,6 +244,19 @@ describe("the signed-out front door", () => {
           caller,
         }),
       );
+    });
+  });
+
+  describe("when a signed-in person removes one of their own sign-in methods", () => {
+    /** @scenario "The password procedures answer on auth's namespace" */
+    it("hands auth the caller's own id and answers success, as user.unlinkAccount did", async () => {
+      unlinkOwnAccount.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+
+      await expect(person.unlinkAccount({ accountId: "account-9" })).resolves.toEqual({
+        success: true,
+      });
+      expect(unlinkOwnAccount).toHaveBeenCalledWith({ userId: "user-1", accountId: "account-9" });
     });
   });
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { automationFilterValueSchema, automationFiltersSchema } from "./automation-filters.ts";
@@ -19,14 +20,24 @@ import {
  */
 
 /** The project an automation call is about, and the whole input of five reads. */
-export const automationApiProjectScopeSchema = z.object({ projectId: z.string() });
+const automationApiProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface AutomationApiProjectScopeSchema extends Named<
+  typeof automationApiProjectScopeSchemaDefinition
+> {}
+export const automationApiProjectScopeSchema: AutomationApiProjectScopeSchema =
+  automationApiProjectScopeSchemaDefinition;
 export type AutomationApiProjectScope = z.infer<typeof automationApiProjectScopeSchema>;
 
 /** One automation in one project. */
-export const automationApiTriggerScopeSchema = z.object({
+const automationApiTriggerScopeSchemaDefinition = z.object({
   projectId: z.string(),
   triggerId: z.string(),
 });
+export interface AutomationApiTriggerScopeSchema extends Named<
+  typeof automationApiTriggerScopeSchemaDefinition
+> {}
+export const automationApiTriggerScopeSchema: AutomationApiTriggerScopeSchema =
+  automationApiTriggerScopeSchemaDefinition;
 export type AutomationApiTriggerScope = z.infer<typeof automationApiTriggerScopeSchema>;
 
 /**
@@ -40,19 +51,29 @@ export const automationApiTraceDebounceMsSchema = z
   .max(MAX_TRACE_DEBOUNCE_MS);
 
 /** The automation a test fire is rendering the message for. */
-export const automationApiTriggerIdentitySchema = z.object({
+const automationApiTriggerIdentitySchemaDefinition = z.object({
   name: z.string(),
   alertType: alertTypeSchema.nullable().default(null),
 });
+export interface AutomationApiTriggerIdentitySchema extends Named<
+  typeof automationApiTriggerIdentitySchemaDefinition
+> {}
+export const automationApiTriggerIdentitySchema: AutomationApiTriggerIdentitySchema =
+  automationApiTriggerIdentitySchemaDefinition;
 export type AutomationApiTriggerIdentity = z.infer<typeof automationApiTriggerIdentitySchema>;
 
 /** Validates filter value structure without restricting field names. */
-export const automationApiPermissiveFiltersSchema = z.record(
+const automationApiPermissiveFiltersSchemaDefinition = z.record(
   z.string(),
   automationFilterValueSchema,
 );
+export interface AutomationApiPermissiveFiltersSchema extends Named<
+  typeof automationApiPermissiveFiltersSchemaDefinition
+> {}
+export const automationApiPermissiveFiltersSchema: AutomationApiPermissiveFiltersSchema =
+  automationApiPermissiveFiltersSchemaDefinition;
 
-export const automationApiActionParamsSchema = z.object({
+const automationApiActionParamsSchemaDefinition = z.object({
   // createdByUserId is server-stamped from the session — the wire MUST NOT
   // carry it or a hostile client can forge audit attribution
   // (builder5015-002 / applyr-002).
@@ -82,6 +103,11 @@ export const automationApiActionParamsSchema = z.object({
   bodyTemplate: z.string().nullable().optional(),
   contentType: z.string().optional(),
 });
+export interface AutomationApiActionParamsSchema extends Named<
+  typeof automationApiActionParamsSchemaDefinition
+> {}
+export const automationApiActionParamsSchema: AutomationApiActionParamsSchema =
+  automationApiActionParamsSchemaDefinition;
 export type AutomationApiActionParams = z.infer<typeof automationApiActionParamsSchema>;
 
 /**
@@ -89,7 +115,7 @@ export type AutomationApiActionParams = z.infer<typeof automationApiActionParams
  * purpose: it carries no webhook destination and no Slack bot connection,
  * which is why the router refuses `SEND_WEBHOOK` here outright.
  */
-export const automationApiCreateInputSchema = z.object({
+const automationApiCreateInputSchemaDefinition = z.object({
   projectId: z.string(),
   name: z.string(),
   action: triggerActionSchema,
@@ -119,58 +145,93 @@ export const automationApiCreateInputSchema = z.object({
       .optional(),
   }),
 });
+export interface AutomationApiCreateInputSchema extends Named<
+  typeof automationApiCreateInputSchemaDefinition
+> {}
+export const automationApiCreateInputSchema: AutomationApiCreateInputSchema =
+  automationApiCreateInputSchemaDefinition;
 export type AutomationApiCreateInput = z.infer<typeof automationApiCreateInputSchema>;
 
-export const automationApiRecentFiresInputSchema = z.object({
+const automationApiRecentFiresInputSchemaDefinition = z.object({
   projectId: z.string(),
   triggerId: z.string(),
   limit: z.number().int().min(1).max(20).default(20),
 });
+export interface AutomationApiRecentFiresInputSchema extends Named<
+  typeof automationApiRecentFiresInputSchemaDefinition
+> {}
+export const automationApiRecentFiresInputSchema: AutomationApiRecentFiresInputSchema =
+  automationApiRecentFiresInputSchemaDefinition;
 export type AutomationApiRecentFiresInput = z.infer<typeof automationApiRecentFiresInputSchema>;
 
-export const automationApiWebhookDeliveriesInputSchema = z.object({
+const automationApiWebhookDeliveriesInputSchemaDefinition = z.object({
   projectId: z.string(),
   triggerId: z.string(),
   limit: z.number().int().min(1).max(50).default(50),
 });
+export interface AutomationApiWebhookDeliveriesInputSchema extends Named<
+  typeof automationApiWebhookDeliveriesInputSchemaDefinition
+> {}
+export const automationApiWebhookDeliveriesInputSchema: AutomationApiWebhookDeliveriesInputSchema =
+  automationApiWebhookDeliveriesInputSchemaDefinition;
 export type AutomationApiWebhookDeliveriesInput = z.infer<
   typeof automationApiWebhookDeliveriesInputSchema
 >;
 
-export const automationApiRecentActivityInputSchema = z.object({
+const automationApiRecentActivityInputSchemaDefinition = z.object({
   projectId: z.string(),
   limit: z.number().int().min(1).max(200).default(100),
 });
+export interface AutomationApiRecentActivityInputSchema extends Named<
+  typeof automationApiRecentActivityInputSchemaDefinition
+> {}
+export const automationApiRecentActivityInputSchema: AutomationApiRecentActivityInputSchema =
+  automationApiRecentActivityInputSchemaDefinition;
 export type AutomationApiRecentActivityInput = z.infer<
   typeof automationApiRecentActivityInputSchema
 >;
 
-export const automationApiToggleTriggerInputSchema = z.object({
+const automationApiToggleTriggerInputSchemaDefinition = z.object({
   triggerId: z.string(),
   active: z.boolean(),
   projectId: z.string(),
 });
+export interface AutomationApiToggleTriggerInputSchema extends Named<
+  typeof automationApiToggleTriggerInputSchemaDefinition
+> {}
+export const automationApiToggleTriggerInputSchema: AutomationApiToggleTriggerInputSchema =
+  automationApiToggleTriggerInputSchemaDefinition;
 export type AutomationApiToggleTriggerInput = z.infer<typeof automationApiToggleTriggerInputSchema>;
 
 /** The channels a connection's bot can see; a webhook connection lists nothing (`no_token`). */
-export const automationApiListSlackChannelsInputSchema = z.object({
+const automationApiListSlackChannelsInputSchemaDefinition = z.object({
   projectId: z.string(),
   slackIntegrationId: z.string(),
 });
+export interface AutomationApiListSlackChannelsInputSchema extends Named<
+  typeof automationApiListSlackChannelsInputSchemaDefinition
+> {}
+export const automationApiListSlackChannelsInputSchema: AutomationApiListSlackChannelsInputSchema =
+  automationApiListSlackChannelsInputSchemaDefinition;
 export type AutomationApiListSlackChannelsInput = z.infer<
   typeof automationApiListSlackChannelsInputSchema
 >;
 
-export const automationApiUpdateTriggerFiltersInputSchema = z.object({
+const automationApiUpdateTriggerFiltersInputSchemaDefinition = z.object({
   triggerId: z.string(),
   projectId: z.string(),
   filters: automationApiPermissiveFiltersSchema,
 });
+export interface AutomationApiUpdateTriggerFiltersInputSchema extends Named<
+  typeof automationApiUpdateTriggerFiltersInputSchemaDefinition
+> {}
+export const automationApiUpdateTriggerFiltersInputSchema: AutomationApiUpdateTriggerFiltersInputSchema =
+  automationApiUpdateTriggerFiltersInputSchemaDefinition;
 export type AutomationApiUpdateTriggerFiltersInput = z.infer<
   typeof automationApiUpdateTriggerFiltersInputSchema
 >;
 
-export const automationApiTestFireInputSchema = z.object({
+const automationApiTestFireInputSchemaDefinition = z.object({
   projectId: z.string(),
   channel: z.enum(["email", "slack", "webhook"]),
   trigger: automationApiTriggerIdentitySchema,
@@ -240,28 +301,43 @@ export const automationApiTestFireInputSchema = z.object({
     .nullable()
     .default(null),
 });
+export interface AutomationApiTestFireInputSchema extends Named<
+  typeof automationApiTestFireInputSchemaDefinition
+> {}
+export const automationApiTestFireInputSchema: AutomationApiTestFireInputSchema =
+  automationApiTestFireInputSchemaDefinition;
 export type AutomationApiTestFireInput = z.infer<typeof automationApiTestFireInputSchema>;
 
 /** The email the drawer previews: the test-fire's example context, with no delivery. */
-export const automationApiPreviewEmailInputSchema = automationApiTestFireInputSchema.pick({
+const automationApiPreviewEmailInputSchemaDefinition = automationApiTestFireInputSchema.pick({
   projectId: true,
   trigger: true,
   draft: true,
   graphAlert: true,
   report: true,
 });
+export interface AutomationApiPreviewEmailInputSchema extends Named<
+  typeof automationApiPreviewEmailInputSchemaDefinition
+> {}
+export const automationApiPreviewEmailInputSchema: AutomationApiPreviewEmailInputSchema =
+  automationApiPreviewEmailInputSchemaDefinition;
 export type AutomationApiPreviewEmailInput = z.infer<typeof automationApiPreviewEmailInputSchema>;
 
-export const automationEmailPreviewSchema = z.object({
+const automationEmailPreviewSchemaDefinition = z.object({
   subject: z.string(),
   html: z.string(),
   usedDefault: z.boolean(),
   missingVariables: z.array(z.string()),
   errors: z.array(z.string()),
 });
+export interface AutomationEmailPreviewSchema extends Named<
+  typeof automationEmailPreviewSchemaDefinition
+> {}
+export const automationEmailPreviewSchema: AutomationEmailPreviewSchema =
+  automationEmailPreviewSchemaDefinition;
 export type AutomationEmailPreview = z.infer<typeof automationEmailPreviewSchema>;
 
-export const automationApiUpsertInputSchema = z.object({
+const automationApiUpsertInputSchemaDefinition = z.object({
   projectId: z.string(),
   triggerId: z.string().optional(),
   name: z.string().min(1),
@@ -286,42 +362,61 @@ export const automationApiUpsertInputSchema = z.object({
   notificationCadence: notificationCadenceSchema.optional(),
   traceDebounceMs: automationApiTraceDebounceMsSchema.optional(),
 });
+export interface AutomationApiUpsertInputSchema extends Named<
+  typeof automationApiUpsertInputSchemaDefinition
+> {}
+export const automationApiUpsertInputSchema: AutomationApiUpsertInputSchema =
+  automationApiUpsertInputSchemaDefinition;
 export type AutomationApiUpsertInput = z.infer<typeof automationApiUpsertInputSchema>;
 
 /** Where a fire-history page resumes: the `(createdAt, id)` of the last fire of the page before. */
-export const triggerFireCursorSchema = z.object({ createdAt: z.date(), id: z.string().min(1) });
+const triggerFireCursorSchemaDefinition = z.object({ createdAt: z.date(), id: z.string().min(1) });
+export interface TriggerFireCursorSchema extends Named<typeof triggerFireCursorSchemaDefinition> {}
+export const triggerFireCursorSchema: TriggerFireCursorSchema = triggerFireCursorSchemaDefinition;
 export type TriggerFireCursor = z.infer<typeof triggerFireCursorSchema>;
 
 /** One page of a trigger's fires, newest first. Metadata only: no trace ids, no trace content. */
-export const triggerFirePageSchema = z.object({
+const triggerFirePageSchemaDefinition = z.object({
   fires: z.array(triggerFireRowSchema),
   nextCursor: triggerFireCursorSchema.nullable(),
 });
+export interface TriggerFirePageSchema extends Named<typeof triggerFirePageSchemaDefinition> {}
+export const triggerFirePageSchema: TriggerFirePageSchema = triggerFirePageSchemaDefinition;
 export type TriggerFirePage = z.infer<typeof triggerFirePageSchema>;
 
 /** One page of one automation's fires, resuming after `cursor` when one is given. */
-export const automationApiFireHistoryInputSchema = z.object({
+const automationApiFireHistoryInputSchemaDefinition = z.object({
   projectId: z.string(),
   triggerId: z.string(),
   limit: z.number().int().min(1).max(100),
   cursor: triggerFireCursorSchema.nullable(),
 });
+export interface AutomationApiFireHistoryInputSchema extends Named<
+  typeof automationApiFireHistoryInputSchemaDefinition
+> {}
+export const automationApiFireHistoryInputSchema: AutomationApiFireHistoryInputSchema =
+  automationApiFireHistoryInputSchemaDefinition;
 export type AutomationApiFireHistoryInput = z.infer<typeof automationApiFireHistoryInputSchema>;
 
 /** The view's page of fires: main's tRPC bounds (at most 50, 20 by default), cursor optional. */
-export const automationApiFireHistoryTrpcInputSchema = z.object({
+const automationApiFireHistoryTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   triggerId: z.string(),
   limit: z.number().int().min(1).max(50).default(20),
   cursor: z.object({ createdAt: z.coerce.date(), id: z.string().min(1) }).nullish(),
 });
+export interface AutomationApiFireHistoryTrpcInputSchema extends Named<
+  typeof automationApiFireHistoryTrpcInputSchemaDefinition
+> {}
+export const automationApiFireHistoryTrpcInputSchema: AutomationApiFireHistoryTrpcInputSchema =
+  automationApiFireHistoryTrpcInputSchemaDefinition;
 
 /**
  * What an alert's latest check observed and decided; metadata only, no trace ids.
  * Verdict and skip code read as plain strings, so a value a newer writer stored
  * survives the read and the view degrades it to a plain "checked".
  */
-export const triggerLatestEvaluationSchema = z.object({
+const triggerLatestEvaluationSchemaDefinition = z.object({
   triggerId: z.string(),
   projectId: z.string(),
   evaluatedAt: z.date(),
@@ -332,10 +427,15 @@ export const triggerLatestEvaluationSchema = z.object({
   timePeriodMinutes: z.number().int().nullable(),
   skipCode: z.string().nullable(),
 });
+export interface TriggerLatestEvaluationSchema extends Named<
+  typeof triggerLatestEvaluationSchemaDefinition
+> {}
+export const triggerLatestEvaluationSchema: TriggerLatestEvaluationSchema =
+  triggerLatestEvaluationSchemaDefinition;
 export type TriggerLatestEvaluation = z.infer<typeof triggerLatestEvaluationSchema>;
 
 /** When an automation acts next: one answer per kind, paused answered first for all. */
-export const nextFiringSchema = z.discriminatedUnion("kind", [
+const nextFiringSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("paused"),
     subject: z.enum(["schedule", "alert", "automation"]),
@@ -351,4 +451,6 @@ export const nextFiringSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("immediate"), traceDebounceMs: z.number() }),
   z.object({ kind: z.literal("alert"), sweepIntervalMs: z.number() }),
 ]);
+export interface NextFiringSchema extends Named<typeof nextFiringSchemaDefinition> {}
+export const nextFiringSchema: NextFiringSchema = nextFiringSchemaDefinition;
 export type NextFiring = z.infer<typeof nextFiringSchema>;

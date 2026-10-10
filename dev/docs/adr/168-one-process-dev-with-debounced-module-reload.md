@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 
-**Status:** Accepted (2026-10-09; see the amendment "one process is the default")
+**Status:** Accepted (2026-10-09; amended 2026-10-10: Vite runs only under `--hmr`, as its own lane)
 
 **Related:** [ADR-004](004-docker-dev-environment.md) (amendments 2026-09-07: the `backend` lane
 and debounced restart), [ADR-111](111-physical-application-workspaces.md) (`tools/dev-runtime`),
@@ -274,6 +274,14 @@ most 5 s for B1, peak RSS at most today's Node total plus 15%, flat connection c
    and it is the default (see the amendment).
 2. May haven install `PostToolUse` and `Stop` hooks per worktree by default, as it does the gate? Moot: the hold was retired on 2026-10-09.
 3. Should the npx CLI (`apps/server`) also run api and worker in one process, without watch?
+   Answered 2026-10-10 (Alex): yes. `npx @langwatch/server` spawns `apps/backend`
+   (`@langwatch/backend`) once: one Node process that boots `startApi` and `startWorker` through the
+   same seam the dev host uses (`startBackend`, `drainBackend`, in `@langwatch/process/backend-host`), with the worker owning telemetry and
+   the api serving the prebuilt UI. No watch, no reload; a signal drains the worker, then the api.
+   Unlike the dev host, a worker that refuses boot is fatal (nothing retries it; an api without its
+   worker runs no jobs and no upgrade). The CLI waits on one health door and gives the worker half
+   its own port slot. Images and the chart keep running each app's own `main.ts`. nlpgo and the
+   ai-gateway run as one `service combined` process when the release binary has it.
 4. Does "dev-env" mean the compose quickstart? If so, retire `make quickstart` and ADR-004's
    compose presets separately.
 
@@ -288,3 +296,19 @@ belong to haven; crash collapsing is haven's logfmt, and the crash log, split-mo
 `LANGWATCH_DEV_WATCH=0`, UI HMR kept) and `haven reload` sends the host SIGUSR2 to re-link the
 backend on demand. `LANGWATCH_DEV_RELOAD`, `_SUPERVISOR`, `_READY_PATTERN`, `_RAW_CRASH` and
 `_CRASH_LOG` no longer exist.
+
+## Amendment 2026-10-10: Vite only under --hmr, as its own lane
+
+Alex, 2026-10-10, superseding "one process is the default" for the UI:
+
+- **A.** Vite exists in dev only under `--hmr`, as its own lane (`@langwatch/ui dev`) beside the
+  backend. The in-process Vite UI host is deleted: `dev:one`, `startUi` and `bootApp`'s `withUi`.
+  `tools/dev-runtime` hosts api and worker only; its Vite module runner stays, as the relink
+  mechanism. Still and `--watch` are unchanged: the api serves the built `apps/ui/dist/client`.
+  `pnpm dev` matches them (UI built once with `build:local`, the backend reloading, the go lane);
+  `pnpm dev:hmr` adds the Vite `ui` lane. `dev:app` (no worker), `dev:concurrent` and `dev:one`
+  are deleted. In haven `LANGWATCH_DEV_ONE_PROCESS` no longer touches the Node lanes; it still
+  folds (or, `=0`, splits) the simulators into the `go` lane.
+- **C.** `npx @langwatch/server` runs api and worker as one process, `apps/backend`; the seam
+  (`startBackend`, `drainBackend`) moves to `packages/process` out of `tools/dev-runtime/src/backend.process.ts`,
+  which keeps only the reload generation. Open question 3 holds the full answer.

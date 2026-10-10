@@ -234,8 +234,8 @@ func resolveLogSource(name string, available map[string]bool) (logSource, bool) 
 	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) && !available["worker"] {
 		return logSource{file: file, label: name, app: name}, true
 	}
-	// A one-process stack (LANGWATCH_DEV_ONE_PROCESS) writes ui, api and worker
-	// to the one app capture. ponytail: a stale api.log from an earlier up wins.
+	// A built-UI stack (still or --watch) writes api and worker, and an older
+	// one-process capture ui too, to the one app capture. ponytail: a stale api.log from an earlier up wins.
 	if available[app.AppLane] && !available[name] && (name == "ui" || slices.Contains(apiLaneApps, name)) {
 		return logSource{file: app.AppLane, label: name, app: name}, true
 	}

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The chart builder's vocabulary: every metric and grouping a series may name, and the
  * series and timeseries shapes built from them. Labels and formatters stay in the browser
@@ -56,7 +57,7 @@ export const analyticsChartGroupSchema = z.enum([
 export type AnalyticsChartGroup = z.infer<typeof analyticsChartGroupSchema>;
 
 /** One charted series: a metric, how it aggregates, and what narrows it. */
-export const analyticsChartSeriesSchema = z.object({
+const analyticsChartSeriesSchemaDefinition = z.object({
   metric: analyticsChartMetricSchema,
   key: z.optional(z.string()),
   subkey: z.optional(z.string()),
@@ -79,10 +80,15 @@ export const analyticsChartSeriesSchema = z.object({
   ),
   asPercent: z.optional(z.boolean()),
 });
+export interface AnalyticsChartSeriesSchema extends Named<
+  typeof analyticsChartSeriesSchemaDefinition
+> {}
+export const analyticsChartSeriesSchema: AnalyticsChartSeriesSchema =
+  analyticsChartSeriesSchemaDefinition;
 export type AnalyticsChartSeries = z.infer<typeof analyticsChartSeriesSchema>;
 
 /** The series a chart asks for, grouped and bucketed. */
-export const analyticsChartTimeseriesSchema = z.object({
+const analyticsChartTimeseriesSchemaDefinition = z.object({
   query: z.optional(z.string()),
   series: z.array(analyticsChartSeriesSchema),
   groupBy: z.optional(analyticsChartGroupSchema),
@@ -90,6 +96,11 @@ export const analyticsChartTimeseriesSchema = z.object({
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
   timeZone: z.string(),
 });
+export interface AnalyticsChartTimeseriesSchema extends Named<
+  typeof analyticsChartTimeseriesSchemaDefinition
+> {}
+export const analyticsChartTimeseriesSchema: AnalyticsChartTimeseriesSchema =
+  analyticsChartTimeseriesSchemaDefinition;
 export type AnalyticsChartTimeseries = z.infer<typeof analyticsChartTimeseriesSchema>;
 
 /**

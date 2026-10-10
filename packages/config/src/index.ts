@@ -20,6 +20,7 @@ export {
 export {
   adminEmails,
   allowedProxyHosts,
+  allowInsecureLocalUrls,
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   foldCacheTtlSeconds,

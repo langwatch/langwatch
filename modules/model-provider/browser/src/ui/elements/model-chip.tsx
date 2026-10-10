@@ -63,7 +63,7 @@ function AliasLabel({
     <Text
       fontSize={fontSize}
       lineClamp={1}
-      color={invalid ? "red.600" : undefined}
+      color={invalid ? "red.fg" : undefined}
       textDecoration={invalid ? "line-through" : undefined}
     >
       <Text as="span" fontWeight="medium">
@@ -94,7 +94,7 @@ function ModelLabel({
       fontSize={fontSize}
       lineClamp={1}
       wordBreak="break-all"
-      color={invalid ? "red.600" : undefined}
+      color={invalid ? "red.fg" : undefined}
       textDecoration={invalid ? "line-through" : undefined}
     >
       {label}
@@ -106,7 +106,7 @@ function UpdateNeededBadge({ size }: { size: "sm" | "md" }) {
   const isSmall = size === "sm";
 
   return (
-    <HStack gap={1} color="red.600" flexShrink={0}>
+    <HStack gap={1} color="red.fg" flexShrink={0}>
       <AlertTriangle size={isSmall ? 12 : 14} aria-hidden />
       <Text
         fontSize={isSmall ? "2xs" : "xs"}

@@ -160,7 +160,7 @@ export function ProviderScopeChips({
    */
   principal?: { name?: string | null; email?: string | null };
   size?: "sm" | "xs";
-  /** "neutral" greys the scope chips where colour would compete with the row. */
+  /** "neutral" uses an unboxed label where a chip would compete with the row. */
   tone?: "scope" | "neutral";
 }) {
   const entries = entriesOrFallback({ scopes, fallbackScopeType });
@@ -193,7 +193,8 @@ export function ProviderScopeChips({
         const chip = (
           <Badge
             colorPalette={tone === "neutral" ? "gray" : style.colorPalette}
-            variant="subtle"
+            variant={tone === "neutral" ? "plain" : "subtle"}
+            color={tone === "neutral" ? "fg.muted" : void 0}
             size={size}
             maxWidth={CHIP_MAX_WIDTH}
           >

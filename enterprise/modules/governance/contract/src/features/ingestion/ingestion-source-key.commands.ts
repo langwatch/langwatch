@@ -1,7 +1,8 @@
 import { API_KEY_REVOCATION_CAUSES } from "@langwatch/api-key-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const ingestionKeyMintCommandSchema = z
+const ingestionKeyMintCommandSchemaDefinition = z
   .object({
     callerUserId: z.string().min(1),
     ownerUserId: z.string().nullable(),
@@ -12,9 +13,14 @@ export const ingestionKeyMintCommandSchema = z
     createdByDeviceLabel: z.string().nullable().optional(),
   })
   .strict();
+export interface IngestionKeyMintCommandSchema extends Named<
+  typeof ingestionKeyMintCommandSchemaDefinition
+> {}
+export const ingestionKeyMintCommandSchema: IngestionKeyMintCommandSchema =
+  ingestionKeyMintCommandSchemaDefinition;
 export type IngestionKeyMintCommand = z.infer<typeof ingestionKeyMintCommandSchema>;
 
-export const issuedIngestionKeySchema = z
+const issuedIngestionKeySchemaDefinition = z
   .object({
     token: z.string().min(1),
     apiKeyId: z.string().min(1),
@@ -22,6 +28,11 @@ export const issuedIngestionKeySchema = z
     sourceType: z.string().min(1),
   })
   .strict();
+export interface IssuedIngestionKeySchema extends Named<
+  typeof issuedIngestionKeySchemaDefinition
+> {}
+export const issuedIngestionKeySchema: IssuedIngestionKeySchema =
+  issuedIngestionKeySchemaDefinition;
 export type IssuedIngestionKey = z.infer<typeof issuedIngestionKeySchema>;
 
 /**
@@ -40,11 +51,16 @@ export const PERSONAL_INGEST_SOURCE_TYPES = [
 ] as const;
 
 /** What became of one of the caller's own personal ingest keys. */
-export const personalIngestionKeyStateSchema = z
+const personalIngestionKeyStateSchemaDefinition = z
   .object({
     sourceType: z.string().min(1),
     live: z.boolean(),
     revocationCause: z.enum(API_KEY_REVOCATION_CAUSES).nullable(),
   })
   .strict();
+export interface PersonalIngestionKeyStateSchema extends Named<
+  typeof personalIngestionKeyStateSchemaDefinition
+> {}
+export const personalIngestionKeyStateSchema: PersonalIngestionKeyStateSchema =
+  personalIngestionKeyStateSchemaDefinition;
 export type PersonalIngestionKeyState = z.infer<typeof personalIngestionKeyStateSchema>;

@@ -73,6 +73,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withInput(z.object({ userName: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal })
+  .withoutAudit("test route")
   .handle(async ({ app, input, response }) =>
     response.write({
       status: 201,
@@ -99,6 +100,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withParams(z.object({ id: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal })
+  .withoutAudit("test route")
   .handle(async ({ app, input, response }) => {
     await app.remove({ id: input.id });
 
@@ -109,6 +111,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withInput(z.object({ userName: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal: malformedOnly })
+  .withoutAudit("test route")
   .handle(async ({ app, input, response }) =>
     response.write({
       status: 201,
@@ -121,6 +124,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withInput(z.object({ userName: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withOutput(z.object({ id: z.string(), userName: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.create(input))
   .build();
 

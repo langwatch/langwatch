@@ -20,7 +20,7 @@ const guides: Guide[] = [
     href: "https://docs.langwatch.ai/integration/python/guide",
     event: "integration_guide_click",
     language: "python",
-    bg: "blue.50",
+    bg: "blue.subtle",
   },
   {
     icon: <FaJs size={16} color="#2563eb" />,
@@ -28,7 +28,7 @@ const guides: Guide[] = [
     href: "https://docs.langwatch.ai/integration/typescript/guide",
     event: "integration_guide_click",
     language: "typescript",
-    bg: "cyan.50",
+    bg: "cyan.subtle",
   },
   {
     icon: <FaGolang size={16} color="#00ADD8" />,
@@ -36,7 +36,7 @@ const guides: Guide[] = [
     href: "https://github.com/langwatch/langwatch/tree/main/sdks/go",
     event: "integration_guide_click",
     language: "golang",
-    bg: "gray.100",
+    bg: "bg.nested",
   },
   {
     icon: <MdHttp size={16} color="grey.500" />,
@@ -44,7 +44,7 @@ const guides: Guide[] = [
     href: "https://docs.langwatch.ai/integration/rest-api",
     event: "integration_guide_click",
     language: "rest",
-    bg: "gray.100",
+    bg: "bg.nested",
   },
 ];
 

@@ -184,7 +184,7 @@ function EmbeddedDefaultModelField({
         state={state}
         actions={actions}
         provider={provider}
-        dialogBackground="bg.surface"
+        dialogBackground="bg.card"
         showRegistryLink={false}
       />
       {field}

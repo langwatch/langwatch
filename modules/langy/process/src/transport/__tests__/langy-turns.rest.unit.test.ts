@@ -51,6 +51,7 @@ function buildApi(options: {
   });
 
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate },
   }).mount(langyTurnsRest.router(), {

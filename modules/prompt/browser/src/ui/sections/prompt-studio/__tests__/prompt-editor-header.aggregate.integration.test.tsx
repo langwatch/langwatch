@@ -44,9 +44,9 @@ function Header() {
       versionMetadata: {
         versionId: "version-1",
         versionNumber: 1,
-        versionCreatedAt: new Date(),
+        versionCreatedAt: new Date().toISOString(),
       },
-    } as PromptConfigFormValues,
+    },
   });
   return (
     <FormProvider {...methods}>

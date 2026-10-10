@@ -3,6 +3,7 @@
  * event names the person and the board, so each can be read, and folded, on its own.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -20,25 +21,35 @@ const scheduleRefShape = {
 };
 
 /** An operator asked for one run now. */
-export const insightRunRequestedEventDataSchema = z.object({
+const insightRunRequestedEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   requestId: z.string().min(1),
   maxInsights: insightRunMaxInsightsSchema,
 });
+export interface InsightRunRequestedEventDataSchema extends Named<
+  typeof insightRunRequestedEventDataSchemaDefinition
+> {}
+export const insightRunRequestedEventDataSchema: InsightRunRequestedEventDataSchema =
+  insightRunRequestedEventDataSchemaDefinition;
 export type InsightRunRequestedEventData = z.infer<typeof insightRunRequestedEventDataSchema>;
 
 /** The run passed its gate and Langy took the turn. `slot` is the instant the run is for. */
-export const insightRunStartedEventDataSchema = z.object({
+const insightRunStartedEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   runId: z.string().min(1),
   slot: z.number().int().nonnegative(),
   conversationId: z.string().min(1),
   turnId: z.string().min(1),
 });
+export interface InsightRunStartedEventDataSchema extends Named<
+  typeof insightRunStartedEventDataSchemaDefinition
+> {}
+export const insightRunStartedEventDataSchema: InsightRunStartedEventDataSchema =
+  insightRunStartedEventDataSchemaDefinition;
 export type InsightRunStartedEventData = z.infer<typeof insightRunStartedEventDataSchema>;
 
 /** How the run ended. A run skipped before Langy took the turn names no conversation. */
-export const insightRunSettledEventDataSchema = z.object({
+const insightRunSettledEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   runId: z.string().min(1),
   slot: z.number().int().nonnegative(),
@@ -47,6 +58,11 @@ export const insightRunSettledEventDataSchema = z.object({
   filedCount: z.number().int().nonnegative(),
   conversationId: z.string().min(1).nullable(),
 });
+export interface InsightRunSettledEventDataSchema extends Named<
+  typeof insightRunSettledEventDataSchemaDefinition
+> {}
+export const insightRunSettledEventDataSchema: InsightRunSettledEventDataSchema =
+  insightRunSettledEventDataSchemaDefinition;
 export type InsightRunSettledEventData = z.infer<typeof insightRunSettledEventDataSchema>;
 
 /**
@@ -54,22 +70,32 @@ export type InsightRunSettledEventData = z.infer<typeof insightRunSettledEventDa
  * hands its process the row's settings again. The zone was checked at the door, so a stored
  * event parses whatever zones a later runtime knows.
  */
-export const insightScheduleConfiguredEventDataSchema = z.object({
+const insightScheduleConfiguredEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   hour: insightRunHourSchema,
   timezone: z.string().min(1).max(64),
   maxInsights: insightRunMaxInsightsSchema,
 });
+export interface InsightScheduleConfiguredEventDataSchema extends Named<
+  typeof insightScheduleConfiguredEventDataSchemaDefinition
+> {}
+export const insightScheduleConfiguredEventDataSchema: InsightScheduleConfiguredEventDataSchema =
+  insightScheduleConfiguredEventDataSchemaDefinition;
 export type InsightScheduleConfiguredEventData = z.infer<
   typeof insightScheduleConfiguredEventDataSchema
 >;
 
 /** The daily run is off. `system`: a run found the board gone, and `reason` says how it ended. */
-export const insightScheduleTurnedOffEventDataSchema = z.object({
+const insightScheduleTurnedOffEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   by: z.enum(["person", "system"]),
   reason: insightRunReasonSchema.nullable(),
 });
+export interface InsightScheduleTurnedOffEventDataSchema extends Named<
+  typeof insightScheduleTurnedOffEventDataSchemaDefinition
+> {}
+export const insightScheduleTurnedOffEventDataSchema: InsightScheduleTurnedOffEventDataSchema =
+  insightScheduleTurnedOffEventDataSchemaDefinition;
 export type InsightScheduleTurnedOffEventData = z.infer<
   typeof insightScheduleTurnedOffEventDataSchema
 >;

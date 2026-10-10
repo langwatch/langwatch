@@ -171,21 +171,21 @@ VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/clickhouse-migrations test src/__t
 It reads every migration not in `src/__tests__/migration-safety.baseline.txt` and fails by name,
 with the fix:
 
-| Rule                                       | Refuses                                                   |
-| ------------------------------------------ | --------------------------------------------------------- |
-| `drop-without-retirement-note`             | a `DROP` with no `-- contract: retired in <release>`      |
-| `retirement-note-above-floor`              | a note naming a release above the floor                   |
-| `modify-column-type`                       | `MODIFY COLUMN` to a new type                             |
-| `add-variable-size-column-without-default` | `Array`, `Map`, `Tuple`, `Nested` added with no `DEFAULT` |
-| `one-statement-per-goose-block`            | two statements in one `StatementBegin` block              |
-| `ddl-without-if-exists`                    | DDL without `IF [NOT] EXISTS`                             |
-| `live-down-migration`                      | a down migration that is not commented out                |
-| `view-replaced-in-place`                   | a view dropped and recreated                              |
+| Rule                                       | Refuses                                                                                                                                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drop-without-retirement-note`             | a `DROP` with no `-- contract: retired in <release>`                                                                                                                             |
+| `retirement-note-above-floor`              | a note naming a release above the floor                                                                                                                                          |
+| `modify-column-type`                       | `MODIFY COLUMN` to a new type                                                                                                                                                    |
+| `add-variable-size-column-without-default` | `Array`, `Map`, `Tuple`, `Nested` added with no `DEFAULT`                                                                                                                        |
+| `one-statement-per-goose-block`            | two statements in one `StatementBegin` block                                                                                                                                     |
+| `ddl-without-if-exists`                    | DDL without `IF [NOT] EXISTS`                                                                                                                                                    |
+| `live-down-migration`                      | a down migration that is not commented out                                                                                                                                       |
+| `view-replaced-in-place`                   | a view dropped and recreated                                                                                                                                                     |
 | `untracked-mutation`                       | `ALTER ... UPDATE/DELETE`, `DELETE FROM`, `MATERIALIZE COLUMN/INDEX/PROJECTION/TTL`, `MODIFY TTL` without `materialize_ttl_after_modify = 0`, with no `-- background step:` note |
-| `unknown-background-step`                  | a `-- background step:` note naming no declared code step |
-| `modify-order-by`                          | `MODIFY ORDER BY` (a new sort key is a new table)         |
-| `optimize-final`                           | `OPTIMIZE TABLE ... FINAL`                                |
-| `materialized-view-populate`               | `CREATE MATERIALIZED VIEW ... POPULATE`                   |
+| `unknown-background-step`                  | a `-- background step:` note naming no declared code step                                                                                                                        |
+| `modify-order-by`                          | `MODIFY ORDER BY` (a new sort key is a new table)                                                                                                                                |
+| `optimize-final`                           | `OPTIMIZE TABLE ... FINAL`                                                                                                                                                       |
+| `materialized-view-populate`               | `CREATE MATERIALIZED VIEW ... POPULATE`                                                                                                                                          |
 
 The last five rows keep reads fast while the api serves through the upgrade (Alex, 2026-10-09).
 Goose files in the newest `langwatch@v*` tag (read from git; a clone without tags fails with the fetch

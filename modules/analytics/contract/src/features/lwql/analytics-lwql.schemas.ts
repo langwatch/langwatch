@@ -4,7 +4,7 @@
  * accepted steps ARE the published contract, so both doors read one copy.
  */
 import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwatch/authorization";
-import { defineMiddlewareContext } from "@langwatch/module";
+import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { LWQL_ACCEPTED_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
@@ -73,23 +73,33 @@ export { MAX_LWQL_LENGTH };
  * anything structured would be one whose shape a declared ClickHouse type
  * cannot describe.
  */
-export const lwqlParameterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const lwqlParameterValueSchemaDefinition = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export interface LwqlParameterValueSchema extends Named<
+  typeof lwqlParameterValueSchemaDefinition
+> {}
+export const lwqlParameterValueSchema: LwqlParameterValueSchema =
+  lwqlParameterValueSchemaDefinition;
 
 /**
  * The datapoint step a caller may request, as every door accepts it — one of
  * the {@link LWQL_ACCEPTED_GRANULARITY_STEPS}, nothing else, so an off-list
  * value is a schema rejection rather than the service's backstop.
  */
-export const lwqlGranularityStepSchema = z.union(
+const lwqlGranularityStepSchemaDefinition = z.union(
   LWQL_ACCEPTED_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
     z.ZodLiteral<(typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number]>,
     z.ZodLiteral<(typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number]>,
     ...z.ZodLiteral<(typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number]>[],
   ],
 );
+export interface LwqlGranularityStepSchema extends Named<
+  typeof lwqlGranularityStepSchemaDefinition
+> {}
+export const lwqlGranularityStepSchema: LwqlGranularityStepSchema =
+  lwqlGranularityStepSchemaDefinition;
 
 /** One submitted statement, as both doors accept it. */
-export const lwqlStatementSchema = z.object({
+const lwqlStatementSchemaDefinition = z.object({
   // Deliberately not `.trim()`: the statement the database runs must be the one
   // that was submitted, and normalising it here — however harmlessly — is the
   // first step of the rewriting this API promises never to do.
@@ -107,6 +117,8 @@ export const lwqlStatementSchema = z.object({
    */
   granularitySeconds: lwqlGranularityStepSchema.optional(),
 });
+export interface LwqlStatementSchema extends Named<typeof lwqlStatementSchemaDefinition> {}
+export const lwqlStatementSchema: LwqlStatementSchema = lwqlStatementSchemaDefinition;
 
 export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
 
@@ -114,7 +126,7 @@ export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
  * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
  * The workbench runs inside one project already, so only the key door accepts `projectId`.
  */
-export const lwqlKeyStatementSchema = z.object({
+const lwqlKeyStatementSchemaDefinition = z.object({
   ...lwqlStatementSchema.shape,
   projectId: z
     .string()
@@ -124,5 +136,7 @@ export const lwqlKeyStatementSchema = z.object({
       "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
     ),
 });
+export interface LwqlKeyStatementSchema extends Named<typeof lwqlKeyStatementSchemaDefinition> {}
+export const lwqlKeyStatementSchema: LwqlKeyStatementSchema = lwqlKeyStatementSchemaDefinition;
 
 export type LangWatchQLKeyStatementRequest = z.infer<typeof lwqlKeyStatementSchema>;

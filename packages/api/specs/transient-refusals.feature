@@ -37,7 +37,7 @@ Feature: Transient refusals keep their body, and JSON text is parsed at the door
     Scenario: The transient allowlist is declared once
       Given the handled-error package
       When a boundary asks whether a handled error is a transient refusal
-      Then only clickhouse_overloaded, service_unavailable and upgrade_in_progress at 503 answer yes
+      Then only clickhouse_overloaded, connect_credential_pending, service_unavailable and upgrade_in_progress at 503 answer yes
 
   Rule: A JSON-text field parses at the door
 

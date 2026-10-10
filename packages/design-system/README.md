@@ -10,7 +10,8 @@ a feature package, routing, transport, or server code.
 pnpm --filter @langwatch/design-system storybook   # standalone, port 6006
 ```
 
-While the browser application's dev server runs (`pnpm dev` or `pnpm dev:ui`),
+While the browser application's Vite dev server runs (`pnpm dev:hmr`, `haven up --hmr`
+or `pnpm dev:ui`),
 `/design-system` opens the same workshop. Storybook starts on the first visit
 to that address, so it costs the dev server nothing at boot, and
 `LANGWATCH_SKIP_STORYBOOK=1` turns it off entirely.
@@ -52,6 +53,48 @@ a row in `colour.stories.tsx`, never a literal at the call site. Code that must
 hand a library a string uses Chakra's `useToken` or `system.token.var` (a CSS
 variable), or `getRawColorValue` / `useColorRawValue` for a literal in the current mode.
 
+### Which surface for which region
+
+The palette follows production main (`e683dd9ea5`), including its inherited
+Chakra colours. Raw gray steps do not change with mode; semantic roles select
+gray in light mode and zinc for dark surfaces. Brand orange is `#ED8926`.
+
+| Role                                           | Light   | Dark    |
+| ---------------------------------------------- | ------- | ------- |
+| bg.page                                        | #f1f5f9 | #10101a |
+| bg.surface                                     | white   | #080812 |
+| bg (Chakra default)                            | white   | black   |
+| bg.panel / bg.card / bg.overlay / bg.raised    | white   | #1a1a24 |
+| bg.muted / bg.nested / bg.softHover / bg.hover | #f1f5f9 | #15151e |
+| bg.input / bg.control                          | #e2e8f0 | #10101a |
+| bg.emphasized                                  | #e2e8f0 | #3a3a44 |
+| bg.selected / nav.bgActive                     | #e2e8f0 | #282832 |
+| bg.rail                                        | #e7ecf2 | #15151e |
+| bg.subtle / bg.stripe                          | #f8fafc | #10101a |
+| border / border.card / border.control          | #e2e8f0 | #3a3a44 |
+| border.muted / border.nested                   | #f1f5f9 | #282832 |
+| border.emphasized / border.strong              | #cbd5e1 | #565664 |
+| fg                                             | #111113 | #f1f5f9 |
+| fg.muted                                       | #3d3d4d | #cbd5e1 |
+| fg.subtle / nav.marker                         | #5c5c6e | #9CA3AF |
+
+Main’s warning surfaces/text/borders use orange; status.warning and
+status.pending use yellow. Structural hairlines preserve main’s subtlety and
+do not claim 3:1 contrast. Do not assume every status or subtle-text pairing
+meets AA. Menus, drawers and dialogs use an opaque panel; controls use input.
+
+The [complete main comparison](docs/main-colour-parity.md) lists raw scales,
+semantic tokens, inherited defaults, branch-only aliases and feature themes.
+
+### Sticky page titles
+
+`PageLayout.Header` stays at the top of its scrolling content panel. Its
+65% content-ground glass and 16px backdrop blur reveal passing content;
+`--lw-panel-alpha` and `--lw-backdrop-blur` restore opacity and remove blur for
+reduced graphics. A reserved 1px hairline starts transparent and fades in
+after scrolling without changing layout. Reduced motion disables the fade.
+Section headers share the same behaviour. `withBorder={false}` opts out.
+
 ## Checklist
 
 - Tokens, never literals: `fg.muted`, `border.emphasized`, `red.solid` — no hex.
@@ -74,3 +117,23 @@ workshop's own pages in `src/workshop`.
 Every docs page shows how many files import the component, counted from the
 import sites when Storybook starts or builds (`.storybook/adoption.ts`;
 `node .storybook/adoption.ts` prints the whole inventory).
+
+## Section navigation
+
+`SectionNavigationFrame` pairs a 176px text rail with the page content on `bg.card`.
+Section and sub-page titles share a borderless 48px row. The vertical `border.muted`
+divider starts below it. Links are 32px tall; hover changes text colour only.
+One 3px `nav.marker` marker follows the current link, including nested lists, in 180ms.
+It jumps for reduced motion and scrolls with the links. Its outer edge is flat,
+and its inner edge has a 2px radius. A collapsed rail retains labelled icon links.
+
+## Option lists
+
+Menu, select and combobox recipes share `option-list.recipe.ts`: 4px container
+padding, 8px item side padding, a 32px minimum row and a subtle `bg.hover` fill.
+Custom popover pickers use `OptionItem` from `./option-list` for the same treatment.
+
+When the unfiltered options have loaded empty, disable the picker and associate
+its trigger with `EmptyOptionsHint` using `aria-describedby`. Supply a creation
+link through `action`. Do not turn loading, failure, filtered no-match results or
+free-text entry into an empty collection.

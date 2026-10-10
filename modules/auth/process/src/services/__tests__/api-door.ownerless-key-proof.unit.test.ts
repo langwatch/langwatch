@@ -1,3 +1,4 @@
+import { createErrorHandler } from "@langwatch/api";
 /**
  * Keys created before keys had owners keep main's trace reads: a legacy project key or an
  * ownerless API key reads its own project's traces on an own-only proof, through the real door
@@ -7,7 +8,6 @@ import type {
   ApiKeyTokenResolutionInput,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
-import { createErrorHandler } from "@langwatch/api";
 import {
   createRestRuntime,
   defineRestRouter,
@@ -128,6 +128,7 @@ const routes = defineRestRouter(TracesApi)
   .post("/search", "search")
   .withPermission("traces:view")
   .withOutput(z.object({ read: z.boolean() }))
+  .withoutAudit("test route")
   .handle(({ app }) => app.search())
   .build()
   .router();

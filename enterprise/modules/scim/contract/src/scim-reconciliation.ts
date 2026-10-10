@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The organization's view of its own directory sync (ADR-122).
@@ -12,13 +13,18 @@ import { z } from "zod";
 /** Whether the reader has something to do, not how far along the sync is. */
 export const scimSyncToneSchema = z.enum(["waiting", "working", "attention", "ended"]);
 
-export const scimSyncStatusCopySchema = z
+const scimSyncStatusCopySchemaDefinition = z
   .object({ headline: z.string(), waitingFor: z.string(), tone: scimSyncToneSchema })
   .strict();
+export interface ScimSyncStatusCopySchema extends Named<
+  typeof scimSyncStatusCopySchemaDefinition
+> {}
+export const scimSyncStatusCopySchema: ScimSyncStatusCopySchema =
+  scimSyncStatusCopySchemaDefinition;
 export type ScimSyncStatusCopy = z.infer<typeof scimSyncStatusCopySchema>;
 
 /** One thing the directory asked for that has not been applied. */
-export const scimReconciliationFailureSchema = z
+const scimReconciliationFailureSchemaDefinition = z
   .object({
     title: z.string(),
     description: z.string(),
@@ -27,10 +33,15 @@ export const scimReconciliationFailureSchema = z
     retired: z.boolean(),
   })
   .strict();
+export interface ScimReconciliationFailureSchema extends Named<
+  typeof scimReconciliationFailureSchemaDefinition
+> {}
+export const scimReconciliationFailureSchema: ScimReconciliationFailureSchema =
+  scimReconciliationFailureSchemaDefinition;
 export type ScimReconciliationFailure = z.infer<typeof scimReconciliationFailureSchema>;
 
 /** One membership change the directory itself caused. */
-export const scimReconciliationChangeSchema = z
+const scimReconciliationChangeSchemaDefinition = z
   .object({
     grantId: z.string(),
     summary: z.string(),
@@ -41,9 +52,14 @@ export const scimReconciliationChangeSchema = z
     kind: z.enum(["attached", "removed"]),
   })
   .strict();
+export interface ScimReconciliationChangeSchema extends Named<
+  typeof scimReconciliationChangeSchemaDefinition
+> {}
+export const scimReconciliationChangeSchema: ScimReconciliationChangeSchema =
+  scimReconciliationChangeSchemaDefinition;
 export type ScimReconciliationChange = z.infer<typeof scimReconciliationChangeSchema>;
 
-export const connectionReconciliationSchema = z
+const connectionReconciliationSchemaDefinition = z
   .object({
     connectionId: z.string(),
     /** What the administrator registered the provider as. */
@@ -63,18 +79,28 @@ export const connectionReconciliationSchema = z
     remediation: z.string(),
   })
   .strict();
+export interface ConnectionReconciliationSchema extends Named<
+  typeof connectionReconciliationSchemaDefinition
+> {}
+export const connectionReconciliationSchema: ConnectionReconciliationSchema =
+  connectionReconciliationSchemaDefinition;
 export type ConnectionReconciliation = z.infer<typeof connectionReconciliationSchema>;
 
-export const organizationReconciliationSchema = z
+const organizationReconciliationSchemaDefinition = z
   .object({
     connections: connectionReconciliationSchema.array(),
     recentChanges: scimReconciliationChangeSchema.array(),
   })
   .strict();
+export interface OrganizationReconciliationSchema extends Named<
+  typeof organizationReconciliationSchemaDefinition
+> {}
+export const organizationReconciliationSchema: OrganizationReconciliationSchema =
+  organizationReconciliationSchemaDefinition;
 export type OrganizationReconciliation = z.infer<typeof organizationReconciliationSchema>;
 
 /** One line of a connection's recent directory activity, said as the directory's act (ADR-126). */
-export const scimDirectoryActivityEntrySchema = z
+const scimDirectoryActivityEntrySchemaDefinition = z
   .object({
     eventId: z.string(),
     summary: z.string(),
@@ -82,6 +108,11 @@ export const scimDirectoryActivityEntrySchema = z
     outcome: z.enum(["ok", "refused"]),
   })
   .strict();
+export interface ScimDirectoryActivityEntrySchema extends Named<
+  typeof scimDirectoryActivityEntrySchemaDefinition
+> {}
+export const scimDirectoryActivityEntrySchema: ScimDirectoryActivityEntrySchema =
+  scimDirectoryActivityEntrySchemaDefinition;
 export type ScimDirectoryActivityEntry = z.infer<typeof scimDirectoryActivityEntrySchema>;
 
 /**
@@ -95,21 +126,36 @@ export interface ScimDirectoryOwnership {
 }
 
 /** The organization the read is BUILT from, never a filter beside an id. */
-export const scimReconciliationScopeSchema = z
+const scimReconciliationScopeSchemaDefinition = z
   .object({ organizationId: z.string().min(1) })
   .strict();
+export interface ScimReconciliationScopeSchema extends Named<
+  typeof scimReconciliationScopeSchemaDefinition
+> {}
+export const scimReconciliationScopeSchema: ScimReconciliationScopeSchema =
+  scimReconciliationScopeSchemaDefinition;
 export type ScimReconciliationScope = z.infer<typeof scimReconciliationScopeSchema>;
 
 /** Which of these members the organization's directories created, for member provenance. */
-export const scimDirectoryMembersInputSchema = z
+const scimDirectoryMembersInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1), userIds: z.array(z.string().min(1)) })
   .strict();
+export interface ScimDirectoryMembersInputSchema extends Named<
+  typeof scimDirectoryMembersInputSchemaDefinition
+> {}
+export const scimDirectoryMembersInputSchema: ScimDirectoryMembersInputSchema =
+  scimDirectoryMembersInputSchemaDefinition;
 export type ScimDirectoryMembersInput = z.infer<typeof scimDirectoryMembersInputSchema>;
 
 /** One member a directory created; `providerId` is what registration called its provider. */
-export const scimDirectoryMemberSchema = z
+const scimDirectoryMemberSchemaDefinition = z
   .object({ userId: z.string(), providerId: z.string().nullable() })
   .strict();
+export interface ScimDirectoryMemberSchema extends Named<
+  typeof scimDirectoryMemberSchemaDefinition
+> {}
+export const scimDirectoryMemberSchema: ScimDirectoryMemberSchema =
+  scimDirectoryMemberSchemaDefinition;
 export type ScimDirectoryMember = z.infer<typeof scimDirectoryMemberSchema>;
 
 /**

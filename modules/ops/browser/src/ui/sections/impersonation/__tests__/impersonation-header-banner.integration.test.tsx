@@ -47,7 +47,7 @@ describe("the header's impersonation banner", () => {
   it("names the person being impersonated and offers to stop", () => {
     renderBanner(IMPERSONATED);
     expect(screen.getByText("Impersonating Target User")).not.toBeNull();
-    expect(screen.getAllByRole("link", { name: "Stop" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Stop" }).length).toBeGreaterThan(0);
   });
 
   /** @scenario Impersonation banner does not appear for normal sessions */
@@ -60,7 +60,7 @@ describe("the header's impersonation banner", () => {
   /** @scenario "The banner and the way out keep working on the new claims" */
   it("ends the impersonation on the server, then reloads onto the admin panel", async () => {
     renderBanner(IMPERSONATED);
-    fireEvent.click(screen.getAllByRole("link", { name: "Stop" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]!);
 
     await waitFor(() => expect(hardRedirect).toHaveBeenCalledWith(ADMIN_PANEL_PATH));
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -71,7 +71,7 @@ describe("the header's impersonation banner", () => {
   it("stays put and says so when the server refuses to end it", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ message: "no" }), { status: 500 }));
     renderBanner(IMPERSONATED);
-    fireEvent.click(screen.getAllByRole("link", { name: "Stop" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]!);
 
     await waitFor(() => expect(failed).toHaveBeenCalledTimes(1));
     expect(failed.mock.calls[0]?.[0]).toMatchObject({

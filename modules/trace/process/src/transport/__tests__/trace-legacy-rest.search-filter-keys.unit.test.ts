@@ -14,6 +14,7 @@ import {
 import { tracesRestCredential } from "../traces.rest.ts";
 
 const runtime = createRestRuntime({
+  audit: { record: () => {} },
   authorization: restTestAuthorization(),
   identity: {
     authenticate: () => ({

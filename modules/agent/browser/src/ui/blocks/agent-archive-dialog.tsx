@@ -1,20 +1,5 @@
-import { Dialog } from "@langwatch/design-system/dialog";
-import {
-  Alert,
-  Button,
-  HStack,
-  Input,
-  List,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 
-/** Dialog controls stop propagation so confirmation clicks cannot reopen the card behind them. */
-
-/** The graph a workflow agent points at, archived along with the agent. */
 export type AgentRelatedWorkflow = {
   id: string;
   name: string;
@@ -31,8 +16,6 @@ export type AgentArchiveDialogProps = {
   onConfirm: () => void;
 };
 
-const CONFIRMATION = "delete";
-
 export function AgentArchiveDialog({
   open,
   agentName,
@@ -42,117 +25,21 @@ export function AgentArchiveDialog({
   onClose,
   onConfirm,
 }: AgentArchiveDialogProps) {
-  const [confirmationText, setConfirmationText] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setConfirmationText("");
-  }, [open]);
-
-  const confirmed = confirmationText.toLowerCase() === CONFIRMATION;
-
   return (
-    <Dialog.Root
+    <DeleteConfirmationDialog
       open={open}
-      onOpenChange={onClose}
-      placement="center"
-      initialFocusEl={() => inputRef.current}
-    >
-      <Dialog.Content maxWidth="500px" onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Delete agent?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          {isLoadingRelated ? (
-            <HStack justify="center" paddingY={4}>
-              <Spinner size="sm" />
-              <Text>Loading related items...</Text>
-            </HStack>
-          ) : (
-            <VStack align="stretch" gap={4}>
-              <Text>
-                You are about to delete{" "}
-                <Text as="span" fontWeight="semibold">
-                  &quot;{agentName}&quot;
-                </Text>
-                .
-              </Text>
-
-              {relatedWorkflow && (
-                <Alert.Root status="warning">
-                  <Alert.Indicator>
-                    <TriangleAlert size={16} />
-                  </Alert.Indicator>
-                  <Alert.Content>
-                    <Alert.Title>This will also affect:</Alert.Title>
-                    <Alert.Description>
-                      <VStack align="stretch" gap={1} marginTop={2}>
-                        <Text fontWeight="medium" fontSize="sm">
-                          Workflows (1) - will be archived
-                        </Text>
-                        <List.Root paddingLeft={4}>
-                          <List.Item fontSize="sm" color="fg.muted">
-                            {relatedWorkflow.name}
-                          </List.Item>
-                        </List.Root>
-                      </VStack>
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-
-              <Text>
-                This action cannot be undone. Type{" "}
-                <Text as="span" fontWeight="semibold">
-                  {CONFIRMATION}
-                </Text>{" "}
-                below to confirm:
-              </Text>
-
-              <Input
-                placeholder="Type 'delete' to confirm"
-                value={confirmationText}
-
-                onChange={(event) => {
-                  event.stopPropagation();
-                  setConfirmationText(event.target.value);
-                }}
-                ref={inputRef}
-                onKeyDown={(event) => {
-                  event.stopPropagation();
-                  if (event.key === "Enter" && confirmed && !isLoading) onConfirm();
-                }}
-                data-testid="cascade-archive-confirm-input"
-              />
-            </VStack>
-          )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            variant="outline"
-            marginRight={3}
-            onClick={(event) => {
-              event.stopPropagation();
-              onClose();
-            }}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorPalette="red"
-            onClick={(event) => {
-              event.stopPropagation();
-              if (confirmed && !isLoading) onConfirm();
-            }}
-            disabled={!confirmed || isLoading || isLoadingRelated}
-            data-testid="cascade-archive-confirm-button"
-          >
-            {isLoading ? <Spinner size="sm" /> : "Delete"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      onClose={onClose}
+      onConfirm={onConfirm}
+      closeOnConfirm={false}
+      title="Delete agent?"
+      description={`You are about to delete "${agentName}". This action cannot be undone.`}
+      isLoading={isLoading}
+      isLoadingRelated={isLoadingRelated}
+      inputTestId="cascade-archive-confirm-input"
+      confirmTestId="cascade-archive-confirm-button"
+      consequences={[
+        { label: "Workflows", action: "archived", items: relatedWorkflow ? [relatedWorkflow] : [] },
+      ]}
+    />
   );
 }

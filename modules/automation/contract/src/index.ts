@@ -20,6 +20,9 @@ export {
   triggerSchema,
   triggerTemplateDraftSchema,
   triggerTemplateSchema,
+  type TriggerSchema,
+  type TriggerTemplateSchema,
+  type TriggerTemplateDraftSchema,
 } from "./trigger.ts";
 export type { Trigger, TriggerKind, TriggerTemplate, TriggerTemplateDraft } from "./trigger.ts";
 export * from "./trigger.commands.ts";

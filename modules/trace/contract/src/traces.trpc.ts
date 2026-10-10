@@ -4,7 +4,7 @@
  * sharedTrace (ADR-057); getSampleTraces stays on the API.
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
@@ -88,7 +88,7 @@ const pageOffsetInput = z
   });
 
 /** What a legacy trace read may be scoped by, and what a caller may send. */
-export const traceFilterInputSchema = z.object({
+const traceFilterInputSchemaDefinition = z.object({
   ...sharedFiltersInputSchema.shape,
   pageOffset: pageOffsetInput,
   // Non-negative integers only (#2163): a fractional or negative page size
@@ -97,9 +97,11 @@ export const traceFilterInputSchema = z.object({
   // the caller's tier.
   pageSize: z.number().int().positive().max(TRACES_PAGE_SIZE_MAX).optional(),
 });
+export interface TraceFilterInputSchema extends Named<typeof traceFilterInputSchemaDefinition> {}
+export const traceFilterInputSchema: TraceFilterInputSchema = traceFilterInputSchemaDefinition;
 
 /** The same, plus the paging and ordering the list/search read understands. */
-export const traceListInputSchema = z.object({
+const traceListInputSchemaDefinition = z.object({
   ...traceFilterInputSchema.shape,
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
@@ -107,6 +109,8 @@ export const traceListInputSchema = z.object({
   updatedAt: z.number().optional(),
   scrollId: z.string().optional().nullable(),
 });
+export interface TraceListInputSchema extends Named<typeof traceListInputSchemaDefinition> {}
+export const traceListInputSchema: TraceListInputSchema = traceListInputSchemaDefinition;
 
 /**
  * Opt-in for reviewer corrections. Default false so every existing consumer
@@ -133,7 +137,7 @@ const sortSchema = z.object({
 });
 
 /** One Sessions lens page request, which coding-agent serves as `codingAgents.sessionGroups`. */
-export const traceSessionGroupsInputSchema = z.object({
+const traceSessionGroupsInputSchemaDefinition = z.object({
   projectId: z.string(),
   timeRange: timeRangeSchema,
   sort: sortSchema.optional(),
@@ -142,6 +146,11 @@ export const traceSessionGroupsInputSchema = z.object({
   query: z.string().nullish(),
   evalRuns: explorerInstantEvalRunsSchema,
 });
+export interface TraceSessionGroupsInputSchema extends Named<
+  typeof traceSessionGroupsInputSchemaDefinition
+> {}
+export const traceSessionGroupsInputSchema: TraceSessionGroupsInputSchema =
+  traceSessionGroupsInputSchemaDefinition;
 export type TraceSessionGroupsInput = z.infer<typeof traceSessionGroupsInputSchema>;
 
 /**

@@ -1,4 +1,5 @@
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -29,7 +30,7 @@ export type SignupData = {
 };
 
 /** Whose Cloud subscription plan is asked for, and the person asking. */
-export const subscriptionPlanInputSchema = z.object({
+const subscriptionPlanInputSchemaDefinition = z.object({
   organizationId: z.string(),
   user: z
     .object({
@@ -42,6 +43,11 @@ export const subscriptionPlanInputSchema = z.object({
     })
     .optional(),
 });
+export interface SubscriptionPlanInputSchema extends Named<
+  typeof subscriptionPlanInputSchemaDefinition
+> {}
+export const subscriptionPlanInputSchema: SubscriptionPlanInputSchema =
+  subscriptionPlanInputSchemaDefinition;
 export type SubscriptionPlanInput = z.infer<typeof subscriptionPlanInputSchema>;
 
 export type BillingPlanProvider = {
@@ -184,7 +190,7 @@ export interface BillingPlanResolver {
 }
 
 /** One invoice, as the billing page lists it. */
-export const billingDisplayInvoiceSchema = z
+const billingDisplayInvoiceSchemaDefinition = z
   .object({
     id: z.string(),
     number: z.string().nullable(),
@@ -196,25 +202,52 @@ export const billingDisplayInvoiceSchema = z
     hostedUrl: z.string().nullable(),
   })
   .strict();
+export interface BillingDisplayInvoiceSchema extends Named<
+  typeof billingDisplayInvoiceSchemaDefinition
+> {}
+export const billingDisplayInvoiceSchema: BillingDisplayInvoiceSchema =
+  billingDisplayInvoiceSchemaDefinition;
 export type BillingDisplayInvoice = z.infer<typeof billingDisplayInvoiceSchema>;
 
 /**
  * A hosted page to send the customer to. Null where the provider had nothing
  * to redirect to — a change that took effect without one.
  */
-export const billingRedirectSchema = z.object({ url: z.string().nullable() }).strict();
+const billingRedirectSchemaDefinition = z.object({ url: z.string().nullable() }).strict();
+export interface BillingRedirectSchema extends Named<typeof billingRedirectSchemaDefinition> {}
+export const billingRedirectSchema: BillingRedirectSchema = billingRedirectSchemaDefinition;
 
 /** The billing portal always answers a URL: it is the whole point of the call. */
-export const billingPortalSessionSchema = z.object({ url: z.string() }).strict();
+const billingPortalSessionSchemaDefinition = z.object({ url: z.string() }).strict();
+export interface BillingPortalSessionSchema extends Named<
+  typeof billingPortalSessionSchemaDefinition
+> {}
+export const billingPortalSessionSchema: BillingPortalSessionSchema =
+  billingPortalSessionSchemaDefinition;
 
 /** A live subscription's lines were changed. */
-export const subscriptionItemsUpdatedSchema = z.object({ success: z.boolean() }).strict();
+const subscriptionItemsUpdatedSchemaDefinition = z.object({ success: z.boolean() }).strict();
+export interface SubscriptionItemsUpdatedSchema extends Named<
+  typeof subscriptionItemsUpdatedSchemaDefinition
+> {}
+export const subscriptionItemsUpdatedSchema: SubscriptionItemsUpdatedSchema =
+  subscriptionItemsUpdatedSchemaDefinition;
 
-export const billingStripeWebhookReceiptSchema = z.object({ received: z.literal(true) });
+const billingStripeWebhookReceiptSchemaDefinition = z.object({ received: z.literal(true) });
+export interface BillingStripeWebhookReceiptSchema extends Named<
+  typeof billingStripeWebhookReceiptSchemaDefinition
+> {}
+export const billingStripeWebhookReceiptSchema: BillingStripeWebhookReceiptSchema =
+  billingStripeWebhookReceiptSchemaDefinition;
 
-export const billingStripeWebhookHeadersSchema = z.object({
+const billingStripeWebhookHeadersSchemaDefinition = z.object({
   "stripe-signature": z.string().optional(),
 });
+export interface BillingStripeWebhookHeadersSchema extends Named<
+  typeof billingStripeWebhookHeadersSchemaDefinition
+> {}
+export const billingStripeWebhookHeadersSchema: BillingStripeWebhookHeadersSchema =
+  billingStripeWebhookHeadersSchemaDefinition;
 
 /** How one delivered event was handled: a 400 tells Stripe not to retry, a 500 asks it to. */
 export type HandleEventResult =

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What the `/api/webhooks/v1` surface publishes on the wire. Every enum here
  * is lower_snake_case, input AND output: the stored SCREAMING_SNAKE is
@@ -50,17 +51,24 @@ const sqsEndpointDtoSchema = z.object({
   ...endpointCommonDtoFields,
 });
 
-export const endpointDtoSchema = z.discriminatedUnion("destination_kind", [
+const endpointDtoSchemaDefinition = z.discriminatedUnion("destination_kind", [
   httpEndpointDtoSchema,
   sqsEndpointDtoSchema,
 ]);
+export interface EndpointDtoSchema extends Named<typeof endpointDtoSchemaDefinition> {}
+export const endpointDtoSchema: EndpointDtoSchema = endpointDtoSchemaDefinition;
 
-export const endpointWithSecretDtoSchema = z.discriminatedUnion("destination_kind", [
+const endpointWithSecretDtoSchemaDefinition = z.discriminatedUnion("destination_kind", [
   z.object({ ...httpEndpointDtoSchema.shape, secret: z.string() }),
   z.object({ ...sqsEndpointDtoSchema.shape, secret: z.string() }),
 ]);
+export interface EndpointWithSecretDtoSchema extends Named<
+  typeof endpointWithSecretDtoSchemaDefinition
+> {}
+export const endpointWithSecretDtoSchema: EndpointWithSecretDtoSchema =
+  endpointWithSecretDtoSchemaDefinition;
 
-export const deliveryDtoSchema = z.object({
+const deliveryDtoSchemaDefinition = z.object({
   id: z.string(),
   dispatch_id: z.string(),
   attempt: z.number().int(),
@@ -71,22 +79,31 @@ export const deliveryDtoSchema = z.object({
   error: z.string().nullable(),
   fired_at: z.string(),
 });
+export interface DeliveryDtoSchema extends Named<typeof deliveryDtoSchemaDefinition> {}
+export const deliveryDtoSchema: DeliveryDtoSchema = deliveryDtoSchemaDefinition;
 
-export const eventTypeDtoSchema = z.object({
+const eventTypeDtoSchemaDefinition = z.object({
   type: z.string(),
   family: z.string(),
   schema_version: z.string(),
   is_emitting: z.boolean(),
   description: z.string(),
 });
+export interface EventTypeDtoSchema extends Named<typeof eventTypeDtoSchemaDefinition> {}
+export const eventTypeDtoSchema: EventTypeDtoSchema = eventTypeDtoSchemaDefinition;
 
-export const webhookEventEnvelopeSchema = z.object({
+const webhookEventEnvelopeSchemaDefinition = z.object({
   id: z.string(),
   type: z.string(),
   created: z.string(),
   schema_version: z.string(),
   data: z.record(z.string(), z.unknown()),
 });
+export interface WebhookEventEnvelopeSchema extends Named<
+  typeof webhookEventEnvelopeSchemaDefinition
+> {}
+export const webhookEventEnvelopeSchema: WebhookEventEnvelopeSchema =
+  webhookEventEnvelopeSchemaDefinition;
 
 export const nextCursorSchema = z
   .string()
@@ -99,35 +116,72 @@ export const nextCursorSchema = z
 // dropped: `/deliveries` pages, and `next_cursor` has nowhere to live beside
 // a bare array — so the three are one shape, named once each.
 
-export const endpointListResponseSchema = z.object({
+const endpointListResponseSchemaDefinition = z.object({
   data: z.array(endpointDtoSchema),
 });
+export interface EndpointListResponseSchema extends Named<
+  typeof endpointListResponseSchemaDefinition
+> {}
+export const endpointListResponseSchema: EndpointListResponseSchema =
+  endpointListResponseSchemaDefinition;
 
-export const eventTypeListResponseSchema = z.object({
+const eventTypeListResponseSchemaDefinition = z.object({
   data: z.array(eventTypeDtoSchema),
 });
+export interface EventTypeListResponseSchema extends Named<
+  typeof eventTypeListResponseSchemaDefinition
+> {}
+export const eventTypeListResponseSchema: EventTypeListResponseSchema =
+  eventTypeListResponseSchemaDefinition;
 
-export const deliveryListResponseSchema = z.object({
+const deliveryListResponseSchemaDefinition = z.object({
   data: z.array(deliveryDtoSchema),
   next_cursor: nextCursorSchema,
 });
+export interface DeliveryListResponseSchema extends Named<
+  typeof deliveryListResponseSchemaDefinition
+> {}
+export const deliveryListResponseSchema: DeliveryListResponseSchema =
+  deliveryListResponseSchemaDefinition;
 
-export const webhookEventListResponseSchema = z.object({
+const webhookEventListResponseSchemaDefinition = z.object({
   data: z.array(webhookEventEnvelopeSchema),
   next_cursor: nextCursorSchema,
 });
+export interface WebhookEventListResponseSchema extends Named<
+  typeof webhookEventListResponseSchemaDefinition
+> {}
+export const webhookEventListResponseSchema: WebhookEventListResponseSchema =
+  webhookEventListResponseSchemaDefinition;
 
 // Every single-resource answer is enveloped under `data` too, as main serves it.
 
-export const endpointResponseSchema = z.object({ data: endpointDtoSchema });
+const endpointResponseSchemaDefinition = z.object({ data: endpointDtoSchema });
+export interface EndpointResponseSchema extends Named<typeof endpointResponseSchemaDefinition> {}
+export const endpointResponseSchema: EndpointResponseSchema = endpointResponseSchemaDefinition;
 
-export const endpointWithSecretResponseSchema = z.object({ data: endpointWithSecretDtoSchema });
+const endpointWithSecretResponseSchemaDefinition = z.object({ data: endpointWithSecretDtoSchema });
+export interface EndpointWithSecretResponseSchema extends Named<
+  typeof endpointWithSecretResponseSchemaDefinition
+> {}
+export const endpointWithSecretResponseSchema: EndpointWithSecretResponseSchema =
+  endpointWithSecretResponseSchemaDefinition;
 
-export const endpointArchivedResponseSchema = z.object({
+const endpointArchivedResponseSchemaDefinition = z.object({
   data: z.object({ archived: z.literal(true) }),
 });
+export interface EndpointArchivedResponseSchema extends Named<
+  typeof endpointArchivedResponseSchemaDefinition
+> {}
+export const endpointArchivedResponseSchema: EndpointArchivedResponseSchema =
+  endpointArchivedResponseSchemaDefinition;
 
-export const webhookEventResponseSchema = z.object({ data: webhookEventEnvelopeSchema });
+const webhookEventResponseSchemaDefinition = z.object({ data: webhookEventEnvelopeSchema });
+export interface WebhookEventResponseSchema extends Named<
+  typeof webhookEventResponseSchemaDefinition
+> {}
+export const webhookEventResponseSchema: WebhookEventResponseSchema =
+  webhookEventResponseSchemaDefinition;
 
 const deliveryControlsSchema = {
   max_batch_size: z.number().int().optional(),
@@ -195,7 +249,7 @@ function refineDestinationShape(
   }
 }
 
-export const createEndpointSchema = z
+const createEndpointSchemaDefinition = z
   .object({
     /**
      * Absent means http, which is what every endpoint was before there was more than one kind.
@@ -207,8 +261,10 @@ export const createEndpointSchema = z
     ...deliveryControlsSchema,
   })
   .superRefine(refineDestinationShape);
+export interface CreateEndpointSchema extends Named<typeof createEndpointSchemaDefinition> {}
+export const createEndpointSchema: CreateEndpointSchema = createEndpointSchemaDefinition;
 
-export const updateEndpointSchema = z.object({
+const updateEndpointSchemaDefinition = z.object({
   /**
    * Accepted only when it repeats the kind the endpoint already has; the service refuses a change,
    * because batches planned against the old transport are already in the outbox.
@@ -220,13 +276,17 @@ export const updateEndpointSchema = z.object({
   status: endpointStatusSchema.optional(),
   ...deliveryControlsSchema,
 });
+export interface UpdateEndpointSchema extends Named<typeof updateEndpointSchemaDefinition> {}
+export const updateEndpointSchema: UpdateEndpointSchema = updateEndpointSchemaDefinition;
 
-export const deliveriesQuerySchema = z.object({
+const deliveriesQuerySchemaDefinition = z.object({
   cursor: z.string().max(500).optional(),
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
 });
+export interface DeliveriesQuerySchema extends Named<typeof deliveriesQuerySchemaDefinition> {}
+export const deliveriesQuerySchema: DeliveriesQuerySchema = deliveriesQuerySchemaDefinition;
 
-export const eventsQuerySchema = z
+const eventsQuerySchemaDefinition = z
   .object({
     type: z.string().min(1).max(200).optional(),
     // The events log is a RANGED read by contract, the same contract the
@@ -240,12 +300,14 @@ export const eventsQuerySchema = z
   .refine((q) => q.from <= q.to, {
     message: "from must be less than or equal to to",
   });
+export interface EventsQuerySchema extends Named<typeof eventsQuerySchemaDefinition> {}
+export const eventsQuerySchema: EventsQuerySchema = eventsQuerySchemaDefinition;
 
 // ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
 // {@link endpointResponse} is the one builder behind create, list, get,
 // patch and roll-secret, so one schema describes all five.
 
-export const healthDtoSchema = z.object({
+const healthDtoSchemaDefinition = z.object({
   status: endpointStatusSchema,
   disabled_reason: z.string().nullable(),
   failing_since: z.string().nullable(),
@@ -257,20 +319,35 @@ export const healthDtoSchema = z.object({
   success_rate: z.number().nullable(),
   p95_latency_ms: z.number().int().nullable(),
 });
+export interface HealthDtoSchema extends Named<typeof healthDtoSchemaDefinition> {}
+export const healthDtoSchema: HealthDtoSchema = healthDtoSchemaDefinition;
 
-export const testFireResultSchema = z.object({
+const testFireResultSchemaDefinition = z.object({
   delivered: z.boolean(),
   response_status: z.number().int().nullable(),
   response_body: z.string().optional(),
   error: z.string().optional(),
 });
+export interface TestFireResultSchema extends Named<typeof testFireResultSchemaDefinition> {}
+export const testFireResultSchema: TestFireResultSchema = testFireResultSchemaDefinition;
 
-export const healthResponseSchema = z.object({ data: healthDtoSchema });
+const healthResponseSchemaDefinition = z.object({ data: healthDtoSchema });
+export interface HealthResponseSchema extends Named<typeof healthResponseSchemaDefinition> {}
+export const healthResponseSchema: HealthResponseSchema = healthResponseSchemaDefinition;
 
-export const testFireResponseSchema = z.object({ data: testFireResultSchema });
+const testFireResponseSchemaDefinition = z.object({ data: testFireResultSchema });
+export interface TestFireResponseSchema extends Named<typeof testFireResponseSchemaDefinition> {}
+export const testFireResponseSchema: TestFireResponseSchema = testFireResponseSchemaDefinition;
 
 /** A secret roll takes no body: the endpoint travels in the path. */
-export const rollEndpointSecretBodySchema = z.object({});
+const rollEndpointSecretBodySchemaDefinition = z.object({});
+export interface RollEndpointSecretBodySchema extends Named<
+  typeof rollEndpointSecretBodySchemaDefinition
+> {}
+export const rollEndpointSecretBodySchema: RollEndpointSecretBodySchema =
+  rollEndpointSecretBodySchemaDefinition;
 
 /** A test fire takes no body: the endpoint travels in the path. */
-export const testEndpointBodySchema = z.object({});
+const testEndpointBodySchemaDefinition = z.object({});
+export interface TestEndpointBodySchema extends Named<typeof testEndpointBodySchemaDefinition> {}
+export const testEndpointBodySchema: TestEndpointBodySchema = testEndpointBodySchemaDefinition;

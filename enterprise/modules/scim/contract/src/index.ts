@@ -29,6 +29,14 @@ export {
   type RedriveRetiredApplyInput,
   type RedriveRetiredApplyResult,
   type ScimOperator,
+  type OversightFailureSchema,
+  type OversightSyncListSchema,
+  type OversightSyncSchema,
+  type DirectoryIdentityRowSchema,
+  type ListOversightSyncsInputSchema,
+  type OversightConnectionInputSchema,
+  type RedriveRetiredApplyInputSchema,
+  type RedriveRetiredApplyResultSchema,
 } from "./scim-oversight.ts";
 export {
   RECENT_DIRECTORY_CHANGE_LIMIT,
@@ -53,6 +61,15 @@ export {
   type ScimReconciliationFailure,
   type ScimReconciliationScope,
   type ScimSyncStatusCopy,
+  type ConnectionReconciliationSchema,
+  type OrganizationReconciliationSchema,
+  type ScimDirectoryActivityEntrySchema,
+  type ScimDirectoryMemberSchema,
+  type ScimDirectoryMembersInputSchema,
+  type ScimReconciliationChangeSchema,
+  type ScimReconciliationFailureSchema,
+  type ScimReconciliationScopeSchema,
+  type ScimSyncStatusCopySchema,
 } from "./scim-reconciliation.ts";
 export {
   SCIM_REQUEST_FEED_LIMIT,
@@ -69,6 +86,11 @@ export {
   type ScimRequestLogEntry,
   type ScimRequestLogQuery,
   type ScimRequestRecord,
+  type ScimRequestEntrySchema,
+  type ScimRequestRecordSchema,
+  type ScimConnectionRequestsInputSchema,
+  type ScimRequestLogEntrySchema,
+  type ScimRequestLogQuerySchema,
 } from "./scim-request-log.ts";
 export {
   ScimApplyNotRedrivableError,
@@ -96,6 +118,13 @@ export {
   type ScimTokenEntitlement,
   type ScimTokenRecord,
   type ScimTokenSummary,
+  type GenerateScimTokenSchema,
+  type IssuedScimTokenSchema,
+  type RevokeScimTokenSchema,
+  type ScimTokenRevokedSchema,
+  type ScimTokenScopeSchema,
+  type ScimTokenSummarySchema,
+  type ScimDirectoryConnectionSchema,
 } from "./scim-token.ts";
 export { SCIM_ROLES, resolveHighestRole, type ScimRole } from "./scim-role-resolver.ts";
 export {
@@ -149,6 +178,17 @@ export {
   scimApplyRedrivenPayloadSchema,
   scimUserOpSchema,
   scimUserPushedPayloadSchema,
+  type ScimSyncFactInputSchema,
+  type ScimSyncFailureSchema,
+  type ScimApplyFailedPayloadSchema,
+  type ScimApplyRecoveredPayloadSchema,
+  type ScimApplyRetiredPayloadSchema,
+  type ScimCostCenterChangedEventDataSchema,
+  type ScimGroupMappedPayloadSchema,
+  type ScimTokenIssuedPayloadSchema,
+  type ScimTokenRevokedPayloadSchema,
+  type ScimApplyRedrivenPayloadSchema,
+  type ScimUserPushedPayloadSchema,
 } from "./scim-sync.ts";
 export {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
@@ -172,4 +212,10 @@ export {
   SCIM_SYNC_COMMAND_TYPES,
   type ScimSyncCommand,
   type ScimSyncCommandType,
+  type IssueScimTokenCommandDataSchema,
+  type RedriveScimApplyCommandDataSchema,
+  type RecordScimApplyFailureCommandDataSchema,
+  type RecordScimGroupMappingCommandDataSchema,
+  type RecordScimUserPushCommandDataSchema,
+  type RevokeScimSyncCommandDataSchema,
 } from "./scim-sync-commands.ts";

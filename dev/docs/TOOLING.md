@@ -117,7 +117,7 @@ replay whatever lands in the shared cache.
 
 ## Why some things are in Go
 
-The dev scripts (`generate-modules`, `sync-references`, `ensure-built`) walk
+The dev scripts (`generate-modules`, `sync-references`) walk
 the whole tree on every start, so they need to be quick. `devscripts.sh` runs them with `go run` when Go is
 installed, or a prebuilt binary in Docker.
 
@@ -159,20 +159,20 @@ make herrgen lint-rules test-scripts        # each calls its cached Nx target
   generate-modules  ->  modules/catalogue.json becomes the generated module lists
   nx run-many       ->  prisma:generate, generate:langy-skills, generate:feature-map,
                         generate:setup-skill-bodies, generate:evaluators (all cached)
-  ensure-built      ->  rebuild the few packages that ship built output,
-                        only if their input content changed, with each package's own build
+  ensure:built      ->  nx run-many -t build for the SDK, the MCP server, ksuid and
+                        mail, the packages that resolve a built dist (cached; a hit replays it)
 ```
 
 ## Everyday commands
 
 ```bash
-pnpm typecheck:affected      # typecheck only what your change reached
+pnpm --filter <pkg> typecheck  # one package
 pnpm test:affected           # same for tests
 pnpm lint:types:affected     # same for type-aware lint
-pnpm lint                    # fast lint, cached per project
+pnpm lint                    # whole-tree oxlint, uncached (oxlint is fast)
 pnpm lint:changed            # the same for what you changed and its dependents
 pnpm lint:architecture       # whole-tree policies
-pnpm typecheck               # the whole lot, cold. Slow, and queues for a slot
+pnpm typecheck               # one root tsc -b, incremental: rechecks only what changed
 ```
 
 If a heavy command sits there saying it's queued, haven is waiting for a slot.

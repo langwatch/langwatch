@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Wire schemas for model-provider module REST families — published promises
  * enforced in contract. Relocated from server-local `*.rules.ts` files so the
@@ -12,9 +13,14 @@ import { customModelEntrySchema } from "./custom-model.ts";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The path parameter naming the provider a write is keyed on. */
-export const modelProviderRestParamsSchema = z.object({ provider: z.string().min(1) });
+const modelProviderRestParamsSchemaDefinition = z.object({ provider: z.string().min(1) });
+export interface ModelProviderRestParamsSchema extends Named<
+  typeof modelProviderRestParamsSchemaDefinition
+> {}
+export const modelProviderRestParamsSchema: ModelProviderRestParamsSchema =
+  modelProviderRestParamsSchemaDefinition;
 
-export const updateModelProviderInputSchema = z.object({
+const updateModelProviderInputSchemaDefinition = z.object({
   enabled: z.boolean(),
   customKeys: z.record(z.string(), z.unknown()).optional(),
   customModels: z.union([z.array(customModelEntrySchema), z.array(z.string())]).optional(),
@@ -24,6 +30,11 @@ export const updateModelProviderInputSchema = z.object({
   extraHeaders: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
   defaultModel: z.string().optional(),
 });
+export interface UpdateModelProviderInputSchema extends Named<
+  typeof updateModelProviderInputSchemaDefinition
+> {}
+export const updateModelProviderInputSchema: UpdateModelProviderInputSchema =
+  updateModelProviderInputSchemaDefinition;
 
 const extraHeaderSchema = z.object({
   key: z.string(),
@@ -31,7 +42,7 @@ const extraHeaderSchema = z.object({
 });
 
 /** One model provider entry, as this family's response has always published it. */
-export const apiResponseModelProviderSchema = z.object({
+const apiResponseModelProviderSchemaDefinition = z.object({
   id: z.string().optional(),
   provider: z.string(),
   enabled: z.boolean(),
@@ -44,13 +55,23 @@ export const apiResponseModelProviderSchema = z.object({
   disabledByDefault: z.boolean().optional(),
   extraHeaders: z.array(extraHeaderSchema).nullable().optional(),
 });
+export interface ApiResponseModelProviderSchema extends Named<
+  typeof apiResponseModelProviderSchemaDefinition
+> {}
+export const apiResponseModelProviderSchema: ApiResponseModelProviderSchema =
+  apiResponseModelProviderSchemaDefinition;
 
 export type ApiResponseModelProvider = z.infer<typeof apiResponseModelProviderSchema>;
 
 /** A record mapping provider keys to their configuration. */
-export const apiResponseModelProvidersSchema = z
+const apiResponseModelProvidersSchemaDefinition = z
   .object({})
   .catchall(apiResponseModelProviderSchema);
+export interface ApiResponseModelProvidersSchema extends Named<
+  typeof apiResponseModelProvidersSchemaDefinition
+> {}
+export const apiResponseModelProvidersSchema: ApiResponseModelProvidersSchema =
+  apiResponseModelProvidersSchemaDefinition;
 
 export type ApiResponseModelProviders = z.infer<typeof apiResponseModelProvidersSchema>;
 
@@ -59,7 +80,12 @@ export type ApiResponseModelProviders = z.infer<typeof apiResponseModelProviders
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The path parameter every item address of this family names. */
-export const modelDefaultsRestParamsSchema = z.object({ id: z.string().min(1) });
+const modelDefaultsRestParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface ModelDefaultsRestParamsSchema extends Named<
+  typeof modelDefaultsRestParamsSchemaDefinition
+> {}
+export const modelDefaultsRestParamsSchema: ModelDefaultsRestParamsSchema =
+  modelDefaultsRestParamsSchemaDefinition;
 
 const scopeAttachmentSchema = z.object({
   scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
@@ -71,20 +97,30 @@ const scopeAttachmentSchema = z.object({
  * higher scope" — see the cascading-default-models ADR (dev/docs/adr/020).
  * `scopes` is the (scopeType, scopeId) attachment list; at least one required.
  */
-export const createModelDefaultConfigInputSchema = z.object({
+const createModelDefaultConfigInputSchemaDefinition = z.object({
   config: z.record(z.string(), z.string()),
   scopes: z.array(scopeAttachmentSchema).min(1),
 });
+export interface CreateModelDefaultConfigInputSchema extends Named<
+  typeof createModelDefaultConfigInputSchemaDefinition
+> {}
+export const createModelDefaultConfigInputSchema: CreateModelDefaultConfigInputSchema =
+  createModelDefaultConfigInputSchemaDefinition;
 
 /**
  * Body of PUT /api/model-defaults/:id. Both fields are optional — update
  * just the payload or just the scope attachments. Sending `scopes: []`
  * deletes the config (an unattached config can never be hit by the resolver).
  */
-export const updateModelDefaultConfigInputSchema = z.object({
+const updateModelDefaultConfigInputSchemaDefinition = z.object({
   config: z.record(z.string(), z.string()).optional(),
   scopes: z.array(scopeAttachmentSchema).optional(),
 });
+export interface UpdateModelDefaultConfigInputSchema extends Named<
+  typeof updateModelDefaultConfigInputSchemaDefinition
+> {}
+export const updateModelDefaultConfigInputSchema: UpdateModelDefaultConfigInputSchema =
+  updateModelDefaultConfigInputSchemaDefinition;
 
 const scopeRefSchema = z.object({
   type: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
@@ -108,7 +144,7 @@ const effectiveResolutionSchema = z
   })
   .nullable();
 
-export const apiResponseModelDefaultsSchema = z.object({
+const apiResponseModelDefaultsSchemaDefinition = z.object({
   scope: z.object({
     projectId: z.string(),
     teamId: z.string().nullable(),
@@ -122,10 +158,20 @@ export const apiResponseModelDefaultsSchema = z.object({
   }),
   configs: z.array(configRowSchema),
 });
+export interface ApiResponseModelDefaultsSchema extends Named<
+  typeof apiResponseModelDefaultsSchemaDefinition
+> {}
+export const apiResponseModelDefaultsSchema: ApiResponseModelDefaultsSchema =
+  apiResponseModelDefaultsSchemaDefinition;
 
-export const apiResponseConfigCreatedSchema = z.object({
+const apiResponseConfigCreatedSchemaDefinition = z.object({
   id: z.string(),
 });
+export interface ApiResponseConfigCreatedSchema extends Named<
+  typeof apiResponseConfigCreatedSchemaDefinition
+> {}
+export const apiResponseConfigCreatedSchema: ApiResponseConfigCreatedSchema =
+  apiResponseConfigCreatedSchemaDefinition;
 
 export type CreateModelDefaultConfigInput = z.infer<typeof createModelDefaultConfigInputSchema>;
 export type UpdateModelDefaultConfigInput = z.infer<typeof updateModelDefaultConfigInputSchema>;
@@ -136,13 +182,23 @@ export type ApiResponseModelDefaults = z.infer<typeof apiResponseModelDefaultsSc
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The conversation posted by the browser; project and model remain request headers. */
-export const playgroundRestBodySchema = z.object({
+const playgroundRestBodySchemaDefinition = z.object({
   messages: z.array(z.unknown()),
 });
+export interface PlaygroundRestBodySchema extends Named<
+  typeof playgroundRestBodySchemaDefinition
+> {}
+export const playgroundRestBodySchema: PlaygroundRestBodySchema =
+  playgroundRestBodySchemaDefinition;
 
 /** The target and optional system prompt carried by the released playground wire contract. */
-export const playgroundRestHeadersSchema = z.object({
+const playgroundRestHeadersSchemaDefinition = z.object({
   "x-project-id": z.string().nullable().optional(),
   "x-model": z.string().nullable().optional(),
   "x-system-prompt": z.string().nullable().optional(),
 });
+export interface PlaygroundRestHeadersSchema extends Named<
+  typeof playgroundRestHeadersSchemaDefinition
+> {}
+export const playgroundRestHeadersSchema: PlaygroundRestHeadersSchema =
+  playgroundRestHeadersSchemaDefinition;

@@ -3,14 +3,14 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
@@ -72,20 +72,18 @@ function renderSidebar({
   permissions?: string[];
 }) {
   declarations.current = analyticsLends;
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          project: PROJECT,
-          pathname,
-          permissions,
-          flags: { release_dashboards: { enabled: true, isLoading: false } },
-          commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
-        }}
-      >
-        <ProductSidebar surface={surface} isCompact={false} />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        project: PROJECT,
+        pathname,
+        permissions,
+        flags: { release_dashboards: { enabled: true, isLoading: false } },
+        commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
+      }}
+    >
+      <ProductSidebar surface={surface} isCompact={false} />
+    </WithStubNavigationHost>,
   );
 }
 

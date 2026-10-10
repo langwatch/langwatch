@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The spend reconciliation REST vocabulary: the query each read accepts, the body a replay
  * posts, and the rows each answers with. Published once so the doc, the route and a
@@ -132,7 +133,7 @@ export const gatewayEpochMsSchema = z.coerce
     example: 1782864000000,
   });
 
-export const gatewaySpendEventsQuerySchema = z
+const gatewaySpendEventsQuerySchemaDefinition = z
   .object({
     // The reconciliation pull is a RANGED read by contract: without bounds
     // the walk sorts the whole 13-month table under FINAL on every page.
@@ -145,6 +146,11 @@ export const gatewaySpendEventsQuerySchema = z
   .refine((q) => q.from <= q.to, {
     message: "from must be less than or equal to to",
   });
+export interface GatewaySpendEventsQuerySchema extends Named<
+  typeof gatewaySpendEventsQuerySchemaDefinition
+> {}
+export const gatewaySpendEventsQuerySchema: GatewaySpendEventsQuerySchema =
+  gatewaySpendEventsQuerySchemaDefinition;
 
 export const GATEWAY_END_USER_SPEND_WINDOWS = {
   day: 24 * 60 * 60 * 1000,
@@ -152,34 +158,46 @@ export const GATEWAY_END_USER_SPEND_WINDOWS = {
   month: 30 * 24 * 60 * 60 * 1000,
 } as const;
 
-export const gatewayEndUserSpendQuerySchema = z.object({
+const gatewayEndUserSpendQuerySchemaDefinition = z.object({
   window: z.enum(["day", "week", "month"]).optional().default("month"),
   from: z.coerce.number().int().positive().optional(),
   to: z.coerce.number().int().positive().optional(),
   virtual_key_id: z.string().min(1).max(100).optional(),
 });
+export interface GatewayEndUserSpendQuerySchema extends Named<
+  typeof gatewayEndUserSpendQuerySchemaDefinition
+> {}
+export const gatewayEndUserSpendQuerySchema: GatewayEndUserSpendQuerySchema =
+  gatewayEndUserSpendQuerySchemaDefinition;
 
-export const gatewayEndUserSpendParamsSchema = z.object({ id: z.string().min(1) });
+const gatewayEndUserSpendParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface GatewayEndUserSpendParamsSchema extends Named<
+  typeof gatewayEndUserSpendParamsSchemaDefinition
+> {}
+export const gatewayEndUserSpendParamsSchema: GatewayEndUserSpendParamsSchema =
+  gatewayEndUserSpendParamsSchemaDefinition;
 
 // ── Response DTO schemas ───────────────────────────────────────────────
 // These mirror the shapes the handlers below return. Without them the
 // generated spec documents these routes with `responses: {}`, so a caller
 // reading the spec learns the route exists and nothing about what it answers.
 
-export const gatewaySpendUsageSchema = z.object({
+const gatewaySpendUsageSchemaDefinition = z.object({
   input_tokens: z.number().int(),
   output_tokens: z.number().int(),
   cache_read_input_tokens: z.number().int(),
   cache_creation_input_tokens: z.number().int(),
   reasoning_tokens: z.number().int(),
 });
+export interface GatewaySpendUsageSchema extends Named<typeof gatewaySpendUsageSchemaDefinition> {}
+export const gatewaySpendUsageSchema: GatewaySpendUsageSchema = gatewaySpendUsageSchemaDefinition;
 
 /**
  * `usageSchema` plus image quantities, for this repository's own rollups
  * (spend-summaries, end-user spend). /spend-events stays on the base schema
  * since the shared webhook envelope builder doesn't carry these fields yet.
  */
-export const gatewaySpendUsageWithImagesSchema = z.object({
+const gatewaySpendUsageWithImagesSchemaDefinition = z.object({
   ...gatewaySpendUsageSchema.shape,
   // Always present, 0 on a request/rollup that used no images. The object
   // already carries the cache and reasoning counts as 0 when unused, so an
@@ -205,9 +223,14 @@ export const gatewaySpendUsageWithImagesSchema = z.object({
       "Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum.",
     ),
 });
+export interface GatewaySpendUsageWithImagesSchema extends Named<
+  typeof gatewaySpendUsageWithImagesSchemaDefinition
+> {}
+export const gatewaySpendUsageWithImagesSchema: GatewaySpendUsageWithImagesSchema =
+  gatewaySpendUsageWithImagesSchemaDefinition;
 
 /** Money is published twice: a display string and the canonical integer. */
-export const gatewaySpendCostSchema = z.object({
+const gatewaySpendCostSchemaDefinition = z.object({
   total_usd: z
     .string()
     .describe(`Display value. ${USD_DISPLAY_STRING_FORMAT} Use nano_usd for arithmetic.`),
@@ -218,11 +241,13 @@ export const gatewaySpendCostSchema = z.object({
       "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against.",
     ),
 });
+export interface GatewaySpendCostSchema extends Named<typeof gatewaySpendCostSchemaDefinition> {}
+export const gatewaySpendCostSchema: GatewaySpendCostSchema = gatewaySpendCostSchemaDefinition;
 
 /** Null when the walk is exhausted. A full page does NOT imply more. */
 export const gatewaySpendNextCursorSchema = z.string().nullable();
 
-export const gatewaySpendSummaryRowSchema = z.object({
+const gatewaySpendSummaryRowSchemaDefinition = z.object({
   /** The first grouping dimension's value, unchanged from when a rollup could
    *  only be grouped one way. Read `group` to tell two dimensions apart. */
   key: z.string(),
@@ -235,8 +260,13 @@ export const gatewaySpendSummaryRowSchema = z.object({
   usage: gatewaySpendUsageWithImagesSchema,
   cost: gatewaySpendCostSchema,
 });
+export interface GatewaySpendSummaryRowSchema extends Named<
+  typeof gatewaySpendSummaryRowSchemaDefinition
+> {}
+export const gatewaySpendSummaryRowSchema: GatewaySpendSummaryRowSchema =
+  gatewaySpendSummaryRowSchemaDefinition;
 
-export const gatewayEndUserCapSchema = z.object({
+const gatewayEndUserCapSchemaDefinition = z.object({
   budget_id: z.string(),
   anchor_id: z.string(),
   window: z.string(),
@@ -245,8 +275,10 @@ export const gatewayEndUserCapSchema = z.object({
   spent_usd: z.string().describe(`Spend against that cap. ${USD_DISPLAY_STRING_FORMAT}`),
   period_started_at: z.string(),
 });
+export interface GatewayEndUserCapSchema extends Named<typeof gatewayEndUserCapSchemaDefinition> {}
+export const gatewayEndUserCapSchema: GatewayEndUserCapSchema = gatewayEndUserCapSchemaDefinition;
 
-export const gatewayEndUserSpendSchema = z.object({
+const gatewayEndUserSpendSchemaDefinition = z.object({
   end_user_id: z.string(),
   window: z.string(),
   from: z.string(),
@@ -256,6 +288,11 @@ export const gatewayEndUserSpendSchema = z.object({
   usage: gatewaySpendUsageWithImagesSchema,
   caps: z.array(gatewayEndUserCapSchema),
 });
+export interface GatewayEndUserSpendSchema extends Named<
+  typeof gatewayEndUserSpendSchemaDefinition
+> {}
+export const gatewayEndUserSpendSchema: GatewayEndUserSpendSchema =
+  gatewayEndUserSpendSchemaDefinition;
 
 /** The refusals every route here documents; the 200 comes from its output. */
 
@@ -316,7 +353,7 @@ export const gatewayQueryBooleanSchema = z
     example: "true",
   });
 
-export const gatewaySpendSummariesQuerySchema = z
+const gatewaySpendSummariesQuerySchemaDefinition = z
   .object({
     group_by: gatewaySpendGroupBySchema,
     bucket: z.enum(SPEND_BUCKETS).optional().default("none"),
@@ -355,22 +392,42 @@ export const gatewaySpendSummariesQuerySchema = z
   .refine((q) => q.from <= q.to, {
     message: "from must be less than or equal to to",
   });
+export interface GatewaySpendSummariesQuerySchema extends Named<
+  typeof gatewaySpendSummariesQuerySchemaDefinition
+> {}
+export const gatewaySpendSummariesQuerySchema: GatewaySpendSummariesQuerySchema =
+  gatewaySpendSummariesQuerySchemaDefinition;
 
 /** A page of spend rollups; follow `next_cursor` until it comes back null. */
-export const gatewaySpendSummariesPageSchema = z.object({
+const gatewaySpendSummariesPageSchemaDefinition = z.object({
   data: z.array(gatewaySpendSummaryRowSchema),
   next_cursor: gatewaySpendNextCursorSchema,
 });
+export interface GatewaySpendSummariesPageSchema extends Named<
+  typeof gatewaySpendSummariesPageSchemaDefinition
+> {}
+export const gatewaySpendSummariesPageSchema: GatewaySpendSummariesPageSchema =
+  gatewaySpendSummariesPageSchemaDefinition;
 export type GatewaySpendSummariesPage = z.infer<typeof gatewaySpendSummariesPageSchema>;
 
 /** A page of the per-request ledger, as the canonical billing envelopes. */
-export const gatewaySpendEventsPageSchema = z.object({
+const gatewaySpendEventsPageSchemaDefinition = z.object({
   data: z.array(gatewaySpendEventEnvelopeSchema),
   next_cursor: gatewaySpendNextCursorSchema,
 });
+export interface GatewaySpendEventsPageSchema extends Named<
+  typeof gatewaySpendEventsPageSchemaDefinition
+> {}
+export const gatewaySpendEventsPageSchema: GatewaySpendEventsPageSchema =
+  gatewaySpendEventsPageSchemaDefinition;
 export type GatewaySpendEventsPage = z.infer<typeof gatewaySpendEventsPageSchema>;
 
-export const gatewayEndUserSpendResponseSchema = z.object({ data: gatewayEndUserSpendSchema });
+const gatewayEndUserSpendResponseSchemaDefinition = z.object({ data: gatewayEndUserSpendSchema });
+export interface GatewayEndUserSpendResponseSchema extends Named<
+  typeof gatewayEndUserSpendResponseSchemaDefinition
+> {}
+export const gatewayEndUserSpendResponseSchema: GatewayEndUserSpendResponseSchema =
+  gatewayEndUserSpendResponseSchemaDefinition;
 export type GatewayEndUserSpendResponse = z.infer<typeof gatewayEndUserSpendResponseSchema>;
 
 export type GatewaySpendSummariesQuery = z.output<typeof gatewaySpendSummariesQuerySchema>;

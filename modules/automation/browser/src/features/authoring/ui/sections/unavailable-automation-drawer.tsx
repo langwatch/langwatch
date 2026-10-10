@@ -1,5 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Alert, Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
 
@@ -28,7 +28,7 @@ export function UnavailableAutomationDrawer({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger />
-          <Heading size="md">Automation</Heading>
+          <Drawer.Title>Automation</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           {error ? (

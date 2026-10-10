@@ -9,12 +9,18 @@
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+
+// jsdom loads no stylesheet, so the theme colours a chart frame is handed have no value to read.
+vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRawColorValue: () => "#123456",
+}));
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];

@@ -6,7 +6,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { AddOrEditDatasetRoutedDrawerToken } from "@langwatch/dataset-client";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
@@ -108,7 +108,7 @@ function toastAddedToDataset({
     description: (
       <RoutedLink
         href={`/${projectSlug}/datasets/${datasetId}`}
-        style={{ color: "white", textDecoration: "underline" }}
+        style={{ color: "inherit", textDecoration: "underline" }}
       >
         View the dataset
       </RoutedLink>
@@ -282,9 +282,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
             <Drawer.CloseTrigger />
           </HStack>
           <HStack>
-            <Text paddingTop={5} fontSize="3xl">
-              Add to Dataset
-            </Text>
+            <Drawer.Title>Add to Dataset</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body overflow="visible" paddingX={0} ref={editorPortalRef}>
@@ -320,7 +318,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
               paddingBottom={4}
               background="bg.panel"
               transition="box-shadow 0.3s ease-in-out"
-              boxShadow={atBottom ? "none" : "0 -2px 5px rgba(0, 0, 0, 0.1)"}
+              boxShadow={
+                atBottom
+                  ? "none"
+                  : "0 -2px 5px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
+              }
               paddingX={6}
             >
               <Button

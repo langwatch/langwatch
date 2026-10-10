@@ -4,7 +4,7 @@
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -27,6 +27,7 @@ import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
+import { formatRate } from "../../model/cost-rate-text.ts";
 import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import {
   filterAndSortCosts,
@@ -41,15 +42,12 @@ import {
 } from "../../model/model-provider-host.ts";
 import { RegexHighlight } from "../elements/regex-highlight.tsx";
 
-const exactRate = (rate: number) =>
-  rate.toLocaleString("fullwide", { useGrouping: false, maximumSignificantDigits: 20 });
-
 /** One rate as US dollars per million tokens; the exact per-token figure sits in the tooltip. */
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
     <Table.Cell padding={0}>
       {rate !== undefined && (
-        <Tooltip content={`$${exactRate(rate)} per token`}>
+        <Tooltip content={`$${formatRate(rate)} per token`}>
           <Text
             as="span"
             display="inline-block"
@@ -59,7 +57,7 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
             fontVariantNumeric="tabular-nums"
             color={isCustom ? "green.fg" : undefined}
           >
-            {formatMoney({ amount: rate * 1_000_000, currency: "USD" })}
+            {formatCurrency({ amount: rate * 1_000_000, currency: "USD" })}
             <Text as="span" color="fg.muted" textStyle="xs">
               {" "}
               / 1M
@@ -443,7 +441,7 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
         {id && (
           <Menu.Item
             value="delete"
-            color="red.600"
+            color="red.fg"
             onClick={(event) => {
               event.stopPropagation();
               deleteLLMModelCost.mutate(

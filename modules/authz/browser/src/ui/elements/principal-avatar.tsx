@@ -1,8 +1,8 @@
 // Member avatar; family-local copy; broken-image guard tracks URL not boolean.
 
-import { Avatar } from "@chakra-ui/react";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { type AvatarRootProps } from "@langwatch/design-system/primitives";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getColorPaletteForString } from "@langwatch/design-system/rotating-colors";
 import { useState } from "react";
 
 export function PrincipalAvatar({
@@ -18,10 +18,15 @@ export function PrincipalAvatar({
 }) {
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
   const showImage = !!image && image !== brokenImageUrl;
-  const colour = getColorForString("colors", name);
+  const colour = getColorPaletteForString(name);
 
   return (
-    <Avatar.Root color="white" background={colour.color} data-principal={id} {...rootProps}>
+    <Avatar.Root
+      color={`${colour}.fg`}
+      background={`${colour}.subtle`}
+      data-principal={id}
+      {...rootProps}
+    >
       {showImage && image ? (
         <Avatar.Image src={image} onError={() => setBrokenImageUrl(image)} />
       ) : null}

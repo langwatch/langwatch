@@ -1,7 +1,8 @@
 import { ValidationError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const ottlValidationErrorSchema = z
+const ottlValidationErrorSchemaDefinition = z
   .object({
     statementIndex: z.number().int().nonnegative(),
     line: z.number().int().nonnegative(),
@@ -9,6 +10,11 @@ export const ottlValidationErrorSchema = z
     message: z.string(),
   })
   .strict();
+export interface OttlValidationErrorSchema extends Named<
+  typeof ottlValidationErrorSchemaDefinition
+> {}
+export const ottlValidationErrorSchema: OttlValidationErrorSchema =
+  ottlValidationErrorSchemaDefinition;
 export type OttlValidationError = z.infer<typeof ottlValidationErrorSchema>;
 
 export const ottlValidationDeferredReasonSchema = z.enum([
@@ -17,7 +23,7 @@ export const ottlValidationDeferredReasonSchema = z.enum([
 ]);
 export type OttlValidationDeferredReason = z.infer<typeof ottlValidationDeferredReasonSchema>;
 
-export const ottlValidationResultSchema = z.discriminatedUnion("status", [
+const ottlValidationResultSchemaDefinition = z.discriminatedUnion("status", [
   z.object({ status: z.literal("valid") }).strict(),
   z
     .object({
@@ -32,12 +38,17 @@ export const ottlValidationResultSchema = z.discriminatedUnion("status", [
     })
     .strict(),
 ]);
+export interface OttlValidationResultSchema extends Named<
+  typeof ottlValidationResultSchemaDefinition
+> {}
+export const ottlValidationResultSchema: OttlValidationResultSchema =
+  ottlValidationResultSchemaDefinition;
 export type OttlValidationResult = z.infer<typeof ottlValidationResultSchema>;
 
 export const ottlEncodingSchema = z.enum(["proto", "json"]);
 export type OttlEncoding = z.infer<typeof ottlEncodingSchema>;
 
-export const ottlTransformInputSchema = z
+const ottlTransformInputSchemaDefinition = z
   .object({
     sourceId: z.string().min(1),
     kind: z.enum(["log", "metric"]),
@@ -46,9 +57,14 @@ export const ottlTransformInputSchema = z
     statements: z.array(z.string()),
   })
   .strict();
+export interface OttlTransformInputSchema extends Named<
+  typeof ottlTransformInputSchemaDefinition
+> {}
+export const ottlTransformInputSchema: OttlTransformInputSchema =
+  ottlTransformInputSchemaDefinition;
 export type OttlTransformInput = z.infer<typeof ottlTransformInputSchema>;
 
-export const ottlTransformResultSchema = z.discriminatedUnion("ok", [
+const ottlTransformResultSchemaDefinition = z.discriminatedUnion("ok", [
   z
     .object({
       ok: z.literal(true),
@@ -63,6 +79,11 @@ export const ottlTransformResultSchema = z.discriminatedUnion("ok", [
     })
     .strict(),
 ]);
+export interface OttlTransformResultSchema extends Named<
+  typeof ottlTransformResultSchemaDefinition
+> {}
+export const ottlTransformResultSchema: OttlTransformResultSchema =
+  ottlTransformResultSchemaDefinition;
 export type OttlTransformResult = z.infer<typeof ottlTransformResultSchema>;
 
 export abstract class GovernanceOttlGateway {

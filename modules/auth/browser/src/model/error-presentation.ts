@@ -1,6 +1,7 @@
 /** Seam that a composition can plug a registry into, so error copy isn't baked into the app. */
 
 import type { AuthErrorExplanation } from "@langwatch/auth-contract";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 
 import { frontDoorErrorCopy } from "./front-door-error-copy.ts";
 import type { AuthHandledError } from "./read-handled-error.ts";
@@ -8,11 +9,26 @@ import type { AuthHandledError } from "./read-handled-error.ts";
 /** Registry function that reads the whole error to fill in templated copy. */
 export type ExplainErrorCode = (error: AuthHandledError) => AuthErrorExplanation | null;
 
+/** The app-wide registry's copy for a code it lists (main's `presentation.ts`), else `null`. */
+function sharedRegistryCopy(error: AuthHandledError): AuthErrorExplanation | null {
+  const explained = explainHandledError({
+    ...error,
+    fault: error.httpStatus >= 500 ? "platform" : "customer",
+    retryable: false,
+    docsUrl: undefined,
+    reasons: [],
+  });
+  if (!explained.isRegistered) return null;
+  return explained.description
+    ? { title: explained.title, description: explained.description }
+    : { title: explained.title };
+}
+
 /**
- * The front door's own codes, until a composition installs a fuller registry.
- * See `front-door-error-copy.ts` for why this package holds any copy at all.
+ * The front door's own codes first, then the app-wide registry, until a composition installs
+ * another. See `front-door-error-copy.ts` for why this package holds any copy at all.
  */
-let installed: ExplainErrorCode = frontDoorErrorCopy;
+let installed: ExplainErrorCode = (error) => frontDoorErrorCopy(error) ?? sharedRegistryCopy(error);
 
 /**
  * Hands the front door this composition's error copy. Called once, by the

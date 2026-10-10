@@ -23,14 +23,14 @@ export function LangyProviderCard({
   badge?: string;
   onClick: () => void;
 }) {
-  const selectedBorder = useColorModeValue("orange.400", "orange.800");
-  const selectedBg = useColorModeValue("orange.50", "orange.950/30");
+  const selectedBorder = useColorModeValue("accent.emphasized", "accent.emphasized");
+  const selectedBg = useColorModeValue("accent.subtle", "accent.subtle");
   const isDark = useColorModeValue(false, true);
   const hoverBorder = useColorModeValue(selectedBorder, "orange.emphasized");
-  const hoverBg = useColorModeValue("gray.50", "bg.muted");
+  const hoverBg = useColorModeValue("bg.subtle", "bg.muted");
   const selectedShadow = isDark
-    ? "0 6px 28px rgba(237,137,38,0.06)"
-    : "0 0 0 1px var(--chakra-colors-orange-100)";
+    ? "0 6px 28px color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent)"
+    : "0 0 0 1px var(--chakra-colors-accent-muted)";
 
   return (
     <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
@@ -75,7 +75,7 @@ export function LangyProviderCard({
             paddingY="3px"
             borderRadius="full"
             background="orange.solid"
-            color="white"
+            color="orange.contrast"
             whiteSpace="nowrap"
             pointerEvents="none"
           >

@@ -33,7 +33,10 @@ export function peopleCutItems({
     { value: "invited", label: "Invited", count: openInviteCount },
     { value: "waiting", label: "Waiting to join", count: requestCount },
   ];
-  return joinRequestsEnabled ? cuts : cuts.filter((item) => item.value !== "waiting");
+  // A request already queued (an SSO "ask" arrival) is shown whatever the flag says.
+  return joinRequestsEnabled || requestCount > 0
+    ? cuts
+    : cuts.filter((item) => item.value !== "waiting");
 }
 
 /** What an empty cut says; never one sentence for all four. */

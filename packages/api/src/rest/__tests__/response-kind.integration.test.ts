@@ -138,6 +138,7 @@ const objects = defineRestRouter(ObjectApi)
   .withRawBody("text")
   .withAccess(publicRoute({ reason: "SCIM presents its own bearer token" }))
   .withResponse("protocol", { produces: "application/scim+json", because: SCIM_REASON })
+  .withoutAudit("test route")
   .handle(({ raw, response }) =>
     response.write({
       status: 201,

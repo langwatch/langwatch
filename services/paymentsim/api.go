@@ -212,6 +212,14 @@ func (s *Server) updateSubscription(r *http.Request, p params) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	var prorations []*Line
+	if p.str("proration_behavior") == prorateAlwaysInvoice {
+		at, ok := p.integer("proration_date")
+		if !ok {
+			at = s.now().Unix()
+		}
+		prorations = s.prorationLines(sub, sub.Items.Data, items, at)
+	}
 	sub.Items.Data = items
 	if p.has("cancel_at_period_end") {
 		sub.CancelAtPeriodEnd = p.boolean("cancel_at_period_end")
@@ -229,6 +237,9 @@ func (s *Server) updateSubscription(r *http.Request, p params) (any, error) {
 	}
 	if diff := changed(before, fields(sub)); len(diff) > 0 {
 		s.emit("customer.subscription.updated", sub, diff)
+	}
+	if len(prorations) > 0 {
+		s.invoiceProrations(sub, prorations)
 	}
 	return sub, nil
 }
@@ -464,6 +475,18 @@ func (s *Server) previewInvoice(_ *http.Request, p params) (any, error) {
 	}
 	inv := &Invoice{ID: "upcoming_in_" + sub.ID, Object: "invoice", BillingReason: "upcoming", Currency: sub.Currency, Customer: sub.Customer, Subscription: &sub.ID, Metadata: map[string]string{}, Status: ptr("draft"), Created: s.now().Unix(), CollectionMethod: sub.CollectionMethod}
 	inv.Lines = listOf([]*Line{}, false, "/v1/invoices/upcoming/lines")
+	if details := p.sub("subscription_details"); details.str("proration_behavior") == prorateAlwaysInvoice {
+		at, ok := details.integer("proration_date")
+		if !ok {
+			at = s.now().Unix()
+		}
+		for _, l := range s.prorationLines(sub, sub.Items.Data, items, at) {
+			inv.Lines.Data = append(inv.Lines.Data, l)
+			inv.Subtotal += l.Amount
+		}
+		inv.Total, inv.AmountDue, inv.AmountRemaining = inv.Subtotal, inv.Subtotal, inv.Subtotal
+		return inv, nil
+	}
 	for _, it := range items {
 		qty := orZero(it.Quantity)
 		amount := amountFor(s.st.price(it.Price.ID), qty)

@@ -3,6 +3,7 @@
  * messages they nudge each other with (ADR-128, "Transport").
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -15,7 +16,7 @@ import {
 } from "./connected-agent.protocol.ts";
 
 /** The value under `agent_call:v1:<callId>`. */
-export const storedCallSchema = z.object({
+const storedCallSchemaDefinition = z.object({
   projectId: z.string(),
   envelope: callEnvelopeSchema,
   /** The pod whose reply channel the result is nudged on. */
@@ -23,28 +24,34 @@ export const storedCallSchema = z.object({
   /** The instance the call was written for; the gateway checks it. */
   instanceId: z.string(),
 });
+export interface StoredCallSchema extends Named<typeof storedCallSchemaDefinition> {}
+export const storedCallSchema: StoredCallSchema = storedCallSchemaDefinition;
 export type StoredCall = z.infer<typeof storedCallSchema>;
 
 /** What the gateway measured when it refused a payload above its cap. */
-export const payloadViolationSchema = z.object({
+const payloadViolationSchemaDefinition = z.object({
   what: z.enum(["envelope", "result", "session"]),
   sizeBytes: z.number(),
   limitBytes: z.number(),
 });
+export interface PayloadViolationSchema extends Named<typeof payloadViolationSchemaDefinition> {}
+export const payloadViolationSchema: PayloadViolationSchema = payloadViolationSchemaDefinition;
 export type PayloadViolation = z.infer<typeof payloadViolationSchema>;
 
 /**
  * The error a stored result carries: what the instance sent, plus the fields the gateway
  * adds when the refusal is its own.
  */
-export const storedResultErrorSchema = z.object({
+const storedResultErrorSchemaDefinition = z.object({
   ...resultErrorSchema.shape,
   payload: payloadViolationSchema.optional(),
 });
+export interface StoredResultErrorSchema extends Named<typeof storedResultErrorSchemaDefinition> {}
+export const storedResultErrorSchema: StoredResultErrorSchema = storedResultErrorSchemaDefinition;
 export type StoredResultError = z.infer<typeof storedResultErrorSchema>;
 
 /** The value under `agent_result:v1:<callId>`. */
-export const storedResultSchema = z.object({
+const storedResultSchemaDefinition = z.object({
   instanceId: z.string(),
   output: outputSchema.optional(),
   session: sessionSchema,
@@ -58,27 +65,35 @@ export const storedResultSchema = z.object({
    */
   undelivered: z.boolean().optional(),
 });
+export interface StoredResultSchema extends Named<typeof storedResultSchemaDefinition> {}
+export const storedResultSchema: StoredResultSchema = storedResultSchemaDefinition;
 export type StoredResult = z.infer<typeof storedResultSchema>;
 
 /** What the dispatcher publishes on an instance channel. */
-export const instanceNudgeSchema = z.union([
+const instanceNudgeSchemaDefinition = z.union([
   z.object({ call: z.string() }),
   z.object({ cancel: z.string() }),
 ]);
+export interface InstanceNudgeSchema extends Named<typeof instanceNudgeSchemaDefinition> {}
+export const instanceNudgeSchema: InstanceNudgeSchema = instanceNudgeSchemaDefinition;
 export type InstanceNudge = z.infer<typeof instanceNudgeSchema>;
 
 /** What the gateway publishes on a pod's reply channel. */
-export const replyNudgeSchema = z.object({
+const replyNudgeSchemaDefinition = z.object({
   callId: z.string(),
   kind: z.enum(["ack", "result"]),
 });
+export interface ReplyNudgeSchema extends Named<typeof replyNudgeSchemaDefinition> {}
+export const replyNudgeSchema: ReplyNudgeSchema = replyNudgeSchemaDefinition;
 export type ReplyNudge = z.infer<typeof replyNudgeSchema>;
 
 /** What a gateway publishes when a socket is gone. */
-export const instanceGoneSchema = z.object({
+const instanceGoneSchemaDefinition = z.object({
   instanceId: z.string(),
   projectId: z.string(),
 });
+export interface InstanceGoneSchema extends Named<typeof instanceGoneSchemaDefinition> {}
+export const instanceGoneSchema: InstanceGoneSchema = instanceGoneSchemaDefinition;
 export type InstanceGone = z.infer<typeof instanceGoneSchema>;
 
 /**

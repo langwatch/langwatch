@@ -40,23 +40,43 @@ export function useConversationPrefetch(
     // A conversation's turns belong to the member the drawer is on.
     const tenantArg = tenantId !== null ? { tenantId } : {};
     const timer = setTimeout(() => {
-      for (const i of order) {
-        const turn = turns[i];
-        if (!turn) continue;
-        // Fire and forget. tRPC's prefetch is a no-op when the entry is already fresh
-        // in cache, so subsequent passes don't re-hit the server.
-        void utils.traces.header.prefetch({
-          projectId,
-          traceId: turn.traceId,
-          occurredAtMs: turn.timestamp,
-          ...tenantArg,
-          full: Math.abs(i - idx) <= NEAR_RADIUS,
-        });
-      }
+      prefetchTurnHeaders({ order, turns, idx, projectId, tenantArg, utils });
     }, PREFETCH_DELAY_MS);
 
     return () => clearTimeout(timer);
   }, [projectId, tenantId, currentTraceId, turns, utils]);
+}
+
+type Utils = ReturnType<typeof api.useUtils>;
+
+function prefetchTurnHeaders({
+  order,
+  turns,
+  idx,
+  projectId,
+  tenantArg,
+  utils,
+}: {
+  order: number[];
+  turns: ReturnType<typeof useConversationContext>["turns"];
+  idx: number;
+  projectId: string;
+  tenantArg: { tenantId?: string };
+  utils: Utils;
+}): void {
+  for (const i of order) {
+    const turn = turns[i];
+    if (!turn) continue;
+    // Fire and forget. tRPC's prefetch is a no-op when the entry is already fresh
+    // in cache, so subsequent passes don't re-hit the server.
+    void utils.traces.header.prefetch({
+      projectId,
+      traceId: turn.traceId,
+      occurredAtMs: turn.timestamp,
+      ...tenantArg,
+      full: Math.abs(i - idx) <= NEAR_RADIUS,
+    });
+  }
 }
 
 /**

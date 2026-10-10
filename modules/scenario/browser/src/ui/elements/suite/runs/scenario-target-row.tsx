@@ -41,15 +41,15 @@ type ScenarioTargetRowProps = {
 };
 
 const STATUS_CIRCLE_COLORS: Record<string, string> = {
-  [ScenarioRunStatus.SUCCESS]: "green.500",
-  [ScenarioRunStatus.FAILED]: "red.500",
-  [ScenarioRunStatus.ERROR]: "red.500",
-  [ScenarioRunStatus.STALLED]: "yellow.500",
-  [ScenarioRunStatus.CANCELLED]: "gray.400",
-  [ScenarioRunStatus.IN_PROGRESS]: "orange.400",
-  [ScenarioRunStatus.PENDING]: "gray.400",
-  [ScenarioRunStatus.QUEUED]: "blue.400",
-  [ScenarioRunStatus.RUNNING]: "orange.400",
+  [ScenarioRunStatus.SUCCESS]: "green.fg",
+  [ScenarioRunStatus.FAILED]: "red.fg",
+  [ScenarioRunStatus.ERROR]: "red.fg",
+  [ScenarioRunStatus.STALLED]: "yellow.fg",
+  [ScenarioRunStatus.CANCELLED]: "fg.subtle",
+  [ScenarioRunStatus.IN_PROGRESS]: "orange.fg",
+  [ScenarioRunStatus.PENDING]: "fg.subtle",
+  [ScenarioRunStatus.QUEUED]: "blue.fg",
+  [ScenarioRunStatus.RUNNING]: "orange.fg",
 };
 
 /** The row's latency: the agent's average turn as the metrics pill reads it, else the duration. */
@@ -144,7 +144,7 @@ function StatusCircle({ status }: { status: ScenarioRunStatus }) {
       width="10px"
       height="10px"
       borderRadius="full"
-      bg={STATUS_CIRCLE_COLORS[status] ?? "gray.400"}
+      bg={STATUS_CIRCLE_COLORS[status] ?? "fg.subtle"}
       flexShrink={0}
     />
   );
@@ -241,13 +241,13 @@ export function ScenarioTargetRow({
             paddingY={0.5}
             borderRadius="md"
             border="1px solid"
-            borderColor="gray.300"
+            borderColor="border.emphasized"
             fontSize="xs"
             color="fg.default"
             cursor={isCancelling ? "default" : "pointer"}
             opacity={isCancelling ? 0.6 : 1}
             flexShrink={0}
-            _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
+            _hover={isCancelling ? undefined : { bg: "bg.muted", borderColor: "border.strong" }}
             onClick={() => onCancel?.()}
             aria-label="Stop run"
             data-testid="cancel-run-button"
@@ -268,7 +268,7 @@ export function ScenarioTargetRow({
               {latencyMs > 0 && <Text fontSize="11px">{formatLatency(latencyMs)}</Text>}
               {scenarioRun.totalCost != null && (
                 <>
-                  <Text color="gray.300">{"⋅"}</Text>
+                  <Text color="fg.subtle">{"⋅"}</Text>
                   <Text fontSize="xs">{formatCost(scenarioRun.totalCost)}</Text>
                 </>
               )}

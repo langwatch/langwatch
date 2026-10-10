@@ -1,6 +1,6 @@
 import { Box, Button, Card, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { PipelineNode } from "@langwatch/ops-contract";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
@@ -31,29 +31,21 @@ export function PipelineTreeCard({
 
   const [showIdle, setShowIdle] = useState(false);
 
-  const pausedKeySet = useMemo(() => new Set(pausedKeys), [pausedKeys]);
+  const pausedKeySet = new Set(pausedKeys);
 
   // The tree is seeded from a 24h known-pipelines registry, so idle
   // pipelines render as pure whitespace; idle rows fold away and say how
   // many. Folding is recursive: classifying on a root's own direct counts
   // alone hid every parent of a busy child, not just the whitespace.
-  const { working, idle } = useMemo(
-    () => ({
-      working: pipelineTree.filter(hasPipelineWork),
-      idle: pipelineTree.filter((node) => !hasPipelineWork(node)),
-    }),
-    [pipelineTree],
-  );
+  const working = pipelineTree.filter(hasPipelineWork);
+  const idle = pipelineTree.filter((node) => !hasPipelineWork(node));
 
   // A pipeline that gains work leaves the fold on its own, because membership
   // is derived from the counts rather than latched when the fold was closed.
-  const visibleTree = useMemo(
-    () => (showIdle ? [...working, ...idle] : working),
-    [working, idle, showIdle],
-  );
-  const idleNames = useMemo(() => new Set(idle.map((node) => node.name)), [idle]);
+  const visibleTree = showIdle ? [...working, ...idle] : working;
+  const idleNames = new Set(idle.map((node) => node.name));
 
-  const filteredTree = useMemo(() => filterTree(visibleTree, filter), [visibleTree, filter]);
+  const filteredTree = filterTree(visibleTree, filter);
 
   const pauseMutation = api.ops.pausePipeline.useMutation({
     onSuccess: () => {
@@ -87,7 +79,7 @@ export function PipelineTreeCard({
   }
 
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
@@ -145,7 +137,7 @@ export function PipelineTreeCard({
               <Box paddingX={4} paddingY={2}>
                 <Button
                   variant="ghost"
-                  size="2xs"
+                  size="sm"
                   onClick={() => setShowIdle((prior) => !prior)}
                   data-testid="ops-idle-pipelines-toggle"
                 >

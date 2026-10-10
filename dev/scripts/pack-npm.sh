@@ -161,9 +161,10 @@ EXCLUDES=(
   --exclude=.github
   # No source maps. Four were re-included ahead of this exclude for the
   # monolith's dist/server bundles (server, workers, task, scenario child);
-  # none of those bundles exists any more. apps/api and apps/worker ship as
-  # SOURCE and run through tsx, so a production stack trace already names a
-  # real file and line, and the one bundle left — apps/server/dist/cli.cjs —
+  # none of those bundles exists any more. apps/backend (hosting apps/api and
+  # apps/worker) ships as SOURCE and runs through node, so a production stack
+  # trace already names a real file and line, and the one bundle left —
+  # apps/server/dist/cli.cjs —
   # is built with `sourcemap: false` and emits no map to re-include.
   # A future bundle that does emit one needs an --include line here, ahead of
   # this rule: rsync takes the FIRST matching filter.

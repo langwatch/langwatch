@@ -1,6 +1,8 @@
 import { LangyMark } from "@langwatch/design-system/langy-mark";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Inbox } from "lucide-react";
 import { useState } from "react";
 
 import { useLangyStore } from "../../../behavior/langy/langy.store.ts";
@@ -54,9 +56,11 @@ function InsightsPage() {
               {folder === "inbox" ? (
                 <InboxEmptyBrief onSetup={() => setSetupOpen(true)} onOpenLangy={openLangy} />
               ) : (
-                <Text color="fg.muted" paddingY={4}>
-                  {EMPTY_FOLDER_LINE[folder]}
-                </Text>
+                <NoDataInfoBlock
+                  icon={<Inbox />}
+                  title={EMPTY_FOLDER_LINE[folder]}
+                  description="Insights will appear here once this preview is connected to your activity."
+                />
               )}
             </Box>
           </HStack>

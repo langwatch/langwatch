@@ -1,4 +1,4 @@
-import { Box, Stack } from "@chakra-ui/react";
+import { Box, SimpleGrid, Stack, Text, Theme } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Banner, BannerAction } from "./banner.tsx";
@@ -27,7 +27,7 @@ type Story = StoryObj<typeof meta>;
 export const Top: Story = {
   args: { placement: "top", action: <BannerAction>Read the setup guide</BannerAction> },
   render: (args) => (
-    <Box borderTopLeftRadius="xl" borderWidth="1px" overflow="hidden" bg="bg.surface" height="48">
+    <Box borderWidth="1px" borderColor="border.muted" bg="bg.panel" minHeight="48">
       <Banner {...args} onDismiss={() => void 0} />
       <Banner status="error" placement="top" title="You've used every seat on your plan.">
         New members can't join until you add seats.
@@ -60,7 +60,7 @@ export const LongText: Story = {
   args: {
     placement: "inline",
     children:
-      "A sentence long enough to wrap onto a second line in a narrow container, so the action and the dismiss button stay pinned to the first line while the text flows underneath.",
+      "A sentence long enough to wrap onto a second line in a narrow container, so the action moves below the copy when space is tight and the dismiss stays at the top.",
     action: <BannerAction>Open</BannerAction>,
     onDismiss: () => void 0,
   },
@@ -68,5 +68,64 @@ export const LongText: Story = {
     <Box maxWidth="sm">
       <Banner {...args} />
     </Box>
+  ),
+};
+
+const statuses = ["info", "warning", "error", "success"] as const;
+
+/** Compare every status and placement in the same light and dark surroundings. */
+export const AllStates: Story = {
+  render: () => (
+    <SimpleGrid columns={{ base: 1, xl: 2 }} gap="6">
+      {(["light", "dark"] as const).map((mode) => (
+        <Theme key={mode} appearance={mode} colorPalette="gray">
+          <Stack bg="bg" color="fg" padding="4" gap="6">
+            <Text fontWeight="medium">{mode === "light" ? "Light" : "Dark"}</Text>
+            {statuses.map((status) => (
+              <Stack key={status} gap="3">
+                <Text textStyle="xs" color="fg.muted">
+                  {status}
+                </Text>
+                <Box bg="bg.panel" borderWidth="1px" borderColor="border.muted">
+                  <Box paddingX="6" paddingY="3" borderBottomWidth="1px" borderColor="border.muted">
+                    <Text fontWeight="medium">Page heading</Text>
+                  </Box>
+                  <Banner status={status} placement="top">
+                    A notice without a title or controls.
+                  </Banner>
+                  <Banner
+                    status={status}
+                    placement="top"
+                    title="Connection needs attention."
+                    action={<BannerAction>Review</BannerAction>}
+                    onDismiss={() => void 0}
+                  >
+                    Review the settings before your next run. This longer message wraps naturally
+                    across lines.
+                  </Banner>
+                  <Text padding="6" color="fg.muted">
+                    Page content continues here.
+                  </Text>
+                </Box>
+                <Banner status={status}>A notice without a title or controls.</Banner>
+                <Banner
+                  status={status}
+                  title="Connection needs attention."
+                  action={<BannerAction>Review</BannerAction>}
+                  onDismiss={() => void 0}
+                >
+                  Review the settings before your next run. This longer message wraps naturally
+                  across lines.
+                </Banner>
+                <Banner status={status} title="A title alone." onDismiss={() => void 0} />
+                <Banner status={status} action={<BannerAction>Review settings</BannerAction>}>
+                  A message with an action and no title.
+                </Banner>
+              </Stack>
+            ))}
+          </Stack>
+        </Theme>
+      ))}
+    </SimpleGrid>
   ),
 };

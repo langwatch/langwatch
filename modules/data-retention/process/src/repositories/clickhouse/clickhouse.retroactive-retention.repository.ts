@@ -53,9 +53,10 @@ const keepForeverRowsSchema = z.array(
 
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
+// ClickHouse stores the command as `WHERE (TenantId = '..')` (25.x), so the needle omits WHERE.
 function tenantFilterParams(projectId: string): Record<string, string> {
   const escapedProjectId = projectId.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  return { tenantFilterNeedle: `WHERE TenantId = '${escapedProjectId}'` };
+  return { tenantFilterNeedle: `TenantId = '${escapedProjectId}'` };
 }
 
 /**

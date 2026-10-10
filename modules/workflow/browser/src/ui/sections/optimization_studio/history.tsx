@@ -228,8 +228,8 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   <HStack fontSize="12px">
                     <PersonAvatar
                       size="2xs"
-                      backgroundColor="orange.400"
-                      color="white"
+                      backgroundColor="orange.solid"
+                      color="orange.contrast"
                       width="16px"
                       height="16px"
                       name={version.author?.name ?? ""}
@@ -268,7 +268,7 @@ export const VersionBox = ({
 } & BoxProps) => {
   return (
     <Box
-      backgroundColor={version?.autoSaved ? "orange.50" : "orange.100"}
+      backgroundColor={version?.autoSaved ? "orange.subtle" : "orange.muted"}
       paddingY={3}
       paddingX={2}
       borderRadius={4}

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every `ingestionKey.*` procedure, declared once, at main's wire names. */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { GovernanceCallSurface } from "../../admin-workspace-view-audit.ts";
 import { issuedIngestionKeySchema } from "./ingestion-source-key.commands.ts";
 
 /** One of the caller's live personal ingestion keys, without its secret. */
-export const personalIngestionKeyListingSchema = z
+const personalIngestionKeyListingSchemaDefinition = z
   .object({
     apiKeyId: z.string(),
     name: z.string(),
@@ -20,18 +20,33 @@ export const personalIngestionKeyListingSchema = z
     lastUsedAtMs: z.number().nullable(),
   })
   .strict();
+export interface PersonalIngestionKeyListingSchema extends Named<
+  typeof personalIngestionKeyListingSchemaDefinition
+> {}
+export const personalIngestionKeyListingSchema: PersonalIngestionKeyListingSchema =
+  personalIngestionKeyListingSchemaDefinition;
 export type PersonalIngestionKeyListing = z.infer<typeof personalIngestionKeyListingSchema>;
 
-export const ingestionKeyMintInputSchema = z.object({
+const ingestionKeyMintInputSchemaDefinition = z.object({
   organizationId: z.string(),
   sourceType: z.string().min(1),
   templateId: z.string().min(1).optional(),
 });
+export interface IngestionKeyMintInputSchema extends Named<
+  typeof ingestionKeyMintInputSchemaDefinition
+> {}
+export const ingestionKeyMintInputSchema: IngestionKeyMintInputSchema =
+  ingestionKeyMintInputSchemaDefinition;
 
-export const rotatedIngestionKeySchema = issuedIngestionKeySchema.safeExtend({
+const rotatedIngestionKeySchemaDefinition = issuedIngestionKeySchema.safeExtend({
   revokedCount: z.number().int().nonnegative(),
   revokedDeviceLabels: z.array(z.string()),
 });
+export interface RotatedIngestionKeySchema extends Named<
+  typeof rotatedIngestionKeySchemaDefinition
+> {}
+export const rotatedIngestionKeySchema: RotatedIngestionKeySchema =
+  rotatedIngestionKeySchemaDefinition;
 export type RotatedIngestionKey = z.infer<typeof rotatedIngestionKeySchema>;
 
 export const ingestionKeyTrpc = defineTrpcContract("ingestionKey")

@@ -24,6 +24,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .post("/", "reportScenarioEvent")
   .withInput(scenarioEventSchema)
   .withPermission("scenarios:create")
+  .withoutAudit("ingestion")
   .withOutput(responseSchemas.success)
   .withStatus(201)
   .withBodyLimit({ maxBytes: SCENARIO_EVENT_MAX_BYTES })
@@ -49,6 +50,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .post("/browser-tab", "offerScenarioBrowserTab")
   .withInput(scenarioEventBrowserTabBodySchema)
   .withPermission("scenarios:create")
+  .withoutAudit("ingestion")
   .withOutput(responseSchemas.browserTabHandoff)
   .withDocs({
     operationId: "postApiScenarioEventsBrowserTab",
@@ -67,6 +69,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .delete("/", "archiveScenarioEvents")
   .withQuery(scenarioEventArchiveQuerySchema)
   .withPermission("scenarios:manage")
+  .withAudit("scenarios.archiveEvents")
   .withOutput(scenarioEventArchiveOutputSchema)
   .withDocs({
     operationId: "deleteApiScenarioEvents",

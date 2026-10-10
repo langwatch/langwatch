@@ -17,6 +17,7 @@ export const workflowExecuteSyncRest = defineRestRouter(WorkflowApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/scenario/execute-sync", "postApiScenarioExecuteSync")
+  .withoutAudit("run, not a change")
   .withInput(executeSyncRelayEventSchema)
   .withBodyLimit({
     maxBytes: EXECUTE_SYNC_MAX_BODY_BYTES,

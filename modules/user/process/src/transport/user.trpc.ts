@@ -95,14 +95,6 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(({ app, actor }) => app.listLinkedAccounts({ userId: actor.id }))
 
-  .procedure("unlinkAccount")
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(async ({ app, actor, input }) => {
-    await app.unlinkOwnAccount({ userId: actor.id, accountId: input.accountId });
-
-    return { success: true as const };
-  })
-
   // The session travels as middleware context: the offer follows how THIS sign-in happened.
   .procedure("secureAccountNudge")
   .withMiddlewareContext(browserSessionContext)

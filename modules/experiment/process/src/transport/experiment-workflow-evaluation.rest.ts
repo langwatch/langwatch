@@ -38,6 +38,7 @@ export const experimentWorkflowEvaluationRest = defineRestRouter(ExperimentApi)
   .withParams(experimentWorkflowEvaluateParamsSchema)
   .withInput(experimentWorkflowEvaluateSchema)
   .withPermission(["workflows:create", "evaluations:view"])
+  .withoutAudit("run, not a change")
   .withOutput(experimentWorkflowEvaluationStartedSchema)
   .withDocs({
     description:

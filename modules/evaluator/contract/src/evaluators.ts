@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The evaluator catalogue a host renders and validates against: the langevals
  * definitions generated from the Python package, plus the ones this platform
@@ -16,10 +17,12 @@ import {
   nativeEvaluatorsSchemaShape,
 } from "./evaluators.native.ts";
 
-export const evaluatorsSchema = z.object({
+const evaluatorsSchemaDefinition = z.object({
   ...generatedEvaluatorsSchema.shape,
   ...nativeEvaluatorsSchemaShape,
 });
+export interface EvaluatorsSchema extends Named<typeof evaluatorsSchemaDefinition> {}
+export const evaluatorsSchema: EvaluatorsSchema = evaluatorsSchemaDefinition;
 export type Evaluators = z.infer<typeof evaluatorsSchema>;
 export type EvaluatorTypes = keyof Evaluators;
 export type { EvaluatorDefinition, EvaluatorCategory };
