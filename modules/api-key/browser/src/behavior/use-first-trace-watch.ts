@@ -2,7 +2,7 @@
 // Waits for the first-trace read hint, then redirects.
 // Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useApiKeyHost } from "../model/api-key-host.ts";
 import {
@@ -21,16 +21,17 @@ import { apiKeyApi } from "./api-key-api.ts";
  */
 export type FirstTraceWatchState = "hidden" | "waiting" | "redirecting";
 
-export function useFirstTraceWatch(): FirstTraceWatchState {
+export function useFirstTraceWatch({
+  organizationId,
+}: {
+  /** The organization the approval was granted for, never the page's ambient one (main's rule). */
+  organizationId: string;
+}): FirstTraceWatchState {
   const host = useApiKeyHost();
   const userId = host.currentUser()?.id ?? null;
   const organizations = host.organizations();
-  const organizationId = host.scope().organizationId;
 
-  const personalProject = useMemo(
-    () => findPersonalProject({ organizations, userId, organizationId }),
-    [organizations, userId, organizationId],
-  );
+  const personalProject = findPersonalProject({ organizations, userId, organizationId });
 
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [hasSeenNeverSynced, setHasSeenNeverSynced] = useState(false);

@@ -56,6 +56,7 @@ type ActionState =
   | { kind: "submitting" }
   | {
       kind: "success";
+      organizationId: string;
       organizationName: string;
       credentialType: CliCredentialType;
       projectName?: string;
@@ -124,6 +125,7 @@ async function approveDeviceLogin({
   if (result.outcome === "failed") return { kind: "error", message: result.message };
   return {
     kind: "success",
+    organizationId: approval.organizationId,
     organizationName: organizationName ?? "your organization",
     credentialType,
     projectName,
@@ -909,7 +911,7 @@ function ActionOutcome({ action }: { action: ActionState }) {
         LangWatch CLI is now authorized for <strong>{action.organizationName}</strong>. You can
         close this tab and return to your terminal.
       </StatusCard>
-      <FirstTraceRedirect />
+      <FirstTraceRedirect organizationId={action.organizationId} />
     </>
   );
 }

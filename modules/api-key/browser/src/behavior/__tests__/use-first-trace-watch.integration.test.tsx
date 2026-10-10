@@ -58,16 +58,16 @@ const ORGANIZATIONS = [
   },
 ];
 
-function watchElement(host: FakeApiKeyHost) {
+function watchElement(host: FakeApiKeyHost, organizationId = "org-1") {
   return (
     <ApiKeyHostProvider value={host}>
-      <FirstTraceRedirect />
+      <FirstTraceRedirect organizationId={organizationId} />
     </ApiKeyHostProvider>
   );
 }
 
-function renderWatch(host: FakeApiKeyHost) {
-  return renderWithDesignSystem(watchElement(host));
+function renderWatch(host: FakeApiKeyHost, organizationId = "org-1") {
+  return renderWithDesignSystem(watchElement(host, organizationId));
 }
 
 beforeEach(() => {
@@ -137,5 +137,49 @@ describe("given a reader with no personal workspace", () => {
     const { container } = renderWatch(host);
     await waitFor(() => expect(container).toBeEmptyDOMElement());
     expect(host.navigations).toEqual([]);
+  });
+});
+
+describe("given the page was opened in one organization and the approval names another", () => {
+  const SECOND_ORGANIZATION = {
+    id: "org-2",
+    name: "Globex",
+    teams: [
+      {
+        id: "team-personal-2",
+        name: "Jane's Globex Workspace",
+        isPersonal: true,
+        ownerUserId: "user-1",
+        projects: [
+          {
+            id: "proj-personal-2",
+            name: "Personal Workspace",
+            slug: "jane-globex",
+            isPersonal: true,
+            ownerUserId: "user-1",
+          },
+        ],
+      },
+    ],
+  };
+
+  /** @scenario The watch follows the organization the approval was granted for */
+  it("watches the approved organization's personal project and takes the reader there", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const host = new FakeApiKeyHost({ organizations: [...ORGANIZATIONS, SECOND_ORGANIZATION] });
+    state.firstMessage = false;
+    const { rerender } = renderWatch(host, "org-2");
+
+    expect(await screen.findByText(/Waiting for your first trace/)).toBeInTheDocument();
+
+    state.firstMessage = true;
+    rerender(watchElement(host, "org-2"));
+    await screen.findByText(/First trace received/);
+    await act(async () => {
+      vi.advanceTimersByTime(FIRST_TRACE_REDIRECT_DELAY_MS);
+    });
+    await waitFor(() =>
+      expect(host.navigations).toEqual([{ kind: "navigate", to: "/jane-globex/traces" }]),
+    );
   });
 });
