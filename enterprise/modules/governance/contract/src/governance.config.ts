@@ -6,6 +6,8 @@
  * resolved only through its handle, never read from `process.env`.
  */
 import {
+  allowedProxyHosts,
+  blockLocalHttpCalls,
   Config,
   gatewayAddressOf,
   gatewayInternalUrl,
@@ -33,6 +35,9 @@ export const governanceConfig = Config.define((c) => ({
   gatewayPublicUrl,
   gatewayInternalUrl,
   gatewayLegacyUrl,
+  /** The address fence a pull source's fetch is judged by, as main's pullers read it. */
+  blockLocalHttpCalls,
+  allowedProxyHosts,
   /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
   isSaas,
   /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */

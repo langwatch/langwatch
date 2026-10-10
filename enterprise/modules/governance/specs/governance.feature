@@ -80,6 +80,13 @@ Feature: Enterprise governance package boundary
     And the application supplies the SSRF-safe HTTP adapter
 
   @unit
+  Scenario: A pull source reaches the private network unless the operator blocks local calls
+    Given the pull fetch is built from BLOCK_LOCAL_HTTP_CALLS and ALLOWED_PROXY_HOSTS
+    When local calls are not blocked, a pull to a loopback or private address is fetched
+    And when they are blocked, it is refused unless its host is on the allowlist
+    And a pull to the cloud metadata address is refused either way
+
+  @unit
   Scenario: Spend spike evaluation does not expose storage syntax
     Given an active spend spike rule targets a source or source type
     When Governance reads the current and baseline spend windows
