@@ -201,6 +201,11 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     describe: () => "Request a new verification email and use the newest link.",
   },
 
+  identity_verification_used: {
+    title: "That confirmation link no longer works",
+    describe: () => "It was already opened once. Send yourself a new link to finish signing up.",
+  },
+
   identity_verification_invalid: {
     title: "That verification link didn't work",
     describe: () =>
