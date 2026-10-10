@@ -119,18 +119,18 @@ Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trp
 
 ```typescript
 // insights.getAll
-// Input: insightProjectScopeSchema, ../contract/src/insight.ts:105
+// Input: insightProjectScopeSchema, ../contract/src/insight.ts:119
 interface Input {
   projectId: string;
 }
 // Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:31)
 
 // insights.file
-type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:107
-type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:79
+type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:139
+type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:111
 
 // insights.markSeen
-// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:133
+// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:159
 interface Input {
   projectId: string;
   insightIds: string[];
@@ -139,7 +139,7 @@ interface Input {
 type Output = unknown;
 
 // insights.archive
-// Input: insightScopeSchema, ../contract/src/insight.ts:126
+// Input: insightScopeSchema, ../contract/src/insight.ts:147
 interface Input {
   projectId: string;
   insightId: string;
@@ -148,12 +148,12 @@ interface Input {
 type Output = unknown;
 
 // insights.keep
-type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:126
+type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:147
 // Output: inline, ../contract/src/insight.trpc.ts:47
 type Output = unknown;
 
 // insights.getBoardDailyRun
-// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:153
+// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:176
 interface Input {
   projectId: string;
   board: {
@@ -161,15 +161,15 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:144
+type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:164
 
 // insights.configureBoardDailyRun
-type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:160
+type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:189
 // Output: inline, ../contract/src/insight.trpc.ts:56
 type Output = unknown;
 
 // insights.turnOffBoardDailyRun
-type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:168
+type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:201
 // Output: inline, ../contract/src/insight.trpc.ts:60
 type Output = unknown;
 ```
