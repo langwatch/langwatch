@@ -2,7 +2,7 @@ import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { WORKFLOW_CARD_OPENER_STYLE } from "@langwatch/design-system/workflow-card";
-import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
+import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 /** A card opener that navigates rather than acts. */
 export function WorkflowCardLink({

@@ -1,7 +1,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
-  Button,
+  IconButton,
   type ButtonProps,
   Center,
   Spinner,
@@ -10,8 +10,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component } from "@langwatch/workflow-contract";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
+import { Check, MinusCircle, Play, Square, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { Check, MinusCircle, Play, Square, X } from "react-feather";
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 
@@ -141,7 +141,8 @@ export function ComponentExecutionButton({
         </Center>
       </Tooltip>
       {isExecuting && (
-        <Button
+        <IconButton
+          aria-label="Stop execution"
           variant="ghost"
           size="xs"
           onClick={() => {
@@ -156,10 +157,11 @@ export function ComponentExecutionButton({
           {...props}
         >
           <Square size={iconSize} />
-        </Button>
+        </IconButton>
       )}
       {showRunButton && (
-        <Button
+        <IconButton
+          aria-label="Run node"
           variant="ghost"
           size="xs"
           onClick={(e) => {
@@ -169,12 +171,13 @@ export function ComponentExecutionButton({
           }}
         >
           <Play size={iconSize} />
-        </Button>
+        </IconButton>
       )}
       {showRunMenu && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
-            <Button
+            <IconButton
+              aria-label="Run node options"
               variant="ghost"
               size="xs"
               paddingX={2}
@@ -184,7 +187,7 @@ export function ComponentExecutionButton({
               {...props}
             >
               <Play size={iconSize} />
-            </Button>
+            </IconButton>
           </Menu.Trigger>
           <Menu.Content>
             <Menu.Item value="run-manual" onClick={() => node && startComponentExecution({ node })}>

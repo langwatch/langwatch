@@ -7,7 +7,7 @@ import { toEpochMs } from "@langwatch/time";
 import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version.tsx";

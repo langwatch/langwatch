@@ -35,7 +35,7 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
   describe("given an if/else run whose condition was false", () => {
     /** @scenario The if/else result shows a single condition value */
     it("shows one Condition box of false, not both branch handles", () => {
-      const { container } = renderWithDesignSystem(
+      renderWithDesignSystem(
         <ExecutionOutputPanel
           executionState={successState({ true: false, false: true })}
           nodeType="if_else"
@@ -43,17 +43,15 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
       );
 
       expect(screen.getByText("Condition")).toBeInTheDocument();
-      expect(container.querySelectorAll("pre")).toHaveLength(1);
-      const box = container.querySelector("pre");
-      expect(box?.textContent).toContain("false");
-      expect(box?.textContent).not.toContain("true");
+      expect(screen.getAllByText("false")).toHaveLength(1);
+      expect(screen.queryByText("true")).not.toBeInTheDocument();
     });
   });
 
   describe("given an if/else run whose condition was true", () => {
     /** @scenario The if/else result shows a single condition value */
     it("shows one Condition box of true", () => {
-      const { container } = renderWithDesignSystem(
+      renderWithDesignSystem(
         <ExecutionOutputPanel
           executionState={successState({ true: true, false: false })}
           nodeType="if_else"
@@ -61,8 +59,8 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
       );
 
       expect(screen.getByText("Condition")).toBeInTheDocument();
-      expect(container.querySelectorAll("pre")).toHaveLength(1);
-      expect(container.querySelector("pre")?.textContent).toContain("true");
+      expect(screen.getAllByText("true")).toHaveLength(1);
+      expect(screen.queryByText("false")).not.toBeInTheDocument();
     });
   });
 
@@ -85,13 +83,12 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
 
   describe("given a non if/else node", () => {
     it("still renders each named output", () => {
-      const { container } = renderWithDesignSystem(
+      renderWithDesignSystem(
         <ExecutionOutputPanel executionState={successState({ answer: "hello" })} nodeType="code" />,
       );
 
       expect(screen.getByText("answer")).toBeInTheDocument();
-      expect(container.querySelectorAll("pre")).toHaveLength(1);
-      expect(container.querySelector("pre")?.textContent).toContain("hello");
+      expect(screen.getAllByText("hello")).toHaveLength(1);
     });
   });
 });

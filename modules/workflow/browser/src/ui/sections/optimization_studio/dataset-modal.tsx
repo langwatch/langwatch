@@ -16,9 +16,9 @@ import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
+import { ArrowLeft, Database, Plus, Upload } from "lucide-react";
 import type React from "react";
 import { useRef, useState } from "react";
-import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
 import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
 import { DatasetPickerList } from "../../../behavior/optimization_studio/lent-dataset-picker-list.tsx";

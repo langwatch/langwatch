@@ -1,7 +1,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
-  Button,
+  IconButton,
   Circle,
   HStack,
   Spacer,
@@ -26,9 +26,9 @@ import {
   Position,
   useUpdateNodeInternals,
 } from "@xyflow/react";
-import React, { forwardRef, type Ref, useEffect, useMemo } from "react";
+import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
+import React, { forwardRef, type Ref, useEffect } from "react";
 import { useDragLayer } from "react-dnd";
-import { Copy, MoreHorizontal, Trash2 } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
@@ -204,13 +204,7 @@ export function NodeSectionTitle({
   children: React.ReactNode;
 }) {
   return (
-    <Text
-      fontSize={fontSize ?? "9px"}
-      textTransform="uppercase"
-      color="fg.muted"
-      fontWeight="bold"
-      paddingTop={1}
-    >
+    <Text textStyle="xs" fontSize={fontSize} color="fg.muted" fontWeight="medium" paddingTop={1}>
       {children}
     </Text>
   );
@@ -297,10 +291,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
     item: { node?: Node } | undefined;
   };
 
-  const isNotDroppable = useMemo(
-    () => isDragging && item?.node?.type === "prompting_technique" && props.type !== "signature",
-    [isDragging, item, props.type],
-  );
+  const isNotDroppable =
+    isDragging && item?.node?.type === "prompting_technique" && props.type !== "signature";
 
   const llmParams = props.data.parameters?.filter((p) => p.type === "llm") ?? [];
 
@@ -321,7 +313,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       gap={2}
       align="start"
       color="fg.muted"
-      fontSize="11px"
+      textStyle="xs"
       minWidth={140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"}
       boxShadow={nodeShadow}
       border="1px solid"
@@ -340,7 +332,10 @@ export const ComponentNode = forwardRef(function ComponentNode(
       {props.selected && !["entry", "end"].includes(props.type) && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
-            <Button
+            <IconButton
+              aria-label="Node actions"
+              variant="ghost"
+              size="xs"
               background="bg"
               position="absolute"
               top="-28px"
@@ -355,7 +350,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
               height="auto"
             >
               <MoreHorizontal size={11} />
-            </Button>
+            </IconButton>
           </Menu.Trigger>
           <NodeToolbar>
             <Menu.Content>
@@ -379,8 +374,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
           size="md"
         />
         <Text
-          fontSize="12px"
-          fontWeight={500}
+          textStyle="sm"
+          fontWeight="medium"
           minWidth="0"
           flexShrink={1}
           lineClamp={1}
@@ -418,7 +413,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <React.Fragment key={llmParam.identifier}>
             <NodeSectionTitle>LLM</NodeSectionTitle>
             <HStack width="full">
-              <LLMModelDisplay model={(llmParam.value as LLMConfig).model} fontSize="11px" />
+              <LLMModelDisplay model={(llmParam.value as LLMConfig).model} fontSize="xs" />
             </HStack>
           </React.Fragment>
         ))}

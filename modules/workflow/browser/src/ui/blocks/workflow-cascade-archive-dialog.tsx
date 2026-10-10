@@ -14,8 +14,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle } from "react-feather";
 
 export type RelatedEntity = {
   id: string;

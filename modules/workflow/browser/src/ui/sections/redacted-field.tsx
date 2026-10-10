@@ -1,7 +1,7 @@
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Lock } from "lucide-react";
 import type React from "react";
-import { Lock } from "react-feather";
 
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";

@@ -1,7 +1,8 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import {
+  Alert,
   Box,
-  type BoxProps,
   Button,
   Heading,
   HStack,
@@ -10,8 +11,10 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { ExecutionState } from "@langwatch/workflow-contract";
+import { CircleAlert } from "lucide-react";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
+import { z } from "zod";
 
 import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
 import { SpanDuration } from "../../elements/span-duration.tsx";
@@ -39,15 +42,8 @@ export const ExecutionOutputPanel = ({
 
   return (
     <VStack align="start" gap={3}>
-      <HStack align="center" width="full" paddingBottom={3}>
-        <Heading
-          as="h3"
-          fontSize="16px"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="fg.muted"
-          paddingBottom={4}
-        >
+      <HStack align="start" width="full" flexWrap="wrap" gap={2}>
+        <Heading as="h3" textStyle="md" fontWeight="semibold" color="fg.muted">
           Outputs
         </Heading>
         <Spacer />
@@ -75,7 +71,7 @@ const ExecutionMetadata = ({
   const hasTiming = executionState.timestamps?.started_at && executionState.timestamps?.finished_at;
 
   return (
-    <HStack gap={3}>
+    <HStack gap={2} flexWrap="wrap" textStyle="xs">
       {executionState.cost !== undefined && (
         <Text color="fg.muted">{numeral(executionState.cost).format("$0.00[000]a")}</Text>
       )}
@@ -99,14 +95,15 @@ const ExecutionMetadata = ({
         <>
           <Text color="fg.subtle">·</Text>
           <Button
-            size="sm"
+            size="xs"
+            variant="ghost"
             onClick={() => {
               openDrawer("traceV2Details", {
                 traceId: executionState.trace_id ?? "",
               });
             }}
           >
-            Full Trace
+            Full trace
           </Button>
         </>
       )}
@@ -156,15 +153,50 @@ const renderExecutionStatus = (executionState: ExecutionState, isWaitingLong?: b
 /**
  * Renders error information if execution failed
  */
+const runErrorDetails = z.object({
+  type: z.string().optional(),
+  name: z.string().optional(),
+  message: z.string().optional(),
+});
+
 const renderExecutionError = (executionState: ExecutionState) => {
   if (executionState.status !== "error") return null;
 
+  const details = executionState.error || "No error message captured";
+  const json = formattedJson(details);
+  const parsed = json ? runErrorDetails.safeParse(JSON.parse(json)) : null;
+  const structured = parsed?.success ? parsed.data : void 0;
+  const summary =
+    structured?.message || details.trim().split("\n").filter(Boolean).at(-1) || details;
+  const exception = /^([\w.]+(?:Error|Exception)):\s*(.*)$/.exec(summary);
+  const title =
+    structured?.type ||
+    structured?.name ||
+    exception?.[1] ||
+    executionState.error_type ||
+    "Execution failed";
+  const message = exception?.[2] || summary;
+
   return (
-    <VStack width="full" align="start" gap={3}>
-      <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
-        Error
-      </Text>
-      <OutputBox color="red.fg" value={executionState.error ?? "No error message captured"} />
+    <VStack width="full" align="stretch" gap={3} minWidth={0}>
+      <RedactedField field="output">
+        <Alert.Root role="alert" status="error" size="sm">
+          <Alert.Indicator>
+            <CircleAlert />
+          </Alert.Indicator>
+          <Alert.Content>
+            <Alert.Title>{title}</Alert.Title>
+            <Alert.Description>{message}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+        <CodePreview
+          code={json ?? details}
+          language={json ? "json" : "python"}
+          filename={json ? "Error details · JSON" : "Error details"}
+          maxHeight="320px"
+          compact
+        />
+      </RedactedField>
     </VStack>
   );
 };
@@ -201,7 +233,7 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
     const isConditionTrue = "true" in outputs ? outputs.true : !(outputs.false as boolean);
     return (
       <VStack width="full" align="start" gap={3}>
-        <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+        <Text textStyle="sm" fontWeight="medium" color="fg.muted">
           Condition
         </Text>
         <OutputBox value={isConditionTrue} />
@@ -229,7 +261,7 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
           gap={3}
           color={hasTone ? textColor : undefined}
         >
-          <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color={textColor}>
+          <Text textStyle="sm" fontWeight="medium" color={textColor}>
             {identifier}
           </Text>
           <OutputBox value={value} />
@@ -238,23 +270,36 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
     });
 };
 
-/**
- * Renders a formatted output box with proper styling
- */
-const OutputBox = ({ value, ...props }: { value: unknown } & BoxProps) => {
+/** Structured outputs, including JSON strings, share the studio's code view. */
+function formattedJson(value: unknown): string | undefined {
+  try {
+    const parsed: unknown = typeof value === "string" ? JSON.parse(value) : value;
+    if (parsed !== null && typeof parsed === "object") return JSON.stringify(parsed, null, 2);
+  } catch {
+    // Text and multimodal outputs keep their existing renderer.
+  }
+  return void 0;
+}
+
+const OutputBox = ({ value }: { value: unknown }) => {
+  const json = formattedJson(value);
   return (
-    <Box
-      as="pre"
-      borderRadius="6px"
-      padding={4}
-      borderWidth="1px"
-      borderColor="border.emphasized"
-      width="full"
-      whiteSpace="pre-wrap"
-      {...props}
-    >
+    <Box width="full" minWidth={0} textStyle="sm">
       <RedactedField field="output">
-        <RenderInputOutput value={value} showTools />
+        {json ? (
+          <CodePreview code={json} language="json" filename="JSON" maxHeight="320px" compact />
+        ) : (
+          <Box
+            borderRadius="lg"
+            padding={3}
+            borderWidth="1px"
+            borderColor="border"
+            maxHeight="320px"
+            overflow="auto"
+          >
+            <RenderInputOutput value={value} showTools />
+          </Box>
+        )}
       </RedactedField>
     </Box>
   );

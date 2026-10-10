@@ -2,7 +2,7 @@ import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, toDate } from "@langwatch/time";
-import { Clock } from "react-feather";
+import { Clock } from "lucide-react";
 
 const RED_AFTER_MS = 30 * 1000;
 const YELLOW_AFTER_MS = 10 * 1000;

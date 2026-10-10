@@ -10,8 +10,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  ExternalLink as LuExternalLink,
+  KeyRound as LuKeyRound,
+  Settings as LuSettings,
+} from "lucide-react";
 import { useState } from "react";
-import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
 
 import { workflowApi } from "../../../behavior/workflow-api.ts";
 

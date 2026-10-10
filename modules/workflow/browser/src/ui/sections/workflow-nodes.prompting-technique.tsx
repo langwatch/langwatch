@@ -2,10 +2,10 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
 import { type Node, type NodeProps, NodeToolbar } from "@xyflow/react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
-import { MoreHorizontal, Trash2 } from "react-feather";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
@@ -83,7 +83,7 @@ export function PromptingTechniqueWrapper({
       backgroundColor="bg.subtle"
       borderRadius="12px"
       color="fg.muted"
-      fontSize="10px"
+      textStyle="xs"
       boxShadow={wrapperShadow}
       outline={!!node.selected || hovered ? "1.5px solid" : "none"}
       outlineColor={node.selected ? selectionColor : hoveredOutlineColor}
@@ -136,7 +136,7 @@ export function PromptingTechniqueWrapper({
       )}
       <HStack gap={2} width="full" paddingX={3} paddingY={2}>
         <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="xs" />
-        <Text fontSize="12px" fontWeight={500}>
+        <Text textStyle="sm" fontWeight="medium">
           {node.data.cls}
         </Text>
       </HStack>

@@ -1,6 +1,6 @@
-import { Button } from "@langwatch/design-system/primitives";
+import { IconButton } from "@langwatch/design-system/primitives";
+import { RotateCcw, RotateCw } from "lucide-react";
 import { useEffect } from "react";
-import { RotateCcw, RotateCw } from "react-feather";
 
 import { _useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 
@@ -56,24 +56,26 @@ export function WorkflowUndoRedo({ isWorkflowLoaded }: { isWorkflowLoaded: boole
 
   return (
     <>
-      <Button
+      <IconButton
         color="fg.muted"
         size="xs"
         variant="ghost"
+        aria-label="Undo"
         onClick={() => undo()}
         disabled={pastStates.length === 0}
       >
-        <RotateCcw width="16px" />
-      </Button>
-      <Button
+        <RotateCcw size={16} />
+      </IconButton>
+      <IconButton
         color="fg.muted"
         size="xs"
         variant="ghost"
+        aria-label="Redo"
         onClick={() => redo()}
         disabled={futureStates.length === 0}
       >
-        <RotateCw width="16px" />
-      </Button>
+        <RotateCw size={16} />
+      </IconButton>
     </>
   );
 }
