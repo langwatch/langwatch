@@ -329,7 +329,7 @@ function EvaluatorSummaryCard({
                   <Edit2 size={14} />
                 </Button>
               </HStack>
-              <Text fontSize="12px" color="fg.muted">
+              <Text textStyle="caption" color="fg.muted">
                 {evaluatorDefinition.description}
               </Text>
             </VStack>
@@ -348,12 +348,12 @@ function EvaluatorSummaryCard({
                 })}
               />
               {isNameAlreadyInUse && (
-                <Text color="red.fg" fontSize="13px">
+                <Text color="red.fg" textStyle="bodySm">
                   An evaluation with the same name already exists, please choose a different name to
                   have a different slug identifier as well
                 </Text>
               )}
-              <Text fontSize="12px" paddingLeft={4}>
+              <Text textStyle="caption" paddingLeft={4}>
                 {nameValue && "slug: "}
                 {slug}
               </Text>
@@ -466,7 +466,7 @@ function ExecutionCard({
                 <Field.Root>
                   <VStack align="start" gap={1}>
                     <Field.Label margin={0}>Execution Settings</Field.Label>
-                    <Field.HelperText margin={0} fontSize="13px">
+                    <Field.HelperText margin={0} textStyle="bodySm">
                       Configure how and when this evaluation is executed when a new message arrives
                     </Field.HelperText>
                   </VStack>

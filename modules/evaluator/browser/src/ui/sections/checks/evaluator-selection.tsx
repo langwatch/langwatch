@@ -297,7 +297,7 @@ function EvaluatorChoiceCard({
                 size="sm"
                 colorPalette="pink"
                 paddingX={2}
-                fontSize="14px"
+                textStyle="body"
                 marginLeft="-4px"
               >
                 <Tag.Label>Beta</Tag.Label>

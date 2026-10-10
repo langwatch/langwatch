@@ -236,7 +236,7 @@ export function TryItOut({
             type="search"
             placeholder="Search"
             _placeholder={{ color: "fg.subtle" }}
-            fontSize="14px"
+            textStyle="body"
             paddingY={1.5}
             height="auto"
             onChange={(e) => setQuery(e.target.value)}

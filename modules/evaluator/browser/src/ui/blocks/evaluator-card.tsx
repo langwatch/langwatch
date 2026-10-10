@@ -146,7 +146,7 @@ export function EvaluatorCard({
           >
             {evaluator.name}
           </Text>
-          <Text color="fg.subtle" fontSize="12px" lineClamp={1} width="full">
+          <Text color="fg.subtle" textStyle="caption" lineClamp={1} width="full">
             {typeLabel}
             {evaluatorType && ` • ${evaluatorType}`} • {updatedAtLabel}
           </Text>

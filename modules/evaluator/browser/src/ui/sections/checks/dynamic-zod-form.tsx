@@ -136,7 +136,7 @@ const MetricToggleField = ({
                     htmlFor={`metric-${opt}`}
                     marginBottom="0"
                     fontWeight={variant === "studio" ? 400 : undefined}
-                    fontSize={variant === "studio" ? "13px" : undefined}
+                    textStyle={variant === "studio" ? "bodySm" : undefined}
                     cursor="pointer"
                   >
                     Include {meta.label.toLowerCase()}
@@ -528,7 +528,7 @@ function booleanField<T extends EvaluatorTypes>(ctx: ZodFieldContext, field: Zod
             htmlFor={fullPath}
             marginBottom="0"
             fontWeight={variant === "studio" ? 400 : undefined}
-            fontSize={variant === "studio" ? "13px" : undefined}
+            textStyle={variant === "studio" ? "bodySm" : undefined}
           >
             {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
           </Field.Label>
@@ -705,7 +705,7 @@ function SettingsFieldRow<T extends EvaluatorTypes>({
         <HStack width="full">
           <PropertySectionTitle>{camelCaseToTitleCase(fieldKey)}</PropertySectionTitle>
           {isOptional && (
-            <Text color="fg.muted" fontSize="12px">
+            <Text color="fg.muted" textStyle="caption">
               (optional)
             </Text>
           )}

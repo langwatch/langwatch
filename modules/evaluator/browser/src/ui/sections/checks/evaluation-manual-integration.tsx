@@ -194,13 +194,13 @@ export function EvaluationManualIntegration({
 
   return (
     <VStack gap={4} align="start" width="full">
-      <Heading as="h4" fontSize="16px" fontWeight={500} paddingTop={4}>
+      <Heading as="h4" textStyle="sectionTitle" fontWeight={500} paddingTop={4}>
         {executionMode === EvaluationExecutionMode.MANUALLY
           ? "Manual Integration"
           : "Guardrail Integration"}
       </Heading>
       <HStack>
-        <Text fontSize="14px">
+        <Text textStyle="body">
           This {executionMode === EvaluationExecutionMode.MANUALLY ? "evaluator" : "guardrail"}{" "}
           uses:
         </Text>
@@ -218,7 +218,7 @@ export function EvaluationManualIntegration({
             )),
           )}
       </HStack>
-      <Text fontSize="14px">
+      <Text textStyle="body">
         Follow the code example below to integrate this {isGuardrail ? "guardrail" : "evaluator"} in
         your LLM pipeline, save changes first for the {isGuardrail ? "guardrail" : "evaluator"} to
         work.
@@ -404,7 +404,7 @@ function PythonInstructions({ async, snippet }: { async: boolean; snippet: Snipp
 
   return (
     <VStack align="start" width="full" gap={3}>
-      <Text fontSize="14px">
+      <Text textStyle="body">
         Add this import at the top of the file where the LLM call happens:
       </Text>
       <Box className="markdown" width="full">
@@ -412,7 +412,7 @@ function PythonInstructions({ async, snippet }: { async: boolean; snippet: Snipp
       </Box>
       {(!isOutputMandatory || !isGuardrail) && (
         <>
-          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
+          <Text textStyle="body">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
             <CodePreview
               code={`def llm_step():
@@ -472,7 +472,7 @@ function TypeScriptInstructions({ snippet }: { snippet: SnippetContext }) {
 
   return (
     <VStack align="start" width="full" gap={3}>
-      <Text fontSize="14px">
+      <Text textStyle="body">
         First, set up your traces and spans capturing as explained in the{" "}
         <Link href="https://docs.langwatch.ai/integration/typescript/guide" isExternal>
           documentation
@@ -481,7 +481,7 @@ function TypeScriptInstructions({ snippet }: { snippet: SnippetContext }) {
       </Text>
       {(!isOutputMandatory || !isGuardrail) && (
         <>
-          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
+          <Text textStyle="body">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
             <CodePreview
               code={`import { LangWatch } from "langwatch";
@@ -531,7 +531,7 @@ function GoInstructions({ snippet }: { snippet: SnippetContext }) {
   } = snippet;
   return (
     <VStack align="start" width="full" gap={3}>
-      <Text fontSize="14px">
+      <Text textStyle="body">
         First, set up your traces and spans capturing as explained in the{" "}
         <Link href="https://github.com/langwatch/langwatch/tree/main/sdks/go" isExternal>
           Go SDK documentation
@@ -540,7 +540,7 @@ function GoInstructions({ snippet }: { snippet: SnippetContext }) {
       </Text>
       {(!isOutputMandatory || !isGuardrail) && (
         <>
-          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
+          <Text textStyle="body">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
             <CodePreview
               code={buildGoEvaluationSnippet({

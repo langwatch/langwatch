@@ -900,13 +900,13 @@ function PreconditionRow({
             </NativeSelect.Root>
           ) : (
             <>
-              {precondition.rule.includes("regex") && <Text fontSize="16px">{"/"}</Text>}
+              {precondition.rule.includes("regex") && <Text textStyle="sectionTitle">{"/"}</Text>}
               <Input
                 value={precondition.value}
                 onChange={(e) => updatePrecondition(index, "value", e.target.value)}
                 placeholder={precondition.rule.includes("regex") ? "regex" : "text"}
               />
-              {precondition.rule.includes("regex") && <Text fontSize="16px">{"/gi"}</Text>}
+              {precondition.rule.includes("regex") && <Text textStyle="sectionTitle">{"/gi"}</Text>}
             </>
           )}
         </HStack>

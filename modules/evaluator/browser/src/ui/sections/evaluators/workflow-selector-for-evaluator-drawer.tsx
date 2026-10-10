@@ -200,9 +200,9 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
                         emojiPicker.onClose();
                       }}
                     />
-                    <Field.Label>Name and Icon</Field.Label>
+                    <Field.Label>Name and icon</Field.Label>
                     <HStack>
-                      <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
+                      <Button variant="outline" onClick={emojiPicker.onOpen}>
                         {icon}
                       </Button>
                       <Input
