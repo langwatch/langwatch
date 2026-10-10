@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { llmsimCustomModels, llmsimProviderKeys } from "../storage-seed.ts";
+import { llmsimCustomModels, llmsimProviderKeys, llmsimRowModels } from "../storage-seed.ts";
 
 describe("given the seed creates a model provider row", () => {
   /** @scenario "The seeded OpenAI provider offers llmsim's error models" */
@@ -69,5 +69,18 @@ describe("given haven routes models at llmsim", () => {
     ).toBeUndefined();
     expect(llmsimProviderKeys({ provider: "openai", environment })).toBeUndefined();
     expect(llmsimProviderKeys({ provider: "gemini", environment: {} })).toBeUndefined();
+  });
+});
+
+describe("given a seeded llmsim Vertex or Bedrock row", () => {
+  /** @scenario "haven seeds Gemini and Vertex providers at llmsim" */
+  it("offers a custom model, since the catalogue lists none for either", () => {
+    expect(llmsimRowModels({ provider: "vertex_ai" })?.map((model) => model.modelId)).toEqual([
+      "gemini-2.5-flash",
+    ]);
+    expect(llmsimRowModels({ provider: "bedrock" })?.map((model) => model.modelId)).toEqual([
+      "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    ]);
+    expect(llmsimRowModels({ provider: "gemini" })).toBeUndefined();
   });
 });

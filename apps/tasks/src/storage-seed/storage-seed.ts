@@ -68,11 +68,34 @@ export function llmsimCustomModels({
   return LLMSIM_ERROR_MODELS;
 }
 
+/** The llmsim Vertex and Bedrock rows' models: neither has catalogue models, as on main. */
+const LLMSIM_ROW_MODELS: Record<string, CustomModelEntry[]> = {
+  vertex_ai: [
+    { modelId: "gemini-2.5-flash", displayName: "llmsim Gemini 2.5 Flash", mode: "chat" },
+  ],
+  bedrock: [
+    {
+      modelId: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+      displayName: "llmsim Claude 3.5 Sonnet",
+      mode: "chat",
+    },
+  ],
+};
+
 /** A placeholder service account: llmsim checks no credential, and the gateway sends none to it. */
 const LLMSIM_VERTEX_SERVICE_ACCOUNT = JSON.stringify({
   type: "service_account",
   project_id: "llmsim",
 });
+
+/** The custom models a seeded llmsim row offers, so the model picker lists it. */
+export function llmsimRowModels({
+  provider,
+}: {
+  provider: string;
+}): CustomModelEntry[] | undefined {
+  return LLMSIM_ROW_MODELS[provider];
+}
 
 /**
  * Gemini, Vertex and Bedrock rows at llmsim when haven routes there (HAVEN_SEED_LLMSIM_BASE_URL).
@@ -744,7 +767,9 @@ async function seedModelProviderFromEnv({
 
   const id = MODEL_PROVIDER_ID_PREFIX + provider;
   const customKeys = encryption.encrypt(JSON.stringify(keys));
-  const customModels = llmsimCustomModels({ provider, environment: envMap });
+  // A row the seed aims at llmsim is the seed's own, so its models are rewritten on every reseed.
+  const simModels = simKeys ? llmsimRowModels({ provider }) : undefined;
+  const customModels = llmsimCustomModels({ provider, environment: envMap }) ?? simModels;
   const row = await prisma.modelProvider.upsert({
     where: { id },
     create: {
@@ -756,7 +781,12 @@ async function seedModelProviderFromEnv({
       ...(customModels ? { customModels } : {}),
       organizationId,
     },
-    update: { customKeys, enabled: true, disabledAt: null },
+    update: {
+      customKeys,
+      enabled: true,
+      disabledAt: null,
+      ...(simModels ? { customModels: simModels } : {}),
+    },
   });
   await prisma.modelProviderScope.upsert({
     where: {
