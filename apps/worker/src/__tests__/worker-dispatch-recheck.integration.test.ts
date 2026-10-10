@@ -40,7 +40,7 @@ async function migratedClickHouse(): Promise<string> {
   delete process.env.CLICKHOUSE_CLUSTER;
   try {
     await ClickHouseMigrateTask.createFromConfig({
-      config: { buildTime: false, skipped: false, sharedUrl: endpoint.url, privateEndpoints: [] },
+      config: { buildTime: false, sharedUrl: endpoint.url, privateEndpoints: [] },
     }).execute();
   } finally {
     if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
