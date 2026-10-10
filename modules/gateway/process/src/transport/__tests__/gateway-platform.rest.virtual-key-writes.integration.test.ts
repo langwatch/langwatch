@@ -73,7 +73,7 @@ async function mountedKeyWrites() {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({
         listTraceDestinations: async (projectIds) =>
-          projectIds.map((id) => ({ id, teamId: "team_1", archivedAt: null })),
+          projectIds.map((id) => ({ id, teamId: "team_1", archivedAt: null, kind: "application" })),
       }),
       evaluators: createApiFixture({}),
       evaluations: createApiFixture({}),

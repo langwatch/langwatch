@@ -102,6 +102,7 @@ async function mountedCreate(
           organizationId: ORGANIZATION_ID,
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         };
   };
   const app = await GatewayModule.create({
@@ -120,12 +121,20 @@ async function mountedCreate(
         findIdentity: async (id) => identity(id),
         listIdsByOrganization: async () => [...PROJECT_TEAMS.keys()],
         listTraceDestinations: async (projectIds) =>
-          projectIds.map((id) => ({ id, teamId: PROJECT_TEAMS.get(id) ?? "", archivedAt: null })),
+          projectIds.map((id) => ({
+            id,
+            teamId: PROJECT_TEAMS.get(id) ?? "",
+            archivedAt: null,
+            kind: "application",
+          })),
         resolveTraceDestination: async ({ projectScopeIds, traceProjectId }) => {
           const id = traceProjectId ?? (projectScopeIds.length === 1 ? projectScopeIds[0] : null);
           const teamId = id === null || id === undefined ? undefined : PROJECT_TEAMS.get(id);
           return id && teamId
-            ? { outcome: "resolved", project: { id, teamId, archivedAt: null } }
+            ? {
+                outcome: "resolved",
+                project: { id, teamId, archivedAt: null, kind: "application" },
+              }
             : { outcome: "no_destination" };
         },
       }),
