@@ -1,7 +1,7 @@
 import { Box, Card, IconButton, Table, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Database, MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight, Database, MoreHorizontal } from "lucide-react";
+import { Fragment, useState } from "react";
 
 import { NoDataInfoBlock } from "../states/no-data-info-block.tsx";
 import { EmptyValue } from "../values/empty-value.tsx";
@@ -17,7 +17,7 @@ const meta = {
   title: "Data display/List table",
   parameters: {
     usage: {
-      use: 'Every list of rows: the rounded card and sentence-case header are the one list look. Inside a Card or SettingsCard pass variant="embedded". Sortable columns: ListTable.SortHeader. Ids: ListTable.IdCell. Row menus: ListTable.ActionHeader + ListTable.ActionCell, pinned right. Loading: ListTable.LoadingRows.',
+      use: 'Every list of rows: the rounded card and sentence-case header are the one list look. Inside a Card or SettingsCard pass variant="embedded". Sortable columns: ListTable.SortHeader. Ids: ListTable.IdCell. Row menus: ListTable.ActionHeader + ListTable.ActionCell, pinned right. Loading: ListTable.LoadingRows. An opened row, an empty line or a note under the rows: ListTable.SpanRow.',
       avoid:
         "Never a bare Table.Root with its own borders (list-table.md), uppercase headers, a Spinner row while loading, or a second border around an embedded table. Facts about one thing: use Settings card rows.",
     },
@@ -234,3 +234,60 @@ export const LongTextAndNarrowWidth: Story = {
     </Box>
   ),
 };
+
+function OpeningRows(args: Parameters<typeof ListTable>[0]) {
+  const [opened, setOpened] = useState<string[]>([ROWS[0]?.name ?? ""]);
+  const toggle = (name: string) =>
+    setOpened((current) =>
+      current.includes(name) ? current.filter((key) => key !== name) : [...current, name],
+    );
+  return (
+    <ListTable {...args} tableLayout="fixed">
+      <Table.ColumnGroup>
+        <Table.Column width="44px" />
+        <Table.Column />
+        <Table.Column width="120px" />
+      </Table.ColumnGroup>
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader />
+          <Table.ColumnHeader>Prompt</Table.ColumnHeader>
+          <Table.ColumnHeader>Model</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {ROWS.map((row) => {
+          const isOpen = opened.includes(row.name);
+          return (
+            <Fragment key={row.name}>
+              <Table.Row cursor="pointer" aria-expanded={isOpen} onClick={() => toggle(row.name)}>
+                <Table.Cell color="fg.muted">
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </Table.Cell>
+                <Table.Cell>{row.name}</Table.Cell>
+                <Table.Cell>{row.model}</Table.Cell>
+              </Table.Row>
+              {isOpen ? (
+                <ListTable.SpanRow columns={3}>
+                  <Box bg="bg.muted" paddingY={2} paddingLeft={14} paddingRight={4}>
+                    <Text textStyle="sm" color="fg.muted">
+                      Version {row.version}, published by the team.
+                    </Text>
+                  </Box>
+                </ListTable.SpanRow>
+              ) : null}
+            </Fragment>
+          );
+        })}
+        <ListTable.SpanRow columns={3}>
+          <Text textStyle="xs" color="fg.muted" paddingX={4} paddingY={2}>
+            Showing the newest 3 prompts.
+          </Text>
+        </ListTable.SpanRow>
+      </Table.Body>
+    </ListTable>
+  );
+}
+
+/** Rows that open in place, and a note under the rows: ListTable.SpanRow spans every column. */
+export const OpenedRowsAndNote: Story = { render: (args) => <OpeningRows {...args} /> };

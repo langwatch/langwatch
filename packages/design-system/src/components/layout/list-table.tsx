@@ -97,6 +97,8 @@ function ListTableRoot({
           // card's own padding lines up with them.
           "& th:first-of-type, & td:first-of-type": { paddingLeft: "4" },
           "& th:last-of-type, & td:last-of-type": { paddingRight: "4" },
+          // A spanning cell is flush: what it holds pads itself.
+          "& td[data-span-cell]": { padding: "0" },
         }}
         {...props}
       >
@@ -221,8 +223,29 @@ function ActionCell({ children, ...props }: ComponentProps<typeof Table.Cell>) {
 }
 
 /**
+ * A row whose one cell spans every column: an opened row's details, an empty line, a note
+ * under the rows. The cell is flush and takes no row hover; what it holds pads itself.
+ */
+function SpanRow({
+  columns,
+  children,
+  ...props
+}: ComponentProps<typeof Table.Row> & {
+  /** How many columns the table has, so the one cell spans them all. */
+  columns: number;
+}) {
+  return (
+    <Table.Row data-span-row="" _hover={{ bg: "transparent" }} {...props}>
+      <Table.Cell colSpan={columns} data-span-cell="">
+        {children}
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+/**
  * The one list look: rounded card, quiet rules, sentence-case headers. Compose with
- * Table parts plus SortHeader, IdCell, ActionHeader, ActionCell and LoadingRows.
+ * Table parts plus SortHeader, IdCell, ActionHeader, ActionCell, LoadingRows and SpanRow.
  */
 export const ListTable = Object.assign(ListTableRoot, {
   SortHeader,
@@ -230,4 +253,5 @@ export const ListTable = Object.assign(ListTableRoot, {
   LoadingRows,
   ActionHeader,
   ActionCell,
+  SpanRow,
 });
