@@ -84,9 +84,9 @@ function useSpanStoredInvalidation(projectId: string | undefined) {
 }
 
 /**
- * While the project has never received a trace, any trace event on the stream the page
- * already holds re-reads the first-trace flag, so the empty state leaves on arrival
- * without a reload or a poll (WEB-17803). Once the flag is true this does nothing.
+ * While the project has never received a trace, a trace event on the stream the page already
+ * holds IS the first trace: the empty state leaves and the list re-reads at once, before the
+ * stored flag catches up (WEB-17803, WEB-17707). Once the flag is true this does nothing.
  */
 function useFirstTraceArrival(project: { id: string; firstMessage?: boolean } | undefined) {
   const trpcUtils = api.useUtils();
@@ -94,7 +94,8 @@ function useFirstTraceArrival(project: { id: string; firstMessage?: boolean } | 
   const projectId = project?.id;
   return useCallback(() => {
     if (!waiting || !projectId) return;
-    void trpcUtils.project.getHasFirstMessage.invalidate({ projectId });
+    trpcUtils.project.getHasFirstMessage.setData({ projectId }, { firstMessage: true });
+    void trpcUtils.traces.list.invalidate();
   }, [trpcUtils, waiting, projectId]);
 }
 

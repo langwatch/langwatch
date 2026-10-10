@@ -65,14 +65,14 @@ Rule: Onboarding empty state
     And the real trace table is shown
 
   # The flag is read once when the page opens. The page already listens to the
-  # project's live trace stream; while the flag is false, the first trace event on
-  # that stream re-reads it. No poll and no extra subscription (WEB-17803).
+  # project's live trace stream; while the flag is false, a trace event on that stream
+  # is the first trace, ahead of the stored flag (WEB-17803, WEB-17707).
   @integration
   Scenario: The Trace Explorer leaves its empty state when the first trace arrives
     Given the Observe page is open with the project's `firstMessage` flag false
     When the project's live trace stream reports its first trace
-    Then the page re-reads the first-trace flag on its own, without a reload or a poll
-    And the trace results replace the empty state once the flag flips
+    Then the page leaves the empty state on its own, without a reload or a poll
+    And the trace list is read again so the trace replaces the empty state
     And once the flag is true further trace events leave it alone
 
 

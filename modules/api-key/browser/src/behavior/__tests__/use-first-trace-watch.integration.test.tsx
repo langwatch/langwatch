@@ -212,7 +212,7 @@ describe("given the page was opened in one organization and the approval names a
 describe("given the watch confirmed the project has never synced a trace", () => {
   describe("when the project's first trace is received", () => {
     /** @scenario The watch updates when the project's first trace is received */
-    it("learns of it from trace's stream, re-reads the flag once, and redirects", async () => {
+    it("learns of it from trace's stream and redirects without waiting for the flag", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const host = new FakeApiKeyHost({ organizations: ORGANIZATIONS });
       state.firstMessage = false;
@@ -223,12 +223,13 @@ describe("given the watch confirmed the project has never synced a trace", () =>
       expect(state.stream.enabled).toBe(true);
       expect(state.refetches).toBe(0);
 
-      state.stream.onData?.();
-      expect(state.refetches).toBe(1);
-
-      state.firstMessage = true;
+      // The stored flag is still false: the stream event alone is the first trace.
+      await act(async () => {
+        state.stream.onData?.();
+      });
       rerender(watchElement(host));
       await screen.findByText(/First trace received/);
+      expect(state.refetches).toBe(0);
       expect(state.stream.enabled).toBe(false);
       await act(async () => {
         vi.advanceTimersByTime(FIRST_TRACE_REDIRECT_DELAY_MS);

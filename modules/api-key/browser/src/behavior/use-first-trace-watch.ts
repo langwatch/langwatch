@@ -56,12 +56,13 @@ export function useFirstTraceWatch({
     { enabled: polling.enabled, refetchOnWindowFocus: false },
   );
 
-  // While waiting, any event on trace's stream re-reads the flag, as the Trace Explorer does.
+  // While waiting, an event on trace's stream IS the first trace: redirect before the flag
+  // catches up (WEB-17707).
   traceClient.traces.onTraceUpdate.useSubscription(
     { projectId: personalProject?.id ?? "" },
     {
       enabled: polling.enabled && hasSeenNeverSynced,
-      onData: () => void hasFirstMessage.refetch(),
+      onData: () => setIsRedirecting(true),
     },
   );
 

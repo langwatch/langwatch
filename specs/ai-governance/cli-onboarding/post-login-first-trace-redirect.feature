@@ -77,5 +77,5 @@ Feature: Post-login first-trace watch on the CLI authorize page
   Scenario: The watch updates when the project's first trace is received
     Given the watch confirmed the project has never synced a trace
     When the project's first trace is received
-    Then the page learns of it from a server event, with no timer
+    Then the page learns of it from a server event, with no timer and without waiting for the stored flag
     And the redirect starts

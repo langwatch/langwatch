@@ -61,7 +61,7 @@ const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockHeaderInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockSpanTreeInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockEvalsInvalidate = vi.fn().mockResolvedValue(undefined);
-const mockFirstMessageInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockFirstMessageSetData = vi.fn();
 let openDrawerTraceId: string | null = null;
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
@@ -70,7 +70,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
     // useSSESubscription — it only needs to exist, not function.
     traces: { onDiscoverUpdate: {} },
     useUtils: () => ({
-      project: { getHasFirstMessage: { invalidate: mockFirstMessageInvalidate } },
+      project: { getHasFirstMessage: { setData: mockFirstMessageSetData } },
       traces: {
         list: {
           cancel: mockListCancel,
@@ -336,19 +336,21 @@ describe("useTraceFreshness", () => {
     it.each([
       ["a trace summary update", () => capturedOnTraceSummaryUpdated],
       ["a stored span", () => capturedOnSpanStored],
-    ])(
-      "re-reads the first-trace flag on %s from the stream the page holds",
-      async (_l, handler) => {
-        projectRow = { id: "proj-1", firstMessage: false };
-        renderHook(() => useTraceFreshness());
+    ])("leaves the empty state on %s without waiting for the stored flag", async (_l, handler) => {
+      projectRow = { id: "proj-1", firstMessage: false };
+      renderHook(() => useTraceFreshness());
+      mockListInvalidate.mockClear();
 
-        await act(async () => {
-          handler()!(["first-trace"]);
-        });
+      await act(async () => {
+        handler()!(["first-trace"]);
+      });
 
-        expect(mockFirstMessageInvalidate).toHaveBeenCalledWith({ projectId: "proj-1" });
-      },
-    );
+      expect(mockFirstMessageSetData).toHaveBeenCalledWith(
+        { projectId: "proj-1" },
+        { firstMessage: true },
+      );
+      expect(mockListInvalidate).toHaveBeenCalled();
+    });
 
     it("leaves the flag alone once the project has a trace", async () => {
       projectRow = { id: "proj-1", firstMessage: true };
@@ -359,7 +361,7 @@ describe("useTraceFreshness", () => {
         capturedOnSpanStored!(["later-trace"]);
       });
 
-      expect(mockFirstMessageInvalidate).not.toHaveBeenCalled();
+      expect(mockFirstMessageSetData).not.toHaveBeenCalled();
     });
   });
 });
