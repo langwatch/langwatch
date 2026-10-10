@@ -236,6 +236,14 @@ describe("the alert recipe", () => {
   });
 
   describe("given the status strength hierarchy", () => {
+    it("uses main's sunken input ground for a dark neutral solid", () => {
+      const solid = paint({ status: "neutral", variant: "solid", mode: "dark" });
+      expect(solid.ground).toBe("#10101a");
+      expect(solid.ground).toBe(
+        resolve({ value: "var(--chakra-colors-bg-input)", mode: "dark", root: solid.root }),
+      );
+    });
+
     /** @scenario "Status meshes keep their hierarchy and contrast" */
     it.each(["light", "dark"] as const)("orders the painted colour strength in %s", (mode) => {
       for (const status of STATUSES) {
@@ -254,7 +262,12 @@ describe("the alert recipe", () => {
           );
         let previousMinimum = -1;
         let previousMaximum = -1;
-        for (const level of ["outline", "banner", "toast", "subtle", "surface", "solid"] as const) {
+        // Main’s input ground is sunken; the neutral solid is not a stronger status tint.
+        const levels = ["outline", "banner", "toast", "subtle", "surface", "solid"] as const;
+        const orderedLevels = levels.filter(
+          (level) => !(status === "neutral" && mode === "dark" && level === "solid"),
+        );
+        for (const level of orderedLevels) {
           const surface =
             level === "solid"
               ? paint({ status, variant: "solid", mode })

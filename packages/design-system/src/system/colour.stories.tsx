@@ -20,7 +20,28 @@ const foundationColours = [
 const semanticColours = [
   "bg",
   "bg.panel",
-  "nav.bgSelected",
+  "bg.card",
+  "bg.nested",
+  "bg.control",
+  "bg.input",
+  "bg.inputHover",
+  "bg.rail",
+  "bg.emphasized",
+  "bg.softHover",
+  "bg.stripe",
+  "nav.fg",
+  "nav.fgMuted",
+  "nav.bgActive",
+  "nav.bgHover",
+  "border.card",
+  "border.nested",
+  "border.control",
+  "bg.page",
+  "bg.surface",
+  "bg.overlay",
+  "bg.hover",
+  "bg.selected",
+  "nav.marker",
   "bg.raised",
   "bg.muted",
   "bg.subtle",
@@ -47,6 +68,11 @@ const accentColours = [
 ] as const;
 
 const statusColours = [
+  "status.success",
+  "status.error",
+  "status.warning",
+  "status.pending",
+  "status.info",
   "fg.error",
   "bg.error",
   "border.error",
@@ -98,7 +124,8 @@ function ColourFoundations() {
       <Stack gap="1">
         <Heading size="lg">Colour foundations</Heading>
         <Text color="fg.muted">
-          Raw palette values support the system; semantic tokens are the default for components.
+          Production main’s gray and zinc palette, with #ED8926 brand orange. Semantic tokens select
+          the light and dark values; compatibility names alias main’s roles.
         </Text>
       </Stack>
 

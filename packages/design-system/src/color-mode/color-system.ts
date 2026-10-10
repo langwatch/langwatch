@@ -1,3 +1,4 @@
+// Production palette from origin/main e683dd9ea5: platform/app/src/components/ui/color-mode.tsx.
 export const colorSystem = {
   gray: {
     950: { value: "#09090b" },

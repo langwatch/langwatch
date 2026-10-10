@@ -10,7 +10,8 @@ a feature package, routing, transport, or server code.
 pnpm --filter @langwatch/design-system storybook   # standalone, port 6006
 ```
 
-While the browser application's dev server runs (`pnpm dev` or `pnpm dev:ui`),
+While the browser application's Vite dev server runs (`pnpm dev:hmr`, `haven up --hmr`
+or `pnpm dev:ui`),
 `/design-system` opens the same workshop. Storybook starts on the first visit
 to that address, so it costs the dev server nothing at boot, and
 `LANGWATCH_SKIP_STORYBOOK=1` turns it off entirely.
@@ -54,55 +55,36 @@ variable), or `getRawColorValue` / `useColorRawValue` for a literal in the curre
 
 ### Which surface for which region
 
-**One inset frame, one content ground, one raised panel: separate regions with a
-hairline before colour. Dark surfaces follow GitHub Primer; colour carries
-status or accent, and chrome belongs to the ground it frames.**
+The palette follows production main (`e683dd9ea5`), including its inherited
+Chakra colours. Raw gray steps do not change with mode; semantic roles select
+gray in light mode and zinc for dark surfaces. Brand orange is `#ED8926`.
 
-Use Chakra's semantic names in new code. The dark gray scale uses the Primer
-reference values below; its light values are unchanged. `grayScale` selects the
-mode before Chakra's roles resolve, so a raw gray step also follows the theme.
-`zinc` is only the backing dark scale retained for compatibility.
+| Role                                           | Light   | Dark    |
+| ---------------------------------------------- | ------- | ------- |
+| bg.page                                        | #f1f5f9 | #10101a |
+| bg.surface                                     | white   | #080812 |
+| bg (Chakra default)                            | white   | black   |
+| bg.panel / bg.card / bg.overlay / bg.raised    | white   | #1a1a24 |
+| bg.muted / bg.nested / bg.softHover / bg.hover | #f1f5f9 | #15151e |
+| bg.input / bg.control                          | #e2e8f0 | #10101a |
+| bg.emphasized                                  | #e2e8f0 | #3a3a44 |
+| bg.selected / nav.bgActive                     | #e2e8f0 | #282832 |
+| bg.rail                                        | #e7ecf2 | #15151e |
+| bg.subtle / bg.stripe                          | #f8fafc | #10101a |
+| border / border.card / border.control          | #e2e8f0 | #3a3a44 |
+| border.muted / border.nested                   | #f1f5f9 | #282832 |
+| border.emphasized / border.strong              | #cbd5e1 | #565664 |
+| fg                                             | #111113 | #f1f5f9 |
+| fg.muted                                       | #3d3d4d | #cbd5e1 |
+| fg.subtle / nav.marker                         | #5c5c6e | #9CA3AF |
 
-| Region                                                     | Chakra role                      | Dark              | Separation                              |
-| ---------------------------------------------------------- | -------------------------------- | ----------------- | --------------------------------------- |
-| App frame, sidebar, top bar                                | `bg.page` (one documented extra) | #010409           | `border.muted`                          |
-| Content, section nav, page title                           | `bg`                             | #0d1117           | hairline; title adds it after scrolling |
-| Cards, tables, drawers, dialogs, menus, popovers, tooltips | `bg.panel`                       | #151b23           | `border`                                |
-| Wells, hover, small controls                               | `bg.muted` / `bg.emphasized`     | #212830           | `border`                                |
-| Table header/body, EmptyState                              | inherit owning container         | no extra ground   | `bg.muted` hover                        |
-| Default / muted hairline                                   | `border` / `border.muted`        | #3d444d / #2f3742 | structure, not elevation                |
-| Primary / secondary text                                   | `fg` / `fg.muted`                | #f0f6fc / #9198a1 | AA on all four grounds                  |
+Main’s warning surfaces/text/borders use orange; status.warning and
+status.pending use yellow. Structural hairlines preserve main’s subtlety and
+do not claim 3:1 contrast. Do not assume every status or subtle-text pairing
+meets AA. Menus, drawers and dialogs use an opaque panel; controls use input.
 
-`bg.page` is the sole extra surface role: Chakra's `bg` cannot represent both
-Primer's inset shell and its distinct content canvas. `bg.subtle` shares the
-raised value in dark mode. `bg.muted` and `bg.emphasized` share the control value;
-the app uses at most four dark grounds. Status surfaces and per-palette roles
-retain their meaning and colours. Overlay header/body/footer all inherit one
-opaque `bg.panel`; only the sticky title uses glass.
-
-Primer's adjacent surface gaps are deliberately below 8 CIELAB L*. The old
-minimum forced washed-out elevated panels, so the test now checks the four
-reference colours, ascending 3–8 L* steps, shared well/control ground, AA text
-and status contrast, and visible structural hairlines. `border.emphasized`
-remains a stronger edge for focus/meaningful outlines and meets 3:1 against
-controls; ordinary structural borders are intentionally quieter.
-
-### Deprecated aliases — use the Chakra name
-
-| Compatibility name                                        | Use instead                                                   |
-| --------------------------------------------------------- | ------------------------------------------------------------- |
-| `bg.surface`, `bg.rail`                                   | `bg`                                                          |
-| `bg.card`, `bg.overlay`, `bg.inputHover` (old raised use) | `bg.panel` (`bg.inputHover` now aliases `bg.muted` for hover) |
-| `bg.nested`, `bg.raised`, `bg.softHover`, `bg.hover`      | `bg.muted`                                                    |
-| `bg.control`, `bg.input`, `bg.selected`                   | `bg.emphasized`                                               |
-| `bg.stripe`                                               | `bg.subtle`                                                   |
-| `border.card`, `border.control`                           | `border`                                                      |
-| `border.nested`                                           | `border.muted`                                                |
-| `border.strong`                                           | `border.emphasized`                                           |
-
-A table is not a stack of wells: its ordinary rows and header inherit its
-container. Prefer removing call-site background overrides. New shared
-components use Chakra names; aliases keep existing module call sites working.
+The [complete main comparison](docs/main-colour-parity.md) lists raw scales,
+semantic tokens, inherited defaults, branch-only aliases and feature themes.
 
 ### Sticky page titles
 
@@ -135,3 +117,23 @@ workshop's own pages in `src/workshop`.
 Every docs page shows how many files import the component, counted from the
 import sites when Storybook starts or builds (`.storybook/adoption.ts`;
 `node .storybook/adoption.ts` prints the whole inventory).
+
+## Section navigation
+
+`SectionNavigationFrame` pairs a 176px text rail with the page content on `bg.card`.
+Section and sub-page titles share a borderless 48px row. The vertical `border.muted`
+divider starts below it. Links are 32px tall; hover changes text colour only.
+One 3px `nav.marker` marker follows the current link, including nested lists, in 180ms.
+It jumps for reduced motion and scrolls with the links. Its outer edge is flat,
+and its inner edge has a 2px radius. A collapsed rail retains labelled icon links.
+
+## Option lists
+
+Menu, select and combobox recipes share `option-list.recipe.ts`: 4px container
+padding, 8px item side padding, a 32px minimum row and a subtle `bg.hover` fill.
+Custom popover pickers use `OptionItem` from `./option-list` for the same treatment.
+
+When the unfiltered options have loaded empty, disable the picker and associate
+its trigger with `EmptyOptionsHint` using `aria-describedby`. Supply a creation
+link through `action`. Do not turn loading, failure, filtered no-match results or
+free-text entry into an empty collection.

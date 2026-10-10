@@ -58,7 +58,7 @@ export const designSystemConfig = defineConfig({
     body: {
       background: "bg.page",
       fontSize: "14px",
-      color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
+      color: "fg",
     },
     "*::selection": {
       // Undo Chakra's selection color override
@@ -163,7 +163,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         orange: {
           solid: { value: { _light: "#ED8926", _dark: "#ED8926" } },
@@ -197,7 +197,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.orange.200}",
             },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         green: {
           solid: {
@@ -233,7 +233,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.green.200}",
             },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
           solid: {
@@ -254,7 +254,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         yellow: {
           solid: {
@@ -293,7 +293,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.yellow.200}",
             },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
           solid: {
@@ -314,7 +314,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         pink: {
           solid: {
@@ -335,7 +335,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         purple: {
           solid: {
@@ -374,7 +374,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.purple.200}",
             },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         teal: {
           solid: {
@@ -395,7 +395,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         cyan: {
           solid: {
@@ -416,10 +416,10 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
           },
-          focusRing: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
 
-        // Brand orange as LangWatch's accent, apart from warning (yellow).
+        // Brand orange as LangWatch's accent; status.warning remains yellow.
         // An alias palette: `colorPalette="accent"` follows the orange group.
         accent: {
           solid: { value: "{colors.orange.solid}" },
@@ -483,8 +483,8 @@ export const designSystemConfig = defineConfig({
 
         // Navigation semantic tokens - for sidebar menu items
         nav: {
-          // Added after prod: aliases onto prod roles, so call sites keep prod colours.
-          marker: { value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" } },
+          // Branch-only roles alias the production main palette.
+          marker: { value: "{colors.fg.subtle}" },
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
           },
@@ -511,17 +511,16 @@ export const designSystemConfig = defineConfig({
 
         // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
         bg: {
-          // Added after prod: aliases onto prod roles, so call sites keep prod colours.
-          card: { value: { _light: "{colors.bg.panel}", _dark: "{colors.bg.panel}" } },
-          overlay: { value: { _light: "{colors.bg.panel}", _dark: "{colors.bg.panel}" } },
-          nested: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
-          raised: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
-          control: { value: { _light: "{colors.bg.emphasized}", _dark: "{colors.bg.emphasized}" } },
-          hover: { value: { _light: "{colors.bg.softHover}", _dark: "{colors.bg.softHover}" } },
-          selected: {
-            value: { _light: "{colors.bg.emphasized}", _dark: "{colors.bg.emphasized}" },
-          },
-          stripe: { value: { _light: "{colors.bg.subtle}", _dark: "{colors.bg.subtle}" } },
+          DEFAULT: { value: { _light: "{colors.white}", _dark: "{colors.black}" } },
+          // Branch-only roles alias the production main palette.
+          card: { value: "{colors.bg.panel}" },
+          overlay: { value: "{colors.bg.panel}" },
+          nested: { value: "{colors.bg.muted}" },
+          raised: { value: "{colors.bg.panel}" },
+          control: { value: "{colors.bg.input}" },
+          hover: { value: "{colors.bg.softHover}" },
+          selected: { value: "{colors.nav.bgActive}" },
+          stripe: { value: "{colors.bg.subtle}" },
           // Page/sidebar background
           page: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
@@ -560,10 +559,10 @@ export const designSystemConfig = defineConfig({
             value: { _light: "white", _dark: "{colors.zinc.800}" },
           },
           // Status surfaces, one per meaning.
-          error: { value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" } },
-          success: { value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" } },
-          warning: { value: { _light: "{colors.yellow.50}", _dark: "{colors.yellow.900}" } },
-          info: { value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" } },
+          error: { value: { _light: "{colors.red.50}", _dark: "{colors.red.950}" } },
+          success: { value: { _light: "{colors.green.50}", _dark: "{colors.green.950}" } },
+          warning: { value: { _light: "{colors.orange.50}", _dark: "{colors.orange.950}" } },
+          info: { value: { _light: "{colors.blue.50}", _dark: "{colors.blue.950}" } },
           // Dimmer behind modals, tours and overlays.
           scrim: {
             value: { _light: "{colors.blackAlpha.500}", _dark: "{colors.blackAlpha.700}" },
@@ -583,21 +582,19 @@ export const designSystemConfig = defineConfig({
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Status text, one per meaning.
-          error: { value: { _light: "{colors.red.600}", _dark: "{colors.red.300}" } },
+          error: { value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" } },
           success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
-          warning: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.300}" } },
+          warning: { value: { _light: "{colors.orange.600}", _dark: "{colors.orange.300}" } },
           info: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.300}" } },
         },
 
         // Border semantic tokens - visible in dark mode
         border: {
-          // Added after prod: aliases onto prod roles, so call sites keep prod colours.
-          card: { value: { _light: "{colors.border}", _dark: "{colors.border}" } },
-          nested: { value: { _light: "{colors.border.muted}", _dark: "{colors.border.muted}" } },
-          control: { value: { _light: "{colors.border}", _dark: "{colors.border}" } },
-          strong: {
-            value: { _light: "{colors.border.emphasized}", _dark: "{colors.border.emphasized}" },
-          },
+          // Branch-only roles alias the production main palette.
+          card: { value: "{colors.border}" },
+          nested: { value: "{colors.border.muted}" },
+          control: { value: "{colors.border}" },
+          strong: { value: "{colors.border.emphasized}" },
           DEFAULT: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
           },
@@ -611,10 +608,10 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.500}" },
           },
           // Status borders, one per meaning.
-          error: { value: { _light: "{colors.red.300}", _dark: "{colors.red.700}" } },
-          success: { value: { _light: "{colors.green.300}", _dark: "{colors.green.700}" } },
-          warning: { value: { _light: "{colors.yellow.300}", _dark: "{colors.yellow.700}" } },
-          info: { value: { _light: "{colors.blue.300}", _dark: "{colors.blue.700}" } },
+          error: { value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" } },
+          success: { value: { _light: "{colors.green.500}", _dark: "{colors.green.400}" } },
+          warning: { value: { _light: "{colors.orange.500}", _dark: "{colors.orange.400}" } },
+          info: { value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" } },
         },
       },
     },
@@ -670,7 +667,7 @@ export const designSystemConfig = defineConfig({
             },
             outline: {
               boxShadow: "2xs",
-              borderColor: "border.emphasized",
+              borderColor: "border",
               color: "fg",
               _hover: {
                 backgroundColor: "bg.hover",
@@ -834,7 +831,10 @@ export const designSystemConfig = defineConfig({
           root: {
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
-            background: "bg.card",
+            // Home's card: the panel at half strength, blurred, so the page shows through
+            // darker than a solid panel and the card reads as one quiet material.
+            background: "bg.card/50",
+            backdropFilter: "blur(12px)",
             borderColor: "border.card",
             // Clip children to the rounded border. Square child paints —
             // table row hover/selection/tints, header bands, code blocks —
