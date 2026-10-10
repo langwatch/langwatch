@@ -619,3 +619,21 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
     });
   });
 });
+
+describe("SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId", () => {
+  /** @scenario "A trace whose spans carry no signals is not read twice" */
+  it("answers empty from one time-bounded read when no span carries a signal", async () => {
+    const { clickhouse, repo } = readRepository();
+    clickhouse.rows = [{ SpanId: "span-1", Signals: [] }];
+
+    const signals = await repo.findLangwatchSignalsByTraceId({
+      authorization,
+      traceId: "trace-1",
+      occurredAtMs: 1_700_000_000_000,
+    });
+
+    expect(signals).toEqual([]);
+    expect(clickhouse.queries).toHaveLength(1);
+    expect(clickhouse.queries[0]?.query).toContain("StartTime >= fromUnixTimestamp64Milli");
+  });
+});

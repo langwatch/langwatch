@@ -58,3 +58,10 @@ Feature: Reading one stored span back for a derivation consumer
     Given ClickHouse refuses the read
     When the derivation consumer issues it
     Then the failure reaches the caller so the queue redelivers it
+
+  @unit
+  Scenario: A trace whose spans carry no signals is not read twice
+    Given a trace whose spans carry none of the LangWatch signal attributes
+    When the drawer reads its LangWatch signals with the trace's start time
+    Then the answer is empty after that single bounded read
+    And the read is never widened to every partition
