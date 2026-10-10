@@ -8,7 +8,7 @@ import {
 
 const logger = createLogger("langwatch:voice:public-url");
 
-/** The worker's public media origin, as the process resolved it at boot (record §8). */
+/** The worker's public media origin, or why it has none (record §8). */
 export type VoicePublicUrl = { url: string } | { unavailable: string };
 
 /** What the worker resolved, and how to release the tunnel it may have opened. */
@@ -17,10 +17,16 @@ type ResolvedVoicePublicUrl = Readonly<{
   close: () => Promise<void>;
 }>;
 
+/** The worker's public media origin, acquired on the first voice run and shared after. */
+export type VoicePublicUrlSource = Readonly<{
+  acquire: () => Promise<VoicePublicUrl>;
+  close: () => Promise<void>;
+}>;
+
 /**
- * Main's boot-time tunnel: a configured origin wins; else, unless turned off, a quick
- * tunnel to the media door's port. A tunnel that fails is non-fatal and its reason is
- * what the phone run names.
+ * A configured origin wins; else, unless turned off, a quick tunnel to the media door's
+ * port, opened on the first voice run rather than at boot. A tunnel that fails is
+ * non-fatal and its reason is what the phone run names.
  */
 export class VoicePublicUrlService {
   static create(
@@ -38,21 +44,18 @@ export class VoicePublicUrlService {
   ) {}
 
   /**
-   * Only the worker, which spawns the children, resolves an address; a voice-only worker
-   * refuses to boot without a public https origin, as main's did.
+   * Only the worker, which spawns the children, acquires an address; a voice-only worker
+   * refuses to boot without a public https origin, as main's did. Nothing opens here.
    */
-  async resolveForRole(input: {
+  forRole(input: {
     role: ServerRole | undefined;
     configuredUrl: string | undefined;
     tunnelEnabled: boolean;
     workerOnly: boolean;
     port: number;
-  }): Promise<ResolvedVoicePublicUrl> {
+  }): VoicePublicUrlSource {
     if (input.role !== "worker") {
-      return {
-        publicUrl: { unavailable: "this role runs no scenario children" },
-        close: async () => {},
-      };
+      return VoicePublicUrlService.fixed({ unavailable: "this role runs no scenario children" });
     }
     if (input.configuredUrl !== undefined && !input.configuredUrl.startsWith("https://")) {
       throw new Error("VOICE_PUBLIC_BASE_URL must be an https origin");
@@ -62,7 +65,32 @@ export class VoicePublicUrlService {
         "VOICE_WORKER_ONLY is set but VOICE_PUBLIC_BASE_URL is missing; the voice worker refuses to start without a public https origin Twilio can dial back.",
       );
     }
-    return this.resolve(input);
+    return this.lazily(input);
+  }
+
+  /** Concurrent first callers share one acquisition; its answer, failure included, is kept. */
+  lazily(input: {
+    configuredUrl: string | undefined;
+    tunnelEnabled: boolean;
+    port: number;
+  }): VoicePublicUrlSource {
+    let pending: Promise<ResolvedVoicePublicUrl> | undefined;
+    let closed = false;
+    return {
+      acquire: async () => {
+        if (closed) return { unavailable: "the worker is shutting down" };
+        pending ??= this.resolve(input);
+        return (await pending).publicUrl;
+      },
+      close: async () => {
+        closed = true;
+        if (pending) await (await pending).close();
+      },
+    };
+  }
+
+  private static fixed(publicUrl: VoicePublicUrl): VoicePublicUrlSource {
+    return { acquire: async () => publicUrl, close: async () => {} };
   }
 
   async resolve(input: {

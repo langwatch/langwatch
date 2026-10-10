@@ -98,6 +98,8 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
 
   static create(options: {
     config: ScenarioChildProcessConfig;
+    /** Acquires the worker's public media origin, asked only when a voice child starts. */
+    voicePublicUrl?: () => Promise<VoicePublicUrl>;
     pool: ScenarioExecutionPoolService;
     /** Where a voice child registers the media nonce the worker's door will be dialled with. */
     nonces: VoiceNonceRegistryService;
@@ -108,6 +110,7 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
   private constructor(
     private readonly options: {
       config: ScenarioChildProcessConfig;
+      voicePublicUrl?: () => Promise<VoicePublicUrl>;
       pool: ScenarioExecutionPoolService;
       nonces: VoiceNonceRegistryService;
     },
@@ -116,10 +119,10 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
   // An arrow instance property, not a prototype method: tests hold a bare
   // Object.create(prototype) instance and monkey-patch this directly to
   // assert on it, which is unsafe against a method-shorthand member.
-  start = (input: {
+  start = async (input: {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
-  }): ScenarioChildExecutionSession => {
+  }): Promise<ScenarioChildExecutionSession> => {
     const childLogger = logger.child({
       scenarioId: input.jobData.scenarioId,
       projectId: input.jobData.projectId,
@@ -134,8 +137,14 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
       extra?: Record<string, unknown>,
     ) => childLogger[level](extra ?? {}, message);
 
+    // A voice child needs the public origin in its environment; nothing else waits for it.
+    const isVoiceChild = input.jobData.target.type === "voice";
+    const voicePublicUrl =
+      isVoiceChild && this.options.voicePublicUrl
+        ? await this.options.voicePublicUrl()
+        : this.options.config.voicePublicUrl;
     const childEnvironment = buildChildEnvironmentValue({
-      config: this.options.config,
+      config: { ...this.options.config, voicePublicUrl },
       jobData: input.jobData,
       labels: input.environment.labels,
       telemetry: input.environment.telemetry,
@@ -155,7 +164,6 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
 
     // A voice child mints its own Twilio stream nonce and registers it before it
     // dials; that round trip needs an IPC slot no other target's child has.
-    const isVoiceChild = input.jobData.target.type === "voice";
     const child = spawn(spawnConfig.command, spawnConfig.args, {
       env: childEnvironment,
       stdio: isVoiceChild ? ["pipe", "pipe", "pipe", "ipc"] : ["pipe", "pipe", "pipe"],

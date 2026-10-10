@@ -39,6 +39,8 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
+import { spawn } from "node:child_process";
+
 import { type ScenarioExecutionRunner } from "../app/scenario.app.ts";
 import {
   NodeScenarioChildService,
@@ -93,9 +95,20 @@ const childConfig: ScenarioChildProcessConfig = {
   parentEnvironment: {},
 };
 
-function poolWith(jobData: ExecutionJobData): ScenarioExecutionPoolService {
+/** A runner whose run stays active, so a child started after an await still finds it. */
+class HeldRunner implements ScenarioExecutionRunner {
+  execute(): Promise<void> {
+    return new Promise(() => {});
+  }
+  skipCancelled(): void {}
+}
+
+function poolWith(
+  jobData: ExecutionJobData,
+  runner: ScenarioExecutionRunner = new NoopRunner(),
+): ScenarioExecutionPoolService {
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
-  pool.connect(new NoopRunner());
+  pool.connect(runner);
   pool.submit(jobData);
   return pool;
 }
@@ -106,6 +119,50 @@ describe("NodeScenarioChildService", () => {
     stdinEnd.mockClear();
     childSend.mockClear();
     spawned.length = 0;
+    vi.mocked(spawn).mockClear();
+  });
+
+  describe("given the worker's public origin is acquired on demand", () => {
+    const environment = { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } };
+    const nonces = () =>
+      VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() });
+    const spawnedEnvironment = () => vi.mocked(spawn).mock.calls[0]?.[2]?.env;
+
+    /** @scenario "A worker boots without waiting for the voice tunnel" */
+    it("never asks for it when a non-voice child starts", async () => {
+      const voicePublicUrl = vi.fn(async () => ({ url: "https://tunnel.test" }));
+      const adapter = NodeScenarioChildService.create({
+        config: childConfig,
+        voicePublicUrl,
+        pool: poolWith(job()),
+        nonces: nonces(),
+      });
+
+      await adapter.start({ jobData: job(), environment });
+
+      expect(voicePublicUrl).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A voice tunnel that fails on first use names its reason to the phone run" */
+    it("hands a voice child the acquired origin, or the reason it has none", async () => {
+      const voiceJob: ExecutionJobData = {
+        ...job(),
+        target: { type: "voice", referenceId: "agent-1" },
+      };
+      const adapter = NodeScenarioChildService.create({
+        config: childConfig,
+        voicePublicUrl: async () => ({ unavailable: "spawn cloudflared ENOENT" }),
+        pool: poolWith(voiceJob, new HeldRunner()),
+        nonces: nonces(),
+      });
+
+      await adapter.start({ jobData: voiceJob, environment });
+
+      expect(spawnedEnvironment()).toMatchObject({
+        VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON: "spawn cloudflared ENOENT",
+      });
+      expect(spawnedEnvironment()).not.toHaveProperty("VOICE_PUBLIC_BASE_URL");
+    });
   });
 
   describe("given a phone run's child asking to register its stream nonce", () => {
@@ -122,7 +179,7 @@ describe("NodeScenarioChildService", () => {
         pool: poolWith(voiceJob),
         nonces,
       });
-      const session = adapter.start({
+      const session = await adapter.start({
         jobData: voiceJob,
         environment: { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } },
       });
@@ -165,7 +222,7 @@ describe("NodeScenarioChildService", () => {
 
   describe("given a child process spawned from the pre-compiled bundle", () => {
     /** @scenario "Child process receives job data via stdin" */
-    it("writes the job data to the child's stdin as JSON", () => {
+    it("writes the job data to the child's stdin as JSON", async () => {
       const adapter = NodeScenarioChildService.create({
         config: {
           packageRoot: "/app",
@@ -185,7 +242,7 @@ describe("NodeScenarioChildService", () => {
         nonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
       });
 
-      const session = adapter.start({
+      const session = await adapter.start({
         jobData: job(),
         environment: { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } },
       });
