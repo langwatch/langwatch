@@ -6,6 +6,7 @@ import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
+import { epochMsToOtlpNanos } from "~/server/traces/collectorSpan.utils";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
@@ -24,7 +25,7 @@ export async function recordTrackedEventSpan(params: {
 }): Promise<void> {
   const { project, body, eventId } = params;
   const timestampMs = body.timestamp ?? Date.now();
-  const timestampNano = String(timestampMs * 1_000_000);
+  const timestampNano = epochMsToOtlpNanos(timestampMs);
   const spanId = createHash("sha256")
     .update(`${body.trace_id}:${eventId}`)
     .digest("hex")

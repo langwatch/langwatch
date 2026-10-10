@@ -1,0 +1,61 @@
+import { describe, expect, it } from "vitest";
+
+import { epochMsToOtlpNanos } from "../collectorSpan.utils";
+
+// Spec: one exact BigInt conversion shared by every span writer (#8038).
+// `ms * 1_000_000` exceeds Number.MAX_SAFE_INTEGER for real epoch values,
+// so the float product's low digits are rounding noise.
+describe("epochMsToOtlpNanos", () => {
+  describe("given a current epoch millisecond value", () => {
+    it("produces the exact nanosecond string", () => {
+      expect(epochMsToOtlpNanos(1_757_400_000_001)).toBe("1757400000001000000");
+    });
+
+    it("stays exact past Number.MAX_SAFE_INTEGER nanoseconds", () => {
+      // ~1.7e18 ns is far beyond 2^53; BigInt keeps every digit where float
+      // arithmetic is only saved by shortest-round-trip printing today.
+      expect(epochMsToOtlpNanos(1_757_399_999_999)).toBe("1757399999999000000");
+    });
+  });
+
+  describe("given fractional millisecond inputs", () => {
+    it("preserves the sub-millisecond remainder", () => {
+      // Exactly representable at this magnitude; the collector's timestamp
+      // validators accept non-integer milliseconds.
+      expect(epochMsToOtlpNanos(1_757_400_000_000.125)).toBe(
+        "1757400000000125000",
+      );
+      expect(epochMsToOtlpNanos(1_757_400_000_000.375)).toBe(
+        "1757400000000375000",
+      );
+    });
+
+    it("rounds a sub-nanosecond remainder to the nearest nanosecond", () => {
+      // 0.0000006 ms is 0.6 ns and 0.0000004 ms is 0.4 ns. Rounding down the
+      // first (floor) or up the second (ceil) would each break one assertion.
+      expect(epochMsToOtlpNanos(41.0000006)).toBe("41000001");
+      expect(epochMsToOtlpNanos(41.0000004)).toBe("41000000");
+    });
+
+    it("keeps a 0.25ms span from collapsing to zero duration", () => {
+      const start = BigInt(epochMsToOtlpNanos(1_757_400_000_000.125));
+      const end = BigInt(epochMsToOtlpNanos(1_757_400_000_000.375));
+
+      expect(end - start).toBe(250_000n);
+    });
+
+    it("carries a remainder that rounds up into the next millisecond", () => {
+      // At epoch magnitudes a double is spaced 2^-12 ms apart, so a literal
+      // like 1_757_400_000_000.9999999 is stored as exactly 1_757_400_000_001
+      // and never reaches the carry. A small value keeps the 0.9999999 ms
+      // fraction, whose remainder rounds up to a whole millisecond.
+      expect(epochMsToOtlpNanos(41.9999999)).toBe("42000000");
+    });
+  });
+
+  describe("given zero", () => {
+    it("stays zero", () => {
+      expect(epochMsToOtlpNanos(0)).toBe("0");
+    });
+  });
+});
