@@ -32,6 +32,13 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
+vi.mock("../../../behavior/use-all-model-providers-list.ts", () => ({
+  useAllModelProvidersList: () => ({
+    providers: [{ id: "mp_openai", provider: "openai", enabled: true }],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@langwatch/design-system/page-layout", () => ({
   PageLayout: {
     Heading: ({ children }: { children?: ReactNode }) => <h1>{children}</h1>,
@@ -129,7 +136,30 @@ describe("given the LLM Model Costs screen", () => {
       expect(screen.getByText("What each of the 2 models costs per token.")).toBeTruthy();
       expect(screen.getByText("anthropic/claude-sonnet-4-6")).toBeTruthy();
       expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
-      expect(screen.getByText("^openai/gpt-5\\.5$")).toBeTruthy();
+      expect([...document.querySelectorAll("code")].map((cell) => cell.textContent)).toContain(
+        "^openai/gpt-5\\.5$",
+      );
+    });
+  });
+
+  describe("when a model's provider is set up", () => {
+    it("opens that provider's drawer from the model name", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open provider for openai/gpt-5.5" }));
+
+      expect(host.drawerOpens).toEqual([
+        {
+          drawer: "editModelProvider",
+          params: expect.objectContaining({ providerKey: "openai", modelProviderId: "mp_openai" }),
+        },
+      ]);
+    });
+
+    it("leaves a model without a set-up provider as plain code", () => {
+      renderScreen();
+
+      expect(screen.queryByRole("button", { name: /Open provider for anthropic/ })).toBeNull();
     });
   });
 
@@ -232,7 +262,7 @@ describe("given the LLM Model Costs screen", () => {
       regex: "^anthropic/claude-haiku",
     };
     const search = (value: string) =>
-      fireEvent.change(screen.getByRole("searchbox"), { target: { value } });
+      fireEvent.change(screen.getByLabelText("Search model costs"), { target: { value } });
 
     beforeEach(() => {
       mockState.costs = [STORED_ROW, CATALOGUE_ROW, THIRD_ROW];
@@ -247,6 +277,18 @@ describe("given the LLM Model Costs screen", () => {
       expect(screen.getByText("anthropic/claude-haiku-4-5")).toBeTruthy();
       expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
       expect(screen.getByText("Showing 1 of 3 models.")).toBeTruthy();
+    });
+
+    /** @scenario Asking which rule matches a model string narrows the table to those rules */
+    it("keeps only rows whose regex rule matches the typed model string", () => {
+      renderScreen();
+
+      fireEvent.change(screen.getByLabelText("Which rule matches this model?"), {
+        target: { value: "anthropic/claude-haiku-4-5-20260101" },
+      });
+
+      expect(screen.getByText("anthropic/claude-haiku-4-5")).toBeTruthy();
+      expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
     });
 
     /** @scenario The provider filter narrows the table to one provider */

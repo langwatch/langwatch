@@ -1,6 +1,7 @@
 /** Filtering and ordering of the Model Costs table rows. Contract: specs/model-provider.feature. */
 
 import type { LLMModelCostRow } from "./llm-model-cost-row.ts";
+import { ruleVerdict } from "./regex-rule.ts";
 
 export type ModelCostSortKey = "model" | "inputCostPerToken" | "outputCostPerToken";
 export type ModelCostSort = { key: ModelCostSortKey; direction: "asc" | "desc" };
@@ -20,14 +21,18 @@ export function nextSort(args: { current: ModelCostSort | null; key: ModelCostSo
 export function filterAndSortCosts(args: {
   rows: LLMModelCostRow[];
   search: string;
+  /** A model string: keep only rows whose regex rule matches it. */
+  matchModel?: string;
   provider: string;
   customOnly: boolean;
   sort: ModelCostSort | null;
 }): LLMModelCostRow[] {
   const { rows, provider, customOnly, sort } = args;
   const needle = args.search.trim().toLowerCase();
+  const matchModel = args.matchModel?.trim();
   const visible = rows.filter(
     (row) =>
+      (!matchModel || ruleVerdict({ regex: row.regex, model: matchModel }) === "match") &&
       (!needle ||
         row.model.toLowerCase().includes(needle) ||
         row.regex.toLowerCase().includes(needle)) &&
