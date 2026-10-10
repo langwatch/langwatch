@@ -108,7 +108,6 @@ describe("given a member who is not an admin", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       expect(screen.queryByText("Key type")).toBeNull();
-      expect(createButton()).toBeDisabled();
       // Set directly: on a cold, loaded run the drawer's focus trap can land mid-typing and
       // swallow keystrokes, leaving the button disabled. This test pins the payload.
       const nameInput = screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev");
@@ -145,7 +144,8 @@ describe("given a member who is not an admin", () => {
       await chooseExpiration({ user, label: "No expiration" });
       fireEvent.click(screen.getByText("Restricted"));
       expect(await screen.findByTestId("counter")).toHaveTextContent("0");
-      expect(createButton()).toBeDisabled();
+      await user.click(createButton());
+      expect(onCreate).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Pick traces view" }));
       expect(screen.getByTestId("counter")).toHaveTextContent("1");
       await user.click(createButton());
@@ -171,19 +171,21 @@ describe("given a member who is not an admin", () => {
 describe("given a named key with no expiry chosen", () => {
   describe("when the creator has not chosen yet", () => {
     /** @scenario "Create stays unavailable until an expiry is chosen" */
-    it("asks for a choice and keeps Create disabled until one is made", async () => {
+    it("asks for a choice and refuses Create until one is made", async () => {
       const user = userEvent.setup();
-      renderDrawer();
+      const { onCreate } = renderDrawer();
       fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
         target: { value: "CI" },
       });
       expect(screen.getByTestId("api-key-expiration-hint")).toHaveTextContent(
         "Choose when this key expires",
       );
-      expect(createButton()).toBeDisabled();
+      await user.click(createButton());
+      expect(onCreate).not.toHaveBeenCalled();
       await chooseExpiration({ user, label: "No expiration" });
       expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
-      expect(createButton()).toBeEnabled();
+      await user.click(createButton());
+      expect(onCreate).toHaveBeenCalledTimes(1);
     });
   });
 

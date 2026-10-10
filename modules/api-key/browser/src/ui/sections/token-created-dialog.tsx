@@ -222,9 +222,7 @@ export function TokenCreatedDialog({
             <VStack gap={3} align="stretch">
               <HStack gap={4} align="start">
                 <VStack gap={2} align="start" flex={1}>
-                  <Text fontWeight="700" fontSize="sm">
-                    Use in Code
-                  </Text>
+                  <Text textStyle="cardTitle">Use in Code</Text>
                   <HStack
                     gap={1}
                     px={1.5}
@@ -256,9 +254,7 @@ export function TokenCreatedDialog({
                 </VStack>
                 {orgProjects.length > 1 && (
                   <VStack gap={2} align="start" width="200px" flexShrink={0}>
-                    <Text fontWeight="700" fontSize="sm">
-                      Project
-                    </Text>
+                    <Text textStyle="cardTitle">Project</Text>
                     <Select.Root
                       collection={projectCollection}
                       value={activeProjectId ? [activeProjectId] : []}
@@ -299,7 +295,7 @@ export function TokenCreatedDialog({
               {/* Bearer — shellscript-highlighted */}
               {codeTab === "bearer" && newToken && (
                 <VStack gap={1} align="stretch">
-                  <Text fontSize="xs" color="fg.muted">
+                  <Text textStyle="caption" color="fg.muted">
                     Use the <InlineCode>Authorization</InlineCode> header plus{" "}
                     <InlineCode>X-Project-Id</InlineCode>:
                   </Text>
@@ -322,7 +318,7 @@ export function TokenCreatedDialog({
                   instead of going silently blank. */}
               {codeTab === "basic" && (
                 <VStack gap={1} align="stretch">
-                  <Text fontSize="xs" color="fg.muted">
+                  <Text textStyle="caption" color="fg.muted">
                     Encode the project ID and token as{" "}
                     <InlineCode>base64(projectId:token)</InlineCode>:
                   </Text>
@@ -337,7 +333,7 @@ export function TokenCreatedDialog({
                       enableVisibilityToggle
                     />
                   ) : (
-                    <Text fontSize="xs" color="fg.muted">
+                    <Text textStyle="caption" color="fg.muted">
                       Select a project to fill in this header.
                     </Text>
                   )}
@@ -355,9 +351,7 @@ export function TokenCreatedDialog({
 
             {/* ── Section 2: Use with Code Assistants ── */}
             <VStack gap={3} align="stretch">
-              <Text fontWeight="700" fontSize="sm">
-                Use with Code Assistants
-              </Text>
+              <Text textStyle="cardTitle">Use with Code Assistants</Text>
 
               <HStack
                 gap={1}
@@ -403,7 +397,7 @@ export function TokenCreatedDialog({
               {/* Config-file-only assistants: say so, rather than leaving the
                   tab looking broken next to one that offers a command. */}
               {!assistantCommand && newToken && (
-                <Text fontSize="xs" color="fg.muted">
+                <Text textStyle="caption" color="fg.muted">
                   {activeAssistant.label} has no install command: paste the config below into{" "}
                   <Text as="span" fontWeight="semibold" color="fg">
                     {activeAssistant.configPath}
@@ -442,7 +436,7 @@ export function TokenCreatedDialog({
                   </Box>
 
                   <HStack gap={2} flexWrap="wrap" align="center">
-                    <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+                    <Text textStyle="caption" color="fg.muted" flexShrink={0}>
                       Config path:
                     </Text>
                     {CODE_ASSISTANTS.filter((a) => a.configPath).map((ep) => (

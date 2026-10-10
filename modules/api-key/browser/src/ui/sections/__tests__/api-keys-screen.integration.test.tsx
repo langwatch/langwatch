@@ -221,7 +221,7 @@ describe("given the organization has an ingestion key and a regular key", () => 
     /** @scenario The page carries a single title and subtitle */
     it("titles the page once and never gives the regular table a heading of its own", () => {
       renderWithApiKeyHost(<ApiKeysScreen />);
-      expect(screen.getByRole("heading", { name: "API Keys" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "API keys" })).toBeInTheDocument();
       expect(screen.getAllByRole("heading")).toHaveLength(2);
     });
 
@@ -257,8 +257,8 @@ describe("given the organization has an ingestion key and a regular key", () => 
     /** @scenario A key row never renders its secret */
     it("shows a five-character lookup prefix and nothing that could be a token", () => {
       renderWithApiKeyHost(<ApiKeysScreen />);
-      expect(screen.getByText("sk-lw-ab12c…")).toBeInTheDocument();
-      expect(screen.getByText("ik-lw-zz99y…")).toBeInTheDocument();
+      expect(screen.getByTitle("sk-lw-ab12c…")).toBeInTheDocument();
+      expect(screen.getByTitle("ik-lw-zz99y…")).toBeInTheDocument();
     });
   });
 });
@@ -409,7 +409,7 @@ describe("given the project still has a legacy key", () => {
       const banner = screen.getByTestId("legacy-project-key-banner");
       expect(banner).toHaveTextContent("Legacy project keys are going away");
       expect(banner).toHaveTextContent("Use personal access tokens instead.");
-      expect(within(banner).queryByRole("button")).toBeNull();
+      expect(within(banner).getByRole("button", { name: "Create an API key" })).toBeInTheDocument();
     });
 
     it("shows no banner once the legacy key is gone", () => {

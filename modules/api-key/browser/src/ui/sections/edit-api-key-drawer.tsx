@@ -13,9 +13,10 @@ import {
 } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Input, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
+import { SettingsField } from "@langwatch/design-system/settings-field";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -261,7 +262,7 @@ export function EditApiKeyDrawer({
         if (!open) onClose();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <Drawer.Title>Edit API key</Drawer.Title>
           <Drawer.CloseTrigger />
@@ -275,21 +276,12 @@ export function EditApiKeyDrawer({
               </StatusCard>
             )}
             {/* Name */}
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Name
-              </Text>
+            <SettingsField label="Name">
               <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </VStack>
+            </SettingsField>
 
             {/* Description */}
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Description{" "}
-                <Text as="span" color="fg.muted" fontWeight="400">
-                  (optional)
-                </Text>
-              </Text>
+            <SettingsField label="Description (optional)">
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -297,13 +289,10 @@ export function EditApiKeyDrawer({
                 rows={3}
                 resize="vertical"
               />
-            </VStack>
+            </SettingsField>
 
             {/* Scope */}
-            <VStack gap={1.5} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Scope
-              </Text>
+            <SettingsField label="Scope">
               <ScopeChipPicker
                 value={selectedScopes}
                 onChange={(next) => {
@@ -320,59 +309,65 @@ export function EditApiKeyDrawer({
                 currentTeamId={currentTeamId}
                 currentProjectId={currentProjectId}
               />
-            </VStack>
+            </SettingsField>
 
             {/* Permissions */}
-            <VStack gap={2} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Permissions
-              </Text>
-              <HStack justify="space-between" width="full">
-                <SegmentGroup.Root
-                  size="sm"
-                  value={permissionMode}
-                  onValueChange={(e) => handlePermissionModeChange(e.value as "all" | "restricted")}
-                >
-                  <SegmentGroup.Indicator />
-                  <SegmentGroup.Item value="all">
-                    <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
-                  <SegmentGroup.Item value="restricted">
-                    <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
-                </SegmentGroup.Root>
-                {permissionMode === "restricted" && (
-                  <PermissionCounter
-                    count={
-                      Object.values(effectiveCategorySelections).filter((v) => v && v !== "none")
-                        .length
+            <SettingsField label="Permissions">
+              <VStack gap={2} align="start" width="full">
+                <HStack justify="space-between" width="full">
+                  <SegmentGroup.Root
+                    size="sm"
+                    value={permissionMode}
+                    onValueChange={(e) =>
+                      handlePermissionModeChange(e.value as "all" | "restricted")
                     }
+                  >
+                    <SegmentGroup.Indicator />
+                    <SegmentGroup.Item value="all">
+                      <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
+                      <SegmentGroup.ItemHiddenInput />
+                    </SegmentGroup.Item>
+                    <SegmentGroup.Item value="restricted">
+                      <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
+                      <SegmentGroup.ItemHiddenInput />
+                    </SegmentGroup.Item>
+                  </SegmentGroup.Root>
+                  {permissionMode === "restricted" && (
+                    <PermissionCounter
+                      count={
+                        Object.values(effectiveCategorySelections).filter((v) => v && v !== "none")
+                          .length
+                      }
+                    />
+                  )}
+                </HStack>
+
+                {permissionMode === "restricted" && (
+                  <PermissionCategoryList
+                    selections={effectiveCategorySelections}
+                    userPermissions={userPermissions}
+                    onChange={setCategorySelections}
                   />
                 )}
-              </HStack>
-
-              {permissionMode === "restricted" && (
-                <PermissionCategoryList
-                  selections={effectiveCategorySelections}
-                  userPermissions={userPermissions}
-                  onChange={setCategorySelections}
-                />
-              )}
-            </VStack>
+              </VStack>
+            </SettingsField>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full" justify="end" gap={2}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorPalette="orange" variant="solid" onClick={handleSave} disabled={!canSave}>
+        <Drawer.Actions
+          onCancel={onClose}
+          busy={isUpdating}
+          primary={
+            <Button
+              colorPalette="orange"
+              variant="solid"
+              onClick={handleSave}
+              loading={isUpdating}
+              disabled={!canSave}
+            >
               Save
             </Button>
-          </HStack>
-        </Drawer.Footer>
+          }
+        />
       </Drawer.Content>
     </Drawer.Root>
   );
