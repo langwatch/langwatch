@@ -35,8 +35,10 @@ same way, so it counts the rows the widget counts.
 Only the tRPC `analytics.lwql.query` door accepts the field. `POST /api/v1/query` still runs
 what it is sent. The Dashboards board composes the context it runs every query with in one place
 (`BoardQueryContext`, read by `useBoardPeriod`) and sets `excludeOrigins` to `["langy"]` by
-default. The built-in Source parameter planned for the board header shows that default and sets
-the list; until it lands the default is not visible on the board.
+default. In a personal project the default is the empty list: Langy's conversations are the data
+there (owner, 2026-10-10; `defaultBoardExcludedOrigins`, dashboards-v2 AC198). The built-in
+Source parameter planned for the board header shows that default and sets the list; until it
+lands the default is not visible on the board.
 
 ## Rationale / Trade-offs
 

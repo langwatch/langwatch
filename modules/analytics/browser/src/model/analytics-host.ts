@@ -19,6 +19,8 @@ export type AnalyticsHostProject = {
   hasFirstMessage: boolean;
   /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
   kind?: string;
+  /** Whether it is a person's own project, where Langy's conversations are the data. */
+  isPersonal?: boolean;
 };
 
 /** The path parameters and query string a screen was opened with. */

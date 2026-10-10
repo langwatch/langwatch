@@ -10,6 +10,7 @@ import {
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
+  defaultBoardExcludedOrigins,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -71,5 +72,21 @@ describe("fitGranularity", () => {
     expect(boardPeriodGranularity({ grain: "1d", periodStart: 0, periodEnd: thirtyYears })).toBe(
       WEEK_S,
     );
+  });
+});
+
+describe("defaultBoardExcludedOrigins", () => {
+  describe("given a project that holds the member's agent", () => {
+    /** @scenario "AC193 Langy: the origins a board leaves out are a list a board parameter can set later" */
+    it("leaves out Langy's conversations", () => {
+      expect(defaultBoardExcludedOrigins({ isPersonalProject: false })).toEqual(["langy"]);
+    });
+  });
+
+  describe("given a personal project", () => {
+    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
+    it("leaves out no origin", () => {
+      expect(defaultBoardExcludedOrigins({ isPersonalProject: true })).toEqual([]);
+    });
   });
 });

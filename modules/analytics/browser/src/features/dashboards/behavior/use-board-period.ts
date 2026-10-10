@@ -15,7 +15,7 @@ import {
   boardPeriodGranularity,
   type BoardPeriodGrain,
   type BoardPeriodRange,
-  DEFAULT_BOARD_EXCLUDED_ORIGINS,
+  defaultBoardExcludedOrigins,
   parseBoardPeriodGrain,
   parseBoardPeriodRange,
 } from "../model/board-period.ts";
@@ -25,6 +25,7 @@ export function useBoardPeriod() {
   const query = host.route().query;
   const range = parseBoardPeriodRange(query.range);
   const grain = parseBoardPeriodGrain(query.grain);
+  const isPersonalProject = host.project()?.isPersonal === true;
 
   // Fixed per range change so widgets do not refetch on each render; Live moves on each minute.
   const liveEnd =
@@ -38,9 +39,9 @@ export function useBoardPeriod() {
       periodStart,
       periodEnd,
       granularitySeconds: boardPeriodGranularity({ grain, periodStart, periodEnd }),
-      excludeOrigins: DEFAULT_BOARD_EXCLUDED_ORIGINS,
+      excludeOrigins: defaultBoardExcludedOrigins({ isPersonalProject }),
     }),
-    [grain, periodStart, periodEnd],
+    [grain, periodStart, periodEnd, isPersonalProject],
   );
 
   return {

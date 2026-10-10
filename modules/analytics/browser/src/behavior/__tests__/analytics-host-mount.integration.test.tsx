@@ -22,11 +22,16 @@ import { describe, expect, it, vi } from "vitest";
 const PROJECT = { id: "proj-1", slug: "local-dev-project", name: "Local Dev Project" };
 
 const firstMessage = vi.fn((): { data?: { firstMessage: boolean } } => ({}));
+const scopeGraph = vi.fn((): { data?: AnalyticsScopeGraph } => ({}));
 vi.mock("../analytics-api.ts", () => ({
-  analyticsApi: { project: { getHasFirstMessage: { useQuery: () => firstMessage() } } },
+  analyticsApi: {
+    project: { getHasFirstMessage: { useQuery: () => firstMessage() } },
+    organization: { getScopeGraph: { useQuery: () => scopeGraph() } },
+  },
 }));
 
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import type { AnalyticsScopeGraph } from "../../model/analytics-personal-project.ts";
 import AnalyticsHostMount from "../analytics-host-mount.tsx";
 
 class TestScope extends UiScope {
@@ -81,6 +86,12 @@ function Harness({ children }: { children: ReactNode }) {
 function FirstMessageReader() {
   const project = useAnalyticsHost().project();
   return <span data-testid="first-message">{String(project?.hasFirstMessage)}</span>;
+}
+
+/** Stands in for a board: it reads only whether the project is a person's own. */
+function PersonalProjectReader() {
+  const project = useAnalyticsHost().project();
+  return <span data-testid="personal">{String(project?.isPersonal)}</span>;
 }
 
 /** Stands in for the Dashboards gate and the Langy entry points: each reads one flag. */
@@ -153,6 +164,23 @@ describe("given the analytics host mounted over the project in scope", () => {
       render(<FirstMessageReader />, { wrapper: Harness });
 
       expect(screen.getByTestId("first-message")).toHaveTextContent("true");
+    });
+  });
+
+  describe("when the scope graph holds the project in a personal workspace", () => {
+    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
+    it.each([
+      { workspace: "a personal workspace", isPersonal: true },
+      { workspace: "a team", isPersonal: false },
+    ])("reports $isPersonal for the project of $workspace", ({ isPersonal }) => {
+      firstMessage.mockReturnValue({});
+      scopeGraph.mockReturnValue({
+        data: [{ teams: [{ isPersonal, projects: [{ id: PROJECT.id }] }] }],
+      });
+
+      render(<PersonalProjectReader />, { wrapper: Harness });
+
+      expect(screen.getByTestId("personal")).toHaveTextContent(String(isPersonal));
     });
   });
 });
