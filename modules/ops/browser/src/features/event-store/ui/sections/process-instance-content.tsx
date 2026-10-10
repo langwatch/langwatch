@@ -36,7 +36,7 @@ function InstanceStatusRow({ detail, now }: { detail: ProcessInstanceDetail; now
   return (
     <SummaryList>
       <SummaryListItem label="Revision">
-        <Text textStyle="sm" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {detail.revision}
         </Text>
       </SummaryListItem>

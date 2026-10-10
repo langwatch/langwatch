@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { LatencyWindowPercentiles, LatencyWindows } from "@langwatch/ops-contract";
@@ -20,9 +21,7 @@ function PercentileCell({
 }) {
   return (
     <Table.Cell textAlign="end">
-      <Text textStyle="xs" fontFamily="mono" color={window ? undefined : "fg.muted"}>
-        {window ? formatMs(pick(window)) : "—"}
-      </Text>
+      <InlineCode variant="neutral">{window ? formatMs(pick(window)) : "—"}</InlineCode>
     </Table.Cell>
   );
 }

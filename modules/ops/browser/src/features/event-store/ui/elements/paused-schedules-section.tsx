@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
@@ -63,14 +64,10 @@ export function PausedSchedulesSection({
               <Table.Row key={schedule.id} data-testid="paused-schedule-row">
                 <Table.Cell>{schedule.targetType}</Table.Cell>
                 <Table.Cell>
-                  <Text fontFamily="mono" textStyle="xs">
-                    {schedule.targetId}
-                  </Text>
+                  <InlineCode variant="neutral">{schedule.targetId}</InlineCode>
                 </Table.Cell>
                 <Table.Cell color="fg.muted">
-                  <Text fontFamily="mono" textStyle="xs">
-                    {schedule.cron}
-                  </Text>
+                  <InlineCode variant="neutral">{schedule.cron}</InlineCode>
                 </Table.Cell>
               </Table.Row>
             ))}

@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
@@ -215,9 +216,7 @@ export function DlqRow({
         </Badge>
       </Table.Cell>
       <Table.Cell height="49px">
-        <Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">
-          {group.groupId}
-        </Text>
+        <InlineCode variant="neutral">{group.groupId}</InlineCode>
       </Table.Cell>
       <Table.Cell height="49px">
         <Text textStyle="xs" color="fg.muted">

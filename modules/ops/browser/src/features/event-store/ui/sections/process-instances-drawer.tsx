@@ -1,6 +1,8 @@
 import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { IdText } from "@langwatch/design-system/id-text";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -40,9 +42,7 @@ function InstanceRow({
     >
       {showProcess && (
         <Table.Cell>
-          <Text textStyle="xs" fontFamily="mono">
-            {row.processName}
-          </Text>
+          <InlineCode variant="neutral">{row.processName}</InlineCode>
         </Table.Cell>
       )}
       <Table.Cell>
@@ -59,12 +59,10 @@ function InstanceRow({
         </Button>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" color="fg.muted" fontFamily="mono" title={row.projectId}>
-          {middleEllipsis(row.projectId, 24)}
-        </Text>
+        <IdText value={row.projectId} label="ID" />
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {row.revision}
         </Text>
       </Table.Cell>
@@ -83,12 +81,16 @@ function InstanceRow({
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {row.pendingMessages}
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={row.deadMessages > 0 ? "red.fg" : "fg.muted"}>
+        <Text
+          textStyle="caption"
+          fontVariantNumeric="tabular-nums"
+          color={row.deadMessages > 0 ? "red.fg" : "fg.muted"}
+        >
           {row.deadMessages}
         </Text>
       </Table.Cell>

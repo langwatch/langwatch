@@ -1,3 +1,4 @@
+import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { OpsScheduledJob, ProcessWakeRow } from "@langwatch/ops-contract";
@@ -51,9 +52,7 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
         </Badge>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono" title={row.what}>
-          {middleEllipsis(row.what, 44)}
-        </Text>
+        <IdText value={row.what} label="ID" />
       </Table.Cell>
       <Table.Cell>
         <Text textStyle="xs" color="fg.muted" title={row.where}>

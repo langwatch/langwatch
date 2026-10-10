@@ -1,3 +1,4 @@
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Table, Text, VStack } from "@langwatch/design-system/primitives";
@@ -177,7 +178,9 @@ function UsageCell({ instance }: { instance: SelfHostedInstance }) {
   if (traces === null && activeUsers === null) return <EmptyCell />;
   return (
     <VStack align="start" gap={0}>
-      <Text>{(traces ?? 0).toLocaleString()} traces</Text>
+      <Text>
+        <FormattedNumber value={traces ?? 0} /> traces
+      </Text>
       <Text fontSize="xs" color="fg.muted">
         {activeUsers ?? 0} active users
       </Text>

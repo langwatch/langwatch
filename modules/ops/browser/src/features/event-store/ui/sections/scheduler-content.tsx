@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, HStack, Table, Text } from "@langwatch/design-system/primitives";
@@ -125,9 +126,7 @@ function ScheduleRow({
         </HStack>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {job.cron}
-        </Text>
+        <InlineCode variant="neutral">{job.cron}</InlineCode>
         <Text textStyle="xs" color="fg.muted">
           {job.timezone}
         </Text>

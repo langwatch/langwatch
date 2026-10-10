@@ -206,7 +206,7 @@ function CustomTooltip({
             <Box width="6px" height="6px" borderRadius="full" bg={entry.color} />
             <Text textStyle="xs">{entry.name}</Text>
           </HStack>
-          <Text textStyle="xs" fontFamily="mono" fontWeight="medium">
+          <Text textStyle="caption" fontVariantNumeric="tabular-nums" fontWeight="medium">
             {entry.value.toFixed(1)}/s
           </Text>
         </HStack>
@@ -220,7 +220,7 @@ function CustomTooltip({
                 <Box width="6px" height="2px" bg={entry.color} />
                 <Text textStyle="xs">{entry.name}</Text>
               </HStack>
-              <Text textStyle="xs" fontFamily="mono">
+              <Text textStyle="caption" fontVariantNumeric="tabular-nums">
                 {entry.value.toLocaleString()}
               </Text>
             </HStack>

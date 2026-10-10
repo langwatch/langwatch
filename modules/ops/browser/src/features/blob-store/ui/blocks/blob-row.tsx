@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Button, Table, Text } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
@@ -20,14 +21,10 @@ export function BlobRow({
   return (
     <Table.Row>
       <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {blob.projectId}
-        </Text>
+        <InlineCode variant="neutral">{blob.projectId}</InlineCode>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {blob.hash}
-        </Text>
+        <InlineCode variant="neutral">{blob.hash}</InlineCode>
       </Table.Cell>
       <Table.Cell>{formatBytes(blob.sizeBytes)}</Table.Cell>
       <Table.Cell>{formatTtl(blob.ttlSeconds)}</Table.Cell>

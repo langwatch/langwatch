@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
@@ -20,9 +21,7 @@ export function EventDetail({
               <Text textStyle="xs" color="fg.muted">
                 Event ID
               </Text>
-              <Text textStyle="xs" fontFamily="mono">
-                {event.eventId}
-              </Text>
+              <InlineCode variant="neutral">{event.eventId}</InlineCode>
             </VStack>
             <VStack align="start" gap={0}>
               <Text textStyle="xs" color="fg.muted">
@@ -36,9 +35,7 @@ export function EventDetail({
               <Text textStyle="xs" color="fg.muted">
                 Timestamp
               </Text>
-              <Text textStyle="xs" fontFamily="mono">
-                {formatTimestamp(event.eventTimestamp)}
-              </Text>
+              <InlineCode variant="neutral">{formatTimestamp(event.eventTimestamp)}</InlineCode>
             </VStack>
           </HStack>
         </VStack>

@@ -1,4 +1,5 @@
 import type { WireOf } from "@langwatch/api/web";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
@@ -53,12 +54,10 @@ function MessageHeaderRow({
 }) {
   return (
     <HStack gap={2}>
-      <Text textStyle="xs" fontFamily="mono" truncate title={message.messageKey}>
-        {message.intentType}
-      </Text>
+      <InlineCode variant="neutral">{message.intentType}</InlineCode>
       <StatusBadge status={message.status} />
       {message.attempts > 0 && (
-        <Text textStyle="xs" color="orange.fg" fontFamily="mono">
+        <Text textStyle="caption" color="orange.fg">
           {message.attempts} attempts
         </Text>
       )}

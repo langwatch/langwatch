@@ -1,7 +1,9 @@
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Badge, Card, HStack, Status, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
-import { readableDate } from "@langwatch/time";
 import { ArrowRight } from "lucide-react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -80,21 +82,22 @@ export function ReplayHistoryTable() {
                       <Text textStyle="xs">{formatDuration(run.startedAt, run.completedAt)}</Text>
                     </Table.Cell>
                     <Table.Cell textAlign="end">
-                      <Text textStyle="xs">{(run.aggregatesProcessed ?? 0).toLocaleString()}</Text>
+                      <Text textStyle="xs">
+                        <FormattedNumber value={run.aggregatesProcessed ?? 0} />
+                      </Text>
                     </Table.Cell>
                     <Table.Cell textAlign="end">
-                      <Text textStyle="xs">{(run.eventsProcessed ?? 0).toLocaleString()}</Text>
+                      <Text textStyle="xs">
+                        <FormattedNumber value={run.eventsProcessed ?? 0} />
+                      </Text>
                     </Table.Cell>
                     <Table.Cell>
                       <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
-                        {run.startedAt
-                          ? readableDate(run.startedAt).toLocaleString([], {
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "\u2014"}
+                        {run.startedAt ? (
+                          <FormattedDate value={run.startedAt} display="datetime" />
+                        ) : (
+                          <EmptyValue />
+                        )}
                       </Text>
                     </Table.Cell>
                     <Table.Cell>

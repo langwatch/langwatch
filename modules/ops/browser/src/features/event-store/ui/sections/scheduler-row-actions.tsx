@@ -1,6 +1,7 @@
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { RawMenu as Menu } from "@langwatch/design-system/menu";
-import { IconButton, Portal, Text } from "@langwatch/design-system/primitives";
+import { IconButton, Portal } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 
@@ -191,11 +192,7 @@ function SchedulerConfirmations({
 
 /** The identifier, shown where it can be compared rather than read as prose. */
 function TargetIdentity({ targetId }: { targetId: string }) {
-  return (
-    <Text textStyle="xs" fontFamily="mono" color="fg.muted" marginTop={2} wordBreak="break-all">
-      {targetId}
-    </Text>
-  );
+  return <InlineCode variant="neutral">{targetId}</InlineCode>;
 }
 
 /** Confirms by typed project name (irreversible, affects customers). Typing is the

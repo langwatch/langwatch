@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
@@ -339,7 +340,7 @@ function PausedTenantsBanner({
       </Text>
       {tenants.map((tid) => (
         <HStack key={tid} gap={1}>
-          <Badge size="xs" colorPalette="yellow" variant="solid" fontFamily="mono">
+          <Badge size="xs" colorPalette="yellow" variant="solid">
             {tid}
           </Badge>
           <Button
@@ -388,7 +389,7 @@ function TenantActionBar({
       <Text textStyle="xs" fontWeight="medium">
         Tenant actions:
       </Text>
-      <Badge size="xs" variant="subtle" fontFamily="mono">
+      <Badge size="xs" variant="subtle">
         {tenantId}
       </Badge>
       {isPaused ? (
@@ -456,9 +457,7 @@ function GroupRow({
       onClick={() => onOpen(group)}
     >
       <Table.Cell height="49px">
-        <Text textStyle="xs" fontFamily="mono" truncate title={group.groupId}>
-          {group.groupId}
-        </Text>
+        <InlineCode variant="neutral">{group.groupId}</InlineCode>
       </Table.Cell>
       <Table.Cell height="49px">
         <Text textStyle="xs" color="fg.muted" truncate>
@@ -466,12 +465,16 @@ function GroupRow({
         </Text>
       </Table.Cell>
       <Table.Cell height="49px" textAlign="end">
-        <Text textStyle="xs" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {group.pendingJobs}
         </Text>
       </Table.Cell>
       <Table.Cell height="49px" textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={c.attempt > 0 ? "orange.fg" : "fg.muted"}>
+        <Text
+          textStyle="caption"
+          fontVariantNumeric="tabular-nums"
+          color={c.attempt > 0 ? "orange.fg" : "fg.muted"}
+        >
           {c.attempt > 0 ? c.attempt : "—"}
         </Text>
       </Table.Cell>

@@ -1,8 +1,8 @@
+import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
 const ACTION_LABELS: Record<string, string> = {
   process_wake_now: "Wake now",
@@ -43,9 +43,7 @@ export function ProcessRecentActions({ rows, now }: { rows: ProcessAction[]; now
                     <Text textStyle="xs">{ACTION_LABELS[row.action] ?? row.action}</Text>
                   </Table.Cell>
                   <Table.Cell>
-                    <Text textStyle="xs" fontFamily="mono" color="fg.muted" title={row.targetId}>
-                      {middleEllipsis(row.targetId, 64)}
-                    </Text>
+                    <IdText value={row.targetId} label="ID" />
                   </Table.Cell>
                 </Table.Row>
               ))}

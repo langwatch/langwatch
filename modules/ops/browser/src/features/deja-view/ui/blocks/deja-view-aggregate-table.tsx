@@ -42,17 +42,13 @@ export function AggregateTable({
                 onClick={() => onSelect(agg.aggregateId, agg.tenantId)}
               >
                 <Table.Cell>
-                  <Text textStyle="xs" fontFamily="mono">
-                    {agg.aggregateId}
-                  </Text>
+                  <InlineCode variant="neutral">{agg.aggregateId}</InlineCode>
                 </Table.Cell>
                 <Table.Cell>
                   <InlineCode>{agg.aggregateType}</InlineCode>
                 </Table.Cell>
                 <Table.Cell>
-                  <Text textStyle="xs" fontFamily="mono" color="fg.muted">
-                    {agg.tenantId}
-                  </Text>
+                  <InlineCode variant="neutral">{agg.tenantId}</InlineCode>
                 </Table.Cell>
                 <Table.Cell textAlign="end">
                   <Text textStyle="sm" fontWeight="medium">

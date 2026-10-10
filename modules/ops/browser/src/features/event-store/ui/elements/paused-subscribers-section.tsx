@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
@@ -50,9 +51,7 @@ export function PausedSubscribersSection({
             {pausedKeys.map((key) => (
               <Table.Row key={key} data-testid="paused-subscriber-row">
                 <Table.Cell>
-                  <Text fontFamily="mono" textStyle="xs">
-                    {key}
-                  </Text>
+                  <InlineCode variant="neutral">{key}</InlineCode>
                 </Table.Cell>
               </Table.Row>
             ))}

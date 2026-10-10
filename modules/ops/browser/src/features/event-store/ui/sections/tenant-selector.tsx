@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Button,
@@ -93,9 +94,7 @@ export function TenantSelector({
                     <Text textStyle="xs" fontWeight="medium">
                       {tenant.name}
                     </Text>
-                    <Text textStyle="xs" color="fg.muted" fontFamily="mono">
-                      {tenant.id}
-                    </Text>
+                    <InlineCode variant="neutral">{tenant.id}</InlineCode>
                     {tenantIds.includes(tenant.id) && (
                       <Badge size="sm" colorPalette="green">
                         added

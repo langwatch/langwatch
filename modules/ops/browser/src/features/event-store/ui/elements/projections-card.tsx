@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
@@ -9,9 +10,7 @@ function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
   return (
     <Table.Row bg={row.blocked > 0 ? "red.subtle" : undefined}>
       <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {row.projectionName}
-        </Text>
+        <InlineCode variant="neutral">{row.projectionName}</InlineCode>
       </Table.Cell>
       <Table.Cell>
         <Text textStyle="xs" color="fg.muted">
@@ -24,17 +23,21 @@ function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
         </Badge>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {row.pending}
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {row.active}
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={row.blocked > 0 ? "fg.error" : "fg.muted"}>
+        <Text
+          textStyle="caption"
+          fontVariantNumeric="tabular-nums"
+          color={row.blocked > 0 ? "fg.error" : "fg.muted"}
+        >
           {row.blocked}
         </Text>
       </Table.Cell>

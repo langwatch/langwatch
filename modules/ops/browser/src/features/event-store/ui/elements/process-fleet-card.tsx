@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
@@ -19,8 +20,8 @@ function CountCell({ value, color }: { value: number; color?: string }) {
   return (
     <Table.Cell textAlign="end">
       <Text
-        textStyle="xs"
-        fontFamily="mono"
+        textStyle="caption"
+        fontVariantNumeric="tabular-nums"
         color={value > 0 ? color : "fg.muted"}
         fontWeight={value > 0 && color ? "medium" : undefined}
       >
@@ -53,9 +54,7 @@ function FleetRow({
     >
       <Table.Cell>
         <HStack gap={1.5}>
-          <Text textStyle="xs" fontFamily="mono" whiteSpace="nowrap" title={row.processName}>
-            {row.processName}
-          </Text>
+          <InlineCode variant="neutral">{row.processName}</InlineCode>
           {row.scheduled && (
             <Badge size="xs" variant="subtle" colorPalette="gray">
               scheduled

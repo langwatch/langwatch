@@ -87,9 +87,7 @@ function EmittedCommands({ outbox }: { outbox: DejaViewProcessManagerOutboxMessa
       <VStack align="stretch" gap={1}>
         {outbox.map((msg) => (
           <HStack key={msg.messageKey} gap={2}>
-            <Text textStyle="xs" fontFamily="mono" truncate>
-              {msg.intentType}
-            </Text>
+            <InlineCode variant="neutral">{msg.intentType}</InlineCode>
             <Spacer />
             {msg.attempts > 0 && (
               <Text textStyle="2xs" color="fg.muted">

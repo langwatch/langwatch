@@ -1,5 +1,6 @@
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Badge, Box, Card, HStack, Text } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -55,14 +56,11 @@ export function ReplayHistorySection({
                 {formatDuration(latestEntry.startedAt, latestEntry.completedAt)}
               </Text>
               <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
-                {latestEntry.completedAt
-                  ? readableDate(latestEntry.completedAt).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—"}
+                {latestEntry.completedAt ? (
+                  <FormattedDate value={latestEntry.completedAt} display="datetime" />
+                ) : (
+                  <EmptyValue />
+                )}
               </Text>
             </HStack>,
           )

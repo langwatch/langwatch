@@ -1,3 +1,5 @@
+import { IdText } from "@langwatch/design-system/id-text";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
@@ -43,9 +45,7 @@ function ContextRow({
           </a>
         </Text>
       ) : (
-        <Text textStyle="xs" fontFamily="mono" title={value}>
-          {middleEllipsis(value, 40)}
-        </Text>
+        <IdText value={value} label="ID" />
       )}
     </HStack>
   );
@@ -64,9 +64,7 @@ function JobHeaderRow({
 }) {
   return (
     <HStack gap={2}>
-      <Text textStyle="xs" fontFamily="mono" truncate title={job.jobId} flexShrink={1}>
-        {job.jobId}
-      </Text>
+      <InlineCode variant="neutral">{job.jobId}</InlineCode>
       <Spacer />
       {job.payloadBytes !== null && (
         <Text textStyle="xs" color="fg.muted" flexShrink={0}>
@@ -99,7 +97,7 @@ function JobChipsRow({ job }: { job: JobEntry }) {
         </Badge>
       )}
       {kind.jobName && (
-        <Badge size="xs" variant="subtle" fontFamily="mono">
+        <Badge size="xs" variant="subtle">
           {kind.jobName}
         </Badge>
       )}

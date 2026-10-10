@@ -1,3 +1,4 @@
+import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Box,
@@ -13,7 +14,6 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { formatCount, formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
 export type ParkedGroupsRender = (
   tenant: Pick<ParkedTenant, "tenantId" | "queueName">,
@@ -126,9 +126,7 @@ function ParkedTenantRow({
           </IconButton>
         </Table.Cell>
         <Table.Cell>
-          <Text fontFamily="mono" textStyle="xs" title={tenantId}>
-            {middleEllipsis(tenantId, 32)}
-          </Text>
+          <IdText value={tenantId} label="ID" />
         </Table.Cell>
         <Table.Cell color="fg.muted">{queueName}</Table.Cell>
         <Table.Cell>

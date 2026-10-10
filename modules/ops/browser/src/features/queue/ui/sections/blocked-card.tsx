@@ -222,7 +222,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
                           </Text>
                         </Table.Cell>
                         <Table.Cell height="49px">
-                          <Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">
+                          <Text textStyle="monoSm" truncate maxWidth="160px">
                             {cluster.sampleGroupIds.slice(0, 2).join(", ")}
                             {cluster.sampleGroupIds.length > 2
                               ? ` +${cluster.sampleGroupIds.length - 2}`

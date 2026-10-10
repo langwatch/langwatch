@@ -1,3 +1,5 @@
+import { IdText } from "@langwatch/design-system/id-text";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Box,
   Button,
@@ -10,7 +12,6 @@ import {
 import { RotateCcw, XCircle } from "lucide-react";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import {
   type DeadLetterAttemptHistoryRenderer,
@@ -62,20 +63,16 @@ export function DeadLetterRow({
           </chakra.button>
         </Table.Cell>
         <Table.Cell>
-          <Text textStyle="xs" fontFamily="mono">
-            {message.intentType}
-          </Text>
+          <InlineCode variant="neutral">{message.intentType}</InlineCode>
         </Table.Cell>
         <Table.Cell>
           {/* Elided in the MIDDLE: both ends of a key carry information, and a
               right-truncated ksuid is indistinguishable from every other one
               sharing its prefix. */}
-          <Text textStyle="xs" fontFamily="mono" color="fg.muted">
-            {middleEllipsis(message.processKey, 32)}
-          </Text>
+          <IdText value={message.processKey} label="ID" />
         </Table.Cell>
         <Table.Cell textAlign="end">
-          <Text textStyle="xs" fontFamily="mono">
+          <Text textStyle="caption" fontVariantNumeric="tabular-nums">
             {message.attempts}
           </Text>
         </Table.Cell>
@@ -148,9 +145,7 @@ function Labelled({ label, value }: { label: string; value: string }) {
       <Text textStyle="2xs" color="fg.muted">
         {label}
       </Text>
-      <Text textStyle="xs" fontFamily="mono">
-        {value}
-      </Text>
+      <InlineCode variant="neutral">{value}</InlineCode>
     </Box>
   );
 }

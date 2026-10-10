@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Badge, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
@@ -34,9 +35,7 @@ export function ReplayHeader({
         <Text textStyle="xs" color="fg.muted">
           Aggregate:
         </Text>
-        <Text textStyle="xs" fontFamily="mono" fontWeight="medium">
-          {aggregateId}
-        </Text>
+        <InlineCode variant="neutral">{aggregateId}</InlineCode>
       </HStack>
       <Box height="20px" width="1px" bg="border" />
       <HStack gap={2}>

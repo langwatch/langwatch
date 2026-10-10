@@ -1,3 +1,5 @@
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
@@ -79,9 +81,7 @@ export function AnomaliesCard() {
               {anomalies.map((a) => (
                 <Table.Row key={`${a.kind}:${a.tenantId}`}>
                   <Table.Cell>
-                    <Text fontFamily="mono" textStyle="xs">
-                      {a.tenantId}
-                    </Text>
+                    <InlineCode variant="neutral">{a.tenantId}</InlineCode>
                   </Table.Cell>
                   <Table.Cell>{a.kind.replace("_", " ")}</Table.Cell>
                   <Table.Cell>
@@ -89,8 +89,14 @@ export function AnomaliesCard() {
                       {a.tier}
                     </Badge>
                   </Table.Cell>
-                  <Table.Cell>{a.currentRate.toLocaleString()}/min</Table.Cell>
-                  <Table.Cell>{a.baseline.toLocaleString()}/min</Table.Cell>
+                  <Table.Cell>
+                    <FormattedNumber value={a.currentRate} />
+                    /min
+                  </Table.Cell>
+                  <Table.Cell>
+                    <FormattedNumber value={a.baseline} />
+                    /min
+                  </Table.Cell>
                   <Table.Cell>
                     <Text textStyle="xs">{formatAge(a.triggeredAt)}</Text>
                   </Table.Cell>
