@@ -513,28 +513,28 @@ export const designSystemConfig = defineConfig({
         bg: {
           // Page/sidebar background
           page: {
-            value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.950}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.950}" },
           },
           // Four levels: page, card, nested group, then a small control.
           card: {
             value: {
               _light: "white",
-              _dark: "color-mix(in srgb, {colors.zinc.750} 35%, {colors.zinc.800})",
+              _dark: "color-mix(in srgb, {colors.gray.800} 80%, {colors.gray.700})",
             },
           },
           nested: {
             value: {
               _light: "{colors.gray.100}",
-              _dark: "color-mix(in srgb, {colors.zinc.600} 50%, {colors.zinc.700})",
+              _dark: "color-mix(in srgb, {colors.gray.700} 60%, {colors.gray.600})",
             },
           },
           control: {
             value: {
               _light: "{colors.gray.200}",
-              _dark: "color-mix(in srgb, {colors.zinc.500} 50%, {colors.zinc.600})",
+              _dark: "color-mix(in srgb, {colors.gray.600} 50%, {colors.gray.500})",
             },
           },
-          surface: { value: { _light: "{colors.bg.page}", _dark: "{colors.bg.page}" } },
+          surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
           panel: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
           raised: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
           muted: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
@@ -544,7 +544,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.850}" },
           },
           emphasized: { value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" } },
-          subtle: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
+          subtle: { value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.900}" } },
           softHover: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
           input: { value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" } },
           inputHover: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
