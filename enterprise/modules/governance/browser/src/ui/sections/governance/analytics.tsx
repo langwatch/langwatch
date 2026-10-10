@@ -1,7 +1,8 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
-  Box,
+  Card,
   Button,
   createListCollection,
   Field,
@@ -13,7 +14,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
-import { useMemo, useState } from "react";
+import { ChartNoAxesCombined, LayoutDashboard } from "lucide-react";
+import { useState } from "react";
 
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import {
@@ -72,20 +74,17 @@ function AnalyticsPage() {
             query; running it is coming.
           </Text>
 
-          <Tabs.Root defaultValue="explore" variant="line" lazyMount unmountOnExit>
+          <Tabs.Root
+            defaultValue="explore"
+            variant="line"
+            colorPalette="accent"
+            size="sm"
+            lazyMount
+            unmountOnExit
+          >
             <Tabs.List>
-              <Tabs.Trigger
-                value="explore"
-                color="fg.muted"
-                _selected={{ color: "fg", fontWeight: "semibold" }}
-              >
-                Explore
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="dashboards"
-                color="fg.muted"
-                _selected={{ color: "fg", fontWeight: "semibold" }}
-              >
+              <Tabs.Trigger value="explore">Explore</Tabs.Trigger>
+              <Tabs.Trigger value="dashboards">
                 Dashboards
                 <Badge size="xs" variant="subtle" colorPalette="gray">
                   0
@@ -101,7 +100,11 @@ function AnalyticsPage() {
               />
             </Tabs.Content>
             <Tabs.Content value="dashboards" paddingTop={4}>
-              <Text color="fg.muted">Dashboards are not available yet.</Text>
+              <NoDataInfoBlock
+                icon={<LayoutDashboard />}
+                title="Dashboards are not available yet."
+                description="Saved dashboards will appear here once this preview is connected to your data."
+              />
             </Tabs.Content>
           </Tabs.Root>
         </VStack>
@@ -170,14 +173,7 @@ function TemplateChips({
 }) {
   return (
     <HStack gap={2} flexWrap="wrap">
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        letterSpacing="0.08em"
-        color="fg.muted"
-        textTransform="uppercase"
-        paddingRight={1}
-      >
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted" paddingRight={1}>
         Templates
       </Text>
       {EXPLORE_TEMPLATES.map((template) => {
@@ -185,10 +181,9 @@ function TemplateChips({
         return (
           <Button
             key={template.label}
-            size="xs"
+            size="sm"
             variant={active ? "subtle" : "outline"}
-            colorPalette={active ? "orange" : "gray"}
-            borderRadius="full"
+            colorPalette={active ? "accent" : "gray"}
             fontWeight={active ? "medium" : "normal"}
             onClick={() => onPick(template.selection)}
           >
@@ -211,23 +206,17 @@ function ExploreChart({
   timeWindow: ExploreWindow;
 }) {
   return (
-    <VStack
-      align="stretch"
-      gap={1}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="lg"
-      padding={5}
-      minHeight="440px"
-    >
+    <Card.Root variant="showcase" padding={5} minHeight="320px">
       <Text fontWeight="semibold">{exploreChartTitle(selection)}</Text>
       <Text fontSize="sm" color="fg.muted">
         {orgName} · last {timeWindow}
       </Text>
-      <Box flex={1} display="flex" alignItems="center" justifyContent="center">
-        <Text color="fg.muted">This chart is not connected to your data yet</Text>
-      </Box>
-    </VStack>
+      <NoDataInfoBlock
+        icon={<ChartNoAxesCombined />}
+        title="This chart is not connected to your data yet"
+        description="Choose a template or adjust the controls to preview a query. Running it is coming."
+      />
+    </Card.Root>
   );
 }
 
@@ -268,16 +257,16 @@ function ControlSelect({
   onChange: (value: string) => void;
   options: readonly { value: string; label: string }[];
 }) {
-  const collection = useMemo(() => createListCollection({ items: [...options] }), [options]);
+  const collection = createListCollection({ items: [...options] });
   return (
-    <Field.Root orientation="horizontal" width="auto" gap={2}>
+    <Field.Root width={{ base: "full", sm: "auto" }} gap={2}>
       <Field.Label fontSize="sm" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
         {label}
       </Field.Label>
       <Select.Root
         collection={collection}
         size="sm"
-        width="150px"
+        width={{ base: "full", sm: "180px" }}
         value={[value]}
         onValueChange={({ value: next }) => {
           if (next[0]) onChange(next[0]);

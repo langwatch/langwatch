@@ -135,6 +135,8 @@ export const designSystemConfig = defineConfig({
       },
     },
     semanticTokens: {
+      radii: { showcase: { value: "{radii.xl}" } },
+      shadows: { showcase: { value: "{shadows.md}" } },
       colors: {
         // Palette-specific semantic tokens
         gray: {
@@ -822,6 +824,16 @@ export const designSystemConfig = defineConfig({
         },
         variants: {
           variant: {
+            showcase: {
+              root: {
+                borderWidth: "1px",
+                borderStyle: "solid",
+                borderColor: "border.card",
+                background: "bg.card",
+                borderRadius: "showcase",
+                boxShadow: "showcase",
+              },
+            },
             subtle: {
               root: { background: "bg.nested", border: "1px solid", borderColor: "border.nested" },
             },

@@ -35,7 +35,7 @@ import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
-import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
 import {
@@ -521,9 +521,9 @@ function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManage
     { mode: "create"; type: AiToolEntry["type"] } | { mode: "edit"; entry: AiToolEntry } | null
   >(null);
 
-  const startToolRegistration = useCallback(() => {
+  const startToolRegistration = () => {
     setToolDrawer({ mode: "create", type: "coding_assistant" });
-  }, []);
+  };
 
   const sample = useSampleMode();
 
@@ -538,21 +538,18 @@ function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManage
   const [addedEnvironments, setAddedEnvironments] = useState<EnvironmentRow[]>([]);
 
   /** Add a hand-entered environment for this sitting only. */
-  const addEnvironment = useCallback(
-    ({ name, description }: { name: string; description: string }) => {
-      setAddedEnvironments((previous) => [
-        ...previous,
-        {
-          id: `added:${name}:${previous.length}`,
-          name,
-          description,
-          createdIso: nowInstant().toString(),
-          createdBy: "You, this session",
-        },
-      ]);
-    },
-    [],
-  );
+  const addEnvironment = ({ name, description }: { name: string; description: string }) => {
+    setAddedEnvironments((previous) => [
+      ...previous,
+      {
+        id: `added:${name}:${previous.length}`,
+        name,
+        description,
+        createdIso: nowInstant().toString(),
+        createdBy: "You, this session",
+      },
+    ]);
+  };
 
   return {
     catalog,
@@ -690,19 +687,19 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
    * stays red after it has been answered reads as a second, different
    * rejection.
    */
-  const updateComposer = useCallback((next: ComposerState) => {
+  const updateComposer = (next: ComposerState) => {
     setComposer(next);
     setInvalidFieldKeys((keys) =>
       keys.filter((key) => (next.parserConfig[key] ?? "").trim() === ""),
     );
-  }, []);
+  };
 
   /**
    * Open the composer on a fresh draft for the picked type — a draft left
    * over from a different type must never leak its parser or OTTL state
    * into this one.
    */
-  const startComposer = useCallback((sourceType: SourceType) => {
+  const startComposer = (sourceType: SourceType) => {
     setComposer({
       ...blankComposer(),
       sourceType,
@@ -710,7 +707,7 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
     });
     setInvalidFieldKeys([]);
     setComposing(true);
-  }, []);
+  };
 
   /** Close the composer and drop the draft. */
   const closeComposer = () => {
@@ -944,29 +941,19 @@ function InventoryTabs({
       value={inventoryTab}
       onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
+      colorPalette="accent"
+      size="sm"
       lazyMount
       unmountOnExit
     >
       <Tabs.List>
-        <Tabs.Trigger
-          value="catalog"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
+        <Tabs.Trigger value="catalog">
           <GovernanceTabLabel label="Catalog" count={catalogCount} />
         </Tabs.Trigger>
-        <Tabs.Trigger
-          value="environments"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
+        <Tabs.Trigger value="environments">
           <GovernanceTabLabel label="Environments" count={environmentCount} />
         </Tabs.Trigger>
-        <Tabs.Trigger
-          value="sources"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
+        <Tabs.Trigger value="sources">
           <GovernanceTabLabel label="Sources" count={sourceCount} />
         </Tabs.Trigger>
       </Tabs.List>
@@ -3664,6 +3651,7 @@ function ParserSwitchInput({
 
   return (
     <Switch
+      colorPalette="accent"
       checked={on}
       // Never blank: blank means the field's declared default, which is not
       // always off, so writing it back would flip a deliberate choice. And the
@@ -3825,7 +3813,7 @@ function ParserConfigField({
   // array's identity — so an unmemoized call resets highlight and scroll under
   // an open dropdown. It still rebuilds when `values` change, which is correct:
   // these options are a function of the form's other answers.
-  const control = useMemo(() => fieldControl({ field, values }), [field, values]);
+  const control = fieldControl({ field, values });
   const shownHint = control.hint ?? hint;
 
   return (
@@ -4841,24 +4829,18 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
 
-  const claudeCodeEnvBlock = useMemo(
-    () => (isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : ""),
-    [isClaudeCode, details, otlpUrl],
-  );
+  const claudeCodeEnvBlock =
+    isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : "";
 
-  const testCurl = useMemo(
-    () =>
-      details
-        ? buildTestCurl({
-            details,
-            otlpUrl,
-            webhookUrl,
-            usesPushUrl,
-            usesWebhookUrl,
-          })
-        : null,
-    [details, otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl],
-  );
+  const testCurl = details
+    ? buildTestCurl({
+        details,
+        otlpUrl,
+        webhookUrl,
+        usesPushUrl,
+        usesWebhookUrl,
+      })
+    : null;
 
   if (!details) return null;
 
@@ -4911,7 +4893,7 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
           <Link href={`/governance/inventory/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
-          <Button colorPalette="blue" onClick={onClose}>
+          <Button colorPalette="accent" onClick={onClose}>
             I&apos;ve saved it
           </Button>
         </DialogFooter>

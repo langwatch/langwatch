@@ -7,7 +7,7 @@ const meta = {
   title: "Primitives/Card",
   parameters: {
     usage: {
-      use: "A group of facts or controls about one thing. `elevated` sits up off the page (figures, tiles); `outline` sits flat in a list; `subtle` fills a quiet panel.",
+      use: "A group of facts or controls about one thing. `elevated` sits up off the page (figures, tiles); `outline` sits flat in a list; `subtle` fills a quiet panel; `showcase` names Governance and Gateway’s rounded, raised identity.",
       avoid:
         'A hand-built Box with a border and a shadow: use `Card.Root variant="elevated"`. A whole settings block: use Settings card.',
     },
@@ -16,7 +16,7 @@ const meta = {
   tags: ["autodocs"],
   args: { variant: "elevated" },
   argTypes: {
-    variant: { control: "inline-radio", options: ["elevated", "outline", "subtle"] },
+    variant: { control: "inline-radio", options: ["elevated", "outline", "subtle", "showcase"] },
   },
 } satisfies Meta<typeof Card.Root>;
 
@@ -26,7 +26,7 @@ type Story = StoryObj<typeof meta>;
 /** A figure card, as the governance cost and inventory screens draw them. */
 function FigureCard({ label, figure, info }: { label: string; figure: string; info: string }) {
   return (
-    <Card.Root variant="elevated">
+    <Card.Root variant="showcase">
       <Card.Body padding={4} gap={1}>
         <HStack gap={2}>
           <Heading size="sm">{label}</Heading>
@@ -57,7 +57,7 @@ export const Default: Story = {
 export const Variants: Story = {
   render: () => (
     <HStack gap={4} align="stretch">
-      {(["elevated", "outline", "subtle"] as const).map((variant) => (
+      {(["elevated", "outline", "subtle", "showcase"] as const).map((variant) => (
         <Card.Root key={variant} variant={variant} width="16rem">
           <Card.Body padding={4} gap={1}>
             <Heading size="sm">{variant}</Heading>
@@ -105,5 +105,34 @@ export const Clickable: Story = {
         </Text>
       </Card.Body>
     </Card.Root>
+  ),
+};
+
+export const Showcase: Story = {
+  args: { variant: "showcase" },
+  parameters: {
+    usage: {
+      use: "Governance and Gateway's showcase identity: generous rounded corners, a fine semantic border and soft elevation for overview facts and operational panels. Surround it with standard brand controls, tabs and tables.",
+      avoid: "Adding a local radius or shadow to recreate this treatment.",
+    },
+  },
+  render: (args) => (
+    <Stack width="full" maxWidth="32rem" gap={4}>
+      <Card.Root {...args}>
+        <Card.Body>
+          <Heading size="sm">Metered by gateway</Heading>
+          <Text textStyle="2xl" fontWeight="semibold">
+            $12.48
+          </Text>
+          <Text color="fg.muted">Measured requests in this window.</Text>
+        </Card.Body>
+      </Card.Root>
+      <Card.Root {...args} width="16rem" maxWidth="full">
+        <Card.Body>
+          <Heading size="sm">A long operational panel title on a narrow card</Heading>
+          <Text color="fg.muted">The same surface follows light and dark mode.</Text>
+        </Card.Body>
+      </Card.Root>
+    </Stack>
   ),
 };

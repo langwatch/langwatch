@@ -2,6 +2,7 @@ import { Link } from "@langwatch/browser-host/link";
 import { UpgradeRequired } from "@langwatch/design-system/access-state";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -310,8 +311,13 @@ function WebhookEndpointsTable({
   ...actions
 }: EndpointListActions & { endpoints: EndpointView[] }) {
   return (
-    <Card.Root width="full" overflowX="auto">
-      <Table.Root variant="line" size="md" width="full">
+    <Card.Root variant="showcase" width="full" overflowX="auto">
+      <ListTable
+        containerProps={{ overflowX: "auto", maxWidth: "full" }}
+        variant="line"
+        size="md"
+        width="full"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Destination</Table.ColumnHeader>
@@ -326,7 +332,7 @@ function WebhookEndpointsTable({
             <WebhookRow key={endpoint.id} endpoint={endpoint} {...actions} />
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Card.Root>
   );
 }

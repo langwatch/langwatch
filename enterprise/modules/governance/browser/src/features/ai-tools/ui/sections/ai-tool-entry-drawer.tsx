@@ -19,7 +19,7 @@ import {
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Bot, Wrench } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/governance-api.ts";
 import {
@@ -407,10 +407,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   // entry means org-wide (empty department set); DEPARTMENT entries map
   // back to ids. ORGANIZATION and DEPARTMENT are mutually exclusive in the
   // picker (collapseRedundantScopes enforces it), so this is unambiguous.
-  const departmentIds = useMemo(
-    () => scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId),
-    [scopes],
-  );
+  const departmentIds = scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId);
 
   // When the user changes the assistantKind picker on a coding_assistant
   // tile, auto-update iconAsset to the corresponding preset (unless they
@@ -463,7 +460,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const canSave = useMemo(() => canSaveForm({ form, iconAsset }), [form, iconAsset]);
+  const canSave = canSaveForm({ form, iconAsset });
 
   const onSave = () => {
     if (!canSave || !state) return;
@@ -825,6 +822,7 @@ function CostAttributionSection({
           </Text>
         </VStack>
         <Switch
+          colorPalette="accent"
           checked={form.bundledPlan}
           onCheckedChange={({ checked }) => setForm({ ...form, bundledPlan: checked })}
         />
@@ -860,6 +858,7 @@ function CliPathsSection({
             </Text>
           </VStack>
           <Switch
+            colorPalette="accent"
             checked={form.allowVk}
             onCheckedChange={({ checked }) => setForm({ ...form, allowVk: checked })}
           />
@@ -874,6 +873,7 @@ function CliPathsSection({
             </Text>
           </VStack>
           <Switch
+            colorPalette="accent"
             checked={cursorOnly ? false : form.allowOtelDirect}
             disabled={cursorOnly}
             onCheckedChange={({ checked }) => setForm({ ...form, allowOtelDirect: checked })}

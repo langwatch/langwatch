@@ -4,7 +4,7 @@ import { Field, HStack, Input, Text, VStack } from "@langwatch/design-system/pri
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Switch } from "@langwatch/design-system/switch";
 import type { GovernanceSourceType } from "@langwatch/enterprise-governance-contract";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { DashboardSelect } from "../../dashboard-select.tsx";
 import {
@@ -245,17 +245,13 @@ export function PullCadenceField({
     () => effectiveCron !== "" && partsFromPullCron(effectiveCron) === null,
   );
 
-  const parts = useMemo(
-    () =>
-      partsFromPullCron(effectiveCron) ?? {
-        frequency: "minutes" as const,
-        everyMinutes: 15,
-        minute: 0,
-        hour: 9,
-        dayOfWeek: 1,
-      },
-    [effectiveCron],
-  );
+  const parts = partsFromPullCron(effectiveCron) ?? {
+    frequency: "minutes" as const,
+    everyMinutes: 15,
+    minute: 0,
+    hour: 9,
+    dayOfWeek: 1,
+  };
 
   if (!recommended) return null;
 
@@ -296,6 +292,7 @@ export function PullCadenceField({
             Edit as a cron expression
           </Text>
           <Switch
+            colorPalette="accent"
             size="sm"
             checked={isCronMode}
             onCheckedChange={({ checked }) => onToggleCronMode(checked)}

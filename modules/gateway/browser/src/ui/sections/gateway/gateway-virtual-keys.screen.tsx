@@ -1,5 +1,6 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -35,7 +36,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
@@ -163,18 +164,11 @@ function VirtualKeysPage() {
     { organizationId: orgId },
     { enabled: !!orgId },
   );
-  const { spendByKeyId, budgetByKeyId } = useMemo(
-    () => indexSpendRows(spendQuery.data ?? []),
-    [spendQuery.data],
+  const { spendByKeyId, budgetByKeyId } = indexSpendRows(spendQuery.data ?? []);
+  const policyNameById = new Map(
+    (policiesQuery.data ?? []).map((policy) => [policy.id, policy.name]),
   );
-  const policyNameById = useMemo(
-    () => new Map((policiesQuery.data ?? []).map((policy) => [policy.id, policy.name])),
-    [policiesQuery.data],
-  );
-  const { teamNameById, projectNameById } = useMemo(
-    () => indexScopeNames(organization?.teams ?? []),
-    [organization?.teams],
-  );
+  const { teamNameById, projectNameById } = indexScopeNames(organization?.teams ?? []);
   const scopeEntriesWithNames = (scopes: ScopeEntry[]) =>
     scopes.map((s) => ({
       scopeType: s.scopeType,
@@ -196,7 +190,7 @@ function VirtualKeysPage() {
   const [createOpen, setCreateOpen] = useState(false);
   // The guided tour opens the create drawer through the same state the New key button flips.
   const { useRegisterActions } = useLentGuidedTour();
-  const tourActions = useMemo(() => ({ openVirtualKeyCreate: () => setCreateOpen(true) }), []);
+  const tourActions = { openVirtualKeyCreate: () => setCreateOpen(true) };
   useRegisterActions(tourActions);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
   const [editing, setEditing] = useState<VirtualKeyDetail | null>(null);
@@ -207,13 +201,13 @@ function VirtualKeysPage() {
   } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
-  const allRows = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  const allRows = listQuery.data ?? [];
   // A disabled key belongs with the live ones: it is paused, not finished,
   // and it used to appear in neither tab, which left the only route to it a
   // link somebody had kept. Revoked is the one terminal state, so it keeps
   // its own tab.
-  const activeRows = useMemo(() => allRows.filter((vk) => vk.status !== "revoked"), [allRows]);
-  const revokedRows = useMemo(() => allRows.filter((vk) => vk.status === "revoked"), [allRows]);
+  const activeRows = allRows.filter((vk) => vk.status !== "revoked");
+  const revokedRows = allRows.filter((vk) => vk.status === "revoked");
   const rows = statusTab === "active" ? activeRows : revokedRows;
   const listView = resolveListView({
     isLoading: listQuery.isLoading,
@@ -224,10 +218,7 @@ function VirtualKeysPage() {
   // Keys whose traces can actually be opened. A key missing from this map
   // gets no "View traces" action, because the link would only lead to a
   // bounce or to a project that no longer serves anything.
-  const traceHrefByKeyId = useMemo(
-    () => traceHrefsByKeyId({ rows: allRows, teams: organization?.teams ?? [] }),
-    [allRows, organization?.teams],
-  );
+  const traceHrefByKeyId = traceHrefsByKeyId({ rows: allRows, teams: organization?.teams ?? [] });
 
   const confirmRotate = async () => {
     if (!rotating || !orgId) return;
@@ -300,15 +291,17 @@ function VirtualKeysPage() {
                 </Tabs.List>
               </Tabs.Root>
               {rows.length === 0 ? (
-                <Card.Root width="full">
+                <Card.Root variant="showcase" width="full">
                   <Card.Body>
-                    <Text fontSize="sm" color="fg.muted" textAlign="center" py={6}>
-                      No {statusTab} keys.
-                    </Text>
+                    <NoDataInfoBlock
+                      icon={<KeyRound />}
+                      title={`No ${statusTab} keys.`}
+                      description="Keys with this status will appear here."
+                    />
                   </Card.Body>
                 </Card.Root>
               ) : (
-                <Card.Root width="full" overflow="hidden">
+                <Card.Root variant="showcase" width="full" overflow="hidden">
                   {/* The card clips; the body scrolls. Without this the
                       right-hand columns are simply unreachable on a narrow
                       window instead of scrolling into view. Focusable so the
@@ -321,7 +314,12 @@ function VirtualKeysPage() {
                     tabIndex={0}
                     aria-label="Virtual keys table"
                   >
-                    <Table.Root variant="line" size="md" width="full">
+                    <ListTable
+                      containerProps={{ overflowX: "auto", maxWidth: "full" }}
+                      variant="line"
+                      size="md"
+                      width="full"
+                    >
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -360,7 +358,7 @@ function VirtualKeysPage() {
                           />
                         ))}
                       </Table.Body>
-                    </Table.Root>
+                    </ListTable>
                   </Card.Body>
                 </Card.Root>
               )}
