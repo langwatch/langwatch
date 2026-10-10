@@ -3900,6 +3900,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/enterprise-sso-contract':
+        specifier: workspace:*
+        version: link:../../sso/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
@@ -4696,6 +4699,9 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../../packages/eventing
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../../../modules/feature-flag/contract
@@ -4717,6 +4723,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../packages/time
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=2ca39ffc97a786ea3d92b1683757866cc6cdbd6f539edda447d6d1e9a014cf96))

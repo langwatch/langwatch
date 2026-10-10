@@ -2346,4 +2346,11 @@ export interface LwqlPrismaRows {
     readonly privateKeyEncrypted: "String";
     readonly createdAt: "DateTime";
   };
+  readonly SignInProviderMount: {
+    readonly id: "String";
+    readonly provider: "String?";
+    readonly mounted: "Boolean";
+    readonly lastAppliedEventId: "String";
+    readonly updatedAt: "DateTime";
+  };
 }

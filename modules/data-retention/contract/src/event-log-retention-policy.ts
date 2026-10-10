@@ -95,6 +95,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   scim_sso_connection_view: "indefinite",
   scim_sync: "indefinite",
   sso_connection: "indefinite",
+  sso_sign_in_provider: "indefinite",
   system_migration_pass: "indefinite",
   user: "indefinite",
   user_account: "indefinite",

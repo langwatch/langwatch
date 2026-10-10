@@ -150,3 +150,11 @@ export {
   type SsoConnectionTargetSchema,
 } from "./sso.contract.ts";
 export { ssoConfig, type SsoConfig, type SsoConfiguration } from "./sso.config.ts";
+export {
+  SSO_SIGN_IN_PROVIDER_AGGREGATE_TYPE,
+  SSO_SIGN_IN_PROVIDER_RECORDED_EVENT_TYPE,
+  SSO_SIGN_IN_PROVIDER_RECORDED_EVENT_VERSION,
+  ssoSignInProviderRecordedEventDataSchema,
+  type SsoSignInProviderRecordedEventData,
+  type SsoSignInProviderRecordedEventDataSchema,
+} from "./sso-sign-in-provider.events.ts";

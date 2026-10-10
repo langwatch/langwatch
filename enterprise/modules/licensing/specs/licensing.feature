@@ -428,3 +428,22 @@ Feature: Enterprise licensing lifecycle
       When they state more than 2147483647 lite seats
       Then the request is refused as invalid, with a message naming the maximum
       And nothing is signed or stored
+
+  # ADR-179: licensing keeps sso's sign-in provider fact with the id of the event it applied.
+  @unit
+  Scenario: The SSO gate status answers from sso's recorded sign-in provider
+    Given sso recorded that its configured provider "okta" did not mount
+    When an operator asks for the SSO gate status
+    Then it answers provider "okta", not mounted, and whether a licence permits single sign-on
+
+  @unit
+  Scenario: Before sso records a sign-in provider the gate status reports nothing to fix
+    Given no sign-in provider fact has been applied yet
+    When an operator asks for the SSO gate status
+    Then it answers no configured provider, licensed and mounted
+
+  @unit
+  Scenario: A redelivered or older sign-in provider fact never overwrites a newer one
+    Given licensing applied a sign-in provider fact
+    When the same fact is delivered again, or an older one arrives late
+    Then the stored provider, mount state and applied event id are unchanged

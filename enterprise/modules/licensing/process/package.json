@@ -39,6 +39,7 @@
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-license-signing": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-sso-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",

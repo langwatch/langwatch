@@ -6984,3 +6984,15 @@ model WebPushVapidKey {
   privateKeyEncrypted String
   createdAt           DateTime @default(now())
 }
+
+model SignInProviderMount {
+  /// Fixed, so this table holds one row: licensing's copy of sso's sign-in
+  /// provider fact (ADR-179).
+  id                 String   @id @default("self")
+  /// The configured provider's name; null when the deployment signs in by email.
+  provider           String?
+  mounted            Boolean
+  /// The last sso event applied: the row's idempotency guard and its version.
+  lastAppliedEventId String
+  updatedAt          DateTime @default(now()) @updatedAt
+}

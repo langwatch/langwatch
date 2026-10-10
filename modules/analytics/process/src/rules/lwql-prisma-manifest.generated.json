@@ -24866,6 +24866,61 @@
           "documentation": ""
         }
       ]
+    },
+    {
+      "name": "SignInProviderMount",
+      "tableName": "SignInProviderMount",
+      "documentation": "",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Fixed, so this table holds one row: licensing's copy of sso's sign-in\nprovider fact (ADR-179)."
+        },
+        {
+          "name": "provider",
+          "columnName": "provider",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The configured provider's name; null when the deployment signs in by email."
+        },
+        {
+          "name": "mounted",
+          "columnName": "mounted",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastAppliedEventId",
+          "columnName": "lastAppliedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The last sso event applied: the row's idempotency guard and its version."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
     }
   ],
   "enums": [
