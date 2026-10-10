@@ -278,8 +278,9 @@ var (
 	FromStartup = [][]string{{"start:prepare:db"}, {"task", "system-migrations"}}
 )
 
-// headBuildScript is the release image's build step (infra/docker/Dockerfile), run in head's checkout.
-const headBuildScript = `pnpm start:prepare:files && pnpm ensure:built && pnpm exec tsc -b --builders 16 tsconfig.build.json && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
+// headBuildScript is the release image's install and build steps (infra/docker/Dockerfile), run in head's
+// checkout; the install keeps node_modules in step with packages head added.
+const headBuildScript = `pnpm install --frozen-lockfile --prefer-offline && pnpm start:prepare:files && pnpm ensure:built && pnpm exec tsc -b --builders 16 tsconfig.build.json && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
 
 // BuildStamp sits in node_modules, which git ignores, so a build never dirties the checkout.
 const BuildStamp = "node_modules/.upgradelab-build"
