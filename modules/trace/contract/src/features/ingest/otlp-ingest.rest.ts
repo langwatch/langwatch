@@ -3,7 +3,7 @@
  * server transport file instead, keeping this contract free of the DOM-lib
  * `Request` dependency neither the browser SDK nor another module needs.
  */
-import { otlpSourcePolicySchema } from "@langwatch/otlp";
+import { otlpSourcePolicySchema } from "@langwatch/otlp/door";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { z } from "zod";
 
