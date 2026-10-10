@@ -1389,7 +1389,15 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#exportDownload =
       dependencies.protections && dependencies.exportBounds && dependencies.presence
         ? TraceExportDownloadService.create({
-            exports: TraceExportService.create({ traceService: dependencies.traces.read }),
+            exports: TraceExportService.create({
+              traceService: dependencies.traces.read,
+              compileFilter: ({ request }) =>
+                this.compileExplorerTraceFilter({
+                  query: request.query ?? "",
+                  tenantId: request.projectId,
+                  timeRange: { from: request.startDate, to: request.endDate },
+                }),
+            }),
             protections: dependencies.protections,
             bounds: dependencies.exportBounds,
             presence: dependencies.presence,

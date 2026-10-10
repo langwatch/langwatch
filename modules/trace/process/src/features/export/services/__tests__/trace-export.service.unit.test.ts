@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { TraceLegacyReadService } from "../../../legacy/services/trace-legacy-read.service.ts";
 import { TraceExportService } from "../trace-export.service.ts";
-import { legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
+import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
 const protections: Protections = {
   canSeeCapturedInput: true,
@@ -82,7 +82,10 @@ describe("TraceExportService hides what the Explorer hides", () => {
   it("excludes the langy origin from the count and from every batch", async () => {
     const seen: GetAllTracesForProjectOptions[] = [];
     const built = buildOptionsCapturingTraceService();
-    const service = TraceExportService.create({ traceService: built.traceService });
+    const service = TraceExportService.create({
+      compileFilter: hiddenOriginsOnly,
+      traceService: built.traceService,
+    });
 
     await service.getTotalCount({ request: buildExportRequest(), protections });
     await drainExport(service, buildExportRequest());
@@ -94,9 +97,30 @@ describe("TraceExportService hides what the Explorer hides", () => {
     }
   });
 
+  /** @scenario "Langy's own turns are left out of every Analytics read" */
+  it("applies the compiled Explorer filter and sends no free-text query", async () => {
+    const inputs: unknown[] = [];
+    const traceService = legacyReadAnswering(async (input: unknown) => {
+      inputs.push(input);
+      return { groups: [], totalHits: 0, traceChecks: {}, scrollId: undefined } as never;
+    });
+    const filter = { sql: "x = {p:String}", params: { p: "1" } };
+    const service = TraceExportService.create({ traceService, compileFilter: () => filter });
+
+    await service.getTotalCount({
+      request: buildExportRequest({ query: "status:error" }),
+      protections,
+    });
+
+    expect(inputs[0]).not.toHaveProperty("query", "status:error");
+  });
+
   it("keeps them when the query names an origin itself", async () => {
     const built = buildOptionsCapturingTraceService();
-    const service = TraceExportService.create({ traceService: built.traceService });
+    const service = TraceExportService.create({
+      compileFilter: hiddenOriginsOnly,
+      traceService: built.traceService,
+    });
 
     await drainExport(service, buildExportRequest({ query: "origin:langy" }));
 
@@ -108,7 +132,7 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
   describe("when TraceExportService.create() receives the process-owned reader", () => {
     it("wraps that reader without constructing another service", async () => {
       const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-      const service = TraceExportService.create({ traceService });
+      const service = TraceExportService.create({ compileFilter: hiddenOriginsOnly, traceService });
 
       await drainExport(service, buildExportRequest({ mode: "summary" }));
 
@@ -120,7 +144,10 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
     describe("when exportTraces streams a batch", () => {
       it("opts resolveBlobs into the getAllTracesForProject options", async () => {
         const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         await drainExport(service, buildExportRequest({ mode: "full" }));
 
@@ -141,7 +168,10 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
       beforeEach(async () => {
         const built = buildOptionsCapturingTraceService();
         optionsSeen = built.optionsSeen;
-        const service = TraceExportService.create({ traceService: built.traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService: built.traceService,
+        });
         await drainExport(service, buildExportRequest({ mode: "summary" }));
       });
 
@@ -164,7 +194,10 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
     describe("when the export is drained", () => {
       it("emits the trace input/output value into the payload", async () => {
         const { traceService } = buildOptionsCapturingTraceService();
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         let payload = "";
         for await (const { chunk } of service.exportTraces({

@@ -4,17 +4,16 @@ import { createLogger } from "@langwatch/observability";
  * or JSON serialization, yielding chunks progressively so the API layer streams straight to the
  * HTTP response; only one batch, up to 100 traces, is held in memory at a time.
  */
-import {
-  explorerHiddenOrigins,
-  type Protections,
-  type Evaluation,
-  type Trace,
-  type ExportProgress,
-  type ExportRequest,
+import type {
+  Protections,
+  Evaluation,
+  Trace,
+  ExportProgress,
+  ExportRequest,
 } from "@langwatch/trace-contract";
 
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
-import { explorerOriginExclusion } from "../../../rules/trace-filter-hidden-origins.rules.ts";
+import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
@@ -31,12 +30,7 @@ import {
 
 const BATCH_SIZE = 100;
 
-/** The export counts what the Explorer lists: the origins it hides stay out of the file. */
-function explorerHiddenFilter({ request }: { request: ExportRequest }) {
-  return explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(request.query) })(
-    undefined,
-  );
-}
+type ExportFilter = TraceFilterWhere | undefined;
 
 const logger = createLogger("langwatch:export");
 
@@ -47,14 +41,29 @@ const logger = createLogger("langwatch:export");
  */
 export class TraceExportService {
   private readonly traceService: TraceLegacyRead;
+  private readonly compileFilter: (input: { request: ExportRequest }) => ExportFilter;
 
-  private constructor({ traceService }: { traceService: TraceLegacyRead }) {
+  private constructor({
+    traceService,
+    compileFilter,
+  }: {
+    traceService: TraceLegacyRead;
+    compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+  }) {
     this.traceService = traceService;
+    this.compileFilter = compileFilter;
   }
 
   /** Creates the process-owned export facade over the composed trace reader. */
-  static create({ traceService }: { traceService: TraceLegacyRead }): TraceExportService {
-    return new TraceExportService({ traceService });
+  static create({
+    traceService,
+    compileFilter,
+  }: {
+    traceService: TraceLegacyRead;
+    /** The Explorer's compiled filter for the request's query. */
+    compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+  }): TraceExportService {
+    return new TraceExportService({ traceService, compileFilter });
   }
 
   /**
@@ -74,7 +83,6 @@ export class TraceExportService {
         startDate: request.startDate,
         endDate: request.endDate,
         filters: request.filters,
-        query: request.query,
         traceIds: request.traceIds,
         pageSize: 1,
       },
@@ -83,7 +91,7 @@ export class TraceExportService {
         downloadMode: false,
         includeSpans: false,
         scrollId: null,
-        filterWhere: explorerHiddenFilter({ request }),
+        filterWhere: this.compileFilter({ request }),
       },
     );
 
@@ -181,7 +189,6 @@ export class TraceExportService {
         startDate: request.startDate,
         endDate: request.endDate,
         filters: request.filters,
-        query: request.query,
         traceIds: request.traceIds,
         pageSize: BATCH_SIZE,
         scrollId,
@@ -192,7 +199,7 @@ export class TraceExportService {
         includeSpans: request.mode === "full",
         resolveBlobs: true,
         scrollId: scrollId ?? null,
-        filterWhere: explorerHiddenFilter({ request }),
+        filterWhere: this.compileFilter({ request }),
       },
     );
   }
