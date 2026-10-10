@@ -35,20 +35,20 @@ const toastPanel = {
   "--toast-border-color": "colors.border.muted",
 } as const;
 
-/** A light-mode toast's fill: its hue deep under the text, glowing bright towards the top right. */
-const toastMesh = (hue: "red" | "orange" | "green" | "blue") => {
-  const c = (n: number, alpha = "100%") =>
+/** A light-mode toast is deep glass tinted with its status hue: a fine rim, a glow and a gloss. */
+const toastGlass = (hue: "red" | "orange" | "green" | "blue") => {
+  const c = (n: number, alpha: string) =>
     `color-mix(in srgb, var(--chakra-colors-${hue}-${n}) ${alpha}, transparent)`;
-  const mid = `color-mix(in srgb, var(--chakra-colors-${hue}-700) 50%, var(--chakra-colors-${hue}-600))`;
   return {
-    bg: `${hue}.700`,
+    bg: c(950, "82%"),
     backgroundImage: [
-      "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, transparent 55%)",
-      `radial-gradient(55% 140% at 100% 0%, ${c(400, "85%")} 0%, transparent 62%)`,
-      `radial-gradient(60% 150% at 85% 125%, ${c(500, "80%")} 0%, transparent 65%)`,
-      `linear-gradient(105deg, ${c(700)} 0%, ${mid} 50%, ${c(600)} 100%)`,
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 45%)",
+      `radial-gradient(90% 160% at 0% 50%, ${c(500, "28%")} 0%, transparent 60%)`,
     ].join(", "),
-    boxShadow: `inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 28px -10px ${c(500, "70%")}`,
+    borderWidth: "1px",
+    borderColor: c(400, "28%"),
+    backdropFilter: "var(--lw-backdrop-blur, blur(18px) saturate(160%))",
+    boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px -12px ${c(900, "60%")}, 0 2px 6px rgba(2, 6, 23, 0.18)`,
   };
 };
 
@@ -1312,19 +1312,17 @@ export const designSystemConfig = defineConfig({
               animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
             },
             _motionReduce: { transition: "none", animation: "none" },
-            // Light mode: a mesh of the status hue (deep at the text edge, a white
-            // sheen top-right) with white text; the left half stays >= 600 for contrast.
+            // Light mode: status toasts are deep tinted glass with white text.
             _light: {
               "&:is([data-type=error], [data-type=warning], [data-type=success], [data-type=info])":
                 {
-                  borderColor: "transparent",
                   color: "white",
-                  "--toast-trigger-bg": "rgba(255, 255, 255, 0.18)",
+                  "--toast-trigger-bg": "rgba(255, 255, 255, 0.14)",
                 },
-              "&[data-type=error]": toastMesh("red"),
-              "&[data-type=warning]": toastMesh("orange"),
-              "&[data-type=success]": toastMesh("green"),
-              "&[data-type=info]": toastMesh("blue"),
+              "&[data-type=error]": toastGlass("red"),
+              "&[data-type=warning]": toastGlass("orange"),
+              "&[data-type=success]": toastGlass("green"),
+              "&[data-type=info]": toastGlass("blue"),
             },
             _dark: {
               ...toastPanel,
