@@ -771,7 +771,8 @@ type With<S extends RouteShape, Changes extends Partial<RouteShape>> = {
 /** A body is declared only on a method that carries one; a GET or HEAD route is refused here. */
 type BodyMethodGate<Method> = [Extract<Method, "get" | "head">] extends [never] ? unknown : never;
 
-class RouteBuilder<Api, S extends RouteShape> {
+/** Declared invariant: measuring the variance walks every method of the chain. */
+class RouteBuilder<in out Api, in out S extends RouteShape> {
   private readonly router: RestTransportRouter<
     Api,
     S["family"],
@@ -1157,7 +1158,7 @@ class RouteBuilder<Api, S extends RouteShape> {
   withPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
     target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
-  ): RouteBuilder<Api, With<S, { permission: true }>> {
+  ): unknown {
     if (target?.at === "platform") return this.#platformPermission(declared, target);
 
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
