@@ -1,0 +1,16 @@
+diff --git a/lib/tsc.js b/lib/tsc.js
+index eb869b715737e45fcf1af33d1af3157b59ba08de..0dc346959d92f8f80d059096f49e773a3234994d 100644
+--- a/lib/tsc.js
++++ b/lib/tsc.js
+@@ -5,6 +5,11 @@ import { execFileSync } from "node:child_process";
+ 
+ const exe = getExePath();
+ 
++// LangWatch: every compile is capped unless the caller says otherwise
++// (dev/docs/plans/typescript-cpu-and-check-time.md step 1).
++process.env.GOMAXPROCS ??= "2";
++process.env.GOMEMLIMIT ??= "2GiB";
++
+ if (process.platform !== "win32" && typeof process.execve === "function") {
+     // > v22.15.0
+     try {
