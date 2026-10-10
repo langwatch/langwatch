@@ -24,7 +24,7 @@ export function openTasksDatabase(databaseUrl: string, config: TasksConfig): Tas
       log: config.nodeEnvironment === "development" ? ["error", "warn"] : ["error"],
     }),
   );
-  // Session-scoped advisory locks need their own connection for the sequence.
+  // The upgrade lease (packages/upgrade) gets its own connection for the sequence.
   const { pool } = PrismaDriverAdapterService.create().create(databaseUrl);
 
   return {

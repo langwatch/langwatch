@@ -1440,8 +1440,8 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   refuses while the other holds it. Legacy tasks are to fold into upgrade steps, in a later drive.
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
-`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
-lock, before serve, and the access-config render runs from env alone in its Helm job (Alex,
+`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
+lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
 2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
 touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
 migration main has released keeps main's bytes even when it touches two owners: installs hold its
