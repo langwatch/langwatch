@@ -101,7 +101,7 @@ function PermissionBadge({ permissionMode }: { permissionMode: ApiKeyRow["permis
   );
 }
 
-const KEY_COLUMNS = 9;
+const KEY_COLUMNS = 7;
 
 function NoMatchingKeysRow() {
   return (
@@ -137,9 +137,20 @@ function ApiKeyTableRow({
             <Key size={14} />
           </Box>
           <VStack align="start" gap={0} minWidth={0}>
-            <Text textStyle="label" maxWidth="full" truncate title={apiKey.name}>
-              {apiKey.name}
-            </Text>
+            <HStack gap={2} maxWidth="full" minWidth={0}>
+              <Text textStyle="label" truncate title={apiKey.name}>
+                {apiKey.name}
+              </Text>
+              {isExpired(apiKey) ? (
+                <Badge size="sm" colorPalette="red">
+                  Expired
+                </Badge>
+              ) : (
+                <Badge size="sm" colorPalette="green">
+                  Active
+                </Badge>
+              )}
+            </HStack>
             {apiKey.description && (
               <Text
                 textStyle="caption"
@@ -155,17 +166,6 @@ function ApiKeyTableRow({
         </HStack>
       </Table.Cell>
       <Table.Cell>
-        {isExpired(apiKey) ? (
-          <Badge size="sm" colorPalette="red">
-            Expired
-          </Badge>
-        ) : (
-          <Badge size="sm" colorPalette="green">
-            Active
-          </Badge>
-        )}
-      </Table.Cell>
-      <Table.Cell>
         <VStack align="start" gap={0}>
           <IdText
             value={`sk-lw-${apiKey.lookupIdPrefix}…`}
@@ -177,21 +177,24 @@ function ApiKeyTableRow({
           </Text>
         </VStack>
       </Table.Cell>
-      <Table.Cell>
-        <Text textStyle="bodySm">{apiKey.userId ? "Personal" : "Service"}</Text>
-      </Table.Cell>
       <Table.Cell maxWidth="240px">
-        {apiKey.userId ? (
-          <Text
-            textStyle="bodySm"
-            truncate
-            title={apiKey.userEmail ?? apiKey.userName ?? undefined}
-          >
-            {apiKey.userEmail ?? apiKey.userName ?? <EmptyValue label="No owner" />}
+        <VStack align="start" gap={0} minWidth={0}>
+          {apiKey.userId ? (
+            <Text
+              textStyle="bodySm"
+              maxWidth="full"
+              truncate
+              title={apiKey.userEmail ?? apiKey.userName ?? undefined}
+            >
+              {apiKey.userEmail ?? apiKey.userName ?? <EmptyValue label="No owner" />}
+            </Text>
+          ) : (
+            <EmptyValue label="No owner" />
+          )}
+          <Text textStyle="caption" color="fg.muted">
+            {apiKey.userId ? "Personal key" : "Service key"}
           </Text>
-        ) : (
-          <EmptyValue label="No owner" />
-        )}
+        </VStack>
       </Table.Cell>
       <Table.Cell maxWidth="240px">{scopeBadge}</Table.Cell>
       <Table.Cell>
@@ -472,9 +475,7 @@ export default function ApiKeysScreen() {
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader minWidth="220px">Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Status</Table.ColumnHeader>
                   <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
-                  <Table.ColumnHeader>Type</Table.ColumnHeader>
                   <Table.ColumnHeader>Owner</Table.ColumnHeader>
                   <Table.ColumnHeader>Scope</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
