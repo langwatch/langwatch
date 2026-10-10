@@ -40,7 +40,7 @@ const TRACE_CAPABILITY: LensCapability = {
     // formats — users pick whichever reads best for their workflow.
     { id: "since", label: "Since (verbose)", section: "Standard" },
     { id: "timestamp", label: "Timestamp (ISO)", section: "Standard" },
-    { id: "trace", label: "Trace (summary)", section: "Standard" },
+    { id: "trace", label: "Trace", section: "Standard" },
     // Broken-out alternates to the composite Trace summary — let users
     // assemble the column shape they prefer (engineer-friendly summary
     // vs. PM-friendly per-field columns) without a hidden density mode.

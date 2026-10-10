@@ -3,13 +3,12 @@ import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-
 import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
+import { ChevronDown, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
 
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type LensConfig,
@@ -33,9 +32,13 @@ const LENS_GROUPS: { label: string; ids: readonly string[] }[] = [
 ];
 const GROUPED_LENS_IDS: ReadonlySet<string> = new Set(LENS_GROUPS.flatMap((g) => [...g.ids]));
 const isGroupedLens = (id: string): boolean => GROUPED_LENS_IDS.has(id);
-// Headroom reserved on the right edge of the scroller for the inline
-// "+" button + the overflow "⋮" trigger sitting just outside it.
-const LENS_OVERFLOW_RESERVE_PX = 56;
+// Headroom on the scroller's right edge for the inline "+" (24px and its 4px margin) and the
+// "⋮" trigger (24px and the 4px gap) that appears beside the scroller once anything overflows.
+const LENS_OVERFLOW_RESERVE_PX = 60;
+// Every whole slot in the strip (flat tab or group trigger) carries this, so a slot that does
+// not fit moves into the overflow menu instead of being clipped.
+const LENS_SLOT_ATTRIBUTE = "data-lens-slot";
+const groupSlotId = (label: string): string => `group:${label}`;
 
 /** Resolves a group's declared lens ids against the live lens list, dropping any dismissed. */
 function resolveGroupLenses(ids: readonly string[], allLenses: LensConfig[]): LensConfig[] {
@@ -61,9 +64,8 @@ export const LensTabs: React.FC = () => {
   const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   // Grouped lenses live in their dimension dropdowns (Cost, Performance), so
-  // they're pulled out of the flat tab strip (and out of overflow tracking,
-  // which measures rendered tabs by data-value). See
-  // specs/traces-v2/lens-preset-groups.feature
+  // they're pulled out of the flat tab strip; each dropdown is one overflow
+  // slot. See specs/traces-v2/lens-preset-groups.feature
   const flatLenses = useMemo(() => allLenses.filter((l) => !isGroupedLens(l.id)), [allLenses]);
   // Each group's lenses in the group's declared order, dropping any the user
   // has dismissed (absent from allLenses).
@@ -75,26 +77,28 @@ export const LensTabs: React.FC = () => {
       })).filter((g) => g.lenses.length > 0),
     [allLenses],
   );
-  const lensIds = useMemo(() => flatLenses.map((l) => l.id), [flatLenses]);
+  const slotIds = useMemo(
+    () => [...flatLenses.map((l) => l.id), ...lensGroups.map((g) => groupSlotId(g.label))],
+    [flatLenses, lensGroups],
+  );
+  const activeGroup = lensGroups.find((g) => g.lenses.some((l) => l.id === activeLensId));
   const hiddenIds = useOverflowVisibility({
     scrollerRef,
-    items: lensIds,
-    activeId: activeLensId,
+    items: slotIds,
+    activeId: activeGroup ? groupSlotId(activeGroup.label) : activeLensId,
     reservePx: LENS_OVERFLOW_RESERVE_PX,
-    // Chakra's `Tabs.Trigger` already emits `data-value` on each tab,
-    // so we reuse it instead of duplicating the attribute on every
-    // `LensTab`.
-    attribute: "data-value",
+    attribute: LENS_SLOT_ATTRIBUTE,
   });
-
-  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const activeLens = allLenses.find((l) => l.id === activeLensId);
   const activeLensIsDraft = isDraft(activeLensId);
   const overflowItems = useMemo(
-    () => flatLenses.filter((l) => hiddenIds.has(l.id)).map((l) => ({ id: l.id, label: l.name })),
-    [flatLenses, hiddenIds],
+    () =>
+      [
+        ...flatLenses.filter((l) => hiddenIds.has(l.id)),
+        ...lensGroups.filter((g) => hiddenIds.has(groupSlotId(g.label))).flatMap((g) => g.lenses),
+      ].map((l) => ({ id: l.id, label: l.name })),
+    [flatLenses, lensGroups, hiddenIds],
   );
 
   const handleLensChange = (targetId: string) => {
@@ -135,7 +139,7 @@ export const LensTabs: React.FC = () => {
     handleLensChange(id);
     const root = scrollerRef.current;
     if (!root) return;
-    const tab = root.querySelector<HTMLElement>(`[data-value="${id}"]`);
+    const tab = root.querySelector<HTMLElement>(`[${LENS_SLOT_ATTRIBUTE}="${id}"]`);
     tab?.scrollIntoView({
       behavior: "smooth",
       inline: "nearest",
@@ -145,33 +149,6 @@ export const LensTabs: React.FC = () => {
 
   return (
     <>
-      {sidebarCollapsed && (
-        <Tooltip
-          content={
-            <HStack gap={1.5}>
-              <Text>Show filters sidebar</Text>
-              <Kbd>{"["}</Kbd>
-            </HStack>
-          }
-          positioning={{ placement: "bottom" }}
-        >
-          {/* Reads as a real button (matching the time-range button) with a
-              "Filters" label, not a bare chevron the user has to decode. */}
-          <Button
-            aria-label="Show filters sidebar"
-            variant="outline"
-            size="xs"
-            fontWeight="medium"
-            gap={1.5}
-            color="fg.subtle"
-            onClick={toggleSidebar}
-            flexShrink={0}
-          >
-            <PanelLeftOpen size={14} />
-            Filters
-          </Button>
-        </Tooltip>
-      )}
       <HStack gap={0} flex="1" minWidth={0}>
         <Tabs.Root
           value={activeLensId}
@@ -204,6 +181,7 @@ export const LensTabs: React.FC = () => {
                 <LensGroupMenu
                   key={group.label}
                   label={group.label}
+                  hidden={hiddenIds.has(groupSlotId(group.label))}
                   lenses={group.lenses}
                   activeLensId={activeLensId}
                   onSelect={handleLensChange}
@@ -282,7 +260,9 @@ const LensGroupMenu: React.FC<{
   lenses: LensConfig[];
   activeLensId: string;
   onSelect: (id: string) => void;
-}> = ({ label, lenses, activeLensId, onSelect }) => {
+  /** Mounted but laid out with `display: none` while the slot sits in the overflow menu. */
+  hidden: boolean;
+}> = ({ label, lenses, activeLensId, onSelect, hidden }) => {
   if (lenses.length === 0) return null;
   const active = lenses.some((l) => l.id === activeLensId);
   const activeName = lenses.find((l) => l.id === activeLensId)?.name;
@@ -293,6 +273,8 @@ const LensGroupMenu: React.FC<{
           size="sm"
           variant="plain"
           flexShrink={0}
+          display={hidden ? "none" : undefined}
+          data-lens-slot={groupSlotId(label)}
           // Stretch to the tab-row height so the active underline sits on the
           // same baseline as the flat tabs' line indicator (a centred,
           // fixed-height button floated its underline above theirs).

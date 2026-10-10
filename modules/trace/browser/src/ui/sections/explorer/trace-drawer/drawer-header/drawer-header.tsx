@@ -50,8 +50,11 @@ import {
 } from "../../../../../model/explorer/trace-drawer/drawer-header/utils.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
-import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
+import {
+  type FittedChip,
+  FittedChipRow,
+} from "../../../../blocks/explorer/trace-drawer/fitted-chip-row.tsx";
 import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
 import { TracePresenceAvatars } from "../../../../elements/presence/trace-presence-avatars.tsx";
 import { EditableTraceName } from "../../../editable-trace-name.tsx";
@@ -496,22 +499,21 @@ export const DrawerHeader = memo(function DrawerHeader({
       // intentional no-op — see comment above
     },
   });
-  // Source chips: cap inline at 10 so multi-evaluator traces don't hide
-  // their second & third verdicts in the overflow popover by default —
-  // eval status is the highest-signal data on the strip, not something
-  // to bury after a half-dozen capabilities. Anything beyond 10 still
-  // rolls into "+N more" so the row stays scannable.
-  const { primary: primaryChips, overflowChip: chipsOverflow } = splitChipsForOverflow(
-    chipDefs,
-    10,
-  );
-  // Pins: auto-pins (identity/run/tag) always inline. Custom + metadata pins inline up
-  // to MAX_INLINE_PINS — the rest still spill into the overflow popover so a
-  // pathological 200-pin trace can't blow out the header.
+  // Pins: custom + metadata pins beyond MAX_INLINE_PINS fold into their own "+N pinned"
+  // chip first, so a pathological 200-pin trace never mounts 200 pills.
   const MAX_INLINE_PINS = 12;
   const pinResult = renderPinPills(categorizedPins, removePin, {
     maxCustomInline: MAX_INLINE_PINS,
   });
+  // The context line: source chips (service, origin, scenario, sdk, prompts, evals,
+  // annotations), then pins. Whatever does not fit sits behind its "+N".
+  const contextChips: FittedChip[] = [
+    ...chipDefs
+      .filter((c) => !c.hidden)
+      .map((c) => ({ id: `chip:${c.id}`, node: <Chip {...c} /> })),
+    ...pinResult.inline.map((el, i) => ({ id: `pin:${el.key ?? i}`, node: el })),
+    ...(pinResult.overflow ? [{ id: "pin:overflow", node: pinResult.overflow }] : []),
+  ];
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
@@ -574,31 +576,24 @@ export const DrawerHeader = memo(function DrawerHeader({
         cacheCreation5mTokens={cacheCreation5mTokens}
         cacheCreationTokens={cacheCreationTokens}
         cacheReadTokens={cacheReadTokens}
-        chipsOverflow={chipsOverflow}
         contextSizeTokens={contextSizeTokens}
         grandCost={grandCost}
         hasAuthoritativeTokens={hasAuthoritativeTokens}
         isBundledCost={isBundledCost}
         isPlaceholder={isPlaceholder}
         nonBilledCost={nonBilledCost}
-        primaryChips={primaryChips}
         reasoningEffort={reasoningEffort}
         reasoningTokens={reasoningTokens}
         totalTokensWithCache={totalTokensWithCache}
         trace={trace}
       />
 
-      {/* Pin strip only renders when there's something to show — many traces have no auto-pins,
-          and a small height jump between trace-with-pins and trace-without beats dead chrome. */}
+      {/* The context line only renders when there's something to show: many traces have no
+          pins, and a small height jump beats a permanent empty band. */}
       {isPlaceholder ? (
         <Skeleton height="22px" width="180px" borderRadius="md" />
       ) : (
-        (pinResult.inline.length > 0 || pinResult.overflow != null) && (
-          <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
-            {pinResult.inline}
-            {pinResult.overflow}
-          </HStack>
-        )
+        contextChips.length > 0 && <FittedChipRow chips={contextChips} ariaLabel="Trace context" />
       )}
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
@@ -1140,8 +1135,8 @@ function HeaderActions({
 }
 
 /**
- * Performance metrics, pinned context and the source/tools chips in one wrapped
- * strip, so a single row of pills doesn't carry a permanent empty band beneath.
+ * The metrics line: duration, spans, cost, tokens, models. One line; whatever does not
+ * fit sits behind a "+N" chip.
  */
 function HeaderMetricsRow({
   billedCost,
@@ -1149,14 +1144,12 @@ function HeaderMetricsRow({
   cacheCreation5mTokens,
   cacheCreationTokens,
   cacheReadTokens,
-  chipsOverflow,
   contextSizeTokens,
   grandCost,
   hasAuthoritativeTokens,
   isBundledCost,
   isPlaceholder,
   nonBilledCost,
-  primaryChips,
   reasoningEffort,
   reasoningTokens,
   totalTokensWithCache,
@@ -1167,25 +1160,33 @@ function HeaderMetricsRow({
   cacheCreation5mTokens: number | null;
   cacheCreationTokens: number | null;
   cacheReadTokens: number | null;
-  chipsOverflow: ReturnType<typeof splitChipsForOverflow>["overflowChip"];
   contextSizeTokens: number | null;
   grandCost: number;
   hasAuthoritativeTokens: boolean;
   isBundledCost: boolean;
   isPlaceholder: boolean;
   nonBilledCost: number;
-  primaryChips: ReturnType<typeof splitChipsForOverflow>["primary"];
   reasoningEffort: string | null;
   reasoningTokens: number | null;
   totalTokensWithCache: number;
   trace: TraceHeader;
 }) {
-  return (
-    <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
-      {/* Section 1: Performance metrics */}
-      <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
-      {trace.spanCount > 0 && <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />}
-      {trace.ttft != null && (
+  const metrics: FittedChip[] = [
+    {
+      id: "duration",
+      node: <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />,
+    },
+  ];
+  if (trace.spanCount > 0) {
+    metrics.push({
+      id: "spans",
+      node: <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />,
+    });
+  }
+  if (trace.ttft != null) {
+    metrics.push({
+      id: "ttft",
+      node: (
         <Tooltip
           content={`Time to First Token: ${formatDuration(trace.ttft)}`}
           positioning={{ placement: "top" }}
@@ -1194,8 +1195,13 @@ function HeaderMetricsRow({
             <MetricPill label="TTFT" value={formatDuration(trace.ttft)} />
           </Box>
         </Tooltip>
-      )}
-      {grandCost > 0 && (
+      ),
+    });
+  }
+  if (grandCost > 0) {
+    metrics.push({
+      id: "cost",
+      node: (
         <Tooltip
           content={
             <CostBreakdownTooltipContent
@@ -1217,8 +1223,13 @@ function HeaderMetricsRow({
             )}
           </Box>
         </Tooltip>
-      )}
-      {contextSizeTokens != null && contextSizeTokens > 0 && (
+      ),
+    });
+  }
+  if (contextSizeTokens != null && contextSizeTokens > 0) {
+    metrics.push({
+      id: "context-size",
+      node: (
         <Tooltip
           content="Context carried into this trace's first model call."
           positioning={{ placement: "top" }}
@@ -1227,8 +1238,13 @@ function HeaderMetricsRow({
             <MetricPill label="Context size" value={formatTokens(contextSizeTokens)} />
           </Box>
         </Tooltip>
-      )}
-      {trace.totalTokens > 0 && (
+      ),
+    });
+  }
+  if (trace.totalTokens > 0) {
+    metrics.push({
+      id: "tokens",
+      node: (
         <Tooltip
           content={
             <TokenBreakdownTooltipContent
@@ -1256,46 +1272,55 @@ function HeaderMetricsRow({
             />
           </Box>
         </Tooltip>
-      )}
-      {reasoningTokens != null && reasoningTokens > 0 && (
-        <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />
-      )}
-      {trace.models.length > 0 &&
-        (trace.models.length > 1 ? (
-          // Folded +N (matches the table's model chip) — the count lives
-          // inside the pill value rather than as a separate badge; the
-          // full model list is one hover away via the tooltip.
+      ),
+    });
+  }
+  if (reasoningTokens != null && reasoningTokens > 0) {
+    metrics.push({
+      id: "reasoning",
+      node: <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />,
+    });
+  }
+  const [firstModel, ...otherModels] = trace.models;
+  if (firstModel) {
+    metrics.push({
+      id: "models",
+      // Folded +N (matches the table's model chip): the full list is one hover away.
+      node:
+        otherModels.length > 0 ? (
           <ModelsTooltip models={trace.models}>
             <Box display="inline-flex">
-              <MetricPill
-                label="Models"
-                value={`${trace.models[0]!}  +${trace.models.length - 1}`}
-              />
+              <MetricPill label="Models" value={`${firstModel}  +${otherModels.length}`} />
             </Box>
           </ModelsTooltip>
         ) : (
-          <MetricPill label="Model" value={trace.models[0]!} />
-        ))}
-      {reasoningEffort && <MetricPill label="Reasoning effort" value={reasoningEffort} />}
+          <MetricPill label="Model" value={firstModel} />
+        ),
+    });
+  }
+  if (reasoningEffort) {
+    metrics.push({
+      id: "reasoning-effort",
+      node: <MetricPill label="Reasoning effort" value={reasoningEffort} />,
+    });
+  }
 
-      {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
-          prompts, annotations). Capped at 6 inline; surplus rolls into
-          the standard "+N more" popover. No PinDivider before this
-          section — the chip borders give enough visual grouping on
-          their own, the extra rule just read as a stray line. */}
-      {primaryChips.map((c) => (
-        <Chip key={c.id} {...c} />
-      ))}
-      {chipsOverflow}
-      {isPlaceholder && (
-        <Skeleton
-          data-testid="trace-header-metric-skeleton"
-          height="22px"
-          width="120px"
-          borderRadius="md"
-        />
-      )}
-    </HStack>
+  return (
+    <FittedChipRow
+      chips={metrics}
+      ariaLabel="Trace metrics"
+      trailing={
+        isPlaceholder && (
+          <Skeleton
+            data-testid="trace-header-metric-skeleton"
+            height="22px"
+            width="120px"
+            borderRadius="md"
+            flexShrink={0}
+          />
+        )
+      }
+    />
   );
 }
 

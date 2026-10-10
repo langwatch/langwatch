@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The toolbar's grouping menu, time-range popover and columns picker.
+ * The toolbar's view menu (grouping, density), time-range popover and columns picker.
  * @see specs/traces-v2/trace-table.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -11,8 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { ColumnPickerContent } from "../column-picker-content.tsx";
-import { GroupingSelector } from "../grouping-selector.tsx";
 import { TimeRangePicker } from "../time-range-picker.tsx";
+import { ViewMenu } from "../view-menu.tsx";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
@@ -38,15 +38,16 @@ afterEach(() => {
   cleanup();
 });
 
-describe("the grouping menu", () => {
+describe("the view menu", () => {
   /** @scenario "Grouping selector shows checkmark on selected item" */
-  it("marks the selected grouping with a checkmark and no other item", async () => {
+  it("marks the selected grouping with a checkmark and no other grouping", async () => {
     useExplorerStore.getState().setGrouping("by-model");
-    renderWithDesignSystem(<GroupingSelector />);
+    renderWithDesignSystem(<ViewMenu />);
 
-    await userEvent.click(screen.getByRole("button", { name: /Group rows/ }));
+    await userEvent.click(screen.getByRole("button", { name: /View options/ }));
 
-    const items = await screen.findAllByRole("menuitemradio");
+    const group = await screen.findByRole("group", { name: "Group rows" });
+    const items = within(group).getAllByRole("menuitemradio");
     const selected = items.filter((item) => item.getAttribute("aria-checked") === "true");
     expect(selected.map((item) => item.textContent)).toEqual(["By Model"]);
     expect(selected[0]?.querySelector("svg")).toBeVisible();

@@ -1,14 +1,24 @@
-import { Box, Button, Flex, Icon, IconButton } from "@langwatch/design-system/primitives";
+import { Kbd } from "@langwatch/design-system/kbd";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  IconButton,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
+import { Bookmark, Compass, Download, Map, PanelLeftOpen, Tent } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
 import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
@@ -16,20 +26,18 @@ import { useIsNewAccount } from "../hooks/use-is-new-account.ts";
 import { useTraceExplorerTourPreference } from "../onboarding/hooks/use-trace-explorer-tour-preference.ts";
 import { useTourEntryPoints } from "../onboarding/index.ts";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
-import { AutomateButton } from "./automate-button.tsx";
 import { ColumnsDropdown } from "./columns-dropdown.tsx";
-import { DensityToggle } from "./density-toggle.tsx";
-import { GroupingSelector } from "./grouping-selector.tsx";
-import { KeyboardShortcutsButton } from "./keyboard-shortcuts-button.tsx";
 import { LensTabs } from "./lens-tabs.tsx";
 import { LiveIndicator } from "./live-indicator.tsx";
 import { TimeRangePicker } from "./time-range-picker.tsx";
+import { ToolbarMoreMenu } from "./toolbar-more-menu.tsx";
+import { ViewMenu } from "./view-menu.tsx";
 
-// Toolbar widths (the bar's own measured width, not the viewport) below which controls
-// progressively shed chrome to keep the lens tabs readable when the window is narrow or
-// the filters sidebar is wide.
-const TOOLBAR_LABELS_MIN_WIDTH = 800;
-const TOOLBAR_CHEVRONS_MIN_WIDTH = 620;
+// Toolbar widths (the bar's own measured width, not the viewport) below which the right
+// clusters shed labels, then chevrons, so the lens tabs keep the room. Lenses that still do
+// not fit move whole into the lens overflow menu.
+const TOOLBAR_LABELS_MIN_WIDTH = 960;
+const TOOLBAR_CHEVRONS_MIN_WIDTH = 720;
 // Room the optional controls take, so the thresholds hold when they are on the bar.
 const SAMPLE_TOGGLE_WIDTH = 120;
 const TOUR_LABEL_WIDTH = 100;
@@ -62,15 +70,15 @@ interface ToolbarProps {
 }
 
 function TourButton({
-  isNewAccount,
+  showLabel,
   spotlightsActive,
   onClick,
 }: {
-  isNewAccount: boolean;
+  showLabel: boolean;
   spotlightsActive: boolean;
   onClick: () => void;
 }) {
-  if (!isNewAccount && !spotlightsActive) {
+  if (!showLabel && !spotlightsActive) {
     return (
       <IconButton size="xs" variant="ghost" onClick={onClick} aria-label="Show me around">
         <Icon boxSize={3.5} color={{ base: "fg.muted", _dark: "fg.subtle" }}>
@@ -121,7 +129,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
 
   const closeDrawer = useDismissTraceDrawer();
-  const handleSamplePreviewToggle = useCallback(() => {
+  const handleSamplePreviewToggle = () => {
     if (showSamplePreview) {
       setShowSamplePreview(false);
       // Sample data + spotlights ride together — switching samples off
@@ -146,18 +154,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       setSpotlightsActive(true);
       writeSpotlightFragment(firstId);
     }
-  }, [
-    showSamplePreview,
-    spotlightsActive,
-    persistTourDismissal,
-    setShowSamplePreview,
-    onEndTour,
-    setSpotlightsActive,
-    setCurrentSpotlightId,
-    closeDrawer,
-  ]);
+  };
 
-  const handleShowMeAround = useCallback(() => {
+  const handleShowMeAround = () => {
     if (spotlightsActive) {
       // Toggle off — dismiss the spotlight tour.
       persistTourDismissal();
@@ -172,7 +171,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       setSpotlightsActive(true);
       writeSpotlightFragment(firstId);
     }
-  }, [spotlightsActive, persistTourDismissal, setSpotlightsActive, setCurrentSpotlightId]);
+  };
 
   // "Save Lens" outline button only surfaces when the active lens has
   // pending local changes. Clicking it opens the shared
@@ -192,6 +191,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
   const hasParseError = useFilterStore((s) => Boolean(s.parseError));
   const { project } = useOrganizationTeamProject();
   const canSaveLenses = !isAggregateProjectKind(project?.kind);
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   // Measure the toolbar's own width so controls can collapse when space runs
   // out (narrow window OR a wide filters sidebar — viewport breakpoints miss
@@ -218,15 +219,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
     <Flex
       ref={toolbarRef}
       align="center"
-      gap={1.5}
+      gap={2}
       paddingX={2}
       borderBottomWidth="1px"
       borderColor="border"
       flexShrink={0}
       minHeight="36px"
     >
-      {/* Sample-data toggle sits at the front of the toolbar as a top-level "what am I looking at?"
-          affordance. Fully absent (no phantom gap) when `hideSampleDataAction` is set. */}
+      {/* Sample-data toggle leads the bar as a "what am I looking at?" affordance; it sheds
+          its label when the bar is narrow. Fully absent when `hideSampleDataAction` is set. */}
       {!hideSampleDataAction && showSampleDataToggle && (
         <Tooltip
           content={showSamplePreview ? "Hide sample traces" : "See sample traces to explore the UI"}
@@ -244,34 +245,52 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             <Icon boxSize={3.5} color={{ base: "orange.fg", _dark: "orange.fg" }}>
               {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>
-            {showSamplePreview ? "Hide sample data" : "See sample data"}
+            {!labelsCompact && (showSamplePreview ? "Hide sample data" : "See sample data")}
           </Button>
         </Tooltip>
       )}
+      {/* Cluster 1: the lenses, which take every pixel the other two clusters leave. */}
       <LensTabs />
-      <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
+      {/* Cluster 2: what the table holds: filters, saving them, the time window, freshness. */}
+      <HStack gap={1} flexShrink={0}>
+        {sidebarCollapsed && (
+          <Tooltip
+            content={
+              <HStack gap={1.5}>
+                <Text>Show filters sidebar</Text>
+                <Kbd>{"["}</Kbd>
+              </HStack>
+            }
+            positioning={{ placement: "bottom" }}
+          >
+            <Button
+              aria-label="Show filters sidebar"
+              variant="outline"
+              size="xs"
+              fontWeight="medium"
+              gap={1.5}
+              color="fg.subtle"
+              onClick={toggleSidebar}
+              flexShrink={0}
+            >
+              <PanelLeftOpen size={14} />
+              Filters
+            </Button>
+          </Tooltip>
+        )}
         {canSaveLenses && activeLensIsDraft && !hasParseError && (
           <LensNamePopover
             defaultName={`${activeLensName} (copy)`}
             onSubmit={(name) => createLens(name)}
           >
-            {/* Icon-only at rest — the full "Save current filtered view"
-                label made this the widest control in the toolbar. The
-                label slides out leftwards on hover (it precedes the icon
-                in DOM order, and the right-anchored cluster absorbs the
-                growth on the left edge), so the affordance still explains
-                itself before commit. */}
+            {/* Icon-only at rest; the label slides out leftwards on hover. Gap 0 so the
+                collapsed label leaves no phantom space beside the icon. */}
             <Button
               size="xs"
               variant="outline"
               colorPalette="orange"
               aria-label="Save current filtered view as a new lens"
               className="group"
-              // Zero the inter-child gap so the collapsed (zero-width) label
-              // doesn't leave a phantom gap to the left of the icon at rest —
-              // that gap was what made the icon sit off-centre in the
-              // icon-only state. The text-to-icon spacing is reinstated as a
-              // `marginRight` on the label that animates in only on hover.
               gap={0}
             >
               <Box
@@ -301,40 +320,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             </Button>
           </LensNamePopover>
         )}
-        <Tooltip
-          content={spotlightsActive ? "End the guided tour" : "Start the guided tour of this page"}
-          positioning={{ placement: "bottom" }}
-        >
-          {/* Full "Show me around" label only for accounts younger than
-              5 days — the tour is an onboarding affordance, and the wide
-              label is wasted toolbar room for everyone who's already
-              been around. "End tour" always shows in full while a tour
-              is running so the escape hatch stays obvious. */}
-          <TourButton
-            isNewAccount={isNewAccount}
-            spotlightsActive={spotlightsActive}
-            onClick={handleShowMeAround}
-          />
-        </Tooltip>
-        <LiveIndicator />
-        {/* Vertical separator clusters the toolbar into:
-              [Save · Tour · Live] · [Time] · [Display: cols, group, density]
-              · [Tools: export, automate] · [Help]
-            Previously these were a flat row of 10 controls with no
-            visual hierarchy — auditor pain was "I don't know what
-            each icon does, and they all blur together". */}
-        <ToolbarDivider />
         <TimeRangePicker compact={labelsCompact} />
-        <ToolbarDivider />
+        <LiveIndicator />
+      </HStack>
+      <ToolbarDivider />
+      {/* Cluster 3: how the table looks (view, columns), getting data out, and help. */}
+      <HStack gap={1} flexShrink={0}>
+        <ViewMenu compact={labelsCompact} />
         <ColumnsDropdown compact={chevronsCompact} />
-        <GroupingSelector compact={chevronsCompact} />
-        <DensityToggle />
-        {/* Toolbar Find button retired in Round 3 — Find is bound to
-            ⌘/Ctrl+F, exactly where users expect it. The discoverability
-            hint moved underneath the search bar so first-time users
-            still learn the shortcut without a permanent toolbar icon
-            taking up scarce horizontal room. */}
-        <ToolbarDivider />
         {onExportAll && (
           <Tooltip
             content="Export the current view to CSV or JSON"
@@ -353,18 +346,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             </IconButton>
           </Tooltip>
         )}
-        <AutomateButton compact={labelsCompact} />
-        <ToolbarDivider />
-        <KeyboardShortcutsButton />
-      </Flex>
+        <Tooltip
+          content={spotlightsActive ? "End the guided tour" : "Start the guided tour of this page"}
+          positioning={{ placement: "bottom" }}
+        >
+          {/* Full "Show me around" label only for accounts younger than 5 days, and only
+              while the bar has room; "End tour" always shows in full so the escape hatch
+              stays obvious. */}
+          <TourButton
+            showLabel={isNewAccount && !labelsCompact}
+            spotlightsActive={spotlightsActive}
+            onClick={handleShowMeAround}
+          />
+        </Tooltip>
+        <ToolbarMoreMenu />
+      </HStack>
     </Flex>
   );
 };
 
-/** Thin vertical hairline used to cluster the toolbar into role-based
- *  groups (time / display / tools / help). Kept as a tiny presentational
- *  component to avoid repeating the same height + colour + margin
- *  inline four times. */
+/** Thin vertical hairline between the toolbar's clusters. */
 const ToolbarDivider: React.FC = () => (
-  <Box width="1px" height="14px" bg="border.muted" marginX={0.5} aria-hidden="true" />
+  <Box width="1px" height="16px" bg="border.muted" flexShrink={0} aria-hidden="true" />
 );
