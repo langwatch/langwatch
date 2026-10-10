@@ -54,6 +54,19 @@ Feature: Release manifests order every migration step release by release
     Then loading is refused naming the step id and both releases
 
   @unit
+  Scenario: The shipped deprecation register names the retired project scope tables
+    Given packages/upgrade/releases/deprecations/deprecations.json as this image ships it
+    When the register is loaded
+    Then it names DataPrivacyProjectScope and DataRetentionProjectScope as deprecated Postgres tables
+    And each says what replaces it and that it is removed in a future release
+
+  @unit
+  Scenario: A deprecation removed before it is deprecated, or named twice, is refused
+    Given a register whose entry is removed in 3.21.0 but deprecated in 3.22.0
+    When the register is loaded
+    Then loading is refused naming the entry and both releases
+
+  @unit
   Scenario: A manifest whose file name is not its release is refused
     Given a manifest file named 3.21.0.json whose release reads 3.22.0
     When the manifests are loaded

@@ -89,8 +89,6 @@ export const prismaTableCatalogue = {
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
-  "DataPrivacyProjectScope": "DataPrivacyProjectScope",
-  "DataRetentionProjectScope": "DataRetentionProjectScope",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
   "InstantEvalJudgeSpend": "InstantEvalJudgeSpend",
@@ -1613,25 +1611,6 @@ export const prismaModelFieldCatalogue = {
     "personalOnly",
     "config",
     "createdAt",
-    "updatedAt"
-  ],
-  "DataPrivacyProjectScope": [
-    "projectId",
-    "organizationId",
-    "teamId",
-    "isPersonal",
-    "departmentId",
-    "teamRecordedAt",
-    "departmentRecordedAt",
-    "archivedAt",
-    "updatedAt"
-  ],
-  "DataRetentionProjectScope": [
-    "projectId",
-    "organizationId",
-    "teamId",
-    "teamRecordedAt",
-    "archivedAt",
     "updatedAt"
   ],
   "InstantEvalJudgeProject": [
@@ -3209,8 +3188,6 @@ export const prismaRelationCatalogue = {
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
-  "DataPrivacyProjectScope": {},
-  "DataRetentionProjectScope": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
   "InstantEvalJudgeSpend": {},

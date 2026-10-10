@@ -5,7 +5,7 @@ import {
   UpgradeLedgerRepository as ServingLedger,
 } from "@langwatch/upgrade";
 import { readImageCodeSteps } from "@langwatch/upgrade/gate";
-import { loadReleases } from "@langwatch/upgrade/manifest";
+import { type Deprecation, loadDeprecations, loadReleases } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
   type ListRunsInput,
@@ -85,6 +85,10 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   findStatus(): Promise<UpgradeStatus> {
     return this.reader.status();
+  }
+
+  findDeprecations(): Deprecation[] {
+    return loadDeprecations();
   }
 
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage> {

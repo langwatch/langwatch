@@ -58,6 +58,18 @@ export const opsUpgradeLeaseSchema = z.object({
 });
 export type OpsUpgradeLease = z.infer<typeof opsUpgradeLeaseSchema>;
 
+/** Something this image still ships but retires; a null release is unreleased, or not yet named. */
+export const opsUpgradeDeprecationSchema = z.object({
+  id: z.string(),
+  what: z.string(),
+  kind: z.string(),
+  deprecatedIn: z.string().nullable(),
+  removedIn: z.string().nullable(),
+  successor: z.string().nullable(),
+  notice: z.string(),
+});
+export type OpsUpgradeDeprecation = z.infer<typeof opsUpgradeDeprecationSchema>;
+
 /** Where the installation stands; `state`, `tone` and `reason` are the reader's words, raw. */
 export const opsUpgradeStatusSchema = z.object({
   state: z.string(),
@@ -75,6 +87,8 @@ export const opsUpgradeStatusSchema = z.object({
   counts: countsSchema,
   failedStepIds: z.array(z.string()),
   failedTargets: z.number().int(),
+  /** The image's deprecation register (ruling D8), shown under "Deprecated". */
+  deprecations: z.array(opsUpgradeDeprecationSchema),
 });
 export type OpsUpgradeStatus = z.infer<typeof opsUpgradeStatusSchema>;
 

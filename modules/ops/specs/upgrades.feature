@@ -38,6 +38,14 @@ Feature: Ops shows an installation's release upgrades, read-only
     And it names the command "pnpm task upgrade"
 
   @integration
+  Scenario: The overview lists what the image deprecates, its replacement and when it is removed
+    Given an image whose deprecation register names the Postgres table DataPrivacyProjectScope
+    And the entry is replaced by Project and Team placement and names no removal release
+    When an operator opens Ops, Upgrades
+    Then a "Deprecated" section lists the table with its notice
+    And it shows what replaces it and "A future release" as when it is removed
+
+  @integration
   Scenario: The overview says when no upgrade has been recorded yet
     Given an installation whose ledger holds no release
     When an operator opens Ops, Upgrades

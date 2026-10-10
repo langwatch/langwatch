@@ -567,6 +567,7 @@ export interface LwqlPrismaRows {
     readonly language: "String";
     readonly framework: "String";
     readonly kind: "String";
+    readonly aggregateRule: "Json?";
     readonly firstMessage: "Boolean";
     readonly integrated: "Boolean";
     readonly createdAt: "DateTime";
@@ -824,6 +825,7 @@ export interface LwqlPrismaRows {
     readonly sqsSecretAccessKeyEncrypted: "String?";
     readonly secretEncrypted: "String";
     readonly signatureScheme: "String?";
+    readonly idempotencyKey: "String?";
     readonly previousSecretEncrypted: "String?";
     readonly previousSecretExpiresAt: "DateTime?";
     readonly enabledEvents: "String[]";
@@ -834,6 +836,7 @@ export interface LwqlPrismaRows {
     readonly maxBatchSize: "Int";
     readonly maxBatchDelayMs: "Int";
     readonly maxInFlight: "Int";
+    readonly allowSelfSignedCertificate: "Boolean";
     readonly lastSuccessAt: "DateTime?";
     readonly lastFailureAt: "DateTime?";
     readonly archivedAt: "DateTime?";
@@ -1231,25 +1234,6 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
-  readonly DataPrivacyProjectScope: {
-    readonly projectId: "String";
-    readonly organizationId: "String";
-    readonly teamId: "String?";
-    readonly isPersonal: "Boolean?";
-    readonly departmentId: "String?";
-    readonly teamRecordedAt: "DateTime?";
-    readonly departmentRecordedAt: "DateTime?";
-    readonly archivedAt: "DateTime?";
-    readonly updatedAt: "DateTime";
-  };
-  readonly DataRetentionProjectScope: {
-    readonly projectId: "String";
-    readonly organizationId: "String";
-    readonly teamId: "String?";
-    readonly teamRecordedAt: "DateTime?";
-    readonly archivedAt: "DateTime?";
-    readonly updatedAt: "DateTime";
-  };
   readonly InstantEvalJudgeProject: {
     readonly projectId: "String";
     readonly organizationId: "String";
@@ -1587,6 +1571,7 @@ export interface LwqlPrismaRows {
     readonly createdByUserId: "String?";
     readonly expiresAt: "DateTime?";
     readonly maxViews: "Int?";
+    readonly condition: "Json?";
     readonly occurredAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1697,6 +1682,7 @@ export interface LwqlPrismaRows {
     readonly licenseTokenHash: "String?";
     readonly licenseInstanceId: "String?";
     readonly licenseExpiresAt: "DateTime?";
+    readonly licenseId: "String?";
   };
   readonly VirtualKeyScope: {
     readonly id: "String";
