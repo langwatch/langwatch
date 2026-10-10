@@ -24,7 +24,7 @@ const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 /** Auth's account doors: each writes through user, then ends the credentials it outdates. */
 export type InstanceAdminAccounts = Pick<AuthApi, "deactivateUser" | "changeUserEmail">;
 /** Project's one door for its sharing switch, so share hears the fact it revokes from. */
-export type InstanceAdminProjects = Pick<ProjectApi, "setTraceSharing">;
+type InstanceAdminProjects = Pick<ProjectApi, "setTraceSharing">;
 export type InstanceAdminShares = Pick<ShareApi, "countTraceShares">;
 
 interface InstanceAdminServiceOptions {

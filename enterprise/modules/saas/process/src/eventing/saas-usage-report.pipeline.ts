@@ -21,8 +21,7 @@ import { z } from "zod";
 
 import type { SaasModule } from "../app/saas.app.ts";
 
-export const RECORD_USAGE_REPORT_RECEIVED_COMMAND_TYPE =
-  "lw.saas.record_usage_report_received" as const;
+const RECORD_USAGE_REPORT_RECEIVED_COMMAND_TYPE = "lw.saas.record_usage_report_received" as const;
 
 const usageReportReceivedEventSchema = z.object({
   ...EventSchema.shape,
@@ -41,7 +40,7 @@ export type SaasUsageReportPipeline = StaticPipelineDefinition<
 >;
 
 /** One accepted report per install and instant; a retried send records it once. */
-export const RecordUsageReportReceivedCommand = defineCommand({
+const RecordUsageReportReceivedCommand = defineCommand({
   commandType: RECORD_USAGE_REPORT_RECEIVED_COMMAND_TYPE,
   eventType: USAGE_REPORT_RECEIVED_EVENT_TYPE,
   eventVersion: USAGE_REPORT_RECEIVED_EVENT_VERSION,
@@ -52,7 +51,7 @@ export const RecordUsageReportReceivedCommand = defineCommand({
 });
 
 /** saas_usage_report: saas records the fact; nurturing reacts from its side (§9, rule 7). */
-export function buildSaasUsageReportPipeline(): SaasUsageReportPipeline {
+function buildSaasUsageReportPipeline(): SaasUsageReportPipeline {
   return definePipeline({
     name: SAAS_USAGE_REPORT_PIPELINE_NAME,
     aggregate: defineAggregate({ type: SAAS_USAGE_REPORT_AGGREGATE_TYPE }),

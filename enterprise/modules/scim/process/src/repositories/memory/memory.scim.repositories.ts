@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
+
+import type { ScimSeatRepository } from "../scim-seat.repository.ts";
 import type { ScimRepositories } from "../scim.repositories.ts";
-import { MemoryScimSeatRepository } from "./memory.scim-seat.repository.ts";
 import { MemoryScimSsoConnectionRepository } from "./memory.scim-sso-connection.repository.ts";
 import { MemoryScimSyncActivityRepository } from "./memory.scim-sync-activity.repository.ts";
 import { MemoryScimSyncProjectionRepository } from "./memory.scim-sync-projection.repository.ts";
@@ -18,5 +20,20 @@ export class MemoryScimRepositories {
       scimSsoConnections: MemoryScimSsoConnectionRepository.create(),
       seats: MemoryScimSeatRepository.create(),
     };
+  }
+}
+
+/** Holds no seats for any organization. */
+export class MemoryScimSeatRepository implements ScimSeatRepository {
+  static create(): MemoryScimSeatRepository {
+    return new MemoryScimSeatRepository();
+  }
+
+  private constructor() {}
+
+  async countMemberSeats(
+    _input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationMemberSeats> {
+    return { fullMembers: 0, liteMembers: 0, developers: 0 };
   }
 }

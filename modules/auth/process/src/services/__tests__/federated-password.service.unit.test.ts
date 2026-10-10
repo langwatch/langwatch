@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { NO_SIGN_IN_PROVIDERS } from "../../app/__tests__/support/sign-in-providers.ts";
 import { HttpAuth0PasswordChannel } from "../../channels/http/http.auth0-password.channel.ts";
-import { MemoryAuth0PasswordChannel } from "../../channels/memory/memory.auth0-password.channel.ts";
+import { MemoryAuth0PasswordChannel } from "../../channels/memory/memory.auth.channels.ts";
 import { FederatedPasswordService } from "../federated-password.service.ts";
 
 const CHANGE = {
