@@ -184,7 +184,12 @@ export class WebhookEgressService {
     const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
     const admission = judgeWebhookUrl({ url, allowInsecureLocal });
     if (!admission.admitted) {
-      throw new DispatchError({ message: `${label}: ${admission.reason}`, retryable: false });
+      // The author typed this URL, so the refusal is theirs to read (a test fire answers it).
+      throw new DispatchError({
+        message: `${label}: ${admission.reason}`,
+        retryable: false,
+        customerMessage: `${admission.reason.charAt(0).toUpperCase()}${admission.reason.slice(1)}`,
+      });
     }
     // A real fire only; a test fire is counted on its own door instead — the
     // automation drawer's per-user limit, or the tier-effective per-organization

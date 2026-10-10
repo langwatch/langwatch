@@ -386,3 +386,15 @@ Feature: Automation ownership
     When the author test-fires it
     Then the test fire is refused as test_fire_unavailable with the token remediation, not an internal error
 
+  @unit
+  Scenario: A test fire to a revoked Slack webhook names the remediation
+    Given an automation delivering through a Slack incoming webhook Slack has revoked
+    When the author test-fires it
+    Then the test fire is refused as test_fire_unavailable with the webhook remediation, not an internal error
+
+  @unit
+  Scenario: A webhook test fire the endpoint or the fence refuses names why
+    Given a webhook automation whose endpoint answers non-2xx, or whose URL the webhook module refuses
+    When the author test-fires it
+    Then the test fire is refused as test_fire_unavailable with the reason, not an internal error
+
