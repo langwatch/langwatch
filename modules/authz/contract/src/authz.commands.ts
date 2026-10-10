@@ -443,6 +443,8 @@ export type AuthzFindLiveSharedProjectGrantsInput = z.infer<
 const authzSharedProjectGrantSchemaDefinition = z.object({
   grantId: z.string().min(1),
   memberProjectId: z.string().min(1),
+  /** The stored window; null when it no longer parses, so the row is still listed and revocable. */
+  condition: grantConditionSchema.nullable(),
 });
 export interface AuthzSharedProjectGrantSchema extends Named<
   typeof authzSharedProjectGrantSchemaDefinition
