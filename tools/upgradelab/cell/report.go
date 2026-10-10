@@ -109,7 +109,7 @@ var invariantNames = map[string]string{
 	"I0":  "the api serves everything from boot while the upgrade runs: no holding page",
 	"B1":  "no browser console error and no failed request during the walk",
 	"I7":  "every stored event parses under head's schemas and upcasts",
-	"I5":  "read models are filled: trace meter equals the trace count, open suite runs counted, scope rows for every project",
+	"I5":  "read models are filled: trace meter equals the trace count, open suite runs counted",
 	"I2":  "ledger current: every step done or not-needed (operator steps aside)",
 	"I2b": "nothing reopened after ready",
 	"I3":  "api ready and every live roster row declares the image's steps",

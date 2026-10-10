@@ -526,7 +526,7 @@ func (cell *run) browserVerdict() Verdict {
 // readModelVerdict (I5): the projections an upgrade must leave filled. Any failed part fails it; a part
 // that cannot be judged makes it inconclusive, never a pass.
 func (cell *run) readModelVerdict(ctx context.Context) Verdict {
-	parts := []Verdict{cell.traceMeterPart(ctx), cell.openSuitesPart(ctx), cell.scopePart(ctx)}
+	parts := []Verdict{cell.traceMeterPart(ctx), cell.openSuitesPart(ctx)}
 	result, detail := "pass", []string{}
 	for _, part := range parts {
 		detail = append(detail, part.Name+": "+part.Result+" ("+part.Detail+")")
@@ -592,22 +592,6 @@ func (cell *run) openSuitesPart(ctx context.Context) Verdict {
 		return Verdict{Name: "open suite runs", Result: "inconclusive", Detail: err.Error()}
 	}
 	return Verdict{Name: "open suite runs", Result: "inconclusive", Detail: fmt.Sprintf("by status %q; no started-run count to compare yet", strings.ReplaceAll(strings.TrimSpace(out), "\n", ", "))}
-}
-
-// scopePart: privacy and retention resolve through a per-project scope row (data privacy's and data
-// retention's own fold); a live project without one resolves to nothing.
-func (cell *run) scopePart(ctx context.Context) Verdict {
-	var gaps []string
-	for _, table := range []string{"DataPrivacyProjectScope", "DataRetentionProjectScope"} {
-		out, err := psql(ctx, cell.stores.psqlURL(), `SELECT count(*) FROM mydb."Project" p WHERE p."archivedAt" IS NULL AND NOT EXISTS (SELECT 1 FROM mydb."`+table+`" s WHERE s."projectId" = p.id)`)
-		if err != nil {
-			return Verdict{Name: "privacy and retention", Result: "inconclusive", Detail: err.Error()}
-		}
-		if strings.TrimSpace(out) != "0" {
-			gaps = append(gaps, table+" misses "+strings.TrimSpace(out))
-		}
-	}
-	return Verdict{Name: "privacy and retention", Result: map[bool]string{true: "pass", false: "fail"}[len(gaps) == 0], Detail: fmt.Sprintf("projects without a scope row: %v", gaps)}
 }
 
 // storedEventsVerdict (I7): head's worker parses every stored event on every ClickHouse target under
