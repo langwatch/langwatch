@@ -46,7 +46,7 @@ var cloudBilling = map[string]string{"STRIPE_SECRET_KEY": "sk_test_upgradelab_ne
 // Tiers and shapes a cell accepts today; L and XL wait for the scale generator (lane L4).
 var (
 	Tiers      = []string{"S", "M"}
-	DataShapes = []string{"typical"}
+	DataShapes = []string{"typical", EmptyShape}
 )
 
 // processKeys are the only parent variables a child sees: never a provider key or a store URL.

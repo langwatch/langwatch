@@ -131,7 +131,12 @@ func (cell *run) copyVerdict(ctx context.Context) Verdict {
 			}
 		}
 	}
-	return verdict("I4", len(shrunk) == 0, fmt.Sprintf("%d stores fingerprinted; shrunk: %v", len(cell.before), shrunk))
+	tables := make([]string, 0, len(cell.before))
+	for store, each := range cell.before {
+		tables = append(tables, fmt.Sprintf("%s %d tables", store, len(each)))
+	}
+	slices.Sort(tables)
+	return verdict("I4", len(shrunk) == 0, fmt.Sprintf("every table counted at the cut and after (%s); shrunk: %v", strings.Join(tables, ", "), shrunk))
 }
 
 func (cell *run) readBackVerdict(ctx context.Context) Verdict {

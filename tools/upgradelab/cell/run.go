@@ -109,13 +109,17 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	if options.FromSnapshot != "" {
 		origin = []step{{"stores", cell.freshStores}, {"restore", cell.restore}, {"from-up", cell.fromUp}, {"sign-in", cell.resumeSeed}}
 	}
-	cell.runSteps(ctx, slices.Concat([]step{{"build", cell.buildBoth}}, origin, []step{
+	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, []step{
 		{"traffic-before", cell.trafficBefore}, {"cut", cell.cut}, {"switch", cell.switchToHead}, {"ready", cell.awaitReady},
 		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", func(ctx context.Context) error {
 			cell.stopObservers()
 			return cell.checks(ctx)
 		}},
-	}))
+	})
+	if cell.emptyOrigin() {
+		steps = cell.emptySteps()
+	}
+	cell.runSteps(ctx, steps)
 	cell.finishTraffic()
 	cell.partialTraffic()
 	cell.noteLoad("end")
@@ -553,7 +557,7 @@ func (cell *run) startObservers(ctx context.Context) {
 	cell.sampleStop = stop
 	go SampleResources(sampleCtx, SampleSpec{Path: filepath.Join(cell.options.RunDir, "resources.jsonl"), Origin: cell.origin,
 		Every: 5 * time.Second, Procs: cell.procList, ClickHouseBase: cell.stores.ClickHouseBase, RedisPort: cell.stores.RedisPort})
-	if cell.options.Shots {
+	if cell.options.Shots && !cell.emptyOrigin() { // the walker signs in, and an empty install has no account until ready
 		email, password := generate.SeedAccount(cell.options.Seed)
 		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
 			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: 10 * time.Second})
@@ -696,6 +700,9 @@ func (cell *run) awaitReady(ctx context.Context) error {
 		return errors.Join(err, cell.deathNote())
 	}
 	cell.mark("ready")
+	if cell.emptyOrigin() {
+		cell.emptyAccount(ctx)
+	}
 	cell.grantOperator(ctx)
 	cell.assertOldWritersGone(ctx)
 	ledger, err := Ledger(ctx, cell.stores)
