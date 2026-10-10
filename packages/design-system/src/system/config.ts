@@ -50,11 +50,11 @@ const toastGlass = (hue: keyof typeof TOAST_DRIFT) => {
     `color-mix(in srgb, color-mix(in srgb, var(--chakra-colors-${TOAST_DRIFT[hue]}-${n}) 55%, var(--chakra-colors-${hue}-${n})) ${alpha}, transparent)`;
   const field = "50% calc(100% + var(--viewport-offset-bottom, 1rem) - var(--toast-shift))";
   return {
-    bg: c(900, "88%"),
+    bg: c(800, "88%"),
     backgroundImage: [
       "linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 45%)",
       `radial-gradient(40% 24% at 50% 100%, ${c(500, "62%")} 0%, transparent 100%)`,
-      `linear-gradient(170deg, ${c(900, "92%")} 0%, ${c(900, "90%")} 55%, ${drift(800, "90%")} 70%, ${drift(700, "88%")} 80%, ${c(800, "88%")} 90%, ${c(700, "88%")} 100%)`,
+      `linear-gradient(170deg, ${c(800, "92%")} 0%, ${c(800, "90%")} 55%, ${drift(700, "90%")} 70%, ${drift(600, "88%")} 80%, ${c(700, "88%")} 90%, ${c(600, "88%")} 100%)`,
     ].join(", "),
     backgroundSize: "100% 100%, 100vw 100vh, 100vw 100vh",
     backgroundPosition: `0 0, ${field}, ${field}`,
@@ -66,22 +66,16 @@ const toastGlass = (hue: keyof typeof TOAST_DRIFT) => {
   };
 };
 
-/** A light-mode solid badge is the toast glass shrunk to a count: deep base, rim, gloss, glow. */
+/** A light-mode solid badge is quiet glass on its palette's solid colour: a fine rim, a light. */
 const badgeGlass = {
   color: "white",
-  bg: "var(--chakra-colors-color-palette-600)",
-  backgroundImage: [
-    "linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 62%)",
-    "radial-gradient(120% 80% at 50% 115%, color-mix(in srgb, var(--chakra-colors-color-palette-400) 85%, transparent) 0%, transparent 70%)",
-    "linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--chakra-colors-color-palette-800) 35%, transparent) 100%)",
-  ].join(", "),
+  bg: "colorPalette.solid",
+  backgroundImage:
+    "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)",
   boxShadow: [
-    "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-color-palette-300) 55%, transparent)",
-    "inset 0 1px 0 rgba(255, 255, 255, 0.28)",
-    "0 1px 3px color-mix(in srgb, var(--chakra-colors-color-palette-600) 45%, transparent)",
+    "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-color-palette-700) 35%, transparent)",
+    "inset 0 1px 0 rgba(255, 255, 255, 0.2)",
   ].join(", "),
-  textShadow:
-    "0 1px 1px color-mix(in srgb, var(--chakra-colors-color-palette-900) 55%, transparent)",
 };
 
 export const designSystemConfig = defineConfig({
