@@ -304,13 +304,19 @@ export class UpgradeRunnerService {
 
   /** The ledger as the planner reads it; an empty or absent one is read from the tools' records. */
   private async readLedger(): Promise<{ steps: LedgerFacts; runs: UpgradeRun[] }> {
-    if ((await this.runner.ledgerExists()) && !(await this.runner.isEmpty())) {
+    if ((await this.runner.ledgerExists()) && (await this.seeded())) {
       return { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
     }
     const { postgres, clickhouse } = this.options;
     const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
     const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
     return { steps: [...prisma, ...goose], runs: [] };
+  }
+
+  /** A seed that failed or was cut after its run row seeds again, never reads as fresh. */
+  private async seeded(): Promise<boolean> {
+    const runs = await this.ledger.findRuns();
+    return runs.some((run) => run.kind === "seed" && run.outcome === "succeeded");
   }
 
   /** `fresh`: this runner found no Prisma history, so what the ledger holds it applied itself. */
@@ -334,7 +340,7 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     fresh: boolean;
   }): Promise<UpgradeOutcome> {
-    if (await this.runner.isEmpty()) {
+    if (!(await this.seeded())) {
       const { postgres, clickhouse } = this.options;
       await UpgradeLedgerSeedService.create({ postgres, clickhouse }).seed();
     }
