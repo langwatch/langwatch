@@ -114,6 +114,28 @@ export const ActionsWithStart: Story = {
   ),
 };
 
+/** A drawer that keeps a draft: Save takes Cancel's place via `secondary`, Discard on the left. */
+export const ActionsWithSecondary: Story = {
+  render: (args) => (
+    <Drawer.Root {...args}>
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
+          <Drawer.Title>Evaluator</Drawer.Title>
+        </Drawer.Header>
+        <Drawer.Body>
+          <Text textStyle="sm">Exact match · 2 unsaved changes</Text>
+        </Drawer.Body>
+        <Drawer.Actions
+          start={<Button variant="outline">Discard</Button>}
+          secondary={<Button variant="outline">Save</Button>}
+          primary={<Button colorPalette="orange">Apply</Button>}
+        />
+      </Drawer.Content>
+    </Drawer.Root>
+  ),
+};
+
 /** The width steps this product adds on top of Chakra's own. */
 export const Sizes: Story = {
   args: { size: "2xl" },

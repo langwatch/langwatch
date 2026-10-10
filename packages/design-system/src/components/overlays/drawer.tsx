@@ -85,6 +85,17 @@ export interface DrawerActionsProps {
   busy?: boolean;
   /** A secondary action on the left edge: Delete, Duplicate, Test connection. */
   start?: React.ReactNode;
+  /**
+   * Takes Cancel's place: a second outline action beside the primary, for a drawer that keeps
+   * a draft and never closes on its footer (the studio's Save beside Apply). No Cancel then.
+   */
+  secondary?: React.ReactNode;
+  /**
+   * Only the row, without the footer around it: for a host that draws the footer itself and
+   * may show it outside the drawer (the studio's expanded view). Outside a drawer, pass
+   * `secondary` or `onCancel`, since the default Cancel closes the drawer it sits in.
+   */
+  bare?: boolean;
 }
 
 /** The drawer's footer row: `start` on the left, then Cancel (outline) and the primary. */
@@ -94,26 +105,33 @@ export function DrawerActions({
   cancelLabel = "Cancel",
   busy = false,
   start,
+  secondary,
+  bare = false,
 }: DrawerActionsProps) {
+  const row = (
+    <HStack width="full" gap={2}>
+      {start}
+      <Spacer />
+      {secondary ?? <DrawerCancel onCancel={onCancel} cancelLabel={cancelLabel} busy={busy} />}
+      {primary}
+    </HStack>
+  );
+  return bare ? row : <ChakraDrawer.Footer>{row}</ChakraDrawer.Footer>;
+}
+
+function DrawerCancel({
+  onCancel,
+  cancelLabel,
+  busy,
+}: Required<Pick<DrawerActionsProps, "cancelLabel" | "busy">> &
+  Pick<DrawerActionsProps, "onCancel">) {
   const cancel = (
     <Button variant="outline" onClick={onCancel} disabled={busy}>
       {cancelLabel}
     </Button>
   );
-  return (
-    <ChakraDrawer.Footer>
-      <HStack width="full" gap={2}>
-        {start}
-        <Spacer />
-        {onCancel ? (
-          cancel
-        ) : (
-          <ChakraDrawer.ActionTrigger asChild>{cancel}</ChakraDrawer.ActionTrigger>
-        )}
-        {primary}
-      </HStack>
-    </ChakraDrawer.Footer>
-  );
+  if (onCancel) return cancel;
+  return <ChakraDrawer.ActionTrigger asChild>{cancel}</ChakraDrawer.ActionTrigger>;
 }
 
 /** Product adds custom sizes to Chakra's drawer recipe. */

@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { StudioIsolatedErrorBoundary } from "../states/studio-error-boundary.tsx";
 import { Drawer as BaseDrawer } from "./drawer.tsx";
-export type { AppDrawerSize, DrawerRootProps } from "./drawer.tsx";
+export type { AppDrawerSize, DrawerActionsProps, DrawerRootProps } from "./drawer.tsx";
 
 export { DrawerOffsetProvider } from "./drawer.tsx";
 
@@ -73,6 +73,7 @@ export const DrawerBody = BaseDrawer.Body;
 export const DrawerDescription = BaseDrawer.Description;
 export const DrawerTitle = BaseDrawer.Title;
 export const DrawerActionTrigger = BaseDrawer.ActionTrigger;
+export const DrawerActions = BaseDrawer.Actions;
 
 export const Drawer = {
   Root: DrawerRoot,
@@ -82,6 +83,8 @@ export const Drawer = {
   Header: DrawerHeader,
   Body: DrawerBody,
   Footer: DrawerFooter,
+  /** The standard footer row; `bare` for a host that draws the footer itself. */
+  Actions: DrawerActions,
   Description: DrawerDescription,
   Title: DrawerTitle,
   ActionTrigger: DrawerActionTrigger,

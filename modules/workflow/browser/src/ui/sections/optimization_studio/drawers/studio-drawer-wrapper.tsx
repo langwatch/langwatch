@@ -37,7 +37,7 @@ export type StudioDrawerWrapperProps = {
   children: React.ReactNode;
   /** Called when the drawer should close (e.g. close button or backdrop click). */
   onClose: () => void;
-  /** Content rendered in the drawer footer (e.g. Apply/Save/Discard buttons) */
+  /** The footer row, a `<Drawer.Actions bare … />`: the wrapper draws the footer around it. */
   footer?: React.ReactNode;
 };
 
@@ -48,7 +48,7 @@ function escapeCollapses(input: { key: string; expanded: boolean }): boolean {
 }
 
 /**
- * StudioDrawerWrapper -- reusable drawer shell for the optimization studio.
+ * StudioDrawerWrapper -- reusable drawer shell for the workflow studio.
  */
 export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioDrawerWrapperProps) {
   const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded, duplicateNode, deleteNode } =

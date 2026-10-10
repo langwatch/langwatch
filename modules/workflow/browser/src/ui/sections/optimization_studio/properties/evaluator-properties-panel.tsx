@@ -1,5 +1,6 @@
 import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type EvaluatorEditorValues, type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
@@ -271,37 +272,43 @@ function DbEvaluatorForm({
   // Register footer with the drawer wrapper
   const footerContent = useMemo(
     () => (
-      <HStack width="full">
-        {hasLocalChanges && (
+      <Drawer.Actions
+        bare
+        start={
+          hasLocalChanges && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDiscard}
+              data-testid="evaluator-discard-button"
+            >
+              Discard
+            </Button>
+          )
+        }
+        secondary={
           <Button
             variant="outline"
             size="sm"
-            onClick={handleDiscard}
-            data-testid="evaluator-discard-button"
+            onClick={handleSave}
+            loading={updateMutation.isPending}
+            data-testid="evaluator-save-button"
           >
-            Discard
+            Save
           </Button>
-        )}
-        <Spacer />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSave}
-          loading={updateMutation.isPending}
-          data-testid="evaluator-save-button"
-        >
-          Save
-        </Button>
-        <Button
-          colorPalette="orange"
-          variant="solid"
-          size="sm"
-          onClick={handleApply}
-          data-testid="evaluator-apply-button"
-        >
-          Apply
-        </Button>
-      </HStack>
+        }
+        primary={
+          <Button
+            colorPalette="orange"
+            variant="solid"
+            size="sm"
+            onClick={handleApply}
+            data-testid="evaluator-apply-button"
+          >
+            Apply
+          </Button>
+        }
+      />
     ),
     [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
