@@ -1,12 +1,19 @@
-// CLI authorize flow state message. Traces-v2 visual language. Role derived (alert vs status)
-// matters for screen readers (refusals interrupt; success/explanation are polite).
+// CLI authorize flow state message, drawn as the design system's inline banner. Role is the
+// banner's: an error interrupts a screen reader, the rest are polite.
 
-import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { Banner, type BannerStatus } from "@langwatch/design-system/banner";
 import type React from "react";
+
+const STATUS: Record<"green" | "red" | "orange" | "blue", BannerStatus> = {
+  green: "success",
+  red: "error",
+  orange: "warning",
+  blue: "info",
+};
 
 export function StatusCard({
   palette,
-  icon,
+  icon: Glyph,
   title,
   children,
 }: {
@@ -15,28 +22,9 @@ export function StatusCard({
   title: string;
   children: React.ReactNode;
 }) {
-  const role = palette === "red" || palette === "orange" ? "alert" : "status";
   return (
-    <Box
-      role={role}
-      borderWidth="1px"
-      borderColor={`${palette}.muted`}
-      borderRadius="lg"
-      bg={`${palette}.subtle`}
-      paddingX={5}
-      paddingY={4}
-    >
-      <HStack align="flex-start" gap={3}>
-        <Icon as={icon} boxSize={5} color={`${palette}.fg`} flexShrink={0} marginTop={0.5} />
-        <VStack align="stretch" gap={1} flex={1}>
-          <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
-            {title}
-          </Text>
-          <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-            {children}
-          </Text>
-        </VStack>
-      </HStack>
-    </Box>
+    <Banner status={STATUS[palette]} title={title} icon={<Glyph size={16} aria-hidden="true" />}>
+      {children}
+    </Banner>
   );
 }

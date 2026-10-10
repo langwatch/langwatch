@@ -197,6 +197,7 @@ function refreshWorld() {
     watchCliDeviceApproval: (input) => flow.watchDeviceApproval(input),
   };
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

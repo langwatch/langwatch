@@ -1,17 +1,19 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
-export const seedActionOutcomeSchema = z.discriminatedUnion("status", [
+const seedActionOutcomeSchemaDefinition = z.discriminatedUnion("status", [
   z.object({ status: z.literal("succeeded"), summary: z.string() }),
   z.object({ status: z.literal("skipped"), reason: z.string() }),
   z.object({ status: z.literal("failed"), error: z.string() }),
 ]);
+export interface SeedActionOutcomeSchema extends Named<typeof seedActionOutcomeSchemaDefinition> {}
+export const seedActionOutcomeSchema: SeedActionOutcomeSchema = seedActionOutcomeSchemaDefinition;
 
 export type SeedActionOutcome = z.infer<typeof seedActionOutcomeSchema>;
 
 /** One run over the demo organization: every action's outcome, in either mode. */
-export const seedRunReportSchema = z.object({
+const seedRunReportSchemaDefinition = z.object({
   startedAt: z.string(),
   completedAt: z.string(),
   organizationId: z.string(),
@@ -21,14 +23,18 @@ export const seedRunReportSchema = z.object({
     z.object({ name: z.string(), outcome: seedActionOutcomeSchema, durationMs: z.number() }),
   ),
 });
+export interface SeedRunReportSchema extends Named<typeof seedRunReportSchemaDefinition> {}
+export const seedRunReportSchema: SeedRunReportSchema = seedRunReportSchemaDefinition;
 
 export type SeedRunReport = z.infer<typeof seedRunReportSchema>;
 
 /** Dry-run unless `execute`; the target defaults to the first allowlisted organization. */
-export const demoDataRunInputSchema = z.object({
+const demoDataRunInputSchemaDefinition = z.object({
   execute: z.boolean(),
   organizationId: z.string().min(1).optional(),
 });
+export interface DemoDataRunInputSchema extends Named<typeof demoDataRunInputSchemaDefinition> {}
+export const demoDataRunInputSchema: DemoDataRunInputSchema = demoDataRunInputSchemaDefinition;
 
 export type DemoDataRunInput = z.infer<typeof demoDataRunInputSchema>;
 

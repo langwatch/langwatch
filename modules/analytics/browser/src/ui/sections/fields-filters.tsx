@@ -1,5 +1,5 @@
+import { system } from "@langwatch/design-system";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Popover } from "@langwatch/design-system/popover";
@@ -192,7 +192,7 @@ function FieldsFilter({
   setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
   negated?: boolean;
 }) {
-  const gray400 = useColorRawValue("gray.400");
+  const gray400 = system.token.var("colors.fg.subtle");
 
   const setFilter = useCallback(
     (filterId: FilterField, values: FilterParam) => {

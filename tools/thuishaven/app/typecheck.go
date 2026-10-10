@@ -19,16 +19,15 @@ type TypecheckRun struct {
 	ExtraArgs        []string
 	SlotsOverride    int
 	MaxRSSOverrideMB int
-	Affected         bool
+	// Affected is accepted for the CLI's --affected and runs the same root
+	// `tsc -b`, which re-checks only what changed (ADR-150, 2026-10-10).
+	Affected bool
 }
 
 // Typecheck runs `pnpm typecheck` under a machine-wide slot so parallel
-// typechecks can't exhaust RAM. Affected runs `nx affected -t typecheck` from
-// the merge-base instead, holding every check slot free right now (at least
-// one) and telling Nx that count in NX_PARALLEL: one counted slot per parallel
-// tsc, and nothing below re-queues (CHECK_QUEUE_HELD).
+// typechecks can't exhaust RAM; nothing below re-queues (CHECK_QUEUE_HELD).
+// Per-project Nx typecheck is gone: one tsc per project re-checks each closure.
 func (o *Orchestrator) Typecheck(ctx context.Context, r TypecheckRun) error {
-	affected := r.Affected
 	if o.sem == nil {
 		return fmt.Errorf("semaphore not wired")
 	}
@@ -36,15 +35,12 @@ func (o *Orchestrator) Typecheck(ctx context.Context, r TypecheckRun) error {
 	if r.SlotsOverride > 0 {
 		slots = r.SlotsOverride
 	}
-	release, slot, parallel, err := o.holdTypecheckSlots(ctx, slots, affected)
+	release, slot, err := o.holdTypecheckSlot(ctx, slots)
 	if err != nil {
 		return err
 	}
 	defer release()
 	note := fmt.Sprintf("haven: typecheck slot %d/%d", slot, slots)
-	if affected {
-		note += fmt.Sprintf(", --affected with NX_PARALLEL=%d", parallel)
-	}
 	if !o.cfg.IsAgent {
 		note = "\x1b[2m" + note + "\x1b[0m"
 	}
@@ -57,39 +53,20 @@ func (o *Orchestrator) Typecheck(ctx context.Context, r TypecheckRun) error {
 	// another slot behind the one this process already holds.
 	env := []string{"CHECK_SLOTS=0", "CHECK_QUEUE_HELD=" + strconv.Itoa(os.Getpid())}
 	shell := "pnpm typecheck"
-	if affected {
-		// The ceiling is per slot, and this run holds `parallel` of them.
-		rl.MaxRSSBytes *= int64(parallel)
-		env = append(env, "NX_PARALLEL="+strconv.Itoa(parallel))
-		shell = affectedTypecheckShell
-	}
 	for _, a := range r.ExtraArgs {
 		shell += " " + shellQuote(a)
 	}
 	return o.sup.RunOnceBounded(ctx, "typecheck", r.RepoDir, shell, env, ReapLimits(rl))
 }
 
-// holdTypecheckSlots waits for one "checks" slot, the counter `haven machine slot run`
-// shares (ADR-064, ADR-095), and for an affected run takes every other slot
-// free right now too. slots == 0 is the gate turned off.
-func (o *Orchestrator) holdTypecheckSlots(ctx context.Context, slots int, affected bool) (release func(), slot, parallel int, err error) {
+// holdTypecheckSlot waits for one "checks" slot, the counter `haven machine slot run`
+// shares (ADR-064, ADR-095). slots == 0 is the gate turned off.
+func (o *Orchestrator) holdTypecheckSlot(ctx context.Context, slots int) (release func(), slot int, err error) {
 	if slots <= 0 {
-		return func() {}, 0, 1, nil
+		return func() {}, 0, nil
 	}
-	first, slot, err := o.sem.Acquire(ctx, "checks", slots)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	if !affected {
-		return first, slot, 1, nil
-	}
-	more, n := o.takeFreeCheckSlots(slots, slots-1)
-	return func() { more(); first() }, slot, 1 + n, nil
+	return o.sem.Acquire(ctx, "checks", slots)
 }
-
-// affectedTypecheckShell typechecks what changed since this branch left its
-// upstream, or origin/main when it has none (a detached worktree).
-const affectedTypecheckShell = `pnpm exec nx affected -t typecheck --base="$(git merge-base HEAD '@{upstream}' 2>/dev/null || git merge-base HEAD origin/main)" --head=HEAD`
 
 // takeFreeCheckSlots takes up to n more of the pool's check slots that are
 // free right now, without waiting, and returns how many it got plus their release.

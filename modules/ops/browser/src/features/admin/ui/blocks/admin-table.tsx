@@ -1,16 +1,5 @@
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Input,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ListPage, ListPageError } from "@langwatch/design-system/list-page";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import type { ReactNode } from "react";
 
 import type { PaginationState } from "../elements/admin-cells.tsx";
@@ -26,18 +15,14 @@ export interface AdminTableProps {
   error?: unknown;
   /** Optional app-owned error presentation for handled transport failures. */
   errorContent?: ReactNode;
-  /** Optional app-owned search control; the Chakra input remains the default. */
+  /** Optional app-owned search control; SearchInput remains the default. */
   searchInput?: ReactNode;
   /** Optional app-owned create action, usually a page-specific button. */
   createAction?: ReactNode;
   children: ReactNode;
 }
 
-/**
- * Controlled list-view chrome shared by Ops admin resources. Resource
- * queries, routing and handled-error copy stay in the application; this
- * package owns heading, search, card, loading and paging presentation.
- */
+/** Adapts Ops resource paging and errors to the shared list-page composition. */
 export function AdminTable({
   title,
   searchValue,
@@ -53,122 +38,39 @@ export function AdminTable({
   children,
 }: AdminTableProps) {
   return (
-    <>
-      <PageLayout.Header>
-        <PageLayout.Heading>{title}</PageLayout.Heading>
-        <Spacer />
-        {createAction}
-      </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
-        {searchInput ?? (
-          <Input
+    <ListPage
+      title={title}
+      actions={createAction}
+      loading={isLoading}
+      refreshing={isFetching}
+      error={
+        error
+          ? (errorContent ?? <ListPageError title={`Couldn't load ${title.toLowerCase()}`} />)
+          : void 0
+      }
+      toolbar={
+        searchInput ?? (
+          <SearchInput
+            containerProps={{ width: "full", maxWidth: "lg", minWidth: 0 }}
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={searchPlaceholder}
-            width="full"
-            maxWidth="480px"
           />
-        )}
-
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
-            <AdminTableContent
-              title={title}
-              error={error}
-              errorContent={errorContent}
-              isLoading={isLoading}
-              isFetching={isFetching}
-            >
-              {children}
-            </AdminTableContent>
-          </Card.Body>
-        </Card.Root>
-
-        {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
-      </VStack>
-    </>
-  );
-}
-
-function PaginationBar({ page, perPage, total, onPageChange }: PaginationState) {
-  const totalPages = Math.max(1, Math.ceil(total / perPage));
-  const canPrev = page > 1;
-  const canNext = page < totalPages;
-  const rangeStart = total === 0 ? 0 : (page - 1) * perPage + 1;
-  const rangeEnd = Math.min(total, page * perPage);
-
-  return (
-    <HStack width="full" justify="end" gap={4}>
-      <Text fontSize="sm" color="fg.muted">
-        {rangeStart}–{rangeEnd} of {total}
-      </Text>
-      <HStack gap={1}>
-        <Button
-          aria-label="Previous page"
-          size="sm"
-          variant="outline"
-          disabled={!canPrev}
-          onClick={() => onPageChange(page - 1)}
-        >
-          <ChevronLeft size={14} />
-        </Button>
-        <Button
-          aria-label="Next page"
-          size="sm"
-          variant="outline"
-          disabled={!canNext}
-          onClick={() => onPageChange(page + 1)}
-        >
-          <ChevronRight size={14} />
-        </Button>
-      </HStack>
-    </HStack>
-  );
-}
-
-interface AdminTableContentProps {
-  title: string;
-  error?: unknown;
-  errorContent?: ReactNode;
-  isLoading?: boolean;
-  isFetching?: boolean;
-  children: ReactNode;
-}
-
-function AdminTableContent({
-  title,
-  error,
-  errorContent,
-  isLoading,
-  isFetching,
-  children,
-}: AdminTableContentProps) {
-  if (error) {
-    return (
-      errorContent ?? (
-        <Box paddingY={10} paddingX={4}>
-          <Text color="red.500">Couldn&apos;t load {title.toLowerCase()}</Text>
-        </Box>
-      )
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <Box paddingY={10} textAlign="center">
-        <Spinner size="md" />
-      </Box>
-    );
-  }
-
-  return (
-    <Box position="relative" width="full" overflow="auto">
-      {isFetching && (
-        <Box position="absolute" top={2} right={2} zIndex={1} color="fg.muted">
-          <Spinner size="xs" />
-        </Box>
-      )}
+        )
+      }
+      pagination={
+        pagination
+          ? {
+              page: pagination.page,
+              pageSize: pagination.perPage,
+              totalCount: pagination.total,
+              onPageChange: pagination.onPageChange,
+              unitLabel: title.toLowerCase(),
+            }
+          : void 0
+      }
+    >
       {children}
-    </Box>
+    </ListPage>
   );
 }

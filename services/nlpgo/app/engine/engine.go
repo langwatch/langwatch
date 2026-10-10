@@ -194,7 +194,10 @@ type NodeHTTP struct {
 	StatusText      string            `json:"status_text,omitempty"`
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 	RenderedBody    string            `json:"rendered_body,omitempty"`
-	Warnings        []string          `json:"warnings,omitempty"`
+	// ResponseBody is the upstream's answer to a non-2xx, secrets redacted,
+	// so the author can read the endpoint's complaint. Empty on success.
+	ResponseBody string   `json:"response_body,omitempty"`
+	Warnings     []string `json:"warnings,omitempty"`
 }
 
 // NodeMetrics carries an LLM node's token usage + resolved model so the
@@ -680,6 +683,9 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 			ResponseHeaders: res.ResponseHeaders,
 			RenderedBody:    res.RenderedBody,
 			Warnings:        res.Warnings,
+		}
+		if res.StatusCode/100 != 2 {
+			ns.HTTP.ResponseBody = redactSecrets(string(res.UpstreamBody), secrets)
 		}
 	}
 	if err != nil {

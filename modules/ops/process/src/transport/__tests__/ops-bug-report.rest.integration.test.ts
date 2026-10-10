@@ -91,6 +91,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   function mountApp(options: { keys?: Readonly<{ token: string; projectId: string }> } = {}) {
     const app = opsApp();
     const runtime = createRestRuntime({
+      audit: { record: () => {} },
       authorization: restTestAuthorization(),
       identity: {
         authenticate: () => {

@@ -17,6 +17,7 @@ function buildApi(relayMaxPayloadMb?: number) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: connectDoor(),
   } as never);

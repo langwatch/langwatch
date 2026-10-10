@@ -1,3 +1,4 @@
+import { system } from "@langwatch/design-system/system";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * useMultiRunData - Hook for fetching multiple run data in compare mode
@@ -8,15 +9,15 @@ import { experimentApi } from "../experiment-api.ts";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [
-  "#3b82f6", // blue
-  "#dd6b20", // orange
-  "#38a169", // green
-  "#d53f8c", // pink
-  "#805ad5", // purple
-  "#e53e3e", // red
-  "#319795", // teal
-  "#718096", // gray
-] as const;
+  "chart.2",
+  "chart.1",
+  "chart.3",
+  "chart.8",
+  "chart.5",
+  "red.solid",
+  "chart.6",
+  "fg.subtle",
+].map((token) => system.token.var(`colors.${token}`));
 
 export type RunWithColor = {
   runId: string;

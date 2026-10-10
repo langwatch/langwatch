@@ -23,6 +23,7 @@ import {
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../../rules/admission-audit.rules.ts";
+import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
   isActiveAdmin,
@@ -614,11 +615,17 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
           !(candidate.organizationId === organizationId && candidate.userId === userId),
       ),
     );
+    const teamIds = new Set(this.teamsOf(organizationId).map((team) => team.id));
     this.memory.teamUsers.splice(
       0,
       this.memory.teamUsers.length,
-      ...this.memory.teamUsers.filter((candidate) => candidate.userId !== userId),
+      ...this.memory.teamUsers.filter(
+        (candidate) => candidate.userId !== userId || !teamIds.has(candidate.teamId),
+      ),
     );
+    for (const group of this.memory.groups.values()) {
+      if (group.organizationId === organizationId) group.memberIds.delete(userId);
+    }
 
     const archivedAt = nowInstant();
     const archivedTeamIds: string[] = [];
@@ -819,6 +826,12 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       after: row.after,
       actorUserId,
       actorUser: actor ? { id: actor.id, name: actor.name, email: actor.email } : null,
+      ...auditOriginOf({
+        metadata: row.metadata,
+        action: row.action,
+        args: row.args,
+        userId: row.userId,
+      }),
     };
   }
 

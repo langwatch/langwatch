@@ -38,7 +38,6 @@ import {
 import {
   assertActionParamsFieldsAreThisChannels,
   assertHeaderValuesTravelWithTheirDestination,
-  channelActionParamsSchema,
   readDeliveryConfiguration,
   resolveCredentialPlaceholders,
   splitStoredRuleFromDelivery,
@@ -331,7 +330,10 @@ export class AutomationRestColumnsService {
       resolveCredentialPlaceholders({ action, incoming: connected }),
     );
     const persisted = await this.deps.providers.persistActionParamsFor(action, {
-      incoming: readDeliveryConfiguration({ schema: channelActionParamsSchema(action), delivery }),
+      incoming: readDeliveryConfiguration({
+        schema: this.deps.providers.actionParamsSchemaFor(action),
+        delivery,
+      }),
       loadExisting: () => Promise.resolve(stored),
     });
     return recordSchema.catch({}).parse(persisted);

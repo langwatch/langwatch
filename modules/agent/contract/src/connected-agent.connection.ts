@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type {
@@ -19,57 +20,102 @@ import {
 } from "./connected-agent.protocol.ts";
 
 /** The caller the project door admitted, in the form a connected session stores it. */
-export const agentConnectCallerSchema = z.object({
+const agentConnectCallerSchemaDefinition = z.object({
   project: z.object({ id: z.string(), slug: z.string() }),
   userId: z.string().nullable(),
   /** `user:<id>`, `key:<id>` or `legacy-project:<id>`: live sessions store it, never reword it. */
   principalId: z.string(),
 });
+export interface AgentConnectCallerSchema extends Named<
+  typeof agentConnectCallerSchemaDefinition
+> {}
+export const agentConnectCallerSchema: AgentConnectCallerSchema =
+  agentConnectCallerSchemaDefinition;
 
 export type AgentConnectCaller = z.infer<typeof agentConnectCallerSchema>;
 
 /** The protocol's own header: the instance token a poll and a frames post carry. */
-export const agentConnectHeadersSchema = z.object({
+const agentConnectHeadersSchemaDefinition = z.object({
   instanceToken: z.string().optional(),
 });
+export interface AgentConnectHeadersSchema extends Named<
+  typeof agentConnectHeadersSchemaDefinition
+> {}
+export const agentConnectHeadersSchema: AgentConnectHeadersSchema =
+  agentConnectHeadersSchemaDefinition;
 
-export const agentConnectCredentialsSchema = z.object({
+const agentConnectCredentialsSchemaDefinition = z.object({
   ...agentConnectHeadersSchema.shape,
   caller: agentConnectCallerSchema,
 });
+export interface AgentConnectCredentialsSchema extends Named<
+  typeof agentConnectCredentialsSchemaDefinition
+> {}
+export const agentConnectCredentialsSchema: AgentConnectCredentialsSchema =
+  agentConnectCredentialsSchemaDefinition;
 
 export type AgentConnectCredentials = z.infer<typeof agentConnectCredentialsSchema>;
 
 /** What the socket's door decided: the admitted credentials, or the refusal to frame. */
-export const agentConnectAdmissionSchema = z.union([
+const agentConnectAdmissionSchemaDefinition = z.union([
   z.object({ admitted: agentConnectCredentialsSchema }),
   z.object({ refused: z.instanceof(Error) }),
 ]);
+export interface AgentConnectAdmissionSchema extends Named<
+  typeof agentConnectAdmissionSchemaDefinition
+> {}
+export const agentConnectAdmissionSchema: AgentConnectAdmissionSchema =
+  agentConnectAdmissionSchemaDefinition;
 
 export type AgentConnectAdmission = z.infer<typeof agentConnectAdmissionSchema>;
 
 export const agentConnectRegisterInputSchema = registerFrameSchema;
-export const agentConnectRegisterOutputSchema = z.object({
+const agentConnectRegisterOutputSchemaDefinition = z.object({
   frame: z.union([registeredFrameSchema, refusedFrameSchema]),
   instanceToken: z.string().optional(),
 });
-export const agentConnectPollQuerySchema = z.object({
+export interface AgentConnectRegisterOutputSchema extends Named<
+  typeof agentConnectRegisterOutputSchemaDefinition
+> {}
+export const agentConnectRegisterOutputSchema: AgentConnectRegisterOutputSchema =
+  agentConnectRegisterOutputSchemaDefinition;
+const agentConnectPollQuerySchemaDefinition = z.object({
   inFlight: z
     .string()
     .max(200_000)
     .optional()
     .catch(void 0),
 });
-export const agentConnectPollOutputSchema = z.object({
+export interface AgentConnectPollQuerySchema extends Named<
+  typeof agentConnectPollQuerySchemaDefinition
+> {}
+export const agentConnectPollQuerySchema: AgentConnectPollQuerySchema =
+  agentConnectPollQuerySchemaDefinition;
+const agentConnectPollOutputSchemaDefinition = z.object({
   frames: z.array(z.union([callFrameSchema, cancelFrameSchema])),
 });
-export const agentConnectFramesInputSchema = z.object({
+export interface AgentConnectPollOutputSchema extends Named<
+  typeof agentConnectPollOutputSchemaDefinition
+> {}
+export const agentConnectPollOutputSchema: AgentConnectPollOutputSchema =
+  agentConnectPollOutputSchemaDefinition;
+const agentConnectFramesInputSchemaDefinition = z.object({
   frames: z
     .array(z.union([ackFrameSchema, resultFrameSchema, deregisterFrameSchema]))
     .min(1)
     .max(100),
 });
-export const agentConnectFramesOutputSchema = z.object({ accepted: z.number().int() });
+export interface AgentConnectFramesInputSchema extends Named<
+  typeof agentConnectFramesInputSchemaDefinition
+> {}
+export const agentConnectFramesInputSchema: AgentConnectFramesInputSchema =
+  agentConnectFramesInputSchemaDefinition;
+const agentConnectFramesOutputSchemaDefinition = z.object({ accepted: z.number().int() });
+export interface AgentConnectFramesOutputSchema extends Named<
+  typeof agentConnectFramesOutputSchemaDefinition
+> {}
+export const agentConnectFramesOutputSchema: AgentConnectFramesOutputSchema =
+  agentConnectFramesOutputSchemaDefinition;
 
 export type AgentConnectRegisterInput = z.infer<typeof agentConnectRegisterInputSchema>;
 export type AgentConnectRegisterOutput = z.infer<typeof agentConnectRegisterOutputSchema>;

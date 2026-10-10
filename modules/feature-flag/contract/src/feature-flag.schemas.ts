@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -26,7 +27,7 @@ export interface FeatureFlagWrite {
   lastEditedBy: string | null;
 }
 
-export const operatorFeatureFlagSchema = z
+const operatorFeatureFlagSchemaDefinition = z
   .object({
     key: z.string(),
     scope: z.enum(["SYSTEM", "PRODUCT"]),
@@ -41,8 +42,13 @@ export const operatorFeatureFlagSchema = z
     updatedAt: z.date().nullable(),
   })
   .strict();
+export interface OperatorFeatureFlagSchema extends Named<
+  typeof operatorFeatureFlagSchemaDefinition
+> {}
+export const operatorFeatureFlagSchema: OperatorFeatureFlagSchema =
+  operatorFeatureFlagSchemaDefinition;
 
-export const operatorFeatureFlagFamilySchema = z
+const operatorFeatureFlagFamilySchemaDefinition = z
   .object({
     family: z.string(),
     keyPrefix: z.string(),
@@ -51,19 +57,29 @@ export const operatorFeatureFlagFamilySchema = z
     description: z.string(),
   })
   .strict();
+export interface OperatorFeatureFlagFamilySchema extends Named<
+  typeof operatorFeatureFlagFamilySchemaDefinition
+> {}
+export const operatorFeatureFlagFamilySchema: OperatorFeatureFlagFamilySchema =
+  operatorFeatureFlagFamilySchemaDefinition;
 
-export const operatorFeatureFlagCatalogueSchema = z
+const operatorFeatureFlagCatalogueSchemaDefinition = z
   .object({
     flags: z.array(operatorFeatureFlagSchema),
     families: z.array(operatorFeatureFlagFamilySchema),
   })
   .strict();
+export interface OperatorFeatureFlagCatalogueSchema extends Named<
+  typeof operatorFeatureFlagCatalogueSchemaDefinition
+> {}
+export const operatorFeatureFlagCatalogueSchema: OperatorFeatureFlagCatalogueSchema =
+  operatorFeatureFlagCatalogueSchemaDefinition;
 
 export type OperatorFeatureFlag = z.infer<typeof operatorFeatureFlagSchema>;
 export type OperatorFeatureFlagFamily = z.infer<typeof operatorFeatureFlagFamilySchema>;
 export type OperatorFeatureFlagCatalogue = z.infer<typeof operatorFeatureFlagCatalogueSchema>;
 
-export const featureFlagReadInputSchema = z
+const featureFlagReadInputSchemaDefinition = z
   .object({
     flag: frontendFeatureFlagSchema,
     // `nullish`, not `optional`: #7588 made every flag read state its project
@@ -75,33 +91,58 @@ export const featureFlagReadInputSchema = z
     organizationId: z.string().nullish(),
   })
   .strict();
+export interface FeatureFlagReadInputSchema extends Named<
+  typeof featureFlagReadInputSchemaDefinition
+> {}
+export const featureFlagReadInputSchema: FeatureFlagReadInputSchema =
+  featureFlagReadInputSchemaDefinition;
 
-export const organizationFeatureFlagsInputSchema = z
+const organizationFeatureFlagsInputSchemaDefinition = z
   .object({
     flag: frontendFeatureFlagSchema,
     organizationIds: z.array(z.string()),
   })
   .strict();
+export interface OrganizationFeatureFlagsInputSchema extends Named<
+  typeof organizationFeatureFlagsInputSchemaDefinition
+> {}
+export const organizationFeatureFlagsInputSchema: OrganizationFeatureFlagsInputSchema =
+  organizationFeatureFlagsInputSchemaDefinition;
 
-export const featureFlagTargetRequestSchema = z
+const featureFlagTargetRequestSchemaDefinition = z
   .object({ target: authenticatedFeatureFlagTargetInputSchema })
   .strict();
+export interface FeatureFlagTargetRequestSchema extends Named<
+  typeof featureFlagTargetRequestSchemaDefinition
+> {}
+export const featureFlagTargetRequestSchema: FeatureFlagTargetRequestSchema =
+  featureFlagTargetRequestSchemaDefinition;
 
-export const experimentEnrolmentInputSchema = z
+const experimentEnrolmentInputSchemaDefinition = z
   .object({
     flag: frontendFeatureFlagSchema,
     target: authenticatedFeatureFlagTargetInputSchema,
     enrolled: z.boolean(),
   })
   .strict();
+export interface ExperimentEnrolmentInputSchema extends Named<
+  typeof experimentEnrolmentInputSchemaDefinition
+> {}
+export const experimentEnrolmentInputSchema: ExperimentEnrolmentInputSchema =
+  experimentEnrolmentInputSchemaDefinition;
 
-export const experimentTenantPolicyInputSchema = z
+const experimentTenantPolicyInputSchemaDefinition = z
   .object({
     flag: frontendFeatureFlagSchema,
     scope: experimentTenantScopeSchema,
     policy: experimentTenantPolicySchema,
   })
   .strict();
+export interface ExperimentTenantPolicyInputSchema extends Named<
+  typeof experimentTenantPolicyInputSchemaDefinition
+> {}
+export const experimentTenantPolicyInputSchema: ExperimentTenantPolicyInputSchema =
+  experimentTenantPolicyInputSchemaDefinition;
 
 /**
  * The signed-in person a request is authorized as; `userEmail` arrives as a

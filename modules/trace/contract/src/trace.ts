@@ -1,7 +1,8 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Exact output shape of the existing `traces.spanTreePaginated` route. */
-export const spanTreeNodeSchema = z.object({
+const spanTreeNodeSchemaDefinition = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
   name: z.string(),
@@ -19,20 +20,26 @@ export const spanTreeNodeSchema = z.object({
   cacheCreationTokens: z.number().nullish(),
   updatedAtMs: z.number().nullish(),
 });
+export interface SpanTreeNodeSchema extends Named<typeof spanTreeNodeSchemaDefinition> {}
+export const spanTreeNodeSchema: SpanTreeNodeSchema = spanTreeNodeSchemaDefinition;
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
 
-export const spanTreeCursorSchema = z.object({
+const spanTreeCursorSchemaDefinition = z.object({
   startTimeMs: z.number().int().min(0),
   spanId: z.string().min(1).max(128),
 });
+export interface SpanTreeCursorSchema extends Named<typeof spanTreeCursorSchemaDefinition> {}
+export const spanTreeCursorSchema: SpanTreeCursorSchema = spanTreeCursorSchemaDefinition;
 
 export type SpanTreeCursor = z.infer<typeof spanTreeCursorSchema>;
 
-export const spanTreePageSchema = z.object({
+const spanTreePageSchemaDefinition = z.object({
   nodes: z.array(spanTreeNodeSchema),
   nextCursor: spanTreeCursorSchema.nullable(),
 });
+export interface SpanTreePageSchema extends Named<typeof spanTreePageSchemaDefinition> {}
+export const spanTreePageSchema: SpanTreePageSchema = spanTreePageSchemaDefinition;
 
 export type SpanTreePage = z.infer<typeof spanTreePageSchema>;
 

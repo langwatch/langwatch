@@ -24,6 +24,7 @@ const scores = defineRestRouter(ScoreApi)
   .withInput(z.looseObject({}))
   .withPermission("annotations:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.score(input))
   .build();
 

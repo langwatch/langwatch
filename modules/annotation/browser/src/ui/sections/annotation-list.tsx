@@ -1,9 +1,8 @@
-/** One table renders every annotations view. */
-
 import {
   annotationQueueItemStatusSchema,
   type AnnotationQueueItemStatus,
 } from "@langwatch/annotation-contract";
+/** One table renders every annotations view. */
 import { Link } from "@langwatch/browser-host/link";
 import { downloadCsv } from "@langwatch/csv/download";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -13,6 +12,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Box, Button, Flex, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import { SectionNavigationHeader } from "@langwatch/design-system/section-navigation-frame";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, Database, Download, Inbox, SquarePen, Trash2 } from "lucide-react";
@@ -469,7 +469,7 @@ export function AnnotationList({
 
   return (
     <Flex direction="column" width="full" minWidth={0} height="full" flex={1}>
-      <PageLayout.Header>
+      <SectionNavigationHeader>
         {titleContent ?? <PageLayout.Heading>{copy.heading}</PageLayout.Heading>}
         <Spacer />
         <AnnotationQueueFilter
@@ -497,7 +497,7 @@ export function AnnotationList({
         <PageLayout.HeaderButton onClick={onExport ?? exportPage}>
           {exportLabel ?? "Export"} <Download size={16} />
         </PageLayout.HeaderButton>
-      </PageLayout.Header>
+      </SectionNavigationHeader>
 
       {isLoading && <AnnotationTableSkeleton />}
       {showEmptyState && (

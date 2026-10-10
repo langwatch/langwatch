@@ -79,6 +79,7 @@ function judgment(overrides: Partial<InstantEvalJudgmentWire> = {}): InstantEval
 function mount(api: Partial<InstantEvalApi>, holds: (permission: string) => boolean = () => true) {
   const stub = createApiFixture<InstantEvalApi>(api);
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }) => {

@@ -195,7 +195,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 placeItems="center"
                 width="34px"
                 height="34px"
-                bg="bg.surface"
+                bg="bg.card"
                 borderWidth="1px"
                 borderColor="border"
                 borderRadius="10px"
@@ -229,10 +229,10 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             <HStack
               gap={2}
               padding={2}
-              bg="green.50"
+              bg="green.subtle"
               borderRadius="md"
               fontSize="xs"
-              color="green.700"
+              color="green.fg"
             >
               <Icon as={Check} boxSize={3} />
               <Text>Generated! Review and edit the form on the left.</Text>
@@ -245,7 +245,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               borderWidth="1px"
               borderColor="border.subtle"
               borderRadius="md"
-              bg="bg.surface"
+              bg="bg.card"
               padding={2.5}
             >
               <Text
@@ -311,7 +311,7 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       </Alert.Indicator>
       <Alert.Content gap={2}>
         <Alert.Description>{children}</Alert.Description>
-        <Button colorPalette="blue" color="white" asChild size="sm" alignSelf="flex-start">
+        <Button colorPalette="blue" color="blue.contrast" asChild size="sm" alignSelf="flex-start">
           <a
             data-testid="scenario-ai-configure-default-model-button"
             href="/settings/model-providers"
@@ -368,7 +368,7 @@ function ScenarioGenerationPrompt({
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <HStack gap={3}>
-              <Box p={2} bg="orange.100" borderRadius="md" color="orange.600">
+              <Box p={2} bg="orange.subtle" borderRadius="md" color="orange.fg">
                 <Icon as={AlertTriangle} boxSize={4} />
               </Box>
               <Text fontWeight="semibold" fontSize="sm">
@@ -382,7 +382,7 @@ function ScenarioGenerationPrompt({
                 href="/settings/model-providers"
                 target="_blank"
                 rel="noopener noreferrer"
-                color="blue.500"
+                color="blue.fg"
                 fontWeight="medium"
               >
                 Configure model provider
@@ -415,7 +415,7 @@ function ScenarioGenerationPrompt({
               placeItems="center"
               width="34px"
               height="34px"
-              bg="bg.surface"
+              bg="bg.card"
               borderWidth="1px"
               borderColor="border"
               borderRadius="10px"
@@ -475,7 +475,7 @@ function ScenarioGenerationModelError({
             href="/settings/model-providers"
             target="_blank"
             rel="noopener noreferrer"
-            color="blue.500"
+            color="blue.fg"
             fontWeight="medium"
           >
             Settings → Model Providers
@@ -491,7 +491,7 @@ function ScenarioGenerationModelError({
             href="/settings/model-providers"
             target="_blank"
             rel="noopener noreferrer"
-            color="blue.500"
+            color="blue.fg"
             fontWeight="medium"
           >
             Settings → Model Providers

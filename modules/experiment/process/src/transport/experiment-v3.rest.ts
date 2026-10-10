@@ -93,6 +93,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("evaluations:create")
+  .withoutAudit("run, not a change")
   .withResponse("negotiated", {})
   .withDocs({
     summary: "Run an experiment",
@@ -230,6 +231,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
+  .withAudit("experiments.saveEvaluationsV3")
   .withOutput(saveWorkbenchStateResponseSchema)
   .withDocs({
     summary: "Save an experiment's setup",
@@ -284,6 +286,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
   .withParams(slugVersionParamsSchema)
   .withPermission("experiments:update")
+  .withAudit("experiments.restoreWorkbenchVersion")
   .withInput(restoreWorkbenchVersionBodySchema)
   .withOutput(restoreWorkbenchVersionResponseSchema)
   .withDocs({

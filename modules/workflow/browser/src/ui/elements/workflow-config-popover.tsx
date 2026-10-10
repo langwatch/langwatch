@@ -1,7 +1,7 @@
 import { Popover, PopoverTrigger } from "@langwatch/design-system/popover";
-import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { IconButton, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { X } from "react-feather";
 
 export function WorkflowConfigPopover({
   open,
@@ -51,13 +51,18 @@ export function WorkflowConfigPopover({
             borderBottomWidth="1px"
             borderColor="border"
           >
-            <Text fontSize="14px" fontWeight={500}>
+            <Text textStyle="sm" fontWeight="medium">
               {title}
             </Text>
             <Spacer />
-            <Button size="sm" variant="ghost" onClick={onClose}>
+            <IconButton
+              aria-label="Close workflow settings"
+              size="sm"
+              variant="ghost"
+              onClick={onClose}
+            >
               <X size={16} />
-            </Button>
+            </IconButton>
           </HStack>
           <VStack paddingY={2} paddingX={4} width="full" align="start">
             {children}

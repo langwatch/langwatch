@@ -1,7 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   findSlackConnection,
   type SlackConnection,
@@ -50,7 +50,7 @@ export function SlackConnectionDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">{title}</Heading>
+          <Drawer.Title>{title}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

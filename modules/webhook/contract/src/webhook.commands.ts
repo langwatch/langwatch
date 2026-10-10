@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -8,7 +9,7 @@ import {
   webhookSignatureSchemeSchema,
 } from "./webhook.ts";
 
-export const createWebhookEndpointCommandSchema = z.object({
+const createWebhookEndpointCommandSchemaDefinition = z.object({
   organizationId: z.string().min(1),
   destinationKind: webhookDestinationKindSchema.optional(),
   url: z.string().optional(),
@@ -23,9 +24,14 @@ export const createWebhookEndpointCommandSchema = z.object({
   /** The same migration only: unique per organization, a repeat answers the existing endpoint. */
   idempotencyKey: z.string().min(1).optional(),
 });
+export interface CreateWebhookEndpointCommandSchema extends Named<
+  typeof createWebhookEndpointCommandSchemaDefinition
+> {}
+export const createWebhookEndpointCommandSchema: CreateWebhookEndpointCommandSchema =
+  createWebhookEndpointCommandSchemaDefinition;
 export type CreateWebhookEndpointCommand = z.infer<typeof createWebhookEndpointCommandSchema>;
 
-export const updateWebhookEndpointCommandSchema = z.object({
+const updateWebhookEndpointCommandSchemaDefinition = z.object({
   organizationId: z.string().min(1),
   endpointId: z.string().min(1),
   destinationKind: webhookDestinationKindSchema.optional(),
@@ -35,18 +41,28 @@ export const updateWebhookEndpointCommandSchema = z.object({
   ...webhookDeliveryControlsSchema.partial().shape,
   allowSelfSignedCertificate: z.boolean().optional(),
 });
+export interface UpdateWebhookEndpointCommandSchema extends Named<
+  typeof updateWebhookEndpointCommandSchemaDefinition
+> {}
+export const updateWebhookEndpointCommandSchema: UpdateWebhookEndpointCommandSchema =
+  updateWebhookEndpointCommandSchemaDefinition;
 export type UpdateWebhookEndpointCommand = z.infer<typeof updateWebhookEndpointCommandSchema>;
 
 /** An update plus the status the caller asked for, applied as one change. */
-export const applyWebhookEndpointChangesCommandSchema = z.object({
+const applyWebhookEndpointChangesCommandSchemaDefinition = z.object({
   ...updateWebhookEndpointCommandSchema.shape,
   status: z.enum(["ACTIVE", "DISABLED"]).optional(),
 });
+export interface ApplyWebhookEndpointChangesCommandSchema extends Named<
+  typeof applyWebhookEndpointChangesCommandSchemaDefinition
+> {}
+export const applyWebhookEndpointChangesCommandSchema: ApplyWebhookEndpointChangesCommandSchema =
+  applyWebhookEndpointChangesCommandSchemaDefinition;
 export type ApplyWebhookEndpointChangesCommand = z.infer<
   typeof applyWebhookEndpointChangesCommandSchema
 >;
 
-export const listWebhookEventsQuerySchema = z.object({
+const listWebhookEventsQuerySchemaDefinition = z.object({
   organizationId: z.string().min(1),
   fromMs: z.number().int().min(0).optional(),
   toMs: z.number().int().min(0).optional(),
@@ -54,10 +70,20 @@ export const listWebhookEventsQuerySchema = z.object({
   limit: z.number().int().min(1).max(200),
   types: z.array(z.string()).optional(),
 });
+export interface ListWebhookEventsQuerySchema extends Named<
+  typeof listWebhookEventsQuerySchemaDefinition
+> {}
+export const listWebhookEventsQuerySchema: ListWebhookEventsQuerySchema =
+  listWebhookEventsQuerySchemaDefinition;
 export type ListWebhookEventsQuery = z.infer<typeof listWebhookEventsQuerySchema>;
 
-export const listWebhookEventsResultSchema = z.object({
+const listWebhookEventsResultSchemaDefinition = z.object({
   events: z.array(webhookEnvelopeSchema),
   nextCursor: z.string().nullable(),
 });
+export interface ListWebhookEventsResultSchema extends Named<
+  typeof listWebhookEventsResultSchemaDefinition
+> {}
+export const listWebhookEventsResultSchema: ListWebhookEventsResultSchema =
+  listWebhookEventsResultSchemaDefinition;
 export type ListWebhookEventsResult = z.infer<typeof listWebhookEventsResultSchema>;

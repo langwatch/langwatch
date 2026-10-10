@@ -128,6 +128,25 @@ describe("TargetCellContent", () => {
     cleanup();
   });
 
+  describe("when the target is an evaluator", () => {
+    it("renders the shared verdict summary", () => {
+      renderWithDesignSystem(
+        <TargetCellContent
+          target={createTarget({ type: "evaluator" })}
+          output={{
+            output: { status: "processed", passed: false, score: 0, details: "Invalid JSON" },
+          }}
+          evaluatorResults={{}}
+          row={0}
+        />,
+      );
+      expect(screen.getByText("Failed")).toBeVisible();
+      expect(screen.getByText("Score 0.00")).toBeVisible();
+      expect(screen.getByText("Invalid JSON")).toBeVisible();
+      expect(screen.getByRole("button", { name: "JSON" })).toBeVisible();
+    });
+  });
+
   describe("when rendering the trace link", () => {
     it("renders trace button when traceId is provided", () => {
       const target = createTarget();

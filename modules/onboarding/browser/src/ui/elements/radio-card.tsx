@@ -20,7 +20,7 @@ export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
       <RadioGroup.Item
         value={value}
         _checked={{
-          backgroundColor: "gray.50",
+          backgroundColor: "bg.subtle",
         }}
       >
         <RadioGroup.ItemHiddenInput ref={ref} />
@@ -28,7 +28,7 @@ export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
           cursor="pointer"
           borderRadius="md"
           _hover={{
-            backgroundColor: "gray.50",
+            backgroundColor: "bg.subtle",
           }}
           px={3}
           py={3}

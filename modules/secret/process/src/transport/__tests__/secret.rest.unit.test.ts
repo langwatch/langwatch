@@ -21,6 +21,7 @@ function mount(options: { project?: string; actor?: Actor | null; peers?: Secret
   const app = createSecretTestApp({ peers: options.peers });
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: () => ({
         actor: options.actor === void 0 ? USER : options.actor,

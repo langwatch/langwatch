@@ -65,8 +65,10 @@ replay a pass that the data no longer supports.
 The existing root scripts are unchanged. `test`, `typecheck`, `lint`, `build`
 and every `dev:*` entry keep the exact filter sets that CI, haven and the
 documentation already invoke. Nx is added beside them as `test:all`,
-`test:affected`, `typecheck:all`, `typecheck:affected`, `build:affected`,
-`lint:changed` and `graph`.
+`test:affected`, `build:affected`,
+`lint:changed` and `graph`. (`typecheck:all` and `typecheck:affected` were removed 2026-10-10: one `tsc` per
+project re-checks each dependency closure, 16-35s a package. The root `typecheck`
+is one incremental `tsc -b`; one package is `pnpm --filter <pkg> typecheck`.)
 
 Oxlint is a per-project `lint` target and type-aware oxlint a `lint:types` one
 (amended 2026-09-30). `dev/nx/lint-plugin.mjs` infers `lint` for every workspace
@@ -167,11 +169,12 @@ checkout are Nx targets with honest inputs and outputs:
   copies files from outside its package (the evaluator catalogue, the trace
   schemas, the skills, the OpenAPI document, the redaction sources), so its
   entry in `targetDefaults` names each of them and treats
-  `src/internal/generated` as output, not input. `ensure-built` calls Nx only on a stale stamp (amended 2026-10-09, 2026-10-10):
-  every predev used to pay the graph and hash cost, 5 to 45 s with the daemon off.
-  It hashes each package's content plus the outside inputs this entry names (a
-  test holds the two lists together); a fresh stamp never calls Nx, a stale one
-  runs `nx run <pkg>:build`, so another checkout's cached build can satisfy it.
+  `src/internal/generated` as output, not input. `pnpm ensure:built` is one
+  `nx run-many -t build` over those four (amended 2026-10-10: Nx is the only
+  build cache). The Go `ensure-built`, its content stamp and its lock are gone;
+  a cache hit costs about 2 s of Nx run time, 5 to 6 s with pnpm and the graph.
+  CI's prepare-generated-files action restores only the Nx cache; its second
+  cache, keyed by a hand-written file list, had drifted from these inputs.
 
 `generate:modules`, the two Langy generators and the evaluator-catalogue copy
 stay uncached: each costs less than an Nx task's own start-up, and
@@ -366,3 +369,20 @@ Measured on a frozen `git archive` copy, 4 shared cores; findings byte-identical
 
 The plain run's wall is the plugin process's: its one JavaScript thread is the
 bottleneck, so the split buys memory and system time there, not wall.
+
+## Amendment, 2026-10-10: correctness fixes
+
+`typecheck` is one target, `workspace:typecheck` (the root `tsc -b`, uncached: its
+tsbuildinfo is the incremental cache); `defaultProject` makes a bare `nx typecheck`
+run it and `pnpm typecheck` calls it. The per-project `typecheck` targetDefaults are
+gone, and haven's `--affected` typecheck runs the same root check. `build:types` owns
+declarations only (`*.d.ts`, maps, build info; a project with its own `build`, ksuid,
+keeps its `.d.ts`), and `lint:types` depends on it. `test` and `test:unit` hash the
+three `LANGWATCH_TEST_*_URL` variables, so a run that skipped its datastore legs is
+not replayed once one is set. `pnpm-workspace.yaml` leaves `sharedGlobals`: catalog
+and override edits reach `npmDeps` through the lockfile. `production` also drops
+`*.spec.*`, `*.stories.*` and `tsconfig.test.json`; `__tests__` stays, because five
+packages export fixtures from it. Nx 23.2 has no task-level affected
+(`NX_LEGACY_AFFECTED` is ignored), but legacy affected already selects the readers of
+`{workspaceRoot}` inputs, so CI's global-input guard only adds the root tsconfigs and
+`dev/nx`, and now gates the plain lint step as well as the type-aware one.

@@ -9,6 +9,7 @@ import type {
   selfHostedInstantEvalOfferSchema,
 } from "@langwatch/instant-eval-contract";
 import { INSTANT_EVAL_TARGETS, isInstantEvalRunActive } from "@langwatch/instant-eval-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** How many runs one query may name: the chip ceiling the search bar holds. */
@@ -20,7 +21,7 @@ const EXPLORER_EVAL_RUNS_MAX = 8;
  * it, so a key naming a run this project does not own selects nothing.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-export const explorerInstantEvalRunsSchema = z
+const explorerInstantEvalRunsSchemaDefinition = z
   .record(
     z.string().min(1).max(64),
     z.object({
@@ -33,6 +34,11 @@ export const explorerInstantEvalRunsSchema = z
     message: "At most eight Instant Eval runs may be registered on one query.",
   })
   .optional();
+export interface ExplorerInstantEvalRunsSchema extends Named<
+  typeof explorerInstantEvalRunsSchemaDefinition
+> {}
+export const explorerInstantEvalRunsSchema: ExplorerInstantEvalRunsSchema =
+  explorerInstantEvalRunsSchemaDefinition;
 
 export type ExplorerInstantEvalRuns = z.infer<typeof explorerInstantEvalRunsSchema>;
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { studioWorkflowSchema, workflowWithVersionSchema } from "@langwatch/workflow-contract";
 /**
  * What the experiment feature's tRPC transport answers, stated once: each
@@ -24,15 +25,20 @@ const workbenchAttributionShape = {
 } as const;
 
 /** `getEvaluationsV3BySlug`: the full experiment and the workbench state a page opens on. */
-export const experimentWorkbenchPageSchema = z.object({
+const experimentWorkbenchPageSchemaDefinition = z.object({
   ...experimentSchema.shape,
   workbenchState: persistedEvaluationsV3StateSchema.nullable(),
   version: z.number(),
   ...workbenchAttributionShape,
 });
+export interface ExperimentWorkbenchPageSchema extends Named<
+  typeof experimentWorkbenchPageSchemaDefinition
+> {}
+export const experimentWorkbenchPageSchema: ExperimentWorkbenchPageSchema =
+  experimentWorkbenchPageSchemaDefinition;
 
 /** The monitor row `saveAsMonitor` returned on origin/main. */
-export const experimentPublishedMonitorSchema = z.object({
+const experimentPublishedMonitorSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   experimentId: z.string().nullable(),
@@ -51,43 +57,65 @@ export const experimentPublishedMonitorSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface ExperimentPublishedMonitorSchema extends Named<
+  typeof experimentPublishedMonitorSchemaDefinition
+> {}
+export const experimentPublishedMonitorSchema: ExperimentPublishedMonitorSchema =
+  experimentPublishedMonitorSchemaDefinition;
 export type ExperimentPublishedMonitor = z.infer<typeof experimentPublishedMonitorSchema>;
 
 /** `getWorkbenchVersion`: the cheap staleness probe — the version alone. */
-export const experimentWorkbenchVersionProbeSchema = z.object({
+const experimentWorkbenchVersionProbeSchemaDefinition = z.object({
   experimentId: z.string(),
   version: z.number(),
   updatedAt: z.date(),
   ...workbenchAttributionShape,
 });
+export interface ExperimentWorkbenchVersionProbeSchema extends Named<
+  typeof experimentWorkbenchVersionProbeSchemaDefinition
+> {}
+export const experimentWorkbenchVersionProbeSchema: ExperimentWorkbenchVersionProbeSchema =
+  experimentWorkbenchVersionProbeSchemaDefinition;
 
 /**
  * `saveEvaluationsV3`: the saved experiment, carrying the version THIS write
  * landed on rather than the counter the row happened to hold.
  */
-export const experimentSavedWorkbenchSchema = z.object({
+const experimentSavedWorkbenchSchemaDefinition = z.object({
   ...experimentSchema.shape,
   version: z.number(),
 });
+export interface ExperimentSavedWorkbenchSchema extends Named<
+  typeof experimentSavedWorkbenchSchemaDefinition
+> {}
+export const experimentSavedWorkbenchSchema: ExperimentSavedWorkbenchSchema =
+  experimentSavedWorkbenchSchemaDefinition;
 
 /** `listWorkbenchVersions`: the history drawer, with each author's name resolved. */
-export const experimentWorkbenchVersionsPageSchema = z.object({
+const experimentWorkbenchVersionsPageSchemaDefinition = z.object({
   versions: z.array(
     z.object({ ...workbenchVersionSummarySchema.shape, authorName: z.string().nullable() }),
   ),
   nextCursor: z.number().nullable(),
 });
+export interface ExperimentWorkbenchVersionsPageSchema extends Named<
+  typeof experimentWorkbenchVersionsPageSchemaDefinition
+> {}
+export const experimentWorkbenchVersionsPageSchema: ExperimentWorkbenchVersionsPageSchema =
+  experimentWorkbenchVersionsPageSchemaDefinition;
 
 /** `getExperimentWithDSLBySlug`: one experiment plus the workflow behind it. */
-export const experimentWithDslSchema = z.object({
+const experimentWithDslSchemaDefinition = z.object({
   ...experimentSchema.shape,
   /** Optional as well as nullable: a row with no state reads back undefined. */
   workbenchState: z.json().nullable().optional(),
   dsl: studioWorkflowSchema.optional(),
 });
+export interface ExperimentWithDslSchema extends Named<typeof experimentWithDslSchemaDefinition> {}
+export const experimentWithDslSchema: ExperimentWithDslSchema = experimentWithDslSchemaDefinition;
 
 /** `getAllForEvaluationsList`: one page of the evaluations list. */
-export const experimentEvaluationsListPageSchema = z.object({
+const experimentEvaluationsListPageSchemaDefinition = z.object({
   experiments: z.array(
     z.object({
       ...experimentSchema.shape,
@@ -105,27 +133,46 @@ export const experimentEvaluationsListPageSchema = z.object({
   ),
   totalHits: z.number(),
 });
+export interface ExperimentEvaluationsListPageSchema extends Named<
+  typeof experimentEvaluationsListPageSchemaDefinition
+> {}
+export const experimentEvaluationsListPageSchema: ExperimentEvaluationsListPageSchema =
+  experimentEvaluationsListPageSchemaDefinition;
 export type ExperimentEvaluationsListPage = z.infer<typeof experimentEvaluationsListPageSchema>;
 
 /** `getExperimentBatchEvaluationRuns`: every run of one experiment. */
-export const experimentRunListSchema = z.object({ runs: z.array(experimentRunSchema) });
+const experimentRunListSchemaDefinition = z.object({ runs: z.array(experimentRunSchema) });
+export interface ExperimentRunListSchema extends Named<typeof experimentRunListSchemaDefinition> {}
+export const experimentRunListSchema: ExperimentRunListSchema = experimentRunListSchemaDefinition;
 
 /** `deleteExperiment`: the archive, and its cascade, took effect. */
-export const experimentArchivedSchema = z.object({ success: z.literal(true) });
+const experimentArchivedSchemaDefinition = z.object({ success: z.literal(true) });
+export interface ExperimentArchivedSchema extends Named<
+  typeof experimentArchivedSchemaDefinition
+> {}
+export const experimentArchivedSchema: ExperimentArchivedSchema =
+  experimentArchivedSchemaDefinition;
 
 /**
  * `copy`: the new experiment and the workflow it writes versions into. A V3
  * experiment has no workflow, so `null` is the ordinary answer there.
  */
-export const experimentCopiedSchema = z.object({
+const experimentCopiedSchemaDefinition = z.object({
   experiment: experimentSchema,
   workflow: z.object({ id: z.string() }).nullable(),
 });
+export interface ExperimentCopiedSchema extends Named<typeof experimentCopiedSchemaDefinition> {}
+export const experimentCopiedSchema: ExperimentCopiedSchema = experimentCopiedSchemaDefinition;
 export type ExperimentCopied = z.infer<typeof experimentCopiedSchema>;
 
 /** `onExperimentUpdate`: one freshness signal as the browser receives it. */
-export const experimentUpdateFrameSchema = z.object({
+const experimentUpdateFrameSchemaDefinition = z.object({
   event: z.unknown(),
   timestamp: z.number().optional(),
 });
+export interface ExperimentUpdateFrameSchema extends Named<
+  typeof experimentUpdateFrameSchemaDefinition
+> {}
+export const experimentUpdateFrameSchema: ExperimentUpdateFrameSchema =
+  experimentUpdateFrameSchemaDefinition;
 export type ExperimentUpdateFrame = z.infer<typeof experimentUpdateFrameSchema>;

@@ -129,12 +129,12 @@ function TokenCallout({
   onCreate: () => void;
 }) {
   return (
-    <Alert.Root status="info" variant="subtle" size="sm" borderRadius="md" alignItems="center">
+    <Alert.Root status="info" variant="subtle" size="sm" alignItems="center">
       <Alert.Indicator>
         <KeyRound size={14} />
       </Alert.Indicator>
       <Alert.Content gap={0.5}>
-        <Alert.Description fontSize="sm">
+        <Alert.Description>
           {token ? (
             <HStack gap={1} as="span">
               <Text as="span" fontWeight="medium">

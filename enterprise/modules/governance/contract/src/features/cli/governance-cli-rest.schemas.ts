@@ -6,6 +6,7 @@ import { cliAccessSessionSchema } from "@langwatch/auth-contract";
  * bounded page size. The transport declares these; nothing here knows Hono.
  */
 import type { CliTokenActor } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { governanceSetupStateSchema } from "../../governance.ts";
@@ -20,11 +21,16 @@ import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
 const EVENTS_PAGE_DEFAULT = 50;
 const EVENTS_PAGE_MAX = 200;
 
-export const governanceCliVirtualKeyRequestSchema = z.object({
+const governanceCliVirtualKeyRequestSchemaDefinition = z.object({
   device_label: z.string().optional(),
 });
+export interface GovernanceCliVirtualKeyRequestSchema extends Named<
+  typeof governanceCliVirtualKeyRequestSchemaDefinition
+> {}
+export const governanceCliVirtualKeyRequestSchema: GovernanceCliVirtualKeyRequestSchema =
+  governanceCliVirtualKeyRequestSchemaDefinition;
 
-export const governanceCliIngestionKeyRequestSchema = z.object({
+const governanceCliIngestionKeyRequestSchemaDefinition = z.object({
   source_type: z.string().min(1),
   /**
    * Project id or slug, resolved inside the caller's organization only. Omit
@@ -38,25 +44,45 @@ export const governanceCliIngestionKeyRequestSchema = z.object({
    */
   device_label: z.string().min(1).max(128).optional(),
 });
+export interface GovernanceCliIngestionKeyRequestSchema extends Named<
+  typeof governanceCliIngestionKeyRequestSchemaDefinition
+> {}
+export const governanceCliIngestionKeyRequestSchema: GovernanceCliIngestionKeyRequestSchema =
+  governanceCliIngestionKeyRequestSchemaDefinition;
 
-export const governanceCliSourceParamsSchema = z.object({ sourceId: z.string().min(1) });
+const governanceCliSourceParamsSchemaDefinition = z.object({ sourceId: z.string().min(1) });
+export interface GovernanceCliSourceParamsSchema extends Named<
+  typeof governanceCliSourceParamsSchemaDefinition
+> {}
+export const governanceCliSourceParamsSchema: GovernanceCliSourceParamsSchema =
+  governanceCliSourceParamsSchemaDefinition;
 
-export const governanceCliKeyLookupParamsSchema = z.object({ lookup_id: z.string().min(1) });
+const governanceCliKeyLookupParamsSchemaDefinition = z.object({ lookup_id: z.string().min(1) });
+export interface GovernanceCliKeyLookupParamsSchema extends Named<
+  typeof governanceCliKeyLookupParamsSchemaDefinition
+> {}
+export const governanceCliKeyLookupParamsSchema: GovernanceCliKeyLookupParamsSchema =
+  governanceCliKeyLookupParamsSchemaDefinition;
 
 /** `include_archived=1` is the only truthy spelling the CLI has ever sent. */
-export const governanceCliSourcesQuerySchema = z.object({
+const governanceCliSourcesQuerySchemaDefinition = z.object({
   include_archived: z
     .string()
     .optional()
     .transform((declared) => declared === "1"),
 });
+export interface GovernanceCliSourcesQuerySchema extends Named<
+  typeof governanceCliSourcesQuerySchemaDefinition
+> {}
+export const governanceCliSourcesQuerySchema: GovernanceCliSourcesQuerySchema =
+  governanceCliSourcesQuerySchemaDefinition;
 
 /**
  * A page of one source's events. Both fields are optional and neither can
  * refuse the request: an unreadable `limit` falls back to the default rather
  * than reaching the read as `NaN`.
  */
-export const governanceCliSourceEventsQuerySchema = z.object({
+const governanceCliSourceEventsQuerySchemaDefinition = z.object({
   limit: z
     .string()
     .optional()
@@ -69,12 +95,17 @@ export const governanceCliSourceEventsQuerySchema = z.object({
     }),
   before_iso: z.string().optional(),
 });
+export interface GovernanceCliSourceEventsQuerySchema extends Named<
+  typeof governanceCliSourceEventsQuerySchemaDefinition
+> {}
+export const governanceCliSourceEventsQuerySchema: GovernanceCliSourceEventsQuerySchema =
+  governanceCliSourceEventsQuerySchemaDefinition;
 
 /**
  * One ingestion template as the CLI reads it. Distinct from the project-key
  * REST's `{ data: [...] }` envelope: this door answers `ingestion_templates`.
  */
-export const governanceCliIngestionTemplateSchema = z.object({
+const governanceCliIngestionTemplateSchemaDefinition = z.object({
   id: z.string(),
   organization_id: z.string().nullable(),
   slug: z.string(),
@@ -87,15 +118,25 @@ export const governanceCliIngestionTemplateSchema = z.object({
   platform_published: z.boolean(),
   enabled: z.boolean(),
 });
+export interface GovernanceCliIngestionTemplateSchema extends Named<
+  typeof governanceCliIngestionTemplateSchemaDefinition
+> {}
+export const governanceCliIngestionTemplateSchema: GovernanceCliIngestionTemplateSchema =
+  governanceCliIngestionTemplateSchemaDefinition;
 
 export type GovernanceCliIngestionTemplate = z.infer<typeof governanceCliIngestionTemplateSchema>;
 
 /** One live personal ingestion key, as the CLI's cache-liveness pre-flight reads it. */
-export const governanceCliIngestionKeySchema = z.object({
+const governanceCliIngestionKeySchemaDefinition = z.object({
   source_type: z.string(),
   lookup_id: z.string(),
   ingestion_template_id: z.string().nullable(),
 });
+export interface GovernanceCliIngestionKeySchema extends Named<
+  typeof governanceCliIngestionKeySchemaDefinition
+> {}
+export const governanceCliIngestionKeySchema: GovernanceCliIngestionKeySchema =
+  governanceCliIngestionKeySchemaDefinition;
 
 export type GovernanceCliIngestionKey = z.infer<typeof governanceCliIngestionKeySchema>;
 
@@ -262,11 +303,16 @@ export type GovernanceCliIngestionKeyStateAnswer = GovernanceCliAnswerOf<
 >;
 
 /** The session the CLI token door hands beside the actor: the device it named and the key that severs it. */
-export const governanceCliSessionSchema = z.object({
+const governanceCliSessionSchemaDefinition = z.object({
   cliApiKeyId: cliAccessSessionSchema.shape.cliApiKeyId,
   clientInfo: cliAccessSessionSchema.shape.clientInfo,
   tokenKey: z.string().min(1),
 });
+export interface GovernanceCliSessionSchema extends Named<
+  typeof governanceCliSessionSchemaDefinition
+> {}
+export const governanceCliSessionSchema: GovernanceCliSessionSchema =
+  governanceCliSessionSchemaDefinition;
 export type GovernanceCliSession = z.infer<typeof governanceCliSessionSchema>;
 
 /** The caller the CLI token door let in, its session, and the organization that session is bound to. */

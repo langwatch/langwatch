@@ -224,7 +224,7 @@ export function AddRowsFromCSVModal({
             {renderMapping}
           </CSVReaderComponent>
           {hasErrors.length > 0 && (
-            <Text color="red">Please check columns have valid formatting</Text>
+            <Text color="red.fg">Please check columns have valid formatting</Text>
           )}
         </Dialog.Body>
 

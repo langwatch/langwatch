@@ -15,16 +15,16 @@ interface StatusDisplayProps {
 }
 
 const STATUS_COLOR_MAP: Record<ScenarioRunStatus, Tokens["colors"]> = {
-  [ScenarioRunStatus.SUCCESS]: "green.300",
-  [ScenarioRunStatus.FAILED]: "red.400",
-  [ScenarioRunStatus.ERROR]: "red.400",
-  [ScenarioRunStatus.CANCELLED]: "red.400",
-  [ScenarioRunStatus.IN_PROGRESS]: "yellow.400",
-  [ScenarioRunStatus.PENDING]: "yellow.400",
-  [ScenarioRunStatus.STALLED]: "yellow.400",
-  [ScenarioRunStatus.QUEUED]: "blue.400",
-  [ScenarioRunStatus.RUNNING]: "yellow.400",
-  [ScenarioRunStatus.PENDING_EVALUATION]: "yellow.400",
+  [ScenarioRunStatus.SUCCESS]: "green.fg",
+  [ScenarioRunStatus.FAILED]: "red.fg",
+  [ScenarioRunStatus.ERROR]: "red.fg",
+  [ScenarioRunStatus.CANCELLED]: "red.fg",
+  [ScenarioRunStatus.IN_PROGRESS]: "yellow.fg",
+  [ScenarioRunStatus.PENDING]: "yellow.fg",
+  [ScenarioRunStatus.STALLED]: "yellow.fg",
+  [ScenarioRunStatus.QUEUED]: "blue.fg",
+  [ScenarioRunStatus.RUNNING]: "yellow.fg",
+  [ScenarioRunStatus.PENDING_EVALUATION]: "yellow.fg",
 };
 
 export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
@@ -48,7 +48,7 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
 
   return (
     <HStack>
-      <Text color="white">Status:</Text>
+      <Text color="fg">Status:</Text>
       <Text color={getStatusColor()} fontWeight="bold">
         {getStatusText()}
       </Text>

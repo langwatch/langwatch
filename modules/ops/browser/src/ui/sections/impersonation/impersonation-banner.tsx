@@ -1,5 +1,4 @@
-import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
-import type React from "react";
+import { Alert, Button } from "@langwatch/design-system/primitives";
 
 export interface ImpersonationBannerProps {
   /**
@@ -23,40 +22,16 @@ export const ImpersonationBanner = ({ onStop, user }: ImpersonationBannerProps) 
   if (!user.impersonator) return null;
 
   return (
-    <HStack
-      fontSize="12px"
-      fontWeight="bold"
-      color="white"
-      background="linear-gradient(135deg, #3182CE, #2B6CB0)"
-      border="1px solid"
-      borderColor="blue.400"
-      borderRadius="full"
-      height="32px"
-      paddingX={3}
-      gap={2}
-      flexShrink={0}
-    >
-      <Text fontSize="12px" lineClamp={1}>
-        Impersonating {user.name ?? user.email ?? "unknown user"}
-      </Text>
-      <chakra.a
-        href="#"
-        onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-          e.preventDefault();
-          onStop();
-        }}
-        fontSize="11px"
-        fontWeight="bold"
-        color="white"
-        background="whiteAlpha.300"
-        borderRadius="full"
-        paddingX={2}
-        paddingY="2px"
-        cursor="pointer"
-        _hover={{ background: "whiteAlpha.400" }}
-      >
+    <Alert.Root status="info" size="sm" width="auto" as="output">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title lineClamp={1}>
+          Impersonating {user.name ?? user.email ?? "unknown user"}
+        </Alert.Title>
+      </Alert.Content>
+      <Button size="xs" variant="outline" onClick={onStop}>
         Stop
-      </chakra.a>
-    </HStack>
+      </Button>
+    </Alert.Root>
   );
 };

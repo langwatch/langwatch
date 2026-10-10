@@ -29,21 +29,36 @@
   ],
   "properties": {
     "formatVersion": { "const": 1 },
-    "id": { "type": "string", "pattern": "^[a-z0-9-]+\\.[0-9a-z.-]+\\.[a-z0-9-]+\\.(S|L)\\.r[0-9]+$" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.[0-9a-z.-]+\\.[a-z0-9-]+\\.(S|L)\\.r[0-9]+$"
+    },
     "recipe": {
       "type": "object",
       "required": ["version", "hash"],
       "properties": { "version": { "type": "integer" }, "hash": { "type": "string" } }
     },
     "release": { "type": "string", "minLength": 1 },
-    "image": { "type": "string", "minLength": 1, "description": "image digest, or the git sha for main" },
+    "image": {
+      "type": "string",
+      "minLength": 1,
+      "description": "image digest, or the git sha for main"
+    },
     "shape": {
       "type": "object",
       "required": ["name", "env", "secretNames"],
       "properties": {
         "name": { "type": "string" },
-        "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "non-secret keys and values only" },
-        "secretNames": { "type": "array", "items": { "type": "string" }, "description": "names of the test secrets, never values" }
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "non-secret keys and values only"
+        },
+        "secretNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "names of the test secrets, never values"
+        }
       }
     },
     "overlays": { "type": "array", "items": { "type": "string" } },
@@ -51,10 +66,17 @@
     "anchor": { "type": "string", "format": "date-time" },
     "createdAt": { "type": "string", "format": "date-time" },
     "generatorCommit": { "type": "string" },
-    "postgresSchema": { "type": "string", "description": "the app schema the dump was taken from; its ledger is <schema>_upgrade_ledger" },
+    "postgresSchema": {
+      "type": "string",
+      "description": "the app schema the dump was taken from; its ledger is <schema>_upgrade_ledger"
+    },
     "serverVersions": { "type": "object", "additionalProperties": { "type": "string" } },
     "prismaMigrations": { "type": "array", "items": { "type": "string" } },
-    "gooseVersions": { "type": "object", "additionalProperties": { "type": "integer" }, "description": "per ClickHouse target" },
+    "gooseVersions": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" },
+      "description": "per ClickHouse target"
+    },
     "fingerprint": {
       "type": "object",
       "description": "store/target -> table -> count and order-independent hash; also the row counts",
@@ -86,7 +108,11 @@
       "items": {
         "type": "object",
         "required": ["prefix", "keys", "bytes"],
-        "properties": { "prefix": { "type": "string" }, "keys": { "type": "integer" }, "bytes": { "type": "integer" } }
+        "properties": {
+          "prefix": { "type": "string" },
+          "keys": { "type": "integer" },
+          "bytes": { "type": "integer" }
+        }
       }
     },
     "objectCount": { "type": "integer" },

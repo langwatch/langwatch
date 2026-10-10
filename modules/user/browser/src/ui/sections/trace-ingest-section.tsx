@@ -226,7 +226,7 @@ function InstallTile({
       {...({ type: "button" } as { type: "button" })}
       onClick={onClick}
       borderWidth="1px"
-      borderColor={installed ? "green.300" : "border.muted"}
+      borderColor={installed ? "green.emphasized" : "border.muted"}
       borderRadius="md"
       padding={3}
       textAlign="left"
@@ -304,7 +304,7 @@ function RawOtlpAdvancedTile() {
           <Text fontSize="xs" color="fg.muted">
             Bring your own OTLP, raw shape. Use for custom telemetry pipelines.
           </Text>
-          <Link href="/me/configure#otlp" color="orange.600" fontSize="xs" fontWeight="medium">
+          <Link href="/me/configure#otlp" color="orange.fg" fontSize="xs" fontWeight="medium">
             Get OTLP token →
           </Link>
         </VStack>

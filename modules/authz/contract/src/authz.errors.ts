@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const AUTHZ_PROBLEM_CODES = [
@@ -25,7 +26,7 @@ export const AUTHZ_PROBLEM_CODES = [
 export const authzProblemCodeSchema = z.enum(AUTHZ_PROBLEM_CODES);
 export type AuthzProblemCode = z.infer<typeof authzProblemCodeSchema>;
 
-export const authzProblemSchema = z
+const authzProblemSchemaDefinition = z
   .object({
     code: authzProblemCodeSchema,
     message: z.string(),
@@ -34,6 +35,8 @@ export const authzProblemSchema = z
     traceId: z.string().optional(),
   })
   .strict();
+export interface AuthzProblemSchema extends Named<typeof authzProblemSchemaDefinition> {}
+export const authzProblemSchema: AuthzProblemSchema = authzProblemSchemaDefinition;
 export type AuthzProblem = z.infer<typeof authzProblemSchema>;
 
 export class GrantValidationError extends HandledError {

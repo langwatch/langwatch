@@ -210,7 +210,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
 
     if (!childSession) {
       childStartedAt = nowInstant().epochMilliseconds;
-      childSession = this.options.childProcesses.start({
+      childSession = await this.options.childProcesses.start({
         jobData,
         environment: {
           labels: prefetch.data.scenario.labels,
@@ -270,7 +270,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     let childStartedAt: number | null = null;
     if (childEnvironment && !this.options.pool.wasCancelled(jobData.scenarioRunId)) {
       childStartedAt = nowInstant().epochMilliseconds;
-      childSession = this.options.childProcesses.start({
+      childSession = await this.options.childProcesses.start({
         jobData,
         environment: childEnvironment,
       });

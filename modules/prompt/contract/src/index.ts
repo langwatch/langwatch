@@ -32,6 +32,15 @@ export {
   LlmConfigOutputTypes,
   type LlmConfigInputType,
   type LlmConfigOutputType,
+  type NodeDatasetSchema,
+  type MessageSchema,
+  type InputsSchema,
+  type OutputsSchema,
+  type ResponseFormatSchema,
+  type RuntimeParametersSchema,
+  type InputWithValueSchema,
+  type RuntimeInputsSchema,
+  type PromptingTechniqueSchema,
 } from "./prompt.field-schemas.ts";
 export * from "./prompt.hoist.ts";
 export * from "./prompt.liquid.ts";

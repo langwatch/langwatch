@@ -34,6 +34,7 @@ function stepsApp() {
     .withInput(z.array(z.object({ index: z.number(), label: z.string() })), { as: "steps" })
     .withPermission("experiments:manage")
     .withOutput(z.object({ logged: z.number() }))
+    .withoutAudit("test route")
     .handle(({ input }) => {
       handed.push(input);
 

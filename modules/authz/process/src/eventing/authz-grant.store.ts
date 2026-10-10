@@ -129,7 +129,7 @@ export type AuthzRoleBindingFilter = Record<string, unknown> & {
   organizationId?: unknown;
 };
 
-/** Each fresh binding is attached when its own id holds its identity, else the holder is its duplicate. */
+/** Each fresh binding attaches if its own id holds its identity, else the holder duplicates. */
 function splitByHeld({
   fresh,
   held,

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Gateway's facts. Governance (a budget crossing, a virtual key lifecycle change) goes to
  * webhook delivery under main's stored type and field names; a licence's managed key
@@ -17,7 +18,7 @@ export const vkLifecycleActionSchema = z.enum([
 ]);
 export type VkLifecycleAction = z.infer<typeof vkLifecycleActionSchema>;
 
-export const recordVkLifecycleCommandDataSchema = z.object({
+const recordVkLifecycleCommandDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organization_id: z.string().min(1),
   virtual_key_id: z.string().min(1),
@@ -28,12 +29,17 @@ export const recordVkLifecycleCommandDataSchema = z.object({
   /** Unix ms of the mutation. */
   occurred_at: z.number().int().positive(),
 });
+export interface RecordVkLifecycleCommandDataSchema extends Named<
+  typeof recordVkLifecycleCommandDataSchemaDefinition
+> {}
+export const recordVkLifecycleCommandDataSchema: RecordVkLifecycleCommandDataSchema =
+  recordVkLifecycleCommandDataSchemaDefinition;
 export type RecordVkLifecycleCommandData = z.infer<typeof recordVkLifecycleCommandDataSchema>;
 
 export const budgetCrossingKindSchema = z.enum(["threshold_crossed", "breached"]);
 export type BudgetCrossingKind = z.infer<typeof budgetCrossingKindSchema>;
 
-export const recordBudgetCrossingCommandDataSchema = z.object({
+const recordBudgetCrossingCommandDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organization_id: z.string().min(1),
   budget_id: z.string().min(1),
@@ -52,10 +58,15 @@ export const recordBudgetCrossingCommandDataSchema = z.object({
   on_breach: z.enum(["block", "warn"]),
   occurred_at: z.number().int().positive(),
 });
+export interface RecordBudgetCrossingCommandDataSchema extends Named<
+  typeof recordBudgetCrossingCommandDataSchemaDefinition
+> {}
+export const recordBudgetCrossingCommandDataSchema: RecordBudgetCrossingCommandDataSchema =
+  recordBudgetCrossingCommandDataSchemaDefinition;
 export type RecordBudgetCrossingCommandData = z.infer<typeof recordBudgetCrossingCommandDataSchema>;
 
 /** One governance fact as a delivery module takes it, typed by the event that recorded it. */
-export const gatewayGovernanceEventSchema = z.discriminatedUnion("type", [
+const gatewayGovernanceEventSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(GATEWAY_BUDGET_CROSSING_EVENT_TYPE),
     data: recordBudgetCrossingCommandDataSchema,
@@ -65,6 +76,11 @@ export const gatewayGovernanceEventSchema = z.discriminatedUnion("type", [
     data: recordVkLifecycleCommandDataSchema,
   }),
 ]);
+export interface GatewayGovernanceEventSchema extends Named<
+  typeof gatewayGovernanceEventSchemaDefinition
+> {}
+export const gatewayGovernanceEventSchema: GatewayGovernanceEventSchema =
+  gatewayGovernanceEventSchemaDefinition;
 export type GatewayGovernanceEvent = z.infer<typeof gatewayGovernanceEventSchema>;
 
 /** Gateway's facts about a self-hosted licence's managed key (C3b); licensing attaches the key. */
@@ -74,7 +90,7 @@ export const GATEWAY_MANAGED_KEY_PROVISIONED_EVENT_TYPE =
   "lw.gateway.managed_key_provisioned" as const;
 
 /** Gateway holds this licence's managed key and has written its services and licence on it. */
-export const gatewayManagedKeyProvisionedEventDataSchema = z.object({
+const gatewayManagedKeyProvisionedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -82,6 +98,11 @@ export const gatewayManagedKeyProvisionedEventDataSchema = z.object({
   issuedLicenseId: z.string().min(1),
   virtualKeyId: z.string().min(1),
 });
+export interface GatewayManagedKeyProvisionedEventDataSchema extends Named<
+  typeof gatewayManagedKeyProvisionedEventDataSchemaDefinition
+> {}
+export const gatewayManagedKeyProvisionedEventDataSchema: GatewayManagedKeyProvisionedEventDataSchema =
+  gatewayManagedKeyProvisionedEventDataSchemaDefinition;
 export type GatewayManagedKeyProvisionedEventData = z.infer<
   typeof gatewayManagedKeyProvisionedEventDataSchema
 >;

@@ -29,13 +29,7 @@ export function TraceDrawerSkeleton({ onClose, expectedSpanCount }: TraceDrawerS
     // header below can run a backdrop-blur fill against the page),
     // and the skeleton has no equivalent translucent layer, so it
     // would otherwise float on the page during the loading flash.
-    <VStack
-      align="stretch"
-      gap={0}
-      flex={1}
-      minHeight={0}
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
-    >
+    <VStack align="stretch" gap={0} flex={1} minHeight={0} bg={"bg.card"}>
       {/* Header — same VStack rhythm as DrawerHeader so swap-in is silent. */}
       <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
         {/* Row 1: type badge · title · status — actions including close on right. */}

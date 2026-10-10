@@ -1,4 +1,4 @@
-import type { BackendHalfName } from "./backend.process.ts";
+import type { BackendHalfName } from "@langwatch/process/backend-host";
 
 /**
  * Why the backend is not whole, as the api's port tells the browser (Alex, 2026-10-10).

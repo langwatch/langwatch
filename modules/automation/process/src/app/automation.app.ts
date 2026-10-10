@@ -293,6 +293,8 @@ type AutomationInfrastructureInput = Readonly<{
     "triggers" | "suppressions" | "persistCaps" | "callCounter" | "emailCaps"
   >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
+  /** The dev switch that lets a webhook automation use http or a port. */
+  allowInsecureLocalUrls: boolean;
 }>;
 
 /** What settlement sends through: the SAME delivery and ceilings graph alerts spend. */
@@ -434,6 +436,7 @@ export class AutomationModule implements AutomationApi {
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
         unsubscribeSigningSecret,
         repositories: setup.repositories,
+        allowInsecureLocalUrls: setup.config.allowInsecureLocalUrls,
         caps: {
           emailHourlyCap: setup.config.emailHourlyCap,
           tenantDailyCap: setup.config.tenantDailyCap,
@@ -487,7 +490,9 @@ export class AutomationModule implements AutomationApi {
     input: AutomationInfrastructureInput,
   ): AutomationComposedInfrastructure {
     const { publicBaseUrl } = input;
-    const providers = AutomationProviderRegistryService.create(input.repositories.triggers);
+    const providers = AutomationProviderRegistryService.create(input.repositories.triggers, {
+      allowInsecureLocalUrls: input.allowInsecureLocalUrls,
+    });
     const clock: AutomationClock = { now: () => nowInstant() };
     // No public origin, no delivery: a digest would link back to nowhere.
     const delivery: AutomationNotificationDelivery = publicBaseUrl

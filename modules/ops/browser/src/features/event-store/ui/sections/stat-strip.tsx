@@ -1,4 +1,5 @@
-import { HStack } from "@langwatch/design-system/primitives";
+import { Card, HStack, VStack } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { LATENCY_SAMPLE_SIZE, type DashboardData } from "@langwatch/ops-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -25,57 +26,68 @@ export function StatStrip({ data }: { data: DashboardData }) {
   const outboxDead = (outboxDeadQuery.data ?? []).reduce((sum, row) => sum + row.count, 0);
 
   return (
-    <HStack gap={1} align="stretch" flexWrap="wrap" data-testid="ops-stat-strip">
+    <VStack align="stretch" gap={3} data-testid="ops-stat-strip">
       <ThroughputStats data={data} />
-      <LinkedStat
-        label="Blocked"
-        value={formatCount(totalBlocked)}
-        sublabel={`${formatCount(data.totalGroups)} groups`}
-        color={totalBlocked > 0 ? "fg.error" : undefined}
-      />
-      <LinkedStat
-        label="Parked"
-        value={formatCount(totalParked)}
-        // Says what it MEANS, not just what it counts: parked is a capacity
-        // limit doing its job, and an unexplained orange six-figure number
-        // reads as an outage to whoever is on call.
-        sublabel={totalParked > 0 ? "at capacity limit" : "none at limit"}
-        color={totalParked > 0 ? "fg.warning" : undefined}
-      />
-      <LatencyStats data={data} />
-      <DeadLetterStat
-        queueDead={totalDlq}
-        outboxDead={outboxDead}
-        isOutboxCountKnown={outboxDeadQuery.data !== undefined}
-      />
-      <RedisStatTile data={data} />
-    </HStack>
+      <Card.Root variant="subtle">
+        <Card.Body padding={2}>
+          <HStack gap={3} align="stretch" flexWrap="wrap">
+            <LinkedStat
+              label="Blocked"
+              value={formatCount(totalBlocked)}
+              sublabel={`${formatCount(data.totalGroups)} groups`}
+              color={totalBlocked > 0 ? "fg.error" : undefined}
+            />
+            <LinkedStat
+              label="Parked"
+              value={formatCount(totalParked)}
+              // Says what it MEANS, not just what it counts: parked is a capacity
+              // limit doing its job, and an unexplained orange six-figure number
+              // reads as an outage to whoever is on call.
+              sublabel={totalParked > 0 ? "at capacity limit" : "none at limit"}
+              color={totalParked > 0 ? "fg.warning" : undefined}
+            />
+            <LatencyStats data={data} />
+            <DeadLetterStat
+              queueDead={totalDlq}
+              outboxDead={outboxDead}
+              isOutboxCountKnown={outboxDeadQuery.data !== undefined}
+            />
+            <RedisStatTile data={data} />
+          </HStack>
+        </Card.Body>
+      </Card.Root>
+    </VStack>
   );
 }
 
 /** Rate tiles: what is arriving, finishing, and failing right now. */
 function ThroughputStats({ data }: { data: DashboardData }) {
   return (
-    <>
-      <LinkedStat
+    <StatTileGrid columns={3}>
+      <StatTile
+        variant="elevated"
         label="Staged/s"
-        value={formatRate(data.throughputIngestedPerSec)}
-        sublabel={`peak ${formatRate(data.peakIngestedPerSec)}`}
-      />
-      <LinkedStat
+        hint={`Peak ${formatRate(data.peakIngestedPerSec)} per second`}
+      >
+        <StatTileFigure>{formatRate(data.throughputIngestedPerSec)}</StatTileFigure>
+      </StatTile>
+      <StatTile
+        variant="elevated"
         label="Completed/s"
-        value={formatRate(data.completedPerSec)}
-        sublabel={`peak ${formatRate(data.peakCompletedPerSec)} · ${formatCount(
-          data.totalCompleted,
-        )} total`}
-      />
-      <LinkedStat
+        hint={`Peak ${formatRate(data.peakCompletedPerSec)} · ${formatCount(data.totalCompleted)} total`}
+      >
+        <StatTileFigure>{formatRate(data.completedPerSec)}</StatTileFigure>
+      </StatTile>
+      <StatTile
+        variant="elevated"
         label="Failed/s"
-        value={formatRate(data.failedPerSec)}
-        sublabel={data.totalFailed > 0 ? `${formatCount(data.totalFailed)} total` : undefined}
-        color={data.failedPerSec > 0 ? "fg.error" : undefined}
-      />
-    </>
+        hint={`${formatCount(data.totalFailed)} total failures`}
+      >
+        <HStack color={data.failedPerSec > 0 ? "fg.error" : void 0}>
+          <StatTileFigure>{formatRate(data.failedPerSec)}</StatTileFigure>
+        </HStack>
+      </StatTile>
+    </StatTileGrid>
   );
 }
 

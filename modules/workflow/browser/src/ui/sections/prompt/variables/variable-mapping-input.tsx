@@ -692,8 +692,8 @@ function fieldFrameStyle(isMissing: boolean) {
     borderColor: "border",
     background: undefined,
     paddingX: undefined,
-    focusBorderColor: "blue.500",
-    focusShadow: "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
+    focusBorderColor: "blue.focusRing",
+    focusShadow: "var(--chakra-colors-blue-emphasized) 0px 1px 0px 0px",
     placeholderColor: undefined,
     testId: undefined,
   };
@@ -949,10 +949,10 @@ function PathBreadcrumb({ path }: { path: string[] }) {
       borderRadius="4px"
       marginBottom={1}
     >
-      <Text fontSize="xs" color="blue.600">
+      <Text fontSize="xs" color="blue.fg">
         {path.map((s) => s.replace(/_/g, " ")).join(" → ")}
       </Text>
-      <Text fontSize="xs" color="blue.400">
+      <Text fontSize="xs" color="blue.fg">
         →
       </Text>
     </HStack>
@@ -1133,7 +1133,7 @@ function UseAsValueOption({ view }: { view: MappingView }) {
         data-highlighted={isHighlighted}
         data-testid="use-as-value-option"
       >
-        <Type size={14} color="var(--chakra-colors-gray-500)" />
+        <Type size={14} color="var(--chakra-colors-fg-muted)" />
         <Text fontSize="13px" color="fg.muted">
           Use "
           <Text as="span" fontWeight="medium" color="fg">

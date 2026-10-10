@@ -97,7 +97,7 @@ export function moduleVitestTestOptions(
 
 export function defineModuleVitestConfig(options: ModuleVitestConfigOptions): ViteUserConfig {
   return defineConfig({
-    // The UI ships through the React Compiler (apps/ui/vite.config.ts); jsdom suites test the same output.
+    // The UI ships through the React Compiler (apps/ui/vite.config.ts); jsdom tests match it.
     plugins: options.kind === "jsdom" ? [react({ compiler: true })] : [],
     test: moduleVitestTestOptions(options),
   });

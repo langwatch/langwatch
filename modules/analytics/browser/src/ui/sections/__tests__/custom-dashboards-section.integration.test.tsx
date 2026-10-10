@@ -69,6 +69,35 @@ describe("the custom dashboards list", () => {
     api.sent = [];
   });
 
+  it("marks the displayed default dashboard when the URL has no dashboard ID", () => {
+    api.dashboards = THREE;
+    const host = new StubAnalyticsHost({ route: { params: {}, query: {} } });
+    render(
+      <AnalyticsTestHarness host={host}>
+        <CustomDashboardsSection projectSlug="my-project" activeDashboardId="d2" />
+      </AnalyticsTestHarness>,
+    );
+
+    expect(screen.getByRole("link", { name: "Costs" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("leaves dashboards unselected on another analytics page without a dashboard ID", () => {
+    api.dashboards = THREE;
+    const host = new StubAnalyticsHost({ route: { params: {}, query: {} } });
+    render(
+      <AnalyticsTestHarness host={host}>
+        <CustomDashboardsSection projectSlug="my-project" />
+      </AnalyticsTestHarness>,
+    );
+
+    for (const dashboard of THREE) {
+      expect(screen.getByRole("link", { name: dashboard.name })).not.toHaveAttribute(
+        "aria-current",
+      );
+    }
+  });
+
   it("shows each dashboard's name on one line with the full name as a tooltip", () => {
     const long = "Quarterly cost and quality review for the enterprise accounts";
     mount([

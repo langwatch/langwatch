@@ -58,6 +58,7 @@ function buildApi(run: (...args: never[]) => unknown) {
     getByIdOrTestSuite: async () => ({ kind: "suite", suite: storedPlan }),
   });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),

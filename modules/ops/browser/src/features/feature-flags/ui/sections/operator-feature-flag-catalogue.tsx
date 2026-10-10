@@ -1,4 +1,6 @@
 import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -12,6 +14,7 @@ import {
   VStack,
   VisuallyHidden,
 } from "@langwatch/design-system/primitives";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {
@@ -20,8 +23,8 @@ import type {
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
 import { format } from "@langwatch/time";
-import { Settings2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Flag, Settings2 } from "lucide-react";
+import { useState } from "react";
 
 import { summarizeTargeting, targetingLabel } from "../../model/targeting-summary.ts";
 import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog.tsx";
@@ -60,10 +63,24 @@ export function OperatorFeatureFlagCatalogueView({
   onClear,
   onSetRules,
 }: OperatorFeatureFlagCatalogueProps) {
-  const grouped = useMemo(() => groupByScope(catalogue.flags), [catalogue.flags]);
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLowerCase();
+  const grouped = groupByScope(
+    catalogue.flags.filter((flag) =>
+      `${flag.key} ${flag.description}`.toLowerCase().includes(query),
+    ),
+  );
 
   return (
-    <Stack gap={8} paddingY={4} maxWidth="1200px">
+    <Stack gap={6} paddingY={2} width="full">
+      <SearchInput
+        aria-label="Search feature flags"
+        placeholder="Search flags by name or description"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        maxWidth="480px"
+        size="sm"
+      />
       <Text fontSize="sm" color="fg.muted">
         Flags resolve from their validated boot override, force-enable list, matching operator rule
         or row, then registry default. Operator changes reach every process through the bounded
@@ -102,7 +119,13 @@ export function OperatorFeatureFlagCatalogueView({
             Dynamically named flags sharing a prefix. Instances appear above after an operator row
             is written.
           </Text>
-          <Table.Root size="sm" variant="line">
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflowX: "auto" }}
+            size="sm"
+            variant="line"
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Prefix</Table.ColumnHeader>
@@ -125,7 +148,7 @@ export function OperatorFeatureFlagCatalogueView({
                 </Table.Row>
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         </Box>
       )}
     </Stack>
@@ -162,16 +185,24 @@ function ScopeSection({
         {description}
       </Text>
       {rows.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-          No flags registered.
-        </Text>
+        <NoDataInfoBlock
+          icon={<Flag />}
+          title="No matching flags"
+          description="Try another name or description. Registered flags appear in their product or system scope."
+        />
       ) : (
-        <Table.Root size="sm" variant="line">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          size="sm"
+          variant="line"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Flag</Table.ColumnHeader>
-              <Table.ColumnHeader>Effective</Table.ColumnHeader>
-              <Table.ColumnHeader>Source</Table.ColumnHeader>
+              <Table.ColumnHeader minWidth="150px">Effective</Table.ColumnHeader>
+              <Table.ColumnHeader minWidth="120px">Source</Table.ColumnHeader>
               <Table.ColumnHeader>Default</Table.ColumnHeader>
               <Table.ColumnHeader>Last edit</Table.ColumnHeader>
             </Table.Row>
@@ -190,7 +221,7 @@ function ScopeSection({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       )}
     </Box>
   );
@@ -241,9 +272,9 @@ function FlagRow({
   return (
     <Table.Row>
       <Table.Cell>
-        <VStack align="start" gap={0}>
-          <HStack gap={2}>
-            <Text fontFamily="mono" fontSize="xs">
+        <VStack align="start" gap={2}>
+          <HStack gap={2} wrap="wrap">
+            <Text fontFamily="mono" fontSize="xs" overflowWrap="anywhere">
               {row.key}
             </Text>
             <ScopeBadge scope={row.scope} />
@@ -257,15 +288,20 @@ function FlagRow({
               </Badge>
             )}
           </HStack>
-          <Text fontSize="xs" color="fg.muted">
-            {row.description}
-          </Text>
+          <Box as="details" fontSize="sm" color="fg.muted" maxWidth="64ch">
+            <Box as="summary" cursor="pointer" fontSize="xs" _hover={{ color: "fg.default" }}>
+              Details
+            </Box>
+            <Text paddingTop={2}>{row.description}</Text>
+          </Box>
         </VStack>
       </Table.Cell>
       <Table.Cell>
         <VStack align="start" gap={1}>
           <HStack gap={2}>
             <Switch
+              colorPalette="accent"
+              aria-label={`Enable ${row.key}`}
               checked={effective || targeting.partialEnabled}
               disabled={!canManage || envLocked || pending}
               onCheckedChange={(details) => void setEnabled(details.checked)}
@@ -274,9 +310,9 @@ function FlagRow({
               <Tooltip content={targetingTooltip(row.rules.length)}>
                 <IconButton
                   aria-label="Specific targeting"
-                  size="xs"
+                  size="sm"
                   variant="ghost"
-                  color="gray.500"
+                  color="fg.muted"
                   onClick={() => setRulesOpen(true)}
                 >
                   <Settings2 size={14} />
@@ -304,10 +340,14 @@ function FlagRow({
         />
       </Table.Cell>
       <Table.Cell>
-        <Text fontSize="xs">{sourceFor(row)}</Text>
+        <Badge variant="subtle" colorPalette="gray">
+          {sourceFor(row)}
+        </Badge>
       </Table.Cell>
       <Table.Cell>
-        <Text fontSize="xs">{row.defaultValue ? "on" : "off"}</Text>
+        <Badge variant="outline" colorPalette="gray">
+          {row.defaultValue ? "On" : "Off"}
+        </Badge>
       </Table.Cell>
       <Table.Cell>
         {row.storedValue === null ? (
@@ -325,16 +365,13 @@ function FlagRow({
               </Text>
               {canManage && (
                 <Button
-                  variant="plain"
-                  size="xs"
-                  paddingX={0}
-                  height="auto"
-                  minWidth="auto"
+                  variant="ghost"
+                  size="sm"
                   flexShrink={0}
                   disabled={pending}
                   onClick={() => void clear()}
                 >
-                  clear
+                  Clear
                 </Button>
               )}
             </HStack>
@@ -366,8 +403,8 @@ function describeTargeting(rules: FeatureFlagRules, effective: boolean) {
 
 function ScopeBadge({ scope }: { scope: "SYSTEM" | "PRODUCT" }) {
   return (
-    <Badge colorPalette={scope === "SYSTEM" ? "purple" : "blue"} size="sm" variant="subtle">
-      {scope}
+    <Badge colorPalette="gray" size="sm" variant="subtle">
+      {scope === "SYSTEM" ? "System" : "Product"}
     </Badge>
   );
 }

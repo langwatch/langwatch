@@ -145,12 +145,31 @@ function summariseSelection({
   return `Shared across ${parts.join(" + ")}.`;
 }
 
-const ScopeIcon = ({ scopeType }: { scopeType: ScopeChipPickerScopeType }) => {
-  if (scopeType === "ORGANIZATION") return <Building2 size={16} aria-hidden />;
-  if (scopeType === "TEAM") return <Users size={16} aria-hidden />;
-  if (scopeType === "DEPARTMENT") return <Boxes size={16} aria-hidden />;
-  return <Folder size={16} aria-hidden />;
+const ScopeIcon = ({
+  scopeType,
+  size = 16,
+}: {
+  scopeType: ScopeChipPickerScopeType;
+  size?: number;
+}) => {
+  if (scopeType === "ORGANIZATION") return <Building2 size={size} aria-hidden />;
+  if (scopeType === "TEAM") return <Users size={size} aria-hidden />;
+  if (scopeType === "DEPARTMENT") return <Boxes size={size} aria-hidden />;
+  return <Folder size={size} aria-hidden />;
 };
+
+/** The compact trigger: one 32px line, the team left to the menu. */
+const COMPACT_TRIGGER = {
+  "& [data-part=trigger]": {
+    height: "32px",
+    minHeight: "32px",
+    paddingInlineStart: "10px",
+    paddingInlineEnd: "32px",
+    fontSize: "13px",
+    lineHeight: "20px",
+  },
+  "& [data-part=indicator] svg": { width: "14px", height: "14px" },
+} as const;
 
 /**
  * Above this many options the dropdown gains a search field: a scope
@@ -397,6 +416,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   singleSelect = false,
   personalScopes = false,
   variant = "chips",
+  size = "md",
   placeholder,
   currentOrganizationId,
   currentTeamId,
@@ -439,6 +459,8 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   singleSelect?: boolean;
   // Variant: chips multi-select or single-select dropdown.
   variant?: "chips" | "single-select";
+  /** `sm` draws the single-select trigger as one 32px line for a filter bar. */
+  size?: "md" | "sm";
   /** Placeholder for the single-select trigger when nothing is picked yet.
    *  Defaults to "Select an option". Only consulted by the single-select
    *  variant. */
@@ -573,6 +595,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
         search={search}
         showSummary={showSummary}
         subjectNoun={subjectNoun}
+        compact={size === "sm"}
         onChange={onChange}
       />
     );
@@ -886,6 +909,47 @@ function optionsOfType(options: ScopeOption[], scopeType: ScopeChipPickerScopeTy
   return options.filter((o) => o.scopeType === scopeType);
 }
 
+/** The trigger's reading of the picked scope: icon, name and (unless compact) its team. */
+function SelectedScope({
+  option,
+  teamName,
+  compact,
+}: {
+  option: ScopeOption;
+  teamName: string | undefined;
+  compact: boolean;
+}) {
+  if (compact) {
+    return (
+      <HStack gap={2} minWidth={0} alignItems="center">
+        <Box display="flex" flexShrink={0} color="fg.muted">
+          <ScopeIcon scopeType={option.scopeType} size={14} />
+        </Box>
+        <Text truncate maxWidth="full" color="fg" fontSize="13px" lineHeight="20px">
+          {option.label}
+        </Text>
+      </HStack>
+    );
+  }
+  return (
+    <HStack gap={2} minWidth={0} alignItems="center">
+      <Box display="flex" flexShrink={0}>
+        <ScopeIcon scopeType={option.scopeType} />
+      </Box>
+      <VStack align="start" gap={0} minWidth={0}>
+        <Text truncate maxWidth="full" color="fg" fontWeight="medium" lineHeight="shorter">
+          {option.label}
+        </Text>
+        {teamName && (
+          <Text truncate maxWidth="full" fontSize="xs" color="fg.muted" lineHeight="shorter">
+            {teamName}
+          </Text>
+        )}
+      </VStack>
+    </HStack>
+  );
+}
+
 /**
  * One scope from a dropdown. PROJECT options group under their parent team so the
  * list stays organised across teams; organization, department and team options keep
@@ -903,6 +967,7 @@ function SingleScopeSelect({
   search,
   showSummary,
   subjectNoun,
+  compact,
   onChange,
 }: {
   label: string;
@@ -916,6 +981,7 @@ function SingleScopeSelect({
   search: ScopeSearch;
   showSummary: boolean;
   subjectNoun: string;
+  compact: boolean;
   onChange: (next: ScopeChipPickerEntry[]) => void;
 }) {
   const selected = scopes[0] ?? null;
@@ -939,37 +1005,15 @@ function SingleScopeSelect({
           onChange(option ? [entryOf(option)] : []);
         }}
       >
-        <Select.Trigger>
+        <Select.Trigger css={compact ? COMPACT_TRIGGER : void 0}>
           <Select.ValueText placeholder={placeholder} lineClamp="none" display="flex" minWidth={0}>
             {() =>
               selectedOption ? (
-                <HStack gap={2} minWidth={0} alignItems="center">
-                  <Box display="flex" flexShrink={0}>
-                    <ScopeIcon scopeType={selectedOption.scopeType} />
-                  </Box>
-                  <VStack align="start" gap={0} minWidth={0}>
-                    <Text
-                      truncate
-                      maxWidth="full"
-                      color="fg"
-                      fontWeight="medium"
-                      lineHeight="shorter"
-                    >
-                      {selectedOption.label}
-                    </Text>
-                    {selectedTeamName && (
-                      <Text
-                        truncate
-                        maxWidth="full"
-                        fontSize="xs"
-                        color="fg.muted"
-                        lineHeight="shorter"
-                      >
-                        {selectedTeamName}
-                      </Text>
-                    )}
-                  </VStack>
-                </HStack>
+                <SelectedScope
+                  option={selectedOption}
+                  teamName={selectedTeamName}
+                  compact={compact}
+                />
               ) : (
                 placeholder
               )

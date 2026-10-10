@@ -3,7 +3,7 @@
  * recording, renderWithGatewayHost for query-string state.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
@@ -304,8 +304,8 @@ export function renderWithGatewayHost(
 ): RenderResult {
   installBrowserApisJsdomLacks();
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemTestProvider>
       <GatewayHostHarness host={host}>{element}</GatewayHostHarness>
-    </ChakraProvider>,
+    </DesignSystemTestProvider>,
   );
 }

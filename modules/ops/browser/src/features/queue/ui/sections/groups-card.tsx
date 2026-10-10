@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -20,7 +21,7 @@ import {
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { MoreVertical, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
@@ -43,7 +44,7 @@ import { ReapStrandedGroupsAction } from "../blocks/reap-stranded-groups-action.
 import { GroupStateBadge } from "../elements/queue-group-state-badge.tsx";
 import { GroupDetailDrawer } from "./group-detail-drawer.tsx";
 const GROUPS_VIEWPORT_HEIGHT = 480;
-const GROUPS_ROW_HEIGHT = 36;
+const GROUPS_ROW_HEIGHT = 49;
 
 /** What stands in for the table while it loads, is idle, or is filtered empty. */
 function GroupsPlaceholder({ isLoading, anyGroups }: { isLoading: boolean; anyGroups: boolean }) {
@@ -87,7 +88,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     { enabled: !!primaryQueue },
   );
 
-  const allGroups = useMemo(() => {
+  const allGroups = (() => {
     const groups: (GroupInfo & { queueName: string })[] = [];
     if (groupsQuery.data && primaryQueue) {
       for (const g of groupsQuery.data.groups) {
@@ -95,18 +96,15 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
       }
     }
     return groups;
-  }, [groupsQuery.data, primaryQueue]);
+  })();
 
   // Classification compares dispatch-eligibility scores against "now"; pinning
   // now to the fetch instant keeps the rows stable between refreshes instead of
   // reclassifying on every unrelated render.
   const now = groupsQuery.dataUpdatedAt || nowInstant().epochMilliseconds;
 
-  const filteredGroups = useMemo(
-    () => filterGroups({ groups: allGroups, statusFilter, search, now }),
-    [allGroups, statusFilter, search, now],
-  );
-  const counts = useMemo(() => countGroupsByStatus(allGroups, now), [allGroups, now]);
+  const filteredGroups = filterGroups({ groups: allGroups, statusFilter, search, now });
+  const counts = countGroupsByStatus(allGroups, now);
 
   // Filter changes shrink the visible row count without re-mounting the
   // scroll container, so the virtualizer's total height drops while
@@ -142,7 +140,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   // Tenant-scoped controls. Activated when the search box is a single
   // tenant prefix (no slash) — typically `project_…`. Reuses the same
   // search input the operator was already typing for filter scope.
-  const tenantScope = useMemo(() => tenantScopeOf(search), [search]);
+  const tenantScope = tenantScopeOf(search);
 
   const pausedTenantsQuery = api.ops.listPausedTenants.useQuery(
     { queueName: primaryQueue ?? "" },
@@ -171,7 +169,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   return (
     <>
-      <Card.Root>
+      <Card.Root borderColor="border.muted" boxShadow="none">
         <Card.Body padding={0}>
           {/* Paused-tenants banner: always visible when at least one tenant is paused so
               operators don't accidentally assume a tenant's silence means it's healthy. */}
@@ -236,10 +234,12 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
               maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
               overflowY="auto"
             >
-              <Table.Root
+              <ListTable
+                density="compact"
+                columnRules={false}
+                containerProps={{ overflow: "visible" }}
                 size="sm"
                 variant="line"
-                css={{ "& tr:last-child td": { borderBottom: "none" } }}
               >
                 <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                   <Table.Row>
@@ -295,7 +295,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                     )}
                   />
                 </Table.Body>
-              </Table.Root>
+              </ListTable>
             </Box>
           )}
         </Card.Body>
@@ -348,7 +348,7 @@ function PausedTenantsBanner({
             {tid}
           </Badge>
           <Button
-            size="2xs"
+            size="sm"
             variant="outline"
             colorPalette="green"
             onClick={() => onUnpause(tid)}
@@ -398,27 +398,27 @@ function TenantActionBar({
       </Badge>
       {isPaused ? (
         <Button
-          size="2xs"
+          size="sm"
           variant="outline"
           colorPalette="green"
           onClick={onUnpause}
           loading={unpausing}
         >
-          Unpause Tenant
+          Unpause tenant
         </Button>
       ) : (
         <Button
-          size="2xs"
+          size="sm"
           variant="outline"
           colorPalette="yellow"
           onClick={onPause}
           loading={pausing}
         >
-          Pause Tenant
+          Pause tenant
         </Button>
       )}
-      <Button size="2xs" variant="outline" colorPalette="red" onClick={onDrain}>
-        Drain All Tenant Groups
+      <Button size="sm" variant="outline" colorPalette="red" onClick={onDrain}>
+        Drain all tenant groups
       </Button>
     </HStack>
   );
@@ -460,49 +460,49 @@ function GroupRow({
       _hover={{ bg: tint ?? "bg.subtle" }}
       onClick={() => onOpen(group)}
     >
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Text textStyle="xs" fontFamily="mono" truncate title={group.groupId}>
           {group.groupId}
         </Text>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Text textStyle="xs" color="fg.muted" truncate>
           {group.pipelineName ?? "—"}
         </Text>
       </Table.Cell>
-      <Table.Cell textAlign="end">
+      <Table.Cell height="49px" textAlign="end">
         <Text textStyle="xs" fontFamily="mono">
           {group.pendingJobs}
         </Text>
       </Table.Cell>
-      <Table.Cell textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={c.attempt > 0 ? "orange.500" : "fg.muted"}>
+      <Table.Cell height="49px" textAlign="end">
+        <Text textStyle="xs" fontFamily="mono" color={c.attempt > 0 ? "orange.fg" : "fg.muted"}>
           {c.attempt > 0 ? c.attempt : "—"}
         </Text>
       </Table.Cell>
-      <Table.Cell>
-        <Text textStyle="xs" color={c.state === "retrying" ? "orange.500" : "fg.muted"}>
+      <Table.Cell height="49px">
+        <Text textStyle="xs" color={c.state === "retrying" ? "orange.fg" : "fg.muted"}>
           {describeNextRun(c, now)}
         </Text>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell height="49px">
         <Text
           textStyle="xs"
-          color={overdue ? "orange.500" : "fg.muted"}
+          color={overdue ? "orange.fg" : "fg.muted"}
           fontWeight={overdue ? "medium" : undefined}
         >
           {formatTimeAgo(group.oldestJobMs)}
           {overdue ? " ⚠" : ""}
         </Text>
       </Table.Cell>
-      <Table.Cell title={c.isFailing ? (group.errorMessage ?? undefined) : undefined}>
+      <Table.Cell height="49px" title={c.isFailing ? (group.errorMessage ?? undefined) : undefined}>
         <GroupStateBadge c={c} />
       </Table.Cell>
       {hasAccess && (
-        <Table.Cell onClick={(e) => e.stopPropagation()}>
+        <Table.Cell height="49px" onClick={(e) => e.stopPropagation()}>
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button size="2xs" variant="ghost" aria-label={`Actions for ${group.groupId}`}>
+              <Button size="sm" variant="ghost" aria-label={`Actions for ${group.groupId}`}>
                 <MoreVertical size={14} />
               </Button>
             </Menu.Trigger>
@@ -562,7 +562,7 @@ function GroupRow({
               </Menu.Item>
               <Menu.Item
                 value="drain"
-                color="red.500"
+                color="fg.error"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDrain(group);
@@ -725,7 +725,7 @@ function GroupsFilterBar({
             {statusButtons.map((btn) => (
               <Button
                 key={btn.value}
-                size="2xs"
+                size="sm"
                 variant={statusFilter === btn.value ? "solid" : "ghost"}
                 colorPalette={btn.color}
                 onClick={() => onStatusFilter(btn.value)}
@@ -739,7 +739,7 @@ function GroupsFilterBar({
               <Search size={11} color="var(--chakra-colors-fg-muted)" />
             </Box>
             <Input
-              size="xs"
+              size="sm"
               placeholder="Search..."
               value={search}
               onChange={(e) => onSearch(e.target.value)}
@@ -807,7 +807,7 @@ function GroupConfirmDialogs({
             });
           }
         }}
-        title="Drain All Tenant Groups"
+        title="Drain all tenant groups"
         description={`Permanently remove ALL pending groups for tenant "${drainTenantTarget}" across every pipeline. Cannot be undone. The event log in ClickHouse is preserved; you can replay later if needed.`}
         isLoading={drainTenantMutation.isPending}
       />

@@ -2,6 +2,7 @@
  * audio effects; client-importable, vendor-agnostic, transport-independent.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -19,7 +20,7 @@ export type CallerVoiceEffect = (typeof CALLER_VOICE_EFFECTS)[number];
  */
 export const CALLER_VOICE_PATTERN = /^[^/\s]+\/[^/\s]+$/;
 
-export const callerVoiceConfigSchema = z.object({
+const callerVoiceConfigSchemaDefinition = z.object({
   /** `"provider/voice"` TTS voice; null means the project default voice. */
   voiceModel: z.string().regex(CALLER_VOICE_PATTERN).nullable().default(null),
   /** [0, 1] probability the caller interrupts each agent turn. UI shows a
@@ -27,6 +28,8 @@ export const callerVoiceConfigSchema = z.object({
   interruptProbability: z.number().min(0).max(1).default(0),
   effects: z.enum(CALLER_VOICE_EFFECTS).default("none"),
 });
+export interface CallerVoiceConfigSchema extends Named<typeof callerVoiceConfigSchemaDefinition> {}
+export const callerVoiceConfigSchema: CallerVoiceConfigSchema = callerVoiceConfigSchemaDefinition;
 export type CallerVoiceConfig = z.infer<typeof callerVoiceConfigSchema>;
 
 export const DEFAULT_CALLER_VOICE: CallerVoiceConfig = {

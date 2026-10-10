@@ -1,6 +1,7 @@
 import {
   Controls,
   Description,
+  Heading,
   Markdown,
   Primary,
   Stories,
@@ -15,52 +16,59 @@ import { adoption, entriesForStory } from "./adoption-data.ts";
 export type Usage = { use: string; avoid?: string };
 
 function usageMarkdown({ usage }: { usage: Usage }): string {
-  const avoid = usage.avoid ? `\n\n**When not to.** ${usage.avoid}` : "";
-  return `**When to use.** ${usage.use}${avoid}`;
+  const avoid = usage.avoid ? `\n\n**Not for:** ${usage.avoid}` : "";
+  return `**Use for:** ${usage.use}${avoid}`;
 }
 
-function adoptionMarkdown({ fileName }: { fileName: string }): string | undefined {
+function adoptionOf({ fileName }: { fileName: string }) {
   if (!adoption) return undefined;
   const entries = entriesForStory({ fileName });
   if (entries.length === 0) return undefined;
+  const files = entries.reduce((sum, [, entry]) => sum + entry.files, 0);
   const rows = entries.map(([subpath, entry]) => {
     const owners = Object.entries(entry.owners)
       .toSorted((a, b) => b[1] - a[1])
       .slice(0, 4)
-      .map(([owner, files]) => `${owner} (${files})`)
+      .map(([owner, count]) => `${owner} (${count})`)
       .join(", ");
-    const names = Object.entries(entry.names)
-      .slice(0, 8)
-      .map(([name, files]) => `${name} ${files}`)
-      .join(", ");
-    const module = `@langwatch/design-system${subpath.slice(1)}`;
-    return `| \`${module}\` | ${entry.files} | ${Object.keys(entry.owners).length} | ${owners || "none yet"} | ${names} |`;
+    return `| \`@langwatch/design-system${subpath.slice(1)}\` | ${entry.files} | ${owners || "none yet"} |`;
   });
-  return [
-    "**Adoption.** Files that import it today, counted from the import sites when this workshop was built.",
-    "",
-    "| Import | Files | Packages | Most used in | Names imported (files) |",
-    "| --- | --- | --- | --- | --- |",
-    ...rows,
-  ].join("\n");
+  const table = ["| Import | Files | Most used in |", "| --- | --- | --- |", ...rows].join("\n");
+  return { files, table };
 }
 
-/** Every docs page: what it is, when to use it, how widely it is used, then the stories. */
+/**
+ * Every docs page, laid out like Chakra's: what it is and when to use it, the
+ * example, its other states, then props. How widely it is used folds away at the end.
+ */
 export function DocsPage() {
   const resolved = useOf("meta");
   const parameters = resolved.type === "meta" ? resolved.preparedMeta.parameters : {};
+  const hasProps = resolved.type === "meta" && resolved.preparedMeta.component !== undefined;
   const { fileName, usage } = parameters as { fileName?: string; usage?: Usage };
-  const adoptionNote = fileName ? adoptionMarkdown({ fileName }) : undefined;
+  const used = fileName ? adoptionOf({ fileName }) : undefined;
   return (
     <>
       <Title />
       <Subtitle />
       <Description />
       {usage ? <Markdown>{usageMarkdown({ usage })}</Markdown> : null}
-      {adoptionNote ? <Markdown>{adoptionNote}</Markdown> : null}
       <Primary />
-      <Controls />
-      <Stories />
+      <Stories title="Examples" includePrimary={false} />
+      {hasProps ? (
+        <>
+          <Heading>Props</Heading>
+          <Controls />
+        </>
+      ) : null}
+      {used ? (
+        <details>
+          <summary>
+            Used in {used.files} {used.files === 1 ? "file" : "files"}
+          </summary>
+          <Markdown>{used.table}</Markdown>
+        </details>
+      ) : null}
     </>
   );
 }

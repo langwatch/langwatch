@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { RoutableConnection } from "../signin/signin-routing.ts";
@@ -166,7 +167,7 @@ export const ssoAttestationNoteSchema = z.string().trim().min(1).max(1_000);
  * REFERENCES. `clientIdRef` and `secretRef` name credential records; the
  * values live wherever credentials live and never in the log.
  */
-export const ssoIdpMetadataSchema = z.object({
+const ssoIdpMetadataSchemaDefinition = z.object({
   issuer: z.string().min(1).nullable(),
   /** The provider id the sign-in surface dials (`okta`, `auth0`, …). */
   providerId: z.string().min(1),
@@ -174,6 +175,8 @@ export const ssoIdpMetadataSchema = z.object({
   secretRef: z.string().min(1).nullable(),
   certRefs: z.array(z.string().min(1)),
 });
+export interface SsoIdpMetadataSchema extends Named<typeof ssoIdpMetadataSchemaDefinition> {}
+export const ssoIdpMetadataSchema: SsoIdpMetadataSchema = ssoIdpMetadataSchemaDefinition;
 export type SsoIdpMetadata = z.infer<typeof ssoIdpMetadataSchema>;
 
 // ---- events --------------------------------------------------------------
@@ -250,7 +253,7 @@ export const SSO_CONNECTION_EVENT_VERSION_LATEST = "2026-08-24" as const;
  *  history is legible without joining anything. */
 const sourced = { source: ssoConnectionSourceSchema };
 
-export const connectionRegisteredPayloadSchema = z.object({
+const connectionRegisteredPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   organizationId: z.string().min(1),
   type: ssoConnectionTypeSchema,
@@ -260,15 +263,25 @@ export const connectionRegisteredPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionRegisteredPayloadSchema extends Named<
+  typeof connectionRegisteredPayloadSchemaDefinition
+> {}
+export const connectionRegisteredPayloadSchema: ConnectionRegisteredPayloadSchema =
+  connectionRegisteredPayloadSchemaDefinition;
 
-export const domainClaimedPayloadSchema = z.object({
+const domainClaimedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainClaimedPayloadSchema extends Named<
+  typeof domainClaimedPayloadSchemaDefinition
+> {}
+export const domainClaimedPayloadSchema: DomainClaimedPayloadSchema =
+  domainClaimedPayloadSchemaDefinition;
 
-export const domainClaimApprovedPayloadSchema = z.object({
+const domainClaimApprovedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   /** The ops user who approved. Recorded because first-verifier-owns makes
@@ -279,8 +292,13 @@ export const domainClaimApprovedPayloadSchema = z.object({
   authority: ssoDomainClaimAuthoritySchema.default("platform-operator"),
   ...sourced,
 });
+export interface DomainClaimApprovedPayloadSchema extends Named<
+  typeof domainClaimApprovedPayloadSchemaDefinition
+> {}
+export const domainClaimApprovedPayloadSchema: DomainClaimApprovedPayloadSchema =
+  domainClaimApprovedPayloadSchemaDefinition;
 
-export const domainClaimRejectedPayloadSchema = z.object({
+const domainClaimRejectedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   /** Why ops said no, in the operator's words. Read back on re-claim. */
@@ -288,26 +306,41 @@ export const domainClaimRejectedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainClaimRejectedPayloadSchema extends Named<
+  typeof domainClaimRejectedPayloadSchemaDefinition
+> {}
+export const domainClaimRejectedPayloadSchema: DomainClaimRejectedPayloadSchema =
+  domainClaimRejectedPayloadSchemaDefinition;
 
 /**
  * A domain taken back out, by whoever manages the connection. It carries
  * only the domain and the actor: everything that domain had is derived
  * state the fold recomputes without it, and the history keeps every step.
  */
-export const domainWithdrawnPayloadSchema = z.object({
+const domainWithdrawnPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainWithdrawnPayloadSchema extends Named<
+  typeof domainWithdrawnPayloadSchemaDefinition
+> {}
+export const domainWithdrawnPayloadSchema: DomainWithdrawnPayloadSchema =
+  domainWithdrawnPayloadSchemaDefinition;
 
-export const connectionDiscardedPayloadSchema = z.object({
+const connectionDiscardedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionDiscardedPayloadSchema extends Named<
+  typeof connectionDiscardedPayloadSchemaDefinition
+> {}
+export const connectionDiscardedPayloadSchema: ConnectionDiscardedPayloadSchema =
+  connectionDiscardedPayloadSchemaDefinition;
 
-export const verificationRequestedPayloadSchema = z.object({
+const verificationRequestedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
@@ -324,11 +357,16 @@ export const verificationRequestedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface VerificationRequestedPayloadSchema extends Named<
+  typeof verificationRequestedPayloadSchemaDefinition
+> {}
+export const verificationRequestedPayloadSchema: VerificationRequestedPayloadSchema =
+  verificationRequestedPayloadSchemaDefinition;
 
 /**
  * Domain attestation (D05 amendment): out of band, no token. Goes APPROVED→VERIFIED in one step.
  */
-export const domainAttestedPayloadSchema = z.object({
+const domainAttestedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   /** A ticket, case or other durable reference to the evidence reviewed. */
@@ -341,21 +379,31 @@ export const domainAttestedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainAttestedPayloadSchema extends Named<
+  typeof domainAttestedPayloadSchemaDefinition
+> {}
+export const domainAttestedPayloadSchema: DomainAttestedPayloadSchema =
+  domainAttestedPayloadSchemaDefinition;
 
-export const domainVerifiedPayloadSchema = z.object({
+const domainVerifiedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainVerifiedPayloadSchema extends Named<
+  typeof domainVerifiedPayloadSchemaDefinition
+> {}
+export const domainVerifiedPayloadSchema: DomainVerifiedPayloadSchema =
+  domainVerifiedPayloadSchemaDefinition;
 
 /**
  * A re-check found the record gone (ADR-123). Stated once, when the evidence
  * first goes missing. `graceEndsAtMs` rides on the fact: the deadline a
  * customer was TOLD is the one they get, whatever the window becomes.
  */
-export const domainProofWaveredPayloadSchema = z.object({
+const domainProofWaveredPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   /** When the record was first found missing. The clock starts here. */
@@ -365,13 +413,18 @@ export const domainProofWaveredPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainProofWaveredPayloadSchema extends Named<
+  typeof domainProofWaveredPayloadSchemaDefinition
+> {}
+export const domainProofWaveredPayloadSchema: DomainProofWaveredPayloadSchema =
+  domainProofWaveredPayloadSchemaDefinition;
 
 /**
  * The grace ran out with the record still missing (ADR-123). The domain stops
  * vouching for NEW people; it suspends nothing and un-proves nothing, because
  * routing is untouched.
  */
-export const domainProofLapsedPayloadSchema = z.object({
+const domainProofLapsedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   /** Carried forward so the fact says how long it was gone before we acted. */
@@ -379,12 +432,17 @@ export const domainProofLapsedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainProofLapsedPayloadSchema extends Named<
+  typeof domainProofLapsedPayloadSchemaDefinition
+> {}
+export const domainProofLapsedPayloadSchema: DomainProofLapsedPayloadSchema =
+  domainProofLapsedPayloadSchemaDefinition;
 
 /**
  * The record is published again (ADR-123). Recovery costs the customer
  * nothing but publishing it: the domain was never un-proved, only doubted.
  */
-export const domainProofRecoveredPayloadSchema = z.object({
+const domainProofRecoveredPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   /** How long the evidence was missing, end to end. */
@@ -392,8 +450,13 @@ export const domainProofRecoveredPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface DomainProofRecoveredPayloadSchema extends Named<
+  typeof domainProofRecoveredPayloadSchemaDefinition
+> {}
+export const domainProofRecoveredPayloadSchema: DomainProofRecoveredPayloadSchema =
+  domainProofRecoveredPayloadSchemaDefinition;
 
-export const connectionActivatedPayloadSchema = z.object({
+const connectionActivatedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   /** The account whose successful test login the activation rests on; null
    *  only for a grandfathered connection, whose test login is the years of
@@ -405,22 +468,37 @@ export const connectionActivatedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionActivatedPayloadSchema extends Named<
+  typeof connectionActivatedPayloadSchemaDefinition
+> {}
+export const connectionActivatedPayloadSchema: ConnectionActivatedPayloadSchema =
+  connectionActivatedPayloadSchemaDefinition;
 
-export const connectionSuspendedPayloadSchema = z.object({
+const connectionSuspendedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   reason: z.string().min(1).nullable(),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionSuspendedPayloadSchema extends Named<
+  typeof connectionSuspendedPayloadSchemaDefinition
+> {}
+export const connectionSuspendedPayloadSchema: ConnectionSuspendedPayloadSchema =
+  connectionSuspendedPayloadSchemaDefinition;
 
-export const connectionResumedPayloadSchema = z.object({
+const connectionResumedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   activationReservationCommandId: z.string().min(1).optional(),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionResumedPayloadSchema extends Named<
+  typeof connectionResumedPayloadSchemaDefinition
+> {}
+export const connectionResumedPayloadSchema: ConnectionResumedPayloadSchema =
+  connectionResumedPayloadSchemaDefinition;
 
-export const teardownRequestedPayloadSchema = z.object({
+const teardownRequestedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   reason: z.string().min(1).nullable(),
   /** When the grace expires. The process manager wakes at this instant and
@@ -430,28 +508,43 @@ export const teardownRequestedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface TeardownRequestedPayloadSchema extends Named<
+  typeof teardownRequestedPayloadSchemaDefinition
+> {}
+export const teardownRequestedPayloadSchema: TeardownRequestedPayloadSchema =
+  teardownRequestedPayloadSchemaDefinition;
 
-export const connectionTornDownPayloadSchema = z.object({
+const connectionTornDownPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionTornDownPayloadSchema extends Named<
+  typeof connectionTornDownPayloadSchemaDefinition
+> {}
+export const connectionTornDownPayloadSchema: ConnectionTornDownPayloadSchema =
+  connectionTornDownPayloadSchemaDefinition;
 
 /**
  * A connection fact as a command decides it. The framework envelope
  * (aggregate, tenant, ids, idempotency key) and `occurredAt` are stamped by
  * whoever appends.
  */
-export const connectionArrivalPolicySetPayloadSchema = z.object({
+const connectionArrivalPolicySetPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   policy: ssoArrivalPolicySchema,
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionArrivalPolicySetPayloadSchema extends Named<
+  typeof connectionArrivalPolicySetPayloadSchemaDefinition
+> {}
+export const connectionArrivalPolicySetPayloadSchema: ConnectionArrivalPolicySetPayloadSchema =
+  connectionArrivalPolicySetPayloadSchemaDefinition;
 
 /** What proved one domain, as a fact carries it — the replacement inherits
  *  these whole rather than re-running a ceremony the customer already ran. */
-export const ssoDomainVerificationSchema = z.object({
+const ssoDomainVerificationSchemaDefinition = z.object({
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
   /** Who proved it; null for a system actor, which is what the grandfather migration is. */
@@ -468,8 +561,13 @@ export const ssoDomainVerificationSchema = z.object({
   evidenceRef: z.string().min(1).max(500).nullable().optional(),
   note: z.string().min(1).max(1_000).nullable().optional(),
 });
+export interface SsoDomainVerificationSchema extends Named<
+  typeof ssoDomainVerificationSchemaDefinition
+> {}
+export const ssoDomainVerificationSchema: SsoDomainVerificationSchema =
+  ssoDomainVerificationSchemaDefinition;
 
-export const connectionRenamedPayloadSchema = z.object({
+const connectionRenamedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   /** Trimmed and non-empty: a connection with a blank name is one whose card
    *  has nothing on it, and the cards are the only place it is read. */
@@ -477,45 +575,77 @@ export const connectionRenamedPayloadSchema = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionRenamedPayloadSchema extends Named<
+  typeof connectionRenamedPayloadSchemaDefinition
+> {}
+export const connectionRenamedPayloadSchema: ConnectionRenamedPayloadSchema =
+  connectionRenamedPayloadSchemaDefinition;
 
 /** What an identity provider update replaces: everything the engine dials,
  *  and not the name (`providerId`), which is the rename's fact. */
-export const ssoIdpDialingSchema = ssoIdpMetadataSchema.omit({ providerId: true });
+const ssoIdpDialingSchemaDefinition = ssoIdpMetadataSchema.omit({ providerId: true });
+export interface SsoIdpDialingSchema extends Named<typeof ssoIdpDialingSchemaDefinition> {}
+export const ssoIdpDialingSchema: SsoIdpDialingSchema = ssoIdpDialingSchemaDefinition;
 export type SsoIdpDialing = z.infer<typeof ssoIdpDialingSchema>;
 
-export const connectionIdpUpdatedPayloadSchema = z.object({
+const connectionIdpUpdatedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   idp: ssoIdpDialingSchema,
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface ConnectionIdpUpdatedPayloadSchema extends Named<
+  typeof connectionIdpUpdatedPayloadSchemaDefinition
+> {}
+export const connectionIdpUpdatedPayloadSchema: ConnectionIdpUpdatedPayloadSchema =
+  connectionIdpUpdatedPayloadSchemaDefinition;
 
-export const replacementConnectionRegisteredPayloadSchema = z.object({
+const replacementConnectionRegisteredPayloadSchemaDefinition = z.object({
   ...connectionRegisteredPayloadSchema.shape,
   replacesConnectionId: z.string().min(1),
   inheritedDomainVerifications: z.array(ssoDomainVerificationSchema).default([]),
 });
+export interface ReplacementConnectionRegisteredPayloadSchema extends Named<
+  typeof replacementConnectionRegisteredPayloadSchemaDefinition
+> {}
+export const replacementConnectionRegisteredPayloadSchema: ReplacementConnectionRegisteredPayloadSchema =
+  replacementConnectionRegisteredPayloadSchemaDefinition;
 
-export const migrationRouteSelectedPayloadSchema = z.object({
+const migrationRouteSelectedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   route: ssoMigrationRouteSchema,
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface MigrationRouteSelectedPayloadSchema extends Named<
+  typeof migrationRouteSelectedPayloadSchemaDefinition
+> {}
+export const migrationRouteSelectedPayloadSchema: MigrationRouteSelectedPayloadSchema =
+  migrationRouteSelectedPayloadSchemaDefinition;
 
-export const migrationFinalizationStartedPayloadSchema = z.object({
+const migrationFinalizationStartedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface MigrationFinalizationStartedPayloadSchema extends Named<
+  typeof migrationFinalizationStartedPayloadSchemaDefinition
+> {}
+export const migrationFinalizationStartedPayloadSchema: MigrationFinalizationStartedPayloadSchema =
+  migrationFinalizationStartedPayloadSchemaDefinition;
 
-export const migrationFinalizedPayloadSchema = z.object({
+const migrationFinalizedPayloadSchemaDefinition = z.object({
   connectionId: z.string().min(1),
   actor: ledgerActorSchema,
   ...sourced,
 });
+export interface MigrationFinalizedPayloadSchema extends Named<
+  typeof migrationFinalizedPayloadSchemaDefinition
+> {}
+export const migrationFinalizedPayloadSchema: MigrationFinalizedPayloadSchema =
+  migrationFinalizedPayloadSchemaDefinition;
 
-export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
+const ssoConnectionFactInputSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
     data: connectionArrivalPolicySetPayloadSchema,
@@ -613,6 +743,11 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
     data: migrationFinalizedPayloadSchema,
   }),
 ]);
+export interface SsoConnectionFactInputSchema extends Named<
+  typeof ssoConnectionFactInputSchemaDefinition
+> {}
+export const ssoConnectionFactInputSchema: SsoConnectionFactInputSchema =
+  ssoConnectionFactInputSchemaDefinition;
 export type SsoConnectionFactInput = z.infer<typeof ssoConnectionFactInputSchema>;
 
 /** A fact with its business time — what the reducer folds. */
@@ -632,7 +767,7 @@ export type SsoDomainVerification = z.infer<typeof ssoDomainVerificationSchema>;
  * a re-claim after a rejection overwrites the row's clock and a queue-latency
  * measurement a later action can rewrite is not one.
  */
-export const ssoDomainClaimSchema = z.object({
+const ssoDomainClaimSchemaDefinition = z.object({
   domain: z.string(),
   state: ssoDomainClaimStateSchema,
   claimedAtMs: z.number(),
@@ -646,6 +781,8 @@ export const ssoDomainClaimSchema = z.object({
   /** The reviewer's words, on a rejection. Read back on a re-claim. */
   note: z.string().nullable(),
 });
+export interface SsoDomainClaimSchema extends Named<typeof ssoDomainClaimSchemaDefinition> {}
+export const ssoDomainClaimSchema: SsoDomainClaimSchema = ssoDomainClaimSchemaDefinition;
 export type SsoDomainClaim = z.infer<typeof ssoDomainClaimSchema>;
 
 /** The dialing information as the fold holds it: the fact's shape, blank before registration. */
@@ -662,7 +799,7 @@ const ssoIdpMetadataStateSchema = z.object({
  * state every guard is evaluated against, and what a peer fold stores and
  * parses back (`ssoConnectionStateSchema`).
  */
-export const ssoConnectionStateSchema = z.object({
+const ssoConnectionStateSchemaDefinition = z.object({
   connectionId: z.string(),
   organizationId: z.string(),
   type: ssoConnectionTypeSchema,
@@ -720,6 +857,11 @@ export const ssoConnectionStateSchema = z.object({
   finalizationRequestedAtMs: z.number().nullable(),
   finalizedAtMs: z.number().nullable(),
 });
+export interface SsoConnectionStateSchema extends Named<
+  typeof ssoConnectionStateSchemaDefinition
+> {}
+export const ssoConnectionStateSchema: SsoConnectionStateSchema =
+  ssoConnectionStateSchemaDefinition;
 export type SsoConnectionState = z.infer<typeof ssoConnectionStateSchema>;
 
 const EMPTY_IDP: SsoIdpMetadata = {

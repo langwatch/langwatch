@@ -102,8 +102,8 @@ one you do not paste anywhere, and module code never reads `process.env` at all
 Plain `pnpm dev` is the default for TypeScript work.
 
 ```bash
-pnpm dev            # app (ui + api + worker, one process) + go (+ langy when selected)
-pnpm dev:one        # the app lane alone
+pnpm dev            # built UI served by the backend (api + worker, one process) + go (+ langy when selected)
+pnpm dev:hmr        # the same with the Vite ui lane (HMR)
 pnpm dev:ui         # the browser application alone
 pnpm dev:backend    # the api and the worker in one process
 pnpm dev:go         # aigateway + nlpgo in one process
@@ -111,9 +111,8 @@ pnpm dev:api        # the API alone, its own process
 pnpm dev:worker     # the background worker alone, its own process
 ```
 
-Locally the ui, the api and the worker share ONE process — the `app` lane — and
-the Go data-plane services share another (`go`). `LANGWATCH_DEV_ONE_PROCESS=0`
-splits the app lane into a `ui` lane and a `backend` lane (api + worker), and the Go lane into `go` and `sims`. It is a launcher, not a process
+Locally the api and the worker share ONE process and the Go data-plane services
+share another (`go`). `LANGWATCH_DEV_ONE_PROCESS=0` splits the Go lane into `go` and `sims`. It is a launcher, not a process
 role: each application still parses its own config and composes its own graph,
 and `dev:api` + `dev:worker` still run them apart when you need the production
 process shape. A backend change reloads the api and the worker in-process and the

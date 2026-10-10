@@ -135,6 +135,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts",
     "postApiV1ProjectsByProjectIdAnalyticsCharts",
   )
+  .withAudit("analytics.savedWorkbenchCharts.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartProjectParamsSchema)
   .withInput(createSavedWorkbenchChartSchema)
@@ -205,6 +206,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .withAudit("analytics.savedWorkbenchCharts.update")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withInput(updateSavedWorkbenchChartSchema)
@@ -243,6 +245,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .withAudit("analytics.savedWorkbenchCharts.delete")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:delete")
@@ -272,6 +275,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
+  .withAudit("analytics.savedWorkbenchCharts.place")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withInput(placeSavedWorkbenchChartSchema)
@@ -309,6 +313,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
+  .withAudit("analytics.savedWorkbenchCharts.unplace")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:update")

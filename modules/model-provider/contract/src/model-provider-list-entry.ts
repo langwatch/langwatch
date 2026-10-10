@@ -4,12 +4,13 @@
  * optional: the transport doesn't send it yet (dev/docs/plans/ui-family-move-manifests.md).
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { customModelEntrySchema } from "./custom-model.ts";
 import { modelProviderScopeSchema } from "./model-provider.ts";
 
-export const modelProviderListEntrySchema = z
+const modelProviderListEntrySchemaDefinition = z
   .object({
     id: z.string(),
     provider: z.string(),
@@ -43,5 +44,10 @@ export const modelProviderListEntrySchema = z
     isSystem: z.boolean().optional(),
   })
   .strict();
+export interface ModelProviderListEntrySchema extends Named<
+  typeof modelProviderListEntrySchemaDefinition
+> {}
+export const modelProviderListEntrySchema: ModelProviderListEntrySchema =
+  modelProviderListEntrySchemaDefinition;
 
 export type ModelProviderListEntry = z.infer<typeof modelProviderListEntrySchema>;

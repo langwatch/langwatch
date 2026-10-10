@@ -50,7 +50,7 @@ bounces them together and `haven logs <name>` still reads each one.
 By default, one Go process: the `go` lane
 hosts the gateway, the NLP engine and every simulator, each on its own address
 and hostname, and no `sims` lane runs. A gateway edit then restarts the
-simulators too; `LANGWATCH_DEV_ONE_PROCESS=0` splits it (and the Node app lane) for protocol load or reload-sensitive work.
+simulators too; `LANGWATCH_DEV_ONE_PROCESS=0` splits it for protocol load or reload-sensitive work.
 Langy always keeps its own lane. Load drivers
 hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
 a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** Contract schemas for the `identity.joinRequests.*` responses, in identity's own vocabulary. */
 import { z } from "zod";
 
@@ -17,22 +18,26 @@ const waitingSinceSchema = z
   .strict();
 
 /** Everything this person has asked to join and not yet heard back on. */
-export const joinRequestMineSchema = waitingSinceSchema
+const joinRequestMineSchemaDefinition = waitingSinceSchema
   .safeExtend({ organizationId: z.string().min(1) })
   .array();
+export interface JoinRequestMineSchema extends Named<typeof joinRequestMineSchemaDefinition> {}
+export const joinRequestMineSchema: JoinRequestMineSchema = joinRequestMineSchemaDefinition;
 export type JoinRequestMine = z.infer<typeof joinRequestMineSchema>;
 
 /** A request was filed; whether it needs an admin or was granted outright. */
-export const joinRequestFiledSchema = z
+const joinRequestFiledSchemaDefinition = z
   .object({ joinRequestId: z.string().min(1), state: z.enum(["PENDING", "APPROVED"]) })
   .strict();
+export interface JoinRequestFiledSchema extends Named<typeof joinRequestFiledSchemaDefinition> {}
+export const joinRequestFiledSchema: JoinRequestFiledSchema = joinRequestFiledSchemaDefinition;
 export type JoinRequestFiled = z.infer<typeof joinRequestFiledSchema>;
 
 /**
  * The organization somebody was just admitted to by its domain setting, or
  * null when nothing admits their address: the ordinary case, not a failure.
  */
-export const joinRequestAdmittedSchema = z
+const joinRequestAdmittedSchemaDefinition = z
   .object({
     organization: z
       .object({
@@ -44,10 +49,15 @@ export const joinRequestAdmittedSchema = z
       .nullable(),
   })
   .strict();
+export interface JoinRequestAdmittedSchema extends Named<
+  typeof joinRequestAdmittedSchemaDefinition
+> {}
+export const joinRequestAdmittedSchema: JoinRequestAdmittedSchema =
+  joinRequestAdmittedSchemaDefinition;
 export type JoinRequestAdmitted = z.infer<typeof joinRequestAdmittedSchema>;
 
 /** Who walked in on the domain setting lately, named for the members area. */
-export const joinRequestAutomaticJoinsSchema = z
+const joinRequestAutomaticJoinsSchemaDefinition = z
   .object({
     joinRequestId: z.string().min(1),
     userId: z.string().min(1),
@@ -57,14 +67,24 @@ export const joinRequestAutomaticJoinsSchema = z
   })
   .strict()
   .array();
+export interface JoinRequestAutomaticJoinsSchema extends Named<
+  typeof joinRequestAutomaticJoinsSchemaDefinition
+> {}
+export const joinRequestAutomaticJoinsSchema: JoinRequestAutomaticJoinsSchema =
+  joinRequestAutomaticJoinsSchemaDefinition;
 export type JoinRequestAutomaticJoins = z.infer<typeof joinRequestAutomaticJoinsSchema>;
 
 /** A write with nothing else to report. */
-export const joinRequestWriteAckSchema = z.object({ success: z.literal(true) }).strict();
+const joinRequestWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
+export interface JoinRequestWriteAckSchema extends Named<
+  typeof joinRequestWriteAckSchemaDefinition
+> {}
+export const joinRequestWriteAckSchema: JoinRequestWriteAckSchema =
+  joinRequestWriteAckSchemaDefinition;
 export type JoinRequestWriteAck = z.infer<typeof joinRequestWriteAckSchema>;
 
 /** One request waiting on this organization's admins, named for the reviewer. */
-export const joinRequestPendingSchema = waitingSinceSchema
+const joinRequestPendingSchemaDefinition = waitingSinceSchema
   .safeExtend({
     userId: z.string().min(1),
     name: z.string(),
@@ -73,20 +93,30 @@ export const joinRequestPendingSchema = waitingSinceSchema
     seat: joinerRoleSchema,
   })
   .array();
+export interface JoinRequestPendingSchema extends Named<
+  typeof joinRequestPendingSchemaDefinition
+> {}
+export const joinRequestPendingSchema: JoinRequestPendingSchema =
+  joinRequestPendingSchemaDefinition;
 export type JoinRequestPending = z.infer<typeof joinRequestPendingSchema>;
 
 /** How colleagues on a matching domain currently get into this organization. */
-export const joinRequestJoiningSchema = z
+const joinRequestJoiningSchemaDefinition = z
   .object({
     domainJoin: domainJoinSettingSchema,
     joinDomains: z.array(z.string()),
     joinerRole: joinerRoleSchema,
   })
   .strict();
+export interface JoinRequestJoiningSchema extends Named<
+  typeof joinRequestJoiningSchemaDefinition
+> {}
+export const joinRequestJoiningSchema: JoinRequestJoiningSchema =
+  joinRequestJoiningSchemaDefinition;
 export type JoinRequestJoining = z.infer<typeof joinRequestJoiningSchema>;
 
 /** The setting changed; both values and both domain lists, as the audit row records them. */
-export const joinRequestJoiningChangedSchema = z
+const joinRequestJoiningChangedSchemaDefinition = z
   .object({
     previous: domainJoinSettingSchema,
     next: domainJoinSettingSchema,
@@ -96,13 +126,23 @@ export const joinRequestJoiningChangedSchema = z
     nextJoinerRole: joinerRoleSchema,
   })
   .strict();
+export interface JoinRequestJoiningChangedSchema extends Named<
+  typeof joinRequestJoiningChangedSchemaDefinition
+> {}
+export const joinRequestJoiningChangedSchema: JoinRequestJoiningChangedSchema =
+  joinRequestJoiningChangedSchemaDefinition;
 export type JoinRequestJoiningChanged = z.infer<typeof joinRequestJoiningChangedSchema>;
 
 /** A member a matching domain admitted, and whether the policy did it with nobody approving. */
-export const identityDomainAdmissionSchema = z.object({
+const identityDomainAdmissionSchemaDefinition = z.object({
   userId: z.string(),
   domain: z.string(),
   automatic: z.boolean(),
   /** Set when single sign-on admitted them on arrival, naming the connection. */
   connectionId: z.string().nullable(),
 });
+export interface IdentityDomainAdmissionSchema extends Named<
+  typeof identityDomainAdmissionSchemaDefinition
+> {}
+export const identityDomainAdmissionSchema: IdentityDomainAdmissionSchema =
+  identityDomainAdmissionSchemaDefinition;

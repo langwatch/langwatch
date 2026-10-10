@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
@@ -30,7 +31,7 @@ export const scenarioVersionedFields = [
 ] as const;
 export type ScenarioVersionedField = (typeof scenarioVersionedFields)[number];
 
-export const scenarioSnapshotFieldsSchema = z
+const scenarioSnapshotFieldsSchemaDefinition = z
   .object({
     name: z.string(),
     situation: z.string(),
@@ -46,6 +47,11 @@ export const scenarioSnapshotFieldsSchema = z
     fields: scenarioFieldValuesSchema.nullable().optional(),
   })
   .strict();
+export interface ScenarioSnapshotFieldsSchema extends Named<
+  typeof scenarioSnapshotFieldsSchemaDefinition
+> {}
+export const scenarioSnapshotFieldsSchema: ScenarioSnapshotFieldsSchema =
+  scenarioSnapshotFieldsSchemaDefinition;
 export type ScenarioSnapshotFields = z.infer<typeof scenarioSnapshotFieldsSchema>;
 
 /** Version 2 added `fields`; a version 1 snapshot has no such key and reads as null (main). */
@@ -116,7 +122,7 @@ export function parseSnapshotEnvelope(snapshot: unknown): ScenarioSnapshotEnvelo
   return { ...envelope, fields: { ...envelope.fields, fields: envelope.fields.fields ?? null } };
 }
 
-export const scenarioVersionSummarySchema = z
+const scenarioVersionSummarySchemaDefinition = z
   .object({
     version: z.number().int().positive(),
     authorId: z.string().nullable(),
@@ -127,17 +133,27 @@ export const scenarioVersionSummarySchema = z
     isSynthesized: z.boolean(),
   })
   .strict();
+export interface ScenarioVersionSummarySchema extends Named<
+  typeof scenarioVersionSummarySchemaDefinition
+> {}
+export const scenarioVersionSummarySchema: ScenarioVersionSummarySchema =
+  scenarioVersionSummarySchemaDefinition;
 export type ScenarioVersionSummary = z.infer<typeof scenarioVersionSummarySchema>;
 
-export const scenarioVersionDetailSchema = scenarioVersionSummarySchema
+const scenarioVersionDetailSchemaDefinition = scenarioVersionSummarySchema
   .safeExtend({
     fields: scenarioSnapshotFieldsSchema,
     schemaVersion: z.number().int().positive(),
   })
   .strict();
+export interface ScenarioVersionDetailSchema extends Named<
+  typeof scenarioVersionDetailSchemaDefinition
+> {}
+export const scenarioVersionDetailSchema: ScenarioVersionDetailSchema =
+  scenarioVersionDetailSchemaDefinition;
 export type ScenarioVersionDetail = z.infer<typeof scenarioVersionDetailSchema>;
 
-export const scenarioVersionListInputSchema = scenarioIdInputSchema
+const scenarioVersionListInputSchemaDefinition = scenarioIdInputSchema
   .omit({ id: true })
   .safeExtend({
     scenarioId: z.string().min(1),
@@ -145,33 +161,55 @@ export const scenarioVersionListInputSchema = scenarioIdInputSchema
     cursor: z.number().int().optional(),
   })
   .strict();
+export interface ScenarioVersionListInputSchema extends Named<
+  typeof scenarioVersionListInputSchemaDefinition
+> {}
+export const scenarioVersionListInputSchema: ScenarioVersionListInputSchema =
+  scenarioVersionListInputSchemaDefinition;
 export type ScenarioVersionListInput = z.infer<typeof scenarioVersionListInputSchema>;
 
-export const scenarioVersionInputSchema = scenarioVersionListInputSchema
+const scenarioVersionInputSchemaDefinition = scenarioVersionListInputSchema
   .pick({ projectId: true, scenarioId: true })
   .safeExtend({ version: z.number().int().positive() })
   .strict();
+export interface ScenarioVersionInputSchema extends Named<
+  typeof scenarioVersionInputSchemaDefinition
+> {}
+export const scenarioVersionInputSchema: ScenarioVersionInputSchema =
+  scenarioVersionInputSchemaDefinition;
 export type ScenarioVersionInput = z.infer<typeof scenarioVersionInputSchema>;
 
-export const scenarioVersionRestoreInputSchema = scenarioVersionInputSchema
+const scenarioVersionRestoreInputSchemaDefinition = scenarioVersionInputSchema
   .safeExtend({ actor: scenarioActorSchema })
   .strict();
+export interface ScenarioVersionRestoreInputSchema extends Named<
+  typeof scenarioVersionRestoreInputSchemaDefinition
+> {}
+export const scenarioVersionRestoreInputSchema: ScenarioVersionRestoreInputSchema =
+  scenarioVersionRestoreInputSchemaDefinition;
 export type ScenarioVersionRestoreInput = z.infer<typeof scenarioVersionRestoreInputSchema>;
 
-export const scenarioMoveInputSchema = scenarioIdInputSchema
+const scenarioMoveInputSchemaDefinition = scenarioIdInputSchema
   .omit({ id: true })
   .safeExtend({
     scenarioId: z.string().min(1),
     testSuiteId: z.string().min(1).nullable(),
   })
   .strict();
+export interface ScenarioMoveInputSchema extends Named<typeof scenarioMoveInputSchemaDefinition> {}
+export const scenarioMoveInputSchema: ScenarioMoveInputSchema = scenarioMoveInputSchemaDefinition;
 export type ScenarioMoveInput = z.infer<typeof scenarioMoveInputSchema>;
 
-export const scenarioDuplicateInputSchema = scenarioIdInputSchema
+const scenarioDuplicateInputSchemaDefinition = scenarioIdInputSchema
   .omit({ id: true })
   .safeExtend({
     scenarioId: z.string().min(1),
     lastUpdatedById: z.string().min(1).optional(),
   })
   .strict();
+export interface ScenarioDuplicateInputSchema extends Named<
+  typeof scenarioDuplicateInputSchemaDefinition
+> {}
+export const scenarioDuplicateInputSchema: ScenarioDuplicateInputSchema =
+  scenarioDuplicateInputSchemaDefinition;
 export type ScenarioDuplicateInput = z.infer<typeof scenarioDuplicateInputSchema>;

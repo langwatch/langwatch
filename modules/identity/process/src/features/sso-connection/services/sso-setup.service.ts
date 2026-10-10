@@ -1,5 +1,7 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   breakGlassIsLive,
+  normalizeDomain,
   isConfiguredLegacySsoRoute,
   qualifySsoDomainOwnership,
   type SsoConnectionState,
@@ -86,7 +88,7 @@ export class SsoSetupService {
 
     return {
       connection: connection ? connectionView(connection) : null,
-      claims: connection ? claimViews(connection) : [],
+      claims: connection ? await this.claimViews({ organizationId, connection }) : [],
       record: connection ? this.recordView(connection) : null,
       goLive: connection ? await this.goLiveView({ organizationId, connection }) : null,
       legacyRoute: legacy
@@ -172,6 +174,58 @@ export class SsoSetupService {
       activated: connection.state === "ACTIVE",
     };
   }
+
+  /**
+   * A domain asked for and not yet proved. Only a claim on a domain another
+   * organization proved waits for a person; any other claim is the reader's
+   * to prove. A rejection keeps what the operator said for the re-claim.
+   */
+  private async claimViews({
+    organizationId,
+    connection,
+  }: {
+    organizationId: string;
+    connection: SsoConnectionState;
+  }): Promise<SsoSetupDomainClaimView[]> {
+    const claims: SsoSetupDomainClaimView[] = await Promise.all(
+      connection.claimedDomains.map(async (domain) => ({
+        domain,
+        state: "CLAIMED" as const,
+        note: null,
+        waitsForReview: await this.isDisputed({ organizationId, domain }),
+      })),
+    );
+    for (const domain of connection.approvedDomains) {
+      claims.push({ domain, state: "APPROVED", note: null, waitsForReview: false });
+    }
+    if (connection.rejection) {
+      claims.push({
+        domain: connection.rejection.domain,
+        state: "REJECTED",
+        note: connection.rejection.note,
+        waitsForReview: false,
+      });
+    }
+    return claims;
+  }
+
+  /** The ceremony's own dispute read: another organization holds the domain. */
+  private async isDisputed({
+    organizationId,
+    domain,
+  }: {
+    organizationId: string;
+    domain: string;
+  }): Promise<boolean> {
+    const owner = await this.deps.connections
+      .getDomainOwner({ domain: normalizeDomain(domain) })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
+
+    return owner !== null && owner.organizationId !== organizationId;
+  }
 }
 
 function connectionView(connection: SsoConnectionState): SsoSetupConnectionView {
@@ -211,30 +265,4 @@ function proofView({
     verifier:
       proof?.actorId != null ? { type: "user", id: proof.actorId } : { type: "system", id: null },
   };
-}
-
-/**
- * A domain asked for and not yet proved. A claim nobody has approved waits for
- * a person; an approved one is the administrator's to prove; a rejection keeps
- * what the operator said so a re-claim starts from it.
- */
-function claimViews(connection: SsoConnectionState): SsoSetupDomainClaimView[] {
-  const claims: SsoSetupDomainClaimView[] = connection.claimedDomains.map((domain) => ({
-    domain,
-    state: "CLAIMED" as const,
-    note: null,
-    waitsForReview: true,
-  }));
-  for (const domain of connection.approvedDomains) {
-    claims.push({ domain, state: "APPROVED", note: null, waitsForReview: false });
-  }
-  if (connection.rejection) {
-    claims.push({
-      domain: connection.rejection.domain,
-      state: "REJECTED",
-      note: connection.rejection.note,
-      waitsForReview: false,
-    });
-  }
-  return claims;
 }

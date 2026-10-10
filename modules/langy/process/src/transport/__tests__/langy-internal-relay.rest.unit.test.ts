@@ -102,6 +102,7 @@ async function relayRoute() {
     channels: MemoryLangyChannels.create(),
   });
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: app.internalDoor,
     doors: { internal_secret: app.internalDoor },

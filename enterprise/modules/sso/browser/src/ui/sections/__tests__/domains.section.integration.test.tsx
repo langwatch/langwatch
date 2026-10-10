@@ -87,6 +87,7 @@ type SectionProps = {
   evidence?: DomainEvidenceView[];
   claims?: DomainClaimView[];
   canManage?: boolean;
+  live?: boolean;
   provesWithLicense?: boolean;
 };
 
@@ -95,6 +96,7 @@ function sectionWith(overrides: SectionProps) {
     <DomainsSection
       {...TARGET}
       canManage={overrides.canManage ?? true}
+      live={overrides.live ?? false}
       provesWithLicense={overrides.provesWithLicense ?? false}
       evidence={overrides.evidence ?? []}
       claims={overrides.claims ?? [claimed]}
@@ -300,6 +302,20 @@ describe("when an administrator takes a domain back out", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(state.removeDomain.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.com" });
+  });
+});
+
+/** @scenario "A verified domain cannot be removed from a connection that decides sign-in" */
+describe("given a proved domain on a connection that decides sign-in", () => {
+  it("offers no removal and points at removing the connection instead", () => {
+    renderSection({
+      live: true,
+      claims: [],
+      evidence: [{ domain: "acme.com", proved: true, proofState: "VERIFIED", graceEndsAtMs: null }],
+    });
+
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.getByText(/to stop routing it, remove the connection/i)).toBeTruthy();
   });
 });
 

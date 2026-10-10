@@ -24,6 +24,7 @@ describe("the workbench run REST family", () => {
         "ExperimentV3RestApi",
       );
       const runtime = createRestRuntime({
+        audit: { record: () => {} },
         authorization: restTestAuthorization(),
         identity: {
           identify: () => ({

@@ -5,7 +5,7 @@ import {
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { signUpDataSchema } from "@langwatch/onboarding-contract";
 import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";
@@ -45,12 +45,17 @@ import { organizationIntentSchema } from "./organization.ts";
 import { organizationApiScopeGraphInputSchema, scopeGraphSchema } from "./scope-graph.ts";
 
 /** The first organization a person creates, and the name they gave it. */
-export const organizationApiCreateAndAssignInputSchema = z.object({
+const organizationApiCreateAndAssignInputSchemaDefinition = z.object({
   orgName: z.string().optional(),
   phoneNumber: z.string().optional(),
   signUpData: signUpDataSchema.optional(),
   primaryIntent: organizationIntentSchema.optional(),
 });
+export interface OrganizationApiCreateAndAssignInputSchema extends Named<
+  typeof organizationApiCreateAndAssignInputSchemaDefinition
+> {}
+export const organizationApiCreateAndAssignInputSchema: OrganizationApiCreateAndAssignInputSchema =
+  organizationApiCreateAndAssignInputSchemaDefinition;
 export type OrganizationApiCreateAndAssignInput = z.infer<
   typeof organizationApiCreateAndAssignInputSchema
 >;
@@ -60,7 +65,12 @@ export type OrganizationApiCreateAndAssignInput = z.infer<
  * four row types across two features and no schema describes them yet, and a
  * partial one would strip fields the shell reads.
  */
-export const organizationFullyLoadedListSchema = z.array(z.unknown());
+const organizationFullyLoadedListSchemaDefinition = z.array(z.unknown());
+export interface OrganizationFullyLoadedListSchema extends Named<
+  typeof organizationFullyLoadedListSchemaDefinition
+> {}
+export const organizationFullyLoadedListSchema: OrganizationFullyLoadedListSchema =
+  organizationFullyLoadedListSchemaDefinition;
 
 /** Every fact that changes who is in the organization, their seat or their role. */
 const MEMBERSHIP_CHANGED = [

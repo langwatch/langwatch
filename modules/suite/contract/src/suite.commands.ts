@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   evaluatorAttachmentsSchema,
   suiteFieldDefinitionsSchema,
@@ -22,16 +23,21 @@ const suiteDefinitionFieldsSchema = z
   })
   .strict();
 
-export const createSuiteCommandSchema = z.strictObject({
+const createSuiteCommandSchemaDefinition = z.strictObject({
   ...suiteDefinitionFieldsSchema.shape,
   scenarioIds: suiteDefinitionFieldsSchema.shape.scenarioIds.default([]),
   targets: suiteDefinitionFieldsSchema.shape.targets.default([]),
   repeatCount: suiteDefinitionFieldsSchema.shape.repeatCount.default(1),
   labels: suiteDefinitionFieldsSchema.shape.labels.default([]),
 });
+export interface CreateSuiteCommandSchema extends Named<
+  typeof createSuiteCommandSchemaDefinition
+> {}
+export const createSuiteCommandSchema: CreateSuiteCommandSchema =
+  createSuiteCommandSchemaDefinition;
 export type CreateSuiteCommand = z.input<typeof createSuiteCommandSchema>;
 
-export const updateSuiteCommandSchema = suiteDefinitionFieldsSchema
+const updateSuiteCommandSchemaDefinition = suiteDefinitionFieldsSchema
   .omit({ projectId: true })
   .partial()
   .safeExtend({
@@ -43,12 +49,19 @@ export const updateSuiteCommandSchema = suiteDefinitionFieldsSchema
     evaluators: evaluatorAttachmentsSchema.optional(),
   })
   .strict();
+export interface UpdateSuiteCommandSchema extends Named<
+  typeof updateSuiteCommandSchemaDefinition
+> {}
+export const updateSuiteCommandSchema: UpdateSuiteCommandSchema =
+  updateSuiteCommandSchemaDefinition;
 export type UpdateSuiteCommand = z.input<typeof updateSuiteCommandSchema>;
 
-export const suiteIdInputSchema = z
+const suiteIdInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
   })
   .strict();
+export interface SuiteIdInputSchema extends Named<typeof suiteIdInputSchemaDefinition> {}
+export const suiteIdInputSchema: SuiteIdInputSchema = suiteIdInputSchemaDefinition;
 export type SuiteIdInput = z.infer<typeof suiteIdInputSchema>;

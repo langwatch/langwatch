@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
@@ -15,15 +16,21 @@ export function ProcessRecentActions({ rows, now }: { rows: ProcessAction[]; now
   if (rows.length === 0) return null;
 
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
-            Recent Actions
+            Recent actions
           </Text>
         </HStack>
         <Box maxHeight="240px" overflowY="auto">
-          <Table.Root size="sm" variant="line">
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflowX: "auto" }}
+            size="sm"
+            variant="line"
+          >
             <Table.Body>
               {rows.map((row) => (
                 <Table.Row key={row.id}>
@@ -43,7 +50,7 @@ export function ProcessRecentActions({ rows, now }: { rows: ProcessAction[]; now
                 </Table.Row>
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         </Box>
       </Card.Body>
     </Card.Root>

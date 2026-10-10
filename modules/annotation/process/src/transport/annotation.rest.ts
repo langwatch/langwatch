@@ -7,10 +7,7 @@ import {
   annotationRestResponseSchema,
   annotationRestWriteSchema,
 } from "@langwatch/annotation-contract";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 
 export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
@@ -51,6 +48,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .patch("/:id", "updateAnnotation")
+  .withAudit("annotation.update")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)
   .withPermission("annotations:manage")
@@ -69,6 +67,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .delete("/:id", "deleteAnnotation")
+  .withAudit("annotation.deleteById")
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:manage")
   .withOutput(annotationRestDeletedSchema)
@@ -102,6 +101,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .post("/trace/:id", "createTraceAnnotation")
+  .withAudit("annotation.create")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)
   .withPermission("annotations:create")

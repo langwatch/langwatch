@@ -1,7 +1,7 @@
 import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
-import { Alert, Box, Input, VStack } from "@langwatch/design-system/primitives";
+import { Box, Input, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { useForm, type UseFormReturn, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -20,6 +20,7 @@ import { startTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
 import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
 
 const credentialSchema = z.object({
@@ -148,6 +149,25 @@ export function CredentialSignInForm({
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
+        {submitError ? (
+          <HandledErrorAlert
+            title="Couldn't log in"
+            testId="signin-failure"
+            description={
+              <>
+                {submitError}
+                {secondsToWait !== null ? (
+                  <>
+                    {" "}
+                    <span data-testid="retry-countdown">
+                      {describeRemainingWait(secondsToWait)}
+                    </span>
+                  </>
+                ) : null}
+              </>
+            }
+          />
+        ) : null}
         {/* The address the password is for, in a quiet settled pill. Shown only
             when there IS one — an empty pill reads as a field that failed to
             load, not one that was never asked for (e.g. `?local=1`). */}
@@ -214,28 +234,6 @@ export function CredentialSignInForm({
             />
           )}
         </FrontDoorField>
-        {submitError ? (
-          <Alert.Root
-            status="error"
-            variant="outline"
-            borderStartWidth="4px"
-            borderStartColor={"frontDoor.danger"}
-          >
-            <Alert.Content>
-              <Alert.Description data-testid="signin-failure" color={"frontDoor.danger"}>
-                {submitError}
-                {secondsToWait !== null ? (
-                  <>
-                    {" "}
-                    <span data-testid="retry-countdown">
-                      {describeRemainingWait(secondsToWait)}
-                    </span>
-                  </>
-                ) : null}
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-        ) : null}
         <FrontDoorPrimaryButton
           type="submit"
           isBusy={isSubmitting}

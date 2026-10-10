@@ -1,3 +1,5 @@
+import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 import { Dialog } from "@langwatch/design-system/dialog";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -67,15 +69,15 @@ export function ProvisioningTokens({
 
       {(list.isError || connections.isError) &&
         isEnterpriseGateError(list.error ?? connections.error) && (
-          <Alert.Root status="info" data-testid="scim-enterprise-gate">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>Directory sync is an Enterprise feature</Alert.Title>
-              <Alert.Description>
-                Provisioning tokens come with the Enterprise plan. Contact sales to upgrade.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
+          <UpgradeRequired
+            feature="Directory sync"
+            data-testid="scim-enterprise-gate"
+            actions={
+              <Button asChild colorPalette="orange" size="sm">
+                <Link href="/settings/plans">Compare plans</Link>
+              </Button>
+            }
+          />
         )}
       {(list.isError || connections.isError) &&
         !isEnterpriseGateError(list.error ?? connections.error) && (

@@ -37,8 +37,27 @@ function descendants(node: unknown): Element[] {
 
 const scope = globalThis as { window?: unknown };
 
+/** The semantic colours the host resolves and hands the frame; any value will do here. */
+const colors = Object.fromEntries(
+  [
+    "fg",
+    "fg.subtle",
+    "fg.error",
+    "bg.card",
+    "border.card",
+    "border.muted",
+    "blue.subtle",
+    "blue.solid",
+    ...Array.from({ length: 8 }, (_, index) => `chart.${index + 1}`),
+  ].map((name) => [name, "#123456"]),
+);
+
 beforeEach(() => {
-  scope.window = { React: fakeReact, Recharts: {}, LW: { theme: "light" } };
+  scope.window = {
+    React: fakeReact,
+    Recharts: {},
+    LW: { theme: "light", dashboardContext: { colors } },
+  };
 });
 afterEach(() => {
   delete scope.window;

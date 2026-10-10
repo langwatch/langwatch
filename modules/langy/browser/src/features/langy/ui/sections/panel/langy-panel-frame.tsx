@@ -94,7 +94,7 @@ export function LangyPanelFrame({
       position="fixed"
       width={panelWidth({ floating, isDrawerCompanion })}
       zIndex={isDrawerCompanion ? 1600 : 1200}
-      background={isDrawerCompanion ? "bg.surface/80" : "bg.surface"}
+      background={isDrawerCompanion ? "bg.card/80" : "bg.card"}
       borderStyle="solid"
       borderColor={isContextDropOver ? "purple.emphasized" : "border"}
       overflow="hidden"

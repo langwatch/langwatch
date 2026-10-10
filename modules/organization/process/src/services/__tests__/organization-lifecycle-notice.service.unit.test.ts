@@ -31,6 +31,8 @@ function notices(
     recordTraceSharingDisabled: idle,
     recordMemberDisabled: idle,
     recordMemberEnabled: idle,
+    recordMemberRemoved: idle,
+    recordMemberDepartmentChanged: idle,
   });
   return { service, reportError };
 }

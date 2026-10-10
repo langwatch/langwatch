@@ -2,7 +2,7 @@ import { Alert, Button, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 const STATUSES = ["info", "success", "warning", "error", "neutral"] as const;
-const VARIANTS = ["subtle", "surface", "outline", "solid"] as const;
+const VARIANTS = ["solid", "surface", "subtle", "outline"] as const;
 
 const COPY: Record<(typeof STATUSES)[number], { title: string; description: string }> = {
   info: {
@@ -54,8 +54,12 @@ export const Default: Story = {
     <Alert.Root {...args}>
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Title>{COPY.info.title}</Alert.Title>
-        <Alert.Description>{COPY.info.description}</Alert.Description>
+        <Alert.Title>
+          {COPY[typeof args.status === "string" ? args.status : "info"].title}
+        </Alert.Title>
+        <Alert.Description>
+          {COPY[typeof args.status === "string" ? args.status : "info"].description}
+        </Alert.Description>
       </Alert.Content>
     </Alert.Root>
   ),

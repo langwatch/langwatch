@@ -80,7 +80,11 @@ export * from "./features/ingest/trace-processing.events.ts";
 export * from "./features/span/trace-log-contribution.ts";
 export * from "./trace-message.schemas.ts";
 export { safeUnflatten } from "./features/attribute/trace-attribute-unflatten.ts";
-export { predefinedEventTypes, predefinedEventsSchemas } from "./trace-tracked-event.schemas.ts";
+export {
+  predefinedEventTypes,
+  predefinedEventsSchemas,
+  type PredefinedEventsSchemas,
+} from "./trace-tracked-event.schemas.ts";
 export * from "./features/evaluation/trace-evaluation.contract.ts";
 export * from "./trace-format.schemas.ts";
 export * from "./trace-full-read.contract.ts";
@@ -110,6 +114,7 @@ export {
   type NormalizedEvent,
   type NormalizedLink,
   type NormalizedSpan,
+  type NormalizedSpanSchema,
 } from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,
@@ -201,6 +206,17 @@ export {
   type OtlpKeyValueList,
   type OtlpResource,
   type OtlpSpan,
+  type ESpanKindSchema,
+  type EventSchema,
+  type Fixed64Schema,
+  type LinkSchema,
+  type LongBitsSchema,
+  type ResourceSchema,
+  type ScopeSpansSchema,
+  type SpanSchema,
+  type StatusSchema,
+  type ExportTraceServiceRequestSchema,
+  type InstrumentationScopeSchema,
 } from "./trace.otlp.ts";
 export * from "./features/edit-overlay/trace-edit-overlay-apply.ts";
 export * from "./features/content/trace-python-repr.ts";

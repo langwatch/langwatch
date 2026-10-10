@@ -765,14 +765,26 @@ export class PrismaScimRepository extends ScimRepository {
     if (input.connectionIds.length === 0) return [];
 
     const where = { connectionId: { in: input.connectionIds } };
-    const select = { connectionId: true, userId: true } as const;
+    const select = { connectionId: true, userId: true, organizationId: true } as const;
     const [owned, identified] = await Promise.all([
       this.prisma.scimDirectoryUser.findMany({ where, select }),
       this.prisma.scimExternalId.findMany({ where, select }),
     ]);
+    const claims = [...owned, ...identified];
+    // Somebody the directory deactivated is no longer one it manages here.
+    const deactivated = await this.prisma.scimUserResource.findMany({
+      where: {
+        active: false,
+        organizationId: { in: [...new Set(claims.map((row) => row.organizationId))] },
+        userId: { in: [...new Set(claims.map((row) => row.userId))] },
+      },
+      select: { organizationId: true, userId: true },
+    });
+    const inactive = new Set(deactivated.map((row) => `${row.organizationId}\u0000${row.userId}`));
     const ownership = new Map<string, ScimDirectoryOwnership>();
-    for (const row of [...owned, ...identified]) {
-      ownership.set(`${row.connectionId}\u0000${row.userId}`, row);
+    for (const { connectionId, userId, organizationId } of claims) {
+      if (inactive.has(`${organizationId}\u0000${userId}`)) continue;
+      ownership.set(`${connectionId}\u0000${userId}`, { connectionId, userId });
     }
     return [...ownership.values()];
   }

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "@langwatch/redaction";
 import { z } from "zod";
 
@@ -18,7 +19,7 @@ const VALID_PII_ENTITIES = new Set(
   [...REDACTION_MARKER_ENTITIES].filter((entity) => entity !== SECRET_MARKER_ENTITY),
 );
 
-export const audienceSchema = z
+const audienceSchemaDefinition = z
   .object({
     admins: z.boolean().optional(),
     allMembers: z.boolean().optional(),
@@ -28,25 +29,34 @@ export const audienceSchema = z
     groupIds: z.array(z.string()).optional(),
   })
   .strict();
+export interface AudienceSchema extends Named<typeof audienceSchemaDefinition> {}
+export const audienceSchema: AudienceSchema = audienceSchemaDefinition;
 export type Audience = z.infer<typeof audienceSchema>;
 
-export const categorySettingSchema = z
+const categorySettingSchemaDefinition = z
   .object({ disposition: z.enum(DISPOSITIONS), audience: audienceSchema.optional() })
   .strict();
+export interface CategorySettingSchema extends Named<typeof categorySettingSchemaDefinition> {}
+export const categorySettingSchema: CategorySettingSchema = categorySettingSchemaDefinition;
 export type CategorySetting = z.infer<typeof categorySettingSchema>;
 
 export const CUSTOM_ATTRIBUTE_DISPOSITIONS = ["restrict", "drop"] as const;
 export type CustomAttributeDisposition = (typeof CUSTOM_ATTRIBUTE_DISPOSITIONS)[number];
-export const customAttributeRuleSchema = z
+const customAttributeRuleSchemaDefinition = z
   .object({
     pattern: z.string().trim().min(1).max(256),
     disposition: z.enum(CUSTOM_ATTRIBUTE_DISPOSITIONS),
     audience: audienceSchema.optional(),
   })
   .strict();
+export interface CustomAttributeRuleSchema extends Named<
+  typeof customAttributeRuleSchemaDefinition
+> {}
+export const customAttributeRuleSchema: CustomAttributeRuleSchema =
+  customAttributeRuleSchemaDefinition;
 export type CustomAttributeRule = z.infer<typeof customAttributeRuleSchema>;
 
-export const dataPrivacyConfigSchema = z
+const dataPrivacyConfigSchemaDefinition = z
   .object({
     categories: z
       .object({
@@ -102,9 +112,11 @@ export const dataPrivacyConfigSchema = z
     customAttributes: z.array(customAttributeRuleSchema).max(50).optional(),
   })
   .strict();
+export interface DataPrivacyConfigSchema extends Named<typeof dataPrivacyConfigSchemaDefinition> {}
+export const dataPrivacyConfigSchema: DataPrivacyConfigSchema = dataPrivacyConfigSchemaDefinition;
 export type DataPrivacyConfig = z.infer<typeof dataPrivacyConfigSchema>;
 
-export const resolvedAudienceSchema = z
+const resolvedAudienceSchemaDefinition = z
   .object({
     admins: z.boolean(),
     allMembers: z.boolean(),
@@ -114,24 +126,33 @@ export const resolvedAudienceSchema = z
     groupIds: z.array(z.string()),
   })
   .strict();
+export interface ResolvedAudienceSchema extends Named<typeof resolvedAudienceSchemaDefinition> {}
+export const resolvedAudienceSchema: ResolvedAudienceSchema = resolvedAudienceSchemaDefinition;
 export type ResolvedAudience = z.infer<typeof resolvedAudienceSchema>;
 
-export const resolvedCategorySchema = z
+const resolvedCategorySchemaDefinition = z
   .object({ disposition: z.enum(DISPOSITIONS), audience: resolvedAudienceSchema })
   .strict();
+export interface ResolvedCategorySchema extends Named<typeof resolvedCategorySchemaDefinition> {}
+export const resolvedCategorySchema: ResolvedCategorySchema = resolvedCategorySchemaDefinition;
 export type ResolvedCategory = z.infer<typeof resolvedCategorySchema>;
 
-export const resolvedCustomAttributeRuleSchema = z
+const resolvedCustomAttributeRuleSchemaDefinition = z
   .object({
     pattern: z.string(),
     disposition: z.enum(CUSTOM_ATTRIBUTE_DISPOSITIONS),
     audience: resolvedAudienceSchema,
   })
   .strict();
+export interface ResolvedCustomAttributeRuleSchema extends Named<
+  typeof resolvedCustomAttributeRuleSchemaDefinition
+> {}
+export const resolvedCustomAttributeRuleSchema: ResolvedCustomAttributeRuleSchema =
+  resolvedCustomAttributeRuleSchemaDefinition;
 export type ResolvedCustomAttributeRule = z.infer<typeof resolvedCustomAttributeRuleSchema>;
 
 /** Every field populated: the cascade's answer, never a partial rule. */
-export const resolvedDataPrivacySchema = z
+const resolvedDataPrivacySchemaDefinition = z
   .object({
     categories: z
       .object({
@@ -152,6 +173,11 @@ export const resolvedDataPrivacySchema = z
     customAttributes: z.array(resolvedCustomAttributeRuleSchema),
   })
   .strict();
+export interface ResolvedDataPrivacySchema extends Named<
+  typeof resolvedDataPrivacySchemaDefinition
+> {}
+export const resolvedDataPrivacySchema: ResolvedDataPrivacySchema =
+  resolvedDataPrivacySchemaDefinition;
 export type ResolvedDataPrivacy = z.infer<typeof resolvedDataPrivacySchema>;
 
 export const EMPTY_AUDIENCE: ResolvedAudience = {
@@ -184,7 +210,7 @@ export function resolveAudience(audience?: Audience): ResolvedAudience {
   };
 }
 
-export const dataPrivacyPolicySchema = z
+const dataPrivacyPolicySchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -196,9 +222,11 @@ export const dataPrivacyPolicySchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface DataPrivacyPolicySchema extends Named<typeof dataPrivacyPolicySchemaDefinition> {}
+export const dataPrivacyPolicySchema: DataPrivacyPolicySchema = dataPrivacyPolicySchemaDefinition;
 export type DataPrivacyPolicy = z.infer<typeof dataPrivacyPolicySchema>;
 
-export const dataPrivacyRowSchema = z
+const dataPrivacyRowSchemaDefinition = z
   .object({
     scopeType: z.enum(DATA_PRIVACY_SCOPE_TYPES),
     scopeId: z.string().min(1),
@@ -206,6 +234,8 @@ export const dataPrivacyRowSchema = z
     config: dataPrivacyConfigSchema,
   })
   .strict();
+export interface DataPrivacyRowSchema extends Named<typeof dataPrivacyRowSchemaDefinition> {}
+export const dataPrivacyRowSchema: DataPrivacyRowSchema = dataPrivacyRowSchemaDefinition;
 
 export interface DataPrivacyScope {
   scopeType: DataPrivacyScopeType;

@@ -174,6 +174,13 @@ export type RestAuditRow = Readonly<{
   resultId: string | null;
   /** The handled error's own code, on a refusal; absent on an answer. */
   errorCode?: string;
+  /** The operator behind an impersonated call. */
+  impersonatorId?: string;
+  /** The API key the call presented, whether it acts as its person or as nobody (E11). */
+  apiKeyId?: string;
+  /** Where the call came from, as the door resolved it, and the caller's user agent. */
+  ipAddress?: string;
+  userAgent?: string;
 }>;
 
 /** One mutation on the deployment's trail, as this transport leaves it. */

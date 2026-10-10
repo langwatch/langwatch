@@ -41,7 +41,7 @@ function SelectableIconBadge({ badge }: { badge?: string }): React.ReactElement 
       paddingY="3px"
       borderRadius="full"
       background="orange.solid"
-      color="white"
+      color="orange.contrast"
       whiteSpace="nowrap"
       pointerEvents="none"
     >
@@ -156,8 +156,8 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
 
   const cardSize = size === "sm" ? "72px" : "96px";
   const selectedShadow = isDark
-    ? "0 6px 28px rgba(237,137,38,0.06)"
-    : "0 0 0 1px var(--chakra-colors-orange-100)";
+    ? "0 6px 28px color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent)"
+    : "0 0 0 1px var(--chakra-colors-accent-muted)";
   const hoverSelectedBorder = isDark ? "orange.emphasized" : selectedBorderColor;
 
   return (
@@ -224,5 +224,5 @@ function cardBorderWidth({ isDark, selected }: { isDark: boolean; selected: bool
 }
 
 function unselectedHoverBg(isDark: boolean): string {
-  return isDark ? "bg.muted" : "gray.50";
+  return isDark ? "bg.muted" : "bg.subtle";
 }

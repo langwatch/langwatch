@@ -44,6 +44,7 @@ const desk = defineRestRouter(DeskApi)
   .withAccess(publicRoute({ reason: "staff is resolved by the route's own middleware context" }))
   .withOutput(z.object({ id: z.string() }))
   .withMiddlewareContext(staff)
+  .withoutAudit("test route")
   .handle(async ({ app, input }, who) => app.open({ title: input.title, staff: who }))
 
   .post("/api/desk/echo", "echoDesk")
@@ -51,6 +52,7 @@ const desk = defineRestRouter(DeskApi)
   .withAccess(publicRoute({ reason: "the middleware context reads the parsed body" }))
   .withOutput(z.object({ id: z.string() }))
   .withMiddlewareContext(title)
+  .withoutAudit("test route")
   .handle(async ({ app }, parsed) => app.open({ title: parsed.title, staff: "nobody" }))
   .build();
 

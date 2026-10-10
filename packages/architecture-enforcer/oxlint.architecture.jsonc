@@ -40,6 +40,7 @@
     // Two calls joined by `&&` read fine; three calls, four operators, a nested
     // ternary or a deep chain that also combines are what a reader trips on.
     "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
+    "langwatch/contract-schema-named": "error",
     "langwatch/conditional-type-depth": "error",
     "langwatch/em-dash-in-copy": "error",
     "langwatch/environment-boundaries": "error",

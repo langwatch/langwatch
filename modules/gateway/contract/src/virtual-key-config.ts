@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Virtual-key config schema stored in VirtualKey.config; mirrors specs and Go
  * gateway struct. Unknown keys lenient.
@@ -14,10 +15,15 @@ export type GuardrailDirection = z.infer<typeof guardrailDirectionSchema>;
 // direction to N GatewayGuardrail row ids. The GatewayGuardrail row
 // itself owns evaluator + failure mode; the VK only declares the
 // reference. See specs/ai-gateway/governance/guardrails-project-scope.feature.
-export const guardrailAttachmentSchema = z.object({
+const guardrailAttachmentSchemaDefinition = z.object({
   direction: guardrailDirectionSchema,
   guardrailIds: z.array(z.string()).default([]),
 });
+export interface GuardrailAttachmentSchema extends Named<
+  typeof guardrailAttachmentSchemaDefinition
+> {}
+export const guardrailAttachmentSchema: GuardrailAttachmentSchema =
+  guardrailAttachmentSchemaDefinition;
 export type GuardrailAttachment = z.infer<typeof guardrailAttachmentSchema>;
 
 /**
@@ -41,7 +47,7 @@ export function normalizeVkTags(tags: readonly unknown[]): string[] {
   return [...normalized];
 }
 
-export const virtualKeyConfigSchema = z.object({
+const virtualKeyConfigSchemaDefinition = z.object({
   modelsAllowed: z.array(z.string()).nullable().default(null),
   /** ModelProvider ids; null means all providers including future ones. */
   providersAllowed: z
@@ -89,6 +95,8 @@ export const virtualKeyConfigSchema = z.object({
     })
     .default({ tags: [] }),
 });
+export interface VirtualKeyConfigSchema extends Named<typeof virtualKeyConfigSchemaDefinition> {}
+export const virtualKeyConfigSchema: VirtualKeyConfigSchema = virtualKeyConfigSchemaDefinition;
 
 export type VirtualKeyConfig = z.infer<typeof virtualKeyConfigSchema>;
 

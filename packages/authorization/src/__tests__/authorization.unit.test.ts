@@ -122,7 +122,7 @@ describe("the authorization proof", () => {
 
   describe("when the shape is wrong", () => {
     it("refuses to seal a proof with no grants, a shared grant without a condition, or an own grant with one", () => {
-      expect(() => sealAuthorization(proof({ grants: [] }))).toThrow();
+      expect(() => sealAuthorization(proof({ grants: [] }))).toThrow(/Too small/);
       expect(() =>
         sealAuthorization(
           proof({
@@ -136,7 +136,7 @@ describe("the authorization proof", () => {
             ],
           }),
         ),
-      ).toThrow();
+      ).toThrow(/a shared grant carries a condition/);
       expect(() =>
         sealAuthorization(
           proof({
@@ -151,7 +151,7 @@ describe("the authorization proof", () => {
             ],
           }),
         ),
-      ).toThrow();
+      ).toThrow(/a shared grant carries a condition/);
     });
 
     it("refuses a shared grant that names no project and a purpose outside the vocabulary", () => {
@@ -168,14 +168,15 @@ describe("the authorization proof", () => {
             ],
           }),
         ),
-      ).toThrow();
+      ).toThrow(/a shared grant names the project/);
+      // wrong-typed input: a purpose kind outside the vocabulary must be refused
       expect(() =>
         sealAuthorization(
           proof({
             purpose: { kind: "batch", route: "x" } as unknown as AuthorizationInput["purpose"],
           }),
         ),
-      ).toThrow();
+      ).toThrow(/Invalid discriminator/);
     });
   });
 
@@ -238,7 +239,9 @@ describe("the authorization proof", () => {
     });
 
     it("refuses a seal that names a project outside its grants", () => {
-      expect(() => sealAuthorization({ ...proof(), narrowedTo: "proj_outsider" })).toThrow();
+      expect(() => sealAuthorization({ ...proof(), narrowedTo: "proj_outsider" })).toThrow(
+        /a narrowed proof names a project/,
+      );
     });
   });
 });

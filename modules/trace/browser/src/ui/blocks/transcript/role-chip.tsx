@@ -30,13 +30,13 @@ export const ROLE_PALETTES: Record<string, RolePalette> = {
     fg: "fg.muted",
     muted: "bg.subtle",
     solid: "gray.solid",
-    contrast: "white",
+    contrast: "gray.contrast",
   },
   user: {
     fg: "blue.fg",
     muted: "blue.muted",
     solid: "blue.solid",
-    contrast: "white",
+    contrast: "blue.contrast",
   },
   // Assistant tracks the bubble layout's purple (AssistantTurnCard uses
   // purple.muted/purple.fg). When scenario mode flips a source-user turn
@@ -47,19 +47,19 @@ export const ROLE_PALETTES: Record<string, RolePalette> = {
     fg: "purple.fg",
     muted: "purple.muted",
     solid: "purple.solid",
-    contrast: "white",
+    contrast: "purple.contrast",
   },
   tool: {
     fg: "orange.fg",
     muted: "orange.muted",
     solid: "orange.solid",
-    contrast: "white",
+    contrast: "orange.contrast",
   },
   developer: {
     fg: "purple.fg",
     muted: "purple.muted",
     solid: "purple.solid",
-    contrast: "white",
+    contrast: "purple.contrast",
   },
 };
 

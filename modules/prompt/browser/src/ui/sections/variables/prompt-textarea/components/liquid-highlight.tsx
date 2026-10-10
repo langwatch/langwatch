@@ -1,7 +1,7 @@
 import { type LiquidToken, tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
 import type { ReactNode } from "react";
 
-const TAG_COLOR = "var(--chakra-colors-purple-500)";
+const TAG_COLOR = "var(--chakra-colors-purple-fg)";
 
 /**
  * Real fontWeight changes character width in borderless mode's variable-width
@@ -37,7 +37,7 @@ function tokenNode({
   if (token.type === "variable") {
     const name = variableNameOf(token);
     const isInvalid = name ? !isKnownVariable(name) : true;
-    const color = isInvalid ? "var(--chakra-colors-red-500)" : "var(--chakra-colors-blue-500)";
+    const color = isInvalid ? "var(--chakra-colors-red-fg)" : "var(--chakra-colors-blue-fg)";
     return (
       <span key={`var-${index}`} style={emphasis({ color, borderless })}>
         {token.value}

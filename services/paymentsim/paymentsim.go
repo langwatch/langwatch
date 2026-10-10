@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,9 @@ type Config struct {
 	WebhookSecret string
 	// CatalogPath is a stripe-catalog.json seeded at start (PAYMENTSIM_CATALOG).
 	CatalogPath string
+	// IDBase offsets every counter id so a restart never reuses one the app already stored
+	// (PAYMENTSIM_ID_BASE, default the start time in seconds). Zero keeps ids deterministic.
+	IDBase int
 }
 
 // LoadConfig reads paymentsim's configuration from the environment.
@@ -46,7 +50,16 @@ func LoadConfig() Config {
 		Addr: os.Getenv("PAYMENTSIM_ADDR"), Stack: os.Getenv("PAYMENTSIM_STACK"),
 		PublicURL: os.Getenv("PAYMENTSIM_PUBLIC_URL"), WebhookURL: os.Getenv("PAYMENTSIM_WEBHOOK_URL"),
 		WebhookSecret: os.Getenv("PAYMENTSIM_WEBHOOK_SECRET"), CatalogPath: os.Getenv("PAYMENTSIM_CATALOG"),
+		IDBase: idBaseFromEnv(),
 	})
+}
+
+// idBaseFromEnv is PAYMENTSIM_ID_BASE, or the start time in seconds: later starts always count higher.
+func idBaseFromEnv() int {
+	if v, err := strconv.Atoi(os.Getenv("PAYMENTSIM_ID_BASE")); err == nil && v >= 0 {
+		return v
+	}
+	return int(time.Now().Unix())
 }
 
 func withDefaults(cfg Config) Config {
@@ -82,6 +95,7 @@ func NewServer(cfg Config) (*Server, error) {
 func newServer(cfg Config, bundle fs.FS) (*Server, error) {
 	cfg = withDefaults(cfg)
 	s := &Server{cfg: cfg, st: newState(), real: time.Now, console: newConsole(bundle)}
+	s.st.idBase = cfg.IDBase
 	s.hook = newHooks(cfg.WebhookURL, cfg.WebhookSecret, func() time.Time { return s.real() })
 	if cfg.CatalogPath != "" {
 		raw, err := os.ReadFile(cfg.CatalogPath)

@@ -16,7 +16,9 @@ describe("the worker's event-log retention coverage", () => {
     try {
       const unclassified = eventing.definitions
         .map((definition) => definition.metadata.aggregateType)
-        .filter((aggregateType) => !Object.hasOwn(RETENTION_CLASS_BY_AGGREGATE_TYPE, aggregateType));
+        .filter(
+          (aggregateType) => !Object.hasOwn(RETENTION_CLASS_BY_AGGREGATE_TYPE, aggregateType),
+        );
       expect(unclassified).toEqual([]);
     } finally {
       await runtime.stop();

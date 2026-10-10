@@ -13,18 +13,10 @@ import (
 // Run dispatches a subcommand and returns the process exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: devscripts generate-modules|sync-references|ensure-built [args]")
+		fmt.Fprintln(stderr, "usage: devscripts generate-modules|sync-references [args]")
 		return 2
 	}
 	command, rest := args[0], args[1:]
-	if command == "ensure-built" {
-		root, err := findRoot()
-		if err != nil {
-			fmt.Fprintln(stderr, "ensure-built:", err)
-			return 1
-		}
-		return EnsureBuilt(root, rest, stderr)
-	}
 	root, rest, err := rootFrom(command, rest)
 	if err != nil {
 		fmt.Fprintln(stderr, command+":", err)

@@ -4,7 +4,7 @@
  * fake RECORDS what a screen asked and reported. Not exported.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
@@ -102,11 +102,11 @@ export function renderWithAuthzHost(
   return {
     host,
     ...render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemTestProvider>
         <UiHostServicesContextProvider value={billingLendsContactSales}>
           <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
         </UiHostServicesContextProvider>
-      </ChakraProvider>,
+      </DesignSystemTestProvider>,
     ),
   };
 }

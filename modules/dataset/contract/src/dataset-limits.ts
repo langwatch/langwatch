@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The dataset size limits one organization answers, and how a limit reads in
  * copy. Browser safe, so the upload drawer and the server quote one number.
@@ -10,7 +11,7 @@ import {
 } from "@langwatch/plans";
 import { z } from "zod";
 
-export const datasetLimitsSchema = z
+const datasetLimitsSchemaDefinition = z
   .object({
     /** The largest file an image or file cell accepts. */
     attachmentBytes: z.number().int().positive(),
@@ -28,6 +29,8 @@ export const datasetLimitsSchema = z
     rowsMax: z.number().int().positive(),
   })
   .strict();
+export interface DatasetLimitsSchema extends Named<typeof datasetLimitsSchemaDefinition> {}
+export const datasetLimitsSchema: DatasetLimitsSchema = datasetLimitsSchemaDefinition;
 export type DatasetLimits = z.infer<typeof datasetLimitsSchema>;
 
 /** The request-bounds registry key each limit is resolved from. */

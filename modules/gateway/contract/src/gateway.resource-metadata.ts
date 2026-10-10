@@ -4,6 +4,7 @@
  * platform never interprets.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -21,11 +22,13 @@ export const EXTERNAL_ID_MAX_LENGTH = 128;
  * then have to version, and a number would come back as a string from any
  * caller that round-trips through a form, so the wire says string and means it.
  */
-export const resourceMetadataSchema = z
+const resourceMetadataSchemaDefinition = z
   .record(z.string().min(1).max(METADATA_MAX_KEY_LENGTH), z.string().max(METADATA_MAX_VALUE_LENGTH))
   .refine((map) => Object.keys(map).length <= METADATA_MAX_KEYS, {
     message: `must hold at most ${METADATA_MAX_KEYS} keys`,
   });
+export interface ResourceMetadataSchema extends Named<typeof resourceMetadataSchemaDefinition> {}
+export const resourceMetadataSchema: ResourceMetadataSchema = resourceMetadataSchemaDefinition;
 
 /**
  * Trimmed, because a trailing space is invisible in a dashboard and would make

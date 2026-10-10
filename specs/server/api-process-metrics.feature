@@ -51,12 +51,11 @@ Feature: The standalone API process serves its own metrics
       Then it names the absence at boot
 
     @unit
-    Scenario: Outside production an unset key leaves the endpoint open
+    Scenario: Outside production an unset key leaves no metrics endpoint either
       Given the API process runs outside production with no metrics API key configured
-      When a caller scrapes its metrics endpoint without credentials
-      Then the response is successful
-      # The convenience the web process has always allowed, kept identical so
-      # the credential has one rule across the deployment rather than two.
+      When it composes
+      Then its metrics endpoint is absent rather than open
+      # ADR-175 (2026-10-09, TS-METRICS-NO-KEY): closed in every environment, as the Go gateway's door is.
 
   Rule: Composing metrics twice does not cost the process its metrics
 

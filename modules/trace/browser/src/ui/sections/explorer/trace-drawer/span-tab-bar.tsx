@@ -369,7 +369,7 @@ export const SpanTabBar = memo(function SpanTabBar({
       flexShrink={0}
       align="stretch"
       minHeight="38px"
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
+      bg={"bg.card"}
     >
       {collapsePosition === "leading" && collapseToggle}
 

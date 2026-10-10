@@ -1,7 +1,7 @@
-import { Box, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { PageLayout } from "./page-layout.tsx";
+import { PageHeadingSizeProvider, PageLayout } from "./page-layout.tsx";
 
 const meta = {
   title: "Navigation and layout/Page layout",
@@ -81,5 +81,99 @@ export const LongTitleAndNarrowWidth: Story = {
         <PageLayout.Heading>Organization members and invitations</PageLayout.Heading>
       </PageLayout.Header>
     </Box>
+  ),
+};
+
+/** Compare the shared bar in both modes without changing route-owned title sizing. */
+export const HeaderStates: Story = {
+  render: () => (
+    <HStack align="start" gap={6} wrap="wrap">
+      {(["light", "dark"] as const).map((mode) => (
+        <Stack
+          key={mode}
+          className={mode}
+          color="fg"
+          bg="bg.panel"
+          width="480px"
+          gap={4}
+          paddingY={4}
+        >
+          <Text paddingX={6} color="fg.muted">
+            {mode}
+          </Text>
+          <PageLayout.Header
+            actions={<PageLayout.HeaderButton primary>Create key</PageLayout.HeaderButton>}
+          >
+            <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
+            <Badge variant="subtle">12</Badge>
+          </PageLayout.Header>
+          <PageLayout.Header
+            actions={<PageLayout.HeaderButton disabled>Export</PageLayout.HeaderButton>}
+          >
+            <Stack gap={0.5} minWidth={0}>
+              <PageLayout.Heading>Costs</PageLayout.Heading>
+              <PageLayout.Subtitle>Usage across your organization</PageLayout.Subtitle>
+            </Stack>
+          </PageLayout.Header>
+          <PageLayout.Header
+            withBorder={false}
+            actions={<PageLayout.HeaderButton loading>Refreshing</PageLayout.HeaderButton>}
+          >
+            <PageLayout.Heading>Integrations</PageLayout.Heading>
+          </PageLayout.Header>
+          <PageHeadingSizeProvider size="lg">
+            <PageLayout.Header>
+              <PageLayout.Heading>Account settings</PageLayout.Heading>
+            </PageLayout.Header>
+          </PageHeadingSizeProvider>
+          <Box width="320px">
+            <PageLayout.Header actions={<PageLayout.HeaderButton>Invite</PageLayout.HeaderButton>}>
+              <PageLayout.Heading>Organization members and invitations</PageLayout.Heading>
+            </PageLayout.Header>
+          </Box>
+        </Stack>
+      ))}
+    </HStack>
+  ),
+};
+
+/** Scroll either panel: the reserved hairline fades in without moving the title. */
+export const ScrollingGlass: Story = {
+  render: () => (
+    <HStack align="start" gap={6} wrap="wrap">
+      {(["light", "dark"] as const).map((mode) => (
+        <Box
+          key={mode}
+          className={mode}
+          bg="bg.surface"
+          color="fg"
+          width="480px"
+          height="320px"
+          overflowY="auto"
+          borderWidth="1px"
+          borderColor="border.card"
+          borderRadius="lg"
+        >
+          <PageLayout.Header>
+            <PageLayout.Heading>Integrations</PageLayout.Heading>
+          </PageLayout.Header>
+          <Stack padding={6} gap={4}>
+            {Array.from({ length: 12 }, (_, index) => (
+              <Box
+                key={index}
+                bg="bg.card"
+                borderWidth="1px"
+                borderColor="border.card"
+                borderRadius="lg"
+                padding={4}
+              >
+                <Text>Connection {index + 1}</Text>
+                <Text color="fg.muted">Content scrolls underneath the title.</Text>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      ))}
+    </HStack>
   ),
 };

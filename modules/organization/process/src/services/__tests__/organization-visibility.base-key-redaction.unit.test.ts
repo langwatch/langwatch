@@ -22,7 +22,7 @@ const CALLER = { id: "user-1" };
 
 const T0 = Temporal.Instant.fromEpochMilliseconds(0);
 
-/** One organization with the two stored keys on its only project, in the memory twin. */
+/** One organization holding a stored licence, with two stored keys on its only project. */
 function seededMembership(): MemoryOrganizationMembershipRepository {
   const memory = MemoryOrganizationDatabase.create();
   memory.organizations.set("org-1", {
@@ -38,6 +38,7 @@ function seededMembership(): MemoryOrganizationMembershipRepository {
     s3SecretAccessKey: STORED_S3_SECRET,
     s3Bucket: null,
     stripeCustomerId: null,
+    license: STORED_LICENSE,
     createdAt: T0,
     updatedAt: T0,
   });
@@ -112,11 +113,7 @@ function visibility(granted: readonly string[], permissions = testPermissions(gr
   const membership = seededMembership();
   return OrganizationVisibilityService.create({
     reader: {
-      getAllForUser: async (input) =>
-        (await membership.findAllForUser(input)).map((organization) => ({
-          ...organization,
-          license: STORED_LICENSE,
-        })),
+      getAllForUser: (input) => membership.findAllForUser(input),
       findOrganizationWithMembers: (input) => membership.findOrganizationWithMembers(input),
       findMemberById: (input) => membership.findMemberById(input),
     },

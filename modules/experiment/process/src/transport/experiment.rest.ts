@@ -138,6 +138,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .post("/", "postApiExperiments")
   .withInput(createExperimentBodySchema)
   .withPermission("experiments:create")
+  .withAudit("experiments.saveExperiment")
   .withOutput(createExperimentResponseSchema)
   .withDocs({
     tags: EXPERIMENT_TAGS,

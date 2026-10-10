@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 
 import { processFailureLine } from "@langwatch/observability";
 import type * as ApiMain from "@langwatch/platform-api";
+import {
+  backendHalfOf,
+  BACKEND_HALF_SERVICE,
+  BACKEND_READY_MSG,
+  drainBackend,
+  type BackendHalves,
+} from "@langwatch/process/backend-host";
 import type * as WorkerMain from "@langwatch/worker";
 import {
   createRunnableDevEnvironment,
@@ -16,18 +23,13 @@ import {
 import { ESModulesEvaluator, type ModuleEvaluator, type ModuleRunner } from "vite/module-runner";
 
 import {
-  backendHalfOf,
-  BACKEND_HALF_SERVICE,
-  BACKEND_READY_MSG,
   disposeGeneration,
-  drainBackend,
   freeLoopbackPort,
   listenersAddedSince,
   replaceBackend,
   snapshotListeners,
-  startBackend,
+  startFreshBackend,
   type AddedListener,
-  type BackendHalves,
   type ListenerSnapshot,
   type PortForwarder,
 } from "./backend.process.ts";
@@ -42,9 +44,9 @@ import { bootFailureOf, type BootFailure } from "./boot-failure.ts";
 import { buildOrb, forwardPortWithOrb, servesOrb, type OrbBuild } from "./haven-orb.ts";
 
 /**
- * Local-only host for the whole Node side of a stack in one process (ADR-168, B1): the UI's Vite
- * server, plus api and worker through a Vite module runner, so a backend edit re-boots them while
- * the HMR socket stays up. Production still runs each app's own main.ts.
+ * Local-only host for api and worker in one process (ADR-168), loaded through a Vite module
+ * runner so a backend edit re-links them in place. The UI is served built, or by its own Vite
+ * lane under --hmr (amendment 2026-10-10). Production still runs each app's own main.ts.
  */
 const APP_SERVICE = "langwatch-app";
 const SHUTDOWN_DEADLINE_MS = 20_000;
@@ -76,7 +78,6 @@ const recycleLimits = {
 };
 const rssMiB = (): number => Math.round(process.memoryUsage.rss() / 1_048_576);
 
-let ui: ViteDevServer | undefined;
 let backendVite: ViteDevServer | undefined;
 let runner: ModuleRunner | undefined;
 let halves: BackendHalves | undefined;
@@ -115,11 +116,12 @@ const stop = (code: number): Promise<void> => {
     try {
       for (const watcher of watchers) watcher.close();
       retries.reset();
-      await reloading;
-      if (halves) await drainBackend(halves);
-      await apiPort?.close();
-      await runner?.close();
-      await Promise.all([ui?.close(), backendVite?.close()]);
+      await timedStep("pending reload", () => reloading);
+      const draining = halves;
+      if (draining) await timedStep("backend drain", () => drainBackend(draining));
+      await timedStep("api port", () => apiPort?.close());
+      await timedStep("module runner", () => runner?.close());
+      await timedStep("backend vite", () => backendVite?.close());
     } catch (error) {
       write(processFailureLine({ service: APP_SERVICE, event: "shutdown failed", error }));
       exitCode = 1;
@@ -137,6 +139,14 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
+/** A shutdown that outlives its deadline names the step it was stuck in, not just the deadline. */
+async function timedStep(step: string, run: () => Promise<unknown> | undefined): Promise<void> {
+  const startedAt = Date.now();
+  await run();
+  const record = { level: "info", msg: "shutdown step done", step, ms: Date.now() - startedAt };
+  process.stdout.write(`${JSON.stringify(record)}\n`);
+}
+
 /** Hands over to a fresh process: the dev script's loop restarts a host exiting 75. */
 function recycle(reason: string): void {
   const record = { level: "info", msg: "backend recycling", reason, generation, rssMiB: rssMiB() };
@@ -144,26 +154,9 @@ function recycle(reason: string): void {
   void stop(RECYCLE_EXIT_CODE);
 }
 
-/** The boot guard's crash hook: drain the backend, close both Vite servers, exit non-zero. */
+/** The boot guard's crash hook: drain the backend, close the Vite server, exit non-zero. */
 export function stopAfterCrash(): void {
   void stop(1);
-}
-
-/** The UI's Vite server, from apps/ui/vite.config.ts unchanged; it proxies /api to the api. */
-async function startUi(): Promise<ViteDevServer> {
-  const before = new Set(process.listeners("SIGTERM"));
-  const server = await createServer({
-    root: UI_ROOT,
-    configFile: path.join(UI_ROOT, "vite.config.ts"),
-    configLoader: "runner",
-  });
-  // Vite's own SIGTERM hook closes only itself and exits, cutting the backend drain short.
-  for (const listener of process.listeners("SIGTERM")) {
-    if (!before.has(listener)) process.off("SIGTERM", listener);
-  }
-  await server.listen();
-  server.printUrls();
-  return server;
 }
 
 /**
@@ -293,9 +286,9 @@ function bootRefused(error: unknown): void {
 }
 
 /**
- * Boots the linked generation: beside the serving one when there is one (the api first, then
- * API_PORT moves, then the old drains and the worker starts), else both halves fresh. Answers how
- * many listeners the old generation left behind; a refused half throws, tagged with its name.
+ * Boots the linked generation: beside the serving one (api, API_PORT moves, old drains, worker),
+ * else both halves fresh, API_PORT routed once the api starts. Answers how many listeners the old
+ * generation left behind; a refused half throws, tagged with its name.
  */
 async function bootNext({
   worker,
@@ -309,12 +302,13 @@ async function bootNext({
   const port = await freeLoopbackPort();
   const old = halves;
   if (!old) {
-    const started = await startBackend({
+    const started = await startFreshBackend({
       startWorker: worker.startWorker,
-      startApi: (options) => api.startApi({ ...options, port }),
+      startApi: api.startApi,
+      apiPort: port,
+      route: (next) => apiPort?.route(next),
     });
     halves = started.halves;
-    apiPort?.route(port);
     if (started.workerFailure !== undefined) throw started.workerFailure;
     return 0;
   }
@@ -442,14 +436,10 @@ function loadOrb(): Promise<OrbBuild | undefined> {
   return orb;
 }
 
-/** Starts the UI (not in the api lane), then the watch, then the first backend generation. */
-export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
-  if (withUi) {
-    process.chdir(UI_ROOT);
-    ui = await startUi();
-  }
+/** Holds API_PORT, starts the watch, then boots the first backend generation. */
+export async function bootApp(): Promise<void> {
   const port = envPositive({ name: "API_PORT", fallback: 6_560 });
-  const withOrb = servesOrb({ withUi, slug: process.env.LANGWATCH_SLUG });
+  const withOrb = servesOrb({ slug: process.env.LANGWATCH_SLUG });
   apiPort = await forwardPortWithOrb({
     port,
     orb: withOrb ? loadOrb : undefined,

@@ -5,8 +5,8 @@ import type {
 import { Temporal } from "@langwatch/time";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
-import type { ProjectCredentials } from "./project-credentials.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
+import type { ProjectCredentials } from "./project-credentials.service.ts";
 
 type PersonalProjectDependencies = Readonly<{
   projects: ProjectRepository;

@@ -503,7 +503,7 @@ describe("the Test Runs list", () => {
     // it reads apart from the two that do not.
     const archive = screen.getByRole("menuitem", { name: "Archive run plan" });
     const edit = screen.getByRole("menuitem", { name: "Edit run plan" });
-    expect(archive).toHaveStyle({ color: "var(--chakra-colors-red-600)" });
+    expect(archive).toHaveStyle({ color: "var(--chakra-colors-red-fg)" });
     expect(edit.style.color).toBe("");
   });
 

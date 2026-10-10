@@ -3,7 +3,7 @@
  * the abstract host port rather than mocking a module. Not exported.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import {
@@ -214,13 +214,13 @@ export function renderWithOrganizationHost(
   return {
     host,
     ...render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemTestProvider>
         <UiHostServicesContextProvider
           value={{ ...billingLendsContactSales, ...(analytics ? { analytics } : {}) }}
         >
           <OrganizationHostProvider value={host}>{element}</OrganizationHostProvider>
         </UiHostServicesContextProvider>
-      </ChakraProvider>,
+      </DesignSystemTestProvider>,
     ),
   };
 }

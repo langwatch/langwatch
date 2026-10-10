@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -15,7 +16,7 @@ import {
  * `/api/files/{projectId}/{id}` — no arbitrary URLs.
  */
 
-export const traceMediaRefSchema = z.object({
+const traceMediaRefSchemaDefinition = z.object({
   kind: z.enum(["audio", "image", "video", "file"]),
   url: z.string(),
   filename: z.string().optional(),
@@ -24,6 +25,8 @@ export const traceMediaRefSchema = z.object({
   /** Role of the chat message the part was found under; absent for pre-role traces. */
   role: z.enum(MEDIA_PART_ROLES).optional(),
 });
+export interface TraceMediaRefSchema extends Named<typeof traceMediaRefSchemaDefinition> {}
+export const traceMediaRefSchema: TraceMediaRefSchema = traceMediaRefSchemaDefinition;
 
 export type TraceMediaRef = z.infer<typeof traceMediaRefSchema>;
 

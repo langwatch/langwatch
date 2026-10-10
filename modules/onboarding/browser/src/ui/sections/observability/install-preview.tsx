@@ -1,4 +1,3 @@
-import { createShikiAdapter } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
   ClientOnly,
@@ -7,9 +6,8 @@ import {
   Tabs,
   useTabs,
 } from "@langwatch/design-system/primitives";
+import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import type React from "react";
-import { useMemo } from "react";
-import { createHighlighter } from "shiki";
 
 import type { InstallMatrix } from "./codegen/registry.tsx";
 
@@ -31,17 +29,7 @@ export function InstallPreview({ install }: InstallPreviewProps): React.ReactEle
 
   const tabs = useTabs({ defaultValue: tabItems[0]?.key });
 
-  const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<Awaited<ReturnType<typeof createHighlighter>>>({
-      async load() {
-        return createHighlighter({
-          langs: ["bash"],
-          themes: ["github-dark", "github-light"],
-        });
-      },
-      theme: colorMode === "dark" ? "github-dark" : "github-light",
-    });
-  }, [colorMode]);
+  const shikiAdapter = useShikiAdapter(colorMode);
 
   if (tabItems[0] && !tabItems.find((t) => t.key === tabs.value)) {
     tabs.setValue(tabItems[0].key);
@@ -65,13 +53,13 @@ export function InstallPreview({ install }: InstallPreviewProps): React.ReactEle
               bg="bg.panel/60"
               borderRadius="xl"
               border="1px solid"
-              borderColor="gray.200"
+              borderColor="border"
               backdropFilter="blur(20px) saturate(1.3)"
-              boxShadow="0 2px 16px rgba(0,0,0,0.04)"
+              boxShadow="0 2px 16px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
               overflow="hidden"
               meta={{ colorScheme: colorMode }}
             >
-              <CodeBlock.Header borderBottomWidth="1px" borderColor="gray.200">
+              <CodeBlock.Header borderBottomWidth="1px" borderColor="border">
                 <Tabs.List w="full" border="0" ms="-1">
                   {tabItems.map((t) => (
                     <Tabs.Trigger colorPalette="teal" key={t.key} value={t.key} textStyle="xs">

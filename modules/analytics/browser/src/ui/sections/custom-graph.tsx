@@ -7,8 +7,9 @@ import {
   withGroupedPipeline,
   type CustomGraphInput,
 } from "@langwatch/dashboard-contract";
+import { system } from "@langwatch/design-system";
 import { CachedView } from "@langwatch/design-system/cached-view";
-import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Delayed } from "@langwatch/design-system/delayed";
 import {
   Badge,
@@ -422,9 +423,9 @@ function useChartPalette() {
   return {
     getColor: useGetRotatingColorForCharts(),
     areaFillOpacity: useColorModeValue(0.3, 0.15),
-    gray400: useColorRawValue("gray.400"),
-    gridColor: useColorModeValue("rgba(0, 0, 0, 0.08)", "rgba(255, 255, 255, 0.08)"),
-    cursorColor: useColorModeValue("rgba(0, 0, 0, 0.1)", "rgba(255, 255, 255, 0.1)"),
+    gray400: system.token.var("colors.fg.subtle"),
+    gridColor: system.token.var("colors.border.muted"),
+    cursorColor: system.token.var("colors.bg.nested"),
   };
 }
 
@@ -608,7 +609,7 @@ function GraphContainer({
   // A row of figures draws its own compact error per figure (see SummaryGraph): it often sits
   // in a tab header or a small card.
   const failedOutright = Boolean(timeseries.error) && !timeseries.data && graphType !== "summary";
-  // A summary draws its own empty figures (see SummaryGraph); the chart placeholder overflows a tab header.
+  // A summary draws its own empty figures (see SummaryGraph); the placeholder overflows a tab.
   const showEmpty =
     isEmpty && graphType !== "monitor_graph" && (graphType !== "summary" || Boolean(emptyState));
   return (
@@ -1195,7 +1196,16 @@ const pieChartPercentageLabel = (props: PieLabelRenderProps) => {
   const y = Number(props.cy) + radius * Math.sin(-midAngle * RADIAN);
 
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
+    <text
+      x={x}
+      y={y}
+      fill="var(--chakra-colors-fg)"
+      stroke="var(--chakra-colors-bg-card)"
+      strokeWidth={3}
+      paintOrder="stroke"
+      textAnchor="middle"
+      dominantBaseline="central"
+    >
       {`${(Number(props.percent ?? 0) * 100).toFixed(0)}%`}
     </text>
   );
@@ -1416,7 +1426,7 @@ function MonitorGraph({
   summaryTimeseries: TimeseriesQuery;
   sortedKeys: string[];
   nameForSeries: (aggKey: string) => string;
-  getColor: (colorSet: RotatingColorSet, index: number, opacity: number) => string;
+  getColor: RotatingColor;
   size?: "sm" | "md";
   filterParams: ReturnType<typeof useFilterParams>["filterParams"];
   height_: number;
@@ -1437,18 +1447,14 @@ function MonitorGraph({
       summary: summaryTimeseries,
       disabled: !!input.monitorGraph?.disabled,
     });
-  const gray400 = useColorRawValue("gray.400");
-
-  // Color adjustments for light/dark mode
-  // Light mode: light backgrounds, dark text
-  // Dark mode: dark backgrounds, light text
-  const bgAdjustment = useColorModeValue(-400, 200);
-  const textAdjustment = useColorModeValue(300, -300);
-  const areaAdjustment = useColorModeValue(-300, 100);
+  const gray400 = system.token.var("colors.fg.subtle");
 
   // Glow effect for dark mode based on colorSet
-  const glowColor = getColor(colorSet, 0, 0);
-  const boxShadow = useColorModeValue("none", `0 0 20px ${glowColor}40, 0 0 40px ${glowColor}20`);
+  const glowColor = getColor(colorSet, 0, "solid");
+  const boxShadow = useColorModeValue(
+    "none",
+    `0 0 20px color-mix(in srgb, ${glowColor} 25%, transparent), 0 0 40px color-mix(in srgb, ${glowColor} 12%, transparent)`,
+  );
 
   return (
     <Box
@@ -1457,7 +1463,7 @@ function MonitorGraph({
       position="relative"
       border="1px solid"
       borderColor="border"
-      backgroundColor={getColor(colorSet, 0, bgAdjustment)}
+      backgroundColor={getColor(colorSet, 0, "subtle")}
       borderRadius="lg"
       paddingTop={2}
       overflow="hidden"
@@ -1471,7 +1477,7 @@ function MonitorGraph({
         padding={8}
         gap={2}
         align="start"
-        color={getColor(colorSet, 0, textAdjustment)}
+        color={getColor(colorSet, 0, "fg")}
       >
         <HStack>
           {input.monitorGraph?.isGuardrail && (
@@ -1554,11 +1560,11 @@ function MonitorGraph({
               key={aggKey}
               type="monotone"
               dataKey={aggKey}
-              stroke={getColor(colorSet, index, areaAdjustment)}
+              stroke={getColor(colorSet, index, "muted")}
               stackId={
                 ["stacked_bar", "stacked_area"].includes(input.graphType) ? "same" : undefined
               }
-              fill={getColor(colorSet, index, areaAdjustment)}
+              fill={getColor(colorSet, index, "muted")}
               strokeWidth={2.5}
               dot={false}
               name={nameForSeries(aggKey)}

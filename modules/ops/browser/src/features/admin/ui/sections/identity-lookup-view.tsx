@@ -1,6 +1,11 @@
+import { ActivityTimeline } from "@langwatch/design-system/activity-timeline";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
+  Alert,
   Badge,
+  Skeleton,
   Box,
   Button,
   Heading,
@@ -9,16 +14,23 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type { IdentityLookupAnswer, LookupPerson } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Search } from "lucide-react";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter } from "../../../../behavior/ops-router.ts";
-import { shortenIdentifier, waitedFor } from "../../model/identity-lookup-copy.ts";
+import {
+  identifierStateLabel,
+  operatorActivityLabel,
+  summarizeOperatorActivity,
+  shortenIdentifier,
+  waitedFor,
+} from "../../model/identity-lookup-copy.ts";
 import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
@@ -45,7 +57,7 @@ export default function IdentityLookupView() {
 
   const setOpenPerson = (userId: string | null) => {
     router.replace(
-      { query: { ...router.query, person: userId ?? undefined } },
+      { query: { ...router.query, person: userId ?? void 0 } },
       {
         shallow: true,
       },
@@ -55,20 +67,21 @@ export default function IdentityLookupView() {
   return (
     <>
       <AdminTable
-        title="Identity Lookup"
+        title="Identity lookup"
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Type the email address the support case is about"
+        searchPlaceholder="Search by email address"
         isLoading={address.length > 0 && lookup.isLoading}
         isFetching={lookup.isFetching}
         error={lookup.error}
       >
         <VStack align="stretch" gap={8} width="full" padding={6}>
           {address.length === 0 && (
-            <Text color="fg.muted">
-              Type an email address to see how sign-in would route it, who holds it, and what is
-              waiting on a human.
-            </Text>
+            <NoDataInfoBlock
+              icon={<Search />}
+              title="Look up an identity"
+              description="Type an email address to see how sign-in would route it, who holds it, and what is waiting on a human."
+            />
           )}
           {lookup.data && (
             <>
@@ -99,14 +112,12 @@ export default function IdentityLookupView() {
 /** Both the typed and the resolved address: a normalization must be told apart from a typo. */
 function ResolvedAddress({ typed, resolved }: { typed: string; resolved: string }) {
   return (
-    <HStack gap={2} fontSize="sm" wrap="wrap">
-      <Text color="fg.muted">You typed</Text>
-      <Text fontWeight="medium">{typed}</Text>
-      <Text color="fg.muted">· resolved to</Text>
-      <Text fontWeight="medium" data-testid="resolved-address">
-        {resolved}
-      </Text>
-    </HStack>
+    <SummaryList>
+      <SummaryListItem label="You typed">{typed}</SummaryListItem>
+      <SummaryListItem label="Resolved address">
+        <Text data-testid="resolved-address">{resolved}</Text>
+      </SummaryListItem>
+    </SummaryList>
   );
 }
 
@@ -116,35 +127,29 @@ function RoutingPanel({ routing }: { routing: IdentityLookupAnswer["routing"] })
       <Heading size="sm" paddingBottom={2}>
         Routing
       </Heading>
-      <VStack align="start" gap={2}>
-        <HStack gap={2} wrap="wrap">
+      <SummaryList>
+        <SummaryListItem label="Sign-in route">
           <Badge colorPalette="blue">
             {routing.outcome === "redirect_to_connection"
               ? "Sent to the identity provider"
               : "Shown the sign-in methods"}
           </Badge>
-          <Text fontSize="sm" color="fg.muted">
-            because
-          </Text>
-          <Badge variant="outline" data-testid="routing-reason">
-            {routing.reasonCode}
-          </Badge>
-        </HStack>
-        {routing.methods.length > 0 && (
-          <Text fontSize="sm" color="fg.muted">
-            Offered: {routing.methods.join(", ")}
-          </Text>
-        )}
+        </SummaryListItem>
+        <SummaryListItem label="Reason">
+          <Text data-testid="routing-reason">{routing.reasonCode.replace(/_/g, " ")}</Text>
+        </SummaryListItem>
+        <SummaryListItem label="Methods">{routing.methods.join(", ")}</SummaryListItem>
         {routing.connection && (
-          <Text fontSize="sm" data-testid="routing-connection">
-            Connection{" "}
-            {routing.connection.organizationName ??
-              shortenIdentifier(routing.connection.organizationId)}{" "}
-            ({routing.connection.providerId}) is{" "}
-            {routing.connection.state.replace(/_/g, " ").toLowerCase()}.
-          </Text>
+          <SummaryListItem label="Connection">
+            <Text data-testid="routing-connection">
+              {routing.connection.organizationName ??
+                shortenIdentifier(routing.connection.organizationId)}{" "}
+              · {routing.connection.providerId} ·{" "}
+              {routing.connection.state.replace(/_/g, " ").toLowerCase()}
+            </Text>
+          </SummaryListItem>
         )}
-      </VStack>
+      </SummaryList>
     </Box>
   );
 }
@@ -164,7 +169,14 @@ function PeopleTable({
       <Heading size="sm" paddingBottom={2}>
         People holding this address
       </Heading>
-      <Table.Root variant="line" size="md" width="full">
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflowX: "auto" }}
+        variant="line"
+        size="sm"
+        width="full"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Person</Table.ColumnHeader>
@@ -192,7 +204,24 @@ function PeopleTable({
             >
               <Table.Cell>
                 <VStack align="start" gap={0}>
-                  <Text>{person.name ?? person.email ?? <EmptyCell />}</Text>
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    height="auto"
+                    whiteSpace="normal"
+                    textAlign="start"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpen(person.userId);
+                    }}
+                  >
+                    {person.name ?? person.email ?? "Unnamed person"}
+                  </Button>
+                  {person.name && person.email && (
+                    <Text fontSize="xs" color="fg.muted">
+                      {person.email}
+                    </Text>
+                  )}
                   <ShortId id={person.userId} />
                 </VStack>
               </Table.Cell>
@@ -212,9 +241,9 @@ function PeopleTable({
               </Table.Cell>
               <Table.Cell>
                 <Text fontSize="sm">
-                  {person.holding.map((held) => `${held.provider} (${held.state})`).join(", ") || (
-                    <EmptyCell />
-                  )}
+                  {person.holding
+                    .map((held) => `${held.provider} (${identifierStateLabel(held.state)})`)
+                    .join(", ") || <EmptyCell />}
                 </Text>
               </Table.Cell>
               <Table.Cell textAlign="right">
@@ -225,7 +254,7 @@ function PeopleTable({
             </Table.Row>
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Box>
   );
 }
@@ -255,7 +284,7 @@ function PersonRowActions({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           aria-label={`Actions for ${person.name ?? person.userId}`}
           onClick={(event) => event.stopPropagation()}
@@ -327,31 +356,34 @@ function ClaimQueuePanel() {
 function OperatorActivityPanel() {
   const activity = api.identityLookup.recentActivity.useQuery({}, { retry: false });
 
+  const entries = summarizeOperatorActivity(activity.data ?? []);
+
   return (
-    <Box>
-      <Heading size="sm" paddingBottom={2}>
-        What operators have done recently
-      </Heading>
-      {activity.data?.length === 0 ? (
-        <Text color="fg.muted" fontSize="sm">
-          Nothing has been looked up yet.
-        </Text>
+    <Box data-testid="operator-activity">
+      {activity.error ? (
+        <Alert.Root status="error" role="alert">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Couldn't load operator activity</Alert.Title>
+          </Alert.Content>
+        </Alert.Root>
       ) : (
-        <VStack align="stretch" gap={1} data-testid="operator-activity">
-          {activity.data?.map((act) => (
-            <HStack key={act.auditId} justify="space-between">
-              <Text fontSize="sm">
-                {act.operatorName ??
-                  (act.operatorUserId ? shortenIdentifier(act.operatorUserId) : "somebody")}{" "}
-                · {act.act}
-                {act.address ? ` · ${act.address}` : ""}
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                {formatDateTime(act.atMs)}
-              </Text>
-            </HStack>
-          ))}
-        </VStack>
+        <ActivityTimeline
+          title="What operators have done recently"
+          emptyState={
+            activity.isLoading ? (
+              <Skeleton height="24" aria-label="Loading operator activity" />
+            ) : (
+              "Nothing has been looked up yet."
+            )
+          }
+          entries={entries.map(({ activity: act, count }) => ({
+            id: act.auditId,
+            occurredAtMs: act.atMs,
+            content: `${act.operatorName ?? (act.operatorUserId ? shortenIdentifier(act.operatorUserId) : "An operator")} ${operatorActivityLabel(act.act)}${act.address ? ` · ${act.address}` : ""}`,
+            meta: count > 1 ? `${count} times · latest shown` : void 0,
+          }))}
+        />
       )}
     </Box>
   );

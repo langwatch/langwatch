@@ -132,6 +132,11 @@ Feature: Slack connections
       And the other project's connection is unchanged and still project-scoped
 
     @unit
+    Scenario: A legacy webhook URL that is not a Slack incoming webhook is refused before anything is stored
+      When an automation is saved with a webhook URL outside hooks.slack.com as a legacy secret
+      Then the save is refused naming the slackWebhook field and no connection is created
+
+    @unit
     Scenario: A legacy secret this project can already use reuses that connection
       Given the organization has an organization connection holding a bot token
       When an automation in this project is saved with that bot token as a legacy secret

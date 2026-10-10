@@ -1,18 +1,29 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const codeEvaluatorFieldSchema = z
+const codeEvaluatorFieldSchemaDefinition = z
   .object({
     identifier: z.string().min(1),
     type: z.string().min(1),
   })
   .strict();
-export const codeEvaluatorConfigSchema = z
+export interface CodeEvaluatorFieldSchema extends Named<
+  typeof codeEvaluatorFieldSchemaDefinition
+> {}
+export const codeEvaluatorFieldSchema: CodeEvaluatorFieldSchema =
+  codeEvaluatorFieldSchemaDefinition;
+const codeEvaluatorConfigSchemaDefinition = z
   .object({
     code: z.string().min(1),
     inputs: z.array(codeEvaluatorFieldSchema).min(1),
     outputs: z.array(codeEvaluatorFieldSchema).min(1),
   })
   .strict();
+export interface CodeEvaluatorConfigSchema extends Named<
+  typeof codeEvaluatorConfigSchemaDefinition
+> {}
+export const codeEvaluatorConfigSchema: CodeEvaluatorConfigSchema =
+  codeEvaluatorConfigSchemaDefinition;
 export type CodeEvaluatorConfig = z.infer<typeof codeEvaluatorConfigSchema>;
 
 export type CodeEvaluatorExecutionInput = {

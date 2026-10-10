@@ -1,13 +1,13 @@
-import { Box, Button, type ButtonProps, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { forwardRef, type ReactNode } from "react";
 
-import { bannerGlass, bannerRim, type StatusHue } from "../../system/status-glass.ts";
+import { statusMesh } from "../../system/alert.recipe.ts";
 import { CloseButton } from "../overlays/close-button.tsx";
 
 export type BannerStatus = "info" | "warning" | "error" | "success";
 
-const HUE: Record<BannerStatus, StatusHue> = {
+const HUE: Record<BannerStatus, "blue" | "orange" | "red" | "green"> = {
   info: "blue",
   warning: "orange",
   error: "red",
@@ -15,6 +15,9 @@ const HUE: Record<BannerStatus, StatusHue> = {
 };
 
 const GLYPH = { info: Info, warning: TriangleAlert, error: AlertCircle, success: CheckCircle2 };
+
+/** The quietest of the status meshes: a banner sits across content without shouting. */
+const BANNER_MESH = statusMesh("banner");
 
 /** The panel's own corner radius, so a top banner's one rounded corner continues it. */
 const PANEL_RADIUS = "xl";
@@ -38,7 +41,7 @@ export type BannerProps = {
   "data-testid"?: string;
 };
 
-/** The banner's one action: a small pill in the banner's rim colour, a link through `asChild`. */
+/** The banner's one action: a small outline button, a link through `asChild`. */
 export const BannerAction = forwardRef<HTMLButtonElement, ButtonProps>(
   function BannerAction(props, ref) {
     return (
@@ -46,20 +49,20 @@ export const BannerAction = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         size="xs"
         variant="outline"
-        borderRadius="full"
-        borderColor="var(--banner-rim)"
-        bg={{ _light: "bg.surface/70", _dark: "whiteAlpha.100" }}
+        colorPalette="gray"
+        bg="transparent"
+        borderColor="border.muted"
         color="fg"
-        fontWeight="semibold"
+        boxShadow="none"
+        _hover={{ bg: "bg.panel", borderColor: "border" }}
         flexShrink={0}
-        _hover={{ bg: { _light: "bg.surface", _dark: "whiteAlpha.200" } }}
         {...props}
       />
     );
   },
 );
 
-/** A status message across a page or a section, in the toasts' glass at a pale tint. */
+/** A status message across a page or a section: a light status tint, a hairline, an icon. */
 export function Banner({
   status = "info",
   placement = "inline",
@@ -74,74 +77,76 @@ export function Banner({
   const Glyph = GLYPH[status];
   const top = placement === "top";
   return (
-    <HStack
+    <Box
+      display="grid"
+      gridTemplateColumns={onDismiss ? "auto minmax(0, 1fr) auto" : "auto minmax(0, 1fr)"}
+      alignItems="start"
       data-testid={testId}
       data-banner-placement={placement}
       role={status === "error" ? "alert" : "status"}
-      align="flex-start"
-      gap="2.5"
+      gap="3"
       width="full"
-      paddingY="2.5"
-      paddingStart="4"
-      paddingEnd="3"
+      paddingY={top ? "2.5" : "3"}
+      paddingStart={top ? "6" : "4"}
+      paddingEnd={top ? "4" : "3"}
       textStyle="sm"
-      {...bannerGlass(hue)}
-      css={{
-        "--banner-rim": bannerRim(hue),
-        ...(top
+      colorPalette={hue}
+      color="fg"
+      bg={BANNER_MESH.bg}
+      backgroundImage={BANNER_MESH.backgroundImage}
+      css={
+        top
           ? {
               borderRadius: 0,
               borderBottomLeftRadius: PANEL_RADIUS,
-              boxShadow: "inset 0 -1px 0 var(--banner-rim)",
+              borderBottomWidth: "1px",
+              borderColor: BANNER_MESH.borderColor,
               // Stacked top banners read as one band: only the last one curves.
               "&:has(+ [data-banner-placement=top])": { borderBottomLeftRadius: 0 },
             }
-          : {
-              borderRadius: "xl",
-              borderWidth: "1px",
-              borderColor: "var(--banner-rim)",
-              boxShadow: {
-                _light: "inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(2, 6, 23, 0.04)",
-                _dark: "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
-              },
-            }),
-      }}
+          : { borderRadius: "lg", borderWidth: "1px", borderColor: BANNER_MESH.borderColor }
+      }
     >
       <Box
-        color={{ _light: `${hue}.600`, _dark: `${hue}.300` }}
+        color="colorPalette.fg"
         display="flex"
         alignItems="center"
-        height="5"
-        flexShrink={0}
+        height={top ? "7" : "5"}
+        aria-hidden="true"
       >
-        {icon ?? <Glyph size={16} aria-hidden="true" />}
+        {icon ?? <Glyph size={16} />}
       </Box>
-      <chakra.div
-        flex="1"
-        minWidth={0}
-        display="flex"
-        flexDirection={top ? "row" : "column"}
-        flexWrap="wrap"
-        columnGap="1.5"
-        rowGap="0.5"
-        alignItems={top ? "baseline" : "stretch"}
-      >
-        {title && (
-          <Text as="span" fontWeight="semibold" data-part="title">
-            {title}
-          </Text>
-        )}
-        {title && children ? " " : null}
-        {children && (
-          <Text as="span" color="fg.muted">
-            {children}
-          </Text>
-        )}
-      </chakra.div>
-      {action}
+      <HStack align="start" gap="3" rowGap="2" flexWrap="wrap" minWidth={0}>
+        <Box flex="1 1 20rem" minWidth={0} paddingY={top ? "1" : "0"} overflowWrap="anywhere">
+          {title && (
+            <Text
+              as="span"
+              display={top ? "inline" : "block"}
+              fontWeight="medium"
+              data-part="title"
+            >
+              {title}
+            </Text>
+          )}
+          {title && children && top ? " " : null}
+          {children && (
+            <Text as="span" display={top ? "inline" : "block"} color="fg">
+              {children}
+            </Text>
+          )}
+        </Box>
+        {action}
+      </HStack>
       {onDismiss && (
-        <CloseButton size="2xs" aria-label="Dismiss" onClick={onDismiss} flexShrink={0} />
+        <CloseButton
+          size="xs"
+          aria-label="Dismiss"
+          onClick={onDismiss}
+          color="fg.muted"
+          marginTop={top ? "0" : "-1"}
+          _hover={{ color: "fg", bg: "bg.panel" }}
+        />
       )}
-    </HStack>
+    </Box>
   );
 }

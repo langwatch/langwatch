@@ -45,6 +45,9 @@ const CONFIG: AutomationServerConfig = {
   persistDailyCapPaid: 500,
   persistDailyCapEnterprise: 5_000,
   publicBaseUrl: "https://app.langwatch.test",
+  slackApiBase: "https://slack.com/api",
+  slackWebhookBase: "https://hooks.slack.com",
+  allowInsecureLocalUrls: false,
 };
 
 /** A memory-tier worker hosting automation's pipeline, every peer a fixture but `slack`. */

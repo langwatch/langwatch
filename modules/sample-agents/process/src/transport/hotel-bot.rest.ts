@@ -16,6 +16,7 @@ export const hotelBotRest = defineRestRouter(SampleAgentsApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/demo/hotel_bot", "runHotelBot")
+  .withoutAudit("run, not a change")
   .withInput(hotelBotRequestSchema)
   .withCredential("project", { key: true })
   .withPermission("traces:create")

@@ -46,41 +46,41 @@ export function SectionFocusGlow({
         @keyframes tracesSectionFocusGlow {
           0% {
             box-shadow:
-              0 0 0 0 rgba(59, 130, 246, 0),
-              0 0 0 0 rgba(59, 130, 246, 0);
-            border-color: rgba(59, 130, 246, 0);
+              0 0 0 0 transparent,
+              0 0 0 0 transparent;
+            border-color: transparent;
           }
           18% {
             box-shadow:
-              0 0 0 2px rgba(59, 130, 246, 0.65),
-              0 0 28px 6px rgba(59, 130, 246, 0.42);
-            border-color: rgba(59, 130, 246, 0.85);
+              0 0 0 2px color-mix(in srgb, var(--chakra-colors-blue-fg) 65%, transparent),
+              0 0 28px 6px color-mix(in srgb, var(--chakra-colors-blue-fg) 42%, transparent);
+            border-color: color-mix(in srgb, var(--chakra-colors-blue-fg) 85%, transparent);
           }
           100% {
             box-shadow:
-              0 0 0 0 rgba(59, 130, 246, 0),
-              0 0 0 0 rgba(59, 130, 246, 0);
-            border-color: rgba(59, 130, 246, 0);
+              0 0 0 0 transparent,
+              0 0 0 0 transparent;
+            border-color: transparent;
           }
         }
         @keyframes tracesSectionFocusGlowDark {
           0% {
             box-shadow:
-              0 0 0 0 rgba(125, 211, 252, 0),
-              0 0 0 0 rgba(125, 211, 252, 0);
-            border-color: rgba(125, 211, 252, 0);
+              0 0 0 0 transparent,
+              0 0 0 0 transparent;
+            border-color: transparent;
           }
           18% {
             box-shadow:
-              0 0 0 2px rgba(125, 211, 252, 0.55),
-              0 0 28px 6px rgba(125, 211, 252, 0.4);
-            border-color: rgba(125, 211, 252, 0.85);
+              0 0 0 2px color-mix(in srgb, var(--chakra-colors-blue-fg) 55%, transparent),
+              0 0 28px 6px color-mix(in srgb, var(--chakra-colors-blue-fg) 40%, transparent);
+            border-color: color-mix(in srgb, var(--chakra-colors-blue-fg) 85%, transparent);
           }
           100% {
             box-shadow:
-              0 0 0 0 rgba(125, 211, 252, 0),
-              0 0 0 0 rgba(125, 211, 252, 0);
-            border-color: rgba(125, 211, 252, 0);
+              0 0 0 0 transparent,
+              0 0 0 0 transparent;
+            border-color: transparent;
           }
         }
         .traces-section-focus-glow {

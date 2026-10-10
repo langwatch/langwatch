@@ -1,11 +1,12 @@
 // Run plan scope: what a run covers (all, test suites, labels, or scenarios).
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const SUITE_SCOPE_MODES = ["all", "test_suites", "labels", "scenarios"] as const;
 export type SuiteScopeMode = (typeof SUITE_SCOPE_MODES)[number];
 
-export const suiteScopeSchema = z.discriminatedUnion("mode", [
+const suiteScopeSchemaDefinition = z.discriminatedUnion("mode", [
   /** Every non-archived scenario of the project. */
   z.object({ mode: z.literal("all") }),
   /** The non-archived scenarios filed in any of these test suites. */
@@ -18,6 +19,8 @@ export const suiteScopeSchema = z.discriminatedUnion("mode", [
   /** The stored `scenarioIds`, picked by hand. */
   z.object({ mode: z.literal("scenarios") }),
 ]);
+export interface SuiteScopeSchema extends Named<typeof suiteScopeSchemaDefinition> {}
+export const suiteScopeSchema: SuiteScopeSchema = suiteScopeSchemaDefinition;
 export type SuiteScope = z.infer<typeof suiteScopeSchema>;
 
 /** What a plan with no stored scope covers. */

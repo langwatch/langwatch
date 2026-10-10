@@ -31,8 +31,9 @@ touching git.
 ## Layout
 
 ```
-apps/           ui (Vite SPA :5560) · api (tRPC+REST+SSE :6560) · worker (queues, projections,
-                subscribers) · tasks (migrations/backfills, run before serve) · server (npx CLI)
+apps/           ui (Vite-built SPA the api serves; Vite dev server only under --hmr)
+                · api (tRPC+REST+SSE :6560) · worker (queues, projections, subscribers)
+                · tasks (migrations/backfills, run before serve) · server (npx CLI)
                 · scenario-child. An app is main.ts + config.ts; no product code.
 modules/<name>/ one feature: contract/ · process/ · browser/ · client/ (+ specs/, adrs/)
 modules/catalogue.json   the one map of subject -> owning module
@@ -115,7 +116,8 @@ pnpm install                        # root only; one lockfile. Narrow: --filter 
 pnpm start:prepare:files            # generated files (Prisma client, etc.); fixes "Cannot find module"
 pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # after adding/removing a workspace package
-pnpm test:affected / typecheck:affected   # Nx: only packages this change reached, cached
+pnpm test:affected                  # Nx: only packages this change reached, cached
+pnpm typecheck                      # one root tsc -b; incremental, rechecks only what changed
 pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran
 make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```

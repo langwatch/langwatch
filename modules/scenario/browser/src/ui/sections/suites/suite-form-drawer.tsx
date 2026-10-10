@@ -196,7 +196,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                       <Input
                         placeholder="e.g., Critical Path Run Plan"
                         {...field}
-                        borderColor={errors.name ? "red.500" : undefined}
+                        borderColor={errors.name ? "red.fg" : undefined}
                       />
                     )}
                   />
@@ -366,7 +366,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                                 max={MAX_SUITE_REPEAT_COUNT}
                                 {...field}
                                 onChange={(event) => field.onChange(event.target.valueAsNumber)}
-                                borderColor={errors.repeatCount ? "red.500" : undefined}
+                                borderColor={errors.repeatCount ? "red.fg" : undefined}
                               />
                             )}
                           />

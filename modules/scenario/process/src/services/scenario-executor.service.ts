@@ -51,7 +51,8 @@ const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
 /** The process facts a child is started with, as the module resolved them. */
 type ScenarioExecutorHost = Readonly<{
-  voicePublicUrl: VoicePublicUrl;
+  /** Acquires the worker's public media origin on the first voice run. */
+  voicePublicUrl: () => Promise<VoicePublicUrl>;
   nlpServiceUrl: string | undefined;
   /** The engine hop's shared credential, as the process resolved it. */
   nlpInternalSecret: string | undefined;
@@ -155,6 +156,7 @@ export class ScenarioExecutorService {
       cancellations: this.input.cancellationSubscriptions,
       childProcesses: NodeScenarioChildService.create({
         config: this.#childConfig(),
+        voicePublicUrl: this.input.host.voicePublicUrl,
         pool,
         nonces: this.input.voiceNonces,
       }),
@@ -187,7 +189,6 @@ export class ScenarioExecutorService {
       ],
       nodeEnv: host.nodeEnvironment,
       isSaas: host.isSaas,
-      voicePublicUrl: host.voicePublicUrl,
       baseHost: host.publicBaseUrl,
       egress: {
         blockLocal: config.blockLocalHttpCalls,

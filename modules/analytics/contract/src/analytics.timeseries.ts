@@ -1,10 +1,16 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const analyticsFilterValueSchema = z.union([
+const analyticsFilterValueSchemaDefinition = z.union([
   z.array(z.string()),
   z.record(z.string(), z.array(z.string())),
   z.record(z.string(), z.record(z.string(), z.array(z.string()))),
 ]);
+export interface AnalyticsFilterValueSchema extends Named<
+  typeof analyticsFilterValueSchemaDefinition
+> {}
+export const analyticsFilterValueSchema: AnalyticsFilterValueSchema =
+  analyticsFilterValueSchemaDefinition;
 
 export const analyticsAggregationSchema = z.enum([
   "terms",
@@ -19,14 +25,16 @@ export const analyticsAggregationSchema = z.enum([
   "p90",
 ]);
 
-export const analyticsPipelineSchema = z
+const analyticsPipelineSchemaDefinition = z
   .object({
     field: z.enum(["trace_id", "user_id", "thread_id", "customer_id"]),
     aggregation: z.enum(["sum", "avg", "min", "max"]),
   })
   .strict();
+export interface AnalyticsPipelineSchema extends Named<typeof analyticsPipelineSchemaDefinition> {}
+export const analyticsPipelineSchema: AnalyticsPipelineSchema = analyticsPipelineSchemaDefinition;
 
-export const analyticsSeriesSchema = z
+const analyticsSeriesSchemaDefinition = z
   .object({
     metric: z.string().min(1),
     key: z.string().optional(),
@@ -37,8 +45,10 @@ export const analyticsSeriesSchema = z
     asPercent: z.boolean().optional(),
   })
   .strict();
+export interface AnalyticsSeriesSchema extends Named<typeof analyticsSeriesSchemaDefinition> {}
+export const analyticsSeriesSchema: AnalyticsSeriesSchema = analyticsSeriesSchemaDefinition;
 
-export const analyticsTimeseriesInputSchema = z
+const analyticsTimeseriesInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     startDate: z.number().positive(),
@@ -56,6 +66,11 @@ export const analyticsTimeseriesInputSchema = z
     shouldSkipPreviousPeriod: z.boolean().optional(),
   })
   .strict();
+export interface AnalyticsTimeseriesInputSchema extends Named<
+  typeof analyticsTimeseriesInputSchemaDefinition
+> {}
+export const analyticsTimeseriesInputSchema: AnalyticsTimeseriesInputSchema =
+  analyticsTimeseriesInputSchemaDefinition;
 
 export const analyticsTableSchema = z.enum([
   "trace_analytics_rollup",
@@ -66,22 +81,32 @@ export const analyticsTableSchema = z.enum([
   "evaluation_runs",
 ]);
 
-export const analyticsTimeseriesBucketSchema = z
+const analyticsTimeseriesBucketSchemaDefinition = z
   .object({
     date: z.string(),
   })
   .catchall(
     z.union([z.number(), z.string(), z.record(z.string(), z.record(z.string(), z.number()))]),
   );
+export interface AnalyticsTimeseriesBucketSchema extends Named<
+  typeof analyticsTimeseriesBucketSchemaDefinition
+> {}
+export const analyticsTimeseriesBucketSchema: AnalyticsTimeseriesBucketSchema =
+  analyticsTimeseriesBucketSchemaDefinition;
 
-export const analyticsTimeseriesResultSchema = z
+const analyticsTimeseriesResultSchemaDefinition = z
   .object({
     previousPeriod: z.array(analyticsTimeseriesBucketSchema),
     currentPeriod: z.array(analyticsTimeseriesBucketSchema),
   })
   .strict();
+export interface AnalyticsTimeseriesResultSchema extends Named<
+  typeof analyticsTimeseriesResultSchemaDefinition
+> {}
+export const analyticsTimeseriesResultSchema: AnalyticsTimeseriesResultSchema =
+  analyticsTimeseriesResultSchemaDefinition;
 
-export const analyticsReadInputSchema = z
+const analyticsReadInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     startDate: z.number().positive(),
@@ -89,6 +114,11 @@ export const analyticsReadInputSchema = z
     filters: z.record(z.string(), analyticsFilterValueSchema).optional(),
   })
   .strict();
+export interface AnalyticsReadInputSchema extends Named<
+  typeof analyticsReadInputSchemaDefinition
+> {}
+export const analyticsReadInputSchema: AnalyticsReadInputSchema =
+  analyticsReadInputSchemaDefinition;
 
 export type AnalyticsAggregation = z.infer<typeof analyticsAggregationSchema>;
 export type AnalyticsPipeline = z.infer<typeof analyticsPipelineSchema>;
@@ -108,7 +138,7 @@ export type AnalyticsFilterValue =
 export type AnalyticsFilters = Partial<Record<string, AnalyticsFilterValue>>;
 export type AnalyticsReadInput = z.infer<typeof analyticsReadInputSchema>;
 
-export const analyticsFeedbackEventSchema = z.object({
+const analyticsFeedbackEventSchemaDefinition = z.object({
   event_id: z.string(),
   event_type: z.string(),
   project_id: z.string().optional(),
@@ -121,41 +151,71 @@ export const analyticsFeedbackEventSchema = z.object({
   metrics: z.array(z.object({ key: z.string(), value: z.number() })).optional(),
   event_details: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
 });
+export interface AnalyticsFeedbackEventSchema extends Named<
+  typeof analyticsFeedbackEventSchemaDefinition
+> {}
+export const analyticsFeedbackEventSchema: AnalyticsFeedbackEventSchema =
+  analyticsFeedbackEventSchemaDefinition;
 export type AnalyticsFeedbackEvent = z.infer<typeof analyticsFeedbackEventSchema>;
 
-export const analyticsFeedbacksResultSchema = z.object({
+const analyticsFeedbacksResultSchemaDefinition = z.object({
   events: z.array(analyticsFeedbackEventSchema),
 });
+export interface AnalyticsFeedbacksResultSchema extends Named<
+  typeof analyticsFeedbacksResultSchemaDefinition
+> {}
+export const analyticsFeedbacksResultSchema: AnalyticsFeedbacksResultSchema =
+  analyticsFeedbacksResultSchemaDefinition;
 export type AnalyticsFeedbacksResult = z.infer<typeof analyticsFeedbacksResultSchema>;
 
-export const analyticsTopDocumentSchema = z.object({
+const analyticsTopDocumentSchemaDefinition = z.object({
   documentId: z.string(),
   count: z.number(),
   traceId: z.string(),
   content: z.string().optional(),
 });
+export interface AnalyticsTopDocumentSchema extends Named<
+  typeof analyticsTopDocumentSchemaDefinition
+> {}
+export const analyticsTopDocumentSchema: AnalyticsTopDocumentSchema =
+  analyticsTopDocumentSchemaDefinition;
 export type AnalyticsTopDocument = z.infer<typeof analyticsTopDocumentSchema>;
 
-export const analyticsTopDocumentsResultSchema = z.object({
+const analyticsTopDocumentsResultSchemaDefinition = z.object({
   topDocuments: z.array(analyticsTopDocumentSchema),
   totalUniqueDocuments: z.number(),
 });
+export interface AnalyticsTopDocumentsResultSchema extends Named<
+  typeof analyticsTopDocumentsResultSchemaDefinition
+> {}
+export const analyticsTopDocumentsResultSchema: AnalyticsTopDocumentsResultSchema =
+  analyticsTopDocumentsResultSchemaDefinition;
 export type AnalyticsTopDocumentsResult = z.infer<typeof analyticsTopDocumentsResultSchema>;
 
 /** One offered value for a filter field, exactly as the picker renders it. */
-export const analyticsFilterOptionSchema = z.object({
+const analyticsFilterOptionSchemaDefinition = z.object({
   field: z.string(),
   label: z.string(),
   count: z.number(),
 });
+export interface AnalyticsFilterOptionSchema extends Named<
+  typeof analyticsFilterOptionSchemaDefinition
+> {}
+export const analyticsFilterOptionSchema: AnalyticsFilterOptionSchema =
+  analyticsFilterOptionSchemaDefinition;
 export type AnalyticsFilterOption = z.infer<typeof analyticsFilterOptionSchema>;
 
 /** What `dataForFilter` answers with. */
-export const analyticsFilterOptionsResultSchema = z.object({
+const analyticsFilterOptionsResultSchemaDefinition = z.object({
   options: z.array(analyticsFilterOptionSchema),
 });
+export interface AnalyticsFilterOptionsResultSchema extends Named<
+  typeof analyticsFilterOptionsResultSchemaDefinition
+> {}
+export const analyticsFilterOptionsResultSchema: AnalyticsFilterOptionsResultSchema =
+  analyticsFilterOptionsResultSchemaDefinition;
 
-export const analyticsTimeseriesRowSchema = z
+const analyticsTimeseriesRowSchemaDefinition = z
   .object({
     // ClickHouse JSONEachRow is an members boundary, not an API input.
     // Keep this deliberately permissive: the displaced parser treated a bad
@@ -166,6 +226,11 @@ export const analyticsTimeseriesRowSchema = z
     group_key: z.unknown().optional(),
   })
   .catchall(z.unknown());
+export interface AnalyticsTimeseriesRowSchema extends Named<
+  typeof analyticsTimeseriesRowSchemaDefinition
+> {}
+export const analyticsTimeseriesRowSchema: AnalyticsTimeseriesRowSchema =
+  analyticsTimeseriesRowSchemaDefinition;
 
 export type AnalyticsTimeseriesRow = z.infer<typeof analyticsTimeseriesRowSchema>;
 

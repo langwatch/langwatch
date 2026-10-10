@@ -201,8 +201,6 @@ export class OrganizationVisibilityService {
     organization.elasticsearchNodeUrl = null;
     organization.elasticsearchApiKey = null;
     organization.useCustomElasticsearch = false;
-    // Licensing owns the licence key now; a row that still carries it never ships it.
-    Reflect.deleteProperty(organization, "license");
   }
 
   /**

@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, matchesGlob } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { mergeDiagnostics } from "../../packages/oxlint-rules/src/unused-directives.mjs";
@@ -38,15 +38,38 @@ function changedFiles(base) {
   return [...new Set([...tracked, ...untracked])].toSorted((a, b) => a.localeCompare(b));
 }
 
-/** The union config's ignorePatterns: `extends` does not carry them to the parts. */
-function ignoreArgs() {
-  const printed = spawnSync(OXLINT, ["--print-config", "-c", ".oxlintrc.jsonc"], {
+function printedConfig(config) {
+  const printed = spawnSync(OXLINT, ["--print-config", "-c", config], {
     cwd: root,
     encoding: "utf8",
   });
   if (printed.status !== 0) throw new Error(`oxlint --print-config failed:\n${printed.stdout}`);
 
-  return JSON.parse(printed.stdout).ignorePatterns.flatMap((p) => ["--ignore-pattern", p]);
+  return JSON.parse(printed.stdout);
+}
+
+/** The union config's ignorePatterns: `extends` does not carry them to the parts. */
+function ignoreArgs() {
+  return printedConfig(".oxlintrc.jsonc").ignorePatterns.flatMap((p) => ["--ignore-pattern", p]);
+}
+
+const ruleName = (rule) => rule.trim().split("/").at(-1);
+const UNUSED = /^Unused (?:eslint|oxlint)-[a-z-]+ directive/;
+
+/** A run without the type-aware rules cannot judge a directive that names only them. */
+function judgedWithoutTypes() {
+  const typeOnly = new Set(Object.keys(printedConfig(".oxlintrc.types.jsonc").rules).map(ruleName));
+
+  return (diagnostic) => {
+    if (diagnostic.code !== undefined || !UNUSED.test(diagnostic.message)) return true;
+    const { offset, length } = diagnostic.labels?.[0]?.span ?? { offset: 0, length: 0 };
+    const source = readFileSync(join(root, diagnostic.filename));
+    const text = source.subarray(offset, offset + length).toString("utf8");
+    const rules = /disable(?:-next-line|-line)?\s+([^*\n]*?)(?:\s+--|\*\/|$)/m.exec(text)?.[1];
+    const names = rules?.split(",").map(ruleName).filter(Boolean) ?? [];
+
+    return names.length === 0 || !names.every((name) => typeOnly.has(name));
+  };
 }
 
 /** Workspace roots a change reached, dependents included; every root when unscoped. */
@@ -63,6 +86,15 @@ function affectedRoots({ roots, files, base }) {
   return roots.filter((member) => names.has(nameOf(member)));
 }
 
+/** nx.json's `lintGlobals` as root-relative globs: editing one re-lints everything. */
+function lintGlobals() {
+  const { namedInputs } = JSON.parse(readFileSync(join(root, "nx.json"), "utf8"));
+  const expand = (input) =>
+    (namedInputs[input] ?? [input]).flatMap((i) => (i === input ? [i] : expand(i)));
+
+  return expand("lintGlobals").map((glob) => glob.replace("{workspaceRoot}/", ""));
+}
+
 /** What each process lints: projects, plus the files no Nx `lint` target owns. */
 function scopes({ types, files, base }) {
   const own = new Set(ownLintMembers(root).map((member) => member.root));
@@ -74,7 +106,9 @@ function scopes({ types, files, base }) {
   if (files === undefined && base === undefined) return [{ paths: ["."], ignores: [] }];
   const outside = (file) => !members.some((member) => file.startsWith(`${member}/`));
   const lintable = files?.filter((file) => LINTABLE.test(file) && existsSync(join(root, file)));
-  const residual = lintable === undefined ? ["."] : lintable.filter(outside);
+  const globals = lintGlobals();
+  const global = files?.some((file) => globals.some((glob) => matchesGlob(file, glob)));
+  const residual = lintable === undefined || global ? ["."] : lintable.filter(outside);
   const ignores = members.flatMap((member) => ["--ignore-pattern", `${member}/**`]);
 
   return [
@@ -138,7 +172,8 @@ const runs = scopes({ types, files, base })
     return reports.includes(undefined) ? undefined : mergeDiagnostics({ reports });
   });
 const results = await Promise.all(runs);
-const diagnostics = results.flatMap((result) => result ?? []);
+const judged = types ? () => true : judgedWithoutTypes();
+const diagnostics = results.flatMap((result) => result ?? []).filter(judged);
 const position = (d) => [
   d.filename,
   d.labels?.[0]?.span.line ?? 0,

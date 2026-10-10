@@ -697,7 +697,7 @@ describe("the tRPC audit sink", () => {
           projectId: "project-1",
           targetKind: "organization",
           targetId: "org-1",
-          metadata: { impersonatorId: "admin-1" },
+          metadata: { impersonatorId: "admin-1", channel: "app" },
         }),
       );
     });
@@ -721,6 +721,104 @@ describe("the tRPC audit sink", () => {
           actorUserId: "admin-1",
           ipAddress: "203.0.113.7",
           userAgent: "Mozilla/5.0 (audit test)",
+        }),
+      );
+    });
+  });
+});
+
+describe("the REST audit sink", () => {
+  function auditedDoor() {
+    const record = vi.fn<ApiDoorPeers["auditLog"]["record"]>(async () => ({
+      id: "audit-1",
+      occurredAt: 0,
+    }));
+    const getScope: AuthzApi["getScope"] = async (ids) => {
+      if (ids.projectId === "project-1") {
+        return { type: "project", id: "project-1", teamId: "team-1", organizationId: "org-1" };
+      }
+      throw new AuthzScopeNotFoundError(ids);
+    };
+    const { audit } = ApiDoorService.create({
+      ...peers,
+      authz: { ...peers.authz, getScope },
+      auditLog: { record },
+    }).door();
+
+    return { rest: audit.rest, record };
+  }
+  const row = {
+    actorId: "user-1",
+    action: "prompts.update",
+    scope: { tier: "project", id: "project-1" },
+    params: {},
+    resultId: "prompt-1",
+  } as const;
+
+  describe("given a row whose scope came from the key, not the path", () => {
+    it("names the project and the organization holding it", async () => {
+      const { rest, record } = auditedDoor();
+
+      await rest.record(row);
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", projectId: "project-1" }),
+      );
+    });
+
+    it("names the organization of an organization scope", async () => {
+      const { rest, record } = auditedDoor();
+
+      await rest.record({ ...row, scope: { tier: "organization", id: "org-2" } });
+
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org-2" }));
+    });
+  });
+
+  describe("given a row that says where the call came from", () => {
+    it("records the address, the user agent and the operator in their own columns", async () => {
+      const { rest, record } = auditedDoor();
+
+      await rest.record({
+        ...row,
+        impersonatorId: "admin-1",
+        ipAddress: "203.0.113.7",
+        userAgent: "Mozilla/5.0 (audit test)",
+      });
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          actorUserId: "admin-1",
+          metadata: { channel: "api", impersonatorId: "admin-1" },
+          ipAddress: "203.0.113.7",
+          userAgent: "Mozilla/5.0 (audit test)",
+        }),
+      );
+    });
+  });
+
+  describe("given a service key acting as nobody", () => {
+    it("names the key as apikey:<id>", async () => {
+      const { rest, record } = auditedDoor();
+
+      await rest.record({ ...row, actorId: null, apiKeyId: "key-9" });
+
+      const [entry] = record.mock.calls[0] ?? [];
+      expect(entry).toMatchObject({ userId: "apikey:key-9", metadata: { channel: "api" } });
+    });
+  });
+
+  describe("given a personal key", () => {
+    it("names its person with the key beside them", async () => {
+      const { rest, record } = auditedDoor();
+
+      await rest.record({ ...row, apiKeyId: "key-9" });
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          metadata: { channel: "api", apiKeyId: "key-9" },
         }),
       );
     });

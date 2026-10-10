@@ -92,6 +92,22 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe("<HomePageBanners />", () => {
   beforeEach(() => {
+    // jsdom does not apply Chakra's layered token stylesheet.
+    const sheet = document.createElement("style");
+    sheet.dataset.bannerTokens = "true";
+    sheet.textContent = `body {
+      --chakra-colors-accent-solid: #ED8926;
+      --chakra-colors-orange-muted: #FFF3E4;
+      --chakra-colors-purple-solid: #805AD5;
+      --chakra-colors-bg-subtle: #f8fafc;
+      --chakra-colors-orange-fg: #7B341E;
+      --chakra-colors-red-solid: #E53E3E;
+      --chakra-colors-orange-subtle: #FFF3E4;
+      --chakra-colors-teal-solid: #319795;
+      --chakra-colors-cyan-solid: #00B5D8;
+      --chakra-colors-cyan-subtle: #EDFDFD;
+    }`;
+    document.head.append(sheet);
     localStorage.clear();
     vi.clearAllMocks();
     routerPush.mockClear();
@@ -101,6 +117,7 @@ describe("<HomePageBanners />", () => {
   });
 
   afterEach(() => {
+    document.head.querySelectorAll("style[data-banner-tokens]").forEach((node) => node.remove());
     cleanup();
     localStorage.clear();
   });

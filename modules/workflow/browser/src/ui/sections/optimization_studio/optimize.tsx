@@ -21,8 +21,8 @@ import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import type { Entry } from "@langwatch/workflow-contract";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useState } from "react";
-import { CheckSquare, Info, TrendingUp } from "react-feather";
+import { CheckSquare, Info, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   Controller,
   type ControllerRenderProps,
@@ -93,7 +93,7 @@ export function Optimize() {
     <>
       <Tooltip content={isRunning ? "Optimization is running" : ""}>
         <Button
-          colorPalette="green"
+          colorPalette="orange"
           size="sm"
           onClick={() => {
             // `trackEvent` DID NOT TRAVEL. Product analytics is the application's own
@@ -375,54 +375,39 @@ export function OptimizeModalContent({
     setOpenResultsPanelRequest,
   ]);
 
-  const onSubmit = useCallback(
-    async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
-      if (!project || !workflowId) return;
-      if (!confirmOptimizationSetSize(train.length)) return;
+  const onSubmit = async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
+    if (!project || !workflowId) return;
+    if (!confirmOptimizationSetSize(train.length)) return;
 
-      const versionId = canSave
-        ? await commitNewVersion({
-            commitVersion: commitVersion.mutateAsync,
-            store: { getWorkflow, setLastCommittedWorkflow, setCurrentVersionId },
-            projectId: project.id,
-            workflowId,
-            version,
-            commitMessage,
-          })
-        : currentVersionId;
+    const versionId = canSave
+      ? await commitNewVersion({
+          commitVersion: commitVersion.mutateAsync,
+          store: { getWorkflow, setLastCommittedWorkflow, setCurrentVersionId },
+          projectId: project.id,
+          workflowId,
+          version,
+          commitMessage,
+        })
+      : currentVersionId;
 
-      if (!versionId) {
-        toaster.create({
-          title: "Version ID not found for optimization",
-          description: "Failed to find version ID for optimization",
-          type: "error",
-        });
-        return;
-      }
-
-      void versions.refetch();
-
-      startOptimizationExecution({
-        workflow_version_id: versionId,
-        optimizer: optimizer.value,
-        params,
+    if (!versionId) {
+      toaster.create({
+        title: "Version ID not found for optimization",
+        description: "Failed to find version ID for optimization",
+        type: "error",
       });
-      setHasStarted(true);
-    },
-    [
-      canSave,
-      commitVersion,
-      currentVersionId,
-      getWorkflow,
-      project,
-      setCurrentVersionId,
-      setLastCommittedWorkflow,
-      startOptimizationExecution,
-      train.length,
-      versions,
-      workflowId,
-    ],
-  );
+      return;
+    }
+
+    void versions.refetch();
+
+    startOptimizationExecution({
+      workflow_version_id: versionId,
+      optimizer: optimizer.value,
+      params,
+    });
+    setHasStarted(true);
+  };
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } = useModelProviderKeys({
     workflow: getWorkflow(),
@@ -438,7 +423,7 @@ export function OptimizeModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content borderTop="5px solid" borderColor="green.emphasized">
         <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>
@@ -466,7 +451,7 @@ export function OptimizeModalContent({
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
-        borderColor="green.400"
+        borderColor="green.emphasized"
       >
         <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
         <Dialog.CloseTrigger />

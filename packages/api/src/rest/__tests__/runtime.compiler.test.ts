@@ -45,10 +45,12 @@ const transportDeclaration = defineRestRouter(AnnotationApi)
   .withInput(z.object({ title: z.string() }))
   .withPermission("annotations:update")
   .withOutput(z.object({ id: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.updateAnnotation(input))
   .delete("/:id", "deleteAnnotation")
   .withParams(z.object({ id: z.string() }))
   .withPermission("annotations:update")
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.deleteAnnotation(input))
   .build();
 transportDeclaration.router();
@@ -157,7 +159,7 @@ const payload = z.discriminatedUnion("kind", [
 const unionRoute = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .post("/:id", "write").withParams(z.object({ id: z.string() }))
   .withInput(payload).withPermission("annotations:view").withOutput(z.object({ id: z.string() }));
-unionRoute().handle(({ input }) => ({ id: input.kind === "text" ? input.text : String(input.count) }));
+unionRoute().withoutAudit("test route").handle(({ input }) => ({ id: input.kind === "text" ? input.text : String(input.count) }));
 unionRoute().handle(({ input }) => ({ id: input.text }));
 const conflict = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), id: z.string() }),
@@ -205,6 +207,7 @@ const tier = z.object({ tier: z.literal("organization") });
 defineRestRouter(api).withNamespace("roles").withVersion("2026-09-08")
   .withCredential("organization")
   .get("/", "listRoles").withPermission("organization:manage").withOutput(tier)
+  .withoutAudit("test route")
   .handle(({ scope }) => ({ tier: scope.tier }));
 defineRestRouter(api).withNamespace("secrets").withVersion("2026-09-08")
   .get("/", "listSecrets").withPermission("secrets:view").withOutput(tier)

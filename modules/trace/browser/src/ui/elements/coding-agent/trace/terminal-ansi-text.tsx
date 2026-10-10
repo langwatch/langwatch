@@ -32,7 +32,7 @@ export const AnsiText = memo(function AnsiText({ text }: { text: string }) {
       // terminal. The selection highlight uses a semantic token.
       userSelect="text"
       css={{
-        "&::selection, & ::selection": { bg: `${TERMINAL_TOKENS.blue}55` },
+        "&::selection, & ::selection": { bg: "blue.subtle" },
       }}
     >
       {lines.map((line, lineIndex) => (

@@ -33,8 +33,8 @@ import { z } from "zod";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { PersonalProjectService } from "../../services/personal-project.service.ts";
-import { ProjectCredentialsService } from "../../services/project-credentials.service.ts";
 import { ProjectCreatedNoticeService } from "../../services/project-created-notice.service.ts";
+import { ProjectCredentialsService } from "../../services/project-credentials.service.ts";
 import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,

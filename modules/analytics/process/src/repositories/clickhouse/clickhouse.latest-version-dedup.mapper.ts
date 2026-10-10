@@ -1,30 +1,7 @@
 /**
- * Latest-version dedup for ReplacingMergeTree reads that aggregate over every
- * key in a time range (analytics timeseries).
- *
- * The IN-tuple form (`(TenantId, Key, UpdatedAt) IN (SELECT ..., max(UpdatedAt)
- * GROUP BY ...)`) builds a hash SET with one entry per key in range before the
- * outer read starts. A set cannot spill to disk, so its size grows with the
- * tenant's trace count and nothing in the query can bound it: on a high-volume
- * project a 30-day dashboard panel (60 days with the previous period) holds tens
- * of millions of entries and fails with MEMORY_LIMIT_EXCEEDED.
- *
- * This form reads the table once and collapses each key to its latest row with
- * `argMax(tuple(...), UpdatedAt)`. The per-key state lives in an aggregation
- * hash table, which `max_bytes_before_external_group_by` spills to disk, so the
- * query degrades to slower instead of failing. The carried row is a tuple so a
- * NULL in the latest version stays NULL (`argMax` on a Nullable column skips
- * NULLs and would return an older version's value).
- *
- * Semantics match the IN-tuple form: both pick the newest version among the
- * rows that pass `where`. Two rows tied on `UpdatedAt` collapse to one here,
- * where the IN-tuple form kept (and double counted) both.
- *
- * The carried row is buffered per key, so only use this when every carried
- * column is narrow. A whole `Map` column is the case to avoid: callers narrow a
- * map to the keys they read, or keep the IN-tuple form.
- *
- * @see dev/docs/best_practices/clickhouse-queries.md "Whole-range aggregates"
+ * Latest-version dedup for ReplacingMergeTree reads over every key in a range. The IN-tuple hash
+ * set cannot spill (MEMORY_LIMIT_EXCEEDED); this collapses keys with a spillable `argMax(tuple)`.
+ * Carry only narrow columns (narrow a `Map` to the keys read): clickhouse-queries.md.
  */
 
 export interface LatestVersionColumn {
@@ -80,28 +57,9 @@ function splitCarriedColumns({
 }
 
 /**
- * Derived table holding the newest version of each key in range.
- *
- * Shape:
- *
- *   (
- *     SELECT <keys>, argMax(__latest_row, __version) AS __latest,
- *            tupleElement(__latest, 1) AS <col1>, ...
- *     FROM (
- *       SELECT <keys>, tuple(<col1 expr>, ...) AS __latest_row,
- *              <versionColumn> AS __version
- *       FROM <table> [AS <sourceAlias>]
- *       WHERE <where>
- *     )
- *     GROUP BY <keys>
- *   ) <alias>
- *
- * `where` is applied to every version row before the collapse, exactly where
- * the IN-tuple form applied it, and must carry the tenant and partition
- * predicates. Column expressions are evaluated per version row too, so a
- * predicate carried as a column (e.g. a filter verdict) is the verdict of the
- * latest version. When `sourceAlias` is given the raw table is aliased with it,
- * so expressions written against the outer alias (`ta.X`) evaluate unchanged.
+ * Derived table of the newest version of each key in range: `argMax(__latest_row, __version)`
+ * grouped by the keys, unpacked per column. `where` applies to every version row before the
+ * collapse and must carry the tenant and partition predicates.
  */
 export function latestVersionSubquery({
   table,

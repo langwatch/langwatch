@@ -5,13 +5,13 @@ import {
 } from "@langwatch/scenario-contract";
 
 export const CONSOLE_COLORS: Record<string, Tokens["colors"]> = {
-  consoleBg: "gray.950",
-  consoleText: "gray.200",
-  headerColor: "white",
-  successColor: "green.300",
-  failureColor: "red.400",
-  warningColor: "yellow.400",
-  pendingColor: "yellow.400",
+  consoleBg: "bg.panel",
+  consoleText: "fg",
+  headerColor: "fg",
+  successColor: "green.fg",
+  failureColor: "red.fg",
+  warningColor: "yellow.fg",
+  pendingColor: "yellow.fg",
 };
 
 export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
@@ -28,7 +28,7 @@ export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
 };
 
 export const REASONING_VERDICT_COLOR_MAP: Record<Verdict, Tokens["colors"]> = {
-  [Verdict.SUCCESS]: "green.300",
-  [Verdict.FAILURE]: "red.400",
-  [Verdict.INCONCLUSIVE]: "yellow.400",
+  [Verdict.SUCCESS]: "green.fg",
+  [Verdict.FAILURE]: "red.fg",
+  [Verdict.INCONCLUSIVE]: "yellow.fg",
 };

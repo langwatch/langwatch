@@ -41,6 +41,7 @@ function buildApi(options: {
   );
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permissions }) => {

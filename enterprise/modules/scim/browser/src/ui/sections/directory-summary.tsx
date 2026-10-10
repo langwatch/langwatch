@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Directory page's status band: which sources are connected, when the last
@@ -7,7 +8,7 @@ import { Link } from "@langwatch/browser-host/link";
  * Spec: specs/identity/directory-administration.feature
  */
 import {
-  Alert,
+  Button,
   Card,
   HStack,
   SimpleGrid,
@@ -103,16 +104,15 @@ export default function DirectorySummary({
 /** A plan state, not a failure: said as an upsell, as the directory band does on main. */
 function EnterpriseGate() {
   return (
-    <Alert.Root status="info" data-testid="directory-enterprise-gate">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Directory sync is an Enterprise feature</Alert.Title>
-        <Alert.Description>
-          Connect your identity provider and the people, groups and sync status this band reports
-          fill themselves in. Contact sales to upgrade.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <UpgradeRequired
+      feature="Directory sync"
+      data-testid="directory-enterprise-gate"
+      actions={
+        <Button asChild colorPalette="orange" size="sm">
+          <Link href="/settings/plans">Compare plans</Link>
+        </Button>
+      }
+    />
   );
 }
 

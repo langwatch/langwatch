@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withMigrations(…)`, `src/governance.module.ts:54`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withMigrations(…)`, `src/governance.module.ts:45`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -763,7 +763,7 @@ Answers at `/api/auth/cli/virtual-key`, `/api/v1/auth/cli/virtual-key`.
 
 #### `GET /api/auth/cli/governance/ingest/sources` · `listCliIngestionSources`
 
-Permission `ingestionSources:view`. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:88`.
+Permission `ingestionSources:view`. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:87`.
 
 Answers at `/api/auth/cli/governance/ingest/sources`, `/api/v1/auth/cli/governance/ingest/sources`.
 
@@ -776,7 +776,7 @@ interface Query {
 
 #### `GET /api/auth/cli/governance/ingest/sources/:sourceId/events` · `listCliIngestionSourceEvents`
 
-Permission `activityMonitor:view`. Entitlement `enterprise` (feature `ACTIVITY_MONITOR`). Declared at `src/transport/governance-cli.rest.ts:101`.
+Permission `activityMonitor:view`. Entitlement `enterprise` (feature `ACTIVITY_MONITOR`). Declared at `src/transport/governance-cli.rest.ts:100`.
 
 Answers at `/api/auth/cli/governance/ingest/sources/:sourceId/events`, `/api/v1/auth/cli/governance/ingest/sources/:sourceId/events`.
 
@@ -794,7 +794,7 @@ interface Query {
 
 #### `GET /api/auth/cli/governance/ingest/sources/:sourceId/health` · `readCliIngestionSourceHealth`
 
-Permission `activityMonitor:view`. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:117`.
+Permission `activityMonitor:view`. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:116`.
 
 Answers at `/api/auth/cli/governance/ingest/sources/:sourceId/health`, `/api/v1/auth/cli/governance/ingest/sources/:sourceId/health`.
 
@@ -804,35 +804,35 @@ type Params = z.infer<typeof governanceCliSourceParamsSchema>; // ../contract/sr
 
 #### `GET /api/auth/cli/governance/status` · `readCliGovernanceStatus`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:130`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:129`.
 
 Answers at `/api/auth/cli/governance/status`, `/api/v1/auth/cli/governance/status`.
 
 #### `GET /api/auth/cli/governance/ingestion-templates` · `listCliIngestionTemplates`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:137`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:136`.
 
 Answers at `/api/auth/cli/governance/ingestion-templates`, `/api/v1/auth/cli/governance/ingestion-templates`.
 
 #### `POST /api/auth/cli/governance/ingestion-key` · `mintCliIngestionKey`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:143`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:142`.
 
 Answers at `/api/auth/cli/governance/ingestion-key`, `/api/v1/auth/cli/governance/ingestion-key`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/governance-cli.rest.ts:144)
+// Rawbody: "text" (inline, src/transport/governance-cli.rest.ts:143)
 ```
 
 #### `GET /api/auth/cli/governance/ingestion-keys` · `listCliIngestionKeys`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:151`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:149`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys`, `/api/v1/auth/cli/governance/ingestion-keys`.
 
 #### `GET /api/auth/cli/governance/ingestion-keys/:lookup_id` · `readCliIngestionKeyState`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:157`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:155`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys/:lookup_id`, `/api/v1/auth/cli/governance/ingestion-keys/:lookup_id`.
 

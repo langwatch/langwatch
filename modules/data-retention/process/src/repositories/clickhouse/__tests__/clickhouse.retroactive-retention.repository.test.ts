@@ -337,7 +337,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     ]);
     const query = required(queries[0]);
     expect(query.params).toEqual({
-      tenantFilterNeedle: "WHERE TenantId = 'weird\\'\\\\id'",
+      tenantFilterNeedle: "TenantId = 'weird\\'\\\\id'",
     });
     expect(query.sql).not.toContain("weird'\\id");
   });
@@ -368,7 +368,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(command.sql).toContain("mutation_id = {mutationId:String}");
     expect(command.params).toEqual({
       mutationId: "mut-xyz",
-      tenantFilterNeedle: "WHERE TenantId = 'project-1'",
+      tenantFilterNeedle: "TenantId = 'project-1'",
     });
     expect(command.sql).not.toContain("'mut-xyz'");
   });

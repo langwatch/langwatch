@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -63,6 +65,12 @@ func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) erro
 	if name == "obs" {
 		return o.restartObservability(ctx)
 	}
+	if handled, err := o.restartUIBundle(ctx, uiRestart{slug: slug, name: name, out: os.Stdout}); handled {
+		if err == nil {
+			fmt.Printf("  %s\n", uiBundleSwapped)
+		}
+		return err
+	}
 	msgs, err := o.restartServices(slug, name)
 	for _, m := range msgs {
 		fmt.Printf("  %s\n", m)
@@ -76,11 +84,45 @@ func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) erro
 // render — the dashboard shows the summary as a toast instead. Observability is
 // not offered here: it is shared machinery, bounced from the CLI (`restart obs`).
 func (o *Orchestrator) RestartStackQuiet(slug, name string) (string, error) {
+	if handled, err := o.restartUIBundle(context.Background(), uiRestart{slug: slug, name: name, out: io.Discard}); handled {
+		if err != nil {
+			return "", err
+		}
+		return uiBundleSwapped, nil
+	}
 	msgs, err := o.restartServices(slug, name)
 	if err != nil {
 		return "", err
 	}
 	return strings.Join(msgs, " · "), nil
+}
+
+const uiBundleSwapped = "ui bundle rebuilt and swapped in; the backend was not restarted"
+
+// uiRestart is one `restart ui` request: the stack, the name and where the
+// build's output goes (discarded under the dashboard's alt-screen).
+type uiRestart struct {
+	slug, name string
+	out        io.Writer
+}
+
+// restartUIBundle answers `restart ui` on a built-UI stack (still or --watch):
+// its app port is the Node host serving the bundle, so bouncing it would
+// restart the backend. It rebuilds the bundle as `reload ui` does instead.
+// handled is false for every other name and under --hmr (the Vite ui lane).
+func (o *Orchestrator) restartUIBundle(ctx context.Context, r uiRestart) (handled bool, err error) {
+	slug, name, out := r.slug, r.name, r.out
+	if name != "ui" {
+		return false, nil
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || st.Refresh == domain.RefreshHMR || st.Layout.IsMonolith() {
+		return false, nil
+	}
+	if !o.launcherIsOurs(st) {
+		return true, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
+	}
+	return true, o.buildUIBundle(ctx, st, out)
 }
 
 // restartServices SIGTERMs the process group of each supervised child the name
@@ -103,7 +145,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if slices.ContainsFunc(targets, isSimsTarget) {
 		if goLane, ok := o.goLaneHostingSims(st); ok {
 			targets = foldSimsIntoGoLane(targets, goLane)
-			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
+			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one Go process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
 		}
 	}
 	for _, t := range targets {

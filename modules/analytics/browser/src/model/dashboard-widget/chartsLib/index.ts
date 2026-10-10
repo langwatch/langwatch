@@ -12,7 +12,7 @@ import { parseIsoInstant, utcParts } from "./utc-instant.ts";
 type Row = Record<string, unknown>;
 
 interface LWGlobal {
-  theme?: "light" | "dark";
+  dashboardContext?: { colors?: Readonly<Record<string, string>> };
   navigate?: (target: string, params?: Record<string, unknown>) => void;
 }
 
@@ -31,37 +31,29 @@ declare const window: {
 // Theme + color helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_COLORS = [
-  "#6366f1",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
-  "#06b6d4",
-  "#a855f7",
-  "#ec4899",
-  "#84cc16",
-];
-
 const DEFAULT_HEIGHT = 240;
 
-function currentTheme(): "light" | "dark" {
-  return window.LW?.theme === "dark" ? "dark" : "light";
+/** Resolved by the host before crossing the opaque iframe boundary. */
+function token(name: string): string {
+  const value = window.LW?.dashboardContext?.colors?.[name];
+  if (!value) throw new Error(`Missing chart colour token: ${name}`);
+  return value;
 }
 
-/** Chrome (axis/grid/text) colors — separate from the categorical data palette. */
 function chrome() {
-  const dark = currentTheme() === "dark";
   return {
-    text: dark ? "#e5e7eb" : "#374151",
-    axis: dark ? "#9ca3af" : "#6b7280",
-    grid: dark ? "#374151" : "#e5e7eb",
-    tooltipBg: dark ? "#1f2937" : "#ffffff",
-    tooltipBorder: dark ? "#374151" : "#e5e7eb",
+    text: token("fg"),
+    axis: token("fg.subtle"),
+    grid: token("border.muted"),
+    tooltipBg: token("bg.card"),
+    tooltipBorder: token("border.card"),
   };
 }
 
 function paletteFor(colors?: string[]): string[] {
-  return colors && colors.length > 0 ? colors : DEFAULT_COLORS;
+  return colors && colors.length > 0
+    ? colors
+    : Array.from({ length: 8 }, (_, index) => token(`chart.${index + 1}`));
 }
 
 function colorAt(colors: string[], index: number): string {
@@ -485,7 +477,7 @@ export function MetricStat({
 }: MetricStatProps) {
   const c = chrome();
   const palette = paletteFor(colors);
-  const deltaColor = deltaDirection === "down" ? "#ef4444" : "#22c55e";
+  const deltaColor = token(deltaDirection === "down" ? "fg.error" : "fg.success");
   const deltaArrow = deltaDirection === "down" ? "▼" : "▲";
   const hasValue = typeof value === "string" || !isMissingNumber(value);
 
@@ -1032,12 +1024,12 @@ export function ProjectionBars({
       budget !== undefined &&
         h(R.ReferenceLine, {
           y: budget,
-          stroke: "#ef4444",
+          stroke: token("fg.error"),
           strokeDasharray: "4 3",
           label: {
             value: "Budget",
             position: "right",
-            fill: "#ef4444",
+            fill: token("fg.error"),
             fontSize: 11,
           },
         }),
@@ -1304,7 +1296,7 @@ export interface HeatmapProps {
 }
 
 /** The default heatmap scale, also the fallback for an unparsable colorScale. */
-const HEATMAP_FALLBACK_SCALE: [string, string] = ["#eef2ff", "#4338ca"];
+const heatmapScale = (): [string, string] => [token("blue.subtle"), token("blue.solid")];
 
 /**
  * Parses `#rgb`/`#rrggbb` to an [r, g, b] triple, or null. Author `colorScale` is Babel-compiled
@@ -1325,8 +1317,8 @@ export function parseHexRgb(hex: string): [number, number, number] | null {
 }
 
 export function interpolateColor(from: string, to: string, t: number): string {
-  const [r1, g1, b1] = parseHexRgb(from) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[0])!;
-  const [r2, g2, b2] = parseHexRgb(to) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[1])!;
+  const [r1, g1, b1] = parseHexRgb(from) ?? parseHexRgb(token("blue.subtle"))!;
+  const [r2, g2, b2] = parseHexRgb(to) ?? parseHexRgb(token("blue.solid"))!;
   const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
   return `rgb(${mix(r1, r2)}, ${mix(g1, g2)}, ${mix(b1, b2)})`;
 }
@@ -1347,7 +1339,7 @@ export function Heatmap({
   const rows = yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
   const xValues = cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
   const yValues = rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
-  const scale = colorScale ?? ["#eef2ff", "#4338ca"];
+  const scale = colorScale ?? heatmapScale();
   const values = data
     .map((row) => toNumber(row[valueKey]))
     .filter((value): value is number => value !== null);

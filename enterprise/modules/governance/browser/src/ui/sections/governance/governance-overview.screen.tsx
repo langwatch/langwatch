@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { api } from "../../../behavior/governance-api.ts";
@@ -64,14 +64,14 @@ function GovernanceOverviewPage() {
           position="relative"
           zIndex={1}
         >
-          <HStack gap={2} height="48px">
+          <PageLayout.Header>
             <PageLayout.Heading>AI Governance</PageLayout.Heading>
             <Badge colorPalette="purple" size="sm" variant="surface">
               Preview
             </Badge>
             <Spacer />
             <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
-          </HStack>
+          </PageLayout.Header>
           <VStack align="stretch" gap={6}>
             {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
 

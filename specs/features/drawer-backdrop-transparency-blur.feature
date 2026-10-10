@@ -1,7 +1,7 @@
-Feature: Drawer backdrop transparency and blur
+Feature: One drawer overlay surface
   As a user
-  I want drawers to be semi-transparent with a blur effect
-  So that I can maintain spatial context of the content behind the drawer
+  I want drawers and their menus to share one opaque raised surface
+  So that the application reads as one calm material regardless of the content behind it
 
   # All 1 scenario bound to drawer-backdrop.integration.test.tsx.
 
@@ -9,7 +9,7 @@ Feature: Drawer backdrop transparency and blur
     Given the application is loaded
 
   @integration
-  Scenario: Drawer content panel applies blur filter and transparency
+  Scenario: Drawer content panel shares the opaque overlay surface
     When a drawer opens
-    Then the drawer content panel has a backdrop-filter with 25px blur
-    And the drawer content panel background uses 80% opacity
+    Then the drawer content panel uses the shared overlay background
+    And the drawer content panel does not blur or mix the page behind it

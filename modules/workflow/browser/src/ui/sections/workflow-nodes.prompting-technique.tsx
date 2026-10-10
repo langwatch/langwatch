@@ -2,10 +2,10 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
 import { type Node, type NodeProps, NodeToolbar } from "@xyflow/react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
-import { MoreHorizontal, Trash2 } from "react-feather";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
@@ -60,7 +60,7 @@ export function PromptingTechniqueWrapper({
     ref: string;
   };
 }) {
-  const { ComponentIcon, useColorModeValue } = useWorkflowNodeHost();
+  const { ComponentIcon } = useWorkflowNodeHost();
   const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore((state) => ({
     node: decoratedBy?.ref ? state.nodes.find((node) => node.id === decoratedBy.ref) : void 0,
     setNode: state.setNode,
@@ -68,10 +68,7 @@ export function PromptingTechniqueWrapper({
     deselectAllNodes: state.deselectAllNodes,
   }));
   const hovered = false;
-  const wrapperShadow = useColorModeValue(
-    "0px 0px 4px 0px rgba(0, 0, 0, 0.1)",
-    "0px 0px 4px 0px rgba(0, 0, 0, 0.3)",
-  );
+  const wrapperShadow = "sm";
 
   if (!node) {
     return children;
@@ -86,7 +83,7 @@ export function PromptingTechniqueWrapper({
       backgroundColor="bg.subtle"
       borderRadius="12px"
       color="fg.muted"
-      fontSize="10px"
+      textStyle="xs"
       boxShadow={wrapperShadow}
       outline={!!node.selected || hovered ? "1.5px solid" : "none"}
       outlineColor={node.selected ? selectionColor : hoveredOutlineColor}
@@ -139,7 +136,7 @@ export function PromptingTechniqueWrapper({
       )}
       <HStack gap={2} width="full" paddingX={3} paddingY={2}>
         <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="xs" />
-        <Text fontSize="12px" fontWeight={500}>
+        <Text textStyle="sm" fontWeight="medium">
           {node.data.cls}
         </Text>
       </HStack>

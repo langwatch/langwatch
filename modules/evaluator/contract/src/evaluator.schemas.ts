@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The inputs the `evaluators.*` tRPC surface publishes, kept in the
  * contract so the wire shape a client is typed against is stated once,
@@ -15,31 +16,51 @@ import type { Evaluator, EvaluatorWithFields } from "./evaluator.ts";
 import { evaluatorsSchema } from "./evaluators.generated.ts";
 
 /** One project. The list read names it and nothing else. */
-export const evaluatorApiProjectInputSchema = z.object({ projectId: z.string() });
+const evaluatorApiProjectInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface EvaluatorApiProjectInputSchema extends Named<
+  typeof evaluatorApiProjectInputSchemaDefinition
+> {}
+export const evaluatorApiProjectInputSchema: EvaluatorApiProjectInputSchema =
+  evaluatorApiProjectInputSchemaDefinition;
 
 /** One evaluator inside one project, addressed by `id`. */
-export const evaluatorApiEvaluatorIdInputSchema = z.object({
+const evaluatorApiEvaluatorIdInputSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
 });
+export interface EvaluatorApiEvaluatorIdInputSchema extends Named<
+  typeof evaluatorApiEvaluatorIdInputSchemaDefinition
+> {}
+export const evaluatorApiEvaluatorIdInputSchema: EvaluatorApiEvaluatorIdInputSchema =
+  evaluatorApiEvaluatorIdInputSchemaDefinition;
 
 /**
  * One evaluator inside one project, addressed by `evaluatorId`. The same pair
  * as `evaluatorApiEvaluatorIdInputSchema` under the field name the copy-lineage
  * and history procedures have always published, which is why both exist.
  */
-export const evaluatorApiEvaluatorInputSchema = z.object({
+const evaluatorApiEvaluatorInputSchemaDefinition = z.object({
   projectId: z.string(),
   evaluatorId: z.string(),
 });
+export interface EvaluatorApiEvaluatorInputSchema extends Named<
+  typeof evaluatorApiEvaluatorInputSchemaDefinition
+> {}
+export const evaluatorApiEvaluatorInputSchema: EvaluatorApiEvaluatorInputSchema =
+  evaluatorApiEvaluatorInputSchemaDefinition;
 
 /** One evaluator inside one project, addressed by its slug. */
-export const evaluatorApiSlugInputSchema = z.object({
+const evaluatorApiSlugInputSchemaDefinition = z.object({
   slug: z.string(),
   projectId: z.string(),
 });
+export interface EvaluatorApiSlugInputSchema extends Named<
+  typeof evaluatorApiSlugInputSchemaDefinition
+> {}
+export const evaluatorApiSlugInputSchema: EvaluatorApiSlugInputSchema =
+  evaluatorApiSlugInputSchemaDefinition;
 
-export const evaluatorApiUpdateInputSchema = z.object({
+const evaluatorApiUpdateInputSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string().min(1).max(255).optional(),
@@ -47,15 +68,25 @@ export const evaluatorApiUpdateInputSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });
+export interface EvaluatorApiUpdateInputSchema extends Named<
+  typeof evaluatorApiUpdateInputSchemaDefinition
+> {}
+export const evaluatorApiUpdateInputSchema: EvaluatorApiUpdateInputSchema =
+  evaluatorApiUpdateInputSchemaDefinition;
 
-export const evaluatorApiPushToCopiesInputSchema = z.object({
+const evaluatorApiPushToCopiesInputSchemaDefinition = z.object({
   projectId: z.string(),
   evaluatorId: z.string(),
   copyIds: z.array(z.string()).optional(),
 });
+export interface EvaluatorApiPushToCopiesInputSchema extends Named<
+  typeof evaluatorApiPushToCopiesInputSchemaDefinition
+> {}
+export const evaluatorApiPushToCopiesInputSchema: EvaluatorApiPushToCopiesInputSchema =
+  evaluatorApiPushToCopiesInputSchemaDefinition;
 
 /** Creating an evaluator. An omitted id is minted before the handler runs. */
-export const evaluatorApiCreateInputSchema = z.object({
+const evaluatorApiCreateInputSchemaDefinition = z.object({
   // Generated server-side so it's present in audit log args for history lookup
   id: z.string().default(newEvaluatorId),
   projectId: z.string(),
@@ -64,15 +95,25 @@ export const evaluatorApiCreateInputSchema = z.object({
   config: z.record(z.string(), z.unknown()),
   workflowId: z.string().optional(),
 });
+export interface EvaluatorApiCreateInputSchema extends Named<
+  typeof evaluatorApiCreateInputSchemaDefinition
+> {}
+export const evaluatorApiCreateInputSchema: EvaluatorApiCreateInputSchema =
+  evaluatorApiCreateInputSchemaDefinition;
 
 /** Copying an evaluator between projects. An omitted id names the copy. */
-export const evaluatorApiCopyInputSchema = z.object({
+const evaluatorApiCopyInputSchemaDefinition = z.object({
   evaluatorId: z.string(),
   projectId: z.string(),
   sourceProjectId: z.string(),
   // Generated server-side so it's present in audit log args for history lookup
   newEvaluatorId: z.string().default(newEvaluatorId),
 });
+export interface EvaluatorApiCopyInputSchema extends Named<
+  typeof evaluatorApiCopyInputSchemaDefinition
+> {}
+export const evaluatorApiCopyInputSchema: EvaluatorApiCopyInputSchema =
+  evaluatorApiCopyInputSchemaDefinition;
 
 export type EvaluatorApiProjectInput = z.infer<typeof evaluatorApiProjectInputSchema>;
 export type EvaluatorApiEvaluatorIdInput = z.infer<typeof evaluatorApiEvaluatorIdInputSchema>;
@@ -106,14 +147,16 @@ export type EvaluatorApiDeleteOutput = Evaluator;
  * What the evaluator tRPC surface answers with, beyond the evaluator rows
  * above. Each is the shape the procedure already returned.
  */
-export const evaluatorCopySchema = z.object({
+const evaluatorCopySchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   projectId: z.string(),
   fullPath: z.string(),
 });
+export interface EvaluatorCopySchema extends Named<typeof evaluatorCopySchemaDefinition> {}
+export const evaluatorCopySchema: EvaluatorCopySchema = evaluatorCopySchemaDefinition;
 
-export const evaluatorHistoryEntrySchema = z.object({
+const evaluatorHistoryEntrySchemaDefinition = z.object({
   id: z.string(),
   action: z.string(),
   createdAt: z.date(),
@@ -122,9 +165,14 @@ export const evaluatorHistoryEntrySchema = z.object({
     .object({ id: z.string(), name: z.string().nullable(), email: z.string().nullable() })
     .nullable(),
 });
+export interface EvaluatorHistoryEntrySchema extends Named<
+  typeof evaluatorHistoryEntrySchemaDefinition
+> {}
+export const evaluatorHistoryEntrySchema: EvaluatorHistoryEntrySchema =
+  evaluatorHistoryEntrySchemaDefinition;
 
 /** The entry-node fields a workflow evaluator maps trace data onto. */
-export const evaluatorWorkflowFieldsSchema = z.object({
+const evaluatorWorkflowFieldsSchemaDefinition = z.object({
   evaluatorId: z.string(),
   evaluatorType: z.string(),
   workflowId: z.string().optional(),
@@ -133,45 +181,90 @@ export const evaluatorWorkflowFieldsSchema = z.object({
   fields: z.array(evaluatorFieldSchema),
   outputFields: z.array(evaluatorFieldSchema),
 });
+export interface EvaluatorWorkflowFieldsSchema extends Named<
+  typeof evaluatorWorkflowFieldsSchemaDefinition
+> {}
+export const evaluatorWorkflowFieldsSchema: EvaluatorWorkflowFieldsSchema =
+  evaluatorWorkflowFieldsSchemaDefinition;
 
 /** The workflow an archive would take with the evaluator; monitor answers for its own rows. */
-export const evaluatorRelatedEntitiesSchema = z.object({
+const evaluatorRelatedEntitiesSchemaDefinition = z.object({
   workflow: z.object({ id: z.string(), name: z.string() }).nullable(),
 });
+export interface EvaluatorRelatedEntitiesSchema extends Named<
+  typeof evaluatorRelatedEntitiesSchemaDefinition
+> {}
+export const evaluatorRelatedEntitiesSchema: EvaluatorRelatedEntitiesSchema =
+  evaluatorRelatedEntitiesSchemaDefinition;
 
 /** One evaluator a workflow backs, as a workflow's archive preview names it. */
-export const evaluatorByWorkflowSchema = z.object({ id: z.string(), name: z.string() });
+const evaluatorByWorkflowSchemaDefinition = z.object({ id: z.string(), name: z.string() });
+export interface EvaluatorByWorkflowSchema extends Named<
+  typeof evaluatorByWorkflowSchemaDefinition
+> {}
+export const evaluatorByWorkflowSchema: EvaluatorByWorkflowSchema =
+  evaluatorByWorkflowSchemaDefinition;
 
 /** What a cascade archive took with it. */
-export const evaluatorCascadeArchiveSchema = z.object({
+const evaluatorCascadeArchiveSchemaDefinition = z.object({
   evaluator: evaluatorSchema,
   archivedWorkflow: z.object({ id: z.string() }).nullable(),
 });
+export interface EvaluatorCascadeArchiveSchema extends Named<
+  typeof evaluatorCascadeArchiveSchemaDefinition
+> {}
+export const evaluatorCascadeArchiveSchema: EvaluatorCascadeArchiveSchema =
+  evaluatorCascadeArchiveSchemaDefinition;
 
 /** How far a push to the replicas reached. */
-export const evaluatorPushToCopiesSchema = z.object({
+const evaluatorPushToCopiesSchemaDefinition = z.object({
   pushedTo: z.number(),
   selectedCopies: z.number(),
 });
+export interface EvaluatorPushToCopiesSchema extends Named<
+  typeof evaluatorPushToCopiesSchemaDefinition
+> {}
+export const evaluatorPushToCopiesSchema: EvaluatorPushToCopiesSchema =
+  evaluatorPushToCopiesSchemaDefinition;
 
 /** A copy pulled back into line with its source. */
-export const evaluatorSyncFromSourceSchema = z.object({ ok: z.literal(true) });
+const evaluatorSyncFromSourceSchemaDefinition = z.object({ ok: z.literal(true) });
+export interface EvaluatorSyncFromSourceSchema extends Named<
+  typeof evaluatorSyncFromSourceSchemaDefinition
+> {}
+export const evaluatorSyncFromSourceSchema: EvaluatorSyncFromSourceSchema =
+  evaluatorSyncFromSourceSchemaDefinition;
 
 /** One workflow inside one project: the Optimization Studio's evaluator switch is scoped by it. */
-export const evaluatorApiWorkflowInputSchema = z.object({
+const evaluatorApiWorkflowInputSchemaDefinition = z.object({
   workflowId: z.string(),
   projectId: z.string(),
 });
+export interface EvaluatorApiWorkflowInputSchema extends Named<
+  typeof evaluatorApiWorkflowInputSchemaDefinition
+> {}
+export const evaluatorApiWorkflowInputSchema: EvaluatorApiWorkflowInputSchema =
+  evaluatorApiWorkflowInputSchemaDefinition;
 
 /** The studio's save-as-evaluator switch; `isComponent` is sent and ignored, as it always was. */
-export const evaluatorApiWorkflowToggleInputSchema = z.object({
+const evaluatorApiWorkflowToggleInputSchemaDefinition = z.object({
   ...evaluatorApiWorkflowInputSchema.shape,
   isEvaluator: z.boolean(),
   isComponent: z.boolean(),
 });
+export interface EvaluatorApiWorkflowToggleInputSchema extends Named<
+  typeof evaluatorApiWorkflowToggleInputSchemaDefinition
+> {}
+export const evaluatorApiWorkflowToggleInputSchema: EvaluatorApiWorkflowToggleInputSchema =
+  evaluatorApiWorkflowToggleInputSchemaDefinition;
 
 /** What a studio switch answers once the write is done. */
-export const evaluatorWorkflowSwitchedSchema = z.object({ success: z.boolean() }).strict();
+const evaluatorWorkflowSwitchedSchemaDefinition = z.object({ success: z.boolean() }).strict();
+export interface EvaluatorWorkflowSwitchedSchema extends Named<
+  typeof evaluatorWorkflowSwitchedSchemaDefinition
+> {}
+export const evaluatorWorkflowSwitchedSchema: EvaluatorWorkflowSwitchedSchema =
+  evaluatorWorkflowSwitchedSchemaDefinition;
 
 export type EvaluatorCopy = z.infer<typeof evaluatorCopySchema>;
 export type EvaluatorHistoryEntry = z.infer<typeof evaluatorHistoryEntrySchema>;

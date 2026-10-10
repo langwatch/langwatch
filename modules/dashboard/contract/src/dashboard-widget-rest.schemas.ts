@@ -11,9 +11,10 @@ import {
   dashboardWidgetQuerySchema,
   dashboardWidgetSourceSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const createDashboardWidgetSchema = z.object({
+const createDashboardWidgetSchemaDefinition = z.object({
   name: dashboardWidgetNameSchema,
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
@@ -22,8 +23,13 @@ export const createDashboardWidgetSchema = z.object({
   /** Where the widget came from; the API records `{ kind: "api" }` when the body names none. */
   source: dashboardWidgetSourceSchema.optional(),
 });
+export interface CreateDashboardWidgetSchema extends Named<
+  typeof createDashboardWidgetSchemaDefinition
+> {}
+export const createDashboardWidgetSchema: CreateDashboardWidgetSchema =
+  createDashboardWidgetSchemaDefinition;
 
-export const updateDashboardWidgetSchema = z
+const updateDashboardWidgetSchemaDefinition = z
   .object({
     name: dashboardWidgetNameSchema.optional(),
     code: dashboardWidgetCodeSchema.optional(),
@@ -37,13 +43,23 @@ export const updateDashboardWidgetSchema = z
     "Provide at least one of name, code, queries, description or source.",
   )
   .meta({ minProperties: 1 });
+export interface UpdateDashboardWidgetSchema extends Named<
+  typeof updateDashboardWidgetSchemaDefinition
+> {}
+export const updateDashboardWidgetSchema: UpdateDashboardWidgetSchema =
+  updateDashboardWidgetSchemaDefinition;
 
 /** A placement request's envelope: the dashboard a widget is added to. */
-export const assignDashboardWidgetToDashboardSchema = z.object({
+const assignDashboardWidgetToDashboardSchemaDefinition = z.object({
   dashboardId: z.string().min(1),
 });
+export interface AssignDashboardWidgetToDashboardSchema extends Named<
+  typeof assignDashboardWidgetToDashboardSchemaDefinition
+> {}
+export const assignDashboardWidgetToDashboardSchema: AssignDashboardWidgetToDashboardSchema =
+  assignDashboardWidgetToDashboardSchemaDefinition;
 
-export const dashboardWidgetResourceSchema = z.object({
+const dashboardWidgetResourceSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   definition: z.object({
@@ -64,13 +80,33 @@ export const dashboardWidgetResourceSchema = z.object({
   colSpan: z.number().int(),
   rowSpan: z.number().int(),
 });
+export interface DashboardWidgetResourceSchema extends Named<
+  typeof dashboardWidgetResourceSchemaDefinition
+> {}
+export const dashboardWidgetResourceSchema: DashboardWidgetResourceSchema =
+  dashboardWidgetResourceSchemaDefinition;
 
-export const dashboardWidgetListSchema = z.object({
+const dashboardWidgetListSchemaDefinition = z.object({
   data: z.array(dashboardWidgetResourceSchema),
 });
+export interface DashboardWidgetListSchema extends Named<
+  typeof dashboardWidgetListSchemaDefinition
+> {}
+export const dashboardWidgetListSchema: DashboardWidgetListSchema =
+  dashboardWidgetListSchemaDefinition;
 
-export const dashboardWidgetProjectParamsSchema = z.object({ projectId: z.string().min(1) });
-export const dashboardWidgetParamsSchema = z.object({
+const dashboardWidgetProjectParamsSchemaDefinition = z.object({ projectId: z.string().min(1) });
+export interface DashboardWidgetProjectParamsSchema extends Named<
+  typeof dashboardWidgetProjectParamsSchemaDefinition
+> {}
+export const dashboardWidgetProjectParamsSchema: DashboardWidgetProjectParamsSchema =
+  dashboardWidgetProjectParamsSchemaDefinition;
+const dashboardWidgetParamsSchemaDefinition = z.object({
   ...dashboardWidgetProjectParamsSchema.shape,
   widgetId: z.string().min(1),
 });
+export interface DashboardWidgetParamsSchema extends Named<
+  typeof dashboardWidgetParamsSchemaDefinition
+> {}
+export const dashboardWidgetParamsSchema: DashboardWidgetParamsSchema =
+  dashboardWidgetParamsSchemaDefinition;

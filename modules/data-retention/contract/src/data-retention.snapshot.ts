@@ -4,6 +4,7 @@
  * browser reads that declaration as its client's types.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -13,19 +14,23 @@ import {
 } from "./data-retention.ts";
 
 /** One scope a retention rule can be bound to, named for a reader. */
-export const retentionScopeRefSchema = z.object({
+const retentionScopeRefSchemaDefinition = z.object({
   scopeType: retentionScopeSchema,
   scopeId: z.string(),
   name: z.string(),
 });
+export interface RetentionScopeRefSchema extends Named<typeof retentionScopeRefSchemaDefinition> {}
+export const retentionScopeRefSchema: RetentionScopeRefSchema = retentionScopeRefSchemaDefinition;
 export type RetentionScopeRef = z.infer<typeof retentionScopeRefSchema>;
 
 /** One stored override: a scope, a category, and the days it keeps. */
-export const retentionRuleSchema = z.object({
+const retentionRuleSchemaDefinition = z.object({
   ...retentionScopeRefSchema.shape,
   category: retentionCategorySchema,
   retentionDays: z.number(),
 });
+export interface RetentionRuleSchema extends Named<typeof retentionRuleSchemaDefinition> {}
+export const retentionRuleSchema: RetentionRuleSchema = retentionRuleSchemaDefinition;
 export type RetentionRule = z.infer<typeof retentionRuleSchema>;
 
 /**
@@ -33,15 +38,20 @@ export type RetentionRule = z.infer<typeof retentionRuleSchema>;
  * A caller who may write nowhere gets every list empty, which is what the page
  * reads to decide whether to offer the add and edit controls at all.
  */
-export const retentionScopeAvailableSchema = z.object({
+const retentionScopeAvailableSchemaDefinition = z.object({
   organization: z.object({ id: z.string(), name: z.string() }).nullable(),
   teams: z.array(z.object({ id: z.string(), name: z.string() })),
   projects: z.array(z.object({ id: z.string(), name: z.string(), teamId: z.string() })),
 });
+export interface RetentionScopeAvailableSchema extends Named<
+  typeof retentionScopeAvailableSchemaDefinition
+> {}
+export const retentionScopeAvailableSchema: RetentionScopeAvailableSchema =
+  retentionScopeAvailableSchemaDefinition;
 export type RetentionScopeAvailable = z.infer<typeof retentionScopeAvailableSchema>;
 
 /** Everything one render of the retention settings page is built from. */
-export const retentionPolicySnapshotSchema = z.object({
+const retentionPolicySnapshotSchemaDefinition = z.object({
   projectId: z.string(),
   /**
    * Effective per-category retention for this project, falling back to the
@@ -58,14 +68,24 @@ export const retentionPolicySnapshotSchema = z.object({
    */
   canConfigureRetention: z.boolean(),
 });
+export interface RetentionPolicySnapshotSchema extends Named<
+  typeof retentionPolicySnapshotSchemaDefinition
+> {}
+export const retentionPolicySnapshotSchema: RetentionPolicySnapshotSchema =
+  retentionPolicySnapshotSchemaDefinition;
 export type RetentionPolicySnapshot = z.infer<typeof retentionPolicySnapshotSchema>;
 
 /**
  * Stored bytes for the scope the selector resolves to, and how many projects
  * contributed — the card says "across N projects" for a wider scope.
  */
-export const retentionStorageUsageSchema = z.object({
+const retentionStorageUsageSchemaDefinition = z.object({
   totalBytes: z.number(),
   projectCount: z.number(),
 });
+export interface RetentionStorageUsageSchema extends Named<
+  typeof retentionStorageUsageSchemaDefinition
+> {}
+export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
+  retentionStorageUsageSchemaDefinition;
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;

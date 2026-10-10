@@ -5,15 +5,7 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  Box,
-  Button,
-  Circle,
-  Heading,
-  HStack,
-  Spinner,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, Circle, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PromptEditorDrawerToken, type PromptEditorDrawerProps } from "@langwatch/prompt-client";
@@ -140,12 +132,12 @@ function EditorTitle({
   versionBadge: ReactNode;
   hasUnsavedChanges: boolean;
 }) {
-  if (!handle) return <Heading>New Prompt</Heading>;
+  if (!handle) return <Drawer.Title>New Prompt</Drawer.Title>;
   return (
     <>
       <HStack asChild gap={1} cursor="pointer" _hover={{ "& .edit-icon": { display: "block" } }}>
         <button type="button" onClick={onRename}>
-          <Heading>{handle}</Heading>
+          <Drawer.Title>{handle}</Drawer.Title>
           <Box className="edit-icon" display="none" transition="opacity 0.2s" color="fg.muted">
             <LuPencil size={16} />
           </Box>
@@ -159,7 +151,7 @@ function EditorTitle({
           openDelay={0}
           showArrow
         >
-          <Circle size="10px" bg="orange.400" data-testid="unsaved-changes-indicator" />
+          <Circle size="10px" bg="orange.solid" data-testid="unsaved-changes-indicator" />
         </Tooltip>
       )}
     </>
@@ -459,9 +451,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           {loadingContent ?? formBodyContent}
         </Drawer.Body>
 
-        <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
-          {footerElement}
-        </Drawer.Footer>
+        <Drawer.Footer>{footerElement}</Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );

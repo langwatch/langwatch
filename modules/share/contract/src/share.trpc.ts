@@ -4,22 +4,27 @@
  * This namespace only mints, lists and revokes links.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { shareLinkSchema, shareResourceTypeSchema, shareVisibilitySchema } from "./share.ts";
 
-export const shareListForResourceInputSchema = z.object({
+const shareListForResourceInputSchemaDefinition = z.object({
   projectId: z.string(),
   resourceType: shareResourceTypeSchema,
   resourceId: z.string(),
 });
+export interface ShareListForResourceInputSchema extends Named<
+  typeof shareListForResourceInputSchemaDefinition
+> {}
+export const shareListForResourceInputSchema: ShareListForResourceInputSchema =
+  shareListForResourceInputSchemaDefinition;
 
 /**
  * TRACE only: `sharedTrace.get` renders a trace and nothing else, so THREAD
  * here would mint a capability no viewer can redeem. See ADR-057.
  */
-export const shareCreateInputSchema = z.object({
+const shareCreateInputSchemaDefinition = z.object({
   projectId: z.string(),
   resourceType: z.literal("TRACE"),
   resourceId: z.string(),
@@ -27,10 +32,16 @@ export const shareCreateInputSchema = z.object({
   expiresAt: z.date().nullish(),
   maxViews: z.number().int().positive().nullish(),
 });
+export interface ShareCreateInputSchema extends Named<typeof shareCreateInputSchemaDefinition> {}
+export const shareCreateInputSchema: ShareCreateInputSchema = shareCreateInputSchemaDefinition;
 
-export const shareRevokeInputSchema = z.object({ projectId: z.string(), id: z.string() });
+const shareRevokeInputSchemaDefinition = z.object({ projectId: z.string(), id: z.string() });
+export interface ShareRevokeInputSchema extends Named<typeof shareRevokeInputSchemaDefinition> {}
+export const shareRevokeInputSchema: ShareRevokeInputSchema = shareRevokeInputSchemaDefinition;
 
-export const shareProjectInputSchema = z.object({ projectId: z.string() });
+const shareProjectInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface ShareProjectInputSchema extends Named<typeof shareProjectInputSchemaDefinition> {}
+export const shareProjectInputSchema: ShareProjectInputSchema = shareProjectInputSchemaDefinition;
 
 export const shareTrpc = defineTrpcContract("share")
   /**

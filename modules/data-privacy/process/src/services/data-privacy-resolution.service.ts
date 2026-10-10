@@ -53,7 +53,7 @@ export class DataPrivacyResolutionService {
     projectIds: readonly string[];
     memo?: PrivacyPolicyRequestMemo;
   }): Promise<ResolvedDataPrivacy> {
-    const distinct = [...new Set(input.projectIds)].sort();
+    const distinct = [...new Set(input.projectIds)].toSorted();
     const { memo } = input;
     if (!memo) return this.foldResolved(distinct);
     const key = distinct.join(",");

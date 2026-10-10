@@ -31,6 +31,7 @@ function buildApi({
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = application ?? createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: connectDoor(refusal ? { refusal } : {}),
   } as never);

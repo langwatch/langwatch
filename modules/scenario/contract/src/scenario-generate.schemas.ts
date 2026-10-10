@@ -1,7 +1,8 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The author-assist model's structured output for one generated scenario. */
-export const scenarioGenerateResultSchema = z.object({
+const scenarioGenerateResultSchemaDefinition = z.object({
   name: z.string().describe("A short, descriptive name for the scenario (3-6 words)"),
   situation: z
     .string()
@@ -12,9 +13,14 @@ export const scenarioGenerateResultSchema = z.object({
     .array(z.string())
     .describe("3-6 specific, observable success criteria that can be judged from the conversation"),
 });
+export interface ScenarioGenerateResultSchema extends Named<
+  typeof scenarioGenerateResultSchemaDefinition
+> {}
+export const scenarioGenerateResultSchema: ScenarioGenerateResultSchema =
+  scenarioGenerateResultSchemaDefinition;
 
 /** `POST /api/scenario/generate`'s request body. */
-export const scenarioGenerateRequestSchema = z.object({
+const scenarioGenerateRequestSchemaDefinition = z.object({
   prompt: z.string().min(1, "Prompt is required"),
   currentScenario: z
     .object({
@@ -25,7 +31,19 @@ export const scenarioGenerateRequestSchema = z.object({
     .nullable(),
   projectId: z.string().min(1, "Project ID is required"),
 });
+export interface ScenarioGenerateRequestSchema extends Named<
+  typeof scenarioGenerateRequestSchemaDefinition
+> {}
+export const scenarioGenerateRequestSchema: ScenarioGenerateRequestSchema =
+  scenarioGenerateRequestSchemaDefinition;
 export type ScenarioGenerateRequest = z.infer<typeof scenarioGenerateRequestSchema>;
 
-export const scenarioGenerateResponseSchema = z.object({ scenario: scenarioGenerateResultSchema });
+const scenarioGenerateResponseSchemaDefinition = z.object({
+  scenario: scenarioGenerateResultSchema,
+});
+export interface ScenarioGenerateResponseSchema extends Named<
+  typeof scenarioGenerateResponseSchemaDefinition
+> {}
+export const scenarioGenerateResponseSchema: ScenarioGenerateResponseSchema =
+  scenarioGenerateResponseSchemaDefinition;
 export type ScenarioGenerateResponse = z.infer<typeof scenarioGenerateResponseSchema>;

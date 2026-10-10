@@ -276,7 +276,8 @@ async function prepare({ wire, ctx }) {
   await wire.signIn({ email: ctx.email, password: ctx.password });
   const created = await initializeOrganization({ wire, ctx });
   ctx.organizationId = created.organizationId;
-  ctx.grantPaidPlan?.({ organizationId: ctx.organizationId }); // retention overrides refuse a free plan
+  // retention overrides refuse a free plan
+  ctx.grantPaidPlan?.({ organizationId: ctx.organizationId });
   const organizations = await wire.query({ path: "organization.getAll", input: {} });
   ctx.projectId = findProjectId({ organizations, slug: created.projectSlug });
   if (!ctx.projectId) {

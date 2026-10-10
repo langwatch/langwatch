@@ -153,8 +153,8 @@ describe.skipIf(!DB_URL)("PrismaOrganizationSpendRepository", () => {
         ...window(),
       });
 
-      expect(rollups.map(({ project }) => project.id).sort()).toEqual(
-        [projectId, aggregateId].sort(),
+      expect(rollups.map(({ project }) => project.id).toSorted()).toEqual(
+        [projectId, aggregateId].toSorted(),
       );
     });
   });

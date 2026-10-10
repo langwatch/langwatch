@@ -511,7 +511,7 @@ export class GovernanceModule implements GovernanceRestApi {
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
-  static readonly operatorReads = governanceOperatorReads;
+  static readonly operatorReads: Readonly<Record<string, unknown>> = governanceOperatorReads;
 
   static async create({
     config,

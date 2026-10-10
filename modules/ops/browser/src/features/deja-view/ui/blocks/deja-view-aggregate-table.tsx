@@ -1,4 +1,5 @@
 import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Card, Table, Text } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 
@@ -13,16 +14,22 @@ export function AggregateTable({
   onSelect: (aggregateId: string, tenantId: string) => void;
 }) {
   return (
-    <Card.Root overflow="hidden">
+    <Card.Root borderColor="border.muted" boxShadow="none" overflow="hidden">
       <Table.ScrollArea>
-        <Table.Root size="sm" variant="line">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          size="sm"
+          variant="line"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Aggregate ID</Table.ColumnHeader>
               <Table.ColumnHeader>Type</Table.ColumnHeader>
               <Table.ColumnHeader>Tenant</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Event Count</Table.ColumnHeader>
-              <Table.ColumnHeader>Last Event</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="end">Event count</Table.ColumnHeader>
+              <Table.ColumnHeader>Last event</Table.ColumnHeader>
               <Table.ColumnHeader />
             </Table.Row>
           </Table.Header>
@@ -63,7 +70,7 @@ export function AggregateTable({
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Table.ScrollArea>
     </Card.Root>
   );

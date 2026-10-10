@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The license registry as everything outside the feature reads it (ADR-156).
@@ -36,7 +37,7 @@ export const issuedLicenseStatusSchema = z.enum(["active", "revoked", "supersede
 export type IssuedLicenseStatus = z.infer<typeof issuedLicenseStatusSchema>;
 
 /** A registry row as an operator surface reads it, without the held license. */
-export const issuedLicenseViewSchema = z.object({
+const issuedLicenseViewSchemaDefinition = z.object({
   id: z.string(),
   licenseId: z.string(),
   tokenHash: z.string(),
@@ -74,23 +75,29 @@ export const issuedLicenseViewSchema = z.object({
   /** Whether a reissued license is waiting to be delivered to its install. */
   hasPendingDelivery: z.boolean(),
 });
+export interface IssuedLicenseViewSchema extends Named<typeof issuedLicenseViewSchemaDefinition> {}
+export const issuedLicenseViewSchema: IssuedLicenseViewSchema = issuedLicenseViewSchemaDefinition;
 export type IssuedLicenseView = z.infer<typeof issuedLicenseViewSchema>;
 
-export const issuedLicensePageSchema = z.object({
+const issuedLicensePageSchemaDefinition = z.object({
   licenses: z.array(issuedLicenseViewSchema),
   total: z.number(),
 });
+export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}
+export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
 export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
 /** The customer a license is issued to: one that exists, or a new one to create. */
-export const licenseCustomerSchema = z.union([
+const licenseCustomerSchemaDefinition = z.union([
   z.object({ organizationId: z.string().min(1) }),
   z.object({ newOrganizationName: z.string().min(1) }),
 ]);
+export interface LicenseCustomerSchema extends Named<typeof licenseCustomerSchemaDefinition> {}
+export const licenseCustomerSchema: LicenseCustomerSchema = licenseCustomerSchemaDefinition;
 export type LicenseCustomer = z.infer<typeof licenseCustomerSchema>;
 
 /** The commercial terms an operator sets on a license. */
-export const licenseTermsInputSchema = z.object({
+const licenseTermsInputSchemaDefinition = z.object({
   services: z.array(z.enum(CONNECT_SERVICES)).optional(),
   seatRateCents: z.number().int().min(0).nullable().optional(),
   seatCurrency: seatCurrencySchema.nullable().optional(),
@@ -98,13 +105,20 @@ export const licenseTermsInputSchema = z.object({
   overageEnabled: z.boolean().optional(),
   overageMaxUsdCents: z.number().int().min(0).nullable().optional(),
 });
+export interface LicenseTermsInputSchema extends Named<typeof licenseTermsInputSchemaDefinition> {}
+export const licenseTermsInputSchema: LicenseTermsInputSchema = licenseTermsInputSchemaDefinition;
 export type LicenseTermsInput = z.infer<typeof licenseTermsInputSchema>;
 
 /** A signed license and the row that records it. The key is handed over once. */
-export const signedIssuedLicenseSchema = z.object({
+const signedIssuedLicenseSchemaDefinition = z.object({
   licenseKey: z.string(),
   license: issuedLicenseViewSchema,
 });
+export interface SignedIssuedLicenseSchema extends Named<
+  typeof signedIssuedLicenseSchemaDefinition
+> {}
+export const signedIssuedLicenseSchema: SignedIssuedLicenseSchema =
+  signedIssuedLicenseSchemaDefinition;
 export type SignedIssuedLicense = z.infer<typeof signedIssuedLicenseSchema>;
 
 /**
@@ -115,15 +129,17 @@ export type SignedIssuedLicense = z.infer<typeof signedIssuedLicenseSchema>;
 export const seatChangeBillingOutcomeSchema = z.enum(["pending", "nothing_to_invoice"]);
 export type SeatChangeBillingOutcome = z.infer<typeof seatChangeBillingOutcomeSchema>;
 
-export const seatChangeResultSchema = z.object({
+const seatChangeResultSchemaDefinition = z.object({
   ...signedIssuedLicenseSchema.shape,
   previousMaxMembers: z.number(),
   billing: seatChangeBillingOutcomeSchema,
 });
+export interface SeatChangeResultSchema extends Named<typeof seatChangeResultSchemaDefinition> {}
+export const seatChangeResultSchema: SeatChangeResultSchema = seatChangeResultSchemaDefinition;
 export type SeatChangeResult = z.infer<typeof seatChangeResultSchema>;
 
 /** A seat change that raised a linked license: the fact billing invoices from. */
-export const licenseSeatChangeSchema = z.object({
+const licenseSeatChangeSchemaDefinition = z.object({
   /** The replacement registry row the new seat count is signed into. */
   licenseRowId: z.string(),
   organizationId: z.string(),
@@ -132,6 +148,8 @@ export const licenseSeatChangeSchema = z.object({
   /** ISO 8601. When the replacement was signed; proration counts from here. */
   changedAt: z.string(),
 });
+export interface LicenseSeatChangeSchema extends Named<typeof licenseSeatChangeSchemaDefinition> {}
+export const licenseSeatChangeSchema: LicenseSeatChangeSchema = licenseSeatChangeSchemaDefinition;
 export type LicenseSeatChange = z.infer<typeof licenseSeatChangeSchema>;
 
 /** The customer organization a license is attributed to, as the registry needs it. */

@@ -1,14 +1,17 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { agentInputBindingSchema } from "../fields.ts";
 import { baseAgentConfigSchema } from "./code.ts";
 
-export const httpHeaderSchema = z.object({
+const httpHeaderSchemaDefinition = z.object({
   key: z.string(),
   value: z.string(),
 });
+export interface HttpHeaderSchema extends Named<typeof httpHeaderSchemaDefinition> {}
+export const httpHeaderSchema: HttpHeaderSchema = httpHeaderSchemaDefinition;
 
-export const httpAuthSchema = z.discriminatedUnion("type", [
+const httpAuthSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("none") }),
   z.object({ type: z.literal("bearer"), token: z.string() }),
   z.object({
@@ -22,10 +25,12 @@ export const httpAuthSchema = z.discriminatedUnion("type", [
     password: z.string(),
   }),
 ]);
+export interface HttpAuthSchema extends Named<typeof httpAuthSchemaDefinition> {}
+export const httpAuthSchema: HttpAuthSchema = httpAuthSchemaDefinition;
 
 export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 
-export const httpAgentConfigSchema = z.object({
+const httpAgentConfigSchemaDefinition = z.object({
   ...baseAgentConfigSchema.shape,
   url: z.string().min(1, "URL is required"),
   method: z.enum(HTTP_METHODS).default("POST"),
@@ -44,6 +49,8 @@ export const httpAgentConfigSchema = z.object({
     })
     .optional(),
 });
+export interface HttpAgentConfigSchema extends Named<typeof httpAgentConfigSchemaDefinition> {}
+export const httpAgentConfigSchema: HttpAgentConfigSchema = httpAgentConfigSchemaDefinition;
 
 export type HttpHeader = z.infer<typeof httpHeaderSchema>;
 export type HttpAuth = z.infer<typeof httpAuthSchema>;

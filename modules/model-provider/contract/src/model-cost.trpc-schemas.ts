@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The input shapes the custom model-cost tRPC surface parses. Two carry a
  * caller-supplied `regex`, accepted only when it compiles and is free of
@@ -16,19 +17,34 @@ export type ModelCostRegexSafetyCheck = Readonly<{
   isSafeRegex(pattern: string): boolean;
 }>;
 
-export const modelCostProjectTrpcInputSchema = z.object({
+const modelCostProjectTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
 });
+export interface ModelCostProjectTrpcInputSchema extends Named<
+  typeof modelCostProjectTrpcInputSchemaDefinition
+> {}
+export const modelCostProjectTrpcInputSchema: ModelCostProjectTrpcInputSchema =
+  modelCostProjectTrpcInputSchemaDefinition;
 
-export const modelCostDeleteTrpcInputSchema = z.object({
+const modelCostDeleteTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string(),
 });
+export interface ModelCostDeleteTrpcInputSchema extends Named<
+  typeof modelCostDeleteTrpcInputSchemaDefinition
+> {}
+export const modelCostDeleteTrpcInputSchema: ModelCostDeleteTrpcInputSchema =
+  modelCostDeleteTrpcInputSchemaDefinition;
 
-export const modelCostModelLimitsTrpcInputSchema = z.object({
+const modelCostModelLimitsTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   model: z.string(),
 });
+export interface ModelCostModelLimitsTrpcInputSchema extends Named<
+  typeof modelCostModelLimitsTrpcInputSchemaDefinition
+> {}
+export const modelCostModelLimitsTrpcInputSchema: ModelCostModelLimitsTrpcInputSchema =
+  modelCostModelLimitsTrpcInputSchemaDefinition;
 
 export function createModelCostWriteTrpcInputSchema({
   isSafeRegex,
@@ -102,10 +118,20 @@ export function createModelCostPreviewTrpcInputSchema({
  * check — the same compile-and-check the pricing path runs, so the verdict a
  * caller reads is unchanged by the predicate no longer being a process port.
  */
-export const modelCostWriteTrpcInputSchema = createModelCostWriteTrpcInputSchema({
+const modelCostWriteTrpcInputSchemaDefinition = createModelCostWriteTrpcInputSchema({
   isSafeRegex: isSafeCostRegex,
 });
+export interface ModelCostWriteTrpcInputSchema extends Named<
+  typeof modelCostWriteTrpcInputSchemaDefinition
+> {}
+export const modelCostWriteTrpcInputSchema: ModelCostWriteTrpcInputSchema =
+  modelCostWriteTrpcInputSchemaDefinition;
 
-export const modelCostPreviewTrpcInputSchema = createModelCostPreviewTrpcInputSchema({
+const modelCostPreviewTrpcInputSchemaDefinition = createModelCostPreviewTrpcInputSchema({
   isSafeRegex: isSafeCostRegex,
 });
+export interface ModelCostPreviewTrpcInputSchema extends Named<
+  typeof modelCostPreviewTrpcInputSchemaDefinition
+> {}
+export const modelCostPreviewTrpcInputSchema: ModelCostPreviewTrpcInputSchema =
+  modelCostPreviewTrpcInputSchemaDefinition;

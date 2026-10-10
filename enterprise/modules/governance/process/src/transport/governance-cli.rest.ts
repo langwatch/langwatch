@@ -66,6 +66,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   // The deleted project-key door answers 410 so old CLIs upgrade (Alex, 2026-10-01). Remove
   // after a few releases. Old CLIs print only `error_description`, so the body keeps their shape.
   .post("/api/auth/cli/project-key", "readCliProjectKey")
+  .withoutAudit("gone, writes nothing")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
   .responds(governanceCliProjectKeyGoneAnswers)
@@ -78,6 +79,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
     },
   }))
   .post("/api/auth/cli/virtual-key", "issueCliVirtualKey")
+  .withAudit("governance.issueCliVirtualKey")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
   .responds(governanceCliVirtualKeyAnswers)
@@ -140,6 +142,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
     app.cliIngestionTemplates({ actor, session, organizationId: scope.id }),
   )
   .post("/api/auth/cli/governance/ingestion-key", "mintCliIngestionKey")
+  .withAudit("governance.mintCliIngestionKey")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionKeyAnswers)

@@ -12,6 +12,7 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -25,6 +26,27 @@ import {
   FRAME_RESTART_MAX_ATTEMPTS,
   useFrameAutoRestart,
 } from "../../../../behavior/use-frame-auto-restart.ts";
+
+function withThemeColors(context: ChartFrameDashboardContext): ChartFrameDashboardContext {
+  const names = [
+    "fg",
+    "fg.subtle",
+    "border.muted",
+    "bg.card",
+    "border.card",
+    "fg.error",
+    "fg.success",
+    "bg.error",
+    "border.error",
+    "blue.subtle",
+    "blue.solid",
+    ...Array.from({ length: 8 }, (_, index) => `chart.${index + 1}`),
+  ];
+  return {
+    ...context,
+    colors: Object.fromEntries(names.map((name) => [name, getRawColorValue(name)])),
+  };
+}
 
 export interface SandboxedChartFrameProps {
   /** The widget's React/TSX source. The frame re-mounts whenever this changes. */
@@ -116,7 +138,7 @@ export function SandboxedChartFrame({
     const bridge = FrameBridgeSession.create({
       iframe,
       executeQuery: (args) => executeQueryRef.current(args),
-      dashboardContext: dashboardContextRef.current,
+      dashboardContext: withThemeColors(dashboardContextRef.current),
       params: paramsRef.current,
       source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
@@ -134,7 +156,7 @@ export function SandboxedChartFrame({
 
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
-    bridgeRef.current?.postDashboardContextChange(dashboardContext);
+    bridgeRef.current?.postDashboardContextChange(withThemeColors(dashboardContext));
   }, [dashboardContext]);
 
   if (restart.status !== "running") {

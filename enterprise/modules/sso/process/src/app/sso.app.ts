@@ -526,6 +526,7 @@ export class SsoModule implements SsoApiContract {
 
     return entries.map((entry) => ({
       eventId: entry.eventId,
+      eventType: entry.eventType,
       occurredAtMs: entry.occurredAtMs,
       summary: entry.summary,
       carriedOver: entry.carriedOver,

@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { BackLink } from "@langwatch/design-system/back-link";
 import {
   DialogBody,
@@ -19,7 +18,6 @@ import {
   Box,
   Button,
   Code,
-  Heading,
   HStack,
   SimpleGrid,
   Spacer,
@@ -27,13 +25,13 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 import { Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
 import numeral from "numeral";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
@@ -196,7 +194,7 @@ function SourcePullStatus({ source }: { source: Source }) {
         </Text>
       )}
       {pull?.error && (
-        <Text fontSize="sm" color="red.600">
+        <Text fontSize="sm" color="red.fg">
           {pull.error}{" "}
           {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
           records may be incomplete.
@@ -479,16 +477,13 @@ function useIngestionSourceDetailPage() {
   // client instead of useQuery: pages once loaded are kept and never
   // refetched, which pins the first page's time anchor.
   const utils = api.useUtils();
-  const fetchEventsPage = useCallback(
-    (request: PageRequest) =>
-      utils.activityMonitor.eventsForSource.fetch({
-        organizationId: orgId,
-        sourceId: sourceId ?? "",
-        limit: request.limit,
-        ...(request.beforeIso ? { beforeIso: request.beforeIso } : {}),
-      }),
-    [utils, orgId, sourceId],
-  );
+  const fetchEventsPage = (request: PageRequest) =>
+    utils.activityMonitor.eventsForSource.fetch({
+      organizationId: orgId,
+      sourceId: sourceId ?? "",
+      limit: request.limit,
+      ...(request.beforeIso ? { beforeIso: request.beforeIso } : {}),
+    });
   const eventsPager = useSourceEventsPager<EventRow>({
     enabled: !!orgId && !!sourceId && canReadActivity,
     fetchPage: fetchEventsPage,
@@ -751,7 +746,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-          color="blue.600"
+          color="accent.fg"
         >
           Choosing the right OTel endpoint
         </Link>
@@ -790,7 +785,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
             the{" "}
             <Link
               href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
-              color="blue.600"
+              color="accent.fg"
             >
               otel-generic docs
             </Link>{" "}
@@ -818,34 +813,10 @@ function MetricCard({
   hint?: string;
   isLoading?: boolean;
 }) {
-  const label = (
-    <Text
-      fontSize="xs"
-      fontWeight="semibold"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-      // Only when there is a hint, so a card without one is not decorated with
-      // a dotted underline promising an explanation that never appears.
-      textDecoration={hint ? "underline dotted" : undefined}
-      textUnderlineOffset={hint ? "3px" : undefined}
-      cursor={hint ? "help" : undefined}
-      width="fit-content"
-    >
-      {title}
-    </Text>
-  );
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
-      {hint ? <Tooltip content={hint}>{label}</Tooltip> : label}
-      {isLoading ? (
-        <Spinner size="xs" marginTop={2} />
-      ) : (
-        <Heading as="span" size="md" marginTop={1} display="block">
-          {value}
-        </Heading>
-      )}
-    </Box>
+    <StatTile variant="showcase" label={title} hint={hint}>
+      {isLoading ? <Spinner size="xs" /> : <StatTileFigure>{value}</StatTileFigure>}
+    </StatTile>
   );
 }
 
@@ -1019,7 +990,7 @@ function SecretRevealModal({
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Button colorPalette="blue" onClick={onClose}>
+          <Button colorPalette="accent" onClick={onClose}>
             I&apos;ve saved it
           </Button>
         </DialogFooter>

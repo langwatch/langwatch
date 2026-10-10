@@ -141,7 +141,7 @@ describe("given an administrator on the Authentication page", () => {
         hostWith({ grants: ["sso:view", "organization:manage"] }),
       );
 
-      const title = screen.getByRole("heading", { level: 1, name: "Authentication" });
+      const title = screen.getByRole("heading", { level: 1, name: "Overview" });
       const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
       expect(rail.contains(title)).toBe(false);
       expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();

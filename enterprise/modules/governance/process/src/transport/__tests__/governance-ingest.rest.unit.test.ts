@@ -126,6 +126,7 @@ function mountIngest(world: World = {}) {
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

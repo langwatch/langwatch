@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, Table } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
@@ -14,7 +15,13 @@ export function BlobTable({
 }) {
   return (
     <Box overflowX="auto">
-      <Table.Root variant="line" size="sm">
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflowX: "auto" }}
+        variant="line"
+        size="sm"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Project</Table.ColumnHeader>
@@ -37,7 +44,7 @@ export function BlobTable({
             />
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Box>
   );
 }

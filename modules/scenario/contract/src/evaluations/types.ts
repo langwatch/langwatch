@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { evaluatorAttachmentsSchema } from "../evaluator-attachments.ts";
@@ -5,7 +6,7 @@ import { runEvaluatorDefinitionSchema } from "../features/run/scenario-run-evalu
 import { scenarioFieldValuesSchema } from "../suite-fields.ts";
 
 /** What one evaluation job carries: enough to load everything else. */
-export const scenarioEvaluationsJobPayloadSchema = z.object({
+const scenarioEvaluationsJobPayloadSchemaDefinition = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),
@@ -35,4 +36,9 @@ export const scenarioEvaluationsJobPayloadSchema = z.object({
   attempt: z.number().int().min(1),
   occurredAt: z.number(),
 });
+export interface ScenarioEvaluationsJobPayloadSchema extends Named<
+  typeof scenarioEvaluationsJobPayloadSchemaDefinition
+> {}
+export const scenarioEvaluationsJobPayloadSchema: ScenarioEvaluationsJobPayloadSchema =
+  scenarioEvaluationsJobPayloadSchemaDefinition;
 export type ScenarioEvaluationsJobPayload = z.infer<typeof scenarioEvaluationsJobPayloadSchema>;

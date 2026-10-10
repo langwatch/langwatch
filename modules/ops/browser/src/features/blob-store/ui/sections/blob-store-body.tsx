@@ -1,3 +1,4 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Button, Center, EmptyState, Flex, Spinner } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { Database } from "lucide-react";
@@ -38,17 +39,11 @@ export function BlobStoreBody({
 
   if (blobs.length === 0) {
     return (
-      <Center paddingY={20}>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Database />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No stored payloads</EmptyState.Title>
-            <EmptyState.Description>Nothing is being held for this queue.</EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      </Center>
+      <NoDataInfoBlock
+        icon={<Database />}
+        title="No stored payloads"
+        description="Nothing is being held for this queue."
+      />
     );
   }
 

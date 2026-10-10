@@ -216,7 +216,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/annotation.rest.ts:20`          |
+| Declared at | `src/transport/annotation.rest.ts:12`          |
 | Base URL    | `/api/annotations`, twin `/api/v1/annotations` |
 | Addressing  | dated                                          |
 | Credential  | project                                        |
@@ -226,7 +226,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 List annotations in the caller’s project
 
-Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:24`.
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:16`.
 
 Answers at `/api/annotations`, `/api/v1/annotations`; also, undocumented, `/api/annotations/2026-08-07`, `/api/v1/annotations/2026-08-07`, `/api/annotations/latest`, `/api/v1/annotations/latest`.
 
@@ -242,7 +242,7 @@ type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract
 
 Get an annotation in the caller’s project
 
-Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:41`.
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:33`.
 
 Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
 
@@ -258,7 +258,7 @@ type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src
 
 Update an annotation in the caller’s project
 
-Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:58`.
+Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:50`.
 
 Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
 
@@ -277,7 +277,7 @@ type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src
 
 Delete an annotation in the caller’s project
 
-Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:76`.
+Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:68`.
 
 Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
 
@@ -294,7 +294,7 @@ interface Response {
 
 List annotations on a trace in the caller’s project
 
-Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:90`.
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:82`.
 
 Answers at `/api/annotations/trace/:id`, `/api/v1/annotations/trace/:id`; also, undocumented, `/api/annotations/2026-08-07/trace/:id`, `/api/v1/annotations/2026-08-07/trace/:id`, `/api/annotations/latest/trace/:id`, `/api/v1/annotations/latest/trace/:id`.
 
@@ -308,7 +308,7 @@ type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract
 
 Create an unattributed annotation on a trace
 
-Permission `annotations:create`. Declared at `src/transport/annotation.rest.ts:109`.
+Permission `annotations:create`. Declared at `src/transport/annotation.rest.ts:101`.
 
 Answers at `/api/annotations/trace/:id`, `/api/v1/annotations/trace/:id`; also, undocumented, `/api/annotations/2026-08-07/trace/:id`, `/api/v1/annotations/2026-08-07/trace/:id`, `/api/annotations/latest/trace/:id`, `/api/v1/annotations/latest/trace/:id`.
 

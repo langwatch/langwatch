@@ -47,6 +47,9 @@ async function application() {
     recordPresenceSettingChanged: accepts,
     recordTraceSharingDisabled: accepts,
     recordMemberDisabled: accepts,
+    recordMemberEnabled: accepts,
+    recordMemberRemoved: accepts,
+    recordMemberDepartmentChanged: accepts,
   });
 
   return { app, repositories: setup.repositories, permissions };

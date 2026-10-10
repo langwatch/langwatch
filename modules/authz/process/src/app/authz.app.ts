@@ -387,7 +387,7 @@ export class AuthzModule implements AuthzApi {
       }
       throw error;
     }
-    // ADR-177 decision 5: only an organisation admin opens an aggregate; the role is read only here.
+    // ADR-177 decision 5: only an organisation admin opens an aggregate; read only here.
     if (scope.type === "project" && isAggregateProjectKind(scope.kind)) {
       const { organizationRole } = await this.#permissions.getDecision({
         userId: by.id,

@@ -20,6 +20,7 @@ export const SSO_CONNECTION_HISTORY_LIMIT = 200;
 export interface SsoConnectionHistoryEntryView {
   /** The event this line IS, so a re-render cannot reorder or duplicate it. */
   eventId: string;
+  eventType?: string;
   occurredAtMs: number;
   summary: string;
   /** True when the grandfather migration produced this fact from an existing

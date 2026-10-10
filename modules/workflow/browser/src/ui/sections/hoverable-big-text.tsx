@@ -128,11 +128,11 @@ export function HoverableBigText({
             {expandable && (
               <Text
                 textAlign="center"
-                background="black"
+                background="yellow.subtle"
                 width="calc(100% + 16px)"
                 marginLeft="-8px"
                 marginTop="-4px"
-                color="yellow.400"
+                color="yellow.fg"
               >
                 click anywhere to expand
               </Text>

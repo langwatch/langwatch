@@ -17,9 +17,13 @@ import { DashboardNameDialog } from "./dashboard-name-dialog.tsx";
 
 interface CustomDashboardsSectionProps {
   projectSlug: string;
+  activeDashboardId?: string;
 }
 
-export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSectionProps) {
+export function CustomDashboardsSection({
+  projectSlug,
+  activeDashboardId,
+}: CustomDashboardsSectionProps) {
   const host = useAnalyticsHost();
   const project = host.project();
   const acceptsWrites = !isAggregateProjectKind(project?.kind);
@@ -126,8 +130,8 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
     );
   }
 
-  // Determine which dashboard is selected based on URL or default to first
-  const selectedDashboardId = currentDashboardId;
+  // The reports page resolves its default dashboard even when the URL has no ID.
+  const selectedDashboardId = activeDashboardId ?? currentDashboardId;
 
   return (
     <>
@@ -310,7 +314,7 @@ function DashboardRowMenu({
         {canDelete && (
           <Menu.Item
             value="delete"
-            color="red.600"
+            color="red.fg"
             data-testid="analytics-dashboard-delete"
             onClick={onDelete}
           >

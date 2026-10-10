@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const ADMIN_WORKSPACE_VIEW_ACTION = "governance.viewWorkspaceAs" as const;
@@ -13,7 +14,7 @@ const workspaceViewerShape = {
 };
 
 /** A personal or team workspace is a team; an aggregate project is the project itself (ADR-177). */
-export const recordWorkspaceViewInputSchema = z.discriminatedUnion("kind", [
+const recordWorkspaceViewInputSchemaDefinition = z.discriminatedUnion("kind", [
   z
     .object({
       ...workspaceViewerShape,
@@ -29,14 +30,24 @@ export const recordWorkspaceViewInputSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
 ]);
+export interface RecordWorkspaceViewInputSchema extends Named<
+  typeof recordWorkspaceViewInputSchemaDefinition
+> {}
+export const recordWorkspaceViewInputSchema: RecordWorkspaceViewInputSchema =
+  recordWorkspaceViewInputSchemaDefinition;
 export type RecordWorkspaceViewInput = z.infer<typeof recordWorkspaceViewInputSchema>;
 
-export const recordWorkspaceViewResultSchema = z
+const recordWorkspaceViewResultSchemaDefinition = z
   .object({
     recorded: z.boolean(),
     auditLogId: z.string().min(1).nullable(),
   })
   .strict();
+export interface RecordWorkspaceViewResultSchema extends Named<
+  typeof recordWorkspaceViewResultSchemaDefinition
+> {}
+export const recordWorkspaceViewResultSchema: RecordWorkspaceViewResultSchema =
+  recordWorkspaceViewResultSchemaDefinition;
 export type RecordWorkspaceViewResult = z.infer<typeof recordWorkspaceViewResultSchema>;
 
 export const GOVERNANCE_CALL_SURFACES = ["trpc", "hono", "cli", "mcp"] as const;

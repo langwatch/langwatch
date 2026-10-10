@@ -15,6 +15,7 @@ const meta = {
   tags: ["autodocs"],
   args: {
     placeholder: "Search traces",
+    containerProps: { width: "full", minWidth: 0 },
   },
   render: (args) => (
     <Box maxWidth="sm">
@@ -62,4 +63,12 @@ export const NarrowWidth: Story = {
       <SearchInput {...args} />
     </Box>
   ),
+};
+
+/** The wrapper owns the available width, including on narrow list pages. */
+export const ListToolbar: Story = {
+  args: {
+    placeholder: "Search by ID, name, email, or organization",
+    containerProps: { width: "full", maxWidth: "lg", minWidth: 0 },
+  },
 };

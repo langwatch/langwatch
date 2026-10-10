@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Process configuration for the confirmed-persist daily ceiling. */
@@ -30,8 +31,13 @@ export interface AutomationPersistCapDecision {
   skipped: number;
 }
 
-export const automationPersistCapCountSchema = z.object({
+const automationPersistCapCountSchemaDefinition = z.object({
   count: z.number(),
   skipped: z.number(),
 });
+export interface AutomationPersistCapCountSchema extends Named<
+  typeof automationPersistCapCountSchemaDefinition
+> {}
+export const automationPersistCapCountSchema: AutomationPersistCapCountSchema =
+  automationPersistCapCountSchemaDefinition;
 export type AutomationPersistCapCount = z.infer<typeof automationPersistCapCountSchema>;

@@ -29,8 +29,8 @@ describe("the management REST audit declaration", () => {
     expect(audited.map((route) => [route.operation, route.audit])).toEqual(
       expect.arrayContaining([
         ["updateOrganization", "management.organization.update"],
-        ["removeOrganizationMember", "management.organization.delete-member"],
-        ["createOrganizationInvites", "management.invite.create-invites"],
+        ["removeOrganizationMember", "management.member.delete"],
+        ["createOrganizationInvites", "management.invite.create"],
       ]),
     );
   });

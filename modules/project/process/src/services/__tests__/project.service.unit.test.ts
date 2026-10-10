@@ -79,6 +79,12 @@ const traceDestination = {
   teamId: "trace_team",
   apiKey: "trace-api-key",
   archivedAt: null,
+  kind: PROJECT_KIND.APPLICATION,
+};
+
+const governanceTraceDestination = {
+  ...traceDestination,
+  kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
 };
 
 const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithTeam => ({
@@ -103,8 +109,8 @@ class StubRepository implements ProjectRepository {
     return Promise.resolve();
   }
 
-  revivePersonalInTeam(): Promise<void> {
-    return Promise.resolve();
+  revivePersonalInTeam(): Promise<string[]> {
+    return Promise.resolve([]);
   }
 
   createPersonal(): Promise<string> {
@@ -175,6 +181,13 @@ class StubRepository implements ProjectRepository {
   findPersonalProjectOwner = vi.fn(
     async (): Promise<{ ownerUserId: string | null } | null> => null,
   );
+  updateAggregateRule = vi.fn(async () => applicationProject);
+  findPersonalProjectIds = vi.fn(async (): Promise<string[]> => []);
+  findReadableProjectIds = vi.fn(async (): Promise<string[]> => []);
+  findCandidateMembers = vi.fn(async () => []);
+  findAggregate = vi.fn(async () => []);
+  findLiveAggregateIds = vi.fn(async (): Promise<string[]> => []);
+  findAllLiveAggregates = vi.fn(async () => []);
 }
 
 class StubOrganizationService {
@@ -487,19 +500,19 @@ describe("ProjectService", () => {
 
   it("uses the oldest governance destination when there is no alternative", async () => {
     const repository = new StubRepository();
-    repository.findOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
+    repository.findOldestGovernanceTraceDestination.mockResolvedValue(governanceTraceDestination);
 
     await expect(
       createService(repository).resolveTraceDestination({
         organizationId: "org",
         projectScopeIds: [],
       }),
-    ).resolves.toEqual({ outcome: "resolved", project: traceDestination });
+    ).resolves.toEqual({ outcome: "resolved", project: governanceTraceDestination });
   });
 
   it("reports ambiguity when a governance fallback would hide live alternatives", async () => {
     const repository = new StubRepository();
-    repository.findOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
+    repository.findOldestGovernanceTraceDestination.mockResolvedValue(governanceTraceDestination);
     repository.countLiveNonGovernanceProjects.mockResolvedValue(1);
 
     await expect(
@@ -818,6 +831,7 @@ describe("ProjectService", () => {
         organizationId: "org",
         isPersonal: false,
         ownerUserId: null,
+        kind: PROJECT_KIND.APPLICATION,
       },
       {
         id: "project_2",
@@ -827,6 +841,7 @@ describe("ProjectService", () => {
         organizationId: "org",
         isPersonal: false,
         ownerUserId: null,
+        kind: PROJECT_KIND.APPLICATION,
       },
     ]);
 
@@ -843,6 +858,7 @@ describe("ProjectService", () => {
         organizationId: "org",
         isPersonal: false,
         ownerUserId: null,
+        kind: PROJECT_KIND.APPLICATION,
       },
       {
         id: "project_2",
@@ -852,6 +868,7 @@ describe("ProjectService", () => {
         organizationId: "org",
         isPersonal: false,
         ownerUserId: null,
+        kind: PROJECT_KIND.APPLICATION,
       },
     ]);
     expect(repository.findNamesByIds).toHaveBeenCalledWith(["project_1", "project_2"]);

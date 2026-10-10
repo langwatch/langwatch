@@ -216,6 +216,33 @@ func TestSlackWithoutTokenIsNotAuthed(t *testing.T) {
 	expect(t, "error", reply["error"], "not_authed")
 }
 
+// @scenario "A token that says it is invalid or revoked is refused as Slack refuses it"
+func TestSlackRefusesInvalidAndRevokedTokens(t *testing.T) {
+	g := newRig(t, Config{})
+	for token, want := range map[string]string{"xoxb-invalid-token": "invalid_auth", "xoxb-revoked-token": "token_revoked"} {
+		reply := asMap(t, g.postAs("/api/auth.test", map[string]string{"Authorization": "Bearer " + token}, `{}`).body)
+		expect(t, "ok", reply["ok"], false)
+		expect(t, "error", reply["error"], want)
+	}
+}
+
+// @scenario "A token that lapsed after connecting passes the check and fails the post"
+func TestSlackLapsedTokenFailsThePost(t *testing.T) {
+	g := newRig(t, Config{})
+	headers := map[string]string{"Authorization": "Bearer xoxb-lapsed-token"}
+	check := asMap(t, g.postAs("/api/auth.test", headers, `{}`).body)
+	expect(t, "auth.test ok", check["ok"], true)
+	post := asMap(t, g.postAs("/api/chat.postMessage", headers, `{"channel":"C0ALERTS","text":"hi"}`).body)
+	expect(t, "error", post["error"], "token_revoked")
+}
+
+// @scenario "A post to an archived channel fails as Slack fails it"
+func TestSlackArchivedChannel(t *testing.T) {
+	g := newRig(t, Config{})
+	reply := asMap(t, g.postAs("/api/chat.postMessage", bearer(), `{"channel":"C0OLD","text":"hi"}`).body)
+	expect(t, "error", reply["error"], "is_archived")
+}
+
 // @scenario "A post to an unknown channel fails as Slack fails it"
 func TestSlackUnknownChannel(t *testing.T) {
 	g := newRig(t, Config{})

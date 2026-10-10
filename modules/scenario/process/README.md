@@ -6,7 +6,7 @@ The server half of [scenario](../README.md). Scenarios and simulations: authored
 
 ## Installation
 
-`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareBindings(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…)`, `src/scenario.module.ts:32`.
+`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareContext(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…)`, `src/scenario.module.ts:31`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -770,7 +770,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/scenario.rest.ts:125`       |
+| Declared at | `src/transport/scenario.rest.ts:130`       |
 | Base URL    | `/api/scenarios`, twin `/api/v1/scenarios` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -780,19 +780,19 @@ type Response = unknown;
 
 Get all scenarios for a project
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:130`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:135`.
 
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
 ```typescript
-// Response: z.array(scenarioRestResponseWithPlatformUrlSchema) (inline, src/transport/scenario.rest.ts:132)
+// Response: z.array(scenarioRestResponseWithPlatformUrlSchema) (inline, src/transport/scenario.rest.ts:137)
 ```
 
 #### `GET /:id` · `getApiScenariosById`
 
 Get a specific scenario by ID
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:151`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:156`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -808,7 +808,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Create a new scenario
 
-Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:175`.
+Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:180`.
 
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
@@ -821,7 +821,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:221`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:226`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -835,7 +835,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:251`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:256`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -849,7 +849,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Archive (soft-delete) a scenario
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:284`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:289`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -866,7 +866,7 @@ interface Response {
 
 List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:300`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:305`.
 
 Answers at `/api/scenarios/:id/versions`, `/api/v1/scenarios/:id/versions`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions`, `/api/v1/scenarios/2026-08-07/:id/versions`, `/api/scenarios/latest/:id/versions`, `/api/v1/scenarios/latest/:id/versions`.
 
@@ -896,7 +896,7 @@ interface Response {
 
 Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:338`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:343`.
 
 Answers at `/api/scenarios/:id/versions/:version`, `/api/v1/scenarios/:id/versions/:version`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions/:version`, `/api/v1/scenarios/2026-08-07/:id/versions/:version`, `/api/scenarios/latest/:id/versions/:version`, `/api/v1/scenarios/latest/:id/versions/:version`.
 
@@ -913,7 +913,7 @@ type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../c
 
 |             |                                                        |
 | ----------- | ------------------------------------------------------ |
-| Declared at | `src/transport/simulation-run.rest.ts:45`              |
+| Declared at | `src/transport/simulation-run.rest.ts:50`              |
 | Base URL    | `/api/simulation-runs`, twin `/api/v1/simulation-runs` |
 | Addressing  | dated                                                  |
 | Credential  | project                                                |
@@ -923,7 +923,7 @@ type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../c
 
 List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:49`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:54`.
 
 Answers at `/api/simulation-runs`, `/api/v1/simulation-runs`; also, undocumented, `/api/simulation-runs/2026-08-07`, `/api/v1/simulation-runs/2026-08-07`, `/api/simulation-runs/latest`, `/api/v1/simulation-runs/latest`.
 
@@ -943,7 +943,7 @@ type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/
 
 Get a single simulation run by its ID
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:68`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:73`.
 
 Answers at `/api/simulation-runs/:scenarioRunId`, `/api/v1/simulation-runs/:scenarioRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/:scenarioRunId`, `/api/v1/simulation-runs/2026-08-07/:scenarioRunId`, `/api/simulation-runs/latest/:scenarioRunId`, `/api/v1/simulation-runs/latest/:scenarioRunId`.
 
@@ -959,7 +959,7 @@ type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; //
 
 List batch summaries for a scenario set (pass/fail counts per batch)
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:87`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:92`.
 
 Answers at `/api/simulation-runs/batches/list`, `/api/v1/simulation-runs/batches/list`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/list`, `/api/v1/simulation-runs/2026-08-07/batches/list`, `/api/simulation-runs/latest/batches/list`, `/api/v1/simulation-runs/latest/batches/list`.
 
@@ -977,7 +977,7 @@ type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contrac
 
 Get the summary of a single batch run, including its completion flag
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:113`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:118`.
 
 Answers at `/api/simulation-runs/batches/:batchRunId`, `/api/v1/simulation-runs/batches/:batchRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/v1/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/simulation-runs/latest/batches/:batchRunId`, `/api/v1/simulation-runs/latest/batches/:batchRunId`.
 

@@ -181,6 +181,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   })
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
+  .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
@@ -214,6 +215,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     "/api/evaluations/:evaluator/:subpath/evaluate",
     "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   )
+  .withoutAudit("run, not a change")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(namespacedEvaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
@@ -244,6 +246,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
+  .withoutAudit("run, not a change")
   .withParams(evaluatorParamsSchema)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")

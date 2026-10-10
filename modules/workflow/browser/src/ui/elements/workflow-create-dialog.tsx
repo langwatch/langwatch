@@ -1,16 +1,8 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, Grid, Heading, HStack, Separator } from "@langwatch/design-system/primitives";
 import { studioWorkflowSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type DragEvent,
-  type ReactNode,
-} from "react";
-import { ChevronLeft, File, Upload } from "react-feather";
+import { ChevronLeft, File, Upload } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { TEMPLATES } from "../../model/templates/templates.registry.ts";
 
@@ -96,41 +88,35 @@ function useWorkflowFileDrop(onFileSelect: (file: File) => void) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragOver = useCallback((event: DragEvent) => {
+  const handleDragOver = (event: DragEvent) => {
     event.preventDefault();
     setIsDragging(true);
-  }, []);
+  };
 
-  const handleDragLeave = useCallback(() => {
+  const handleDragLeave = () => {
     setIsDragging(false);
-  }, []);
+  };
 
-  const handleDrop = useCallback(
-    (event: DragEvent) => {
-      event.preventDefault();
-      setIsDragging(false);
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault();
+    setIsDragging(false);
 
-      const file = event.dataTransfer.files[0];
-      if (file) {
-        onFileSelect(file);
-      }
-    },
-    [onFileSelect],
-  );
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      onFileSelect(file);
+    }
+  };
 
-  const handleClick = useCallback(() => {
+  const handleClick = () => {
     fileInputRef.current?.click();
-  }, []);
+  };
 
-  const handleFileInputChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        onFileSelect(file);
-      }
-    },
-    [onFileSelect],
-  );
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onFileSelect(file);
+    }
+  };
 
   return {
     isDragging,
@@ -159,19 +145,16 @@ export function WorkflowCreateDialog({
     }
   }, [open]);
 
-  const handleFileUpload = useCallback(
-    async (file: File) => {
-      const result = await parseWorkflowImport(file);
+  const handleFileUpload = async (file: File) => {
+    const result = await parseWorkflowImport(file);
 
-      if (!result.success) {
-        onImportError(result.error);
-        return;
-      }
+    if (!result.success) {
+      onImportError(result.error);
+      return;
+    }
 
-      setStep({ step: "create", template: result.workflow });
-    },
-    [onImportError],
-  );
+    setStep({ step: "create", template: result.workflow });
+  };
 
   const fileDrop = useWorkflowFileDrop((file) => {
     void handleFileUpload(file);

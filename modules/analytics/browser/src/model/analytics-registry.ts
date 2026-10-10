@@ -6,8 +6,8 @@ import {
   analyticsChartSeriesSchema,
   analyticsChartTimeseriesSchema,
 } from "@langwatch/analytics-contract";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
-import { formatMoney } from "@langwatch/design-system/format-money";
 import { z } from "zod";
 
 import {
@@ -99,21 +99,21 @@ export const analyticsMetrics = {
       ...numericMetricDefaults,
       label: "Total Cost",
       colorSet: "greenTones",
-      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      format: (amount) => formatCurrency({ amount, currency: "USD" }),
       increaseIs: "neutral",
     },
     cost_billed: {
       ...numericMetricDefaults,
       label: "Billed Cost",
       colorSet: "greenTones",
-      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      format: (amount) => formatCurrency({ amount, currency: "USD" }),
       increaseIs: "neutral",
     },
     cost_non_billed: {
       ...numericMetricDefaults,
       label: "Non-billed (theoretical) Cost",
       colorSet: "grayTones",
-      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      format: (amount) => formatCurrency({ amount, currency: "USD" }),
       increaseIs: "neutral",
     },
     prompt_tokens: {

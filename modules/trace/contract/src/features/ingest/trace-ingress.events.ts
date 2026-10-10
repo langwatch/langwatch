@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace.constants.ts";
@@ -24,32 +25,49 @@ const traceIngressEventEnvelopeSchema = z.object({
 });
 
 /** Ids optional: the event log keeps only the traceparent, so an event read back carries none. */
-export const spanReceivedEventMetadataSchema = z
+const spanReceivedEventMetadataSchemaDefinition = z
   .object({
     processingTraceparent: z.string().optional(),
     spanId: z.string().optional(),
     traceId: z.string().optional(),
   })
   .passthrough();
+export interface SpanReceivedEventMetadataSchema extends Named<
+  typeof spanReceivedEventMetadataSchemaDefinition
+> {}
+export const spanReceivedEventMetadataSchema: SpanReceivedEventMetadataSchema =
+  spanReceivedEventMetadataSchemaDefinition;
 
-export const spanReceivedEventDataSchema = z.object({
+const spanReceivedEventDataSchemaDefinition = z.object({
   span: spanSchema,
   resource: resourceSchema.nullable(),
   instrumentationScope: instrumentationScopeSchema.nullable(),
   piiRedactionLevel: piiRedactionLevelSchema,
 });
+export interface SpanReceivedEventDataSchema extends Named<
+  typeof spanReceivedEventDataSchemaDefinition
+> {}
+export const spanReceivedEventDataSchema: SpanReceivedEventDataSchema =
+  spanReceivedEventDataSchemaDefinition;
 
-export const spanReceivedEventSchema = z.object({
+const spanReceivedEventSchemaDefinition = z.object({
   ...traceIngressEventEnvelopeSchema.shape,
   type: z.literal(SPAN_RECEIVED_EVENT_TYPE),
   data: spanReceivedEventDataSchema,
   metadata: spanReceivedEventMetadataSchema.optional(),
 });
+export interface SpanReceivedEventSchema extends Named<typeof spanReceivedEventSchemaDefinition> {}
+export const spanReceivedEventSchema: SpanReceivedEventSchema = spanReceivedEventSchemaDefinition;
 
 /** What a metering consumer reads of span_received: its trace and when the span started. */
-export const spanReceivedMeteringDataSchema = z.object({
+const spanReceivedMeteringDataSchemaDefinition = z.object({
   span: spanSchema.pick({ traceId: true, startTimeUnixNano: true }),
 });
+export interface SpanReceivedMeteringDataSchema extends Named<
+  typeof spanReceivedMeteringDataSchemaDefinition
+> {}
+export const spanReceivedMeteringDataSchema: SpanReceivedMeteringDataSchema =
+  spanReceivedMeteringDataSchemaDefinition;
 
 export type SpanReceivedEventMetadata = z.infer<typeof spanReceivedEventMetadataSchema>;
 export type SpanReceivedEventData = z.infer<typeof spanReceivedEventDataSchema>;

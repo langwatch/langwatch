@@ -274,6 +274,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withCredential("otlp_ingest")
 
   .post("/api/otel/v1/traces", "ingestOtlpTraces")
+  .withoutAudit("ingestion")
   .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })

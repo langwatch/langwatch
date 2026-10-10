@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What the automation REST doors send and answer: `/api/triggers`, the
  * older `/api/trigger/slack`, and `/api/unsubscribe` (RFC 8058) share
@@ -30,7 +31,7 @@ export const automationRestAlertTypeSchema = z.enum(["CRITICAL", "WARNING", "INF
  * names, credentials read back as the placeholder. The channel's own schema
  * still rules; `automation-rest.public-api-action-params` holds each to its fields.
  */
-export const automationRestEmailActionParamsSchema = z
+const automationRestEmailActionParamsSchemaDefinition = z
   .object({
     members: z
       .array(z.string())
@@ -39,8 +40,13 @@ export const automationRestEmailActionParamsSchema = z
   })
   .loose()
   .describe("Email delivery.");
+export interface AutomationRestEmailActionParamsSchema extends Named<
+  typeof automationRestEmailActionParamsSchemaDefinition
+> {}
+export const automationRestEmailActionParamsSchema: AutomationRestEmailActionParamsSchema =
+  automationRestEmailActionParamsSchemaDefinition;
 
-export const automationRestSlackActionParamsSchema = z
+const automationRestSlackActionParamsSchemaDefinition = z
   .object({
     slackIntegrationId: z
       .string()
@@ -96,8 +102,13 @@ export const automationRestSlackActionParamsSchema = z
     "Slack delivery through a Slack connection (`slackIntegrationId`), plus `slackChannelId` " +
       "when the connection is a bot.",
   );
+export interface AutomationRestSlackActionParamsSchema extends Named<
+  typeof automationRestSlackActionParamsSchemaDefinition
+> {}
+export const automationRestSlackActionParamsSchema: AutomationRestSlackActionParamsSchema =
+  automationRestSlackActionParamsSchemaDefinition;
 
-export const automationRestWebhookActionParamsSchema = z
+const automationRestWebhookActionParamsSchemaDefinition = z
   .object({
     url: z.string().describe("Where the request goes. https only, and not a private host."),
     method: z
@@ -139,8 +150,13 @@ export const automationRestWebhookActionParamsSchema = z
   })
   .loose()
   .describe("Delivery to a customer endpoint over HTTP, with a body in any media type.");
+export interface AutomationRestWebhookActionParamsSchema extends Named<
+  typeof automationRestWebhookActionParamsSchemaDefinition
+> {}
+export const automationRestWebhookActionParamsSchema: AutomationRestWebhookActionParamsSchema =
+  automationRestWebhookActionParamsSchemaDefinition;
 
-export const automationRestDatasetActionParamsSchema = z
+const automationRestDatasetActionParamsSchemaDefinition = z
   .object({
     datasetId: z.string().describe("The dataset matched traces are appended to."),
     datasetMapping: z
@@ -152,8 +168,13 @@ export const automationRestDatasetActionParamsSchema = z
   })
   .loose()
   .describe("Append matched traces to a dataset.");
+export interface AutomationRestDatasetActionParamsSchema extends Named<
+  typeof automationRestDatasetActionParamsSchemaDefinition
+> {}
+export const automationRestDatasetActionParamsSchema: AutomationRestDatasetActionParamsSchema =
+  automationRestDatasetActionParamsSchemaDefinition;
 
-export const automationRestAnnotationQueueActionParamsSchema = z
+const automationRestAnnotationQueueActionParamsSchemaDefinition = z
   .object({
     annotators: z
       .array(z.object({ id: z.string(), name: z.string() }))
@@ -162,6 +183,11 @@ export const automationRestAnnotationQueueActionParamsSchema = z
   })
   .loose()
   .describe("Queue matched traces for a person to label.");
+export interface AutomationRestAnnotationQueueActionParamsSchema extends Named<
+  typeof automationRestAnnotationQueueActionParamsSchemaDefinition
+> {}
+export const automationRestAnnotationQueueActionParamsSchema: AutomationRestAnnotationQueueActionParamsSchema =
+  automationRestAnnotationQueueActionParamsSchemaDefinition;
 
 /**
  * Every delivery configuration an update accepts. Each member keeps what it
@@ -177,11 +203,16 @@ const automationRestAnyActionParamsSchema = z.union([
 ]);
 
 /** A stored template type read for the wire: one this family does not publish reads as none. */
-export const automationRestStoredSlackTemplateTypeSchema = slackTemplateTypeSchema
+const automationRestStoredSlackTemplateTypeSchemaDefinition = slackTemplateTypeSchema
   .nullable()
   .catch(null);
+export interface AutomationRestStoredSlackTemplateTypeSchema extends Named<
+  typeof automationRestStoredSlackTemplateTypeSchemaDefinition
+> {}
+export const automationRestStoredSlackTemplateTypeSchema: AutomationRestStoredSlackTemplateTypeSchema =
+  automationRestStoredSlackTemplateTypeSchemaDefinition;
 
-export const automationRestTemplatesSchema = z
+const automationRestTemplatesSchemaDefinition = z
   .object({
     slackTemplateType: z.enum(["string", "block_kit"]).nullable().optional(),
     slackTemplate: z.string().nullable().optional(),
@@ -192,6 +223,11 @@ export const automationRestTemplatesSchema = z
     "The Liquid templates this automation's message is rendered from. Absent fields render the " +
       "LangWatch default for the channel.",
   );
+export interface AutomationRestTemplatesSchema extends Named<
+  typeof automationRestTemplatesSchemaDefinition
+> {}
+export const automationRestTemplatesSchema: AutomationRestTemplatesSchema =
+  automationRestTemplatesSchemaDefinition;
 
 const notificationCadenceSchema = z
   .enum(NOTIFICATION_CADENCES)
@@ -218,7 +254,7 @@ const filterQuerySchema = z
 const permissiveFiltersSchema = z.record(z.string(), automationFilterValueSchema);
 
 /** One automation, as `/api/triggers` writes it: credentials placeholdered, rule apart. */
-export const automationRestResponseSchema = z.object({
+const automationRestResponseSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   action: automationRestActionSchema,
@@ -256,9 +292,19 @@ export const automationRestResponseSchema = z.object({
   updatedAt: z.string(),
   platformUrl: z.string().url(),
 });
+export interface AutomationRestResponseSchema extends Named<
+  typeof automationRestResponseSchemaDefinition
+> {}
+export const automationRestResponseSchema: AutomationRestResponseSchema =
+  automationRestResponseSchemaDefinition;
 export type AutomationRestResponse = z.infer<typeof automationRestResponseSchema>;
 
-export const automationRestIdParamsSchema = z.object({ triggerId: z.string().min(1) });
+const automationRestIdParamsSchemaDefinition = z.object({ triggerId: z.string().min(1) });
+export interface AutomationRestIdParamsSchema extends Named<
+  typeof automationRestIdParamsSchemaDefinition
+> {}
+export const automationRestIdParamsSchema: AutomationRestIdParamsSchema =
+  automationRestIdParamsSchemaDefinition;
 
 /** What every create states, whichever channel it delivers on. */
 const createCommonFields = {
@@ -286,7 +332,7 @@ const createCommonFields = {
 };
 
 /** The create body, discriminated by the channel it delivers on. */
-export const automationRestCreateInputSchema = z.discriminatedUnion("action", [
+const automationRestCreateInputSchemaDefinition = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("SEND_EMAIL"),
     actionParams: automationRestEmailActionParamsSchema,
@@ -313,9 +359,14 @@ export const automationRestCreateInputSchema = z.discriminatedUnion("action", [
     ...createCommonFields,
   }),
 ]);
+export interface AutomationRestCreateInputSchema extends Named<
+  typeof automationRestCreateInputSchemaDefinition
+> {}
+export const automationRestCreateInputSchema: AutomationRestCreateInputSchema =
+  automationRestCreateInputSchemaDefinition;
 export type AutomationRestCreateInput = z.infer<typeof automationRestCreateInputSchema>;
 
-export const automationRestUpdateInputSchema = z.object({
+const automationRestUpdateInputSchemaDefinition = z.object({
   name: z.string().min(1).optional(),
   active: z.boolean().optional(),
   message: z.string().nullable().optional(),
@@ -355,12 +406,22 @@ export const automationRestUpdateInputSchema = z.object({
   notificationCadence: notificationCadenceSchema.optional(),
   traceDebounceMs: traceDebounceMsSchema.optional(),
 });
+export interface AutomationRestUpdateInputSchema extends Named<
+  typeof automationRestUpdateInputSchemaDefinition
+> {}
+export const automationRestUpdateInputSchema: AutomationRestUpdateInputSchema =
+  automationRestUpdateInputSchemaDefinition;
 export type AutomationRestUpdateInput = z.infer<typeof automationRestUpdateInputSchema>;
 
-export const automationRestDeletedSchema = z.object({
+const automationRestDeletedSchemaDefinition = z.object({
   id: z.string(),
   deleted: z.boolean(),
 });
+export interface AutomationRestDeletedSchema extends Named<
+  typeof automationRestDeletedSchemaDefinition
+> {}
+export const automationRestDeletedSchema: AutomationRestDeletedSchema =
+  automationRestDeletedSchemaDefinition;
 
 /** The opaque page cursor the REST family hands out: base64url JSON of `(createdAt, id)`. */
 export function encodeTriggerFireCursor(cursor: TriggerFireCursor): string {
@@ -389,14 +450,19 @@ function readCursorJson(encoded: string): unknown {
   }
 }
 
-export const automationRestFiresQuerySchema = z.object({
+const automationRestFiresQuerySchemaDefinition = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: automationRestFireCursorSchema
     .optional()
     .describe("The `nextCursor` from the previous page. Omit for the newest fires."),
 });
+export interface AutomationRestFiresQuerySchema extends Named<
+  typeof automationRestFiresQuerySchemaDefinition
+> {}
+export const automationRestFiresQuerySchema: AutomationRestFiresQuerySchema =
+  automationRestFiresQuerySchemaDefinition;
 
-export const automationRestFirePageSchema = z.object({
+const automationRestFirePageSchemaDefinition = z.object({
   fires: z
     .array(
       z.object({
@@ -413,9 +479,14 @@ export const automationRestFirePageSchema = z.object({
     .nullable()
     .describe("Pass as `cursor` to read the page after this one. Null on the last page."),
 });
+export interface AutomationRestFirePageSchema extends Named<
+  typeof automationRestFirePageSchemaDefinition
+> {}
+export const automationRestFirePageSchema: AutomationRestFirePageSchema =
+  automationRestFirePageSchemaDefinition;
 export type AutomationRestFirePage = z.infer<typeof automationRestFirePageSchema>;
 
-export const automationRestTestFireSchema = z.object({
+const automationRestTestFireSchemaDefinition = z.object({
   ...testFireResultSchema.shape,
   usedDefault: z
     .boolean()
@@ -425,12 +496,22 @@ export const automationRestTestFireSchema = z.object({
     ),
   httpStatus: z.number().optional().describe("Webhook only: what the endpoint answered with."),
 });
+export interface AutomationRestTestFireSchema extends Named<
+  typeof automationRestTestFireSchemaDefinition
+> {}
+export const automationRestTestFireSchema: AutomationRestTestFireSchema =
+  automationRestTestFireSchemaDefinition;
 
 /** An action that takes no body. */
-export const automationRestNoBodySchema = z.object({});
+const automationRestNoBodySchemaDefinition = z.object({});
+export interface AutomationRestNoBodySchema extends Named<
+  typeof automationRestNoBodySchemaDefinition
+> {}
+export const automationRestNoBodySchema: AutomationRestNoBodySchema =
+  automationRestNoBodySchemaDefinition;
 
 /** The body `/api/trigger/slack` reads, in its own spelling. */
-export const slackAutomationRestInputSchema = z
+const slackAutomationRestInputSchemaDefinition = z
   .object({
     slack_webhook: z
       .string()
@@ -471,9 +552,24 @@ export const slackAutomationRestInputSchema = z
       path: ["slack_connection_id"],
     },
   );
+export interface SlackAutomationRestInputSchema extends Named<
+  typeof slackAutomationRestInputSchemaDefinition
+> {}
+export const slackAutomationRestInputSchema: SlackAutomationRestInputSchema =
+  slackAutomationRestInputSchemaDefinition;
 
 /** The one sentence `/api/trigger/slack` answers a successful create with. */
-export const slackAutomationRestCreatedSchema = z.object({ message: z.string() });
+const slackAutomationRestCreatedSchemaDefinition = z.object({ message: z.string() });
+export interface SlackAutomationRestCreatedSchema extends Named<
+  typeof slackAutomationRestCreatedSchemaDefinition
+> {}
+export const slackAutomationRestCreatedSchema: SlackAutomationRestCreatedSchema =
+  slackAutomationRestCreatedSchemaDefinition;
 
 /** What the mail client reads back from `/api/unsubscribe`. */
-export const unsubscribeRestAcknowledgedSchema = z.object({ ok: z.boolean() });
+const unsubscribeRestAcknowledgedSchemaDefinition = z.object({ ok: z.boolean() });
+export interface UnsubscribeRestAcknowledgedSchema extends Named<
+  typeof unsubscribeRestAcknowledgedSchemaDefinition
+> {}
+export const unsubscribeRestAcknowledgedSchema: UnsubscribeRestAcknowledgedSchema =
+  unsubscribeRestAcknowledgedSchemaDefinition;

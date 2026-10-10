@@ -25,7 +25,12 @@ export function parseUpgradesTab({
 
 function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[] }) {
   return (
-    <ListTable data-testid="upgrade-dataplanes">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-dataplanes"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Target</Table.ColumnHeader>
@@ -78,23 +83,16 @@ export function UpgradesTabs({
         const next = parseUpgradesTab({ value: event.value, hasTargets: targets.length > 0 });
         onSelectTab?.(next);
       }}
-      colorPalette="orange"
+      variant="line"
+      colorPalette="accent"
       width="full"
       lazyMount
       unmountOnExit
     >
-      <Tabs.List marginBottom={6} gap={6}>
-        <Tabs.Trigger value="overview" paddingX={0}>
-          Overview
-        </Tabs.Trigger>
-        <Tabs.Trigger value="tenants" paddingX={0}>
-          Tenant migrations
-        </Tabs.Trigger>
-        {targets.length > 0 && (
-          <Tabs.Trigger value="dataplanes" paddingX={0}>
-            Dataplanes
-          </Tabs.Trigger>
-        )}
+      <Tabs.List marginBottom={5} overflowX="auto">
+        <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+        <Tabs.Trigger value="tenants">Tenant migrations</Tabs.Trigger>
+        {targets.length > 0 && <Tabs.Trigger value="dataplanes">Dataplanes</Tabs.Trigger>}
       </Tabs.List>
       <Tabs.Content value="overview" padding={0}>
         {overview}

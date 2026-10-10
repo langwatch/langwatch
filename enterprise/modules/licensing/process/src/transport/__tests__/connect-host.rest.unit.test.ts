@@ -56,6 +56,7 @@ const accepting: ConnectBearerVerifiers = {
 
 function mount(app: Partial<LicensingApi>, verifiers: ConnectBearerVerifiers = accepting) {
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     doors: { licence_token: connectHostDoor.open(createApiFixture<LicensingApi>(verifiers)) },
     authorization: restTestAuthorization(),
     identity: {

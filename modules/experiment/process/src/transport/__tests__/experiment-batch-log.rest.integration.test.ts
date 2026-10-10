@@ -43,6 +43,7 @@ function mount(
 ) {
   const assertBatchLogWithinLimit = options.assertBatchLogWithinLimit ?? (async () => undefined);
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
@@ -203,6 +204,7 @@ describe("given the legacy evaluation batch log behind a door that refuses the c
       }
     }
     const runtime = createRestRuntime({
+      audit: { record: () => {} },
       authorization: restTestAuthorization(),
       identity: {
         authenticate: () => {

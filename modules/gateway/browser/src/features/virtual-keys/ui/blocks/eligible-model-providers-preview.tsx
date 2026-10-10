@@ -1,5 +1,5 @@
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ExternalLink } from "lucide-react";
@@ -212,23 +212,16 @@ export function EligibleModelProvidersPreview({
 
   if (eligible.length === 0) {
     return (
-      <VStack
-        align="stretch"
-        gap={2}
-        borderWidth="1px"
-        borderColor="orange.muted"
-        borderRadius="md"
-        background="orange.subtle"
-        padding={3}
-      >
-        <Text fontSize="sm" fontWeight="medium">
-          No model providers visible at this scope.
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
-          Ask an admin to add one at <InlineCode>/settings/model-providers</InlineCode>. The key
-          cannot route requests until at least one provider is in scope.
-        </Text>
-      </VStack>
+      <Alert.Root status="warning" size="sm">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>No model providers visible at this scope.</Alert.Title>
+          <Alert.Description>
+            Ask an admin to add one at <InlineCode>/settings/model-providers</InlineCode>. The key
+            cannot route requests until at least one provider is in scope.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
 

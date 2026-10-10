@@ -76,11 +76,9 @@ describe("haven orb on a built-UI stack", () => {
   describe("given which lane the dev runtime runs", () => {
     /** @scenario "absent from a built-UI stack haven does not run" */
     it("serves the orb only on haven's built-UI lane", () => {
-      expect(servesOrb({ withUi: false, slug: "feat-x" })).toBe(true);
-      expect(servesOrb({ withUi: false, slug: undefined })).toBe(false);
-      expect(servesOrb({ withUi: false, slug: "" })).toBe(false);
-      // dev:one: the UI's Vite server injects the orb itself.
-      expect(servesOrb({ withUi: true, slug: "feat-x" })).toBe(false);
+      expect(servesOrb({ slug: "feat-x" })).toBe(true);
+      expect(servesOrb({ slug: undefined })).toBe(false);
+      expect(servesOrb({ slug: "" })).toBe(false);
     });
   });
 

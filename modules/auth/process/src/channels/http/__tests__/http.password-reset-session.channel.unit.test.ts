@@ -12,6 +12,8 @@ import { setSessionCookie } from "better-auth/cookies";
 import {
   PasswordResetSessionChannel,
   type PasswordResetEndpointContext,
+  replaceLiveResetLink,
+  type ResetLinkStorage,
 } from "../http.password-reset-session.channel.ts";
 
 function contextFor({
@@ -114,5 +116,49 @@ describe("the password reset session", () => {
 
       expect(createSession).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("asking for a second reset link while one is live", () => {
+  /** Better Auth's verification rows, keyed by the unique `token` column the user id lands in. */
+  function storageHolding(rows: { identifier: string; value: string }[]) {
+    const held = [...rows];
+    const storage: ResetLinkStorage = {
+      deleteMany: async ({ where }) => {
+        const [byValue, byPrefix] = where;
+        const doomed = held.filter(
+          (row) => row.value === byValue?.value && row.identifier.startsWith(byPrefix?.value ?? ""),
+        );
+        for (const row of doomed) held.splice(held.indexOf(row), 1);
+        return doomed.length;
+      },
+    };
+    return { held, storage };
+  }
+
+  /** @scenario "A second reset request while a link is live sends a fresh link" */
+  it("replaces the live link so the new one can be written", async () => {
+    const { held, storage } = storageHolding([
+      { identifier: "reset-password:old", value: "user-1" },
+      { identifier: "reset-password:other", value: "user-2" },
+    ]);
+
+    await replaceLiveResetLink({
+      verification: { identifier: "reset-password:new", value: "user-1" },
+      storage,
+    });
+
+    expect(held).toEqual([{ identifier: "reset-password:other", value: "user-2" }]);
+  });
+
+  it("leaves every other kind of verification row alone", async () => {
+    const { held, storage } = storageHolding([{ identifier: "two-factor-abc", value: "user-1" }]);
+
+    await replaceLiveResetLink({
+      verification: { identifier: "two-factor-def", value: "user-1" },
+      storage,
+    });
+
+    expect(held).toHaveLength(1);
   });
 });

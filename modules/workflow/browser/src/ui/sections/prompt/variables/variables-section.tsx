@@ -2,6 +2,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
   Button,
+  IconButton,
   HStack,
   Input,
   Spacer,
@@ -12,7 +13,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 import { Info, Plus, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 import {
   type AvailableSource,
@@ -117,72 +118,63 @@ export const VariablesSection = ({
   const shouldShowAddButton = showAddButton ?? canAddRemove;
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const handleAddVariable = useCallback(
-    (type: FieldType = "str") => {
-      const existingIdentifiers = variables.map((v) => v.identifier);
-      const newIdentifier = generateUniqueIdentifier({
-        baseName: "input",
-        existingIdentifiers,
-      });
-      onChange([...variables, { identifier: newIdentifier, type }]);
-      // Auto-focus the new variable name
-      setEditingId(newIdentifier);
-    },
-    [variables, onChange],
-  );
+  const handleAddVariable = (type: FieldType = "str") => {
+    const existingIdentifiers = variables.map((v) => v.identifier);
+    const newIdentifier = generateUniqueIdentifier({
+      baseName: "input",
+      existingIdentifiers,
+    });
+    onChange([...variables, { identifier: newIdentifier, type }]);
+    // Auto-focus the new variable name
+    setEditingId(newIdentifier);
+  };
 
-  const handleRemoveVariable = useCallback(
-    (identifier: string) => {
-      onChange(variables.filter((v) => v.identifier !== identifier));
-      // Also remove the mapping if it exists
-      if (onMappingChange) {
-        onMappingChange(identifier, undefined);
+  const handleRemoveVariable = (identifier: string) => {
+    onChange(variables.filter((v) => v.identifier !== identifier));
+    // Also remove the mapping if it exists
+    if (onMappingChange) {
+      onMappingChange(identifier, undefined);
+    }
+  };
+
+  const handleUpdateVariable = (oldIdentifier: string, updates: Partial<Variable>) => {
+    const newIdentifier = updates.identifier
+      ? normalizeIdentifier(updates.identifier)
+      : oldIdentifier;
+
+    // Check for duplicates
+    if (
+      updates.identifier &&
+      newIdentifier !== oldIdentifier &&
+      variables.some((v) => v.identifier === newIdentifier)
+    ) {
+      // Don't allow duplicate identifiers
+      return false;
+    }
+
+    onChange(
+      variables.map((v) =>
+        v.identifier === oldIdentifier ? { ...v, ...updates, identifier: newIdentifier } : v,
+      ),
+    );
+
+    // If identifier changed, update the mapping key
+    if (updates.identifier && newIdentifier !== oldIdentifier && onMappingChange) {
+      const existingMapping = mappings[oldIdentifier];
+      if (existingMapping) {
+        onMappingChange(oldIdentifier, undefined);
+        onMappingChange(newIdentifier, existingMapping);
       }
-    },
-    [variables, onChange, onMappingChange],
-  );
+    }
 
-  const handleUpdateVariable = useCallback(
-    (oldIdentifier: string, updates: Partial<Variable>) => {
-      const newIdentifier = updates.identifier
-        ? normalizeIdentifier(updates.identifier)
-        : oldIdentifier;
-
-      // Check for duplicates
-      if (
-        updates.identifier &&
-        newIdentifier !== oldIdentifier &&
-        variables.some((v) => v.identifier === newIdentifier)
-      ) {
-        // Don't allow duplicate identifiers
-        return false;
-      }
-
-      onChange(
-        variables.map((v) =>
-          v.identifier === oldIdentifier ? { ...v, ...updates, identifier: newIdentifier } : v,
-        ),
-      );
-
-      // If identifier changed, update the mapping key
-      if (updates.identifier && newIdentifier !== oldIdentifier && onMappingChange) {
-        const existingMapping = mappings[oldIdentifier];
-        if (existingMapping) {
-          onMappingChange(oldIdentifier, undefined);
-          onMappingChange(newIdentifier, existingMapping);
-        }
-      }
-
-      return true;
-    },
-    [variables, onChange, mappings, onMappingChange],
-  );
+    return true;
+  };
 
   return (
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+        <Text textStyle="sm" fontWeight="medium" color="fg.muted">
           {title}
         </Text>
         <Spacer />
@@ -293,7 +285,7 @@ function VariableList({
   renderSourceIcon,
 }: VariableListProps) {
   return variables.length === 0 ? (
-    <Text fontSize="13px" color="fg.subtle">
+    <Text textStyle="sm" color="fg.subtle">
       No variables defined
     </Text>
   ) : (
@@ -452,7 +444,7 @@ const VariableRow = ({
           size="sm"
           width="100px"
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="sm"
 
           borderColor={hasError ? "border.error" : undefined}
           data-testid={`variable-name-input-${variable.identifier}`}
@@ -461,7 +453,7 @@ const VariableRow = ({
         <HStack gap={1}>
           <Text
             fontFamily="mono"
-            fontSize="13px"
+            textStyle="sm"
             cursor={readOnly ? "default" : "pointer"}
             onClick={readOnly ? undefined : onStartEdit}
             border="1px solid"
@@ -525,7 +517,7 @@ const VariableRow = ({
               flex={1}
               minWidth={0}
               fontFamily="mono"
-              fontSize="13px"
+              textStyle="sm"
               variant="flushed"
               borderColor="border"
               autoresize
@@ -545,8 +537,9 @@ const VariableRow = ({
       {/* Delete Button */}
       {canRemove && !readOnly && (
         <Tooltip content="Remove variable" positioning={{ placement: "top" }}>
-          <Button
-            size="xs"
+          <IconButton
+            aria-label={`Remove ${variable.identifier} variable`}
+            size="sm"
             variant="ghost"
             colorPalette="gray"
             onClick={onRemove}
@@ -554,8 +547,8 @@ const VariableRow = ({
             color="fg.subtle"
             data-testid={`remove-variable-${variable.identifier}`}
           >
-            <X size={14} />
-          </Button>
+            <X size={16} />
+          </IconButton>
         </Tooltip>
       )}
     </HStack>

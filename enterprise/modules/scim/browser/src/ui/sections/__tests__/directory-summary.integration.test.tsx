@@ -95,7 +95,9 @@ describe("the directory's status band", () => {
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
       expect(screen.getByTestId("members-outside-directory")).toHaveTextContent("1 of 4");
-      expect(screen.getByLabelText(/removing them there will not remove them here/)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/removing them there will not remove them here/),
+      ).toBeInTheDocument();
     });
   });
 
@@ -133,7 +135,7 @@ describe("given a plan that does not carry directory sync", () => {
     state.readError = { data: { error: { code: "enterprise_plan_required" } } };
     renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
-    expect(screen.getByText("Directory sync is an Enterprise feature")).toBeInTheDocument();
+    expect(screen.getByText("Directory sync on Enterprise")).toBeInTheDocument();
     expect(screen.queryByTestId("directory-summary")).not.toBeInTheDocument();
   });
 });

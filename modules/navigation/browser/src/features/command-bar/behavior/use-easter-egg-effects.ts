@@ -1,3 +1,4 @@
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useCallback } from "react";
 
@@ -49,18 +50,16 @@ function triggerConfetti() {
 
   const particles: Particle[] = [];
   const colors = [
-    "#f44336",
-    "#e91e63",
-    "#9c27b0",
-    "#673ab7",
-    "#3f51b5",
-    "#2196f3",
-    "#00bcd4",
-    "#009688",
-    "#4caf50",
-    "#ffeb3b",
-    "#ff9800",
-  ];
+    "red.solid",
+    "chart.8",
+    "chart.5",
+    "chart.2",
+    "chart.7",
+    "chart.6",
+    "chart.3",
+    "chart.4",
+    "chart.1",
+  ].map(getRawColorValue);
 
   for (let i = 0; i < 150; i++) {
     particles.push({
@@ -68,7 +67,7 @@ function triggerConfetti() {
       y: Math.random() * canvas.height - canvas.height,
       vx: (Math.random() - 0.5) * 10,
       vy: Math.random() * 3 + 2,
-      color: colors[Math.floor(Math.random() * colors.length)] ?? "#f44336",
+      color: colors[Math.floor(Math.random() * colors.length)] ?? getRawColorValue("red.solid"),
       size: Math.random() * 8 + 4,
     });
   }

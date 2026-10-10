@@ -1,21 +1,19 @@
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Spinner,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { Box, Button, Stack, Table, Text } from "@langwatch/design-system/primitives";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
+import { Layers } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 import { describeNextWake } from "../../model/process-presentation.ts";
 
@@ -48,9 +46,17 @@ function InstanceRow({
         </Table.Cell>
       )}
       <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono" title={row.processKey}>
+        <Button
+          variant="plain"
+          size="xs"
+          title={row.processKey}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(row);
+          }}
+        >
           {middleEllipsis(row.processKey, 44)}
-        </Text>
+        </Button>
       </Table.Cell>
       <Table.Cell>
         <Text textStyle="xs" color="fg.muted" fontFamily="mono" title={row.projectId}>
@@ -65,7 +71,7 @@ function InstanceRow({
       <Table.Cell>
         <Text
           textStyle="xs"
-          color={wakeOverdue ? "orange.500" : "fg.muted"}
+          color={wakeOverdue ? "fg.warning" : "fg.muted"}
           fontWeight={wakeOverdue ? "medium" : undefined}
         >
           {describeNextWake(row.nextWakeAt, now)}
@@ -73,7 +79,7 @@ function InstanceRow({
       </Table.Cell>
       <Table.Cell>
         <Text textStyle="xs" color="fg.muted">
-          {formatTimeAgo(row.updatedAt, now)}
+          <FormattedDate value={row.updatedAt} display="relative" />
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
@@ -82,11 +88,7 @@ function InstanceRow({
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          color={row.deadMessages > 0 ? "red.500" : "fg.muted"}
-        >
+        <Text textStyle="xs" fontFamily="mono" color={row.deadMessages > 0 ? "red.fg" : "fg.muted"}>
           {row.deadMessages}
         </Text>
       </Table.Cell>
@@ -106,33 +108,36 @@ function InstancesTable({
   onOpen: (row: ProcessInstanceRow) => void;
 }) {
   return (
-    <Table.ScrollArea>
-      <Table.Root size="sm" variant="line">
-        <Table.Header>
-          <Table.Row>
-            {showProcess && <Table.ColumnHeader>Process</Table.ColumnHeader>}
-            <Table.ColumnHeader>Process key</Table.ColumnHeader>
-            <Table.ColumnHeader>Project</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end">Revision</Table.ColumnHeader>
-            <Table.ColumnHeader>Next wake</Table.ColumnHeader>
-            <Table.ColumnHeader>Updated</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end">Pending</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end">Dead</Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {rows.map((row) => (
-            <InstanceRow
-              key={`${row.processName}:${row.projectId}:${row.processKey}`}
-              row={row}
-              now={now}
-              showProcess={showProcess}
-              onOpen={onOpen}
-            />
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Table.ScrollArea>
+    <ListTable
+      density="compact"
+      columnRules={false}
+      whiteSpace="nowrap"
+      containerProps={{ overflowX: "auto" }}
+    >
+      <Table.Header>
+        <Table.Row>
+          {showProcess && <Table.ColumnHeader>Process</Table.ColumnHeader>}
+          <Table.ColumnHeader>Process key</Table.ColumnHeader>
+          <Table.ColumnHeader>Project</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Revision</Table.ColumnHeader>
+          <Table.ColumnHeader>Next wake</Table.ColumnHeader>
+          <Table.ColumnHeader>Updated</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Pending</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Dead</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {rows.map((row) => (
+          <InstanceRow
+            key={`${row.processName}:${row.projectId}:${row.processKey}`}
+            row={row}
+            now={now}
+            showProcess={showProcess}
+            onOpen={onOpen}
+          />
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }
 
@@ -152,19 +157,19 @@ function InstancesBody({
   onOpen: (row: ProcessInstanceRow) => void;
 }) {
   if (isPending) {
-    return (
-      <Box padding={4}>
-        <Spinner size="sm" />
-      </Box>
-    );
+    return <ListPageSkeleton label="Loading process instances" />;
   }
   if (rows.length === 0) {
     return (
-      <Box padding={4}>
-        <Text textStyle="xs" color="fg.muted">
-          {searching ? "No instances match the search." : "No instances yet for this process."}
-        </Text>
-      </Box>
+      <NoDataInfoBlock
+        icon={<Layers />}
+        title={searching ? "No instances match the search." : "No instances yet for this process."}
+        description={
+          searching
+            ? "Try a different process key."
+            : "Instances appear when this process receives work."
+        }
+      />
     );
   }
   return <InstancesTable rows={rows} now={now} showProcess={showProcess} onOpen={onOpen} />;
@@ -198,77 +203,64 @@ export function ProcessInstancesDrawer({ processName, onClose, onOpenInstance }:
   );
   const now = query.dataUpdatedAt || nowInstant().epochMilliseconds;
   const total = query.data?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rows = query.data?.instances ?? [];
   const allProcesses = !processName;
 
   return (
     <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
-          <HStack gap={2} width="full">
-            <Drawer.Title>Process instances</Drawer.Title>
-            {allProcesses ? (
-              <Badge size="sm" variant="subtle" colorPalette="gray">
-                all processes
-              </Badge>
-            ) : (
-              <Text textStyle="xs" color="fg.muted" fontFamily="mono">
-                {processName}
-              </Text>
-            )}
-            <Spacer />
-            <Text textStyle="xs" color="fg.muted">
-              {total} total
+          <DetailDrawerHeader kind="Processes" title="Process instances">
+            <Text textStyle="sm" color="fg.muted">
+              {allProcesses ? "All processes" : processName}
             </Text>
-          </HStack>
+          </DetailDrawerHeader>
         </Drawer.Header>
         <Drawer.Body>
-          <HStack gap={2} marginBottom={3}>
-            <Input
-              size="xs"
-              width="260px"
+          <Stack gap={4}>
+            <SearchInput
+              aria-label="Search process instances"
               placeholder="Search by process key..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
+              onChange={(event) => {
+                setSearch(event.target.value);
                 setPage(1);
               }}
             />
-            <Spacer />
-            {pageCount > 1 && (
-              <HStack gap={1}>
-                <Text textStyle="xs" color="fg.muted">
-                  Page {page} of {pageCount}
-                </Text>
-                <Button
-                  size="2xs"
-                  variant="outline"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  size="2xs"
-                  variant="outline"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage(page + 1)}
-                >
-                  Next
-                </Button>
-              </HStack>
+            {query.isError ? (
+              <HandledErrorAlert
+                error={query.error}
+                fallbackTitle="The process instances could not load"
+              />
+            ) : (
+              <>
+                <InstancesBody
+                  isPending={query.isPending}
+                  rows={rows}
+                  searching={!!search.trim()}
+                  now={now}
+                  showProcess={allProcesses}
+                  onOpen={(row) => onOpenInstance(row)}
+                />
+              </>
             )}
-          </HStack>
-          <InstancesBody
-            isPending={query.isPending}
-            rows={rows}
-            searching={!!search.trim()}
-            now={now}
-            showProcess={allProcesses}
-            onOpen={(row) => onOpenInstance(row)}
-          />
+          </Stack>
         </Drawer.Body>
+        <Drawer.Footer>
+          <Box width="full">
+            {!query.isError && (
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                totalCount={total}
+                visibleCount={rows.length}
+                unitLabel="instances"
+                isLoading={query.isPending}
+                onPageChange={setPage}
+              />
+            )}
+          </Box>
+        </Drawer.Footer>
         <Drawer.CloseTrigger />
       </Drawer.Content>
     </Drawer.Root>

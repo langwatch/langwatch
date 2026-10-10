@@ -1,11 +1,11 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
-import { Lightbulb, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
@@ -83,10 +83,7 @@ export function RoutingPoliciesPage() {
           {/* "Publish a default policy" is an instruction, so it is only shown
             to whoever can carry it out. */}
           {canManage && !cannotRead && !policiesQuery.isLoading && !hasAnyDefault && (
-            <NoDefaultNotice
-              hasPolicies={policies.length > 0}
-              onAddOrganizationPolicy={() => openNew("organization", true)}
-            />
+            <NoDefaultNotice hasPolicies={policies.length > 0} />
           )}
 
           {!cannotRead && !policiesQuery.isLoading && (
@@ -196,7 +193,7 @@ function useScopeNameResolver(
     | null
     | undefined,
 ) {
-  const names = useMemo(() => {
+  const names = (() => {
     const teams = new Map<string, string>();
     const projects = new Map<string, string>();
     for (const team of organization?.teams ?? []) {
@@ -206,7 +203,7 @@ function useScopeNameResolver(
       }
     }
     return { teams, projects };
-  }, [organization?.teams]);
+  })();
 
   return (scopes: ScopeTriadEntry[]): NamedScope[] =>
     scopes.map((scope) => {
@@ -220,51 +217,18 @@ function useScopeNameResolver(
  * Without a default policy a new key routes through whatever it can reach, so
  * this says what is missing where the operator can fix it.
  */
-function NoDefaultNotice({
-  hasPolicies,
-  onAddOrganizationPolicy,
-}: {
-  hasPolicies: boolean;
-  onAddOrganizationPolicy: () => void;
-}) {
+function NoDefaultNotice({ hasPolicies }: { hasPolicies: boolean }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="orange.muted"
-      borderRadius="md"
-      backgroundColor="orange.subtle"
-      padding={4}
+    <Banner
+      status="warning"
+      title={hasPolicies ? "Pick a default policy" : "Publish a default policy"}
     >
-      <HStack alignItems="start" gap={3}>
-        <Box color="orange.fg" paddingTop="2px">
-          <Lightbulb size={18} />
-        </Box>
-        <VStack align="start" gap={1}>
-          <Text fontSize="sm" fontWeight="semibold">
-            {hasPolicies ? "Pick a default policy" : "Publish a default policy"}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            Without one, a new key routes through whichever providers it can reach, in no order you
-            chose, and the model tiers mean nothing. A default policy at the organization level pins
-            both, and a team or project can still override it.
-          </Text>
-          <HStack gap={3} paddingTop={1}>
-            <Button size="xs" colorPalette="orange" onClick={onAddOrganizationPolicy}>
-              <Plus size={12} /> Add an organization policy
-            </Button>
-            <Link
-              href={docsUrl("/ai-gateway/governance/routing-policies")}
-              isExternal
-              color="orange.fg"
-              fontSize="xs"
-              fontWeight="medium"
-            >
-              Read the guide
-            </Link>
-          </HStack>
-        </VStack>
-      </HStack>
-    </Box>
+      A default organization policy sets provider order and model tiers for new keys. Teams and
+      projects can override it.{" "}
+      <Link href={docsUrl("/ai-gateway/governance/routing-policies")} isExternal>
+        Read the guide
+      </Link>
+    </Banner>
   );
 }
 

@@ -1,8 +1,9 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { FormatMoney } from "@langwatch/design-system/format-money-display";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { Money } from "@langwatch/design-system/money";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Box,
@@ -165,16 +166,14 @@ export function DSPyExperiment({
       />
       <Box width="calc(100vw - 391px)" height="full" position="relative">
         <VStack align="start" width="100%" maxWidth="1200px" height="full" gap={8} padding={6}>
-          <HStack width="full" align="end">
-            <Heading as="h1" size="lg">
-              {experiment.name ?? experiment.slug}
-            </Heading>
+          <PageLayout.Header>
+            <PageLayout.Heading>{experiment.name ?? experiment.slug}</PageLayout.Heading>
             <Spacer />
             <FeedbackLink />
-          </HStack>
+          </PageLayout.Header>
           {runsView === "loading" && <Skeleton width="100%" height="30px" />}
           {runsView === "error" && (
-            <Alert.Root>
+            <Alert.Root status="error">
               <Alert.Indicator />
               Error loading experiment runs
             </Alert.Root>
@@ -414,7 +413,7 @@ function DSPyRunsListStatus({ runsView }: { runsView: QueryView }) {
   }
   if (runsView === "error") {
     return (
-      <Alert.Root>
+      <Alert.Root status="error">
         <Alert.Indicator />
         Error loading experiment runs
       </Alert.Root>
@@ -468,7 +467,7 @@ export function DSPyExperimentRunList({
   return (
     <VStack
       align="start"
-      background="bg.surface"
+      background="bg.card"
       paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
       borderColor="border.emphasized"
@@ -504,9 +503,9 @@ export function DSPyExperimentRunList({
               cursor="pointer"
               as="button"
               opacity={!selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5}
-              background={selectedRuns?.includes(run.runId) ? "gray.200" : "none"}
+              background={selectedRuns?.includes(run.runId) ? "bg.emphasized" : "none"}
               _hover={{
-                background: selectedRuns?.includes(run.runId) ? "gray.200" : "gray.100",
+                background: selectedRuns?.includes(run.runId) ? "bg.emphasized" : "bg.muted",
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -529,10 +528,10 @@ export function DSPyExperimentRunList({
                   <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
                   <VStack align="start" gap={2} width="100%" paddingRight={2}>
                     <HStack width="100%">
-                      <Skeleton height="12px" background="gray.400" flexGrow={1} />
+                      <Skeleton height="12px" background="bg.emphasized" flexGrow={1} />
                       <Spinner size="xs" flexShrink={0} />
                     </HStack>
-                    <Skeleton width="100%" height="12px" background="gray.400" />
+                    <Skeleton width="100%" height="12px" background="bg.emphasized" />
                   </VStack>
                 </>
               ) : (
@@ -577,7 +576,7 @@ function LoadedRunSummary({
           height="24px"
           minWidth="24px"
           minHeight="24px"
-          background="gray.300"
+          background="border.emphasized"
           borderRadius="100%"
           backgroundColor={getColorForString("colors", run.runId).color}
         />
@@ -590,7 +589,7 @@ function LoadedRunSummary({
               height="12px"
               minWidth="12px"
               minHeight="12px"
-              background="gray.300"
+              background="border.emphasized"
               borderRadius="100%"
               backgroundColor={getColorForString("colors", run.runId).color}
             />
@@ -613,7 +612,7 @@ function LoadedRunSummary({
           {runCost && (
             <>
               <Text>·</Text>
-              <Text>{formatMoney({ amount: runCost, currency: "USD" }, "$0.00[0]")}</Text>
+              <Text>{formatCurrency({ amount: runCost, currency: "USD" })}</Text>
             </>
           )}
         </HStack>
@@ -627,7 +626,7 @@ type DSPyExample = DSPyStep["examples"][number];
 type DSPyLLMCall = DSPyStep["llm_calls"][number];
 
 const stepCostOf = (summary: DSPyStepSummary) =>
-  formatMoney({ amount: summary.llm_calls_summary.total_cost, currency: "USD" }, "$0.00[00]");
+  formatCurrency({ amount: summary.llm_calls_summary.total_cost, currency: "USD" });
 
 const stepTokensOf = (summary: DSPyStepSummary) =>
   numeral(summary.llm_calls_summary.total_tokens).format("0a");
@@ -647,7 +646,7 @@ const QueryStatusRows = ({
   if (view === "loading") {
     return Array.from({ length: 3 }).map((_, index) => (
       <Table.Row key={index}>
-        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+        <Table.Cell background="bg.subtle">&nbsp;</Table.Cell>
         {Array.from({ length: skeletonCells }).map((_, cell) => (
           <Table.Cell key={cell}>
             <Skeleton width="100%" height="30px" />
@@ -659,7 +658,7 @@ const QueryStatusRows = ({
   if (view === "error") {
     return (
       <Table.Row>
-        <Table.Cell colSpan={colSpan} color="red.600">
+        <Table.Cell colSpan={colSpan} color="red.fg">
           Error loading step data
         </Table.Cell>
       </Table.Row>
@@ -687,7 +686,7 @@ const PredictorRow = ({
   const signature = predictor?.extended_signature ?? predictor?.signature;
   return (
     <Table.Row>
-      <Table.Cell background="gray.50" textAlign="center">
+      <Table.Cell background="bg.subtle" textAlign="center">
         {index + 1}
       </Table.Cell>
       <Table.Cell>{name}</Table.Cell>
@@ -723,7 +722,7 @@ const ExampleRow = ({
   hasTrace: boolean;
 }) => (
   <Table.Row>
-    <Table.Cell background="gray.50" textAlign="center">
+    <Table.Cell background="bg.subtle" textAlign="center">
       {index + 1}
     </Table.Cell>
     <Table.Cell>
@@ -749,7 +748,7 @@ const LLMCallRow = ({ index, llmCall }: { index: number; llmCall: DSPyLLMCall })
   const response = llmCall.response?.choices?.[0]?.message?.content ?? llmCall.response?.output;
   return (
     <Table.Row>
-      <Table.Cell background="gray.50" textAlign="center">
+      <Table.Cell background="bg.subtle" textAlign="center">
         {index + 1}
       </Table.Cell>
       <Table.Cell>{llmCall.model}</Table.Cell>
@@ -773,7 +772,7 @@ const LLMCallRow = ({ index, llmCall }: { index: number; llmCall: DSPyLLMCall })
       </Table.Cell>
       <Table.Cell>
         {llmCall.cost ? (
-          formatMoney({ amount: llmCall.cost, currency: "USD" }, "$0.00[0000]")
+          formatCurrency({ amount: llmCall.cost, currency: "USD" })
         ) : (
           <ZeroCallCost cached={!!llmCall.response.cached} />
         )}
@@ -799,7 +798,7 @@ const RunColorMark = ({
       <Box
         width="18px"
         height="18px"
-        background="gray.300"
+        background="border.emphasized"
         borderRadius="100%"
         backgroundColor={color}
       />
@@ -934,7 +933,7 @@ export const RunDetails = React.memo(
                 paddingX={4}
                 fontWeight={500}
                 color="fg.muted"
-                background="gray.100"
+                background="bg.muted"
               >
                 <Text>Step {dspyStepSummary.index}</Text>
               </Center>
@@ -976,7 +975,7 @@ export const RunDetails = React.memo(
           >
             {stepView === "loading" && <Skeleton width="100%" height="30px" />}
             {stepView === "error" && (
-              <Alert.Root>
+              <Alert.Root status="error">
                 <Alert.Indicator />
                 Error loading step data
               </Alert.Root>
@@ -1239,8 +1238,7 @@ const compareStepIndex = (a: StepPoint, b: StepPoint) => {
 };
 
 const runColorOf = (runId: string) => {
-  const [name, number] = getColorForString("colors", runId).color.split(".");
-  return getRawColorValue(name && number ? `${name}.${number}` : "gray.300");
+  return getRawColorValue(getColorForString("colors", runId).color);
 };
 
 const bestScoreOf = (data: StepPoint[], runId: string | undefined) =>
@@ -1367,7 +1365,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getRawColorValue("gray.700")}
+                fill={getRawColorValue("fg.muted")}
                 fontSize="12px"
               />
             </ReferenceDot>
@@ -1494,7 +1492,7 @@ export function DSPyExperimentSummary({
       left={0}
       bottom={0}
       width="100%"
-      background="bg.surface"
+      background="bg.card"
       borderTop="1px solid"
       borderColor="border"
       paddingY={4}
@@ -1515,11 +1513,7 @@ export function DSPyExperimentSummary({
           Total Cost
         </Text>
         <Text lineClamp={1} whiteSpace="nowrap">
-          {run && totalCost ? (
-            <FormatMoney amount={totalCost} currency="USD" format="$0.00[00]" />
-          ) : (
-            "-"
-          )}
+          {run && totalCost ? <Money amount={totalCost} currency="USD" /> : "-"}
         </Text>
       </VStack>
       <Spacer />

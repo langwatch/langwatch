@@ -42,10 +42,12 @@ const cliPlaneRest = defineRestRouter(CliPlaneApi)
   .post("/api/auth/cli/device-code", "startCliDeviceCode")
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app }) => app.deviceCode())
   .post("/api/auth/cli/project-key", "readCliProjectKey")
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app }) => app.projectKey())
   .build();
 

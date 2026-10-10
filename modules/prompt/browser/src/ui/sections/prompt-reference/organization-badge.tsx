@@ -6,7 +6,7 @@ export function OrganizationBadge() {
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
-        <Icon color="purple">
+        <Icon color="purple.fg">
           <LuBuilding />
         </Icon>
       </Tooltip.Trigger>

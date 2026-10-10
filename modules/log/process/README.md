@@ -6,7 +6,7 @@ The server half of [log](../README.md). Logs: receiving OTLP logs, canonicalisin
 
 ## Installation
 
-`defineProcessModule("log").withRepositories(logRepositories).withApi(LogModule).withTransports(otlpLogsRest).withEventing(logEventing)`, `src/log.module.ts:10`.
+`defineProcessModule("log").withRepositories(logRepositories).withApi(LogModule).withTransports(otlpLogsRest).withEventing(logEventing).withDoors(…)`, `src/log.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable canonical log capability shared by process features.
 
-Peers call these through the token, declared at `../contract/src/log.api.ts:35`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/log.api.ts:32`; nothing else in this package is public.
 
 #### `prepareCanonicalLogRecords`
 
@@ -24,10 +24,10 @@ prepareCanonicalLogRecords(input: { tenantId: string; organizationId: string; re
 
 #### `receiveOtlpLogs`
 
-One exporter request at the logs door: key, allowance, parse, then collection.
+One exporter request the logs door verified: allowance, parse, then collection.
 
 ```typescript
-receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult>;
+receiveOtlpLogs(input: { request: OtlpDoorRequest; credential: OtlpIngestCredential; }): Promise<LogOtlpDoorResult>;
 ```
 
 #### `collectOtlpLogs`
@@ -52,73 +52,20 @@ recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/otlp-logs.rest.ts:26`   |
+| Declared at | `src/transport/otlp-logs.rest.ts:115`  |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
-| Credential  | project                                |
+| Credential  | otlp_ingest                            |
 
 #### `POST /api/otel/v1/logs` · `ingestOtlpLogs`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:31`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:121`.
 
 Answers at `/api/otel/v1/logs`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:32)
-// Response: inline, src/transport/otlp-logs.rest.ts:35
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1/logs` · `ingestOtlpLogsAlias`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:51`.
-
-Answers at `/:otlpBase{.+}/v1/logs`.
-
-```typescript
-// Params: otlpLogAliasParamsSchema, ../contract/src/log.api.ts:24
-interface Params {
-  otlpBase: string;
-}
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:53)
-// Response: inline, src/transport/otlp-logs.rest.ts:56
-type Response = unknown;
-```
-
-#### `POST /:otlpBase{.+}/v1/logs/` · `ingestOtlpLogsAliasSlash`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:70`.
-
-Answers at `/:otlpBase{.+}/v1/logs/`.
-
-```typescript
-type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:24
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:72)
-// Response: inline, src/transport/otlp-logs.rest.ts:75
-type Response = unknown;
-```
-
-#### `POST /v1/logs` · `ingestOtlpLogsRootV1`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:89`.
-
-Answers at `/v1/logs`.
-
-```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:90)
-// Response: inline, src/transport/otlp-logs.rest.ts:93
-type Response = unknown;
-```
-
-#### `POST /v1/logs/` · `ingestOtlpLogsRootV1Slash`
-
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:107`.
-
-Answers at `/v1/logs/`.
-
-```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:108)
-// Response: inline, src/transport/otlp-logs.rest.ts:111
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:123)
+// Response: inline, src/transport/otlp-logs.rest.ts:126
 type Response = unknown;
 ```
 

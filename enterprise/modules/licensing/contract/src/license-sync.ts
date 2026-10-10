@@ -4,6 +4,7 @@
  * what it gets back, and every code either host can refuse it with.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { ConnectCredentialGrant, ConnectService } from "./issued-license.ts";
@@ -13,7 +14,7 @@ import type { ConnectCredentialGrant, ConnectService } from "./issued-license.ts
  * organization name, no hostname, no user data and no statistics, and
  * `.strict()` is what keeps it that way as the install side grows.
  */
-export const licenseSyncBodySchema = z
+const licenseSyncBodySchemaDefinition = z
   .object({
     version: z.string().min(1).max(100),
     seats: z
@@ -24,11 +25,18 @@ export const licenseSyncBodySchema = z
       .strict(),
   })
   .strict();
+export interface LicenseSyncBodySchema extends Named<typeof licenseSyncBodySchemaDefinition> {}
+export const licenseSyncBodySchema: LicenseSyncBodySchema = licenseSyncBodySchemaDefinition;
 
 export type LicenseSyncBody = z.infer<typeof licenseSyncBodySchema>;
 
 /** An activation carries its code in the bearer header, so its body names nothing. */
-export const connectActivationRequestSchema = z.object({});
+const connectActivationRequestSchemaDefinition = z.object({});
+export interface ConnectActivationRequestSchema extends Named<
+  typeof connectActivationRequestSchemaDefinition
+> {}
+export const connectActivationRequestSchema: ConnectActivationRequestSchema =
+  connectActivationRequestSchemaDefinition;
 
 /** A credential as presented: the bearer the framework read and the instance id, both unchecked. */
 export interface ConnectPresentedCredential {
@@ -37,21 +45,31 @@ export interface ConnectPresentedCredential {
 }
 
 /** Who the `licence_token` door says presented a licence token (W02-DOOR-SHAPE). */
-export const connectLicenceCallerSchema = z.object({
+const connectLicenceCallerSchemaDefinition = z.object({
   licenseRowId: z.string(),
   organizationId: z.string(),
   instanceId: z.string(),
   virtualKeyId: z.string(),
 });
+export interface ConnectLicenceCallerSchema extends Named<
+  typeof connectLicenceCallerSchemaDefinition
+> {}
+export const connectLicenceCallerSchema: ConnectLicenceCallerSchema =
+  connectLicenceCallerSchemaDefinition;
 
 export type ConnectLicenceCaller = z.infer<typeof connectLicenceCallerSchema>;
 
 /** An activation code the door found redeemable, not yet claimed (W02-ACTIVATE-DOOR). */
-export const connectActivationCallerSchema = z.object({
+const connectActivationCallerSchemaDefinition = z.object({
   activationCodeId: z.string(),
   organizationId: z.string(),
   instanceId: z.string(),
 });
+export interface ConnectActivationCallerSchema extends Named<
+  typeof connectActivationCallerSchemaDefinition
+> {}
+export const connectActivationCallerSchema: ConnectActivationCallerSchema =
+  connectActivationCallerSchemaDefinition;
 
 export type ConnectActivationCaller = z.infer<typeof connectActivationCallerSchema>;
 

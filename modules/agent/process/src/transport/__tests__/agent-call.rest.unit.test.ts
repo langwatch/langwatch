@@ -48,6 +48,7 @@ function buildApi(
   const call = vi.fn(options.call ?? (async () => outcome));
   const app = createApiFixture<AgentApi>({ call });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }): RestCaller => {

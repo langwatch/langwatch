@@ -54,6 +54,7 @@ const routes = defineRestRouter(TracesApi)
   .post("/search", "search")
   .withPermission("traces:view")
   .withOutput(z.object({ read: z.boolean() }))
+  .withoutAudit("test route")
   .handle(({ app }) => app.search())
   .build()
   .router();

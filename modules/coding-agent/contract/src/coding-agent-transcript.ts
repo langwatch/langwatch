@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -15,7 +16,7 @@ import { codingAgentSchema, type CodingAgent } from "./telemetry/index.ts";
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
 const PROMPT_STUB_SAME_TURN_MS = 2_000;
 
-export const transcriptEntrySchema = z.discriminatedUnion("kind", [
+const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("system_prompt"),
     atMs: z.number(),
@@ -75,10 +76,12 @@ export const transcriptEntrySchema = z.discriminatedUnion("kind", [
     text: z.string(),
   }),
 ]);
+export interface TranscriptEntrySchema extends Named<typeof transcriptEntrySchemaDefinition> {}
+export const transcriptEntrySchema: TranscriptEntrySchema = transcriptEntrySchemaDefinition;
 
 export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
 
-export const codingAgentTranscriptSchema = z.object({
+const codingAgentTranscriptSchemaDefinition = z.object({
   agent: codingAgentSchema,
   sessionId: z.string().nullable(),
   entries: z.array(transcriptEntrySchema),
@@ -90,6 +93,11 @@ export const codingAgentTranscriptSchema = z.object({
   }),
   subAgents: z.array(z.object({ agentId: z.string(), toolCalls: z.number() })),
 });
+export interface CodingAgentTranscriptSchema extends Named<
+  typeof codingAgentTranscriptSchemaDefinition
+> {}
+export const codingAgentTranscriptSchema: CodingAgentTranscriptSchema =
+  codingAgentTranscriptSchemaDefinition;
 
 export type CodingAgentTranscript = z.infer<typeof codingAgentTranscriptSchema>;
 

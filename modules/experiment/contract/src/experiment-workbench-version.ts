@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -21,7 +22,7 @@ export type WorkbenchActorLabel = z.infer<typeof workbenchActorLabelSchema>;
 // Signal-then-refetch: names WHAT changed and at which version, never the
 // state itself. Client compares versions and refetches through the normal
 // read path when it is behind. Shape lives here with the wire publisher.
-export const experimentUpdateSignalSchema = z.object({
+const experimentUpdateSignalSchemaDefinition = z.object({
   event: z.literal("experiment_updated"),
   experimentId: z.string(),
   slug: z.string(),
@@ -34,13 +35,20 @@ export const experimentUpdateSignalSchema = z.object({
    */
   runId: z.string().optional(),
 });
+export interface ExperimentUpdateSignalSchema extends Named<
+  typeof experimentUpdateSignalSchemaDefinition
+> {}
+export const experimentUpdateSignalSchema: ExperimentUpdateSignalSchema =
+  experimentUpdateSignalSchemaDefinition;
 export type ExperimentUpdateSignal = z.infer<typeof experimentUpdateSignalSchema>;
 
-export const workbenchActorSchema = z.object({
+const workbenchActorSchemaDefinition = z.object({
   userId: z.string().optional(),
   label: workbenchActorLabelSchema,
   runId: z.string().optional(),
 });
+export interface WorkbenchActorSchema extends Named<typeof workbenchActorSchemaDefinition> {}
+export const workbenchActorSchema: WorkbenchActorSchema = workbenchActorSchemaDefinition;
 export type WorkbenchActor = z.infer<typeof workbenchActorSchema>;
 
 export const workbenchReferenceTypeSchema = z.enum([
@@ -95,13 +103,18 @@ export const collectWorkbenchReferences = (
   return new Map([...grouped].map(([type, ids]) => [type, [...ids]]));
 };
 
-export const workbenchValidationIssueSchema = z.object({
+const workbenchValidationIssueSchemaDefinition = z.object({
   path: z.string(),
   message: z.string(),
 });
+export interface WorkbenchValidationIssueSchema extends Named<
+  typeof workbenchValidationIssueSchemaDefinition
+> {}
+export const workbenchValidationIssueSchema: WorkbenchValidationIssueSchema =
+  workbenchValidationIssueSchemaDefinition;
 export type WorkbenchValidationIssue = z.infer<typeof workbenchValidationIssueSchema>;
 
-export const workbenchStateViewSchema = z.object({
+const workbenchStateViewSchemaDefinition = z.object({
   experimentId: z.string(),
   slug: z.string(),
   name: z.string().nullable(),
@@ -111,16 +124,26 @@ export const workbenchStateViewSchema = z.object({
   actorLabel: workbenchActorLabelSchema.optional(),
   runId: z.string().optional(),
 });
+export interface WorkbenchStateViewSchema extends Named<
+  typeof workbenchStateViewSchemaDefinition
+> {}
+export const workbenchStateViewSchema: WorkbenchStateViewSchema =
+  workbenchStateViewSchemaDefinition;
 export type WorkbenchStateView = z.infer<typeof workbenchStateViewSchema>;
 
-export const workbenchSaveResultSchema = z.object({
+const workbenchSaveResultSchemaDefinition = z.object({
   experimentId: z.string(),
   slug: z.string(),
   version: z.number(),
 });
+export interface WorkbenchSaveResultSchema extends Named<
+  typeof workbenchSaveResultSchemaDefinition
+> {}
+export const workbenchSaveResultSchema: WorkbenchSaveResultSchema =
+  workbenchSaveResultSchemaDefinition;
 export type WorkbenchSaveResult = z.infer<typeof workbenchSaveResultSchema>;
 
-export const workbenchVersionSummarySchema = z.object({
+const workbenchVersionSummarySchemaDefinition = z.object({
   version: z.number(),
   counterVersion: z.number(),
   autoSaved: z.boolean(),
@@ -130,6 +153,11 @@ export const workbenchVersionSummarySchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface WorkbenchVersionSummarySchema extends Named<
+  typeof workbenchVersionSummarySchemaDefinition
+> {}
+export const workbenchVersionSummarySchema: WorkbenchVersionSummarySchema =
+  workbenchVersionSummarySchemaDefinition;
 export type WorkbenchVersionSummary = z.infer<typeof workbenchVersionSummarySchema>;
 
 const workbenchLocatorSchema = z.object({
@@ -141,16 +169,21 @@ const workbenchLocatorSchema = z.object({
 export const getWorkbenchStateInputSchema = workbenchLocatorSchema;
 export type GetWorkbenchStateInput = z.infer<typeof getWorkbenchStateInputSchema>;
 
-export const saveWorkbenchStateInputSchema = z.object({
+const saveWorkbenchStateInputSchemaDefinition = z.object({
   ...workbenchLocatorSchema.shape,
   state: z.unknown(),
   expectedVersion: z.number().optional(),
   actor: workbenchActorSchema,
   commitMessage: z.string().optional(),
 });
+export interface SaveWorkbenchStateInputSchema extends Named<
+  typeof saveWorkbenchStateInputSchemaDefinition
+> {}
+export const saveWorkbenchStateInputSchema: SaveWorkbenchStateInputSchema =
+  saveWorkbenchStateInputSchemaDefinition;
 export type SaveWorkbenchStateInput = z.infer<typeof saveWorkbenchStateInputSchema>;
 
-export const createEvaluationsV3InputSchema = z.object({
+const createEvaluationsV3InputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string().optional(),
   name: z.string().optional(),
@@ -158,36 +191,61 @@ export const createEvaluationsV3InputSchema = z.object({
   actor: workbenchActorSchema,
   commitMessage: z.string().optional(),
 });
+export interface CreateEvaluationsV3InputSchema extends Named<
+  typeof createEvaluationsV3InputSchemaDefinition
+> {}
+export const createEvaluationsV3InputSchema: CreateEvaluationsV3InputSchema =
+  createEvaluationsV3InputSchemaDefinition;
 export type CreateEvaluationsV3Input = z.infer<typeof createEvaluationsV3InputSchema>;
 
-export const commitWorkbenchVersionInputSchema = z.object({
+const commitWorkbenchVersionInputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string(),
   commitMessage: z.string(),
   actor: workbenchActorSchema,
 });
+export interface CommitWorkbenchVersionInputSchema extends Named<
+  typeof commitWorkbenchVersionInputSchemaDefinition
+> {}
+export const commitWorkbenchVersionInputSchema: CommitWorkbenchVersionInputSchema =
+  commitWorkbenchVersionInputSchemaDefinition;
 export type CommitWorkbenchVersionInput = z.infer<typeof commitWorkbenchVersionInputSchema>;
 
-export const listWorkbenchVersionsInputSchema = z.object({
+const listWorkbenchVersionsInputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string(),
   limit: z.number().optional(),
   cursor: z.number().optional(),
 });
+export interface ListWorkbenchVersionsInputSchema extends Named<
+  typeof listWorkbenchVersionsInputSchemaDefinition
+> {}
+export const listWorkbenchVersionsInputSchema: ListWorkbenchVersionsInputSchema =
+  listWorkbenchVersionsInputSchemaDefinition;
 export type ListWorkbenchVersionsInput = z.infer<typeof listWorkbenchVersionsInputSchema>;
 
-export const workbenchVersionsPageSchema = z.object({
+const workbenchVersionsPageSchemaDefinition = z.object({
   versions: z.array(workbenchVersionSummarySchema),
   nextCursor: z.number().nullable(),
 });
+export interface WorkbenchVersionsPageSchema extends Named<
+  typeof workbenchVersionsPageSchemaDefinition
+> {}
+export const workbenchVersionsPageSchema: WorkbenchVersionsPageSchema =
+  workbenchVersionsPageSchemaDefinition;
 export type WorkbenchVersionsPage = z.infer<typeof workbenchVersionsPageSchema>;
 
-export const restoreWorkbenchVersionInputSchema = z.object({
+const restoreWorkbenchVersionInputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string(),
   version: z.number(),
   actor: workbenchActorSchema,
 });
+export interface RestoreWorkbenchVersionInputSchema extends Named<
+  typeof restoreWorkbenchVersionInputSchemaDefinition
+> {}
+export const restoreWorkbenchVersionInputSchema: RestoreWorkbenchVersionInputSchema =
+  restoreWorkbenchVersionInputSchemaDefinition;
 export type RestoreWorkbenchVersionInput = z.infer<typeof restoreWorkbenchVersionInputSchema>;
 
 /**
@@ -195,7 +253,7 @@ export type RestoreWorkbenchVersionInput = z.infer<typeof restoreWorkbenchVersio
  * The runner computes the scoped merge from its execution plan; the service
  * owns the read-version-write compare-and-set that makes it a durable change.
  */
-export const recordWorkbenchRunResultsInputSchema = z.object({
+const recordWorkbenchRunResultsInputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string(),
   results: persistedResultsSchema,
@@ -203,6 +261,11 @@ export const recordWorkbenchRunResultsInputSchema = z.object({
   actor: workbenchActorSchema,
   commitMessage: z.string(),
 });
+export interface RecordWorkbenchRunResultsInputSchema extends Named<
+  typeof recordWorkbenchRunResultsInputSchemaDefinition
+> {}
+export const recordWorkbenchRunResultsInputSchema: RecordWorkbenchRunResultsInputSchema =
+  recordWorkbenchRunResultsInputSchemaDefinition;
 export type RecordWorkbenchRunResultsInput = z.infer<typeof recordWorkbenchRunResultsInputSchema>;
 
 const MAX_REPORTED_ISSUES = 10;

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const logCorrelationSourceSchema = z.enum([
@@ -10,7 +11,7 @@ const logCorrelationSourceSchema = z.enum([
 const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
 
 /** The trace-fold payload derived from one canonical log record. */
-export const logTraceContributionSchema = z.object({
+const logTraceContributionSchemaDefinition = z.object({
   tenantId: z.string(),
   recordId: z.string().regex(/^[a-f0-9]{64}$/),
   traceId: z.string().regex(/^[a-f0-9]{32}$/),
@@ -28,5 +29,10 @@ export const logTraceContributionSchema = z.object({
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface LogTraceContributionSchema extends Named<
+  typeof logTraceContributionSchemaDefinition
+> {}
+export const logTraceContributionSchema: LogTraceContributionSchema =
+  logTraceContributionSchemaDefinition;
 
 export type LogTraceContribution = z.infer<typeof logTraceContributionSchema>;

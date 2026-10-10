@@ -9,17 +9,18 @@ it. On conflict between sections, the more specific wins.
 
 ## 1. The product
 
-Four Node processes and three Go services:
+Four Node processes, one composite of two of them, and three Go services:
 
-| Process               | Package                   | What it is                                      |
-| --------------------- | ------------------------- | ----------------------------------------------- |
-| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)              |
-| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle    |
-| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers    |
-| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills               |
-| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)        |
-| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators   |
-| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers) |
+| Process               | Package                   | What it is                                                     |
+| --------------------- | ------------------------- | -------------------------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                             |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                   |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                   |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills                              |
+| `apps/backend`        | `@langwatch/backend`      | api + worker in one process: what `npx @langwatch/server` runs |
+| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                       |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                  |
+| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                |
 
 **Applications hold no product code.** The product lives in modules. An
 application is a `main.ts` and a `config.ts`; everything it used to carry —
@@ -34,6 +35,14 @@ browser halves in `src/browser-modules.generated.ts`, written by
 `pnpm generate:modules` from `modules/catalogue.json` and never edited by hand. Each app depends only
 on the half it runs, so no declared edge reaches a browser package from a process app. The
 `installed-*` packages are deleted.
+
+**`apps/backend` is the one composite application (Alex, 2026-10-10).** It runs the api and the worker
+in one Node process through their own start seams (`startApi`, `startWorker`); the seam that boots both
+and drains the worker, then the api (`startBackend`, `drainBackend`), is lifecycle framework in
+`packages/process` (`@langwatch/process/backend-host`), which the dev host (`tools/dev-runtime`, §19)
+runs under its reload. `npx @langwatch/server` runs its `main.ts`, one `runBackend` call, where a
+worker that refuses boot is fatal. Images and the Helm chart still run each app's own `main.ts`. Only it
+and the private dev host may import both start seams (policy `application-boundaries`, ADR-168).
 
 `apps/scenario-child` is the one exception: a standalone program the scenario
 module spawns per run, which owns its own logic (adapters, turn execution) and
@@ -56,7 +65,7 @@ importing nothing from `modules/` ([ADR-160](adr/160-internal-consoles-are-go-se
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
 across laptop, CI and production. Application logic is shared and the parsed
 environment differs; hosting differs too: locally one process and one shared module
-runner and event loop can host ui, api and worker (§19), so a combined boot proves no
+runner and event loop host api and worker (§19), so a combined boot proves no
 multi-process lifecycle or singleton isolation (Alex, 2026-10-01). There
 is no dev-only branch anywhere in an app, because an app has nowhere to put
 one.
@@ -701,7 +710,8 @@ a process that does not select `.rest()`, `.trpc()` or `.browserBundle()` neithe
 that surface. A module whose transport needs a surface the process did not select still installs, and
 that transport is skipped, not refused (Alex, 2026-10-05; §4 says this here only). Deployment is unchanged
 for now: locally one server runs rest, trpc, ui and the worker; in production one pod runs api, trpc
-and ui, and another the worker.
+and ui, and another the worker. `npx @langwatch/server` runs `apps/backend`, the api and the worker in
+one Node process (Alex, 2026-10-10).
 
 **The HTTP boundary is API versus browser bundle.** The host knows two
 paths, `/api` and `/`. The API package owns the fixed tRPC prefix
@@ -1429,6 +1439,7 @@ ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY O
 in the newest `langwatch@v*` tag, read from git, are history and never rewritten; a clone without the
 tags fails the guards rather than passing (Alex, 2026-10-09).
 **No stuck states** (Alex, 2026-10-10, STUCK-STATES; `specs/upgrade/upgrade-stuck-states-*.feature`):
+
 - Once the gate admits (the ledger is current), a schema-not-ready error is a 500 that logs "schema and
   ledger disagree", never `upgrade_in_progress`. That 503 is only for an api the gate has not admitted.
 - A tenant step settles done only when every eligible tenant holds a finished row. A pass that claimed
@@ -1439,25 +1450,25 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   log says it is retrying and why.
 - Legacy `pnpm task` runs and `upgrade` never overlap. Both take the one timed upgrade lease, and each
   refuses while the other holds it. Legacy tasks are to fold into upgrade steps, in a later drive.
-Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
-name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
-`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
-lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
-2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
-touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
-migration main has released keeps main's bytes even when it touches two owners: installs hold its
-checksum, so a later idempotent migration carries the split instead, and the check names it as
-released history (Alex, 2026-10-09). A registered step is re-run only by the app, Retry step on Ops > Upgrades,
-under the lease and the old-writer gate; no module task runs a step's code directly (Alex, 2026-10-09).
-Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
-storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
-run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
-ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
-process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
-key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
-key (Alex, 2026-10-09). Governance's anomaly destination migration passes a migration-only `idempotencyKey` on
-`CreateWebhookEndpointCommand`, unique per organization by a Postgres index, so a re-run or a
-concurrent create answers the endpoint already made (Alex, 2026-10-09, D2).
+  Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
+  name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
+  `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
+  lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
+  2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+  touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
+  migration main has released keeps main's bytes even when it touches two owners: installs hold its
+  checksum, so a later idempotent migration carries the split instead, and the check names it as
+  released history (Alex, 2026-10-09). A registered step is re-run only by the app, Retry step on Ops > Upgrades,
+  under the lease and the old-writer gate; no module task runs a step's code directly (Alex, 2026-10-09).
+  Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
+  storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
+  run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
+  ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
+  process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
+  key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
+  key (Alex, 2026-10-09). Governance's anomaly destination migration passes a migration-only `idempotencyKey` on
+  `CreateWebhookEndpointCommand`, unique per organization by a Postgres index, so a re-run or a
+  concurrent create answers the endpoint already made (Alex, 2026-10-09, D2).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
@@ -1817,7 +1828,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - **What a route needs beyond its input is middleware context, supplied by its own module** (Alex, 2026-10-10).
   `defineMiddlewareContext(name, schema)` declares it, the route names it with `.withMiddlewareContext(x)`, and the
   module installer supplies every name its routes ask for with `.provideMiddlewareContext({ name: (request,
-  { app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
+{ app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
   routes need context it never provides does not publish, and the mount still refuses an unprovided name. No
   process supplies a module's context; a value several modules need is a shared helper (`projectRequestContextOf`
   in `@langwatch/api/rest`). `.withHeaders(...)` values bind themselves.
@@ -1955,6 +1966,17 @@ sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails o
   existing peer, so there is no auth -> project edge (coordinator, members wave 3, 2026-10-05). A sink
   without `organizationOf` refuses the declaration at mount, naming the procedure. Spec:
   `packages/api/specs/trpc-framework.feature`.
+- **E11, every REST write says whether it is audited** (Alex, 2026-10-10): a POST, PUT, PATCH or
+  DELETE route declares `.withAudit("<action>")` or `.withoutAudit("<reason>")`, and the declaration refuses
+  a write route with neither. The action is the tRPC path the same write audits under where one exists
+  (`prompts.update`), so one filter and one phrase cover both doors; the existing `management.*` actions
+  keep their names. Exempt are ingestion (OTLP, collector, RUM, scenario events, batch logs, DSPy
+  steps), reads sent as a POST, runs (workflow run, prompt execute, playground, instant eval, agent
+  test) and other services' webhooks (Stripe, Slack, ElevenLabs). Sign-in, OAuth, device flow and SCIM
+  writes are audited. A REST row takes its organization and project from the declared scope, and carries
+  the client address and user agent as a tRPC row does. A call made with an API key is audited: a
+  service key's row names the key (`apikey:<id>`) and the page shows its name and who created it; a
+  personal key's row names its person with the key beside it (Alex, 2026-10-10).
 - `POST /api/demo/hotel_bot` is for LangWatch staff only (platform operators) (Alex, 2026-10-05): it moves onto
   the platform-operator door tier (E4) when that lands; until then the route refuses every caller, since
   nothing in the product calls it.
@@ -3287,8 +3309,8 @@ a function of datastore state that no input declaration describes.
 
 The root scripts are unchanged. `test`, `typecheck`, `lint` and `build` keep
 the filter sets CI, haven and this documentation already invoke; Nx is
-available beside them as `test:all`, `test:affected`, `typecheck:all`,
-`typecheck:affected`, `build:affected`, `lint:changed` and `graph`. Repointing
+available beside them as `test:all`, `test:affected`,
+`build:affected`, `lint:changed` and `graph`. Repointing
 the root scripts at Nx is a separate decision — the current root `test` covers
 `packages/`, `modules/` and the enterprise packages and deliberately excludes
 the applications, the SDK and the e2e suites, so the two are not the same set.

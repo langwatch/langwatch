@@ -1,7 +1,4 @@
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 /** `/api/organizations` reads, instance bearer key; api-key serves the POST (R3). */
 import {
   OrganizationApi,

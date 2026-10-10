@@ -3,6 +3,7 @@
  * it.
  */
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { system } from "@langwatch/design-system/system";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
 import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
@@ -277,7 +278,7 @@ function ScoreBars({
           />
           <ScoreBarTrack
             entry={entry}
-            color={targetColors?.[entry.variantId] ?? "rgb(37, 99, 235)"}
+            color={targetColors?.[entry.variantId] ?? system.token.var("colors.chart.2")}
             scale={scale}
           />
         </Box>

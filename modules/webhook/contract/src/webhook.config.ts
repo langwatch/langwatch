@@ -1,4 +1,10 @@
-import { Config, isSaas, outboundProxy, type ConfigOf } from "@langwatch/config";
+import {
+  allowInsecureLocalUrls,
+  Config,
+  isSaas,
+  outboundProxy,
+  type ConfigOf,
+} from "@langwatch/config";
 import { z } from "zod";
 
 const unsafeSwitch = z
@@ -7,7 +13,8 @@ const unsafeSwitch = z
   .transform((value) => value === true || value === "1");
 
 export const webhookConfig = Config.define((c) => ({
-  allowInsecureLocalUrls: c.env("WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS", unsafeSwitch),
+  /** The dev switch (the shared leaf); automation honours the same one. */
+  allowInsecureLocalUrls,
   allowAmbientAwsCredentials: c.env("WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS", unsafeSwitch),
   /** The hosted product (the shared leaf): its HTTP egress verifies the receiver's certificate. */
   isSaas,

@@ -581,6 +581,20 @@ func TestKeeperSeedsOnlyOnceTheAPIReportsReady(t *testing.T) {
 			t.Errorf("ran %v, want the seed once", sup.shells)
 		}
 	})
+	t.Run("given the wait, it names backend readiness, never an upgrade it cannot see", func(t *testing.T) {
+		o := &Orchestrator{sup: &fakeSupervisor{}, sys: &fakeSystem{}, log: zap.NewNop()}
+		out := captureStdout(t, func() { o.seedWhenReady(context.Background(), seed) })
+		for _, want := range []string{readyWaitPhase, readyDonePhase} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output lacks %q:\n%s", want, out)
+			}
+		}
+		for _, phase := range []string{out, readyStillPhase} {
+			if strings.Contains(strings.ToLower(phase), "upgrade") {
+				t.Errorf("the readiness wait claims an upgrade: %q", phase)
+			}
+		}
+	})
 	t.Run("given the keeper stops before the api is ready, nothing is seeded", func(t *testing.T) {
 		sup := &fakeSupervisor{notReady: true}
 		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}

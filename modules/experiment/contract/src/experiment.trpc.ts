@@ -2,7 +2,7 @@
 // and runs. Legacy wizard setup stored as open record, verbatim.
 
 import { mappingStateSchema } from "@langwatch/dataset-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { checkPreconditionsSchema } from "@langwatch/trace-contract";
 import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { z } from "zod";
@@ -30,7 +30,7 @@ import { experimentSchema } from "./experiment.ts";
 const projectScopeSchema = z.object({ projectId: z.string() });
 
 /** The legacy wizard's stored setup, named as main named it. */
-export const legacyWorkbenchStateSchema = z
+const legacyWorkbenchStateSchemaDefinition = z
   .looseObject({
     name: z.string().optional(),
     step: z.enum(["task", "dataset", "execution", "evaluation", "results"]).optional(),
@@ -76,40 +76,65 @@ export const legacyWorkbenchStateSchema = z
       .optional(),
   })
   .describe("The wizard's stored setup: read it, change it, send it back whole.");
+export interface LegacyWorkbenchStateSchema extends Named<
+  typeof legacyWorkbenchStateSchemaDefinition
+> {}
+export const legacyWorkbenchStateSchema: LegacyWorkbenchStateSchema =
+  legacyWorkbenchStateSchemaDefinition;
 
 /** `saveExperiment`: the legacy wizard's setup and the graph it writes a version of. */
-export const experimentWizardSaveInputSchema = z.object({
+const experimentWizardSaveInputSchemaDefinition = z.object({
   ...projectScopeSchema.shape,
   experimentId: z.string().optional(),
   workbenchState: legacyWorkbenchStateSchema,
   dsl: studioWorkflowSchema,
   commitMessage: z.string().optional(),
 });
+export interface ExperimentWizardSaveInputSchema extends Named<
+  typeof experimentWizardSaveInputSchemaDefinition
+> {}
+export const experimentWizardSaveInputSchema: ExperimentWizardSaveInputSchema =
+  experimentWizardSaveInputSchemaDefinition;
 export type ExperimentWizardSaveInput = z.infer<typeof experimentWizardSaveInputSchema>;
 
 /** `getExperimentBySlugOrId`: one experiment, named by either key. */
-export const experimentIdOrSlugInputSchema = z.object({
+const experimentIdOrSlugInputSchemaDefinition = z.object({
   ...projectScopeSchema.shape,
   experimentId: z.string().optional(),
   experimentSlug: z.string().optional(),
 });
+export interface ExperimentIdOrSlugInputSchema extends Named<
+  typeof experimentIdOrSlugInputSchemaDefinition
+> {}
+export const experimentIdOrSlugInputSchema: ExperimentIdOrSlugInputSchema =
+  experimentIdOrSlugInputSchemaDefinition;
 export type ExperimentIdOrSlugInput = z.infer<typeof experimentIdOrSlugInputSchema>;
 
 /** `getAllForEvaluationsList`: which page of the evaluations list. */
-export const experimentEvaluationsListInputSchema = z.object({
+const experimentEvaluationsListInputSchemaDefinition = z.object({
   ...projectScopeSchema.shape,
   pageOffset: z.number().optional(),
   pageSize: z.number().optional(),
 });
+export interface ExperimentEvaluationsListInputSchema extends Named<
+  typeof experimentEvaluationsListInputSchemaDefinition
+> {}
+export const experimentEvaluationsListInputSchema: ExperimentEvaluationsListInputSchema =
+  experimentEvaluationsListInputSchemaDefinition;
 export type ExperimentEvaluationsListInput = z.infer<typeof experimentEvaluationsListInputSchema>;
 
 /** `copy`: an experiment from a source project into the target project. */
-export const experimentCopyInputSchema = z.object({
+const experimentCopyInputSchemaDefinition = z.object({
   experimentId: z.string(),
   projectId: z.string(),
   sourceProjectId: z.string(),
   copyDatasets: z.boolean().optional(),
 });
+export interface ExperimentCopyInputSchema extends Named<
+  typeof experimentCopyInputSchemaDefinition
+> {}
+export const experimentCopyInputSchema: ExperimentCopyInputSchema =
+  experimentCopyInputSchemaDefinition;
 export type ExperimentCopyInput = z.infer<typeof experimentCopyInputSchema>;
 
 export const experimentsTrpc = defineTrpcContract("experiments")

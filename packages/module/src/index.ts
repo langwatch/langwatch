@@ -32,6 +32,8 @@ export {
   type TrpcReadOptions,
 } from "./contract/trpc-contract.ts";
 
+export type { Named } from "./contract/named-schema.ts";
+
 export { SCHEMA_HASH_HEADER, schemaHashOf, schemaHashesOf } from "./contract/schema-hash.ts";
 
 export { defineMiddlewareContext, type MiddlewareContext } from "./contract/middleware-context.ts";

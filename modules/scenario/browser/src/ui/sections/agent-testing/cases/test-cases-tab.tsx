@@ -13,7 +13,7 @@ import { TestCasesRail } from "./test-cases-rail.tsx";
 import { useTestCasesTab } from "./use-test-cases-tab.ts";
 
 /** The page header sits right of the rail, so the rail runs full height like every section. */
-export function TestCasesTab({ header }: { header?: ReactNode }) {
+export function TestCasesTab({ header }: { header?: ReactNode | ((title: string) => ReactNode) }) {
   const model = useTestCasesTab();
   // An empty project has nothing to file, so its setup prompt takes the whole page.
   const { data } = model;
@@ -22,6 +22,8 @@ export function TestCasesTab({ header }: { header?: ReactNode }) {
 
   return (
     <Stack
+      data-section-frame
+      background="bg.card"
       direction={{ base: "column", md: "row" }}
       width="full"
       height="full"
@@ -32,7 +34,13 @@ export function TestCasesTab({ header }: { header?: ReactNode }) {
       {!isEmptyProject && <TestCasesRail model={model} />}
 
       <VStack align="stretch" flex={1} minWidth={0} gap={0}>
-        {header}
+        {typeof header === "function"
+          ? header(
+              model.base.selection.kind === "external"
+                ? (model.view.externalSetId ?? "From Code")
+                : (model.view.selectedSuite?.name ?? "Default"),
+            )
+          : header}
         <TestCasesPanel model={model} />
       </VStack>
 

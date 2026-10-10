@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const metricKindSchema = z.enum([
@@ -17,7 +18,7 @@ export type AggregationTemporality = z.infer<typeof aggregationTemporalitySchema
  * Integer and UInt64 values are decimal strings — JS cannot represent every
  * OTLP int64/fixed64 value, while ClickHouse accepts decimal strings for those columns.
  */
-export const canonicalMetricDataPointSchema = z.object({
+const canonicalMetricDataPointSchemaDefinition = z.object({
   tenantId: z.string(),
   organizationId: z.string(),
   pointId: z.string().regex(/^[a-f0-9]{64}$/),
@@ -71,6 +72,11 @@ export const canonicalMetricDataPointSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
   acceptedAt: z.number().int().nonnegative(),
 });
+export interface CanonicalMetricDataPointSchema extends Named<
+  typeof canonicalMetricDataPointSchemaDefinition
+> {}
+export const canonicalMetricDataPointSchema: CanonicalMetricDataPointSchema =
+  canonicalMetricDataPointSchemaDefinition;
 
 export type CanonicalMetricDataPoint = z.infer<typeof canonicalMetricDataPointSchema>;
 

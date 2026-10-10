@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +113,7 @@ func TestRestart(t *testing.T) {
 		t.Run("when the launcher itself owns the port, it is never signalled", func(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.pidsByPort[9000] = []int{42}
+			store.stacks[0].Refresh = domain.RefreshHMR
 			o := restartOrch(store, sys)
 			if err := o.Restart(ctx, params, "ui", false); err != nil {
 				t.Fatalf("Restart: %v", err)
@@ -465,5 +469,56 @@ func TestSelectionIsPerWorktree(t *testing.T) {
 				}
 			})
 		})
+	})
+}
+
+// @scenario "Restarting one service bounces only that service"
+func TestRestartUIOnABuiltStackRebuildsTheBundleWithoutBouncingTheBackend(t *testing.T) {
+	newFixture := func(mode domain.RefreshMode) (*fakeSystem, *Orchestrator, *[]string) {
+		st := restartStack()
+		st.Refresh = mode
+		store := &fakeStore{stacks: []domain.Stack{st}}
+		sys := &fakeSystem{alive: map[int]bool{42: true}, pidsByPort: map[int][]int{9000: {100}}}
+		o := restartOrch(store, sys)
+		var built []string
+		o.uiBuild = func(_ context.Context, dir string, _ io.Writer) error {
+			built = append(built, dir)
+			return nil
+		}
+		return sys, o, &built
+	}
+
+	for _, mode := range []domain.RefreshMode{domain.RefreshStill, domain.RefreshWatch} {
+		t.Run("a "+mode.Name()+" stack rebuilds the bundle and kills nothing", func(t *testing.T) {
+			sys, o, built := newFixture(mode)
+			msg, err := o.RestartStackQuiet("feat-x", "ui")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(msg, "the backend was not restarted") || len(*built) != 1 {
+				t.Fatalf("want one build and the swap message, got %q after %v", msg, *built)
+			}
+			if len(sys.groupTerminated) != 0 {
+				t.Fatalf("the backend must not be bounced, terminated %v", sys.groupTerminated)
+			}
+		})
+	}
+
+	t.Run("an hmr stack still bounces the ui lane", func(t *testing.T) {
+		sys, o, built := newFixture(domain.RefreshHMR)
+		if _, err := o.RestartStackQuiet("feat-x", "ui"); err != nil {
+			t.Fatal(err)
+		}
+		if len(*built) != 0 || len(sys.groupTerminated) == 0 {
+			t.Fatalf("want a bounce and no build, got build %v terminated %v", *built, sys.terminated)
+		}
+	})
+
+	t.Run("a failed build is an error", func(t *testing.T) {
+		_, o, _ := newFixture(domain.RefreshStill)
+		o.uiBuild = func(context.Context, string, io.Writer) error { return errors.New("vite failed") }
+		if _, err := o.RestartStackQuiet("feat-x", "ui"); err == nil {
+			t.Fatal("want the build error")
+		}
 	})
 }

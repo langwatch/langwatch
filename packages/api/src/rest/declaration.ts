@@ -606,6 +606,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly session?: z.ZodType;
   /** Present exactly when the route declared the trail it leaves. */
   readonly audit?: string;
+  /** Present exactly when the route declared it leaves no trail, and why. */
+  readonly auditExempt?: string;
   readonly handler: StoredHandler<Api>;
 }>;
 
@@ -684,6 +686,7 @@ type RouteState = Readonly<{
   credential?: RestDoorCredential;
   session?: z.ZodType;
   audit?: string;
+  auditExempt?: string;
 }>;
 
 type RouteReady<
@@ -1629,7 +1632,7 @@ class RouteBuilder<Api, S extends RouteShape> {
    */
   withAudit(action: string): RouteBuilder<Api, S> {
     assertAuditAction(action);
-    assertSourceUnset("audit", this.state.audit);
+    assertAuditUndeclared(this.state);
 
     return new RouteBuilder<Api, S>({
       router: this.router,
@@ -1642,6 +1645,50 @@ class RouteBuilder<Api, S extends RouteShape> {
       },
     });
   }
+
+  /**
+   * The route leaves no audit row, and the reason says why: ingestion, a read sent as a POST,
+   * a run, or another service's webhook. A write route declares this or `withAudit`.
+   */
+  withoutAudit(reason: string): RouteBuilder<Api, S> {
+    if (reason.trim().length === 0) throw new Error("REST withoutAudit needs a reason");
+    assertAuditUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, auditExempt: reason },
+    });
+  }
+}
+
+const WRITE_METHODS: ReadonlySet<HttpMethod> = new Set(["post", "put", "patch", "delete"]);
+
+/** A write route says whether it leaves a trail (E11): `withAudit` or `withoutAudit`. */
+function assertAuditDeclared({
+  method,
+  operation,
+  state,
+}: {
+  method: HttpMethod;
+  operation: string;
+  state: RouteState;
+}): void {
+  const writes = (state.methods ?? [method]).some((each) => WRITE_METHODS.has(each));
+  if (!writes || state.audit !== void 0 || state.auditExempt !== void 0) return;
+
+  throw new Error(
+    `REST ${operation} is a write route: declare withAudit("<action>") or withoutAudit("<reason>")`,
+  );
+}
+
+/** A route says once whether it leaves a trail. */
+function assertAuditUndeclared(state: RouteState): void {
+  if (state.audit !== void 0 || state.auditExempt !== void 0) {
+    throw new Error("REST route already declared withAudit() or withoutAudit()");
+  }
 }
 
 /**
@@ -1649,8 +1696,8 @@ class RouteBuilder<Api, S extends RouteShape> {
  * by subject, and a free-form sentence cannot be grouped.
  */
 function assertAuditAction(action: string): void {
-  if (!/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/.test(action)) {
-    throw new Error(`REST audit action "${action}" must be dotted lower kebab case`);
+  if (!/^[a-z][a-zA-Z0-9_-]*(\.[a-z][a-zA-Z0-9_-]*)+$/.test(action)) {
+    throw new Error(`REST audit action "${action}" must be dotted segments, as a tRPC path is`);
   }
 }
 
@@ -1720,6 +1767,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
     ...(state.audit ? { audit: state.audit } : {}),
+    ...(state.auditExempt ? { auditExempt: state.auditExempt } : {}),
   };
 }
 
@@ -2233,6 +2281,7 @@ function assertRouteReady({
   }
 
   assertPublicRouteConstraints({ operation, state });
+  assertAuditDeclared({ method, operation, state });
 
   if (state.answers && state.status !== void 0) {
     throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);

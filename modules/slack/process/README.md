@@ -96,7 +96,7 @@ listSlackConnectionClaims(input: { after?: string; limit?: number; }): Promise<S
 
 |             |                                                            |
 | ----------- | ---------------------------------------------------------- |
-| Declared at | `src/transport/slack.rest.ts:40`                           |
+| Declared at | `src/transport/slack.rest.ts:32`                           |
 | Base URL    | `/api/slack-connections`, twin `/api/v1/slack-connections` |
 | Addressing  | dated                                                      |
 | Credential  | project                                                    |
@@ -106,12 +106,12 @@ listSlackConnectionClaims(input: { after?: string; limit?: number; }): Promise<S
 
 List the Slack connections this project can deliver through: its own and its organization's, by name. Never returns a token or webhook URL.
 
-Permission `project:view`. Declared at `src/transport/slack.rest.ts:44`.
+Permission `project:view`. Declared at `src/transport/slack.rest.ts:36`.
 
 Answers at `/api/slack-connections`, `/api/v1/slack-connections`; also, undocumented, `/api/slack-connections/2026-08-07`, `/api/v1/slack-connections/2026-08-07`, `/api/slack-connections/latest`, `/api/v1/slack-connections/latest`.
 
 ```typescript
-// Response: inline, src/transport/slack.rest.ts:46
+// Response: inline, src/transport/slack.rest.ts:38
 type Response = {
   id: string;
   name: string;

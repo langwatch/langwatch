@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export type GovernanceBudgetOverviewInput = {
@@ -11,7 +12,7 @@ export type GovernanceBudgetOverviewInput = {
  * money fields are decimal STRINGS: they are read straight off the ledger and
  * never rounded through a float on the way to a screen.
  */
-export const governanceBudgetOverviewItemSchema = z
+const governanceBudgetOverviewItemSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -41,19 +42,29 @@ export const governanceBudgetOverviewItemSchema = z
     topModels: z.array(z.object({ model: z.string(), spentUsd: z.number() }).strict()).optional(),
   })
   .strict();
+export interface GovernanceBudgetOverviewItemSchema extends Named<
+  typeof governanceBudgetOverviewItemSchemaDefinition
+> {}
+export const governanceBudgetOverviewItemSchema: GovernanceBudgetOverviewItemSchema =
+  governanceBudgetOverviewItemSchemaDefinition;
 
 /**
  * Every budget binding one member's own keys. A caller with no gateway access
  * is answered rather than refused, with the reason, so the screen renders
  * nothing budget-related instead of an error.
  */
-export const governanceBudgetOverviewForUserSchema = z
+const governanceBudgetOverviewForUserSchemaDefinition = z
   .object({
     gatewayAccess: z.boolean(),
     reason: z.enum(["flag_off", "no_membership"]).optional(),
     budgets: z.array(governanceBudgetOverviewItemSchema),
   })
   .strict();
+export interface GovernanceBudgetOverviewForUserSchema extends Named<
+  typeof governanceBudgetOverviewForUserSchemaDefinition
+> {}
+export const governanceBudgetOverviewForUserSchema: GovernanceBudgetOverviewForUserSchema =
+  governanceBudgetOverviewForUserSchemaDefinition;
 
 export type GovernanceBudgetOverviewItem = z.infer<typeof governanceBudgetOverviewItemSchema>;
 

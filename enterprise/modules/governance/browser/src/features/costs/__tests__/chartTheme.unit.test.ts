@@ -24,7 +24,7 @@ const NEUTRAL_SPREAD = 48;
 
 /** The palette family a colour belongs to: a Chakra token's own name, or neutral for a grey. */
 function familyOf(colour: string): string {
-  const token = /-colors-([a-z]+)-solid\)$/.exec(colour);
+  const token = /-colors-([a-z]+)-(?:solid|emphasized)\)$/.exec(colour);
   if (token?.[1]) return token[1];
   const channels = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/.exec(colour)?.slice(1);
   if (!channels) throw new Error(`no family for ${colour}`);

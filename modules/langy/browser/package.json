@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.219",
-    "@chakra-ui/charts": "^3.36.0",
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@langwatch/api": "workspace:*",

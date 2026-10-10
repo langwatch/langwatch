@@ -1,4 +1,5 @@
 import { ledgerActorSchema, organizationRoleSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { authzPrincipalRefSchema, grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
@@ -8,7 +9,7 @@ const callerSchema = authzPrincipalRefSchema;
 
 const nullableTextSchema = z.string().nullable();
 
-export const authzBindingWriteSchema = z
+const authzBindingWriteSchemaDefinition = z
   .object({
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).nullish(),
@@ -16,16 +17,23 @@ export const authzBindingWriteSchema = z
     scopeId: z.string().min(1),
   })
   .strict();
+export interface AuthzBindingWriteSchema extends Named<typeof authzBindingWriteSchemaDefinition> {}
+export const authzBindingWriteSchema: AuthzBindingWriteSchema = authzBindingWriteSchemaDefinition;
 export type AuthzBindingWrite = z.infer<typeof authzBindingWriteSchema>;
 
-export const authzListManagedBindingsForUserInputSchema = z
+const authzListManagedBindingsForUserInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1), userId: z.string().min(1) })
   .strict();
+export interface AuthzListManagedBindingsForUserInputSchema extends Named<
+  typeof authzListManagedBindingsForUserInputSchemaDefinition
+> {}
+export const authzListManagedBindingsForUserInputSchema: AuthzListManagedBindingsForUserInputSchema =
+  authzListManagedBindingsForUserInputSchemaDefinition;
 export type AuthzListManagedBindingsForUserInput = z.infer<
   typeof authzListManagedBindingsForUserInputSchema
 >;
 
-export const authzManagedUserBindingSchema = z
+const authzManagedUserBindingSchemaDefinition = z
   .object({
     id: z.string(),
     userId: z.string().nullable(),
@@ -38,21 +46,38 @@ export const authzManagedUserBindingSchema = z
     createdAt: z.date(),
   })
   .strict();
+export interface AuthzManagedUserBindingSchema extends Named<
+  typeof authzManagedUserBindingSchemaDefinition
+> {}
+export const authzManagedUserBindingSchema: AuthzManagedUserBindingSchema =
+  authzManagedUserBindingSchemaDefinition;
 export type AuthzManagedUserBinding = z.infer<typeof authzManagedUserBindingSchema>;
 
-export const authzListManagedBindingsForUserOutputSchema = z.array(authzManagedUserBindingSchema);
+const authzListManagedBindingsForUserOutputSchemaDefinition = z.array(
+  authzManagedUserBindingSchema,
+);
+export interface AuthzListManagedBindingsForUserOutputSchema extends Named<
+  typeof authzListManagedBindingsForUserOutputSchemaDefinition
+> {}
+export const authzListManagedBindingsForUserOutputSchema: AuthzListManagedBindingsForUserOutputSchema =
+  authzListManagedBindingsForUserOutputSchemaDefinition;
 export type AuthzListManagedBindingsForUserOutput = z.infer<
   typeof authzListManagedBindingsForUserOutputSchema
 >;
 
-export const authzListManagedBindingsForOrganizationInputSchema = z
+const authzListManagedBindingsForOrganizationInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1) })
   .strict();
+export interface AuthzListManagedBindingsForOrganizationInputSchema extends Named<
+  typeof authzListManagedBindingsForOrganizationInputSchemaDefinition
+> {}
+export const authzListManagedBindingsForOrganizationInputSchema: AuthzListManagedBindingsForOrganizationInputSchema =
+  authzListManagedBindingsForOrganizationInputSchemaDefinition;
 export type AuthzListManagedBindingsForOrganizationInput = z.infer<
   typeof authzListManagedBindingsForOrganizationInputSchema
 >;
 
-export const authzManagedOrganizationBindingSchema = z
+const authzManagedOrganizationBindingSchemaDefinition = z
   .object({
     id: z.string(),
     userId: nullableTextSchema,
@@ -76,16 +101,26 @@ export const authzManagedOrganizationBindingSchema = z
     expiresAt: z.date().nullable().optional(),
   })
   .strict();
+export interface AuthzManagedOrganizationBindingSchema extends Named<
+  typeof authzManagedOrganizationBindingSchemaDefinition
+> {}
+export const authzManagedOrganizationBindingSchema: AuthzManagedOrganizationBindingSchema =
+  authzManagedOrganizationBindingSchemaDefinition;
 export type AuthzManagedOrganizationBinding = z.infer<typeof authzManagedOrganizationBindingSchema>;
 
-export const authzListManagedBindingsForOrganizationOutputSchema = z.array(
+const authzListManagedBindingsForOrganizationOutputSchemaDefinition = z.array(
   authzManagedOrganizationBindingSchema,
 );
+export interface AuthzListManagedBindingsForOrganizationOutputSchema extends Named<
+  typeof authzListManagedBindingsForOrganizationOutputSchemaDefinition
+> {}
+export const authzListManagedBindingsForOrganizationOutputSchema: AuthzListManagedBindingsForOrganizationOutputSchema =
+  authzListManagedBindingsForOrganizationOutputSchemaDefinition;
 export type AuthzListManagedBindingsForOrganizationOutput = z.infer<
   typeof authzListManagedBindingsForOrganizationOutputSchema
 >;
 
-export const authzAccessBreakdownInputSchema = z
+const authzAccessBreakdownInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     userId: z.string().min(1),
@@ -93,9 +128,14 @@ export const authzAccessBreakdownInputSchema = z
     userEmail: nullableTextSchema,
   })
   .strict();
+export interface AuthzAccessBreakdownInputSchema extends Named<
+  typeof authzAccessBreakdownInputSchemaDefinition
+> {}
+export const authzAccessBreakdownInputSchema: AuthzAccessBreakdownInputSchema =
+  authzAccessBreakdownInputSchemaDefinition;
 export type AuthzAccessBreakdownInput = z.infer<typeof authzAccessBreakdownInputSchema>;
 
-export const authzAccessBreakdownBindingSchema = z
+const authzAccessBreakdownBindingSchemaDefinition = z
   .object({
     id: z.string(),
     role: z.string(),
@@ -108,8 +148,13 @@ export const authzAccessBreakdownBindingSchema = z
     cappedBySeat: z.boolean(),
   })
   .strict();
+export interface AuthzAccessBreakdownBindingSchema extends Named<
+  typeof authzAccessBreakdownBindingSchemaDefinition
+> {}
+export const authzAccessBreakdownBindingSchema: AuthzAccessBreakdownBindingSchema =
+  authzAccessBreakdownBindingSchemaDefinition;
 
-export const authzAccessBreakdownOutputSchema = z
+const authzAccessBreakdownOutputSchemaDefinition = z
   .object({
     user: z
       .object({
@@ -134,14 +179,24 @@ export const authzAccessBreakdownOutputSchema = z
     directBindings: z.array(authzAccessBreakdownBindingSchema),
   })
   .strict();
+export interface AuthzAccessBreakdownOutputSchema extends Named<
+  typeof authzAccessBreakdownOutputSchemaDefinition
+> {}
+export const authzAccessBreakdownOutputSchema: AuthzAccessBreakdownOutputSchema =
+  authzAccessBreakdownOutputSchemaDefinition;
 export type AuthzAccessBreakdownOutput = z.infer<typeof authzAccessBreakdownOutputSchema>;
 
-export const authzLegacyAccessNoticeInputSchema = z
+const authzLegacyAccessNoticeInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1), userId: z.string().min(1) })
   .strict();
+export interface AuthzLegacyAccessNoticeInputSchema extends Named<
+  typeof authzLegacyAccessNoticeInputSchemaDefinition
+> {}
+export const authzLegacyAccessNoticeInputSchema: AuthzLegacyAccessNoticeInputSchema =
+  authzLegacyAccessNoticeInputSchemaDefinition;
 export type AuthzLegacyAccessNoticeInput = z.infer<typeof authzLegacyAccessNoticeInputSchema>;
 
-export const authzCreateBindingInputSchema = authzBindingWriteSchema.safeExtend({
+const authzCreateBindingInputSchemaDefinition = authzBindingWriteSchema.safeExtend({
   organizationId: z.string().min(1),
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
@@ -151,12 +206,22 @@ export const authzCreateBindingInputSchema = authzBindingWriteSchema.safeExtend(
   /** When the binding stops granting; a moment already passed is refused. */
   expiresAt: z.date().optional(),
 });
+export interface AuthzCreateBindingInputSchema extends Named<
+  typeof authzCreateBindingInputSchemaDefinition
+> {}
+export const authzCreateBindingInputSchema: AuthzCreateBindingInputSchema =
+  authzCreateBindingInputSchemaDefinition;
 export type AuthzCreateBindingInput = z.infer<typeof authzCreateBindingInputSchema>;
 
-export const authzCreateBindingOutputSchema = z.object({ id: z.string().min(1) }).strict();
+const authzCreateBindingOutputSchemaDefinition = z.object({ id: z.string().min(1) }).strict();
+export interface AuthzCreateBindingOutputSchema extends Named<
+  typeof authzCreateBindingOutputSchemaDefinition
+> {}
+export const authzCreateBindingOutputSchema: AuthzCreateBindingOutputSchema =
+  authzCreateBindingOutputSchemaDefinition;
 export type AuthzCreateBindingOutput = z.infer<typeof authzCreateBindingOutputSchema>;
 
-export const authzUpdateBindingInputSchema = z
+const authzUpdateBindingInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     bindingId: z.string().min(1),
@@ -166,9 +231,14 @@ export const authzUpdateBindingInputSchema = z
     caller: callerSchema,
   })
   .strict();
+export interface AuthzUpdateBindingInputSchema extends Named<
+  typeof authzUpdateBindingInputSchemaDefinition
+> {}
+export const authzUpdateBindingInputSchema: AuthzUpdateBindingInputSchema =
+  authzUpdateBindingInputSchemaDefinition;
 export type AuthzUpdateBindingInput = z.infer<typeof authzUpdateBindingInputSchema>;
 
-export const authzDeleteBindingInputSchema = z
+const authzDeleteBindingInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     bindingId: z.string().min(1),
@@ -176,9 +246,14 @@ export const authzDeleteBindingInputSchema = z
     caller: callerSchema,
   })
   .strict();
+export interface AuthzDeleteBindingInputSchema extends Named<
+  typeof authzDeleteBindingInputSchemaDefinition
+> {}
+export const authzDeleteBindingInputSchema: AuthzDeleteBindingInputSchema =
+  authzDeleteBindingInputSchemaDefinition;
 export type AuthzDeleteBindingInput = z.infer<typeof authzDeleteBindingInputSchema>;
 
-export const authzApplyMemberBindingsInputSchema = z
+const authzApplyMemberBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     userId: z.string().min(1),
@@ -188,7 +263,17 @@ export const authzApplyMemberBindingsInputSchema = z
     caller: callerSchema,
   })
   .strict();
+export interface AuthzApplyMemberBindingsInputSchema extends Named<
+  typeof authzApplyMemberBindingsInputSchemaDefinition
+> {}
+export const authzApplyMemberBindingsInputSchema: AuthzApplyMemberBindingsInputSchema =
+  authzApplyMemberBindingsInputSchemaDefinition;
 export type AuthzApplyMemberBindingsInput = z.infer<typeof authzApplyMemberBindingsInputSchema>;
 
-export const authzBindingMutationSuccessSchema = z.object({ success: z.literal(true) }).strict();
+const authzBindingMutationSuccessSchemaDefinition = z.object({ success: z.literal(true) }).strict();
+export interface AuthzBindingMutationSuccessSchema extends Named<
+  typeof authzBindingMutationSuccessSchemaDefinition
+> {}
+export const authzBindingMutationSuccessSchema: AuthzBindingMutationSuccessSchema =
+  authzBindingMutationSuccessSchemaDefinition;
 export type AuthzBindingMutationSuccess = z.infer<typeof authzBindingMutationSuccessSchema>;

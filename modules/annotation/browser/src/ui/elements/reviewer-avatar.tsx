@@ -5,7 +5,7 @@
 
 import { Avatar } from "@langwatch/design-system/avatar";
 import { type AvatarRootProps } from "@langwatch/design-system/primitives";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getColorPaletteForString } from "@langwatch/design-system/rotating-colors";
 import { useState } from "react";
 
 export function ReviewerAvatar({
@@ -20,7 +20,11 @@ export function ReviewerAvatar({
   const showImage = !!image && image !== brokenImageUrl;
 
   return (
-    <Avatar.Root color="white" background={getColorForString("colors", name).color} {...rootProps}>
+    <Avatar.Root
+      color={`${getColorPaletteForString(name)}.fg`}
+      background={`${getColorPaletteForString(name)}.subtle`}
+      {...rootProps}
+    >
       {showImage && image ? (
         <Avatar.Image src={image} onError={() => setBrokenImageUrl(image)} />
       ) : null}

@@ -1,4 +1,7 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { CodePreview } from "@langwatch/design-system/code-preview";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
@@ -15,8 +18,8 @@ import {
   Text,
   Wrap,
 } from "@langwatch/design-system/primitives";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { readableDate } from "@langwatch/time";
 import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -24,7 +27,6 @@ import { api, type RouterOutputs } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { UpgradeTenantList } from "./upgrade-tenant-list.tsx";
 const STATUS_COLOR: Record<string, string> = {
   finalized: "green",
@@ -132,7 +134,7 @@ export function UpgradeTenantMigrations() {
 
   return (
     <Stack gap={6}>
-      <HStack alignItems="flex-start" gap={3}>
+      <HStack alignItems="flex-start" gap={3} wrap="wrap">
         <Stack gap={1} flex={1} minWidth={0}>
           <Text textStyle="sm" color="fg.muted">
             Per-organization data migrations, run in order at worker boot. Held organizations failed
@@ -159,7 +161,12 @@ export function UpgradeTenantMigrations() {
         </Button>
       </HStack>
 
-      <ListTable data-testid="upgrade-tenant-migrations-table">
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflowX: "auto" }}
+        data-testid="upgrade-tenant-migrations-table"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Step</Table.ColumnHeader>
@@ -205,13 +212,13 @@ function CountCell({ count, palette }: { count: number; palette?: string }) {
   if (count === 0 || !palette) {
     return (
       <Text as="span" textStyle="sm" color={count === 0 ? "fg.subtle" : void 0}>
-        {count}
+        <FormattedNumber value={count} />
       </Text>
     );
   }
   return (
     <Badge size="sm" variant="subtle" colorPalette={palette}>
-      {count}
+      <FormattedNumber value={count} />
     </Badge>
   );
 }
@@ -323,7 +330,7 @@ function MigrationDetail({
       </Heading>
       {showEnrollments && <EnrollmentTable enrollments={enrollments} canManage={canManage} />}
       {migration.attention.length > 0 && (
-        <ListTable size="sm">
+        <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Organization needing attention</Table.ColumnHeader>
@@ -372,8 +379,8 @@ function OrganizationPicker({
     return (
       <HStack marginTop={3}>
         <Box>
-          <Text fontSize="sm">{value.name}</Text>
-          <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          <Text textStyle="sm">{value.name}</Text>
+          <Text fontFamily="mono" textStyle="xs" color="fg.muted">
             {value.id}
           </Text>
         </Box>
@@ -387,7 +394,8 @@ function OrganizationPicker({
 
   return (
     <Stack gap={2} marginTop={3}>
-      <Input
+      <SearchInput
+        type="text"
         size="sm"
         aria-label="Search organizations"
         placeholder="Search organizations by name or paste an id"
@@ -395,12 +403,12 @@ function OrganizationPicker({
         onChange={(event) => setQuery(event.target.value)}
       />
       {search.isFetching && (
-        <Text fontSize="xs" color="fg.muted">
+        <Text textStyle="xs" color="fg.muted">
           Searching…
         </Text>
       )}
       {search.data?.length === 0 && !search.isFetching && (
-        <Text fontSize="xs" color="fg.muted">
+        <Text textStyle="xs" color="fg.muted">
           No organizations match.
         </Text>
       )}
@@ -413,7 +421,7 @@ function OrganizationPicker({
           onClick={() => onChange(organization)}
         >
           <Text as="span">{organization.name}</Text>
-          <Text as="span" fontFamily="mono" fontSize="xs" color="fg.muted">
+          <Text as="span" fontFamily="mono" textStyle="xs" color="fg.muted">
             {organization.id}
           </Text>
         </Button>
@@ -558,7 +566,7 @@ function HeldBackClassFields({
 }) {
   return (
     <Stack gap={2} paddingTop={3}>
-      <Text fontSize="sm">Organizations normally held back</Text>
+      <Text textStyle="sm">Organizations normally held back</Text>
       <Checkbox
         size="sm"
         checked={includeEnterprise}
@@ -702,7 +710,7 @@ function CohortDialog({
       confirmDisabled={!sampleSizeValid}
     >
       <Stack gap={1}>
-        <Text fontSize="sm">How many organizations to enroll</Text>
+        <Text textStyle="sm">How many organizations to enroll</Text>
         <Input
           size="sm"
           type="number"
@@ -865,7 +873,7 @@ function EnrollmentTable({
   const [showAll, setShowAll] = useState(false);
   if (enrollments.length === 0) {
     return (
-      <Text fontSize="sm" color="fg.muted">
+      <Text textStyle="sm" color="fg.muted">
         No organizations are enrolled for this step yet.
       </Text>
     );
@@ -874,7 +882,7 @@ function EnrollmentTable({
   const hiddenCount = enrollments.length - visible.length;
   return (
     <Stack gap={2}>
-      <ListTable size="sm">
+      <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
@@ -941,18 +949,20 @@ function EnrollmentRow({
         ) : (
           <Text color="fg.muted">Deleted organization</Text>
         )}
-        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+        <Text fontFamily="mono" textStyle="xs" color="fg.muted">
           {enrollment.organizationId}
         </Text>
       </Table.Cell>
       <Table.Cell>
         {enrollment.enrolledByLabel ?? (
-          <Text as="span" fontFamily="mono" fontSize="xs">
+          <Text as="span" fontFamily="mono" textStyle="xs">
             {enrollment.enrolledByUserId}
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>{readableDate(enrollment.createdAt).toLocaleString()}</Table.Cell>
+      <Table.Cell>
+        <FormattedDate value={enrollment.createdAt} />
+      </Table.Cell>
       {canManage && (
         <Table.Cell textAlign="right">
           <Button
@@ -985,10 +995,12 @@ function AttentionRow({ record }: { record: MigrationListing["attention"][number
             {STATUS_LABEL[record.status] ?? record.status}
           </Badge>
         </Table.Cell>
-        <Table.Cell>{readableDate(record.updatedAt).toLocaleString()}</Table.Cell>
+        <Table.Cell>
+          <FormattedDate value={record.updatedAt} />
+        </Table.Cell>
         <Table.Cell>
           {record.report == null ? (
-            <Text fontSize="sm" color="fg.muted">
+            <Text textStyle="sm" color="fg.muted">
               No report
             </Text>
           ) : (
@@ -1001,7 +1013,14 @@ function AttentionRow({ record }: { record: MigrationListing["attention"][number
       {expanded && record.report != null && (
         <Table.Row>
           <Table.Cell colSpan={4}>
-            <JsonViewer data={record.report} maxHeight="320px" />
+            <CodePreview
+              code={JSON.stringify(record.report, null, 2)}
+              language="json"
+              filename="Migration report"
+              compact
+              lineNumbers
+              maxHeight="320px"
+            />
           </Table.Cell>
         </Table.Row>
       )}

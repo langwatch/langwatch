@@ -2,7 +2,7 @@ import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { WORKFLOW_CARD_OPENER_STYLE } from "@langwatch/design-system/workflow-card";
-import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
+import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 /** A card opener that navigates rather than acts. */
 export function WorkflowCardLink({
@@ -55,7 +55,7 @@ export function WorkflowCardActions({
         <Menu.Item value="copy" onClick={onCopy}>
           <Copy size={16} /> Replicate to another project
         </Menu.Item>
-        <Menu.Item value="delete" color="red.500" onClick={onDelete}>
+        <Menu.Item value="delete" color="red.fg" onClick={onDelete}>
           <Trash2 size={16} /> Delete
         </Menu.Item>
       </Menu.Content>

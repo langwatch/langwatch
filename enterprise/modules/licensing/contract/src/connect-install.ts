@@ -5,6 +5,7 @@
  * the two hosts give it, and what the Settings screens render from.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { CONNECT_SERVICES } from "./issued-license.ts";
@@ -28,27 +29,34 @@ export interface LicenseSeatCounts {
   readonly liteMembers: number;
 }
 
-export const connectSyncAnswerSchema = z.object({
+const connectSyncAnswerSchemaDefinition = z.object({
   services: z.array(z.string()),
   /** A reissued license waiting for this install, sent until it is presented. */
   license: z.string().optional(),
 });
+export interface ConnectSyncAnswerSchema extends Named<typeof connectSyncAnswerSchemaDefinition> {}
+export const connectSyncAnswerSchema: ConnectSyncAnswerSchema = connectSyncAnswerSchemaDefinition;
 
 /** The hosted services the registry has the license entitled to, and any reissued license. */
 export type LicenseSyncAnswer = z.infer<typeof connectSyncAnswerSchema>;
 
-export const connectActivationAnswerSchema = z.object({
+const connectActivationAnswerSchemaDefinition = z.object({
   license: z.string().min(1),
   planType: z.string(),
   maxMembers: z.number(),
   expiresAt: z.string(),
   services: z.array(z.string()),
 });
+export interface ConnectActivationAnswerSchema extends Named<
+  typeof connectActivationAnswerSchemaDefinition
+> {}
+export const connectActivationAnswerSchema: ConnectActivationAnswerSchema =
+  connectActivationAnswerSchemaDefinition;
 
 /** The license an activation code minted, as it comes back. */
 export type ActivationAnswer = z.infer<typeof connectActivationAnswerSchema>;
 
-export const connectBudgetSchema = z.object({
+const connectBudgetSchemaDefinition = z.object({
   id: z.string(),
   scope: z.string(),
   window: z.string(),
@@ -59,47 +67,68 @@ export const connectBudgetSchema = z.object({
   period_started_at: z.string(),
   is_contract: z.boolean(),
 });
+export interface ConnectBudgetSchema extends Named<typeof connectBudgetSchemaDefinition> {}
+export const connectBudgetSchema: ConnectBudgetSchema = connectBudgetSchemaDefinition;
 
-export const connectContractSchema = z.object({
+const connectContractSchemaDefinition = z.object({
   ...connectBudgetSchema.shape,
   commit_usd: z.number(),
   maximum_cap_usd: z.number(),
   overage_enabled: z.boolean(),
   term_ends_at: z.string().nullable(),
 });
+export interface ConnectContractSchema extends Named<typeof connectContractSchemaDefinition> {}
+export const connectContractSchema: ConnectContractSchema = connectContractSchemaDefinition;
 
 /**
  * The published shape of the usage answer. Both halves parse against it, which
  * is what keeps the hosted route and the install from drifting apart.
  */
-export const connectUsageAnswerSchema = z.object({
+const connectUsageAnswerSchemaDefinition = z.object({
   services: z.array(z.string()),
   spend_available: z.boolean(),
   read_at: z.string(),
   contract: connectContractSchema.nullable(),
   budgets: z.array(connectBudgetSchema),
 });
+export interface ConnectUsageAnswerSchema extends Named<
+  typeof connectUsageAnswerSchemaDefinition
+> {}
+export const connectUsageAnswerSchema: ConnectUsageAnswerSchema =
+  connectUsageAnswerSchemaDefinition;
 
-export const connectSetBudgetAnswerSchema = z.object({
+const connectSetBudgetAnswerSchemaDefinition = z.object({
   cap_usd: z.number(),
   maximum_cap_usd: z.number(),
 });
+export interface ConnectSetBudgetAnswerSchema extends Named<
+  typeof connectSetBudgetAnswerSchemaDefinition
+> {}
+export const connectSetBudgetAnswerSchema: ConnectSetBudgetAnswerSchema =
+  connectSetBudgetAnswerSchemaDefinition;
 
-export const connectVerdictSchema = z.object({
+const connectVerdictSchemaDefinition = z.object({
   questionId: z.string(),
   probability: z.number().optional(),
   score: z.number().optional(),
   label: z.string().optional(),
   probabilities: z.record(z.string(), z.number()).optional(),
 });
+export interface ConnectVerdictSchema extends Named<typeof connectVerdictSchemaDefinition> {}
+export const connectVerdictSchema: ConnectVerdictSchema = connectVerdictSchemaDefinition;
 
-export const connectClassifyAnswerSchema = z.object({
+const connectClassifyAnswerSchemaDefinition = z.object({
   verdicts: z.array(connectVerdictSchema),
   skipped_reason: z.string().optional(),
   input_tokens: z.number(),
   is_text_truncated: z.boolean(),
   charged_usd: z.number(),
 });
+export interface ConnectClassifyAnswerSchema extends Named<
+  typeof connectClassifyAnswerSchemaDefinition
+> {}
+export const connectClassifyAnswerSchema: ConnectClassifyAnswerSchema =
+  connectClassifyAnswerSchemaDefinition;
 
 /** One judged text, as the host answers it. */
 export interface ConnectClassifyAnswer {
@@ -145,7 +174,7 @@ export type LicenseRefreshOutcome = Exclude<
 >;
 
 /** The views above, as the wire carries them. */
-export const connectBudgetViewSchema = z.object({
+const connectBudgetViewSchemaDefinition = z.object({
   id: z.string(),
   scope: z.string(),
   window: z.string(),
@@ -156,22 +185,31 @@ export const connectBudgetViewSchema = z.object({
   periodStartedAt: z.string(),
   isContract: z.boolean(),
 });
+export interface ConnectBudgetViewSchema extends Named<typeof connectBudgetViewSchemaDefinition> {}
+export const connectBudgetViewSchema: ConnectBudgetViewSchema = connectBudgetViewSchemaDefinition;
 
-export const connectContractViewSchema = z.object({
+const connectContractViewSchemaDefinition = z.object({
   ...connectBudgetViewSchema.shape,
   commitUsd: z.number(),
   maximumCapUsd: z.number(),
   overageEnabled: z.boolean(),
   termEndsAt: z.string().nullable(),
 });
+export interface ConnectContractViewSchema extends Named<
+  typeof connectContractViewSchemaDefinition
+> {}
+export const connectContractViewSchema: ConnectContractViewSchema =
+  connectContractViewSchemaDefinition;
 
-export const connectUsageViewSchema = z.object({
+const connectUsageViewSchemaDefinition = z.object({
   services: z.array(z.string()),
   spendAvailable: z.boolean(),
   readAt: z.string(),
   contract: connectContractViewSchema.nullable(),
   budgets: z.array(connectBudgetViewSchema),
 });
+export interface ConnectUsageViewSchema extends Named<typeof connectUsageViewSchemaDefinition> {}
+export const connectUsageViewSchema: ConnectUsageViewSchema = connectUsageViewSchemaDefinition;
 
 const connectRefusalSchema = z.object({ code: z.string(), meta: z.unknown().optional() });
 
@@ -180,7 +218,7 @@ const connectSyncViewSchema = z.object({
   lastError: z.object({ code: z.string() }).nullable(),
 });
 
-export const connectStatusSchema = z.union([
+const connectStatusSchemaDefinition = z.union([
   z.object({ deployment: z.literal("off") }),
   z.object({
     deployment: z.literal("on"),
@@ -194,20 +232,34 @@ export const connectStatusSchema = z.union([
     sync: connectSyncViewSchema,
   }),
 ]);
+export interface ConnectStatusSchema extends Named<typeof connectStatusSchemaDefinition> {}
+export const connectStatusSchema: ConnectStatusSchema = connectStatusSchemaDefinition;
 
-export const connectServicesSetSchema = z.object({
+const connectServicesSetSchemaDefinition = z.object({
   enabledServices: z.array(z.enum(CONNECT_SERVICES)),
 });
+export interface ConnectServicesSetSchema extends Named<
+  typeof connectServicesSetSchemaDefinition
+> {}
+export const connectServicesSetSchema: ConnectServicesSetSchema =
+  connectServicesSetSchemaDefinition;
 
-export const connectCapSetSchema = z.object({
+const connectCapSetSchemaDefinition = z.object({
   capUsd: z.number(),
   maximumCapUsd: z.number(),
 });
+export interface ConnectCapSetSchema extends Named<typeof connectCapSetSchemaDefinition> {}
+export const connectCapSetSchema: ConnectCapSetSchema = connectCapSetSchemaDefinition;
 
-export const licenseRefreshOutcomeSchema = z.union([
+const licenseRefreshOutcomeSchemaDefinition = z.union([
   z.object({ outcome: z.literal("unchanged") }),
   z.object({ outcome: z.literal("updated"), maxMembers: z.number(), expiresAt: z.string() }),
 ]);
+export interface LicenseRefreshOutcomeSchema extends Named<
+  typeof licenseRefreshOutcomeSchemaDefinition
+> {}
+export const licenseRefreshOutcomeSchema: LicenseRefreshOutcomeSchema =
+  licenseRefreshOutcomeSchemaDefinition;
 
 /**
  * The install's identity row, for the usage report and the checkup (ADR-156,

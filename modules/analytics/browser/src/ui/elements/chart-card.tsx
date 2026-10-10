@@ -12,7 +12,7 @@ export function ChartCard({
       <Card.Root>
         <Card.Header>
           <HStack gap={2}>
-            <BarChart2 color="orange" />
+            <BarChart2 color="var(--chakra-colors-orange-fg)" />
             <Heading size="sm">{title}</Heading>
           </HStack>
         </Card.Header>

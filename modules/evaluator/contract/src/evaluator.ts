@@ -1,4 +1,5 @@
 import { generate } from "@langwatch/ksuid";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const EVALUATOR_FEATURE_ID = "evaluator" as const;
@@ -10,19 +11,23 @@ export const newEvaluatorId = (): string => generate(EVALUATOR_KSUID_RESOURCE).t
 export const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
 export type EvaluatorType = z.infer<typeof evaluatorTypeSchema>;
 
-export const evaluatorFieldSchema = z
+const evaluatorFieldSchemaDefinition = z
   .object({
     identifier: z.string().min(1),
     type: z.string().min(1),
     optional: z.boolean().optional(),
   })
   .strict();
+export interface EvaluatorFieldSchema extends Named<typeof evaluatorFieldSchemaDefinition> {}
+export const evaluatorFieldSchema: EvaluatorFieldSchema = evaluatorFieldSchemaDefinition;
 export type EvaluatorField = z.infer<typeof evaluatorFieldSchema>;
 
-export const evaluatorConfigSchema = z.record(z.string(), z.unknown());
+const evaluatorConfigSchemaDefinition = z.record(z.string(), z.unknown());
+export interface EvaluatorConfigSchema extends Named<typeof evaluatorConfigSchemaDefinition> {}
+export const evaluatorConfigSchema: EvaluatorConfigSchema = evaluatorConfigSchemaDefinition;
 export type EvaluatorConfig = z.infer<typeof evaluatorConfigSchema>;
 
-export const evaluatorSchema = z
+const evaluatorSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -39,6 +44,8 @@ export const evaluatorSchema = z
     _count: z.object({ copiedEvaluators: z.number().int().nonnegative() }).optional(),
   })
   .strict();
+export interface EvaluatorSchema extends Named<typeof evaluatorSchemaDefinition> {}
+export const evaluatorSchema: EvaluatorSchema = evaluatorSchemaDefinition;
 export type Evaluator = z.infer<typeof evaluatorSchema>;
 
 export const standardEvaluatorOutputFields = [
@@ -47,7 +54,7 @@ export const standardEvaluatorOutputFields = [
   { identifier: "label", type: "str" },
 ] as const satisfies readonly EvaluatorField[];
 
-export const evaluatorWithFieldsSchema = evaluatorSchema
+const evaluatorWithFieldsSchemaDefinition = evaluatorSchema
   .safeExtend({
     fields: z.array(evaluatorFieldSchema),
     outputFields: z.array(evaluatorFieldSchema),
@@ -55,6 +62,11 @@ export const evaluatorWithFieldsSchema = evaluatorSchema
     workflowIcon: z.string().optional(),
   })
   .strict();
+export interface EvaluatorWithFieldsSchema extends Named<
+  typeof evaluatorWithFieldsSchemaDefinition
+> {}
+export const evaluatorWithFieldsSchema: EvaluatorWithFieldsSchema =
+  evaluatorWithFieldsSchemaDefinition;
 export type EvaluatorWithFields = z.infer<typeof evaluatorWithFieldsSchema>;
 
 export type EvaluatorCategory =
@@ -147,10 +159,15 @@ export const EVALUATOR_DELETED_EVENT_TYPE = "lw.evaluator.deleted" as const;
 export const EVALUATOR_DELETED_EVENT_VERSION = "2026-10-07" as const;
 
 /** Ids only: a peer reads anything else through `EvaluatorApi`, never the event. */
-export const evaluatorDeletedEventDataSchema = z.object({
+const evaluatorDeletedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
   evaluatorId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface EvaluatorDeletedEventDataSchema extends Named<
+  typeof evaluatorDeletedEventDataSchemaDefinition
+> {}
+export const evaluatorDeletedEventDataSchema: EvaluatorDeletedEventDataSchema =
+  evaluatorDeletedEventDataSchemaDefinition;
 export type EvaluatorDeletedEventData = z.infer<typeof evaluatorDeletedEventDataSchema>;

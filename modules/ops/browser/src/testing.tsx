@@ -1,7 +1,7 @@
 /** OpsHostApi test harness. fakeOpsHost records port writes; renderWithOpsHost owns
  * query state (overlays open from ?key=). Same shape as gateway-web. */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
@@ -224,9 +224,9 @@ export function renderWithOpsHost(
 ): OpsRenderResult {
   const mounted = host ?? fakeOpsHost();
   const wrap = (child: ReactElement) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemTestProvider>
       <OpsHostHarness host={mounted}>{child}</OpsHostHarness>
-    </ChakraProvider>
+    </DesignSystemTestProvider>
   );
   const result = render(wrap(element));
   return {

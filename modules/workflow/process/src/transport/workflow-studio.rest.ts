@@ -23,6 +23,7 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/workflows/code-completion", "completeWorkflowCode")
+  .withoutAudit("run, not a change")
   .withQuery(workflowCodeCompletionQuerySchema)
   .withInput(workflowCodeCompletionBodySchema)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -34,6 +35,7 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   })
 
   .post("/api/workflows/post_event", "postWorkflowStudioEvent")
+  .withoutAudit("studio event relay, not a change")
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("workflows:manage", {

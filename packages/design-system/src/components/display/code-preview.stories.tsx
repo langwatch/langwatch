@@ -29,6 +29,42 @@ export const Shell: Story = {
   args: { filename: "terminal", language: "bash", code: 'curl -X POST "$LANGWATCH_ENDPOINT"' },
 };
 
+export const LineNumbers: Story = {
+  args: {
+    filename: "app.ts",
+    language: "typescript",
+    lineNumbers: true,
+    code: 'import { setup } from "langwatch";\n\nsetup({ apiKey: process.env.LANGWATCH_API_KEY });\n\nexport const ready = true;',
+  },
+};
+
+const TABBED =
+  'class Code:\n\tdef __call__(self, input: str = None):\n\t\treturn {"output": {"accepted": True, "count": 2, "rows": [input]}}';
+
+/** Tabs read four wide; a long line wraps under its own indent, never back at column 0. */
+export const CompactWrapped: Story = {
+  args: { filename: "code.py", language: "python", compact: true, lineNumbers: true, code: TABBED },
+  decorators: [(Story) => <div style={{ maxWidth: 460 }}>{Story()}</div>],
+};
+
+const DIFF = `@@ -1,5 +1,6 @@
+ import langwatch
+ 
+-langwatch.setup()
++langwatch.setup(api_key=os.environ["LANGWATCH_API_KEY"])
++langwatch.trace(name="checkout")
+ print("hello")`;
+
+/** A unified diff: a +/- column, tinted lines, the code still highlighted as Python. */
+export const Diff: Story = {
+  args: { filename: "example.py", language: "python", diff: true, code: DIFF },
+};
+
+/** A diff with old and new line numbers side by side. */
+export const DiffWithLineNumbers: Story = {
+  args: { filename: "example.py", language: "python", diff: true, lineNumbers: true, code: DIFF },
+};
+
 const SECRET = "sk-lw-9f8e7d6c5b4a3210";
 const ENV = `LANGWATCH_API_KEY=${SECRET}\nLANGWATCH_ENDPOINT=https://app.langwatch.ai`;
 

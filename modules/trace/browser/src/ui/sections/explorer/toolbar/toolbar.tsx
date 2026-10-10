@@ -241,7 +241,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             aria-pressed={showSamplePreview}
             flexShrink={0}
           >
-            <Icon boxSize={3.5} color={{ base: "orange.500", _dark: "orange.fg" }}>
+            <Icon boxSize={3.5} color={{ base: "orange.fg", _dark: "orange.fg" }}>
               {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>
             {showSamplePreview ? "Hide sample data" : "See sample data"}

@@ -145,6 +145,7 @@ async function buildApi(
   const refusals: string[] = [];
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {

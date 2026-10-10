@@ -216,7 +216,7 @@ function SourceTableRow({
               <Link
                 href={`/governance/inventory/${source.id}`}
                 color="fg"
-                _hover={{ color: "orange.600" }}
+                _hover={{ color: "orange.fg" }}
               >
                 <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
                   {source.name}
@@ -301,7 +301,7 @@ function SourceTableRow({
               )}
               <Menu.Item
                 value="archive"
-                color="red.500"
+                color="red.fg"
                 onClick={(event) => {
                   event.stopPropagation();
                   if (!confirmArchiveSource({ name: source.name })) return;

@@ -213,6 +213,7 @@ describe("given one of the assertion refusals the boundary admits", () => {
     renderError("sso_setup_address_mismatch");
 
     expect(screen.getByText("That sign-in came from a different address")).toBeTruthy();
+    expect(screen.getByText(/only the person who registered it can test it/)).toBeTruthy();
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 

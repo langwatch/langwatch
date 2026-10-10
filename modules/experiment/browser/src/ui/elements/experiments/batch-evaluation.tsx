@@ -1,9 +1,9 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
-  Button,
   Card,
   Container,
   Heading,
@@ -127,7 +127,7 @@ const EvaluationSummaryCard = ({
           <Text color="fg" fontSize="15px" fontWeight="500">
             {name}
           </Text>
-          <HStack align="end" color={score < 0.5 ? "red.500" : "green.500"}>
+          <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
             <Text fontSize="26px" fontWeight="300">
               {numeral(score).format(metric === "score" ? "0.00" : "0%")}
             </Text>
@@ -138,13 +138,13 @@ const EvaluationSummaryCard = ({
           <HStack fontSize="11px" textTransform="uppercase" fontWeight="600" color="fg.muted">
             {group.skipped.length && (
               <Text>
-                <StatusDot color="yellow.400" />
+                <StatusDot color="yellow.fg" />
                 {group.skipped.length} skipped
               </Text>
             )}
             {group.error.length && (
               <Text>
-                <StatusDot color="red.400" />
+                <StatusDot color="red.fg" />
                 {group.error.length} error
               </Text>
             )}
@@ -231,7 +231,7 @@ const EvaluationRow = ({
       </Table.Cell>
     )}
     <Table.Cell>
-      {evaluation.cost ? formatMoney({ amount: evaluation.cost, currency: "USD" }) : "-"}
+      {evaluation.cost ? formatCurrency({ amount: evaluation.cost, currency: "USD" }) : "-"}
     </Table.Cell>
     <Table.Cell>{readableDate(evaluation.createdAt).toLocaleString()}</Table.Cell>
   </Table.Row>
@@ -313,33 +313,31 @@ export default function BatchEvaluation({
   return (
     <Box background="bg.surface" width="full" height="full" paddingTop={14}>
       <Container maxW={"calc(100vw - 200px)"}>
-        <HStack width="full" verticalAlign={"middle"} paddingBottom={6}>
-          <VStack align="start">
-            <Heading as={"h1"} size="lg">
-              {experiment.name ?? experiment.slug}
-            </Heading>
-            <Text>Dataset: {data[0]?.dataset.name ?? ""}</Text>
+        <PageLayout.Header>
+          <VStack align="start" gap={0}>
+            <PageLayout.Heading>{experiment.name ?? experiment.slug}</PageLayout.Heading>
+            <Text color="fg.muted" fontSize="xs">
+              Dataset: {data[0]?.dataset.name ?? ""}
+            </Text>
           </VStack>
 
           <Spacer />
-          <Button
-            colorPalette="black"
+          <PageLayout.HeaderButton
             minWidth="fit-content"
-            variant="ghost"
             onClick={() => evaluations.data && downloadCSV()}
           >
             Download Results CSV{" "}
             <Icon marginLeft={2}>
               <Download />
             </Icon>
-          </Button>
-        </HStack>
+          </PageLayout.HeaderButton>
+        </PageLayout.Header>
       </Container>
       <HStack
         align="center"
         alignItems="stretch"
         justify="center"
-        background="gray.50"
+        background="bg.subtle"
         padding={6}
         gap={6}
       >
@@ -348,7 +346,7 @@ export default function BatchEvaluation({
         ))}
         <StatCard
           title="Evaluations Cost"
-          value={totalCost ? formatMoney({ amount: totalCost, currency: "USD" }) : "-"}
+          value={totalCost ? formatCurrency({ amount: totalCost, currency: "USD" }) : "-"}
         />
         <StatCard
           title="Runtime"
@@ -377,8 +375,8 @@ export default function BatchEvaluation({
 }
 
 const STATUS_COLORS = new Map<string, string>([
-  ["skipped", "yellow.700"],
-  ["error", "red.700"],
+  ["skipped", "yellow.fg"],
+  ["error", "red.fg"],
 ]);
 
 function statusBucket(status: string): "processed" | "error" | "skipped" | "unknown" {
@@ -395,8 +393,8 @@ function resultColor({
   isScore: boolean;
   evaluation: BatchEvaluation;
 }): string {
-  if (isScore) return evaluation.score < 0.5 ? "red.500" : "green.500";
-  return evaluation.passed ? "green.500" : "red.500";
+  if (isScore) return evaluation.score < 0.5 ? "red.fg" : "green.fg";
+  return evaluation.passed ? "green.fg" : "red.fg";
 }
 
 function resultLabel({

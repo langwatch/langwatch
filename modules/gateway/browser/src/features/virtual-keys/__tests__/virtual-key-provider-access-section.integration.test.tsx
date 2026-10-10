@@ -3,7 +3,7 @@
  * Provider access: all/none master checkbox stores wildcard or clears selection.
  * Spec: specs/ai-gateway/governance/vk-provider-access.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode, useState } from "react";
@@ -17,7 +17,7 @@ import {
 } from "../ui/blocks/virtual-key-provider-access-section.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemTestProvider>{children}</DesignSystemTestProvider>
 );
 
 const ORG_ID = "org-acme";

@@ -3,7 +3,7 @@
  * browser's cache keys, so they are the wire names the settings screen has
  * always called, and the schemas below are the ones it has always sent.
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { webhookEventTypeSchema } from "./webhook.events.ts";
@@ -16,35 +16,55 @@ import {
 } from "./webhook.ts";
 
 /** Every procedure on this surface names the organization it acts within. */
-export const webhookEndpointOrganizationScopeSchema = z.object({
+const webhookEndpointOrganizationScopeSchemaDefinition = z.object({
   organizationId: z.string(),
 });
+export interface WebhookEndpointOrganizationScopeSchema extends Named<
+  typeof webhookEndpointOrganizationScopeSchemaDefinition
+> {}
+export const webhookEndpointOrganizationScopeSchema: WebhookEndpointOrganizationScopeSchema =
+  webhookEndpointOrganizationScopeSchemaDefinition;
 
-export const webhookEndpointScopeSchema = z.object({
+const webhookEndpointScopeSchemaDefinition = z.object({
   ...webhookEndpointOrganizationScopeSchema.shape,
   endpointId: z.string(),
 });
+export interface WebhookEndpointScopeSchema extends Named<
+  typeof webhookEndpointScopeSchemaDefinition
+> {}
+export const webhookEndpointScopeSchema: WebhookEndpointScopeSchema =
+  webhookEndpointScopeSchemaDefinition;
 
 /**
  * The queue half of a destination; which credentials are ALLOWED is the
  * application's call. They are nullable, not merely optional: absent keeps what
  * is stored and null clears it, and clearing is what a leaked key demands.
  */
-export const webhookEndpointSqsInputSchema = z.object({
+const webhookEndpointSqsInputSchemaDefinition = z.object({
   queueUrl: z.string(),
   roleArn: z.string().nullable().optional(),
   externalId: z.string().nullable().optional(),
   accessKeyId: z.string().nullable().optional(),
   secretAccessKey: z.string().nullable().optional(),
 });
+export interface WebhookEndpointSqsInputSchema extends Named<
+  typeof webhookEndpointSqsInputSchemaDefinition
+> {}
+export const webhookEndpointSqsInputSchema: WebhookEndpointSqsInputSchema =
+  webhookEndpointSqsInputSchemaDefinition;
 
-export const webhookEndpointDeliveriesInputSchema = z.object({
+const webhookEndpointDeliveriesInputSchemaDefinition = z.object({
   ...webhookEndpointScopeSchema.shape,
   limit: z.number().int().min(1).max(200).optional(),
   cursor: z.object({ firedAt: z.coerce.date(), id: z.string() }).optional(),
 });
+export interface WebhookEndpointDeliveriesInputSchema extends Named<
+  typeof webhookEndpointDeliveriesInputSchemaDefinition
+> {}
+export const webhookEndpointDeliveriesInputSchema: WebhookEndpointDeliveriesInputSchema =
+  webhookEndpointDeliveriesInputSchemaDefinition;
 
-export const webhookEndpointCreateInputSchema = z.object({
+const webhookEndpointCreateInputSchemaDefinition = z.object({
   ...webhookEndpointOrganizationScopeSchema.shape,
   destinationKind: webhookDestinationKindSchema.optional(),
   url: z.string().optional(),
@@ -55,8 +75,13 @@ export const webhookEndpointCreateInputSchema = z.object({
   maxInFlight: z.number().int().optional(),
   allowSelfSignedCertificate: z.boolean().optional(),
 });
+export interface WebhookEndpointCreateInputSchema extends Named<
+  typeof webhookEndpointCreateInputSchemaDefinition
+> {}
+export const webhookEndpointCreateInputSchema: WebhookEndpointCreateInputSchema =
+  webhookEndpointCreateInputSchemaDefinition;
 
-export const webhookEndpointUpdateInputSchema = z.object({
+const webhookEndpointUpdateInputSchemaDefinition = z.object({
   ...webhookEndpointScopeSchema.shape,
   // Accepted only when it repeats the kind the endpoint already has. Zod
   // strips unknown keys, so leaving it out would silently drop a caller's
@@ -70,6 +95,11 @@ export const webhookEndpointUpdateInputSchema = z.object({
   maxInFlight: z.number().int().optional(),
   allowSelfSignedCertificate: z.boolean().optional(),
 });
+export interface WebhookEndpointUpdateInputSchema extends Named<
+  typeof webhookEndpointUpdateInputSchemaDefinition
+> {}
+export const webhookEndpointUpdateInputSchema: WebhookEndpointUpdateInputSchema =
+  webhookEndpointUpdateInputSchemaDefinition;
 
 export const webhookEndpointTrpc = defineTrpcContract("webhookEndpoints")
   /** The event catalog the drawer renders its checkboxes from. */

@@ -61,7 +61,7 @@ function GroupMemberRow({
         <Button
           size="xs"
           variant="ghost"
-          color={markedForRemoval ? "blue.500" : "fg.muted"}
+          color={markedForRemoval ? "blue.fg" : "fg.muted"}
           aria-label={markedForRemoval ? `Undo removal of ${label}` : `Mark ${label} for removal`}
           onClick={onToggle}
         >
@@ -76,7 +76,7 @@ function StagedMemberRow({ addition, onUndo }: { addition: PendingAddition; onUn
   return (
     <HStack py={1} fontSize="sm" opacity={0.7}>
       <MemberAvatar name={addition.label} image={addition.image} size="xs" />
-      <Text flex={1} color="green.600">
+      <Text flex={1} color="fg.success">
         {addition.label}
       </Text>
       <Button

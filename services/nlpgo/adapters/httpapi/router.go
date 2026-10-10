@@ -16,6 +16,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	gatewaydomain "github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/domain"
 )
@@ -165,4 +166,11 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrUpstreamHTTP, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrChildUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrGatewayUnavailable, http.StatusBadGateway)
+	// Refusals the in-process dispatcher makes of a caller; the playground
+	// proxy forwards them as the 4xx they are rather than as a 502.
+	herr.RegisterStatus(gatewaydomain.ErrRateLimited, http.StatusTooManyRequests)
+	herr.RegisterStatus(gatewaydomain.ErrBudgetExceeded, http.StatusPaymentRequired)
+	herr.RegisterStatus(gatewaydomain.ErrModelNotAllowed, http.StatusBadRequest)
+	herr.RegisterStatus(gatewaydomain.ErrProviderNotBound, http.StatusBadRequest)
+	herr.RegisterStatus(gatewaydomain.ErrModelNotRecognized, http.StatusBadRequest)
 }

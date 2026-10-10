@@ -565,7 +565,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
   "specs/npx-installer/02-predeps.feature",
-  "specs/npx-installer/03-services.feature",
   "specs/npx-installer/04-validation.feature",
   "specs/npx-installer/05-publish.feature",
   "specs/npx-installer/06-langy.feature",
@@ -815,6 +814,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/model-providers/scope-and-multi-instance.feature",
   "specs/monitors/online-evaluator-loop-prevention.feature",
   "specs/navigation/shared-section-navigation-layout.feature",
+  // Reason: left LEGACY_INERT when npx ran api and worker as one apps/backend
+  // process and nlpgo with the ai-gateway as one Go process (Alex, 2026-10-10);
+  // those four scenarios are enforced. The older orchestration ones stay untagged.
+  "specs/npx-installer/03-services.feature",
   "specs/npx-installer/07-lean-install.feature",
   // Reason: arrived partially tagged when #7932 added three @unit metric
   // scenarios and retired its LEGACY_INERT entry. The eight untagged ones

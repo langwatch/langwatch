@@ -25,7 +25,7 @@ import {
  */
 function RunDrawerErrorBody({ error }: { error: unknown }) {
   return (
-    <Drawer.Body bg={{ base: "bg.surface", _dark: "bg.panel" }}>
+    <Drawer.Body bg={"bg.card"}>
       <VStack gap={3} align="start" w="100%" pt={4}>
         <Drawer.CloseTrigger />
         <Box width="100%">
@@ -66,7 +66,7 @@ function RunDrawerBody({
       width="full"
       height="full"
       overflow="hidden"
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
+      bg={"bg.card"}
     >
       <RunDrawerHeaderBand detail={detail} scenarioVersion={state.scenarioVersion} stop={stop} />
       <RunDrawerContent detail={detail} isSideBySide={state.isSideBySide} />

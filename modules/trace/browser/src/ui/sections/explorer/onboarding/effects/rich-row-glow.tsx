@@ -35,32 +35,32 @@ export const RichRowGlow: React.FC = () => {
       @keyframes tracesRichRowGlow {
         0%, 100% {
           filter:
-            drop-shadow(0 0 6px rgba(59, 130, 246, 0.45))
-            drop-shadow(0 0 16px rgba(99, 102, 241, 0.24));
+            drop-shadow(0 0 6px color-mix(in srgb, var(--chakra-colors-blue-fg) 45%, transparent))
+            drop-shadow(0 0 16px color-mix(in srgb, var(--chakra-colors-purple-fg) 24%, transparent));
         }
         50% {
           filter:
-            drop-shadow(0 0 12px rgba(59, 130, 246, 0.7))
-            drop-shadow(0 0 26px rgba(99, 102, 241, 0.36));
+            drop-shadow(0 0 12px color-mix(in srgb, var(--chakra-colors-blue-fg) 70%, transparent))
+            drop-shadow(0 0 26px color-mix(in srgb, var(--chakra-colors-purple-fg) 36%, transparent));
         }
       }
       @keyframes tracesRichRowGlowDark {
         0%, 100% {
           filter:
-            drop-shadow(0 0 8px rgba(125, 211, 252, 0.32))
-            drop-shadow(0 0 20px rgba(165, 180, 252, 0.2));
+            drop-shadow(0 0 8px color-mix(in srgb, var(--chakra-colors-blue-fg) 32%, transparent))
+            drop-shadow(0 0 20px color-mix(in srgb, var(--chakra-colors-purple-fg) 20%, transparent));
         }
         50% {
           filter:
-            drop-shadow(0 0 14px rgba(125, 211, 252, 0.55))
-            drop-shadow(0 0 30px rgba(165, 180, 252, 0.34));
+            drop-shadow(0 0 14px color-mix(in srgb, var(--chakra-colors-blue-fg) 55%, transparent))
+            drop-shadow(0 0 30px color-mix(in srgb, var(--chakra-colors-purple-fg) 34%, transparent));
         }
       }
       ${each("")} {
-        --rich-ring: rgba(59, 130, 246, 0.55);
-        --rich-ring-hover: rgba(59, 130, 246, 0.78);
-        --rich-bg: rgba(59, 130, 246, 0.08);
-        --rich-bg-hover: rgba(59, 130, 246, 0.18);
+        --rich-ring: color-mix(in srgb, var(--chakra-colors-blue-fg) 55%, transparent);
+        --rich-ring-hover: color-mix(in srgb, var(--chakra-colors-blue-fg) 78%, transparent);
+        --rich-bg: color-mix(in srgb, var(--chakra-colors-blue-fg) 8%, transparent);
+        --rich-bg-hover: color-mix(in srgb, var(--chakra-colors-blue-fg) 18%, transparent);
         position: relative;
         z-index: 10;
         cursor: pointer;
@@ -68,10 +68,10 @@ export const RichRowGlow: React.FC = () => {
         transition: filter 220ms ease;
       }
       ${each("", { dark: true })} {
-        --rich-ring: rgba(125, 211, 252, 0.4);
-        --rich-ring-hover: rgba(125, 211, 252, 0.62);
-        --rich-bg: rgba(125, 211, 252, 0.1);
-        --rich-bg-hover: rgba(125, 211, 252, 0.2);
+        --rich-ring: color-mix(in srgb, var(--chakra-colors-blue-fg) 40%, transparent);
+        --rich-ring-hover: color-mix(in srgb, var(--chakra-colors-blue-fg) 62%, transparent);
+        --rich-bg: color-mix(in srgb, var(--chakra-colors-blue-fg) 10%, transparent);
+        --rich-bg-hover: color-mix(in srgb, var(--chakra-colors-blue-fg) 20%, transparent);
         animation: tracesRichRowGlowDark 2.2s ease-in-out infinite;
       }
       ${each(" > tr > td")} {

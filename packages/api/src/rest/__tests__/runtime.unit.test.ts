@@ -51,6 +51,7 @@ describe("defineRestRouter", () => {
       .delete("/:id", "deleteAnnotation")
       .withParams(z.object({ id: z.string() }))
       .withPermission("annotations:view")
+      .withoutAudit("test route")
       .handle(async () => {})
       .build();
 
@@ -108,6 +109,7 @@ describe("defineRestRouter", () => {
       router()
         .get(dynamicPath, "missingParams")
         .withPermission("annotations:view")
+        .withoutAudit("test route")
         .handle(() => {});
     }).toThrow(/must declare withParams/);
 
@@ -138,6 +140,7 @@ describe("defineRestRouter", () => {
           .post("/report", "reportBug")
           .withInput(z.object({ projectId: z.string() }))
           .withAccess(publicRoute({ reason: "issue intake; reporters may hold no credential" }))
+          .withoutAudit("test route")
           .handle(() => {}),
       ).toThrow(/cannot take "projectId" as input/);
     });
@@ -186,6 +189,7 @@ describe("defineRestRouter", () => {
           .withInput(z.object({ name: z.string() }))
           .withPermission("project:create")
           .withAccess(anyAuthenticated({ reason: "the key's own ceiling is the whole gate" }))
+          .withoutAudit("test route")
           .handle(() => {}),
       ).toThrow(/declares both a permission and authenticated access/);
     });
@@ -409,6 +413,7 @@ describe("defineRestRouter", () => {
           .withInput(z.object({ a: z.number() }))
           .methods(["POST", "GET"])
           .withOutput(answer)
+          .withoutAudit("test route")
           .handle(() => ({ ok: true })),
       ).toThrow(/declares a body and answers GET, which carries none/);
 
@@ -424,6 +429,7 @@ describe("defineRestRouter", () => {
           .withInput(z.object({ a: z.number() }))
           .anyMethod()
           .withRawResponse({ produces: "application/json" })
+          .withoutAudit("test route")
           .handle(() => new Response()),
       ).toThrow(/a body reaches only some of them/);
 
@@ -432,6 +438,7 @@ describe("defineRestRouter", () => {
           .anyMethod()
           .methods(["POST"])
           .withRawResponse({ produces: "application/json" })
+          .withoutAudit("test route")
           .handle(() => new Response()),
       ).toThrow(/answers every method and also names some of them/);
 
@@ -439,6 +446,7 @@ describe("defineRestRouter", () => {
         hook()
           .anyMethod()
           .withOutput(answer)
+          .withoutAudit("test route")
           .handle(() => ({ ok: true })),
       ).toThrow(/it must declare withResponse\("forwarded"\)/);
     });
@@ -852,6 +860,7 @@ describe("a route whose plan question names a capability and asks only for some 
         when: (input) => customRole.validate(input),
       })
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         handle();
 
@@ -980,6 +989,7 @@ describe("a create declared replayable under a caller's key", () => {
       .withInput(z.object({ name: z.string() }))
       .withOutput(z.object({ name: z.string(), secret: z.string() }))
       .withStatus(201)
+      .withoutAudit("test route")
       .handle(async ({ input }) => ({
         name: await handle(input.name),
         secret: `secret-for-${input.name}`,
@@ -1156,6 +1166,7 @@ describe("a route declared as minting a credential", () => {
       .withPermission("organization:view")
       .mintsCredential("organization:view")
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         handle();
 
@@ -1201,6 +1212,7 @@ describe("a route declared as minting a credential", () => {
         .post("/", "createKey")
         .withAccess(publicRoute({ reason: "no caller" }))
         .mintsCredential("organization:view")
+        .withoutAudit("test route")
         .handle(() => {}),
     ).toThrow(/mints a credential, so it cannot answer with no caller/);
   });

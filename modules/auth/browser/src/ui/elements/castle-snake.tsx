@@ -1,3 +1,4 @@
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -274,14 +275,6 @@ function useGameLoop({
   }, [playing, gameRef, canvasRef, setHud]);
 }
 
-/** Reads a colour the theme already owns, so the game is never off-palette. */
-const themed = (token: string, fallback: string) => {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(
-    `--chakra-colors-front-door-${token}`,
-  );
-  return value.trim() || fallback;
-};
-
 const px = (node: { x: number; y: number }) => ({
   x: node.x * CELL,
   y: node.y * CELL,
@@ -304,7 +297,7 @@ function paint({
   now: number;
   progress: number;
 }) {
-  const accent = themed("detail", "#f56b1a");
+  const accent = getRawColorValue("orange.fg");
   context.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
   // The world dims when it is over, so the ending reads on the picture and
@@ -506,7 +499,7 @@ function paintSnake({
   context.arc(head.x, head.y, 5, 0, Math.PI * 2);
   context.fill();
 
-  context.fillStyle = "rgba(255, 244, 235, 0.95)";
+  context.fillStyle = getRawColorValue("bg.card");
   context.shadowBlur = 0;
   context.beginPath();
   context.arc(head.x, head.y, 2, 0, Math.PI * 2);
@@ -592,9 +585,6 @@ function buildMolecule() {
   return strokes.map((stroke) => stroke.map(([x, y]) => [x - centre[0], y - centre[1]] as const));
 }
 
-/** Not a token colour: nothing else on the front door is allowed to be this. */
-const MOLECULE_INK = "#b58cff";
-
 /** Ease both ends of a glide, so each step lands instead of stopping. */
 const easeInOut = (t: number) => t * t * (3 - 2 * t);
 
@@ -626,6 +616,7 @@ function paintMolecule({
   now: number;
 }) {
   const at = moleculeAt(game, fx, now);
+  const moleculeInk = getRawColorValue("purple.fg");
   // It is unwell: a slow tumble and a faint breath, never a straight run.
   const tumble = Math.sin(now / 650) * 0.14;
   const breath = 0.92 + 0.08 * Math.sin(now / 900);
@@ -634,8 +625,8 @@ function paintMolecule({
   context.translate(at.x, at.y + Math.sin(now / 780) * 1.6);
   context.rotate(tumble);
   context.scale(breath, breath);
-  context.strokeStyle = MOLECULE_INK;
-  context.shadowColor = MOLECULE_INK;
+  context.strokeStyle = moleculeInk;
+  context.shadowColor = moleculeInk;
   context.shadowBlur = 12;
   context.lineWidth = 1.4;
   context.lineJoin = "round";

@@ -81,7 +81,7 @@ export function CommandBarLangyMode({
             boxShadow={
               focused
                 ? "0 0 0 4px var(--chakra-colors-orange-subtle)"
-                : "0 1px 2px rgba(20, 20, 23, 0.04)"
+                : "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
             }
             transition="border-color 150ms ease, box-shadow 150ms ease"
           >
@@ -180,7 +180,7 @@ function KeyHint({ children }: { children: React.ReactNode }) {
       borderWidth="1px"
       borderColor="border.subtle"
       borderRadius="5px"
-      background="bg.surface"
+      background="bg.card"
       color="fg.muted"
     >
       {children}

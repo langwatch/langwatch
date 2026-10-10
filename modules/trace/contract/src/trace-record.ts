@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export type TraceRecordValue =
@@ -52,7 +53,7 @@ const traceRecordSpanSchema = z.looseObject({
  * domain surface; loose nested records retain provider fields without a
  * transport-specific union.
  */
-export const traceRecordSchema = z.looseObject({
+const traceRecordSchemaDefinition = z.looseObject({
   trace_id: z.string(),
   project_id: z.string(),
   metadata: z.record(z.string(), traceRecordValueSchema),
@@ -72,5 +73,7 @@ export const traceRecordSchema = z.looseObject({
   spans: z.array(traceRecordSpanSchema),
   redacted_by_visibility_window: z.boolean().optional(),
 });
+export interface TraceRecordSchema extends Named<typeof traceRecordSchemaDefinition> {}
+export const traceRecordSchema: TraceRecordSchema = traceRecordSchemaDefinition;
 
 export type TraceRecord = z.infer<typeof traceRecordSchema>;

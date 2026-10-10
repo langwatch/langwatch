@@ -23,9 +23,9 @@ export const ORB_PATH = "/__haven/orb/";
 /** The orb's built files by name, and the one the page loads. */
 export type OrbBuild = Readonly<{ entry: string; files: ReadonlyMap<string, string | Uint8Array> }>;
 
-/** Only haven's built-UI lane: a dev:one stack's Vite server injects the orb itself. */
-export function servesOrb({ withUi, slug }: { withUi: boolean; slug: string | undefined }) {
-  return !withUi && Boolean(slug);
+/** The backend serves the orb on any haven stack; under --hmr the Vite ui lane injects its own. */
+export function servesOrb({ slug }: { slug: string | undefined }) {
+  return Boolean(slug);
 }
 
 /** The orb's module script at the end of the head, as the Vite plugin places it. */

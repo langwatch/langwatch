@@ -1,9 +1,4 @@
-import { Input } from "@langwatch/design-system/primitives";
-
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-
-/** Typed in full before the destructive sweep unlocks. */
-const REQUIRED_WORD = "RECLAIM";
+import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 
 export function RunCleanupDialog({
   value,
@@ -19,27 +14,20 @@ export function RunCleanupDialog({
   onConfirm: () => void;
   isLoading: boolean;
 }) {
-  const satisfied = value === REQUIRED_WORD;
-
   return (
-    <ConfirmDialog
+    <DeleteConfirmationDialog
       open={value !== null}
       onClose={onClose}
-      onConfirm={() => {
-        if (satisfied) onConfirm();
-      }}
+      onConfirm={onConfirm}
+      closeOnConfirm={false}
       title="Run cleanup"
-      description={`Payloads nothing references will be deleted. Type ${REQUIRED_WORD} to confirm.`}
+      description="Payloads nothing references will be deleted."
       isLoading={isLoading}
-      confirmDisabled={!satisfied}
-    >
-      <Input
-        size="sm"
-        aria-label={`Type ${REQUIRED_WORD} to confirm`}
-        placeholder={REQUIRED_WORD}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.currentTarget.value)}
-      />
-    </ConfirmDialog>
+      confirmationWord="RECLAIM"
+      caseSensitive
+      confirmLabel="Confirm"
+      value={value ?? ""}
+      onValueChange={onChange}
+    />
   );
 }

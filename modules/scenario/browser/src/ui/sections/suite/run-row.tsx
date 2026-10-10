@@ -144,7 +144,7 @@ function RunRowData({
         isHighlighted
           ? {
               "@keyframes yellowFlash": {
-                "0%": { backgroundColor: "rgba(234, 179, 8, 0.3)" },
+                "0%": { backgroundColor: "yellow.solid/30" },
                 "100%": { backgroundColor: "transparent" },
               },
               animation: "yellowFlash 2s ease-out",

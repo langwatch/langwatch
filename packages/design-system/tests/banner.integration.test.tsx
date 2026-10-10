@@ -64,6 +64,36 @@ describe("Banner", () => {
     });
   });
 
+  describe("given a linked action", () => {
+    it("keeps the destination and does not submit an enclosing form", () => {
+      const onSubmit = vi.fn((event: Event) => event.preventDefault());
+      renderWithDesignSystem(
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit(event.nativeEvent);
+          }}
+        >
+          <Banner
+            action={
+              <BannerAction asChild>
+                <a href="/settings">Review settings</a>
+              </BannerAction>
+            }
+            onDismiss={() => void 0}
+          >
+            Review your connection.
+          </Banner>
+        </form>,
+      );
+      expect(screen.getByRole("link", { name: "Review settings" }).getAttribute("href")).toBe(
+        "/settings",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given an error status", () => {
     /** @scenario "An error banner is announced at once, any other politely" */
     it("is announced as an alert, and a warning as a status", () => {

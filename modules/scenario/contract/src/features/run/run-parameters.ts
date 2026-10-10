@@ -2,6 +2,7 @@
  * whole if any parameter invalid, not partially.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { renderScenarioContent } from "../../scenario-content-template.ts";
@@ -294,6 +295,11 @@ export async function resolveRunParameters({
  * `runParameterValuesSchema`: ciphertext can exceed the source secret's
  * length and is never a regular run parameter.
  */
-export const runSecretCiphertextSchema = z.record(z.string(), z.string());
+const runSecretCiphertextSchemaDefinition = z.record(z.string(), z.string());
+export interface RunSecretCiphertextSchema extends Named<
+  typeof runSecretCiphertextSchemaDefinition
+> {}
+export const runSecretCiphertextSchema: RunSecretCiphertextSchema =
+  runSecretCiphertextSchemaDefinition;
 
 export type RunSecretCiphertext = z.infer<typeof runSecretCiphertextSchema>;

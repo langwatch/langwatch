@@ -48,7 +48,10 @@ import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.ser
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationEmailSuppressionService } from "./automation-email-suppression.service.ts";
 import { AutomationFireHistoryService } from "./automation-fire-history.service.ts";
-import type { AutomationTemplateService, TemplatePreviewInput } from "./automation-template.service.ts";
+import type {
+  AutomationTemplateService,
+  TemplatePreviewInput,
+} from "./automation-template.service.ts";
 
 /** The webhook module's log of this module's webhook attempts (ADR-167). */
 type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;

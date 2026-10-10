@@ -1,6 +1,6 @@
-import { createShikiAdapter } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
+  Card,
   ClientOnly,
   CodeBlock,
   IconButton,
@@ -10,8 +10,8 @@ import {
   useTabs,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { useMemo } from "react";
-import { createHighlighter } from "shiki";
+import { ensureShikiLangLoaded, useShikiAdapter } from "@langwatch/design-system/shiki";
+import { useEffect } from "react";
 
 import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
 import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url.ts";
@@ -65,7 +65,7 @@ export function VirtualKeyUsageSnippet({
   const resolvedBaseUrl = resolveSnippetGatewayBaseUrl(gatewayBaseUrl, deployment.gatewayBaseUrl);
   const showRetrievalHint = !secret;
 
-  const tabItems: TabItem[] = useMemo(() => {
+  const tabItems: TabItem[] = (() => {
     const reminder =
       "The full secret is shown only once during create or rotate. If you do not have it saved, rotate to mint a fresh one.";
     const hashHint = showRetrievalHint
@@ -167,23 +167,17 @@ func main() {
         highlightLines: [1 + curlHighlightShift, 2 + curlHighlightShift],
       },
     ];
-  }, [resolvedBaseUrl, credential, showRetrievalHint, model]);
+  })();
 
   const tabs = useTabs({ defaultValue: "python" });
   const activeTab = tabItems.find((t) => t.key === tabs.value) ?? tabItems[0]!;
   const otherTabs = tabItems.filter((t) => t.key !== tabs.value);
 
-  const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<Awaited<ReturnType<typeof createHighlighter>>>({
-      async load() {
-        return createHighlighter({
-          langs: ["typescript", "python", "go", "bash"],
-          themes: ["github-dark", "github-light"],
-        });
-      },
-      theme: colorMode === "dark" ? "github-dark" : "github-light",
-    });
-  }, [colorMode]);
+  const shikiAdapter = useShikiAdapter(colorMode);
+  // The shared highlighter loads Go on demand; the other tabs' languages load with it.
+  useEffect(() => {
+    void ensureShikiLangLoaded("go");
+  }, []);
 
   return (
     <VStack align="stretch" gap={2}>
@@ -200,66 +194,64 @@ func main() {
           Read more →
         </Link>
       </Text>
-      <Tabs.RootProvider value={tabs} size="sm" variant="line">
+      <Tabs.RootProvider value={tabs} size="sm" variant="line" colorPalette="accent">
         <CodeBlock.AdapterProvider value={shikiAdapter}>
           <ClientOnly>
             {() => (
-              <CodeBlock.Root
-                code={activeTab.code}
-                language={activeTab.language}
-                size="sm"
-                meta={{
-                  highlightLines: activeTab.highlightLines,
-                  colorScheme: colorMode,
-                }}
-                transition="all 0.3s ease"
-                bg="bg.panel/60"
-                borderRadius="xl"
-                border="1px solid"
-                borderColor="border"
-                backdropFilter="blur(20px) saturate(1.3)"
-                boxShadow="0 2px 16px rgba(0,0,0,0.04)"
-                overflow="hidden"
-              >
-                <CodeBlock.Header borderBottomWidth="1px" borderColor="border">
-                  <Tabs.List w="full" border="0" ms="-1">
-                    {tabItems.map((t) => (
-                      <Tabs.Trigger
-                        colorPalette="teal"
-                        key={t.key}
-                        value={t.key}
-                        textStyle="xs"
-                        data-testid={`vk-usage-tab-${t.key}`}
-                      >
-                        {t.title}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                  <CodeBlock.CopyTrigger asChild>
-                    <IconButton variant="ghost" size="2xs" mr={"-4px"} aria-label="Copy code">
-                      <CodeBlock.CopyIndicator />
-                    </IconButton>
-                  </CodeBlock.CopyTrigger>
-                </CodeBlock.Header>
-                <CodeBlock.Content
-                  transition="background-color 0.3s ease, color 0.3s ease"
-                  css={{
-                    "& pre, & code": {
-                      transition: "background-color 0.3s ease, color 0.3s ease",
-                    },
+              <Card.Root variant="showcase">
+                <CodeBlock.Root
+                  code={activeTab.code}
+                  language={activeTab.language}
+                  size="sm"
+                  meta={{
+                    highlightLines: activeTab.highlightLines,
+                    colorScheme: colorMode,
                   }}
-                  overflow="scroll"
+                  transition="all 0.3s ease"
+                  bg="transparent"
+                  borderWidth="0"
+                  overflow="hidden"
                 >
-                  {otherTabs.map((t) => (
-                    <Tabs.Content key={t.key} value={t.key} />
-                  ))}
-                  <Tabs.Content pt="1" value={activeTab.key}>
-                    <CodeBlock.Code>
-                      <CodeBlock.CodeText />
-                    </CodeBlock.Code>
-                  </Tabs.Content>
-                </CodeBlock.Content>
-              </CodeBlock.Root>
+                  <CodeBlock.Header borderBottomWidth="1px" borderColor="border">
+                    <Tabs.List w="full" border="0" ms="-1">
+                      {tabItems.map((t) => (
+                        <Tabs.Trigger
+                          colorPalette="accent"
+                          key={t.key}
+                          value={t.key}
+                          textStyle="xs"
+                          data-testid={`vk-usage-tab-${t.key}`}
+                        >
+                          {t.title}
+                        </Tabs.Trigger>
+                      ))}
+                    </Tabs.List>
+                    <CodeBlock.CopyTrigger asChild>
+                      <IconButton variant="ghost" size="2xs" mr={"-4px"} aria-label="Copy code">
+                        <CodeBlock.CopyIndicator />
+                      </IconButton>
+                    </CodeBlock.CopyTrigger>
+                  </CodeBlock.Header>
+                  <CodeBlock.Content
+                    transition="background-color 0.3s ease, color 0.3s ease"
+                    css={{
+                      "& pre, & code": {
+                        transition: "background-color 0.3s ease, color 0.3s ease",
+                      },
+                    }}
+                    overflow="scroll"
+                  >
+                    {otherTabs.map((t) => (
+                      <Tabs.Content key={t.key} value={t.key} />
+                    ))}
+                    <Tabs.Content pt="1" value={activeTab.key}>
+                      <CodeBlock.Code>
+                        <CodeBlock.CodeText />
+                      </CodeBlock.Code>
+                    </Tabs.Content>
+                  </CodeBlock.Content>
+                </CodeBlock.Root>
+              </Card.Root>
             )}
           </ClientOnly>
         </CodeBlock.AdapterProvider>

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -15,7 +16,7 @@ import {
 } from "./prompt.field-schemas.ts";
 import { getLatestConfigVersionSchema } from "./prompt.version-schema.ts";
 
-export const createPromptInputSchema = z
+const createPromptInputSchemaDefinition = z
   .strictObject({
     handle: handleSchema,
     scope: scopeSchema.optional().default("PROJECT"),
@@ -43,18 +44,24 @@ export const createPromptInputSchema = z
       },
     ],
   });
+export interface CreatePromptInputSchema extends Named<typeof createPromptInputSchemaDefinition> {}
+export const createPromptInputSchema: CreatePromptInputSchema = createPromptInputSchemaDefinition;
 
-export const updatePromptInputSchema = z.strictObject({
+const updatePromptInputSchemaDefinition = z.strictObject({
   ...createPromptInputSchema.omit({ scope: true, handle: true }).shape,
   commitMessage: commitMessageSchema,
   scope: scopeSchema.optional(),
   handle: handleSchema.optional(),
 });
+export interface UpdatePromptInputSchema extends Named<typeof updatePromptInputSchemaDefinition> {}
+export const updatePromptInputSchema: UpdatePromptInputSchema = updatePromptInputSchemaDefinition;
 
-export const updateHandleInputSchema = z.strictObject({
+const updateHandleInputSchemaDefinition = z.strictObject({
   handle: handleSchema,
   scope: scopeSchema,
 });
+export interface UpdateHandleInputSchema extends Named<typeof updateHandleInputSchemaDefinition> {}
+export const updateHandleInputSchema: UpdateHandleInputSchema = updateHandleInputSchemaDefinition;
 
 const configDataSchema = getLatestConfigVersionSchema().shape.configData;
 
@@ -68,12 +75,17 @@ const apiResponsePromptSchemaBase = z.object({
   organizationId: z.string(),
 });
 
-export const apiResponsePromptTagSchema = z.object({
+const apiResponsePromptTagSchemaDefinition = z.object({
   name: z.string(),
   versionId: z.string(),
 });
+export interface ApiResponsePromptTagSchema extends Named<
+  typeof apiResponsePromptTagSchemaDefinition
+> {}
+export const apiResponsePromptTagSchema: ApiResponsePromptTagSchema =
+  apiResponsePromptTagSchemaDefinition;
 
-export const apiResponseVersionOutputSchema = z.object({
+const apiResponseVersionOutputSchemaDefinition = z.object({
   configId: z.string(),
   projectId: z.string(),
   versionId: z.string(),
@@ -94,39 +106,63 @@ export const apiResponseVersionOutputSchema = z.object({
   tags: z.array(apiResponsePromptTagSchema).default([]),
   parameters: runtimeParametersSchema,
 });
+export interface ApiResponseVersionOutputSchema extends Named<
+  typeof apiResponseVersionOutputSchemaDefinition
+> {}
+export const apiResponseVersionOutputSchema: ApiResponseVersionOutputSchema =
+  apiResponseVersionOutputSchemaDefinition;
 
-export const apiResponsePromptWithVersionDataSchema = z.object({
+const apiResponsePromptWithVersionDataSchemaDefinition = z.object({
   ...apiResponsePromptSchemaBase.shape,
   ...apiResponseVersionOutputSchema.omit({ configId: true }).shape,
 });
+export interface ApiResponsePromptWithVersionDataSchema extends Named<
+  typeof apiResponsePromptWithVersionDataSchemaDefinition
+> {}
+export const apiResponsePromptWithVersionDataSchema: ApiResponsePromptWithVersionDataSchema =
+  apiResponsePromptWithVersionDataSchemaDefinition;
 export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataSchema>;
 
-export const promptWireSchema = z.object({
+const promptWireSchemaDefinition = z.object({
   ...apiResponsePromptWithVersionDataSchema.shape,
   platformUrl: z.string(),
 });
+export interface PromptWireSchema extends Named<typeof promptWireSchemaDefinition> {}
+export const promptWireSchema: PromptWireSchema = promptWireSchemaDefinition;
 
-export const assignTagResponseSchema = z.object({
+const assignTagResponseSchemaDefinition = z.object({
   configId: z.string(),
   versionId: z.string(),
   tag: z.string(),
   updatedAt: z.date(),
 });
-export const assignTagInputSchema = z.object({ versionId: nulFreeStringSchema });
-export const tagDefinitionSchema = z.object({
+export interface AssignTagResponseSchema extends Named<typeof assignTagResponseSchemaDefinition> {}
+export const assignTagResponseSchema: AssignTagResponseSchema = assignTagResponseSchemaDefinition;
+const assignTagInputSchemaDefinition = z.object({ versionId: nulFreeStringSchema });
+export interface AssignTagInputSchema extends Named<typeof assignTagInputSchemaDefinition> {}
+export const assignTagInputSchema: AssignTagInputSchema = assignTagInputSchemaDefinition;
+const tagDefinitionSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   createdAt: z.coerce.date(),
 });
-export const createTagInputSchema = z.object({ name: nulFreeStringSchema });
-export const renameTagInputSchema = z.object({ name: nulFreeStringSchema });
-export const syncInputSchema = z.object({
+export interface TagDefinitionSchema extends Named<typeof tagDefinitionSchemaDefinition> {}
+export const tagDefinitionSchema: TagDefinitionSchema = tagDefinitionSchemaDefinition;
+const createTagInputSchemaDefinition = z.object({ name: nulFreeStringSchema });
+export interface CreateTagInputSchema extends Named<typeof createTagInputSchemaDefinition> {}
+export const createTagInputSchema: CreateTagInputSchema = createTagInputSchemaDefinition;
+const renameTagInputSchemaDefinition = z.object({ name: nulFreeStringSchema });
+export interface RenameTagInputSchema extends Named<typeof renameTagInputSchemaDefinition> {}
+export const renameTagInputSchema: RenameTagInputSchema = renameTagInputSchemaDefinition;
+const syncInputSchemaDefinition = z.object({
   configData: getLatestConfigVersionSchema().shape.configData,
   parameters: z.record(z.string(), z.unknown()).optional(),
   localVersion: versionSchema.optional(),
   commitMessage: commitMessageSchema.optional(),
 });
-export const documentedSyncResultSchema = z.object({
+export interface SyncInputSchema extends Named<typeof syncInputSchemaDefinition> {}
+export const syncInputSchema: SyncInputSchema = syncInputSchemaDefinition;
+const documentedSyncResultSchemaDefinition = z.object({
   action: z.enum(["created", "updated", "conflict", "up_to_date"]),
   prompt: apiResponsePromptWithVersionDataSchema.optional(),
   conflictInfo: z
@@ -139,20 +175,40 @@ export const documentedSyncResultSchema = z.object({
     })
     .optional(),
 });
-export const idParamsSchema = z.object({ id: nulFreeStringSchema });
-export const idTagParamsSchema = z.object({
+export interface DocumentedSyncResultSchema extends Named<
+  typeof documentedSyncResultSchemaDefinition
+> {}
+export const documentedSyncResultSchema: DocumentedSyncResultSchema =
+  documentedSyncResultSchemaDefinition;
+const idParamsSchemaDefinition = z.object({ id: nulFreeStringSchema });
+export interface IdParamsSchema extends Named<typeof idParamsSchemaDefinition> {}
+export const idParamsSchema: IdParamsSchema = idParamsSchemaDefinition;
+const idTagParamsSchemaDefinition = z.object({
   id: nulFreeStringSchema,
   tag: nulFreeStringSchema,
 });
-export const tagParamsSchema = z.object({ tag: nulFreeStringSchema });
-export const idVersionParamsSchema = z.object({
+export interface IdTagParamsSchema extends Named<typeof idTagParamsSchemaDefinition> {}
+export const idTagParamsSchema: IdTagParamsSchema = idTagParamsSchemaDefinition;
+const tagParamsSchemaDefinition = z.object({ tag: nulFreeStringSchema });
+export interface TagParamsSchema extends Named<typeof tagParamsSchemaDefinition> {}
+export const tagParamsSchema: TagParamsSchema = tagParamsSchemaDefinition;
+const idVersionParamsSchemaDefinition = z.object({
   id: nulFreeStringSchema,
   versionId: nulFreeStringSchema,
 });
+export interface IdVersionParamsSchema extends Named<typeof idVersionParamsSchemaDefinition> {}
+export const idVersionParamsSchema: IdVersionParamsSchema = idVersionParamsSchemaDefinition;
 
 /** A restore takes no body: the prompt and version travel in the path. */
-export const restorePromptVersionBodySchema = z.object({});
-export const promptWindowQuerySchema = z.object({
+const restorePromptVersionBodySchemaDefinition = z.object({});
+export interface RestorePromptVersionBodySchema extends Named<
+  typeof restorePromptVersionBodySchemaDefinition
+> {}
+export const restorePromptVersionBodySchema: RestorePromptVersionBodySchema =
+  restorePromptVersionBodySchemaDefinition;
+const promptWindowQuerySchemaDefinition = z.object({
   version: z.coerce.number().int().nonnegative().optional(),
   tag: nulFreeStringSchema.optional(),
 });
+export interface PromptWindowQuerySchema extends Named<typeof promptWindowQuerySchemaDefinition> {}
+export const promptWindowQuerySchema: PromptWindowQuerySchema = promptWindowQuerySchemaDefinition;

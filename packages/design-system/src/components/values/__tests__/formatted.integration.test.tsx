@@ -30,9 +30,11 @@ describe("Feature: hover popovers list a value in every format", () => {
       />,
     );
     const box = screen.getByTestId("date-formats");
-    for (const label of ["UTC", "Asia/Tokyo", "Offset", "When"]) {
-      expect(box).toHaveTextContent(label);
-    }
+    expect(box).toHaveTextContent("UTC");
     expect(box).toHaveTextContent(/ago/);
+    expect(box).toHaveTextContent(/ahead of you|behind you|Same offset as you/);
+    expect(box).toHaveTextContent("Source timezone");
+    expect(box).toHaveTextContent("Asia/Tokyo");
+    expect(screen.getByRole("button", { name: /^Copy Unix ms: / })).toBeTruthy();
   });
 });

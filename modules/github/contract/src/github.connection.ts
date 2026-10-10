@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The organization's view of its GitHub connection — narrower than
  * `GithubInstallation`: a member sees a connection exists and how many
@@ -7,7 +8,7 @@ import { z } from "zod";
 
 import { githubPullRequestLiveStatusSchema } from "./github.ts";
 
-export const githubInstallationSummarySchema = z.object({
+const githubInstallationSummarySchemaDefinition = z.object({
   installationId: z.string(),
   accountLogin: z.string(),
   accountType: z.string(),
@@ -18,9 +19,14 @@ export const githubInstallationSummarySchema = z.object({
   /** GitHub can only be uninstalled on GitHub, so this deep-links there. */
   uninstallUrl: z.string(),
 });
+export interface GithubInstallationSummarySchema extends Named<
+  typeof githubInstallationSummarySchemaDefinition
+> {}
+export const githubInstallationSummarySchema: GithubInstallationSummarySchema =
+  githubInstallationSummarySchemaDefinition;
 export type GithubInstallationSummary = z.infer<typeof githubInstallationSummarySchema>;
 
-export const githubConnectionStatusSchema = z.object({
+const githubConnectionStatusSchemaDefinition = z.object({
   /** Whether this instance can start an installation at all. */
   configured: z.boolean(),
   connected: z.boolean(),
@@ -28,6 +34,11 @@ export const githubConnectionStatusSchema = z.object({
   /** Where an install starts, or null on an instance that cannot start one. */
   installUrl: z.string().nullable(),
 });
+export interface GithubConnectionStatusSchema extends Named<
+  typeof githubConnectionStatusSchemaDefinition
+> {}
+export const githubConnectionStatusSchema: GithubConnectionStatusSchema =
+  githubConnectionStatusSchemaDefinition;
 export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema>;
 
 /**
@@ -35,13 +46,23 @@ export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema
  * the deep link a human follows; the webhook removes the local row once
  * GitHub confirms.
  */
-export const githubDisconnectResultSchema = z.object({ uninstallUrl: z.string() });
+const githubDisconnectResultSchemaDefinition = z.object({ uninstallUrl: z.string() });
+export interface GithubDisconnectResultSchema extends Named<
+  typeof githubDisconnectResultSchemaDefinition
+> {}
+export const githubDisconnectResultSchema: GithubDisconnectResultSchema =
+  githubDisconnectResultSchemaDefinition;
 export type GithubDisconnectResult = z.infer<typeof githubDisconnectResultSchema>;
 
 /** What the live pull-request read answers with, for a page of refs. */
-export const githubPullRequestLiveStatusesSchema = z.object({
+const githubPullRequestLiveStatusesSchemaDefinition = z.object({
   statuses: z.array(githubPullRequestLiveStatusSchema),
 });
+export interface GithubPullRequestLiveStatusesSchema extends Named<
+  typeof githubPullRequestLiveStatusesSchemaDefinition
+> {}
+export const githubPullRequestLiveStatusesSchema: GithubPullRequestLiveStatusesSchema =
+  githubPullRequestLiveStatusesSchemaDefinition;
 
 /**
  * One line the deployment's audit trail records about a connection: who acted,

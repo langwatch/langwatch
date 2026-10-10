@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareBindings(…).withEventing(projectLifecycleEventing).withMigrations(…).withTasks(…)`, `src/project.module.ts:17`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…).withTasks(…)`, `src/project.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -417,11 +417,11 @@ Permission `project:view`. Declared at `src/transport/project.rest.ts:116`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-// Params: projectRestParamsSchema, ../contract/src/project.ts:303
+// Params: projectRestParamsSchema, ../contract/src/project.ts:390
 interface Params {
   id: string;
 }
-// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:71
+// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:110
 interface Response {
   id: string;
   name: string;
@@ -444,8 +444,8 @@ Permission `project:update`. Declared at `src/transport/project.rest.ts:140`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
-// Body: projectRestUpdateSchema, ../contract/src/project.ts:293
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
+// Body: projectRestUpdateSchema, ../contract/src/project.ts:386
 interface Body {
   name?: string;
   language?: string;
@@ -453,7 +453,7 @@ interface Body {
   teamId?: string;
   piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
 }
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:71
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:110
 ```
 
 #### `DELETE /:id` · `archiveProject`
@@ -465,8 +465,8 @@ Permission `project:delete`. Declared at `src/transport/project.rest.ts:168`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
-// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:77
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
+// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:125
 interface Response {
   id: string;
   name: string;
@@ -483,8 +483,8 @@ Authenticated: the base key is never handed to an API token, so there is no perm
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
-// Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:35
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
+// Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:56
 interface Response {
   apiKey: string;
 }
@@ -499,10 +499,10 @@ Authenticated: the base key is never handed to an API token, so there is no perm
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
-// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:306
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
+// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:398
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:35
+type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:56
 ```
 
 ## tRPC transport
@@ -519,65 +519,65 @@ Contract `../contract/src/project.trpc.ts:28`, router `src/transport/project.trp
 | `project.revokeProjectApiKey`       | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectApiKeyRevokedSchema`             |
 | `project.update`                    | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`                    | `projectSettingsSavedSchema`             |
 | `project.archiveById`               | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema`               | `projectArchivedSchema`                  |
-| `project.updateAggregateRule`       | mutation | Permission `organization:manage`                                                                                                                                                                                                                                    | `projectUpdateAggregateRuleInputSchema`       | `projectAggregateRuleUpdatedSchema`      |
+| `project.updateAggregateRule`       | mutation | Permission `organization:manage, via projectId`                                                                                                                                                                                                                     | `projectUpdateAggregateRuleInputSchema`       | `projectAggregateRuleUpdatedSchema`      |
 | `project.aggregateMemberCandidates` | query    | Permission `organization:manage`                                                                                                                                                                                                                                    | `projectAggregateMemberCandidatesInputSchema` | `projectAggregateMemberCandidatesSchema` |
 
 ```typescript
 // project.create
-type Input = z.infer<typeof projectCreateInputSchema>; // ../contract/src/project-trpc.schemas.ts:20
-// Output: projectProvisionedSchema, ../contract/src/project.responses.ts:19
+type Input = z.infer<typeof projectCreateInputSchema>; // ../contract/src/project-trpc.schemas.ts:38
+// Output: projectProvisionedSchema, ../contract/src/project.responses.ts:27
 interface Output {
   success: true;
   projectSlug: string;
 }
 
 // project.getHasFirstMessage
-// Input: projectScopeSchema, ../contract/src/project-trpc.schemas.ts:12
+// Input: projectScopeSchema, ../contract/src/project-trpc.schemas.ts:15
 interface Input {
   projectId: string;
 }
-// Output: projectFirstMessageSchema, ../contract/src/project.responses.ts:31
+// Output: projectFirstMessageSchema, ../contract/src/project.responses.ts:47
 interface Output {
   firstMessage: boolean;
 }
 
 // project.getLegacyKeyStatus
-type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:12
-// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:39
+type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
+// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:65
 interface Output {
   present: boolean;
 }
 
 // project.revokeProjectApiKey
-type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:12
-// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:43
+type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
+// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:74
 interface Output {
   revoked: true;
 }
 
 // project.update
-type Input = z.infer<typeof projectUpdateInputSchema>; // ../contract/src/project-trpc.schemas.ts:37
-// Output: projectSettingsSavedSchema, ../contract/src/project.responses.ts:25
+type Input = z.infer<typeof projectUpdateInputSchema>; // ../contract/src/project-trpc.schemas.ts:73
+// Output: projectSettingsSavedSchema, ../contract/src/project.responses.ts:38
 interface Output {
   success: boolean;
   projectSlug: string;
 }
 
 // project.archiveById
-// Input: projectArchiveByIdInputSchema, ../contract/src/project-trpc.schemas.ts:64
+// Input: projectArchiveByIdInputSchema, ../contract/src/project-trpc.schemas.ts:85
 interface Input {
   projectId: string;
   projectToArchiveId: string;
 }
-// Output: projectArchivedSchema, ../contract/src/project.responses.ts:47
+// Output: projectArchivedSchema, ../contract/src/project.responses.ts:82
 interface Output {
   success: true;
   alreadyArchived: boolean;
 }
 
 // project.updateAggregateRule
-type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:71
-// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:87
+type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:97
+// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:136
 interface Output {
   success: true;
   members: {
@@ -590,11 +590,11 @@ interface Output {
 }
 
 // project.aggregateMemberCandidates
-// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:78
+// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:108
 interface Input {
   organizationId: string;
 }
-// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:93
+// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:145
 type Output = {
   id: string;
   name: string;

@@ -17,6 +17,7 @@ import { usageReportRest } from "../usage-report.rest.ts";
 
 function mount(app: Partial<SaasApi>) {
   return createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

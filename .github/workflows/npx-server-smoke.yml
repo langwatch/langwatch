@@ -1,8 +1,8 @@
 # Smoke job for `npx @langwatch/server`. Builds the workspace package as a
 # tarball, then runs it from a fresh sandbox dir on every supported platform.
 # Asserts the full stack (postgres + redis + clickhouse + nlpgo + langevals
-# + ai-gateway + langwatch app) reaches healthy state and that the critical
-# user paths — workflow execution, evaluator run — return 200.
+# + ai-gateway + the langwatch backend) reaches healthy state and that the
+# backend serves the browser bundle at `/`.
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
@@ -36,6 +36,8 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "apps/server/**"
+      # The one process the CLI spawns: the api and the worker together.
+      - "apps/backend/**"
       - "services/langevals/pyproject.toml"
       - "services/langevals/uv.lock"
       - "services/aigateway/**"
@@ -189,9 +191,9 @@ jobs:
         run: >
           pnpm --filter @langwatch/server run test:invariants
 
-      # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships apps/ui/dist + mcp/typescript/dist (the publish sanity check
-      # asserts both), so the artifact THIS job boots must carry them too —
+      # Same prebuild as npx-server-publish.yml (the root `build:server`): every
+      # published artifact ships apps/ui/dist + mcp/typescript/dist (the publish
+      # sanity check asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
       # No separate app install: since ADR-076 langwatch/ is a member of the
@@ -204,8 +206,8 @@ jobs:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
 
-      - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm start:prepare:files && pnpm ensure:built && pnpm run build
+      - name: Build what the backend serves (build:server)
+        run: pnpm run build:server
         env:
           NODE_ENV: production
 
@@ -472,27 +474,33 @@ jobs:
             fi
           fi
 
-      - name: Probe a workflow execution end-to-end
-        # `secrets.*` is not available in step-level `if:` expressions
-        # (only `env`, `inputs`, `github`, `runner`, etc. are valid there).
-        # We expose the secret as a step-env var, then short-circuit inside
-        # the script when it's empty. Net effect matches the original
-        # "skip if no key" intent without invalid YAML.
-        env:
-          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
+      # The api half serves apps/ui/dist/client: `/` must answer with the
+      # built shell, and the hashed script it names must load. The first boot's
+      # upgrade can still hold product paths at 503, so this retries.
+      - name: Assert the backend serves the browser bundle at /
         run: |
-          set -e
-          if [[ -z "$OPENAI_API_KEY" ]]; then
-            echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
-            exit 0
-          fi
-          # Placeholder until the real workflow-execution fixture lands.
-          # We hit nlpgo's /healthz (chi-routed liveness) — the only path
-          # that is actually wired. Earlier drafts hit /health and either
-          # 502'd (POST) or hung 5+min (GET → proxypass self-loop).
+          set -eo pipefail
           base=${RESOLVED_BASE}
-          curl -fsS --max-time 10 "http://127.0.0.1:$((base + 1))/healthz" >/dev/null
-          echo "(placeholder workflow probe — real fixture pending)"
+          for i in $(seq 1 180); do
+            if curl -fsSL --connect-timeout 2 --max-time 10 "http://127.0.0.1:$base/" > /tmp/index.html 2>/dev/null \
+                && grep -q '<div id="root">' /tmp/index.html; then
+              break
+            fi
+            if [ "$i" -eq 180 ]; then
+              echo "✗ / never answered with the UI shell"
+              head -c 2000 /tmp/index.html 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "✓ / answered with the UI shell after ${i}s"
+          asset="$(grep -oE 'src="/assets/[^"]+\.js"' /tmp/index.html | head -n1 | sed -E 's/^src="(.*)"$/\1/' || true)"
+          if [ -z "$asset" ]; then
+            echo "✗ the shell names no hashed /assets/*.js script — not the vite build"
+            exit 1
+          fi
+          curl -fsS --connect-timeout 2 --max-time 10 -o /dev/null "http://127.0.0.1:$base$asset"
+          echo "✓ $asset loads"
 
       - name: Tear down
         if: always()

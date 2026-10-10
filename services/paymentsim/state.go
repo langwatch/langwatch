@@ -253,6 +253,7 @@ type idem struct {
 
 type state struct {
 	counters      map[string]int
+	idBase        int
 	offset        time.Duration
 	products      map[string]*Product
 	prices        []*Price
@@ -280,14 +281,21 @@ func newState() *state {
 func (st *state) reset() {
 	fresh := newState()
 	fresh.products, fresh.prices, fresh.meters, fresh.offset = st.products, st.prices, st.meters, st.offset
-	fresh.counters = st.counters
+	fresh.counters, fresh.idBase = st.counters, st.idBase
 	*st = *fresh
 }
 
-// id is the next deterministic id for prefix: cus_sim000001, sub_sim000001, ...
+// id is the next id for prefix: cus_sim000001, sub_sim000001, ... counted from idBase.
 func (st *state) id(prefix string) string {
 	st.counters[prefix]++
-	return fmt.Sprintf("%s_sim%06d", prefix, st.counters[prefix])
+	return st.idAt(prefix, st.counters[prefix])
+}
+
+// nextID is the id the next call to id(prefix) returns.
+func (st *state) nextID(prefix string) string { return st.idAt(prefix, st.counters[prefix]+1) }
+
+func (st *state) idAt(prefix string, n int) string {
+	return fmt.Sprintf("%s_sim%06d", prefix, st.idBase+n)
 }
 
 func (st *state) price(id string) *Price {

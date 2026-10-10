@@ -1,5 +1,5 @@
 import {
-  Box,
+  Alert,
   Button,
   HStack,
   NativeSelect,
@@ -159,27 +159,18 @@ function NoProvidersToPick({
   modelProvidersAdminPath: string | null;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="orange.muted"
-      borderRadius="md"
-      backgroundColor="orange.subtle"
-      padding={3}
-    >
-      <VStack align="start" gap={1}>
-        <Text fontSize="sm" fontWeight="semibold">
-          {title}
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
-          {body}
-        </Text>
+    <Alert.Root status="warning" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{title}</Alert.Title>
+        <Alert.Description>{body}</Alert.Description>
         {modelProvidersAdminPath && (
-          <Link href={modelProvidersAdminPath} color="orange.fg" fontSize="xs" fontWeight="medium">
+          <Link href={modelProvidersAdminPath} fontWeight="medium">
             Open model providers
           </Link>
         )}
-      </VStack>
-    </Box>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

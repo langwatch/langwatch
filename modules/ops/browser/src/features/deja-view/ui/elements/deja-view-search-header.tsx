@@ -1,4 +1,4 @@
-import { Button, HStack, Input, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Input } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
 export function SearchHeader({
@@ -22,23 +22,20 @@ export function SearchHeader({
 
   return (
     <HStack
-      height="48px"
+      minHeight="48px"
+      wrap="wrap"
       flexShrink={0}
-      paddingX={6}
+      paddingY={3}
       width="full"
-      borderBottom="1px solid"
-      borderBottomColor="border"
       gap={3}
       position="sticky"
       top={0}
       zIndex={10}
       background="bg.surface"
     >
-      <Text textStyle="md" fontWeight="semibold" flexShrink={0}>
-        Deja View
-      </Text>
       <Input
         size="sm"
+        aria-label="Aggregate ID"
         placeholder="Search aggregate ID..."
         value={searchQuery}
         onChange={(e) => onSearchQueryChange(e.target.value)}
@@ -47,6 +44,7 @@ export function SearchHeader({
       />
       <Input
         size="sm"
+        aria-label="Tenant ID"
         placeholder="Tenant ID (optional)"
         value={tenantFilter}
         onChange={(e) => onTenantFilterChange(e.target.value)}
@@ -62,7 +60,7 @@ export function SearchHeader({
         loading={isLoading}
         flexShrink={0}
       >
-        <Search size={14} />
+        <Search size={16} /> Search
       </Button>
     </HStack>
   );

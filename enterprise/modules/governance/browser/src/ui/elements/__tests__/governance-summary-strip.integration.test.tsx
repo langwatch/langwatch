@@ -31,7 +31,7 @@ afterEach(() => cleanup());
 describe("the summary strip", () => {
   describe("given four measured figures with hints", () => {
     /** @scenario "A summary strip states each figure beside the label it counts" */
-    it("puts each figure beside its label and each hint under its own pair", () => {
+    it("keeps each figure, label and hint in its own shared tile", () => {
       renderInChakra(
         <GovernanceSummaryBar
           testId="strip"
@@ -45,10 +45,13 @@ describe("the summary strip", () => {
       );
 
       const people = screen.getByTestId("strip-people");
-      expect(people).toHaveTextContent("3people");
+      expect(within(people).getByText("3")).toBeInTheDocument();
+      expect(within(people).getByText("people")).toBeInTheDocument();
       expect(within(people).getByText("Metered or named")).toBeInTheDocument();
       expect(screen.getByTestId("strip-departments")).toHaveTextContent("The ones you created");
-      expect(screen.getByTestId("strip-unassigned")).toHaveTextContent("4without a department");
+      const unassigned = within(screen.getByTestId("strip-unassigned"));
+      expect(unassigned.getByText("4")).toBeInTheDocument();
+      expect(unassigned.getByText("without a department")).toBeInTheDocument();
       expect(screen.getByTestId("strip")).not.toHaveTextContent(/\b(dept|req|tok)\b/i);
     });
   });
@@ -67,7 +70,8 @@ describe("the summary strip", () => {
       );
 
       const figure = screen.getByTestId("strip-departments");
-      expect(figure).toHaveTextContent("—departments");
+      expect(within(figure).getByText("—")).toBeInTheDocument();
+      expect(within(figure).getByText("departments")).toBeInTheDocument();
       expect(figure).not.toHaveTextContent("0");
     });
   });

@@ -63,6 +63,7 @@ function mount(
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     identity: {
       authenticate: () => ({
         actor: { type: "user" as const, id: "user-1" },

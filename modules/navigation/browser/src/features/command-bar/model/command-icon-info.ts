@@ -77,6 +77,6 @@ export function getIconInfo(item: ListItem) {
 
   return {
     Icon: Icon!,
-    color: iconColors[colorKey] ?? "gray.400",
+    color: iconColors[colorKey] ?? "fg.muted",
   };
 }

@@ -5,7 +5,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  * and exactly what it sends. The same rows print from `langwatch doctor`.
  * Spec: specs/self-hosting/checkup/checkup.feature
  */
-import { Alert, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Cloud } from "lucide-react";
 
 import { useCheckupScreen } from "../../behavior/use-checkup-screen.ts";
@@ -19,13 +19,15 @@ export default function CheckupScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Checkup</PageLayout.Heading>
+        <VStack align="start" gap={1} minWidth={0}>
+          <PageLayout.Heading>Checkup</PageLayout.Heading>
+          <PageLayout.Subtitle>
+            Whether this install is correctly wired, what is broken and how to fix it, and exactly
+            what it sends to LangWatch.
+          </PageLayout.Subtitle>
+        </VStack>
       </PageLayout.Header>
       <VStack align="stretch" gap={6} width="full" paddingTop={4}>
-        <Text color="fg.muted">
-          Whether this install is correctly wired, what is broken and how to fix it, and exactly
-          what it sends to LangWatch.
-        </Text>
         {organizationId ? <CheckupSettings organizationId={organizationId} /> : null}
       </VStack>
     </>
@@ -73,7 +75,7 @@ function CheckupSettings({ organizationId }: { organizationId: string }) {
   const report = usageReport.data;
 
   return (
-    <VStack width="full" align="stretch" gap={0}>
+    <VStack width="full" align="stretch" gap={4}>
       <CheckupRows
         rows={screen.rowsWith(data.rows)}
         ranAt={data.ranAt}

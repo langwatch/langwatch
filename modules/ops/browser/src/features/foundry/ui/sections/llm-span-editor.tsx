@@ -1,4 +1,12 @@
-import { Box, Button, Flex, Input, Text, Textarea } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Flex,
+  Input,
+  NativeSelect,
+  Text,
+  Textarea,
+} from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
@@ -6,10 +14,10 @@ import { LLM_MODELS } from "../../model/foundry-models.ts";
 import type { ChatMessage, LLMConfig, SpanConfig } from "../../model/foundry-types.ts";
 
 const ROLE_COLORS: Record<string, string> = {
-  system: "purple.500",
-  user: "green.400",
-  assistant: "blue.400",
-  tool: "yellow.400",
+  system: "purple.fg",
+  user: "green.fg",
+  assistant: "blue.fg",
+  tool: "yellow.fg",
 };
 
 export function LLMSpanEditor({ span }: { span: SpanConfig }) {
@@ -28,8 +36,8 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
   }
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="blue.500/20" bg="blue.500/5" p={4}>
-      <Text fontSize="sm" fontWeight="semibold" color="blue.400" mb={3}>
+    <Box rounded="lg" border="1px solid" borderColor="blue.muted" bg="blue.subtle" p={4}>
+      <Text fontSize="sm" fontWeight="semibold" color="blue.fg" mb={3}>
         LLM Configuration
       </Text>
 
@@ -81,33 +89,27 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
             border="1px solid"
             borderColor="border"
             borderLeftWidth="2px"
-            borderLeftColor={ROLE_COLORS[msg.role] ?? "gray.500"}
+            borderLeftColor={ROLE_COLORS[msg.role] ?? "gray.fg"}
             bg="bg.subtle"
             p={2}
           >
-            <select
-              value={msg.role}
-              onChange={(e) =>
-                updateMessage(i, {
-                  role: e.target.value as ChatMessage["role"],
-                })
-              }
-              style={{
-                width: "90px",
-                flexShrink: 0,
-                background: "var(--chakra-colors-bg-subtle)",
-                color: "var(--chakra-colors-fg-default)",
-                border: "1px solid var(--chakra-colors-border)",
-                borderRadius: "4px",
-                padding: "2px 6px",
-                fontSize: "12px",
-              }}
-            >
-              <option value="system">system</option>
-              <option value="user">user</option>
-              <option value="assistant">assistant</option>
-              <option value="tool">tool</option>
-            </select>
+            <NativeSelect.Root width="28" flexShrink={0} size="sm">
+              <NativeSelect.Field
+                aria-label={`Message ${i + 1} role`}
+                value={msg.role}
+                onChange={(e) =>
+                  updateMessage(i, {
+                    role: e.target.value as ChatMessage["role"],
+                  })
+                }
+              >
+                <option value="system">system</option>
+                <option value="user">user</option>
+                <option value="assistant">assistant</option>
+                <option value="tool">tool</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
             <Textarea
               flex={1}
               size="sm"
@@ -119,10 +121,10 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
               placeholder="Message content..."
             />
             <Button
-              size="xs"
+              size="sm"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.400" }}
+              _hover={{ color: "red.fg" }}
               onClick={() => updateLLM({ messages: messages.filter((_, j) => j !== i) })}
               alignSelf="flex-start"
             >
@@ -131,7 +133,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
           </Flex>
         ))}
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           onClick={() =>
             updateLLM({

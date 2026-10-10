@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 
@@ -21,7 +22,7 @@ export function TopErrorsCard({
   const truncated = known > shown;
 
   return (
-    <Card.Root overflow="hidden">
+    <Card.Root borderColor="border.muted" boxShadow="none" overflow="hidden">
       <HStack paddingX={4} paddingTop={3} paddingBottom={2}>
         <Text textStyle="xs" fontWeight="medium" color="fg.muted">
           Top errors
@@ -33,7 +34,10 @@ export function TopErrorsCard({
         )}
       </HStack>
       <Table.ScrollArea>
-        <Table.Root
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
           size="sm"
           variant="line"
           css={{ "& tr:last-child td": { borderBottom: "none" } }}
@@ -49,7 +53,7 @@ export function TopErrorsCard({
             {topErrors.slice(0, VISIBLE_ROWS).map((err) => (
               <Table.Row key={`${err.queueName}::${err.normalizedMessage}`}>
                 <Table.Cell>
-                  <Text color="red.500" fontWeight="medium">
+                  <Text color="red.fg" fontWeight="medium">
                     {err.count}
                   </Text>
                 </Table.Cell>
@@ -62,7 +66,7 @@ export function TopErrorsCard({
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Table.ScrollArea>
     </Card.Root>
   );

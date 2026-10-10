@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The cost screen's read side (ADR-128 wave 1). @see specs/governance/governance-cost-screen.feature */
 import { Temporal } from "@langwatch/time";
@@ -24,13 +25,18 @@ const calendarDay = z
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine(isUtcCalendarDay, "Not a day on the calendar.");
 
-export const governanceCostWindowInputSchema = z.object({
+const governanceCostWindowInputSchemaDefinition = z.object({
   organizationId: z.string(),
   windowDays: z.number().int().min(1).max(365).default(30),
 });
+export interface GovernanceCostWindowInputSchema extends Named<
+  typeof governanceCostWindowInputSchemaDefinition
+> {}
+export const governanceCostWindowInputSchema: GovernanceCostWindowInputSchema =
+  governanceCostWindowInputSchemaDefinition;
 export type GovernanceCostWindowInput = z.infer<typeof governanceCostWindowInputSchema>;
 
-export const governanceCostPeriodRecordsInputSchema = z
+const governanceCostPeriodRecordsInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     fromDay: calendarDay,
@@ -38,6 +44,11 @@ export const governanceCostPeriodRecordsInputSchema = z
     provider: z.string(),
   })
   .refine((input) => input.fromDay <= input.toDay, "A period cannot end before it starts.");
+export interface GovernanceCostPeriodRecordsInputSchema extends Named<
+  typeof governanceCostPeriodRecordsInputSchemaDefinition
+> {}
+export const governanceCostPeriodRecordsInputSchema: GovernanceCostPeriodRecordsInputSchema =
+  governanceCostPeriodRecordsInputSchemaDefinition;
 export type GovernanceCostPeriodRecordsInput = z.infer<
   typeof governanceCostPeriodRecordsInputSchema
 >;
@@ -49,99 +60,164 @@ const figure = {
   currenciesWithoutUsdAmount: z.array(z.string()),
 };
 
-export const governanceCostProviderDayRowSchema = z.object({
+const governanceCostProviderDayRowSchemaDefinition = z.object({
   day: z.string(),
   provider: z.string(),
   ...figure,
 });
+export interface GovernanceCostProviderDayRowSchema extends Named<
+  typeof governanceCostProviderDayRowSchemaDefinition
+> {}
+export const governanceCostProviderDayRowSchema: GovernanceCostProviderDayRowSchema =
+  governanceCostProviderDayRowSchemaDefinition;
 export type GovernanceCostProviderDayRow = z.infer<typeof governanceCostProviderDayRowSchema>;
 
-export const governanceCostProviderDayBreakdownSchema = z.object({
+const governanceCostProviderDayBreakdownSchemaDefinition = z.object({
   unavailableReason: governanceCostUnavailableReasonSchema.nullable(),
   rows: z.array(governanceCostProviderDayRowSchema),
   windowDays: z.number().int(),
 });
+export interface GovernanceCostProviderDayBreakdownSchema extends Named<
+  typeof governanceCostProviderDayBreakdownSchemaDefinition
+> {}
+export const governanceCostProviderDayBreakdownSchema: GovernanceCostProviderDayBreakdownSchema =
+  governanceCostProviderDayBreakdownSchemaDefinition;
 export type GovernanceCostProviderDayBreakdown = z.infer<
   typeof governanceCostProviderDayBreakdownSchema
 >;
 
-export const governanceCostModelRowSchema = z.object({ model: z.string(), ...figure });
+const governanceCostModelRowSchemaDefinition = z.object({ model: z.string(), ...figure });
+export interface GovernanceCostModelRowSchema extends Named<
+  typeof governanceCostModelRowSchemaDefinition
+> {}
+export const governanceCostModelRowSchema: GovernanceCostModelRowSchema =
+  governanceCostModelRowSchemaDefinition;
 export type GovernanceCostModelRow = z.infer<typeof governanceCostModelRowSchema>;
 
-export const governanceCostModelBreakdownSchema = z.object({
+const governanceCostModelBreakdownSchemaDefinition = z.object({
   unavailableReason: governanceCostUnavailableReasonSchema.nullable(),
   rows: z.array(governanceCostModelRowSchema),
   windowDays: z.number().int(),
 });
+export interface GovernanceCostModelBreakdownSchema extends Named<
+  typeof governanceCostModelBreakdownSchemaDefinition
+> {}
+export const governanceCostModelBreakdownSchema: GovernanceCostModelBreakdownSchema =
+  governanceCostModelBreakdownSchemaDefinition;
 export type GovernanceCostModelBreakdown = z.infer<typeof governanceCostModelBreakdownSchema>;
 
-export const governanceCostDayRecordSchema = z.object({
+const governanceCostDayRecordSchemaDefinition = z.object({
   label: z.string(),
   ...figure,
 });
+export interface GovernanceCostDayRecordSchema extends Named<
+  typeof governanceCostDayRecordSchemaDefinition
+> {}
+export const governanceCostDayRecordSchema: GovernanceCostDayRecordSchema =
+  governanceCostDayRecordSchemaDefinition;
 export type GovernanceCostDayRecord = z.infer<typeof governanceCostDayRecordSchema>;
 
-export const governanceCostDayRecordsSchema = z.object({
+const governanceCostDayRecordsSchemaDefinition = z.object({
   unavailableReason: governanceCostUnavailableReasonSchema.nullable(),
   records: z.array(governanceCostDayRecordSchema),
 });
+export interface GovernanceCostDayRecordsSchema extends Named<
+  typeof governanceCostDayRecordsSchemaDefinition
+> {}
+export const governanceCostDayRecordsSchema: GovernanceCostDayRecordsSchema =
+  governanceCostDayRecordsSchemaDefinition;
 export type GovernanceCostDayRecords = z.infer<typeof governanceCostDayRecordsSchema>;
 
-export const governanceSpenderRowSchema = z.object({
+const governanceSpenderRowSchemaDefinition = z.object({
   provider: z.string(),
   rawActorId: z.string(),
   label: z.string().nullable(),
   agentId: z.string(),
   ...figure,
 });
+export interface GovernanceSpenderRowSchema extends Named<
+  typeof governanceSpenderRowSchemaDefinition
+> {}
+export const governanceSpenderRowSchema: GovernanceSpenderRowSchema =
+  governanceSpenderRowSchemaDefinition;
 export type GovernanceSpenderRow = z.infer<typeof governanceSpenderRowSchema>;
 
-export const governanceSpenderBreakdownSchema = z.object({
+const governanceSpenderBreakdownSchemaDefinition = z.object({
   unavailableReason: governanceCostUnavailableReasonSchema.nullable(),
   rows: z.array(governanceSpenderRowSchema),
   windowDays: z.number().int(),
 });
+export interface GovernanceSpenderBreakdownSchema extends Named<
+  typeof governanceSpenderBreakdownSchemaDefinition
+> {}
+export const governanceSpenderBreakdownSchema: GovernanceSpenderBreakdownSchema =
+  governanceSpenderBreakdownSchemaDefinition;
 export type GovernanceSpenderBreakdown = z.infer<typeof governanceSpenderBreakdownSchema>;
 
-export const governanceCostCurrencyTotalSchema = z.object({
+const governanceCostCurrencyTotalSchemaDefinition = z.object({
   currencyCode: z.string(),
   amount: z.number().nullable(),
   cellsWithoutAmount: z.number().int(),
 });
+export interface GovernanceCostCurrencyTotalSchema extends Named<
+  typeof governanceCostCurrencyTotalSchemaDefinition
+> {}
+export const governanceCostCurrencyTotalSchema: GovernanceCostCurrencyTotalSchema =
+  governanceCostCurrencyTotalSchemaDefinition;
 export type GovernanceCostCurrencyTotal = z.infer<typeof governanceCostCurrencyTotalSchema>;
 
 /** One lane's figure; `requestsWithoutAmount` is the metered lane's alone and never withholds. */
-export const governanceCostLaneSchema = z.object({
+const governanceCostLaneSchemaDefinition = z.object({
   ...figure,
   currencyTotals: z.array(governanceCostCurrencyTotalSchema),
   requestsWithoutAmount: z.number().int().optional(),
 });
+export interface GovernanceCostLaneSchema extends Named<
+  typeof governanceCostLaneSchemaDefinition
+> {}
+export const governanceCostLaneSchema: GovernanceCostLaneSchema =
+  governanceCostLaneSchemaDefinition;
 export type GovernanceCostLane = z.infer<typeof governanceCostLaneSchema>;
 
 /** Counts only: the seat lane carries no amount field at all (ADR-128). */
-export const governanceSeatPoolSchema = z.object({
+const governanceSeatPoolSchemaDefinition = z.object({
   skuPartNumber: z.string(),
   day: z.string(),
   seatsBought: z.number().int(),
   seatsAssigned: z.number().int(),
 });
+export interface GovernanceSeatPoolSchema extends Named<
+  typeof governanceSeatPoolSchemaDefinition
+> {}
+export const governanceSeatPoolSchema: GovernanceSeatPoolSchema =
+  governanceSeatPoolSchemaDefinition;
 export type GovernanceSeatPool = z.infer<typeof governanceSeatPoolSchema>;
 
-export const governanceSeatLaneSchema = z.discriminatedUnion("status", [
+const governanceSeatLaneSchemaDefinition = z.discriminatedUnion("status", [
   z.object({ status: z.literal("awaiting_data") }),
   z.object({ status: z.literal("read_failed") }),
   z.object({ status: z.literal("reported"), pools: z.array(governanceSeatPoolSchema) }),
 ]);
+export interface GovernanceSeatLaneSchema extends Named<
+  typeof governanceSeatLaneSchemaDefinition
+> {}
+export const governanceSeatLaneSchema: GovernanceSeatLaneSchema =
+  governanceSeatLaneSchemaDefinition;
 export type GovernanceSeatLane = z.infer<typeof governanceSeatLaneSchema>;
 
-export const governanceCostDayCurrencyLineSchema = z.object({
+const governanceCostDayCurrencyLineSchemaDefinition = z.object({
   currencyCode: z.string(),
   amount: z.number().nullable(),
   previousAmount: z.number().nullable(),
 });
+export interface GovernanceCostDayCurrencyLineSchema extends Named<
+  typeof governanceCostDayCurrencyLineSchemaDefinition
+> {}
+export const governanceCostDayCurrencyLineSchema: GovernanceCostDayCurrencyLineSchema =
+  governanceCostDayCurrencyLineSchemaDefinition;
 export type GovernanceCostDayCurrencyLine = z.infer<typeof governanceCostDayCurrencyLineSchema>;
 
-export const governanceCostDaySchema = z.object({
+const governanceCostDaySchemaDefinition = z.object({
   day: z.string(),
   billedUsd: z.number().nullable(),
   gatewayUsd: z.number().nullable(),
@@ -152,19 +228,31 @@ export const governanceCostDaySchema = z.object({
   billedCurrenciesWithoutUsdAmount: z.array(z.string()),
   billedProvisional: z.boolean(),
 });
+export interface GovernanceCostDaySchema extends Named<typeof governanceCostDaySchemaDefinition> {}
+export const governanceCostDaySchema: GovernanceCostDaySchema = governanceCostDaySchemaDefinition;
 export type GovernanceCostDay = z.infer<typeof governanceCostDaySchema>;
 
-export const governanceCostStaleSourcesSchema = z.object({
+const governanceCostStaleSourcesSchemaDefinition = z.object({
   oldestLastSuccessIso: z.string(),
   sourceNames: z.array(z.string()),
 });
+export interface GovernanceCostStaleSourcesSchema extends Named<
+  typeof governanceCostStaleSourcesSchemaDefinition
+> {}
+export const governanceCostStaleSourcesSchema: GovernanceCostStaleSourcesSchema =
+  governanceCostStaleSourcesSchemaDefinition;
 export type GovernanceCostStaleSources = z.infer<typeof governanceCostStaleSourcesSchema>;
 
-export const governanceCostUnpricedWindowSchema = z.object({
+const governanceCostUnpricedWindowSchemaDefinition = z.object({
   sinceIso: z.string(),
   throughIso: z.string(),
   sourceNames: z.array(z.string()),
 });
+export interface GovernanceCostUnpricedWindowSchema extends Named<
+  typeof governanceCostUnpricedWindowSchemaDefinition
+> {}
+export const governanceCostUnpricedWindowSchema: GovernanceCostUnpricedWindowSchema =
+  governanceCostUnpricedWindowSchemaDefinition;
 export type GovernanceCostUnpricedWindow = z.infer<typeof governanceCostUnpricedWindowSchema>;
 
 /** Why a claimed Azure bill shows nothing; main's `azureBillingNote.ts` closed list. */
@@ -176,7 +264,7 @@ export const governanceAzureBillingNoteSchema = z.enum([
 export type GovernanceAzureBillingNote = z.infer<typeof governanceAzureBillingNoteSchema>;
 
 /** The three lanes side by side, never summed into one figure. @see specs/governance/governance-cost-screen.feature */
-export const governanceCostSummarySchema = z.object({
+const governanceCostSummarySchemaDefinition = z.object({
   unavailableReason: governanceCostUnavailableReasonSchema.nullable(),
   billed: governanceCostLaneSchema,
   providers: z.array(z.object({ provider: z.string(), ...figure })),
@@ -188,4 +276,9 @@ export const governanceCostSummarySchema = z.object({
   staleSources: governanceCostStaleSourcesSchema.nullable(),
   unpricedWindow: governanceCostUnpricedWindowSchema.nullable(),
 });
+export interface GovernanceCostSummarySchema extends Named<
+  typeof governanceCostSummarySchemaDefinition
+> {}
+export const governanceCostSummarySchema: GovernanceCostSummarySchema =
+  governanceCostSummarySchemaDefinition;
 export type GovernanceCostSummary = z.infer<typeof governanceCostSummarySchema>;

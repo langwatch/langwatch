@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -37,7 +38,7 @@ const evaluationEventSchema = z.object({
 /**
  * Evaluation scheduled event - emitted when an evaluation job is added to the queue.
  */
-export const evaluationScheduledEventDataSchema = z.object({
+const evaluationScheduledEventDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -45,13 +46,23 @@ export const evaluationScheduledEventDataSchema = z.object({
   traceId: z.string().optional(),
   isGuardrail: z.boolean().optional(),
 });
+export interface EvaluationScheduledEventDataSchema extends Named<
+  typeof evaluationScheduledEventDataSchemaDefinition
+> {}
+export const evaluationScheduledEventDataSchema: EvaluationScheduledEventDataSchema =
+  evaluationScheduledEventDataSchemaDefinition;
 
-export const evaluationScheduledEventSchema = z.object({
+const evaluationScheduledEventSchemaDefinition = z.object({
   ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_SCHEDULED_EVENT_TYPE),
   data: evaluationScheduledEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
+export interface EvaluationScheduledEventSchema extends Named<
+  typeof evaluationScheduledEventSchemaDefinition
+> {}
+export const evaluationScheduledEventSchema: EvaluationScheduledEventSchema =
+  evaluationScheduledEventSchemaDefinition;
 
 export type EvaluationScheduledEventData = z.infer<typeof evaluationScheduledEventDataSchema>;
 export type EvaluationScheduledEvent = z.infer<typeof evaluationScheduledEventSchema>;
@@ -59,7 +70,7 @@ export type EvaluationScheduledEvent = z.infer<typeof evaluationScheduledEventSc
 /**
  * Evaluation started event - emitted when an evaluation execution begins.
  */
-export const evaluationStartedEventDataSchema = z.object({
+const evaluationStartedEventDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -67,13 +78,23 @@ export const evaluationStartedEventDataSchema = z.object({
   traceId: z.string().optional(),
   isGuardrail: z.boolean().optional(),
 });
+export interface EvaluationStartedEventDataSchema extends Named<
+  typeof evaluationStartedEventDataSchemaDefinition
+> {}
+export const evaluationStartedEventDataSchema: EvaluationStartedEventDataSchema =
+  evaluationStartedEventDataSchemaDefinition;
 
-export const evaluationStartedEventSchema = z.object({
+const evaluationStartedEventSchemaDefinition = z.object({
   ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_STARTED_EVENT_TYPE),
   data: evaluationStartedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
+export interface EvaluationStartedEventSchema extends Named<
+  typeof evaluationStartedEventSchemaDefinition
+> {}
+export const evaluationStartedEventSchema: EvaluationStartedEventSchema =
+  evaluationStartedEventSchemaDefinition;
 
 export type EvaluationStartedEventData = z.infer<typeof evaluationStartedEventDataSchema>;
 export type EvaluationStartedEvent = z.infer<typeof evaluationStartedEventSchema>;
@@ -81,7 +102,7 @@ export type EvaluationStartedEvent = z.infer<typeof evaluationStartedEventSchema
 /**
  * Evaluation completed event - emitted when an evaluation execution finishes.
  */
-export const evaluationCompletedEventDataSchema = z.object({
+const evaluationCompletedEventDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   status: z.enum(["processed", "error", "skipped"]),
   score: z.number().nullable().optional(),
@@ -93,13 +114,23 @@ export const evaluationCompletedEventDataSchema = z.object({
   errorDetails: z.string().nullable().optional(),
   costId: z.string().nullable().optional(),
 });
+export interface EvaluationCompletedEventDataSchema extends Named<
+  typeof evaluationCompletedEventDataSchemaDefinition
+> {}
+export const evaluationCompletedEventDataSchema: EvaluationCompletedEventDataSchema =
+  evaluationCompletedEventDataSchemaDefinition;
 
-export const evaluationCompletedEventSchema = z.object({
+const evaluationCompletedEventSchemaDefinition = z.object({
   ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_COMPLETED_EVENT_TYPE),
   data: evaluationCompletedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
+export interface EvaluationCompletedEventSchema extends Named<
+  typeof evaluationCompletedEventSchemaDefinition
+> {}
+export const evaluationCompletedEventSchema: EvaluationCompletedEventSchema =
+  evaluationCompletedEventSchemaDefinition;
 
 export type EvaluationCompletedEventData = z.infer<typeof evaluationCompletedEventDataSchema>;
 export type EvaluationCompletedEvent = z.infer<typeof evaluationCompletedEventSchema>;
@@ -109,7 +140,7 @@ export type EvaluationCompletedEvent = z.infer<typeof evaluationCompletedEventSc
  * Carries evaluator identity and results in a single event, avoiding ClickHouse
  * replica lag from two-event approaches.
  */
-export const evaluationReportedEventDataSchema = z.object({
+const evaluationReportedEventDataSchemaDefinition = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -126,13 +157,23 @@ export const evaluationReportedEventDataSchema = z.object({
   errorDetails: z.string().nullable().optional(),
   costId: z.string().nullable().optional(),
 });
+export interface EvaluationReportedEventDataSchema extends Named<
+  typeof evaluationReportedEventDataSchemaDefinition
+> {}
+export const evaluationReportedEventDataSchema: EvaluationReportedEventDataSchema =
+  evaluationReportedEventDataSchemaDefinition;
 
-export const evaluationReportedEventSchema = z.object({
+const evaluationReportedEventSchemaDefinition = z.object({
   ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_REPORTED_EVENT_TYPE),
   data: evaluationReportedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
+export interface EvaluationReportedEventSchema extends Named<
+  typeof evaluationReportedEventSchemaDefinition
+> {}
+export const evaluationReportedEventSchema: EvaluationReportedEventSchema =
+  evaluationReportedEventSchemaDefinition;
 
 export type EvaluationReportedEventData = z.infer<typeof evaluationReportedEventDataSchema>;
 export type EvaluationReportedEvent = z.infer<typeof evaluationReportedEventSchema>;

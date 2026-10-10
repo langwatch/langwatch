@@ -3,7 +3,7 @@ import type {
   TierTargetSuggestion,
 } from "@langwatch/model-provider-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type {
@@ -75,4 +75,9 @@ export interface EnterpriseGatewayApi {
 export const EnterpriseGatewayApi = moduleApi<EnterpriseGatewayApi>()("enterprise-gateway");
 
 /** A write whose whole answer is that it happened: a screen refetches, never trusting a row. */
-export const enterpriseGatewayWriteAcknowledgedSchema = z.object({ ok: z.boolean() }).strict();
+const enterpriseGatewayWriteAcknowledgedSchemaDefinition = z.object({ ok: z.boolean() }).strict();
+export interface EnterpriseGatewayWriteAcknowledgedSchema extends Named<
+  typeof enterpriseGatewayWriteAcknowledgedSchemaDefinition
+> {}
+export const enterpriseGatewayWriteAcknowledgedSchema: EnterpriseGatewayWriteAcknowledgedSchema =
+  enterpriseGatewayWriteAcknowledgedSchemaDefinition;

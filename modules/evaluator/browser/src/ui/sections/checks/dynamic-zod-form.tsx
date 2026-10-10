@@ -279,7 +279,7 @@ const ArrayField = <T extends EvaluatorTypes>({
         <Box
           key={field.id}
           borderLeft={arraySchema.element instanceof z.ZodObject ? "4px solid" : undefined}
-          borderLeftColor={variant === "studio" ? "border" : "orange.400"}
+          borderLeftColor={variant === "studio" ? "border" : "orange.fg"}
           width="full"
         >
           <HStack

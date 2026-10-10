@@ -472,6 +472,7 @@ export function mountSuiteFamilies(
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

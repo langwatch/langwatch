@@ -1,6 +1,7 @@
 import { neutralizeRows } from "@langwatch/csv";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -31,7 +32,6 @@ import {
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { BarChart3, Bird, Download, X } from "lucide-react";
 import Parse from "papaparse";
-import { useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -244,16 +244,12 @@ function GatewayUsagePage() {
   // Only offered while one key is in focus: the organization-wide view has
   // no single trace destination to open, and the key's own destination is
   // what decides whether there is anything to open at all.
-  const viewTracesHref = useMemo(
-    () =>
-      keyTracesHref({
-        virtualKeyId,
-        key: keyQuery.data,
-        teams: organization?.teams ?? [],
-        window: traceWindowFor({ days, fromIso, toIso }),
-      }),
-    [virtualKeyId, keyQuery.data, organization?.teams, days, fromIso, toIso],
-  );
+  const viewTracesHref = keyTracesHref({
+    virtualKeyId,
+    key: keyQuery.data,
+    teams: organization?.teams ?? [],
+    window: traceWindowFor({ days, fromIso, toIso }),
+  });
 
   const activeQuery = virtualKeyId ? vkSummaryQuery : summaryQuery;
   const data = usageShown({
@@ -375,18 +371,18 @@ function UsageBreakdown({
   return (
     <VStack align="stretch" gap={6}>
       <StatTileGrid columns={4}>
-        <StatTile label="Total spend">
+        <StatTile variant="showcase" label="Total spend">
           <StatTileFigure>{formatBudgetUsd(data.totalUsd)}</StatTileFigure>
         </StatTile>
-        <StatTile label="Requests">
+        <StatTile variant="showcase" label="Requests">
           <UITooltip content="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review.">
             <StatTileFigure>{data.totalRequests.toLocaleString()}</StatTileFigure>
           </UITooltip>
         </StatTile>
-        <StatTile label="Avg $/request">
+        <StatTile variant="showcase" label="Avg $/request">
           <StatTileFigure>{formatAvgCost(data.avgUsdPerRequest)}</StatTileFigure>
         </StatTile>
-        <StatTile label="Blocked by guardrail">
+        <StatTile variant="showcase" label="Blocked by guardrail">
           <Box color={data.blockedRequests > 0 ? "fg.error" : undefined}>
             <StatTileFigure>{data.blockedRequests.toLocaleString()}</StatTileFigure>
           </Box>
@@ -398,8 +394,13 @@ function UsageBreakdown({
       {showKeys && (
         <VStack align="stretch" gap={2}>
           <Heading size="sm">Top virtual keys</Heading>
-          <Card.Root width="full" overflowX="auto">
-            <Table.Root variant="line" size="sm" width="full">
+          <Card.Root variant="showcase" width="full" overflowX="auto">
+            <ListTable
+              containerProps={{ overflowX: "auto", maxWidth: "full" }}
+              variant="line"
+              size="sm"
+              width="full"
+            >
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Key</Table.ColumnHeader>
@@ -424,7 +425,7 @@ function UsageBreakdown({
                   </Table.Row>
                 ))}
               </Table.Body>
-            </Table.Root>
+            </ListTable>
           </Card.Root>
         </VStack>
       )}
@@ -441,8 +442,13 @@ function UsageBreakdown({
             </Link>
           )}
         </HStack>
-        <Card.Root width="full" overflowX="auto">
-          <Table.Root variant="line" size="sm" width="full">
+        <Card.Root variant="showcase" width="full" overflowX="auto">
+          <ListTable
+            containerProps={{ overflowX: "auto", maxWidth: "full" }}
+            variant="line"
+            size="sm"
+            width="full"
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Model</Table.ColumnHeader>
@@ -461,7 +467,7 @@ function UsageBreakdown({
                 </Table.Row>
               ))}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         </Card.Root>
       </VStack>
     </VStack>
@@ -473,15 +479,11 @@ function SpendSparkline({
 }: {
   byDay: { day: string; totalUsd: string; requests: number }[];
 }) {
-  const points = useMemo(
-    () =>
-      byDay.map((p) => ({
-        day: p.day,
-        spendUsd: Number(p.totalUsd),
-        requests: p.requests,
-      })),
-    [byDay],
-  );
+  const points = byDay.map((p) => ({
+    day: p.day,
+    spendUsd: Number(p.totalUsd),
+    requests: p.requests,
+  }));
   return (
     <VStack align="stretch" gap={2}>
       <HStack>

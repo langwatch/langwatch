@@ -9,6 +9,7 @@ import { inviteLandingSchema } from "@langwatch/organization-contract";
 import {
   createdUserSchema,
   userApiChangePasswordInputSchema,
+  userApiUnlinkAccountInputSchema,
   userApiRegisterInputSchema,
   userApiSetPasswordInputSchema,
   userApiSuccessSchema,
@@ -101,6 +102,11 @@ export const authTrpc = defineTrpcContract("auth")
 
   .mutation("changePassword")
   .withInput(userApiChangePasswordInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /** Removing one of the caller's own sign-in methods, moved from `user.*` with its wire. */
+  .mutation("unlinkAccount")
+  .withInput(userApiUnlinkAccountInputSchema)
   .withOutput(userApiSuccessSchema)
 
   /**

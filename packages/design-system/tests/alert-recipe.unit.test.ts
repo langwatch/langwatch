@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
 import { describe, expect, it } from "vitest";
 
+import { statusMesh } from "../src/system/alert.recipe.ts";
 import { system } from "../src/system/index.ts";
 
 type Mode = "light" | "dark";
@@ -85,6 +86,33 @@ function contrast({ a, b }: { a: string; b: string }): number {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
 }
 
+/** Bound every pixel, including overlapping blob peaks, rather than just the flat base. */
+function meshGrounds({ root, ground, mode }: { root: Declarations; ground: string; mode: Mode }) {
+  const stops = [
+    ...(root.backgroundImage ?? "").matchAll(
+      /color-mix\(in srgb, (var\([^)]+\)) (\d+)%, transparent\)/g,
+    ),
+  ];
+  expect(stops).toHaveLength((root.backgroundImage?.match(/radial-gradient/g) ?? []).length);
+  return stops.reduce<string[]>(
+    (grounds, stop) => {
+      const colour = channels(resolve({ value: stop[1] ?? "", mode, root }));
+      const share = Number(stop[2]) / 100;
+      return grounds.flatMap((base) => [
+        base,
+        `#${channels(base)
+          .map((channel, at) =>
+            Math.round(channel * (1 - share) + (colour[at] ?? 0) * share)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("")}`,
+      ]);
+    },
+    [ground],
+  );
+}
+
 /** The colours one alert paints in one mode; an outline alert sits on the surface. */
 function paint({
   status,
@@ -102,10 +130,7 @@ function paint({
   const indicator = slotIn({ styles: slots.indicator, mode }).color;
   const text = read(root.color);
   const own = read(root.background);
-  const ground =
-    own === "transparent"
-      ? read(mode === "light" ? "var(--chakra-colors-bg-surface)" : "var(--chakra-colors-bg-panel)")
-      : own;
+  const ground = own === "transparent" ? read("var(--chakra-colors-bg-card)") : own;
   return {
     root,
     ground,
@@ -118,20 +143,19 @@ function paint({
 describe("the alert recipe", () => {
   describe("given an alert with the default variant", () => {
     /** @scenario "An alert wears the card material in either colour mode" */
-    it("tints the surface in light and the panel in dark", () => {
+    it("tints the card in both modes", () => {
       const light = paint({ status: "error", variant: "subtle", mode: "light" });
       const dark = paint({ status: "error", variant: "subtle", mode: "dark" });
 
-      expect(light.root.background).toContain("var(--chakra-colors-bg-surface)");
-      expect(dark.root.background).toContain("var(--chakra-colors-bg-panel)");
+      expect(light.root.background).toContain("var(--chakra-colors-bg-card)");
+      expect(dark.root.background).toContain("var(--chakra-colors-bg-card)");
       expect(light.ground).not.toBe(dark.ground);
     });
 
     /** @scenario "A status tints its alert in either colour mode" */
     it.each(["light", "dark"] as const)("gives every status its own tint in %s", (mode) => {
       const plain = resolve({
-        value:
-          mode === "light" ? "var(--chakra-colors-bg-surface)" : "var(--chakra-colors-bg-panel)",
+        value: "var(--chakra-colors-bg-card)",
         mode,
         root: {},
       });
@@ -182,9 +206,87 @@ describe("the alert recipe", () => {
     it.each(cases)("reads at AA for $status $variant in $mode", ({ mode, variant, status }) => {
       const painted = paint({ status, variant, mode });
 
-      expect(contrast({ a: painted.title, b: painted.ground })).toBeGreaterThanOrEqual(4.5);
-      expect(contrast({ a: painted.description, b: painted.ground })).toBeGreaterThanOrEqual(4.5);
-      expect(contrast({ a: painted.indicator, b: painted.ground })).toBeGreaterThanOrEqual(3);
+      for (const ground of meshGrounds({ ...painted, mode })) {
+        expect(contrast({ a: painted.title, b: ground })).toBeGreaterThanOrEqual(4.5);
+        expect(contrast({ a: painted.description, b: ground })).toBeGreaterThanOrEqual(4.5);
+        expect(contrast({ a: painted.indicator, b: ground })).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+
+  describe("given the quieter status surfaces", () => {
+    /** @scenario "Status meshes keep their hierarchy and contrast" */
+    it.each(["light", "dark"] as const)("keeps banners and toasts readable in %s", (mode) => {
+      for (const status of STATUSES) {
+        const painted = paint({ status, variant: "subtle", mode });
+        for (const level of ["banner", "toast"] as const) {
+          const surface = slotIn({
+            styles: system.sva({ slots: ["root"], base: { root: statusMesh(level) } })({}).root,
+            mode,
+          });
+          const root = { ...painted.root, ...surface };
+          const ground = resolve({ value: root.background ?? "", mode, root });
+          for (const background of meshGrounds({ root, ground, mode })) {
+            expect(contrast({ a: painted.title, b: background })).toBeGreaterThanOrEqual(4.5);
+            expect(contrast({ a: painted.indicator, b: background })).toBeGreaterThanOrEqual(3);
+          }
+        }
+      }
+    });
+  });
+
+  describe("given the status strength hierarchy", () => {
+    it("uses main's sunken input ground for a dark neutral solid", () => {
+      const solid = paint({ status: "neutral", variant: "solid", mode: "dark" });
+      expect(solid.ground).toBe("#10101a");
+      expect(solid.ground).toBe(
+        resolve({ value: "var(--chakra-colors-bg-input)", mode: "dark", root: solid.root }),
+      );
+    });
+
+    /** @scenario "Status meshes keep their hierarchy and contrast" */
+    it.each(["light", "dark"] as const)("orders the painted colour strength in %s", (mode) => {
+      for (const status of STATUSES) {
+        const painted = paint({ status, variant: "subtle", mode });
+        const plain = channels(
+          resolve({
+            value: "var(--chakra-colors-bg-card)",
+            mode,
+            root: painted.root,
+          }),
+        );
+        const strength = (ground: string) =>
+          channels(ground).reduce(
+            (sum, channel, at) => sum + Math.abs(channel - (plain[at] ?? 0)),
+            0,
+          );
+        let previousMinimum = -1;
+        let previousMaximum = -1;
+        // Main’s input ground is sunken; the neutral solid is not a stronger status tint.
+        const levels = ["outline", "banner", "toast", "subtle", "surface", "solid"] as const;
+        const orderedLevels = levels.filter(
+          (level) => !(status === "neutral" && mode === "dark" && level === "solid"),
+        );
+        for (const level of orderedLevels) {
+          const surface =
+            level === "solid"
+              ? paint({ status, variant: "solid", mode })
+              : (() => {
+                  const styles = slotIn({
+                    styles: system.sva({ slots: ["root"], base: { root: statusMesh(level) } })({})
+                      .root,
+                    mode,
+                  });
+                  const root = { ...painted.root, ...styles };
+                  return { root, ground: resolve({ value: root.background ?? "", mode, root }) };
+                })();
+          const bounds = meshGrounds({ ...surface, mode }).map(strength);
+          expect(Math.min(...bounds), `${status} ${level} base`).toBeGreaterThan(previousMinimum);
+          expect(Math.max(...bounds), `${status} ${level} peaks`).toBeGreaterThan(previousMaximum);
+          previousMinimum = Math.min(...bounds);
+          previousMaximum = Math.max(...bounds);
+        }
+      }
     });
   });
 

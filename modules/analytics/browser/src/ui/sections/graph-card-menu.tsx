@@ -217,7 +217,7 @@ export function GraphCardMenu({
 
         <Menu.Item
           value="delete"
-          color="red.600"
+          color="red.fg"
           data-testid="analytics-chart-delete"
           onClick={onDelete}
         >

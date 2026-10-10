@@ -154,7 +154,7 @@ function BriefingHeadlineSkeleton() {
               align="center"
               paddingX={3}
               paddingY={2.5}
-              background="bg.surface"
+              background="bg.card"
             >
               <Skeleton width="7px" height="7px" borderRadius="full" />
               <Skeleton height="12px" flex={1} width={row === 0 ? "70%" : "56%"} />

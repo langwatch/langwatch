@@ -43,6 +43,7 @@ export class SsoConnectionHistoryService {
 function toHistoryView(entry: SsoConnectionHistoryEntry): SsoConnectionHistoryEntryView {
   return {
     eventId: entry.eventId,
+    eventType: entry.type,
     occurredAtMs: entry.occurredAtMs,
     summary: ssoConnectionHistoryCopy(entry),
     carriedOver: entry.source === "legacy-grandfathered",

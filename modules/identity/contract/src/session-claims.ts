@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -150,7 +151,7 @@ export function signInMethodLabelFor({
  * What this request's callback proved about the provider account behind the session
  * being minted (D06). Absent: there is no callback evidence, so nothing is inferred.
  */
-export const sessionCallbackEvidenceSchema = z.object({
+const sessionCallbackEvidenceSchemaDefinition = z.object({
   providerAccountId: z.string().min(1),
   assertedFactors: z.array(z.string()),
   verifiedTokenClaims: z.boolean(),
@@ -160,13 +161,23 @@ export const sessionCallbackEvidenceSchema = z.object({
     .object({ accountId: z.string(), createdAtMs: z.number(), email: z.string() })
     .optional(),
 });
+export interface SessionCallbackEvidenceSchema extends Named<
+  typeof sessionCallbackEvidenceSchemaDefinition
+> {}
+export const sessionCallbackEvidenceSchema: SessionCallbackEvidenceSchema =
+  sessionCallbackEvidenceSchemaDefinition;
 export type SessionCallbackEvidence = z.infer<typeof sessionCallbackEvidenceSchema>;
 
-export const sessionClaimsMintInputSchema = z.object({
+const sessionClaimsMintInputSchemaDefinition = z.object({
   userId: z.string(),
   path: z.string(),
   callback: sessionCallbackEvidenceSchema.optional(),
 });
+export interface SessionClaimsMintInputSchema extends Named<
+  typeof sessionClaimsMintInputSchemaDefinition
+> {}
+export const sessionClaimsMintInputSchema: SessionClaimsMintInputSchema =
+  sessionClaimsMintInputSchemaDefinition;
 export type SessionClaimsMintInput = z.infer<typeof sessionClaimsMintInputSchema>;
 
 /** What a session records when it is minted: the identifier that minted it and its proofs. */

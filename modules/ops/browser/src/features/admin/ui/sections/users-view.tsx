@@ -1,11 +1,12 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
   Button,
-  Link as ChakraLink,
   Field,
   HStack,
   Input,
@@ -17,7 +18,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant, toDate } from "@langwatch/time";
-import { MoreVertical, Pencil, UserCheck } from "lucide-react";
+import { MoreVertical, Pencil, SearchX, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -104,7 +105,14 @@ export default function UsersView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root variant="line" size="md" width="full">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          variant="line"
+          size="sm"
+          width="full"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>ID</Table.ColumnHeader>
@@ -122,9 +130,11 @@ export default function UsersView() {
             {list.data?.data.length === 0 && (
               <Table.Row>
                 <Table.Cell colSpan={9}>
-                  <Text color="fg.muted" textAlign="center" paddingY={6}>
-                    No users match your search.
-                  </Text>
+                  <NoDataInfoBlock
+                    icon={<SearchX />}
+                    title="No users match your search."
+                    description="Try a different search or clear the filter to see all records."
+                  />
                 </Table.Cell>
               </Table.Row>
             )}
@@ -179,7 +189,7 @@ export default function UsersView() {
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </AdminTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
@@ -397,7 +407,7 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>Edit User</Drawer.Title>
+          <Drawer.Title>Edit user</Drawer.Title>
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>
@@ -489,30 +499,38 @@ function RefChipList({
   }
   if (!Array.isArray(refs) || refs.length === 0) return <EmptyCell />;
   return (
-    <Wrap gap={1}>
-      {refs.map((ref) => (
-        <ChakraLink
-          key={ref.id}
-          asChild
-          fontSize="xs"
-          color="fg"
-          _hover={{ textDecoration: "underline" }}
-        >
-          <RoutedLink href={`/ops/${resource}?q=${ref.id}`}>
-            <Box
-              as="span"
-              paddingX={2}
-              paddingY={0.5}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.emphasized"
-              background="bg.subtle"
-            >
+    <Wrap gap={1} minWidth="44" maxWidth="60">
+      {refs.slice(0, 2).map((ref) => (
+        <Badge key={ref.id} variant="outline" asChild maxWidth="full">
+          <RoutedLink href={`/ops/${resource}?q=${encodeURIComponent(ref.id)}`}>
+            <Text as="span" truncate>
               {ref.name}
-            </Box>
+            </Text>
           </RoutedLink>
-        </ChakraLink>
+        </Badge>
       ))}
+      {refs.length > 2 && (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label={`Show ${refs.length - 2} more ${resource}`}
+            >
+              +{refs.length - 2} more
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content maxHeight="80" overflowY="auto">
+            {refs.slice(2).map((ref) => (
+              <Menu.Item key={ref.id} value={ref.id} asChild>
+                <RoutedLink href={`/ops/${resource}?q=${encodeURIComponent(ref.id)}`}>
+                  {ref.name}
+                </RoutedLink>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Root>
+      )}
     </Wrap>
   );
 }
@@ -538,7 +556,11 @@ function ToggleRow({
           </Text>
         </VStack>
         <Spacer />
-        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
+        <Switch
+          colorPalette="accent"
+          checked={checked}
+          onCheckedChange={(e) => onChange(e.checked)}
+        />
       </HStack>
     </Field.Root>
   );

@@ -193,14 +193,14 @@ export function PersonalOverviewScreen() {
                             width="full"
                             height="2px"
                             borderRadius="full"
-                            backgroundColor="blue.200"
+                            backgroundColor="blue.muted"
                           />
                           {showTheoretical && d.usd > 0 && (
                             <Box
                               position="absolute"
                               bottom={0}
                               width="full"
-                              backgroundColor="blue.200"
+                              backgroundColor="blue.muted"
                               borderRadius="sm"
                               height={`${Math.max(2, theoreticalPct)}%`}
                             />
@@ -210,7 +210,7 @@ export function PersonalOverviewScreen() {
                               position="absolute"
                               bottom={0}
                               width="full"
-                              backgroundColor="blue.400"
+                              backgroundColor="blue.solid"
                               borderRadius="sm"
                               height={`${Math.max(2, billedPct)}%`}
                             />
@@ -336,7 +336,13 @@ function SectionCard({
 }) {
   if (flushContent) {
     return (
-      <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
+      <Box
+        background="bg.card"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        overflow="hidden"
+      >
         <HStack paddingX={4} paddingTop={4} paddingBottom={3}>
           <Text fontSize="sm" fontWeight="semibold">
             {title}
@@ -352,7 +358,13 @@ function SectionCard({
   }
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+    <Box
+      background="bg.card"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
       <HStack marginBottom={3}>
         <Text fontSize="sm" fontWeight="semibold">
           {title}
@@ -422,12 +434,12 @@ function BudgetBanner({
 }) {
   const colors =
     tone === "red"
-      ? { bg: "red.50", border: "red.200", title: "red.700", text: "red.700" }
+      ? { bg: "red.subtle", border: "red.muted", title: "red.fg", text: "red.fg" }
       : {
-          bg: "yellow.50",
-          border: "yellow.200",
-          title: "yellow.800",
-          text: "yellow.800",
+          bg: "yellow.subtle",
+          border: "yellow.emphasized",
+          title: "yellow.fg",
+          text: "yellow.fg",
         };
 
   return (
@@ -480,11 +492,11 @@ function CostSeriesLegend({
     <HStack gap={4} fontSize="xs">
       <LegendChip
         label="Theoretical"
-        color="blue.200"
+        color="blue.muted"
         active={showTheoretical}
         onClick={onToggleTheoretical}
       />
-      <LegendChip label="Billed" color="blue.400" active={showBilled} onClick={onToggleBilled} />
+      <LegendChip label="Billed" color="blue.solid" active={showBilled} onClick={onToggleBilled} />
     </HStack>
   );
 }
@@ -563,7 +575,7 @@ function ToolSpendRow({
               top={0}
               height="full"
               width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
-              backgroundColor="blue.200"
+              backgroundColor="blue.muted"
             />
           )}
           {showBilled && (
@@ -573,7 +585,7 @@ function ToolSpendRow({
               top={0}
               height="full"
               width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-              backgroundColor="blue.400"
+              backgroundColor="blue.solid"
             />
           )}
         </Box>

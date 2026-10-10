@@ -4,24 +4,27 @@
  */
 
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { evaluatorAttachmentsSchema } from "../../evaluator-attachments.ts";
 import { scenarioFieldValuesSchema } from "../../suite-fields.ts";
 
 /** One input a saved evaluator declares. */
-export const runEvaluatorFieldSchema = z.object({
+const runEvaluatorFieldSchemaDefinition = z.object({
   identifier: z.string(),
   type: z.string(),
   optional: z.boolean().optional(),
 });
+export interface RunEvaluatorFieldSchema extends Named<typeof runEvaluatorFieldSchemaDefinition> {}
+export const runEvaluatorFieldSchema: RunEvaluatorFieldSchema = runEvaluatorFieldSchemaDefinition;
 
 /**
  * A saved evaluator as the worker runs it: what the runner dispatches on and
  * the settings and inputs it runs with. Saved evaluators carry no revision,
  * so the definition itself is recorded.
  */
-export const runEvaluatorDefinitionSchema = z.object({
+const runEvaluatorDefinitionSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   /** "evaluator" for a built-in, "workflow" or "code". */
@@ -32,6 +35,11 @@ export const runEvaluatorDefinitionSchema = z.object({
   settings: z.record(z.string(), z.unknown()),
   fields: z.array(runEvaluatorFieldSchema),
 });
+export interface RunEvaluatorDefinitionSchema extends Named<
+  typeof runEvaluatorDefinitionSchemaDefinition
+> {}
+export const runEvaluatorDefinitionSchema: RunEvaluatorDefinitionSchema =
+  runEvaluatorDefinitionSchemaDefinition;
 export type RunEvaluatorDefinition = z.infer<typeof runEvaluatorDefinitionSchema>;
 
 /**
@@ -39,7 +47,7 @@ export type RunEvaluatorDefinition = z.infer<typeof runEvaluatorDefinitionSchema
  * from, the scenario's field values the mappings read and the definition of
  * every attached evaluator, all as they stood at that moment.
  */
-export const runEvaluatorsSchema = z.object({
+const runEvaluatorsSchemaDefinition = z.object({
   /** The scenario's test suite, when it is filed in one. */
   suiteId: z.string().nullable(),
   /** The run plan the run was filed under, when it was. */
@@ -57,6 +65,8 @@ export const runEvaluatorsSchema = z.object({
    */
   definitions: z.array(runEvaluatorDefinitionSchema).optional(),
 });
+export interface RunEvaluatorsSchema extends Named<typeof runEvaluatorsSchemaDefinition> {}
+export const runEvaluatorsSchema: RunEvaluatorsSchema = runEvaluatorsSchemaDefinition;
 export type RunEvaluators = z.infer<typeof runEvaluatorsSchema>;
 
 /** The definition the worker keeps of a saved evaluator. */

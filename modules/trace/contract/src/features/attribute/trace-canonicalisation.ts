@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   canonicalAttributesSchema,
   canonicalEventSchema,
@@ -5,33 +6,58 @@ import {
 } from "@langwatch/span-normalisation";
 import { z } from "zod";
 
-export const canonicalizeSpanAttributesInputSchema = z.object({
+const canonicalizeSpanAttributesInputSchemaDefinition = z.object({
   spanAttributes: canonicalAttributesSchema,
   events: z.array(canonicalEventSchema),
   span: canonicalSpanContextSchema,
 });
+export interface CanonicalizeSpanAttributesInputSchema extends Named<
+  typeof canonicalizeSpanAttributesInputSchemaDefinition
+> {}
+export const canonicalizeSpanAttributesInputSchema: CanonicalizeSpanAttributesInputSchema =
+  canonicalizeSpanAttributesInputSchemaDefinition;
 
-export const canonicalizeSpanAttributesResultSchema = z.object({
+const canonicalizeSpanAttributesResultSchemaDefinition = z.object({
   attributes: canonicalAttributesSchema,
   events: z.array(canonicalEventSchema),
   appliedRules: z.array(z.string()),
 });
+export interface CanonicalizeSpanAttributesResultSchema extends Named<
+  typeof canonicalizeSpanAttributesResultSchemaDefinition
+> {}
+export const canonicalizeSpanAttributesResultSchema: CanonicalizeSpanAttributesResultSchema =
+  canonicalizeSpanAttributesResultSchemaDefinition;
 
-export const canonicalizeLogRecordInputSchema = z.object({
+const canonicalizeLogRecordInputSchemaDefinition = z.object({
   scopeName: z.string(),
   body: z.string(),
   attributes: canonicalAttributesSchema,
 });
+export interface CanonicalizeLogRecordInputSchema extends Named<
+  typeof canonicalizeLogRecordInputSchemaDefinition
+> {}
+export const canonicalizeLogRecordInputSchema: CanonicalizeLogRecordInputSchema =
+  canonicalizeLogRecordInputSchemaDefinition;
 
-export const canonicalizeLogRecordResultSchema = z.object({
+const canonicalizeLogRecordResultSchemaDefinition = z.object({
   attributes: canonicalAttributesSchema,
   appliedRules: z.array(z.string()),
 });
+export interface CanonicalizeLogRecordResultSchema extends Named<
+  typeof canonicalizeLogRecordResultSchemaDefinition
+> {}
+export const canonicalizeLogRecordResultSchema: CanonicalizeLogRecordResultSchema =
+  canonicalizeLogRecordResultSchemaDefinition;
 
-export const extractMessageTextInputSchema = z.object({
+const extractMessageTextInputSchemaDefinition = z.object({
   value: z.unknown(),
   mode: z.enum(["input", "output"]),
 });
+export interface ExtractMessageTextInputSchema extends Named<
+  typeof extractMessageTextInputSchemaDefinition
+> {}
+export const extractMessageTextInputSchema: ExtractMessageTextInputSchema =
+  extractMessageTextInputSchemaDefinition;
 
 export const extractMessageTextResultSchema = z.string().nullable();
 
@@ -45,34 +71,64 @@ const claudeToolResultSchema = z.object({
   text: z.string(),
 });
 
-export const deriveClaudeRequestContentInputSchema = z.object({
+const deriveClaudeRequestContentInputSchemaDefinition = z.object({
   body: z.unknown(),
 });
+export interface DeriveClaudeRequestContentInputSchema extends Named<
+  typeof deriveClaudeRequestContentInputSchemaDefinition
+> {}
+export const deriveClaudeRequestContentInputSchema: DeriveClaudeRequestContentInputSchema =
+  deriveClaudeRequestContentInputSchemaDefinition;
 
-export const deriveClaudeRequestContentResultSchema = z.object({
+const deriveClaudeRequestContentResultSchemaDefinition = z.object({
   messages: z.array(canonicalMessageSchema).nullable(),
   toolResults: z.array(claudeToolResultSchema),
 });
+export interface DeriveClaudeRequestContentResultSchema extends Named<
+  typeof deriveClaudeRequestContentResultSchemaDefinition
+> {}
+export const deriveClaudeRequestContentResultSchema: DeriveClaudeRequestContentResultSchema =
+  deriveClaudeRequestContentResultSchemaDefinition;
 
-export const deriveClaudeResponseContentInputSchema = z.object({
+const deriveClaudeResponseContentInputSchemaDefinition = z.object({
   body: z.unknown(),
 });
+export interface DeriveClaudeResponseContentInputSchema extends Named<
+  typeof deriveClaudeResponseContentInputSchemaDefinition
+> {}
+export const deriveClaudeResponseContentInputSchema: DeriveClaudeResponseContentInputSchema =
+  deriveClaudeResponseContentInputSchemaDefinition;
 
-export const deriveClaudeResponseContentResultSchema = z.object({
+const deriveClaudeResponseContentResultSchemaDefinition = z.object({
   assistantText: z.string().nullable(),
   assistantOutput: z.string().nullable(),
   sessionTitle: z.string().nullable(),
 });
+export interface DeriveClaudeResponseContentResultSchema extends Named<
+  typeof deriveClaudeResponseContentResultSchemaDefinition
+> {}
+export const deriveClaudeResponseContentResultSchema: DeriveClaudeResponseContentResultSchema =
+  deriveClaudeResponseContentResultSchemaDefinition;
 
-export const classifyClaudeCallInputSchema = z.object({
+const classifyClaudeCallInputSchemaDefinition = z.object({
   querySource: z.string().nullable(),
   llmRequestContext: z.string().nullish(),
 });
+export interface ClassifyClaudeCallInputSchema extends Named<
+  typeof classifyClaudeCallInputSchemaDefinition
+> {}
+export const classifyClaudeCallInputSchema: ClassifyClaudeCallInputSchema =
+  classifyClaudeCallInputSchemaDefinition;
 
-export const classifyClaudeCallResultSchema = z.object({
+const classifyClaudeCallResultSchemaDefinition = z.object({
   conversational: z.boolean(),
   cacheWritesLongLived: z.boolean(),
 });
+export interface ClassifyClaudeCallResultSchema extends Named<
+  typeof classifyClaudeCallResultSchemaDefinition
+> {}
+export const classifyClaudeCallResultSchema: ClassifyClaudeCallResultSchema =
+  classifyClaudeCallResultSchemaDefinition;
 
 export type CanonicalizeSpanAttributesInput = z.infer<typeof canonicalizeSpanAttributesInputSchema>;
 export type CanonicalizeSpanAttributesResult = z.infer<

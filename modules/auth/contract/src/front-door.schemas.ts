@@ -4,6 +4,7 @@
  * of the contract rather than a defensive afterthought.
  */
 import { identifierCodeChallengeSchema } from "@langwatch/identity-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -11,45 +12,80 @@ import { z } from "zod";
  * typed, and the break-glass flag. Bounded at the RFC 5321 ceiling: anything
  * past 254 is not an address, so nothing carries it into normalization.
  */
-export const frontDoorRouteInputSchema = z.object({
+const frontDoorRouteInputSchemaDefinition = z.object({
   identifier: z.string().max(254).nullable(),
   /** `?local=1`: the local method set, whatever else would route. */
   breakGlass: z.boolean().optional(),
 });
+export interface FrontDoorRouteInputSchema extends Named<
+  typeof frontDoorRouteInputSchemaDefinition
+> {}
+export const frontDoorRouteInputSchema: FrontDoorRouteInputSchema =
+  frontDoorRouteInputSchemaDefinition;
 export type FrontDoorRouteInput = z.infer<typeof frontDoorRouteInputSchema>;
 
 /** The address a sign-up confirmation link is asked for. */
-export const frontDoorEmailInputSchema = z.object({ email: z.string().email() });
+const frontDoorEmailInputSchemaDefinition = z.object({ email: z.string().email() });
+export interface FrontDoorEmailInputSchema extends Named<
+  typeof frontDoorEmailInputSchemaDefinition
+> {}
+export const frontDoorEmailInputSchema: FrontDoorEmailInputSchema =
+  frontDoorEmailInputSchemaDefinition;
 export type FrontDoorEmailInput = z.infer<typeof frontDoorEmailInputSchema>;
 
 /** Sign-up's address, plus where the screen goes once through: the emailed link carries it. */
-export const signUpVerificationInputSchema = z.object({
+const signUpVerificationInputSchemaDefinition = z.object({
   ...frontDoorEmailInputSchema.shape,
   callbackUrl: z.string().max(2048).optional(),
 });
+export interface SignUpVerificationInputSchema extends Named<
+  typeof signUpVerificationInputSchemaDefinition
+> {}
+export const signUpVerificationInputSchema: SignUpVerificationInputSchema =
+  signUpVerificationInputSchemaDefinition;
 
 /**
  * The caller's own address comes from the session, never the request; the body
  * carries only the S256 challenge whose verifier the asking window keeps.
  */
-export const frontDoorOwnAddressInputSchema = z.object({
+const frontDoorOwnAddressInputSchemaDefinition = z.object({
   codeChallenge: identifierCodeChallengeSchema,
 });
+export interface FrontDoorOwnAddressInputSchema extends Named<
+  typeof frontDoorOwnAddressInputSchemaDefinition
+> {}
+export const frontDoorOwnAddressInputSchema: FrontDoorOwnAddressInputSchema =
+  frontDoorOwnAddressInputSchemaDefinition;
 export type FrontDoorOwnAddressInput = z.infer<typeof frontDoorOwnAddressInputSchema>;
 
 /** The emailed confirmation token a visitor is spending. */
-export const frontDoorTokenInputSchema = z.object({ token: z.string().min(1) });
+const frontDoorTokenInputSchemaDefinition = z.object({ token: z.string().min(1) });
+export interface FrontDoorTokenInputSchema extends Named<
+  typeof frontDoorTokenInputSchemaDefinition
+> {}
+export const frontDoorTokenInputSchema: FrontDoorTokenInputSchema =
+  frontDoorTokenInputSchemaDefinition;
 export type FrontDoorTokenInput = z.infer<typeof frontDoorTokenInputSchema>;
 
 /** The invitation code whose landing page is being read, or reissued. */
-export const frontDoorInviteCodeInputSchema = z.object({ inviteCode: z.string().min(1) });
+const frontDoorInviteCodeInputSchemaDefinition = z.object({ inviteCode: z.string().min(1) });
+export interface FrontDoorInviteCodeInputSchema extends Named<
+  typeof frontDoorInviteCodeInputSchemaDefinition
+> {}
+export const frontDoorInviteCodeInputSchema: FrontDoorInviteCodeInputSchema =
+  frontDoorInviteCodeInputSchemaDefinition;
 export type FrontDoorInviteCodeInput = z.infer<typeof frontDoorInviteCodeInputSchema>;
 
 /** A confirmed address and the proof its spent link minted, asking what it may enrol. */
-export const signUpEnrollmentInputSchema = z.object({
+const signUpEnrollmentInputSchemaDefinition = z.object({
   email: z.string().email(),
   addressProof: z.string().min(1),
 });
+export interface SignUpEnrollmentInputSchema extends Named<
+  typeof signUpEnrollmentInputSchemaDefinition
+> {}
+export const signUpEnrollmentInputSchema: SignUpEnrollmentInputSchema =
+  signUpEnrollmentInputSchemaDefinition;
 export type SignUpEnrollmentInput = z.infer<typeof signUpEnrollmentInputSchema>;
 
 /** A redirect target longer than this is not a route on this site. */

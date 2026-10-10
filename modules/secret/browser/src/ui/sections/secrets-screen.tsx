@@ -157,7 +157,7 @@ function SecretsTableHeader() {
   );
 }
 
-/** A few faint rows, no table chrome: a loading list that turns out empty should barely register. */
+/** A few faint rows, no table chrome: a loading list that turns out empty barely registers. */
 function SecretsTableSkeleton() {
   return (
     <VStack gap={4} width="full" align="start" data-testid="secrets-loading">

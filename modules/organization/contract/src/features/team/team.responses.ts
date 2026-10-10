@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** Contract schemas for the team feature's tRPC responses. */
 import { z } from "zod";
 
@@ -11,17 +12,23 @@ const teamProjectSchema = z.object({
 });
 
 /** A team (or the organization's teams), each with its members and its projects. */
-export const teamWithProjectsSchema = organizationTeamWithMembersSchema.safeExtend({
+const teamWithProjectsSchemaDefinition = organizationTeamWithMembersSchema.safeExtend({
   projects: z.array(teamProjectSchema),
 });
+export interface TeamWithProjectsSchema extends Named<typeof teamWithProjectsSchemaDefinition> {}
+export const teamWithProjectsSchema: TeamWithProjectsSchema = teamWithProjectsSchemaDefinition;
 export type TeamWithProjects = z.infer<typeof teamWithProjectsSchema>;
 
 /** A write with nothing else to report. */
-export const teamWriteAckSchema = z.object({ success: z.literal(true) }).strict();
+const teamWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
+export interface TeamWriteAckSchema extends Named<typeof teamWriteAckSchemaDefinition> {}
+export const teamWriteAckSchema: TeamWriteAckSchema = teamWriteAckSchemaDefinition;
 export type TeamWriteAck = z.infer<typeof teamWriteAckSchema>;
 
 /** A member was removed; the caller reads back who. */
-export const teamMemberRemovedSchema = z
+const teamMemberRemovedSchemaDefinition = z
   .object({ success: z.literal(true), removedUserId: z.string().min(1) })
   .strict();
+export interface TeamMemberRemovedSchema extends Named<typeof teamMemberRemovedSchemaDefinition> {}
+export const teamMemberRemovedSchema: TeamMemberRemovedSchema = teamMemberRemovedSchemaDefinition;
 export type TeamMemberRemoved = z.infer<typeof teamMemberRemovedSchema>;

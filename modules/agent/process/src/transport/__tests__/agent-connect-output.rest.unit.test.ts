@@ -25,6 +25,7 @@ const CONTENT_MARKER = "content-marker";
 function buildApi(connectFrames: AgentApi["connectFrames"]) {
   const app = createApiFixture<AgentApi>({ connectFrames });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: connectDoor(),
   } as never);

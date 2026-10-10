@@ -4,6 +4,7 @@
  * the same parser the tRPC declaration publishes, so they cannot drift.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -13,7 +14,7 @@ import {
 } from "./data-privacy.ts";
 
 /** One stored rule: a scope, whether it covers personal projects, its config. */
-export const dataPrivacyRuleSchema = z
+const dataPrivacyRuleSchemaDefinition = z
   .object({
     scopeType: z.enum(DATA_PRIVACY_SCOPE_TYPES),
     scopeId: z.string(),
@@ -22,6 +23,8 @@ export const dataPrivacyRuleSchema = z
     config: dataPrivacyConfigSchema,
   })
   .strict();
+export interface DataPrivacyRuleSchema extends Named<typeof dataPrivacyRuleSchemaDefinition> {}
+export const dataPrivacyRuleSchema: DataPrivacyRuleSchema = dataPrivacyRuleSchemaDefinition;
 export type DataPrivacyRule = z.infer<typeof dataPrivacyRuleSchema>;
 
 const namedScopeSchema = z.object({ id: z.string(), name: z.string() }).strict();
@@ -31,7 +34,7 @@ const namedScopeSchema = z.object({ id: z.string(), name: z.string() }).strict()
  * Every list empty means the caller may read the page and change nothing —
  * which hides the add and edit controls.
  */
-export const dataPrivacyScopeAvailableSchema = z
+const dataPrivacyScopeAvailableSchemaDefinition = z
   .object({
     organization: namedScopeSchema.nullable(),
     departments: z.array(namedScopeSchema),
@@ -39,10 +42,15 @@ export const dataPrivacyScopeAvailableSchema = z
     projects: z.array(z.object({ id: z.string(), name: z.string(), teamId: z.string() }).strict()),
   })
   .strict();
+export interface DataPrivacyScopeAvailableSchema extends Named<
+  typeof dataPrivacyScopeAvailableSchemaDefinition
+> {}
+export const dataPrivacyScopeAvailableSchema: DataPrivacyScopeAvailableSchema =
+  dataPrivacyScopeAvailableSchemaDefinition;
 export type DataPrivacyScopeAvailable = z.infer<typeof dataPrivacyScopeAvailableSchema>;
 
 /** The choices the restrict-audience picker offers beyond the built-in roles. */
-export const dataPrivacyAudienceOptionsSchema = z
+const dataPrivacyAudienceOptionsSchemaDefinition = z
   .object({
     /**
      * The organization's custom RBAC groups (created on the enterprise plan; an
@@ -51,10 +59,15 @@ export const dataPrivacyAudienceOptionsSchema = z
     groups: z.array(namedScopeSchema),
   })
   .strict();
+export interface DataPrivacyAudienceOptionsSchema extends Named<
+  typeof dataPrivacyAudienceOptionsSchemaDefinition
+> {}
+export const dataPrivacyAudienceOptionsSchema: DataPrivacyAudienceOptionsSchema =
+  dataPrivacyAudienceOptionsSchemaDefinition;
 export type DataPrivacyAudienceOptions = z.infer<typeof dataPrivacyAudienceOptionsSchema>;
 
 /** Everything one render of the data-privacy settings page is built from. */
-export const dataPrivacySnapshotSchema = z
+const dataPrivacySnapshotSchemaDefinition = z
   .object({
     projectId: z.string(),
     /** The effective policy, every field populated by the cascade or the default. */
@@ -78,4 +91,9 @@ export const dataPrivacySnapshotSchema = z
     audienceOptions: dataPrivacyAudienceOptionsSchema,
   })
   .strict();
+export interface DataPrivacySnapshotSchema extends Named<
+  typeof dataPrivacySnapshotSchemaDefinition
+> {}
+export const dataPrivacySnapshotSchema: DataPrivacySnapshotSchema =
+  dataPrivacySnapshotSchemaDefinition;
 export type DataPrivacySnapshot = z.infer<typeof dataPrivacySnapshotSchema>;

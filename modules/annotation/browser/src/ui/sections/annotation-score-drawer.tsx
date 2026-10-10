@@ -1,7 +1,7 @@
 /** The host address controls the score editor overlay. */
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { HStack, Text } from "@langwatch/design-system/primitives";
+import { HStack } from "@langwatch/design-system/primitives";
 
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
 import { AnnotationScoreForm } from "./annotation-score-form.tsx";
@@ -41,9 +41,9 @@ export const AnnotationScoreDrawer = ({
             <Drawer.CloseTrigger />
           </HStack>
           <HStack>
-            <Text paddingTop={5} fontSize="2xl">
+            <Drawer.Title>
               {annotationScoreId ? "Edit Score Metric" : "Add Score Metric"}
-            </Text>
+            </Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

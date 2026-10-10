@@ -23,7 +23,7 @@ export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 // Per-trace ceiling for findStoredSpansByTraceId: the prompt playground's span ceiling
 export const MAX_STORED_TRACE_SPAN_ROWS = 1000;
 
-/** A trace's span with its attributes as stored (strings, never parsed back: "0042" stays "0042"). */
+/** A trace's span with attributes as stored (strings, never parsed back: "0042" stays "0042"). */
 export interface StoredTraceSpan {
   spanId: string;
   traceId: string;

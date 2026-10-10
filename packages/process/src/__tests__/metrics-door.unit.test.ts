@@ -105,11 +105,12 @@ describe("a process scraped through its health door or its pull port", () => {
   });
 
   describe("given no metrics key outside production", () => {
-    /** @scenario "Outside production an unset key leaves the endpoint open" */
-    it("serves a scrape that carries no credential", async () => {
-      const { pull } = await serve(prometheus);
+    /** @scenario "Outside production an unset key leaves no metrics endpoint either" */
+    it("mounts no metrics endpoint, as in production", async () => {
+      const { health, pull } = await serve(prometheus);
 
-      expect((await pull("/metrics")).status).toBe(200);
+      await expect(pull("/metrics")).rejects.toThrow("fetch failed");
+      expect((await health("/metrics")).status).toBe(404);
     });
   });
 });

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const MAX_SCENARIO_PARAMETER_DEFINITIONS = 20;
@@ -38,7 +39,7 @@ export const SECRET_PARAMETER_DEFAULT_MESSAGE = "A secret parameter cannot carry
 /** What a secret parameter with an option list is refused with. */
 export const SECRET_PARAMETER_OPTIONS_MESSAGE = "A secret parameter cannot list options";
 
-export const scenarioParameterDefinitionSchema = z
+const scenarioParameterDefinitionSchemaDefinition = z
   .object({
     name: z
       .string()
@@ -73,9 +74,14 @@ export const scenarioParameterDefinitionSchema = z
     required: z.boolean().optional(),
   })
   .strict();
+export interface ScenarioParameterDefinitionSchema extends Named<
+  typeof scenarioParameterDefinitionSchemaDefinition
+> {}
+export const scenarioParameterDefinitionSchema: ScenarioParameterDefinitionSchema =
+  scenarioParameterDefinitionSchemaDefinition;
 export type ScenarioParameterDefinition = z.infer<typeof scenarioParameterDefinitionSchema>;
 
-export const scenarioParameterDefinitionsSchema = z
+const scenarioParameterDefinitionsSchemaDefinition = z
   .array(scenarioParameterDefinitionSchema)
   .max(
     MAX_SCENARIO_PARAMETER_DEFINITIONS,
@@ -110,6 +116,11 @@ export const scenarioParameterDefinitionsSchema = z
       names.add(definition.name);
     }
   });
+export interface ScenarioParameterDefinitionsSchema extends Named<
+  typeof scenarioParameterDefinitionsSchemaDefinition
+> {}
+export const scenarioParameterDefinitionsSchema: ScenarioParameterDefinitionsSchema =
+  scenarioParameterDefinitionsSchemaDefinition;
 
 const runParameterKeySchema = z.string().refine((name) => !reservedParameterNames.has(name), {
   message: reservedNameMessage,

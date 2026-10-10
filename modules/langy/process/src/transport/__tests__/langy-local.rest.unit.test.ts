@@ -77,6 +77,7 @@ function buildApi(options: { keyed?: boolean; own?: boolean; actor?: RestCaller[
   };
 
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate, identify },
   }).mount(langyLocalRest.router(), {

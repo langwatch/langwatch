@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { TraceSummaryData } from "./features/ingest/trace-projection.ts";
@@ -187,36 +188,55 @@ const traceWithGuardrailSchema = z.object({
   annotations: z.object({ hasAnnotation: z.boolean(), count: z.number() }).optional(),
 });
 
-export const tracesForProjectResultSchema = z.object({
+const tracesForProjectResultSchemaDefinition = z.object({
   groups: z.array(z.array(traceWithGuardrailSchema)),
   totalHits: z.number(),
   traceChecks: z.record(z.string(), z.array(evaluationSchema)),
   scrollId: z.string().optional(),
   updatedThrough: z.number().optional(),
 });
+export interface TracesForProjectResultSchema extends Named<
+  typeof tracesForProjectResultSchemaDefinition
+> {}
+export const tracesForProjectResultSchema: TracesForProjectResultSchema =
+  tracesForProjectResultSchemaDefinition;
 
-export const topicCountsResultSchema = z.object({
+const topicCountsResultSchemaDefinition = z.object({
   topicCounts: z.array(z.object({ key: z.string(), count: z.number() })),
   subtopicCounts: z.array(z.object({ key: z.string(), count: z.number() })),
 });
+export interface TopicCountsResultSchema extends Named<typeof topicCountsResultSchemaDefinition> {}
+export const topicCountsResultSchema: TopicCountsResultSchema = topicCountsResultSchemaDefinition;
 
-export const customersAndLabelsResultSchema = z.object({
+const customersAndLabelsResultSchemaDefinition = z.object({
   customers: z.array(z.string()),
   labels: z.array(z.string()),
 });
+export interface CustomersAndLabelsResultSchema extends Named<
+  typeof customersAndLabelsResultSchemaDefinition
+> {}
+export const customersAndLabelsResultSchema: CustomersAndLabelsResultSchema =
+  customersAndLabelsResultSchemaDefinition;
 
 const fieldNameSchema = z.object({ key: z.string(), label: z.string() });
 
-export const distinctFieldNamesResultSchema = z.object({
+const distinctFieldNamesResultSchemaDefinition = z.object({
   spanNames: z.array(fieldNameSchema),
   metadataKeys: z.array(fieldNameSchema),
   evaluationNames: z.array(fieldNameSchema),
 });
+export interface DistinctFieldNamesResultSchema extends Named<
+  typeof distinctFieldNamesResultSchemaDefinition
+> {}
+export const distinctFieldNamesResultSchema: DistinctFieldNamesResultSchema =
+  distinctFieldNamesResultSchemaDefinition;
 
 /** A trace's settled total cost; null when no span of it carried a cost. */
-export const traceCostSchema = z.object({
+const traceCostSchemaDefinition = z.object({
   traceId: z.string(),
   totalCost: z.number().nullable(),
 });
+export interface TraceCostSchema extends Named<typeof traceCostSchemaDefinition> {}
+export const traceCostSchema: TraceCostSchema = traceCostSchemaDefinition;
 
 export type TraceCost = z.infer<typeof traceCostSchema>;

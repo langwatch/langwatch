@@ -1133,6 +1133,10 @@ const presentations = {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  prompt_tag_conflict: {
+    title: "That tag is already in use",
+    describe: () => "Pick a different name, or move the existing tag to the version you want.",
+  },
   prompt_not_a_copy: {
     // Refused on "sync from source". This prompt was written here rather than
     // copied from somewhere, so there is nothing to sync from and no retry to
@@ -1759,8 +1763,9 @@ const presentations = {
     describe: () => "Pick a name no other team in this organization uses.",
   },
   lite_member_restricted: {
-    title: "Your account doesn't include this",
-    describe: () => "Ask an admin on your team to upgrade your access.",
+    title: "You don't have access to this",
+    describe: () =>
+      "Your role doesn't include this action. Ask an organization admin to give you access.",
   },
   personal_project_key_required: {
     // Reached with a key in hand, so the answer is which key to use instead.
@@ -2369,7 +2374,7 @@ const presentations = {
     // Names the permission when the server sent one, for the same reason
     // `project_permission_denied` does: "ask an admin for access" is an
     // errand with no address, whereas the exact grant can be forwarded as-is.
-    title: "You don't have permission to do this",
+    title: "You don't have access to this",
     describe: (error) => {
       const permission = str(error, "required_permission", "");
       return permission
@@ -2417,7 +2422,7 @@ const presentations = {
     // `project_permission_denied`: the exact grant can be forwarded as-is.
     // Lite-member denials carry their own client modal via the middleware's
     // cause; this copy is what everyone else reads.
-    title: "You don't have permission to do this",
+    title: "You don't have access to this",
     describe: (error) => {
       const permission = str(error, "permission", "");
       return permission
@@ -3205,7 +3210,7 @@ const presentations = {
   sso_setup_address_mismatch: {
     title: "That sign-in came from a different address",
     describe: () =>
-      "The test sign-in used an address outside the domain this connection is being set up for. Sign in with an account on the connection's domain.",
+      "Until this connection is live, only the person who registered it can test it, and your identity provider signed in somebody else. Sign in at your identity provider as the person who registered the connection.",
   },
   sso_domain_not_verified: {
     title: "This domain is not verified yet",

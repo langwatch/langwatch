@@ -13,8 +13,8 @@ Billing: subscriptions, invoices and invoice billing for connected self-hosted c
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)           |
 | Api token      | `BillingApi` = `moduleApi<BillingApi>()("billing")`, `contract/src/billing.api.ts:99` (12 operations) |
 | Other token    | `BillingStripeWebhookApi`, `process/src/transport/billing-stripe-webhook.rest.ts:25`                  |
-| Other token    | `BillingCurrencyApi`, `process/src/transport/currency.trpc.ts:21`                                     |
-| Other token    | `BillingSubscriptionApi`, `process/src/transport/subscription.trpc.ts:69`                             |
+| Other token    | `BillingCurrencyApi`, `process/src/transport/currency.trpc.ts:25`                                     |
+| Other token    | `BillingSubscriptionApi`, `process/src/transport/subscription.trpc.ts:73`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                            |
 
 ## What billing owns

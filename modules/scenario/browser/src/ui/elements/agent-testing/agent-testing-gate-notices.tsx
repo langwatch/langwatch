@@ -13,7 +13,5 @@ export function PageAbsentNotice() {
 
 /** What a reader without the grant a page needs is shown. */
 export function PermissionRequiredNotice({ permission }: { permission: string }) {
-  return (
-    <RestrictedAccess permission={permission} area="Agent Testing" />
-  );
+  return <RestrictedAccess permission={permission} area="Agent Testing" />;
 }

@@ -179,6 +179,7 @@ export function createRunPlansRest(): Readonly<{
     .post("/run", "runRunPlan")
     .withInput(runPlanRunInputSchema)
     .withPermission("scenarios:create")
+    .withoutAudit("run, not a change")
     .withOutput(runPlanRunResultSchema)
     .withDocs({
       tags: ["Run Plans"],
@@ -216,6 +217,7 @@ export function createRunPlansRest(): Readonly<{
     .withParams(runPlanIdParamsSchema)
     .withInput(rerunInputSchema)
     .withPermission("scenarios:create")
+    .withoutAudit("run, not a change")
     .withOutput(runPlanRunResultSchema)
     .withDocs({
       tags: ["Run Plans"],
@@ -239,6 +241,7 @@ export function createRunPlansRest(): Readonly<{
     .delete("/:id", "archiveRunPlan")
     .withParams(runPlanIdParamsSchema)
     .withPermission("scenarios:manage")
+    .withAudit("suites.archive")
     .withOutput(runPlanArchiveResultSchema)
     .withDocs({
       tags: ["Run Plans"],

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The operator dashboard's vocabulary, as schemas. One declaration now: the
  * schema is both the wire contract the snapshot artifact parses against and
@@ -8,7 +9,7 @@ import { z } from "zod";
 import { latencyWindowsSchema } from "./ops-latency.ts";
 
 /** One tenant's parked group, as the drill-down lists it. */
-export const parkedGroupInfoSchema = z.object({
+const parkedGroupInfoSchemaDefinition = z.object({
   groupId: z.string(),
   pendingJobs: z.number(),
   /** Timestamp of the group's oldest waiting job, in ms; null when empty. */
@@ -17,9 +18,11 @@ export const parkedGroupInfoSchema = z.object({
   score: z.number(),
   pipelineName: z.string().nullable(),
 });
+export interface ParkedGroupInfoSchema extends Named<typeof parkedGroupInfoSchemaDefinition> {}
+export const parkedGroupInfoSchema: ParkedGroupInfoSchema = parkedGroupInfoSchemaDefinition;
 export type ParkedGroupInfo = z.infer<typeof parkedGroupInfoSchema>;
 
-export const groupInfoSchema = z.object({
+const groupInfoSchemaDefinition = z.object({
   groupId: z.string(),
   pendingJobs: z.number(),
   score: z.number(),
@@ -39,9 +42,11 @@ export const groupInfoSchema = z.object({
   activeKeyTtlSec: z.number().nullable(),
   processingDurationMs: z.number().nullable(),
 });
+export interface GroupInfoSchema extends Named<typeof groupInfoSchemaDefinition> {}
+export const groupInfoSchema: GroupInfoSchema = groupInfoSchemaDefinition;
 export type GroupInfo = z.infer<typeof groupInfoSchema>;
 
-export const queueSummaryInfoSchema = z.object({
+const queueSummaryInfoSchemaDefinition = z.object({
   name: z.string(),
   displayName: z.string(),
   pendingGroupCount: z.number(),
@@ -54,15 +59,19 @@ export const queueSummaryInfoSchema = z.object({
   // root) or a parked-group strand is visible instead of invisible backlog.
   parkedGroupCount: z.number(),
 });
+export interface QueueSummaryInfoSchema extends Named<typeof queueSummaryInfoSchemaDefinition> {}
+export const queueSummaryInfoSchema: QueueSummaryInfoSchema = queueSummaryInfoSchemaDefinition;
 export type QueueSummaryInfo = z.infer<typeof queueSummaryInfoSchema>;
 
-export const queueInfoSchema = z.object({
+const queueInfoSchemaDefinition = z.object({
   ...queueSummaryInfoSchema.shape,
   groups: z.array(groupInfoSchema),
 });
+export interface QueueInfoSchema extends Named<typeof queueInfoSchemaDefinition> {}
+export const queueInfoSchema: QueueInfoSchema = queueInfoSchemaDefinition;
 export type QueueInfo = z.infer<typeof queueInfoSchema>;
 
-export const throughputPointSchema = z.object({
+const throughputPointSchemaDefinition = z.object({
   timestamp: z.number(),
   ingestedPerSec: z.number(),
   completedPerSec: z.number(),
@@ -71,9 +80,11 @@ export const throughputPointSchema = z.object({
   blockedCount: z.number(),
   parkedCount: z.number(),
 });
+export interface ThroughputPointSchema extends Named<typeof throughputPointSchemaDefinition> {}
+export const throughputPointSchema: ThroughputPointSchema = throughputPointSchemaDefinition;
 export type ThroughputPoint = z.infer<typeof throughputPointSchema>;
 
-export const phaseMetricsSchema = z.object({
+const phaseMetricsSchemaDefinition = z.object({
   pending: z.number(),
   active: z.number(),
   completedPerSec: z.number(),
@@ -85,9 +96,11 @@ export const phaseMetricsSchema = z.object({
   peakLatencyP50Ms: z.number(),
   peakLatencyP99Ms: z.number(),
 });
+export interface PhaseMetricsSchema extends Named<typeof phaseMetricsSchemaDefinition> {}
+export const phaseMetricsSchema: PhaseMetricsSchema = phaseMetricsSchemaDefinition;
 export type PhaseMetrics = z.infer<typeof phaseMetricsSchema>;
 
-export const jobNameMetricsSchema = z.object({
+const jobNameMetricsSchemaDefinition = z.object({
   jobName: z.string(),
   pipelineName: z.string(),
   phase: z.enum(["commands", "projections", "reactions"]),
@@ -102,6 +115,8 @@ export const jobNameMetricsSchema = z.object({
   peakLatencyP50Ms: z.number(),
   peakLatencyP99Ms: z.number(),
 });
+export interface JobNameMetricsSchema extends Named<typeof jobNameMetricsSchemaDefinition> {}
+export const jobNameMetricsSchema: JobNameMetricsSchema = jobNameMetricsSchemaDefinition;
 export type JobNameMetrics = z.infer<typeof jobNameMetricsSchema>;
 
 /** The pipeline tree. Named ahead of the schema — the schema is recursive. */
@@ -124,7 +139,7 @@ export const pipelineNodeSchema: z.ZodType<PipelineNode> = z.lazy(() =>
   }),
 );
 
-export const errorClusterSchema = z.object({
+const errorClusterSchemaDefinition = z.object({
   normalizedMessage: z.string(),
   sampleMessage: z.string(),
   sampleStack: z.string().nullable(),
@@ -133,28 +148,34 @@ export const errorClusterSchema = z.object({
   queueName: z.string(),
   sampleGroupIds: z.array(z.string()),
 });
+export interface ErrorClusterSchema extends Named<typeof errorClusterSchemaDefinition> {}
+export const errorClusterSchema: ErrorClusterSchema = errorClusterSchemaDefinition;
 export type ErrorCluster = z.infer<typeof errorClusterSchema>;
 
 /** Tenant soft-cap parking, not poison-group blocking. */
-export const parkedTenantSchema = z.object({
+const parkedTenantSchemaDefinition = z.object({
   tenantId: z.string(),
   queueName: z.string(),
   groupCount: z.number(),
   /** Age of the longest-waiting parked group, in ms; null when unknown. */
   oldestParkedMs: z.number().nullable(),
 });
+export interface ParkedTenantSchema extends Named<typeof parkedTenantSchemaDefinition> {}
+export const parkedTenantSchema: ParkedTenantSchema = parkedTenantSchemaDefinition;
 export type ParkedTenant = z.infer<typeof parkedTenantSchema>;
 
 /** Included and total rows make bounded sections explicit. */
-export const boundedSchema = z.object({
+const boundedSchemaDefinition = z.object({
   /** Rows included in this snapshot. */
   included: z.number(),
   /** Rows that exist. Equal to `included` when nothing was dropped. */
   total: z.number(),
 });
+export interface BoundedSchema extends Named<typeof boundedSchemaDefinition> {}
+export const boundedSchema: BoundedSchema = boundedSchemaDefinition;
 export type BoundedSection = z.infer<typeof boundedSchema>;
 
-export const redisInfoSchema = z.object({
+const redisInfoSchemaDefinition = z.object({
   usedMemoryHuman: z.string(),
   peakMemoryHuman: z.string(),
   usedMemoryBytes: z.number(),
@@ -167,6 +188,8 @@ export const redisInfoSchema = z.object({
   usedCpuUserMainThreadSeconds: z.number(),
   usedCpuSysMainThreadSeconds: z.number(),
 });
+export interface RedisInfoSchema extends Named<typeof redisInfoSchemaDefinition> {}
+export const redisInfoSchema: RedisInfoSchema = redisInfoSchemaDefinition;
 export type RedisInfo = z.infer<typeof redisInfoSchema>;
 
 /**
@@ -174,7 +197,7 @@ export type RedisInfo = z.infer<typeof redisInfoSchema>;
  * snapshot of that kind has been read yet", which the dashboard renders as
  * its loading state rather than zeroes.
  */
-export const snapshotProvenanceSchema = z.object({
+const snapshotProvenanceSchemaDefinition = z.object({
   /** When the live artifact was computed, in ms; null when none has been read. */
   computedAt: z.number().nullable(),
   /** When the exhaustive detail artifact was computed, in ms. */
@@ -188,9 +211,14 @@ export const snapshotProvenanceSchema = z.object({
    */
   leaseEpoch: z.number().nullable(),
 });
+export interface SnapshotProvenanceSchema extends Named<
+  typeof snapshotProvenanceSchemaDefinition
+> {}
+export const snapshotProvenanceSchema: SnapshotProvenanceSchema =
+  snapshotProvenanceSchemaDefinition;
 export type SnapshotProvenance = z.infer<typeof snapshotProvenanceSchema>;
 
-export const dashboardDataSchema = z.object({
+const dashboardDataSchemaDefinition = z.object({
   totalGroups: z.number(),
   blockedGroups: z.number(),
   parkedGroups: z.number(),
@@ -249,6 +277,8 @@ export const dashboardDataSchema = z.object({
   /** Provenance of the served snapshot, so the page can report its own age. */
   snapshot: snapshotProvenanceSchema,
 });
+export interface DashboardDataSchema extends Named<typeof dashboardDataSchemaDefinition> {}
+export const dashboardDataSchema: DashboardDataSchema = dashboardDataSchemaDefinition;
 export type DashboardData = z.infer<typeof dashboardDataSchema>;
 
 export type SSEEvent =
@@ -256,14 +286,19 @@ export type SSEEvent =
   | { type: "heartbeat"; data: { timestamp: number } };
 
 /** The window a sign-up health reading answers for, in epoch milliseconds. */
-export const opsSignUpHealthInputSchema = z.object({
+const opsSignUpHealthInputSchemaDefinition = z.object({
   fromMs: z.number().int().nonnegative(),
   toMs: z.number().int().nonnegative(),
 });
+export interface OpsSignUpHealthInputSchema extends Named<
+  typeof opsSignUpHealthInputSchemaDefinition
+> {}
+export const opsSignUpHealthInputSchema: OpsSignUpHealthInputSchema =
+  opsSignUpHealthInputSchemaDefinition;
 export type OpsSignUpHealthInput = z.infer<typeof opsSignUpHealthInputSchema>;
 
 /** How many organizations founded in the window nobody meant to found (D12). */
-export const signUpHealthSchema = z.object({
+const signUpHealthSchemaDefinition = z.object({
   organizationsFounded: z.number().int(),
   /** Founded ones whose founder joined another organization within thirty days. */
   orphanedOrganizations: z.number().int(),
@@ -272,4 +307,6 @@ export const signUpHealthSchema = z.object({
   fromMs: z.number(),
   toMs: z.number(),
 });
+export interface SignUpHealthSchema extends Named<typeof signUpHealthSchemaDefinition> {}
+export const signUpHealthSchema: SignUpHealthSchema = signUpHealthSchemaDefinition;
 export type SignUpHealth = z.infer<typeof signUpHealthSchema>;

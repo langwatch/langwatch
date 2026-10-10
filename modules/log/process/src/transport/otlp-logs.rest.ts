@@ -119,6 +119,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   .withCredential("otlp_ingest")
 
   .post("/api/otel/v1/logs", "ingestOtlpLogs")
+  .withoutAudit("ingestion")
   .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })

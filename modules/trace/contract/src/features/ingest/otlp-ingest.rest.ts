@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The OTLP receiver's own errors and small pure helpers. Ports live in the
  * server transport file instead, keeping this contract free of the DOM-lib
@@ -21,7 +22,7 @@ const otlpIngestProjectSchema = z.object({
 export type OtlpIngestProject = Readonly<z.infer<typeof otlpIngestProjectSchema>>;
 
 /** A resolved receiver credential, handed by the OTLP ingest door as the route's session. */
-export const otlpIngestCredentialSchema = z.object({
+const otlpIngestCredentialSchemaDefinition = z.object({
   project: otlpIngestProjectSchema,
   identity: z.object({
     apiKeyId: z.string().nullable(),
@@ -31,6 +32,11 @@ export const otlpIngestCredentialSchema = z.object({
     sourcePolicy: otlpSourcePolicySchema.optional(),
   }),
 });
+export interface OtlpIngestCredentialSchema extends Named<
+  typeof otlpIngestCredentialSchemaDefinition
+> {}
+export const otlpIngestCredentialSchema: OtlpIngestCredentialSchema =
+  otlpIngestCredentialSchemaDefinition;
 /** A refusal is thrown, and the receiver renders it. */
 export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 

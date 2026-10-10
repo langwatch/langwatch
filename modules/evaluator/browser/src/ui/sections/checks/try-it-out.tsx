@@ -3,7 +3,7 @@ import { PeriodSelector, usePeriodSelector } from "@langwatch/browser-host/perio
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Alert,
@@ -90,7 +90,7 @@ export function TryItOut({
 }) {
   const { project } = useOrganizationTeamProject();
   const { watch } = form;
-  const gray400 = useColorRawValue("gray.400");
+  const subtleColor = useColorRawValue("fg.subtle");
 
   const evaluatorType = watch("checkType");
   const preconditions = watch("preconditions");
@@ -229,13 +229,13 @@ export function TryItOut({
         <InputGroup
           maxWidth="350px"
           borderColor="border.emphasized"
-          startElement={<Search color={gray400} width={16} />}
+          startElement={<Search color={subtleColor} width={16} />}
         >
           <Input
             name="query"
             type="search"
             placeholder="Search"
-            _placeholder={{ color: "gray.800" }}
+            _placeholder={{ color: "fg.subtle" }}
             fontSize="14px"
             paddingY={1.5}
             height="auto"
@@ -441,7 +441,7 @@ function detailsCellFor(runningResult: RunningResult): React.ReactNode {
 
 function costCellFor(runningResult: RunningResult): React.ReactNode {
   if (runningResult.status === "processed") {
-    return formatMoney((runningResult.cost as Money) ?? { amount: 0, currency: "USD" });
+    return formatCurrency((runningResult.cost as Money) ?? { amount: 0, currency: "USD" });
   }
   return runningResult.status === "loading" ? "" : "-";
 }
@@ -581,7 +581,7 @@ function totalCostText(
       result.status === "processed" && !!result.cost,
   );
   const currency = costed?.cost?.currency === "EUR" ? "EUR" : "USD";
-  return formatMoney({ amount: totalCost, currency });
+  return formatCurrency({ amount: totalCost, currency });
 }
 
 type SampleTraceRow = Pick<
@@ -612,8 +612,8 @@ function SampleRow({
     >
       <Table.Row
         cursor="pointer"
-        background={livePassesPreconditions ? undefined : "gray.100"}
-        color={livePassesPreconditions ? undefined : "gray.400"}
+        background={livePassesPreconditions ? undefined : "bg.muted"}
+        color={livePassesPreconditions ? undefined : "fg.subtle"}
       >
         <Table.Cell maxWidth="180px" onClick={onOpenTrace}>
           {readableDate(trace.timestamps.started_at).toLocaleDateString(undefined, {
@@ -637,7 +637,7 @@ function SampleRow({
         </Table.Cell>
         {trace.error ? (
           <Table.Cell maxWidth="225px" onClick={onOpenTrace}>
-            <Text lineClamp={1} maxWidth="250px" display="block" color="red.400">
+            <Text lineClamp={1} maxWidth="250px" display="block" color="red.fg">
               Error
               {trace.error.message ? ": " : ""}
               {trace.error.message}

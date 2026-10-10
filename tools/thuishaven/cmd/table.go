@@ -327,7 +327,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "restart",
-		summary: "bounce one supervised service (or all) without tearing the stack down",
+		summary: "bounce one supervised service (or all) without tearing the stack down; `restart ui` on a built-UI stack rebuilds the bundle and swaps it in, no backend restart",
 		args:    "[service]",
 		maxArgs: 1,
 		flags: []flagSpec{
@@ -707,7 +707,7 @@ var baseTable = []commandSpec{
 		args:    "[--affected|--all] [args…]",
 		maxArgs: -1,
 		flags: []flagSpec{
-			{long: "--affected", summary: "nx affected -t typecheck from the merge-base with the upstream, or origin/main (the agent default)"},
+			{long: "--affected", summary: "the root incremental pnpm typecheck (same as --all; tsc rechecks only what changed)"},
 			{long: "--all", summary: "the whole-tree pnpm typecheck (the default for a person)"},
 		},
 		// The summary promises the arguments are forwarded, and they are handed

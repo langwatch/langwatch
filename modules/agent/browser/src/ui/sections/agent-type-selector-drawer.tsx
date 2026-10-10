@@ -105,7 +105,7 @@ export function AgentTypeSelectorDrawer({
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <Button variant="outline" onClick={selection.close}>
             Cancel
           </Button>
@@ -142,7 +142,7 @@ function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
             <Box
               boxSize="8px"
               borderRadius="full"
-              background="green.500"
+              background="green.solid"
               data-testid="agent-type-connected-dot"
             />
             <Text fontWeight="500" fontSize="sm">

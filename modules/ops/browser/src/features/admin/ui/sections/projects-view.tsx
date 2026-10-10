@@ -1,6 +1,8 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -17,7 +19,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant, toDate } from "@langwatch/time";
-import { MoreVertical, Pencil } from "lucide-react";
+import { MoreVertical, Pencil, SearchX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -85,7 +87,14 @@ export default function ProjectsView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root variant="line" size="md" width="full">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          variant="line"
+          size="sm"
+          width="full"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>ID</Table.ColumnHeader>
@@ -102,9 +111,11 @@ export default function ProjectsView() {
             {list.data?.data.length === 0 && (
               <Table.Row>
                 <Table.Cell colSpan={8}>
-                  <Text color="fg.muted" textAlign="center" paddingY={6}>
-                    No projects match your search.
-                  </Text>
+                  <NoDataInfoBlock
+                    icon={<SearchX />}
+                    title="No projects match your search."
+                    description="Try a different search or clear the filter to see all records."
+                  />
                 </Table.Cell>
               </Table.Row>
             )}
@@ -150,7 +161,7 @@ export default function ProjectsView() {
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </AdminTable>
 
       <ProjectEditDrawer project={editing} onClose={() => setEditing(null)} />
@@ -305,7 +316,6 @@ function ProjectEditDrawer({
               </Button>
               <Button
                 colorPalette="red"
-                autoFocus
                 onClick={() =>
                   revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: true })
                 }
@@ -478,14 +488,7 @@ function ProjectEditDrawer({
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <Heading
-      as="h3"
-      size="xs"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-      pt={2}
-    >
+    <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
       {children}
     </Heading>
   );
@@ -514,7 +517,11 @@ function ToggleRow({
           )}
         </VStack>
         <Spacer />
-        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
+        <Switch
+          colorPalette="accent"
+          checked={checked}
+          onCheckedChange={(e) => onChange(e.checked)}
+        />
       </HStack>
     </Field.Root>
   );

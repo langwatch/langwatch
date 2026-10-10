@@ -1,5 +1,6 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -350,8 +351,13 @@ function BudgetDetailPage() {
                     icon={<Receipt size={24} />}
                   />
                 ) : (
-                  <Card.Root width="full" overflow="hidden">
-                    <Table.Root variant="line" size="sm" width="full">
+                  <Card.Root variant="showcase" width="full" overflow="hidden">
+                    <ListTable
+                      containerProps={{ overflowX: "auto", maxWidth: "full" }}
+                      variant="line"
+                      size="sm"
+                      width="full"
+                    >
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeader>When</Table.ColumnHeader>
@@ -389,7 +395,7 @@ function BudgetDetailPage() {
                           </Table.Row>
                         ))}
                       </Table.Body>
-                    </Table.Root>
+                    </ListTable>
                   </Card.Root>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>

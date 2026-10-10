@@ -37,16 +37,8 @@ const SUITE_EDITOR_SUBTITLE = "The fields its scenarios carry, and the checks ev
 
 function SuiteEditorHeader({ storedName }: { storedName: string }) {
   return (
-    <Drawer.Header
-      borderBottomWidth="1px"
-      borderColor="border"
-      paddingX={5}
-      paddingY={3.5}
-      display="block"
-    >
-      <Drawer.Title fontSize="14px" fontWeight="semibold">
-        Edit test suite
-      </Drawer.Title>
+    <Drawer.Header>
+      <Drawer.Title>Edit test suite</Drawer.Title>
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {storedName || SUITE_EDITOR_SUBTITLE}
       </Text>
@@ -133,14 +125,7 @@ function SuiteEditorFields({ model }: { model: SuiteEditorModel }) {
 
 function SuiteEditorFooter({ model }: { model: SuiteEditorModel }) {
   return (
-    <Drawer.Footer
-      borderTopWidth="1px"
-      borderColor="border"
-      paddingX={5}
-      paddingY={3}
-      justifyContent="flex-end"
-      gap={2}
-    >
+    <Drawer.Footer>
       <SmallButton onClick={model.close} data-testid="suite-editor-cancel">
         Cancel
       </SmallButton>
@@ -175,7 +160,7 @@ export function SuiteEditorDrawer(_props: SuiteEditorDrawerProps) {
     >
       <Drawer.Content bg="bg.panel" data-testid="suite-editor">
         <SuiteEditorHeader storedName={model.storedName} />
-        <Drawer.Body paddingX={5} paddingY={4} overflowY="auto">
+        <Drawer.Body>
           <SuiteEditorFields model={model} />
         </Drawer.Body>
         <SuiteEditorFooter model={model} />

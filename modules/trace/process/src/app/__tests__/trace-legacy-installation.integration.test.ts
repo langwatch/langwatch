@@ -123,6 +123,7 @@ function bootTraceApp(options: {
 
   // The project door as the process opens it: absent and unresolvable keys are its refusals.
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request }) => {

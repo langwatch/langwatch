@@ -30,6 +30,49 @@ export const LongText: Story = {
   },
 };
 
+/** Ids, hashes, keys and paths keep both ends: the cut goes in the middle. */
+export const TruncateMiddle: Story = {
+  args: {
+    children: "trace_01J9ZK3Q8W7E6R5T4Y3U2I1O0P",
+    truncate: "middle",
+    maxWidth: "180px",
+  },
+};
+
+/** A path keeps its last segment whole. */
+export const TruncateMiddlePath: Story = {
+  args: {
+    children: "modules/trace/browser/src/ui/sections/explorer/trace-drawer-layout.tsx",
+    truncate: "middle",
+    maxWidth: "260px",
+  },
+};
+
+/** End or middle, side by side, at the same width. Click either: the whole value selects. */
+export const TruncateModes: Story = {
+  render: () => (
+    <Table.Root size="sm" width="420px">
+      <Table.Body>
+        {(["end", "middle"] as const).map((truncate) => (
+          <Table.Row key={truncate}>
+            <Table.Cell width="80px">
+              <Text textStyle="xs">{truncate}</Text>
+            </Table.Cell>
+            <Table.Cell>
+              <InlineCode truncate={truncate} maxWidth="220px">
+                sk-lw-9f8e7d6c5b4a3210fedcba9876543210
+              </InlineCode>
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </Table.Root>
+  ),
+};
+
+/** Opting out of select-on-click, for text a reader picks words from. */
+export const FreeSelection: Story = { args: { selectOnClick: false } };
+
 export const InContexts: Story = {
   render: () => (
     <>

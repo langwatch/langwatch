@@ -3,7 +3,7 @@
  * registry.
  */
 
-import { releaseFlags } from "@langwatch/module";
+import { releaseFlags, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const FRONTEND_FEATURE_FLAGS = [
@@ -68,7 +68,12 @@ export type FrontendFeatureFlag = (typeof FRONTEND_FEATURE_FLAGS)[number];
 export const frontendFeatureFlagSchema = z.enum(FRONTEND_FEATURE_FLAGS);
 
 /** Every browser-visible flag, present exactly once. */
-export const frontendFeatureFlagMapSchema = z.record(frontendFeatureFlagSchema, z.boolean());
+const frontendFeatureFlagMapSchemaDefinition = z.record(frontendFeatureFlagSchema, z.boolean());
+export interface FrontendFeatureFlagMapSchema extends Named<
+  typeof frontendFeatureFlagMapSchemaDefinition
+> {}
+export const frontendFeatureFlagMapSchema: FrontendFeatureFlagMapSchema =
+  frontendFeatureFlagMapSchemaDefinition;
 
 /**
  * Flags a signed-out browser may resolve; deliberate subset (never gates
@@ -83,6 +88,11 @@ export type PublicAnonymousFeatureFlag = (typeof PUBLIC_ANONYMOUS_FEATURE_FLAGS)
  * Keyed loosely since the allowlist is empty today (a `never` record
  * can't express a non-empty one); the real bound is enforced where the map is built.
  */
-export const publicAnonymousFlagMapSchema = z.object({}).strict();
+const publicAnonymousFlagMapSchemaDefinition = z.object({}).strict();
+export interface PublicAnonymousFlagMapSchema extends Named<
+  typeof publicAnonymousFlagMapSchemaDefinition
+> {}
+export const publicAnonymousFlagMapSchema: PublicAnonymousFlagMapSchema =
+  publicAnonymousFlagMapSchemaDefinition;
 
 export type PublicAnonymousFlagMap = Record<string, boolean>;

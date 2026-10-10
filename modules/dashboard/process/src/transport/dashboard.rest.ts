@@ -57,6 +57,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   // Creating asks for `analytics:create`; `:manage` still implies it, so nobody
   // who could create a dashboard yesterday loses that.
   .post("/", "postApiDashboards")
+  .withAudit("dashboards.create")
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:create")
   .withOutput(dashboardResponseSchema)
@@ -76,6 +77,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   // Registered before /:id so "reorder" is not read as an id. Reordering
   // rewrites existing dashboards' positions — an `:update`.
   .put("/reorder", "putApiDashboardsReorder")
+  .withAudit("dashboards.reorderDashboards")
   .withInput(dashboardRestReorderSchema)
   .withPermission("analytics:update")
   .withOutput(dashboardReorderResponseSchema)
@@ -110,6 +112,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   })
 
   .patch("/:id", "patchApiDashboardsById")
+  .withAudit("dashboards.rename")
   .withParams(dashboardRestParamsSchema)
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:update")
@@ -128,6 +131,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
 
   // Hard delete with cascade — deliberately stays at `:manage`.
   .delete("/:id", "deleteApiDashboardsById")
+  .withAudit("dashboards.delete")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(dashboardDeletedResponseSchema)

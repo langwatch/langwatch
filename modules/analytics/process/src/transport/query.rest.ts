@@ -108,6 +108,7 @@ export const queryRest = defineRestRouter(AnalyticsQueryApi)
 
   /** `POST /api/v1/query` — execute one statement. The body IS the query. */
   .post("/", "postApiV1Query")
+  .withoutAudit("read sent as a POST")
   .withInput(lwqlKeyStatementSchema)
   .withAccess(anyAuthenticated({ reason: THE_KEY_FANS_OUT }))
   .withMiddlewareContext(langWatchQLKeyReach)

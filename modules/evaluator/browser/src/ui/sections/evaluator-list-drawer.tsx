@@ -177,7 +177,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

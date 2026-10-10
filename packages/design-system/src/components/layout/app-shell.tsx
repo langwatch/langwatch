@@ -35,11 +35,11 @@ export function IconRailTile({
       paddingY={2}
       borderRadius="xl"
       cursor="pointer"
-      backgroundColor={isActive ? "bg.panel" : "transparent"}
+      backgroundColor={isActive ? "bg.selected" : "transparent"}
       boxShadow={isActive ? "0 1px 3px rgba(26, 26, 46, 0.09)" : undefined}
       color={isActive ? "fg" : "gray.400"}
       transition="all 0.15s ease-in-out"
-      _hover={isActive ? undefined : { backgroundColor: "bg.panel/50", color: "fg.muted" }}
+      _hover={isActive ? undefined : { backgroundColor: "bg.hover", color: "fg.muted" }}
       aria-label={label}
       aria-current={isActive ? "page" : undefined}
       title={title}
@@ -89,7 +89,7 @@ export function IconRail({
       width={ICON_RAIL_WIDTH}
       minWidth={ICON_RAIL_WIDTH}
       minHeight="100vh"
-      backgroundColor="bg.rail"
+      backgroundColor="bg.page"
       borderRightWidth="1px"
       borderRightStyle="solid"
       borderRightColor="border"
@@ -256,7 +256,7 @@ export function CommandBarSurface({
       motionPreset="slide-in-top"
     >
       <Dialog.Content
-        background="bg.surface/92"
+        background="bg.overlay"
         width={{ base: "calc(100vw - 24px)", md: maxWidth }}
         maxWidth={maxWidth}
         marginTop={{ base: "8vh", md: topMargin }}
@@ -419,8 +419,8 @@ export function CommandBarItem({
       cursor="pointer"
       borderRadius="lg"
       marginX={{ base: 2, md: 2.5 }}
-      background={isSelected ? "bg.emphasized/60" : "transparent"}
-      _hover={{ background: "bg.emphasized/80" }}
+      background={isSelected ? "bg.selected" : "transparent"}
+      _hover={{ background: "bg.hover" }}
       onClick={onSelect}
       onMouseEnter={onMouseEnter}
       gap={3.5}

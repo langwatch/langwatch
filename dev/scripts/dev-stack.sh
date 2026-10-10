@@ -5,14 +5,18 @@
 # as its own deployment (see the image's CMD); nothing here is on that path, so
 # there is no production branch to keep in step.
 #
-# Lanes (ADR-004, amendment 2026-09-07 — the local topology; ui and backend
-# only with LANGWATCH_DEV_ONE_PROCESS=0, else the app lane below hosts both):
-#   ui       apps/ui           — Vite on PORT (default 5560), proxying /api to
-#                                the backend lane
+# Two shapes, as haven's (ADR-168, amendment 2026-10-10):
+#   pnpm dev      the UI is built once (`build:local`) and the backend lane
+#                 serves it on PORT (default 5560), as haven up does.
+#   pnpm dev:hmr  adds the ui lane: Vite on PORT, proxying /api to the backend
+#                 lane on PORT + 1000. Vite runs only in this shape.
+#
+# Lanes:
+#   ui       apps/ui           — Vite with HMR; only under --hmr
 #   backend  tools/dev-runtime — the API application AND the worker application
-#                                in ONE Node process: tRPC + REST + SSE on
-#                                PORT + 1000, worker metrics on PORT - 2561.
-#                                Restart-on-change, debounced. It does not
+#                                in ONE Node process: tRPC + REST + SSE, worker
+#                                metrics on PORT - 2561, re-linked in-process on
+#                                a backend change, debounced. It does not
 #                                migrate — this script does, once, before any
 #                                lane starts.
 #   go       cmd/service       — aigateway AND nlpgo in ONE Go process, on the
@@ -21,13 +25,7 @@
 #                                worker subprocesses, so it must not be
 #                                restarted with the rest of the Go code.
 #
-#   app      tools/dev-runtime — the default: the ui and backend lanes as ONE
-#                                Node process: Vite on PORT, api + worker
-#                                re-linked in-process on a backend change
-#                                (ADR-168, B1). Same ports, same debounce.
-#                                LANGWATCH_DEV_ONE_PROCESS=0 runs ui + backend.
-#
-# The app lane (or, split, the ui and backend lanes) always runs. The go lane is a convenience: it is
+# The backend lane always runs. The go lane is a convenience: it is
 # skipped, with a line saying so, when the toolchain is absent, when its ports
 # are already held, or when both opt-out variables are set. Production is
 # unchanged — three Node deployments and separate Go services.
@@ -35,10 +33,13 @@
 # Requires `concurrently` to be resolvable from the workspace root.
 #
 # Usage (from the repo root, normally through the root `dev` script):
-#   bash dev/scripts/dev-stack.sh
+#   bash dev/scripts/dev-stack.sh [--hmr]
 #   PORT=5570 bash dev/scripts/dev-stack.sh
 
 set -eo pipefail
+
+IS_HMR=0
+[ "${1:-}" = "--hmr" ] && IS_HMR=1
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HERE/.." && pwd)"
@@ -69,6 +70,11 @@ export NODE_ENV="${NODE_ENV:-development}"
 # handed out cannot drift apart.
 # shellcheck source=./lib/derive-dev-ports.sh
 . "$HERE/lib/derive-dev-ports.sh"
+# Without Vite the backend lane serves the built UI, so it takes PORT itself:
+# the address in BASE_HOST and NEXTAUTH_URL stays the one the browser opens.
+if [ "$IS_HMR" = "0" ] && [ -z "${API_PORT:-}" ]; then
+  export API_PORT="${PORT:-5560}"
+fi
 derive_dev_ports
 
 # shellcheck source=./lib/shell-quote.sh
@@ -255,8 +261,20 @@ fi
 # starting at once serialise rather than rebuilding a schema underneath one
 # another, then the system-migrations pass (specs/upgrade/entry-points.feature).
 echo "  → preparing the databases (once for this stack)"
-bash "$REPO_ROOT/dev/scripts/devscripts.sh" ensure-built
+pnpm --silent -C "$REPO_ROOT" run ensure:built
 pnpm --silent -C "$REPO_ROOT/apps/api" run start:prepare:db
+
+# The built UI, once, through Nx's cache. Copied out of client.local, which a
+# haven stack in the same checkout moves away on each of its own builds.
+if [ "$IS_HMR" = "0" ]; then
+  echo "  → building the UI (once; pnpm dev:hmr runs Vite instead)"
+  (cd "$REPO_ROOT" && FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm --silent exec nx run @langwatch/ui:build:local --outputStyle=static)
+  UI_DIST="$REPO_ROOT/apps/ui/dist"
+  rm -rf "$UI_DIST/client.dev"
+  cp -R "$UI_DIST/client.local" "$UI_DIST/client.dev"
+  export LANGWATCH_UI_DIST_DIR="$UI_DIST/client.dev"
+  echo "  ✓ ui: built, served by the backend lane on :${API_PORT}"
+fi
 
 # --- the lanes -------------------------------------------------------------
 
@@ -282,9 +300,7 @@ add_lane() {
   COMMANDS+=("bash $(shell_quote "$HERE/lane.sh") $1 $(shell_quote "$2")")
 }
 
-# One process is the default (ADR-168); LANGWATCH_DEV_ONE_PROCESS=0 splits ui from backend.
-ONE_PROCESS="${LANGWATCH_DEV_ONE_PROCESS:-1}"
-if [ "$ONE_PROCESS" = "0" ]; then
+if [ "$IS_HMR" = "1" ]; then
   add_lane ui "$RUNTIME_ENV pnpm --silent --filter @langwatch/ui dev"
 fi
 
@@ -299,11 +315,7 @@ fi
 # process. It boots the worker first, so the queue consumers are attached
 # before anything can enqueue. It does not migrate: the step above did, once,
 # and this lane restarts.
-if [ "$ONE_PROCESS" != "0" ]; then
-  add_lane app "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev:one"
-else
-  add_lane backend "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev"
-fi
+add_lane backend "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev"
 
 NAMES_STR=$(
   IFS=,

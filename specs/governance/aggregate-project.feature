@@ -271,6 +271,13 @@ Feature: An aggregate project reads its member projects
     Then the rule is refused
     And no grant is written
 
+  @unit
+  Scenario: Editing an aggregate's rule asks organisation manage of the aggregate's organisation
+    Given an edit that names only the aggregate project
+    When the door decides the edit
+    Then it asks organization:manage of the organisation that owns the aggregate
+    And the edit never fails as an internal error for want of an organisation id
+
   @integration
   Scenario: A non-admin on the aggregate's team is refused
     Given an aggregate project whose team includes sam

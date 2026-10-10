@@ -1,4 +1,8 @@
-import { InvalidActionParamsError, SLACK_BOT_TOKEN_KEPT } from "@langwatch/automation-contract";
+import {
+  InvalidActionParamsError,
+  SLACK_BOT_TOKEN_KEPT,
+  isSlackWebhookUrl,
+} from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SlackApi, SlackConnectionKind } from "@langwatch/slack-contract";
 import { z } from "zod";
@@ -35,6 +39,13 @@ function slackChannelRequired(): InvalidActionParamsError {
   return new InvalidActionParamsError(
     "A Slack channel is required for a bot connection.",
     "slackChannelId",
+  );
+}
+
+function slackWebhookInvalid(): InvalidActionParamsError {
+  return new InvalidActionParamsError(
+    "Expected a Slack incoming webhook URL (https://hooks.slack.com/services/…).",
+    "slackWebhook",
   );
 }
 
@@ -189,6 +200,7 @@ export class AutomationSlackConnectionService {
     if (!secret) return [];
     // Refused before anything is stored, so a refused save leaves no connection.
     if (kind === "BOT" && !fields.slackChannelId?.trim()) throw slackChannelRequired();
+    if (kind === "INCOMING_WEBHOOK" && !isSlackWebhookUrl(secret)) throw slackWebhookInvalid();
     const organizationId = await this.projects.getOrganizationId(projectId);
     const { id } = await this.slack.findOrCreateSlackConnectionForSecret({
       organizationId,

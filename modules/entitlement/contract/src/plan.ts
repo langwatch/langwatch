@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   planDispatchCeilingsShape,
   planPricesShape,
@@ -7,12 +8,14 @@ import { z } from "zod";
 
 export const planSourceSchema = z.enum(["license", "subscription", "free"]);
 
-export const moneyByCurrencySchema = z.object({
+const moneyByCurrencySchemaDefinition = z.object({
   USD: z.number(),
   EUR: z.number(),
 });
+export interface MoneyByCurrencySchema extends Named<typeof moneyByCurrencySchemaDefinition> {}
+export const moneyByCurrencySchema: MoneyByCurrencySchema = moneyByCurrencySchemaDefinition;
 
-export const planSchema = z.object({
+const planSchemaDefinition = z.object({
   planSource: planSourceSchema,
   type: z.string(),
   name: z.string(),
@@ -31,6 +34,8 @@ export const planSchema = z.object({
   usageUnit: z.string().optional(),
   ...planPricesShape,
 });
+export interface PlanSchema extends Named<typeof planSchemaDefinition> {}
+export const planSchema: PlanSchema = planSchemaDefinition;
 
 export type PlanSource = z.infer<typeof planSourceSchema>;
 export type MoneyByCurrency = z.infer<typeof moneyByCurrencySchema>;

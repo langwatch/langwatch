@@ -91,8 +91,17 @@ function auditRow(overrides: Record<string, unknown> = {}) {
     after: null,
     actorUserId: null,
     actorUser: null,
+    channel: "app",
+    apiKeyId: null,
     ...overrides,
   };
+}
+
+/** Opens the export dialog, picks how much to take, and exports. */
+async function exportVia(range: string) {
+  await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+  await userEvent.click(await screen.findByText(range));
+  await userEvent.click(screen.getByRole("button", { name: "Export" }));
 }
 
 beforeEach(() => {
@@ -117,8 +126,11 @@ describe("given an organization below the Enterprise plan", () => {
       state.planType = "LAUNCH";
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("Enterprise Feature")).toBeInTheDocument();
-      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(screen.getByText("Audit logs on Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+        "href",
+        "/settings/plans",
+      );
     });
 
     /** @scenario A deployment below the plan is told what the audit trail would show */
@@ -150,18 +162,18 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 2;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getAllByLabelText("AI Gateway")).toHaveLength(1);
-      expect(screen.queryByText("Platform")).not.toBeInTheDocument();
       const [gateway, platform] = screen.getAllByTestId("audit-log-entry");
-      expect(gateway).toHaveTextContent(
-        "Alice created virtual key vk_abcdefghijklmnopqrstuvwxyz in Web App",
-      );
-      expect(within(gateway!).getByText("gateway.virtual_key.created")).toBeInTheDocument();
-      expect(platform).toHaveTextContent("Alice added member");
+      expect(within(gateway!).getByText("AI Gateway")).toBeInTheDocument();
+      expect(within(platform!).getByText("Platform")).toBeInTheDocument();
+      expect(within(gateway!).getByText("Alice")).toBeInTheDocument();
+      expect(within(gateway!).getByText("Created virtual key")).toBeInTheDocument();
+      expect(within(gateway!).getByTitle("vk_abcdefghijklmnopqrstuvwxyz")).toBeInTheDocument();
+      expect(within(gateway!).getByText("Web App")).toBeInTheDocument();
+      expect(within(platform!).getByText("Added member")).toBeInTheDocument();
     });
 
     /** @scenario Every entry says where it came from */
-    it("shows the address and the browser on every entry", () => {
+    it("shows the address on every entry and the browser in its detail", async () => {
       state.auditLogs = [
         auditRow({
           userAgent:
@@ -172,49 +184,52 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("203.0.113.9")).toBeInTheDocument();
-      expect(screen.getByText("Chrome on macOS")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Details" }));
+      expect(screen.getByText("Chrome 129 on macOS")).toBeInTheDocument();
     });
 
     /** @scenario A change reads inline as its fields, old to new */
-    it("summarises the change inline and opens the full diff on request", async () => {
+    it("summarises the change and the full diff in the detail it opens", async () => {
       state.auditLogs = [
         auditRow({ before: { baseUrl: "api.openai.com" }, after: { baseUrl: "llmsim.local" } }),
       ];
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("base url")).toBeInTheDocument();
-      expect(screen.getByText("api.openai.com")).toBeInTheDocument();
-      expect(screen.getByText("llmsim.local")).toBeInTheDocument();
       expect(screen.queryByTestId("audit-log-detail")).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "View diff" }));
 
       const detail = screen.getByTestId("audit-log-detail");
+      expect(within(detail).getByText("base url")).toBeInTheDocument();
+      expect(within(detail).getByTitle("api.openai.com")).toBeInTheDocument();
+      expect(within(detail).getByTitle("llmsim.local")).toBeInTheDocument();
       expect(within(detail).getByText("Before")).toBeInTheDocument();
       expect(within(detail).getByText("After")).toBeInTheDocument();
       expect(within(detail).getByText("audit-1")).toBeInTheDocument();
     });
 
     /** @scenario A failed attempt reads as a failure */
-    it("carries the error on its own red line", () => {
+    it("marks the row failed and carries the full error in its detail", async () => {
       state.auditLogs = [auditRow({ error: "FORBIDDEN: not allowed" })];
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("Failed")).toBeInTheDocument();
+      expect(within(screen.getByTestId("audit-log-entry")).getByText("Failed")).toBeInTheDocument();
+      expect(screen.queryByTestId("audit-log-error")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Details" }));
       expect(screen.getByTestId("audit-log-error")).toHaveTextContent("FORBIDDEN: not allowed");
     });
 
     /** @scenario A burst of identical events by one actor reads as one row */
-    it("folds three identical consecutive events into one entry marked ×3", async () => {
+    it("folds three identical consecutive events into one entry marked 3 events", async () => {
       state.auditLogs = ["a", "b", "c"].map((id) => auditRow({ id }));
       state.totalCount = 3;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getAllByTestId("audit-log-entry")).toHaveLength(1);
-      await userEvent.click(screen.getByRole("button", { name: "Show all 3 repeats" }));
-      expect(screen.getAllByTestId("audit-log-repeat")).toHaveLength(2);
+      await userEvent.click(screen.getByRole("button", { name: "3 events" }));
+      expect(screen.getAllByTestId("audit-log-occurrence")).toHaveLength(3);
     });
 
     /** @scenario An impersonated entry names the operator as well as the person */
@@ -228,7 +243,10 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByTestId("audit-log-entry")).toHaveTextContent(/^.*Admin as Alice created/);
+      const entry = screen.getByTestId("audit-log-entry");
+      expect(within(entry).getByText("Admin")).toBeInTheDocument();
+      expect(within(entry).getByText("as Alice")).toBeInTheDocument();
+      expect(within(entry).getByLabelText("Impersonation")).toBeInTheDocument();
     });
 
     /** @scenario The feed reads by day */
@@ -237,7 +255,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByRole("region", { name: "Today" })).toBeInTheDocument();
+      expect(screen.getByRole("rowgroup", { name: "Today" })).toBeInTheDocument();
     });
 
     /** @scenario A row written by a system actor says so rather than naming nobody */
@@ -247,7 +265,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("System")).toBeInTheDocument();
-      expect(screen.queryByText("User not found")).not.toBeInTheDocument();
+      expect(screen.queryByText("Unknown user")).not.toBeInTheDocument();
     });
 
     /** @scenario A row written by a system actor says so rather than naming nobody */
@@ -256,7 +274,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("User not found")).toBeInTheDocument();
+      expect(screen.getByText("Unknown user")).toBeInTheDocument();
     });
   });
 
@@ -349,7 +367,7 @@ describe("given a reader exporting the audit trail", () => {
       state.fetchPages = [{ auditLogs: [auditRow()], totalCount: 1 }];
       renderWithOrganizationHost(<AuditLogScreen />, host);
 
-      await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+      await exportVia("Current view (filters as shown)");
 
       await waitFor(() => expect(calls.exportFetch).toHaveBeenCalled());
       expect(calls.exportFetch).toHaveBeenCalledWith(
@@ -362,6 +380,29 @@ describe("given a reader exporting the audit trail", () => {
     });
   });
 
+  describe("when the reader asks for the whole history", () => {
+    /** @scenario An export asks how much history to take, keeping every other filter */
+    it("reads from the first row, keeping every other filter", async () => {
+      const host = planHost({ query: { actionFilter: "gateway." } });
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      state.fetchPages = [{ auditLogs: [auditRow()], totalCount: 1 }];
+      renderWithOrganizationHost(<AuditLogScreen />, host);
+
+      await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+      expect(
+        await screen.findByText(/apply to every option: action gateway\./),
+      ).toBeInTheDocument();
+      await userEvent.click(screen.getByText("All time"));
+      await userEvent.click(screen.getByRole("button", { name: "Export" }));
+
+      await waitFor(() => expect(calls.exportFetch).toHaveBeenCalled());
+      expect(calls.exportFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: 0, action: "gateway." }),
+      );
+    });
+  });
+
   describe("when the report is ready", () => {
     /** @scenario An exported report carries the same columns the table shows */
     it("hands the application a dated CSV rather than reaching for the browser", async () => {
@@ -370,7 +411,7 @@ describe("given a reader exporting the audit trail", () => {
       state.fetchPages = [{ auditLogs: [auditRow()], totalCount: 1 }];
       const { host } = renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+      await exportVia("Current view (filters as shown)");
 
       await waitFor(() => expect(host.downloads).toHaveLength(1));
       const file = host.downloads[0]!;
@@ -392,7 +433,7 @@ describe("given a reader exporting the audit trail", () => {
       ];
       const { host } = renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+      await exportVia("Current view (filters as shown)");
 
       await waitFor(() => expect(host.downloads).toHaveLength(1));
       expect(calls.exportFetch).toHaveBeenCalledTimes(2);
@@ -414,7 +455,7 @@ describe("given a reader exporting the audit trail", () => {
       state.fetchRejectsWith = new Error("boom");
       const { host } = renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
+      await exportVia("Current view (filters as shown)");
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
       expect(host.failures[0]?.fallbackTitle).toBe("Couldn't export the audit log");
@@ -448,9 +489,46 @@ describe("given a reader narrowing the table", () => {
       const host = planHost({ query: { pageOffset: "50" } });
       renderWithOrganizationHost(<AuditLogScreen />, host);
 
-      await userEvent.selectOptions(screen.getByLabelText("Project"), "proj-2");
+      await userEvent.click(
+        within(screen.getByTestId("audit-project-filter")).getByRole("combobox"),
+      );
+      await userEvent.click(await screen.findByRole("option", { name: /Batch/ }));
 
       expect(host.queries.at(-1)).toMatchObject({ projectId: "proj-2", pageOffset: "0" });
+    });
+  });
+});
+
+describe("given an organization with personal workspaces", () => {
+  describe("when the project filter opens", () => {
+    /** @scenario Changing a filter returns the table to its first page */
+    it("gathers personal workspaces under one group, named for their owners", async () => {
+      const personalTeam = {
+        id: "team-p",
+        name: "Personal",
+        slug: "personal-u-9",
+        isPersonal: true,
+        ownerUserId: "u-9",
+        projects: [{ id: "proj-p", name: "Personal Workspace", slug: "personal-u-9" }],
+      };
+      const engineering = {
+        id: "team-1",
+        name: "Engineering",
+        slug: "engineering",
+        projects: [{ id: "proj-1", name: "Web App", slug: "web-app" }],
+      };
+      const organization = { id: "org-1", name: "Acme", teams: [engineering, personalTeam] };
+      state.members = [{ userId: "u-9", user: { id: "u-9", name: "Bo Owner", email: null } }];
+      const host = planHost({ organization });
+      renderWithOrganizationHost(<AuditLogScreen />, host);
+
+      await userEvent.click(
+        within(screen.getByTestId("audit-project-filter")).getByRole("combobox"),
+      );
+
+      expect(await screen.findByText("Personal workspaces")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("option", { name: /Bo Owner's workspace/ }));
+      expect(host.queries.at(-1)).toMatchObject({ projectId: "proj-p" });
     });
   });
 });

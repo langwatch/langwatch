@@ -1,3 +1,5 @@
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
@@ -5,13 +7,11 @@ import {
   Heading,
   HStack,
   NativeSelect,
-  Skeleton,
   Stack,
   Table,
   Text,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { readableDate } from "@langwatch/time";
 import { useState } from "react";
 
 import { api, type RouterOutputs } from "../../../../behavior/ops-api.ts";
@@ -57,7 +57,7 @@ export function UpgradeTenantList({
         <Heading size="sm" flex={1}>
           Tenants
         </Heading>
-        <NativeSelect.Root size="sm" width="240px">
+        <NativeSelect.Root size="sm" width={{ base: "full", md: "60" }}>
           <NativeSelect.Field
             aria-label="Step"
             value={step ?? ""}
@@ -72,7 +72,7 @@ export function UpgradeTenantList({
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
-        <NativeSelect.Root size="sm" width="160px">
+        <NativeSelect.Root size="sm" width={{ base: "full", md: "40" }}>
           <NativeSelect.Field
             aria-label="State"
             value={state ?? ""}
@@ -123,7 +123,7 @@ function TenantRows({
   titleOf: (name: string) => string;
 }) {
   if (error) return <HandledErrorAlert error={error} fallbackTitle="Couldn't load the tenants" />;
-  if (isLoading) return <Skeleton height="120px" aria-label="Loading tenants" />;
+  if (isLoading) return <ListPageSkeleton label="Loading tenants" />;
   if (rows.length === 0) {
     return (
       <Text textStyle="sm" color="fg.muted">
@@ -132,7 +132,7 @@ function TenantRows({
     );
   }
   return (
-    <ListTable>
+    <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Tenant</Table.ColumnHeader>
@@ -154,7 +154,9 @@ function TenantRows({
               <Table.Cell>
                 <Badge colorPalette={known?.color ?? "gray"}>{known?.label ?? row.status}</Badge>
               </Table.Cell>
-              <Table.Cell>{readableDate(row.updatedAt).toLocaleString()}</Table.Cell>
+              <Table.Cell>
+                <FormattedDate value={row.updatedAt} />
+              </Table.Cell>
             </Table.Row>
           );
         })}

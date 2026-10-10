@@ -6,31 +6,37 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { renderWithDesignSystem } from "../../../testing/index.tsx";
-import { Drawer, setDrawerEndInset } from "../drawer.tsx";
+import { Drawer, DrawerOffsetProvider, setDrawerEndInset } from "../drawer.tsx";
+import { Drawer as StudioDrawer } from "../studio-drawer.tsx";
 
-function renderOpenDrawer() {
+function renderOpenDrawer(Parts: typeof Drawer) {
   renderWithDesignSystem(
-    <Drawer.Root open>
-      <Drawer.Content portalled={false} data-testid="drawer">
-        <Drawer.Body>body</Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>,
+    <DrawerOffsetProvider value={{ marginTop: 48 }}>
+      <Parts.Root open>
+        <Parts.Content portalled={false} data-testid="drawer">
+          <Parts.Body>body</Parts.Body>
+        </Parts.Content>
+      </Parts.Root>
+    </DrawerOffsetProvider>,
   );
   return screen.getByTestId("drawer");
 }
 
-describe("given a docked side panel keeps room on the right edge", () => {
-  afterEach(() => {
-    setDrawerEndInset(0);
-    cleanup();
-  });
+describe.each([Drawer, StudioDrawer])(
+  "given a docked side panel keeps room on the right edge",
+  (Parts) => {
+    afterEach(() => {
+      setDrawerEndInset(0);
+      cleanup();
+    });
 
-  it("every drawer yields that room", () => {
-    setDrawerEndInset(412);
-    expect(renderOpenDrawer()).toHaveStyle({ marginInlineEnd: "412px" });
-  });
+    it("every drawer yields that room", () => {
+      setDrawerEndInset(412);
+      expect(renderOpenDrawer(Parts)).toHaveStyle({ marginInlineEnd: "412px", marginTop: "48px" });
+    });
 
-  it("keeps the default edge when the panel is not docked", () => {
-    expect(renderOpenDrawer().style.marginInlineEnd).toBe("");
-  });
-});
+    it("keeps the default edge when the panel is not docked", () => {
+      expect(renderOpenDrawer(Parts).style.marginInlineEnd).toBe("");
+    });
+  },
+);

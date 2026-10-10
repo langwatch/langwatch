@@ -2,7 +2,7 @@ import http from "node:http";
 
 import { describe, expect, it } from "vitest";
 
-import { freeLoopbackPort, replaceBackend } from "../backend.process.ts";
+import { freeLoopbackPort, replaceBackend, startFreshBackend } from "../backend.process.ts";
 import { forwardPortWithOrb } from "../haven-orb.ts";
 
 const closed = { close: async () => {} };
@@ -102,6 +102,72 @@ describe("given an api generation serving behind the stable port", () => {
       });
       expect(replaced.halves.api).toBe(api);
       expect(replaced.workerFailure).toBeInstanceOf(Error);
+    });
+  });
+});
+
+describe("given the host holding the stable port with no generation serving", () => {
+  describe("when the api starts while the worker is still booting", () => {
+    /** @scenario "A cold boot routes the api before the worker has finished booting" */
+    it("routes the port to the api before the worker resolves", async () => {
+      const stable = await freeLoopbackPort();
+      const forwarder = await forwardPortWithOrb({ port: stable });
+      const apiPort = await freeLoopbackPort();
+      let finishWorker = (): void => {};
+      const booting = startFreshBackend({
+        apiPort,
+        route: (port) => forwarder.route(port),
+        startApi: async ({ port }) => generationOn({ port: port ?? 0, name: "api" }),
+        startWorker: async () => {
+          await new Promise<void>((resolve) => (finishWorker = resolve));
+          return closed;
+        },
+      });
+      // The worker cannot resolve until finishWorker runs, so this answer is mid-boot.
+      await expect.poll(() => get(stable).catch(() => undefined)).toBe("api");
+      finishWorker();
+      const started = await booting;
+
+      expect(started.workerFailure).toBeUndefined();
+      await started.halves.api.close();
+      await forwarder.close();
+    });
+  });
+
+  describe("when the worker then refuses boot", () => {
+    /** @scenario "A cold boot routes the api before the worker has finished booting" */
+    it("keeps the api routed and answers the worker's failure for the retry", async () => {
+      const routed: number[] = [];
+      const api = { close: async () => {} };
+      const started = await startFreshBackend({
+        apiPort: 7,
+        route: (port) => void routed.push(port),
+        startApi: async () => api,
+        startWorker: async () => {
+          throw new Error("worker refused");
+        },
+      });
+      expect(routed).toEqual([7]);
+      expect(started.halves.api).toBe(api);
+      expect(started.workerFailure).toBeInstanceOf(Error);
+    });
+  });
+
+  describe("when the api refuses boot", () => {
+    /** @scenario "A cold boot routes the api before the worker has finished booting" */
+    it("never routes the port", async () => {
+      const routed: number[] = [];
+      await expect(
+        startFreshBackend({
+          apiPort: 7,
+          route: (port) => void routed.push(port),
+          startApi: async () => {
+            throw new Error("api refused");
+          },
+          startWorker: async () => closed,
+        }),
+      ).rejects.toThrow("api refused");
+      expect(routed).toEqual([]);
     });
   });
 });

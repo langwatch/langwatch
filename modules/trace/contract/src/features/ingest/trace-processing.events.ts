@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -80,12 +81,14 @@ const traceEventSchema = z.object({
  */
 const eventMetadataBaseSchema = eventMetadataSchema;
 
-export const spanRecordedEventSchema = z.object({
+const spanRecordedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(SPAN_RECORDED_EVENT_TYPE),
   data: recordTraceSpanEventDataSchema,
   metadata: eventMetadataBaseSchema.optional(),
 });
+export interface SpanRecordedEventSchema extends Named<typeof spanRecordedEventSchemaDefinition> {}
+export const spanRecordedEventSchema: SpanRecordedEventSchema = spanRecordedEventSchemaDefinition;
 
 type SpanRecordedEvent = z.infer<typeof spanRecordedEventSchema>;
 
@@ -102,7 +105,7 @@ const spanReferencedPayloadDataSchema = z.object({
   startTimeUnixMs: z.number().nullable(),
 });
 
-export const spanReferencedPayloadSchema = z.object({
+const spanReferencedPayloadSchemaDefinition = z.object({
   id: z.string(),
   aggregateId: z.string(),
   aggregateType: aggregateTypeSchema,
@@ -115,6 +118,11 @@ export const spanReferencedPayloadSchema = z.object({
   metadata: eventMetadataBaseSchema.optional(),
   idempotencyKey: z.string().optional(),
 });
+export interface SpanReferencedPayloadSchema extends Named<
+  typeof spanReferencedPayloadSchemaDefinition
+> {}
+export const spanReferencedPayloadSchema: SpanReferencedPayloadSchema =
+  spanReferencedPayloadSchemaDefinition;
 type SpanReferencedPayload = z.infer<typeof spanReferencedPayloadSchema>;
 
 /**
@@ -190,20 +198,30 @@ const topicAssignedEventMetadataSchema = z
 /**
  * Zod schema for TopicAssignedEvent data.
  */
-export const topicAssignedEventDataSchema = z.object({
+const topicAssignedEventDataSchemaDefinition = z.object({
   topicId: z.string().nullable(),
   topicName: z.string().nullable(),
   subtopicId: z.string().nullable(),
   subtopicName: z.string().nullable(),
   isIncremental: z.boolean(),
 });
+export interface TopicAssignedEventDataSchema extends Named<
+  typeof topicAssignedEventDataSchemaDefinition
+> {}
+export const topicAssignedEventDataSchema: TopicAssignedEventDataSchema =
+  topicAssignedEventDataSchemaDefinition;
 
-export const topicAssignedEventSchema = z.object({
+const topicAssignedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(TOPIC_ASSIGNED_EVENT_TYPE),
   data: topicAssignedEventDataSchema,
   metadata: topicAssignedEventMetadataSchema.optional(),
 });
+export interface TopicAssignedEventSchema extends Named<
+  typeof topicAssignedEventSchemaDefinition
+> {}
+export const topicAssignedEventSchema: TopicAssignedEventSchema =
+  topicAssignedEventSchemaDefinition;
 export type TopicAssignedEvent = z.infer<typeof topicAssignedEventSchema>;
 
 /**
@@ -236,12 +254,17 @@ const logRecordReceivedEventDataSchema = z.object({
   piiRedactionLevel: piiRedactionLevelSchema,
 });
 
-export const logRecordReceivedEventSchema = z.object({
+const logRecordReceivedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(LOG_RECORD_RECEIVED_EVENT_TYPE),
   data: logRecordReceivedEventDataSchema,
   metadata: logRecordReceivedEventMetadataSchema.optional(),
 });
+export interface LogRecordReceivedEventSchema extends Named<
+  typeof logRecordReceivedEventSchemaDefinition
+> {}
+export const logRecordReceivedEventSchema: LogRecordReceivedEventSchema =
+  logRecordReceivedEventSchemaDefinition;
 
 export type LogRecordReceivedEventData = z.infer<typeof logRecordReceivedEventDataSchema>;
 export type LogRecordReceivedEvent = z.infer<typeof logRecordReceivedEventSchema>;
@@ -251,12 +274,17 @@ const logContributedEventDataSchema = logTraceContributionSchema.omit({
   occurredAt: true,
 });
 
-export const logContributedEventSchema = z.object({
+const logContributedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(LOG_CONTRIBUTED_EVENT_TYPE),
   data: logContributedEventDataSchema,
   metadata: eventMetadataBaseSchema.optional(),
 });
+export interface LogContributedEventSchema extends Named<
+  typeof logContributedEventSchemaDefinition
+> {}
+export const logContributedEventSchema: LogContributedEventSchema =
+  logContributedEventSchemaDefinition;
 export type LogContributedEvent = z.infer<typeof logContributedEventSchema>;
 
 /**
@@ -271,12 +299,17 @@ const metricDataPointCorrelatedEventMetadataSchema = z
 
 const metricDataPointCorrelatedEventDataSchema = z.object(metricCorrelationFields);
 
-export const metricDataPointCorrelatedEventSchema = z.object({
+const metricDataPointCorrelatedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
   data: metricDataPointCorrelatedEventDataSchema,
   metadata: metricDataPointCorrelatedEventMetadataSchema.optional(),
 });
+export interface MetricDataPointCorrelatedEventSchema extends Named<
+  typeof metricDataPointCorrelatedEventSchemaDefinition
+> {}
+export const metricDataPointCorrelatedEventSchema: MetricDataPointCorrelatedEventSchema =
+  metricDataPointCorrelatedEventSchemaDefinition;
 export type MetricDataPointCorrelatedEvent = z.infer<typeof metricDataPointCorrelatedEventSchema>;
 
 /**
@@ -291,17 +324,27 @@ const originResolvedEventMetadataSchema = z
 /**
  * Zod schema for OriginResolvedEvent data.
  */
-export const originResolvedEventDataSchema = z.object({
+const originResolvedEventDataSchemaDefinition = z.object({
   origin: z.string(),
   reason: z.string(),
 });
+export interface OriginResolvedEventDataSchema extends Named<
+  typeof originResolvedEventDataSchemaDefinition
+> {}
+export const originResolvedEventDataSchema: OriginResolvedEventDataSchema =
+  originResolvedEventDataSchemaDefinition;
 
-export const originResolvedEventSchema = z.object({
+const originResolvedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ORIGIN_RESOLVED_EVENT_TYPE),
   data: originResolvedEventDataSchema,
   metadata: originResolvedEventMetadataSchema.optional(),
 });
+export interface OriginResolvedEventSchema extends Named<
+  typeof originResolvedEventSchemaDefinition
+> {}
+export const originResolvedEventSchema: OriginResolvedEventSchema =
+  originResolvedEventSchemaDefinition;
 export type OriginResolvedEvent = z.infer<typeof originResolvedEventSchema>;
 
 /**
@@ -316,17 +359,27 @@ const annotationAddedEventMetadataSchema = z
 /**
  * Zod schema for AnnotationAddedEvent data.
  */
-export const annotationAddedEventDataSchema = z.object({
+const annotationAddedEventDataSchemaDefinition = z.object({
   traceId: z.string(),
   annotationId: z.string(),
 });
+export interface AnnotationAddedEventDataSchema extends Named<
+  typeof annotationAddedEventDataSchemaDefinition
+> {}
+export const annotationAddedEventDataSchema: AnnotationAddedEventDataSchema =
+  annotationAddedEventDataSchemaDefinition;
 
-export const annotationAddedEventSchema = z.object({
+const annotationAddedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_ADDED_EVENT_TYPE),
   data: annotationAddedEventDataSchema,
   metadata: annotationAddedEventMetadataSchema.optional(),
 });
+export interface AnnotationAddedEventSchema extends Named<
+  typeof annotationAddedEventSchemaDefinition
+> {}
+export const annotationAddedEventSchema: AnnotationAddedEventSchema =
+  annotationAddedEventSchemaDefinition;
 
 export type AnnotationAddedEventData = z.infer<typeof annotationAddedEventDataSchema>;
 export type AnnotationAddedEvent = z.infer<typeof annotationAddedEventSchema>;
@@ -343,17 +396,27 @@ const annotationRemovedEventMetadataSchema = z
 /**
  * Zod schema for AnnotationRemovedEvent data.
  */
-export const annotationRemovedEventDataSchema = z.object({
+const annotationRemovedEventDataSchemaDefinition = z.object({
   traceId: z.string(),
   annotationId: z.string(),
 });
+export interface AnnotationRemovedEventDataSchema extends Named<
+  typeof annotationRemovedEventDataSchemaDefinition
+> {}
+export const annotationRemovedEventDataSchema: AnnotationRemovedEventDataSchema =
+  annotationRemovedEventDataSchemaDefinition;
 
-export const annotationRemovedEventSchema = z.object({
+const annotationRemovedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_REMOVED_EVENT_TYPE),
   data: annotationRemovedEventDataSchema,
   metadata: annotationRemovedEventMetadataSchema.optional(),
 });
+export interface AnnotationRemovedEventSchema extends Named<
+  typeof annotationRemovedEventSchemaDefinition
+> {}
+export const annotationRemovedEventSchema: AnnotationRemovedEventSchema =
+  annotationRemovedEventSchemaDefinition;
 
 export type AnnotationRemovedEventData = z.infer<typeof annotationRemovedEventDataSchema>;
 export type AnnotationRemovedEvent = z.infer<typeof annotationRemovedEventSchema>;
@@ -370,17 +433,27 @@ const annotationsBulkSyncedEventMetadataSchema = z
 /**
  * Zod schema for AnnotationsBulkSyncedEvent data.
  */
-export const annotationsBulkSyncedEventDataSchema = z.object({
+const annotationsBulkSyncedEventDataSchemaDefinition = z.object({
   traceId: z.string(),
   annotationIds: z.array(z.string()),
 });
+export interface AnnotationsBulkSyncedEventDataSchema extends Named<
+  typeof annotationsBulkSyncedEventDataSchemaDefinition
+> {}
+export const annotationsBulkSyncedEventDataSchema: AnnotationsBulkSyncedEventDataSchema =
+  annotationsBulkSyncedEventDataSchemaDefinition;
 
-export const annotationsBulkSyncedEventSchema = z.object({
+const annotationsBulkSyncedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ANNOTATIONS_BULK_SYNCED_EVENT_TYPE),
   data: annotationsBulkSyncedEventDataSchema,
   metadata: annotationsBulkSyncedEventMetadataSchema.optional(),
 });
+export interface AnnotationsBulkSyncedEventSchema extends Named<
+  typeof annotationsBulkSyncedEventSchemaDefinition
+> {}
+export const annotationsBulkSyncedEventSchema: AnnotationsBulkSyncedEventSchema =
+  annotationsBulkSyncedEventSchemaDefinition;
 export type AnnotationsBulkSyncedEvent = z.infer<typeof annotationsBulkSyncedEventSchema>;
 
 /**
@@ -397,20 +470,30 @@ const traceNameChangedEventMetadataSchema = z
  * against bad historical data still rejects via Zod instead of silently
  * overriding with a 4 KB blob.
  */
-export const traceNameChangedEventDataSchema = z.object({
+const traceNameChangedEventDataSchemaDefinition = z.object({
   traceId: z.string(),
   /** New name. Trim happens at the command boundary; the event stores the canonical form. */
   newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
   /** User who made the change, if available — for audit + UI attribution. */
   changedByUserId: z.string().nullable(),
 });
+export interface TraceNameChangedEventDataSchema extends Named<
+  typeof traceNameChangedEventDataSchemaDefinition
+> {}
+export const traceNameChangedEventDataSchema: TraceNameChangedEventDataSchema =
+  traceNameChangedEventDataSchemaDefinition;
 
-export const traceNameChangedEventSchema = z.object({
+const traceNameChangedEventSchemaDefinition = z.object({
   ...traceEventSchema.shape,
   type: z.literal(TRACE_NAME_CHANGED_EVENT_TYPE),
   data: traceNameChangedEventDataSchema,
   metadata: traceNameChangedEventMetadataSchema.optional(),
 });
+export interface TraceNameChangedEventSchema extends Named<
+  typeof traceNameChangedEventSchemaDefinition
+> {}
+export const traceNameChangedEventSchema: TraceNameChangedEventSchema =
+  traceNameChangedEventSchemaDefinition;
 
 export type TraceNameChangedEventData = z.infer<typeof traceNameChangedEventDataSchema>;
 export type TraceNameChangedEvent = z.infer<typeof traceNameChangedEventSchema>;

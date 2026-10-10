@@ -1,5 +1,4 @@
-import type { Authorization } from "@langwatch/authorization";
-import { ownProjectIdOf, tenantScopeKey } from "@langwatch/clickhouse-client";
+import { type Authorization, readScopeKeyOf } from "@langwatch/authorization";
 import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import type { DerivedTraceEvent, TraceDerivedEventsInput } from "@langwatch/trace-contract";
@@ -58,9 +57,7 @@ export class TraceEventDerivationService {
   }): Promise<DerivedTraceEvent[]> {
     const read = () =>
       this.spans.findDerivedEventsByTraceId({
-        // shortcut: the derivation reader still filters one TenantId, so a read takes the proof's
-        // own project; fence it through AuthorizedClickHouse once an aggregate derives events.
-        tenantId: ownProjectIdOf({ authorization: input.authorization, reads: "traces" }),
+        authorization: input.authorization,
         traceId: input.traceId,
         ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
       });
@@ -68,7 +65,7 @@ export class TraceEventDerivationService {
       return read();
     }
 
-    const scope = tenantScopeKey({ authorization: input.authorization, reads: "traces" });
+    const scope = readScopeKeyOf(input.authorization);
     const key = `${scope}:${input.traceId}:${input.foldVersion}`;
     const now = nowInstant().epochMilliseconds;
     const hit = this.memo.get(key);

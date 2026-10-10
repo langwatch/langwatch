@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Typed message parts the inline card channel adds to the event stream
  * (ADR-060 §1, §6, §8): `langy-card`, `langy-card-failed`, and
@@ -16,7 +17,7 @@ export const LANGY_CARD_PART_TYPE = "langy-card";
 export const LANGY_CARD_FAILED_PART_TYPE = "langy-card-failed";
 export const LANGY_CHOICE_SELECTION_PART_TYPE = "langy-choice-selection";
 
-export const langyCardPartSchema = z
+const langyCardPartSchemaDefinition = z
   .object({
     type: z.literal(LANGY_CARD_PART_TYPE),
     blockId: z.string().min(1),
@@ -29,21 +30,33 @@ export const langyCardPartSchema = z
   .refine((part) => part.kind === part.card.kind && part.blockId === part.card.blockId, {
     message: "part identity must match the stamped card",
   });
+export interface LangyCardPartSchema extends Named<typeof langyCardPartSchemaDefinition> {}
+export const langyCardPartSchema: LangyCardPartSchema = langyCardPartSchemaDefinition;
 export type LangyCardPart = z.infer<typeof langyCardPartSchema>;
 
-export const langyCardFailedPartSchema = z.object({
+const langyCardFailedPartSchemaDefinition = z.object({
   type: z.literal(LANGY_CARD_FAILED_PART_TYPE),
   blockId: z.string().min(1),
   /** The raw fenced text, for the disclosure's expanded view. */
   raw: z.string(),
 });
+export interface LangyCardFailedPartSchema extends Named<
+  typeof langyCardFailedPartSchemaDefinition
+> {}
+export const langyCardFailedPartSchema: LangyCardFailedPartSchema =
+  langyCardFailedPartSchemaDefinition;
 export type LangyCardFailedPart = z.infer<typeof langyCardFailedPartSchema>;
 
-export const langyChoiceSelectionPartSchema = z
+const langyChoiceSelectionPartSchemaDefinition = z
   .object({
     type: z.literal(LANGY_CHOICE_SELECTION_PART_TYPE),
   })
   .and(langyChoiceSelectionSchema);
+export interface LangyChoiceSelectionPartSchema extends Named<
+  typeof langyChoiceSelectionPartSchemaDefinition
+> {}
+export const langyChoiceSelectionPartSchema: LangyChoiceSelectionPartSchema =
+  langyChoiceSelectionPartSchemaDefinition;
 export type LangyChoiceSelectionPart = z.infer<typeof langyChoiceSelectionPartSchema>;
 
 /** Parse an opaque message part as a stamped card part, or null. */

@@ -144,7 +144,7 @@ export function TraceTableShell<T>({
       width="full"
       // Anchor the table's underlying surface so alpha-blended row tints (red.fg/8,
       // yellow.fg/8) composite over a known base.
-      bg="bg.surface"
+      bg="bg.card"
       css={{
         // `separate` + `border-spacing: 0` keeps the single-pixel grid look while letting each
         // TH/TD render its own borders — under `collapse` adjacent borders merge and the head's
@@ -165,10 +165,10 @@ export function TraceTableShell<T>({
             zIndex: 1,
           },
           // Default rows: the sticky checkbox cell was painting `bg-panel` while the
-          // row body is `transparent` (showing the parent's `bg.surface`).
+          // row body is `transparent` (showing the parent's `bg.card`).
           "& tbody[data-row-variant='default'] > tr > td:first-of-type, & tbody:not([data-row-variant]) > tr > td:first-of-type":
             {
-              backgroundColor: "var(--chakra-colors-bg-surface)",
+              backgroundColor: "var(--chakra-colors-bg-card)",
             },
           // Default-row hover variant for the sticky cell. Mirrors the
           // `style.hoverBg = gray.subtle` painted on the main row's Tr
@@ -186,19 +186,19 @@ export function TraceTableShell<T>({
             // Match RegistryRow's `bg=red.fg/8` so the sticky cell reads
             // as part of the same red surface the rest of the row paints.
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-surface))",
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-card))",
           },
           "& tbody[data-row-variant='warning'] > tr > td:first-of-type": {
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-surface))",
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-card))",
           },
           "& tbody[data-row-variant='error']:hover > tr > td:first-of-type": {
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-surface))",
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-card))",
           },
           "& tbody[data-row-variant='warning']:hover > tr > td:first-of-type": {
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-surface))",
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-card))",
           },
         }),
       }}
@@ -209,7 +209,7 @@ export function TraceTableShell<T>({
         previous `bg.muted`, which felt too dark per operator feedback.
         Dark mode keeps the existing slight elevation token.
       */}
-      <Thead position="sticky" top={0} zIndex={2} bg={{ base: "bg.subtle", _dark: "bg.surface" }}>
+      <Thead position="sticky" top={0} zIndex={2} bg={{ base: "bg.subtle", _dark: "bg.card" }}>
         {reorderable ? (
           <SortableContext items={sortableHeaderIds} strategy={horizontalListSortingStrategy}>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -438,7 +438,7 @@ function HeaderCell<T>({
   const isActiveSort = sortDirection !== false;
   const ariaSort = sortAriaOf({ canSort, sortDirection });
   const draggingZIndex = isDragging ? 4 : undefined;
-  const stickyBg = isStickyFirst ? { base: "bg.subtle", _dark: "bg.surface" } : undefined;
+  const stickyBg = isStickyFirst ? { base: "bg.subtle", _dark: "bg.card" } : undefined;
   const headerBg = isActiveSort ? { base: "bg.muted", _dark: "bg.muted" } : stickyBg;
 
   return (
@@ -482,9 +482,9 @@ function HeaderCell<T>({
       // the body rows. Under `border-collapse: separate` both edges paint cleanly per
       // cell (the TR-level border was being swallowed).
       borderRightWidth="1px"
-      borderRightColor={{ base: "gray.200", _dark: "gray.800" }}
+      borderRightColor={{ base: "border", _dark: "border.strong" }}
       borderBottomWidth="1px"
-      borderBottomColor={{ base: "gray.200", _dark: "gray.800" }}
+      borderBottomColor={{ base: "border", _dark: "border.strong" }}
       // Unified padding for every header — sortable + non-sortable share the
       // same Th paddings so the column titles line up across the row. The
       // sortable button below is `width: full` and only adds its own

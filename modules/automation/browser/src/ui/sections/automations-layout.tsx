@@ -4,8 +4,6 @@
  * retired alerts path renders the automations tab, so that tab is highlighted.
  */
 
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Spacer } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -27,7 +25,7 @@ export const AUTOMATION_SECTIONS: readonly {
   icon: LucideIcon;
 }[] = [
   { section: "overview", label: "Overview", suffix: "", icon: Eye },
-  { section: "automations", label: "Automations", suffix: "/automations", icon: Zap },
+  { section: "automations", label: "Rules", suffix: "/automations", icon: Zap },
   { section: "reports", label: "Reports", suffix: "/schedules", icon: Calendar },
 ];
 
@@ -58,17 +56,8 @@ export function AutomationsLayout({
   return (
     <SectionNavigationFrame
       label="Automations"
-      header={
-        <PageLayout.Header>
-          <PageLayout.Heading>{title}</PageLayout.Heading>
-          {actions ? (
-            <>
-              <Spacer />
-              {actions}
-            </>
-          ) : null}
-        </PageLayout.Header>
-      }
+      pageTitle={title === "Automations" ? "Rules" : title}
+      headerActions={actions}
       links={links}
       activeHref={`${basePath}${active?.suffix ?? ""}`}
       onNavigate={(href) => host.navigate(href)}

@@ -23,7 +23,7 @@ const meta = {
       <Dialog.Trigger asChild>
         <Button size="sm">New project</Button>
       </Dialog.Trigger>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>New project</Dialog.Title>
@@ -57,7 +57,7 @@ export const Closed: Story = {
 export const Loading: Story = {
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Creating the project</Dialog.Title>
         </Dialog.Header>
@@ -74,7 +74,7 @@ export const Loading: Story = {
 export const WithoutBackdrop: Story = {
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content bg="bg" backdrop={false}>
+      <Dialog.Content backdrop={false}>
         <Dialog.Header>
           <Dialog.Title>No backdrop</Dialog.Title>
         </Dialog.Header>
@@ -87,7 +87,7 @@ export const WithoutBackdrop: Story = {
 export const LongText: Story = {
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>

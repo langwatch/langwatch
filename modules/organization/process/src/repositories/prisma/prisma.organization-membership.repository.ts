@@ -49,6 +49,7 @@ import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
   type DeveloperAdmissionVia,
 } from "../../rules/admission-audit.rules.ts";
+import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
 import {
   isActiveAdmin,
   isAdminDemotion,
@@ -1830,6 +1831,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // above revokes on retry; a refusal inside the transaction revokes nothing.
     const archivedTeamIds = await this.prisma.$transaction(async (tx) => {
       await this.deleteMembershipRow({ tx, organizationId, userId });
+      // As main's offboard: a kept group or team row would hand the access back on a rejoin.
+      await tx.groupMembership.deleteMany({ where: { userId, group: { organizationId } } });
+      await tx.teamUser.deleteMany({ where: { userId, team: { organizationId } } });
       return this.archivePersonalWorkspaces({ tx, organizationId, userId });
     });
     await revokeTheirGrants();
@@ -2250,6 +2254,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         after: log.after,
         actorUserId: actorIds.get(log.id) ?? null,
         actorUser: userMap.get(actorIds.get(log.id) ?? "") ?? null,
+        ...auditOriginOf({
+          metadata: log.metadata,
+          action: log.action,
+          args: log.args,
+          userId: log.userId,
+        }),
       };
     });
 

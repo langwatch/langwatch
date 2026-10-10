@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const chatRoleSchema = z.union([
@@ -102,7 +103,7 @@ const scenarioRichContentSchema = z.union([
  * cross-provider wire shape formerly owned by the tracer module; it lives
  * here because scenario-event ingestion is the consumer and owner.
  */
-export const scenarioMessageSchema = z.object({
+const scenarioMessageSchemaDefinition = z.object({
   role: chatRoleSchema.optional(),
   content: z
     .union([z.string(), z.array(scenarioRichContentSchema)])
@@ -115,3 +116,5 @@ export const scenarioMessageSchema = z.object({
   name: z.string().optional().nullable(),
   reasoning_content: z.string().optional().nullable(),
 });
+export interface ScenarioMessageSchema extends Named<typeof scenarioMessageSchemaDefinition> {}
+export const scenarioMessageSchema: ScenarioMessageSchema = scenarioMessageSchemaDefinition;

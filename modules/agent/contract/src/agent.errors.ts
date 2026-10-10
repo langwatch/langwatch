@@ -1,4 +1,5 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { AgentType } from "./config/index.ts";
@@ -210,7 +211,7 @@ const agentCopySelectionProblemSchema = z.object({
   sourceAgentId: z.string(),
 });
 
-export const agentProblemSchema = z.discriminatedUnion("error", [
+const agentProblemSchemaDefinition = z.discriminatedUnion("error", [
   agentNotFoundProblemSchema,
   invalidAgentConfigProblemSchema,
   agentIsNotCopyProblemSchema,
@@ -218,6 +219,8 @@ export const agentProblemSchema = z.discriminatedUnion("error", [
   agentCopiesNotFoundProblemSchema,
   agentCopySelectionProblemSchema,
 ]);
+export interface AgentProblemSchema extends Named<typeof agentProblemSchemaDefinition> {}
+export const agentProblemSchema: AgentProblemSchema = agentProblemSchemaDefinition;
 
 export type AgentProblem = z.infer<typeof agentProblemSchema>;
 

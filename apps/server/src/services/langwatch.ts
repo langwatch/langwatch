@@ -7,15 +7,15 @@ import { execa } from "execa";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
-import { locateApiDir, resolvePnpm } from "./node-deps.ts";
+import { locateBackendDir, resolvePnpm } from "./node-deps.ts";
 import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 /**
- * The langwatch API process, launched via `pnpm run start` in apps/api —
- * the same entry the Docker image and Helm chart run, serving both the
- * API and the browser bundle apps/ui built.
+ * The langwatch backend, launched via `pnpm run start` in apps/backend: the
+ * api (serving the browser bundle apps/ui built) and the worker in one Node
+ * process. The worker runs the upgrade, so nothing here migrates or skips it.
  */
 
 /**
@@ -30,9 +30,9 @@ export async function startLangwatch(
   bus.emit({ type: "starting", service: "langwatch" });
   const start = nowInstant().epochMilliseconds;
 
-  const apiDir = locateApiDir();
-  if (!apiDir) throw new Error("langwatch api dir not found");
-  await ensureNodeModules(apiDir, ctx, bus);
+  const backendDir = locateBackendDir();
+  if (!backendDir) throw new Error("langwatch backend dir not found");
+  await ensureNodeModules(backendDir, ctx, bus);
 
   const sp = servicePaths(ctx.paths);
   const pnpm = await resolvePnpm(ctx.paths);
@@ -41,7 +41,7 @@ export async function startLangwatch(
       name: "langwatch",
       command: pnpm.command,
       args: [...pnpm.args, "run", "start"],
-      cwd: apiDir,
+      cwd: backendDir,
       env: {
         // Defaults first so the user's shell and .env override them.
         ...appOfflineEnv(ctx.paths),
@@ -59,8 +59,8 @@ export async function startLangwatch(
         // reads, so both are set to the one number.
         API_PORT: String(ctx.ports.langwatch),
         PORT: String(ctx.ports.langwatch),
-        SKIP_PRISMA_MIGRATE: "true",
-        SKIP_CLICKHOUSE_MIGRATE: "true",
+        // The worker half's own health door, on the slot ports.ts allocated.
+        WORKER_METRICS_PORT: String(ctx.ports.workerHealth),
       },
     },
     paths: sp,
@@ -68,9 +68,9 @@ export async function startLangwatch(
   });
 
   const ready = await pollUntilHealthy({
-    // The API process's /api/health returns 204 No Content (see
-    // apps/api/src/api-process.lifecycle.ts) — that's the deliberate success
-    // signal for the helm chart's liveness probe too.
+    // The api half's /api/health returns 204 No Content (apiHealthRoute in
+    // apps/api/src/main.ts), the helm chart's liveness signal too. One wait
+    // covers the process: a worker that refuses boot exits it.
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.langwatch}/api/health`, {
       expectStatus: 204,
     }),

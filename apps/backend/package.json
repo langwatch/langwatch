@@ -1,0 +1,27 @@
+{
+  "name": "@langwatch/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The api and the worker in one Node process: the backend `npx @langwatch/server` runs (ADR-168). The seam lives in @langwatch/process.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/main.ts",
+      "default": "./src/main.ts"
+    }
+  },
+  "scripts": {
+    "start": "node --experimental-transform-types --import @langwatch/observability/register $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/worker": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

@@ -36,6 +36,7 @@
   "scripts": {
     "start": "node --experimental-transform-types src/index.ts",
     "build": "tsup && node build.js",
+    "typecheck": "pnpm -w exec tsc -b mcp/typescript",
     "prepublish": "pnpm run build",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.js",

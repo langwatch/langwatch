@@ -26,7 +26,7 @@ function onlyReads(permission: AuthzPermission): boolean {
   );
 }
 
-/** Whether a mutation under this permission writes data under its project, so an aggregate refuses it (ADR-177 decision 8). */
+/** Whether a mutation under this permission writes data under its project; aggregates refuse it. */
 export function writesUnderProject(permission: AuthzPermission): boolean {
   return !onlyReads(permission) && !EXEMPT.has(permissionResource(permission));
 }

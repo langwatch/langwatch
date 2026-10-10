@@ -37,8 +37,8 @@ describe("ImpersonationBanner", () => {
       renderWithDesignSystem(<ImpersonationBanner onStop={() => {}} user={impersonatedUser} />);
       expect(screen.getByText("Impersonating Target User")).not.toBeNull();
       // Chakra renders multiple copies for responsive breakpoints
-      const stopLinks = screen.getAllByRole("link", { name: "Stop" });
-      expect(stopLinks.length).toBeGreaterThan(0);
+      const stopButtons = screen.getAllByRole("button", { name: "Stop" });
+      expect(stopButtons.length).toBeGreaterThan(0);
     });
 
     it("falls back to email when name is null", () => {
@@ -59,7 +59,7 @@ describe("ImpersonationBanner", () => {
 
       renderWithDesignSystem(<ImpersonationBanner onStop={onStop} user={impersonatedUser} />);
 
-      fireEvent.click(screen.getAllByRole("link", { name: "Stop" })[0]!);
+      fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]!);
 
       expect(onStop).toHaveBeenCalledTimes(1);
     });

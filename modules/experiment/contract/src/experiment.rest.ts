@@ -4,6 +4,7 @@
  * door publishes.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { lenientPositiveIntSchema } from "./experiment-workbench-rest.ts";
@@ -13,7 +14,7 @@ const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
 /** One experiment as every route in the family reports it. */
-export const experimentSummarySchema = z.object({
+const experimentSummarySchemaDefinition = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string().nullable(),
@@ -24,8 +25,10 @@ export const experimentSummarySchema = z.object({
   runsCount: z.number(),
   lastRunAt: z.string().nullable(),
 });
+export interface ExperimentSummarySchema extends Named<typeof experimentSummarySchemaDefinition> {}
+export const experimentSummarySchema: ExperimentSummarySchema = experimentSummarySchemaDefinition;
 
-export const experimentsListResponseSchema = z.object({
+const experimentsListResponseSchemaDefinition = z.object({
   experiments: z.array(experimentSummarySchema),
   pagination: z.object({
     page: z.number(),
@@ -34,24 +37,36 @@ export const experimentsListResponseSchema = z.object({
     hasMore: z.boolean(),
   }),
 });
+export interface ExperimentsListResponseSchema extends Named<
+  typeof experimentsListResponseSchemaDefinition
+> {}
+export const experimentsListResponseSchema: ExperimentsListResponseSchema =
+  experimentsListResponseSchemaDefinition;
 
-export const listExperimentsQuerySchema = z.object({
+const listExperimentsQuerySchemaDefinition = z.object({
   page: lenientPositiveIntSchema.transform((page) => page ?? 1).describe("1-based page number"),
   pageSize: lenientPositiveIntSchema
     .transform((size) => Math.min(size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE))
     .describe(`Experiments per page, capped at ${MAX_PAGE_SIZE}`),
 });
+export interface ListExperimentsQuerySchema extends Named<
+  typeof listExperimentsQuerySchemaDefinition
+> {}
+export const listExperimentsQuerySchema: ListExperimentsQuerySchema =
+  listExperimentsQuerySchemaDefinition;
 
-export const slugParamsSchema = z.object({
+const slugParamsSchemaDefinition = z.object({
   slug: z.string().min(1).describe("The experiment's slug, or its id"),
 });
+export interface SlugParamsSchema extends Named<typeof slugParamsSchemaDefinition> {}
+export const slugParamsSchema: SlugParamsSchema = slugParamsSchemaDefinition;
 
 /**
  * `experiment_slug` and `experiment_id` are individually optional and jointly
  * required. `EVALUATIONS_V3` is deliberately not among the accepted types -
  * that is the workbench's own type, written through the workbench's doors.
  */
-export const experimentInitBodySchema = z
+const experimentInitBodySchemaDefinition = z
   .object({
     experiment_id: z.string().optional().nullable(),
     experiment_slug: z.string().optional().nullable(),
@@ -60,6 +75,11 @@ export const experimentInitBodySchema = z
     workflowId: z.string().optional(),
   })
   .refine((data) => Boolean(data.experiment_id || data.experiment_slug));
+export interface ExperimentInitBodySchema extends Named<
+  typeof experimentInitBodySchemaDefinition
+> {}
+export const experimentInitBodySchema: ExperimentInitBodySchema =
+  experimentInitBodySchemaDefinition;
 
 /** What an SDK names an experiment by on the create-or-take door. */
 export type ExperimentRunLookupInput = Readonly<{

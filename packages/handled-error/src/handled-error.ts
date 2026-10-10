@@ -398,6 +398,7 @@ export function activeTraceContext(): { traceId?: string; spanId?: string } {
  */
 export const TRANSIENT_REFUSAL_CODES = [
   "clickhouse_overloaded",
+  "connect_credential_pending",
   "service_unavailable",
   "upgrade_in_progress",
 ] as const satisfies readonly AppErrorCode[];

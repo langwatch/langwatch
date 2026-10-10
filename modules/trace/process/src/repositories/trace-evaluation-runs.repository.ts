@@ -17,7 +17,7 @@ export abstract class TraceEvaluationRunsReadRepository {
     traceId: string;
   }): Promise<EvaluationRunData[]>;
 
-  /** As `findRunsByTraceId`, read through the proof: a member is read only inside its grant (ADR-177). */
+  /** As `findRunsByTraceId`, read through the proof: a member only inside its grant (ADR-177). */
   abstract findReadableRunsByTraceId(input: {
     authorization: Authorization;
     traceId: string;
@@ -39,7 +39,7 @@ export abstract class TraceEvaluationRunsReadRepository {
     traceIds: readonly string[];
   }): Promise<Record<string, TraceEvaluationData[]>>;
 
-  /** As `findTraceEvaluations`, read through the proof: a member only inside its grant (ADR-177). */
+  /** As `findTraceEvaluations`, read through the proof: a member only in its grant (ADR-177). */
   abstract findReadableTraceEvaluations(input: {
     authorization: Authorization;
     traceIds: readonly string[];

@@ -56,12 +56,12 @@ export function BlobRow({
         {canManage && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button variant="ghost" size="2xs" aria-label={`Actions for payload ${blob.hash}`}>
+              <Button variant="ghost" size="sm" aria-label={`Actions for payload ${blob.hash}`}>
                 <MoreVertical size={14} />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
-              <Menu.Item value="delete" color="red.500" onClick={() => onDelete(blob)}>
+              <Menu.Item value="delete" color="red.fg" onClick={() => onDelete(blob)}>
                 Delete payload
               </Menu.Item>
             </Menu.Content>
