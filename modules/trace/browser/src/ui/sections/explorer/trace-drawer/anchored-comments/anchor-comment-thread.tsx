@@ -27,7 +27,7 @@ export function AnchorCommentThread({ comments }: { comments: AnnotationByTrace[
           <PersonAvatar
             size="xs"
             background="gray.solid"
-            color="white"
+            color="gray.contrast"
             name={comment.user?.name ?? comment.email ?? "?"}
             image={comment.user?.image}
           />

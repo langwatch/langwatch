@@ -1,3 +1,4 @@
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { formatDuration } from "@langwatch/design-system/display-formatters";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
@@ -134,7 +135,7 @@ function processToolSpan({
   const label = escapeLabel(
     `tool: ${span.name} · ${formatDuration(duration)}${isError ? " · error" : ""}`,
   );
-  if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
+  if (isError) ctx.messages.push(`    rect ${errorRectColor()}`);
   ctx.messages.push(`    ${parentParticipant}->>${parentParticipant}: ${label}`);
   if (isError) ctx.messages.push("    end");
   span.children
@@ -190,7 +191,7 @@ function emitInteractionStart({
   });
   if (isError) label += " · error";
 
-  if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
+  if (isError) ctx.messages.push(`    rect ${errorRectColor()}`);
   ctx.messages.push(`    ${parentParticipant}->>${currentParticipant}: ${escapeLabel(label)}`);
   ctx.messages.push(`    activate ${currentParticipant}`);
 }
@@ -354,4 +355,12 @@ export function generateMermaidSyntax(
     messageCount: ctx.messages.length,
     participants: Array.from(ctx.participants),
   };
+}
+
+// Mermaid's sequence grammar accepts rgb(), but treats hex's # as a comment.
+function errorRectColor(): string {
+  return getRawColorValue("red.subtle").replace(/^#[\da-f]{6}$/i, (hex) => {
+    const channels = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
+    return `rgb(${channels.join(", ")})`;
+  });
 }

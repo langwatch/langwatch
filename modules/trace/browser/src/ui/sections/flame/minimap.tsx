@@ -301,7 +301,14 @@ function HandleGrip() {
   return (
     <Flex direction="column" gap="2px" pointerEvents="none">
       {[0, 1, 2].map((i) => (
-        <Box key={i} width="2px" height="2px" borderRadius="full" bg="white" opacity={0.85} />
+        <Box
+          key={i}
+          width="2px"
+          height="2px"
+          borderRadius="full"
+          bg="blue.contrast"
+          opacity={0.85}
+        />
       ))}
     </Flex>
   );

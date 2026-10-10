@@ -49,45 +49,45 @@
      produced a field the user could not see. Quiet is still the brief, but
      quiet has to be VISIBLE — the trough now stays legible and the peaks
      read at a glance without shouting. */
-  --langy-target-near-0: rgba(91, 141, 239, 0.16);
-  --langy-target-near-1: rgba(91, 141, 239, 0.34);
-  --langy-target-near-2: rgba(129, 116, 244, 0.5);
-  --langy-target-near-3: rgba(168, 85, 247, 0.36);
+  --langy-target-near-0: color-mix(in srgb, var(--chakra-colors-blue-fg) 16%, transparent);
+  --langy-target-near-1: color-mix(in srgb, var(--chakra-colors-blue-fg) 34%, transparent);
+  --langy-target-near-2: color-mix(in srgb, var(--chakra-colors-purple-fg) 50%, transparent);
+  --langy-target-near-3: color-mix(in srgb, var(--chakra-colors-purple-fg) 36%, transparent);
 
-  --langy-target-hover-1: rgba(91, 141, 239, 0.4);
-  --langy-target-hover-2: rgba(129, 116, 244, 0.62);
-  --langy-target-hover-3: rgba(168, 85, 247, 0.46);
+  --langy-target-hover-1: color-mix(in srgb, var(--chakra-colors-blue-fg) 40%, transparent);
+  --langy-target-hover-2: color-mix(in srgb, var(--chakra-colors-purple-fg) 62%, transparent);
+  --langy-target-hover-3: color-mix(in srgb, var(--chakra-colors-purple-fg) 46%, transparent);
 
-  --langy-target-added: rgba(168, 85, 247, 0.5);
+  --langy-target-added: color-mix(in srgb, var(--chakra-colors-purple-fg) 50%, transparent);
 }
 
 .dark,
 :root.dark {
   /* The 500-weight stops barely register against ink — lift them. */
-  --langy-target-near-0: rgba(95, 163, 255, 0.18);
-  --langy-target-near-1: rgba(95, 163, 255, 0.38);
-  --langy-target-near-2: rgba(139, 130, 255, 0.55);
-  --langy-target-near-3: rgba(168, 85, 247, 0.4);
+  --langy-target-near-0: color-mix(in srgb, var(--chakra-colors-blue-fg) 18%, transparent);
+  --langy-target-near-1: color-mix(in srgb, var(--chakra-colors-blue-fg) 38%, transparent);
+  --langy-target-near-2: color-mix(in srgb, var(--chakra-colors-purple-fg) 55%, transparent);
+  --langy-target-near-3: color-mix(in srgb, var(--chakra-colors-purple-fg) 40%, transparent);
 
-  --langy-target-hover-1: rgba(95, 163, 255, 0.46);
-  --langy-target-hover-2: rgba(139, 130, 255, 0.68);
-  --langy-target-hover-3: rgba(168, 85, 247, 0.52);
+  --langy-target-hover-1: color-mix(in srgb, var(--chakra-colors-blue-fg) 46%, transparent);
+  --langy-target-hover-2: color-mix(in srgb, var(--chakra-colors-purple-fg) 68%, transparent);
+  --langy-target-hover-3: color-mix(in srgb, var(--chakra-colors-purple-fg) 52%, transparent);
 
-  --langy-target-added: rgba(168, 85, 247, 0.56);
+  --langy-target-added: color-mix(in srgb, var(--chakra-colors-purple-fg) 56%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
-    --langy-target-near-0: rgba(95, 163, 255, 0.18);
-    --langy-target-near-1: rgba(95, 163, 255, 0.38);
-    --langy-target-near-2: rgba(139, 130, 255, 0.55);
-    --langy-target-near-3: rgba(168, 85, 247, 0.4);
+    --langy-target-near-0: color-mix(in srgb, var(--chakra-colors-blue-fg) 18%, transparent);
+    --langy-target-near-1: color-mix(in srgb, var(--chakra-colors-blue-fg) 38%, transparent);
+    --langy-target-near-2: color-mix(in srgb, var(--chakra-colors-purple-fg) 55%, transparent);
+    --langy-target-near-3: color-mix(in srgb, var(--chakra-colors-purple-fg) 40%, transparent);
 
-    --langy-target-hover-1: rgba(95, 163, 255, 0.46);
-    --langy-target-hover-2: rgba(139, 130, 255, 0.68);
-    --langy-target-hover-3: rgba(168, 85, 247, 0.52);
+    --langy-target-hover-1: color-mix(in srgb, var(--chakra-colors-blue-fg) 46%, transparent);
+    --langy-target-hover-2: color-mix(in srgb, var(--chakra-colors-purple-fg) 68%, transparent);
+    --langy-target-hover-3: color-mix(in srgb, var(--chakra-colors-purple-fg) 52%, transparent);
 
-    --langy-target-added: rgba(168, 85, 247, 0.56);
+    --langy-target-added: color-mix(in srgb, var(--chakra-colors-purple-fg) 56%, transparent);
   }
 }
 
@@ -100,13 +100,13 @@
 @property --langy-target-color {
   syntax: "<color>";
   inherits: true;
-  initial-value: rgba(0, 0, 0, 0);
+  initial-value: transparent;
 }
 
 /* Invisible until the pointer comes near. No outline, no shadow, no cursor
    change — a registered target that nobody is pointing at is just the element. */
 .langy-target {
-  --langy-target-color: rgba(0, 0, 0, 0);
+  --langy-target-color: transparent;
   /* A phase offset alone is not enough once a whole page lights up at once
      (which is exactly what `#` does): every target still breathes at the SAME
      tempo, so the field reads as one thing pulsing in formation. Deriving the
@@ -264,8 +264,8 @@ tr.langy-target > td:last-of-type {
   outline: 2px solid var(--langy-target-hover-2);
   outline-offset: 1px;
   box-shadow:
-    0 0 0 4px rgba(129, 116, 244, 0.14),
-    0 0 22px 2px rgba(129, 116, 244, 0.35);
+    0 0 0 4px color-mix(in srgb, var(--chakra-colors-purple-fg) 14%, transparent),
+    0 0 22px 2px color-mix(in srgb, var(--chakra-colors-purple-fg) 35%, transparent);
   animation: langy-spotlight-breathe 1.9s ease-in-out infinite;
 }
 
@@ -372,9 +372,9 @@ tr.langy-target > td:last-of-type {
   inset: 0;
   background: radial-gradient(
     120% 100% at 50% 50%,
-    rgba(168, 85, 247, 0.34) 0%,
-    rgba(139, 92, 246, 0.5) 55%,
-    rgba(109, 40, 217, 0.62) 100%
+    color-mix(in srgb, var(--chakra-colors-purple-fg) 34%, transparent) 0%,
+    color-mix(in srgb, var(--chakra-colors-purple-fg) 50%, transparent) 55%,
+    color-mix(in srgb, var(--chakra-colors-purple-fg) 62%, transparent) 100%
   );
 }
 

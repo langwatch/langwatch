@@ -62,7 +62,7 @@ export function ShareTraceDialog({
         tabIndex={-1}
         // Translucent glass surface, matching the drawer. A solid fill here
         // would render the backdrop blur inert.
-        background="bg.surface/80"
+        background="bg.card/80"
         backdropFilter="blur(25px)"
         borderRadius="lg"
         _focusVisible={{ outline: "none" }}

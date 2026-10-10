@@ -108,7 +108,7 @@ function toastAddedToDataset({
     description: (
       <RoutedLink
         href={`/${projectSlug}/datasets/${datasetId}`}
-        style={{ color: "white", textDecoration: "underline" }}
+        style={{ color: "inherit", textDecoration: "underline" }}
       >
         View the dataset
       </RoutedLink>
@@ -318,7 +318,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
               paddingBottom={4}
               background="bg.panel"
               transition="box-shadow 0.3s ease-in-out"
-              boxShadow={atBottom ? "none" : "0 -2px 5px rgba(0, 0, 0, 0.1)"}
+              boxShadow={
+                atBottom
+                  ? "none"
+                  : "0 -2px 5px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
+              }
               paddingX={6}
             >
               <Button

@@ -32,7 +32,7 @@ export const IntegratePaneShell: React.FC<{
       height={isCompact ? undefined : "full"}
       overflow={isCompact ? "hidden" : "auto"}
       position="relative"
-      bg={isCompact ? "transparent" : "bg.surface"}
+      bg={isCompact ? "transparent" : "bg.card"}
     >
       {chrome}
       <Flex

@@ -9,15 +9,15 @@ export const DrawerGlow: React.FC = () => (
     @keyframes tracesTourDrawerGlow {
       0%, 100% {
         box-shadow:
-          inset 0 0 0 1px rgba(59, 130, 246, 0.5),
-          0 0 28px rgba(59, 130, 246, 0.32),
-          0 0 64px rgba(99, 102, 241, 0.22);
+          inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-fg) 50%, transparent),
+          0 0 28px color-mix(in srgb, var(--chakra-colors-blue-fg) 32%, transparent),
+          0 0 64px color-mix(in srgb, var(--chakra-colors-purple-fg) 22%, transparent);
       }
       50% {
         box-shadow:
-          inset 0 0 0 2px rgba(59, 130, 246, 0.7),
-          0 0 44px rgba(59, 130, 246, 0.45),
-          0 0 96px rgba(99, 102, 241, 0.32);
+          inset 0 0 0 2px color-mix(in srgb, var(--chakra-colors-blue-fg) 70%, transparent),
+          0 0 44px color-mix(in srgb, var(--chakra-colors-blue-fg) 45%, transparent),
+          0 0 96px color-mix(in srgb, var(--chakra-colors-purple-fg) 32%, transparent);
       }
     }
     @keyframes tracesTourSidebarGlow {
@@ -32,13 +32,13 @@ export const DrawerGlow: React.FC = () => (
       */
       0%, 100% {
         box-shadow:
-          inset 0 0 0 2px rgba(59, 130, 246, 0.55),
-          inset 0 0 22px rgba(59, 130, 246, 0.28);
+          inset 0 0 0 2px color-mix(in srgb, var(--chakra-colors-blue-fg) 55%, transparent),
+          inset 0 0 22px color-mix(in srgb, var(--chakra-colors-blue-fg) 28%, transparent);
       }
       50% {
         box-shadow:
-          inset 0 0 0 3px rgba(59, 130, 246, 0.75),
-          inset 0 0 36px rgba(59, 130, 246, 0.42);
+          inset 0 0 0 3px color-mix(in srgb, var(--chakra-colors-blue-fg) 75%, transparent),
+          inset 0 0 36px color-mix(in srgb, var(--chakra-colors-blue-fg) 42%, transparent);
       }
     }
     body[data-traces-tour-stage="drawerOverview"] [data-tour-target="drawer"] {
@@ -58,27 +58,27 @@ export const DrawerGlow: React.FC = () => (
     @keyframes tracesTourDrawerGlowDark {
       0%, 100% {
         box-shadow:
-          inset 0 0 0 1px rgba(125, 211, 252, 0.32),
-          0 0 28px rgba(125, 211, 252, 0.22),
-          0 0 64px rgba(165, 180, 252, 0.16);
+          inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-fg) 32%, transparent),
+          0 0 28px color-mix(in srgb, var(--chakra-colors-blue-fg) 22%, transparent),
+          0 0 64px color-mix(in srgb, var(--chakra-colors-purple-fg) 16%, transparent);
       }
       50% {
         box-shadow:
-          inset 0 0 0 2px rgba(125, 211, 252, 0.55),
-          0 0 44px rgba(125, 211, 252, 0.4),
-          0 0 96px rgba(165, 180, 252, 0.3);
+          inset 0 0 0 2px color-mix(in srgb, var(--chakra-colors-blue-fg) 55%, transparent),
+          0 0 44px color-mix(in srgb, var(--chakra-colors-blue-fg) 40%, transparent),
+          0 0 96px color-mix(in srgb, var(--chakra-colors-purple-fg) 30%, transparent);
       }
     }
     @keyframes tracesTourSidebarGlowDark {
       0%, 100% {
         box-shadow:
-          inset 0 0 0 2px rgba(125, 211, 252, 0.4),
-          inset 0 0 22px rgba(125, 211, 252, 0.22);
+          inset 0 0 0 2px color-mix(in srgb, var(--chakra-colors-blue-fg) 40%, transparent),
+          inset 0 0 22px color-mix(in srgb, var(--chakra-colors-blue-fg) 22%, transparent);
       }
       50% {
         box-shadow:
-          inset 0 0 0 3px rgba(125, 211, 252, 0.6),
-          inset 0 0 36px rgba(125, 211, 252, 0.36);
+          inset 0 0 0 3px color-mix(in srgb, var(--chakra-colors-blue-fg) 60%, transparent),
+          inset 0 0 36px color-mix(in srgb, var(--chakra-colors-blue-fg) 36%, transparent);
       }
     }
   `}</style>

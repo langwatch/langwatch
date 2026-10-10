@@ -98,7 +98,7 @@ export function TraceDrawerContent({
           <Box
             flexShrink={0}
             // Translucent fill + backdrop blur so the page behind reads
-            // through. The lower pane container keeps its solid `bg.surface`
+            // through. The lower pane container keeps its solid `bg.card`
             // white, so only the header strip is translucent.
             bg="bg.panel/70"
             backdropFilter="blur(20px) saturate(150%)"
@@ -144,7 +144,7 @@ export function TraceDrawerContent({
               minWidth={0}
               direction="column"
               position="relative"
-              bg={{ base: "bg.surface", _dark: "bg.panel" }}
+              bg={"bg.card"}
             >
               <ScenarioRoleProvider
                 isScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}

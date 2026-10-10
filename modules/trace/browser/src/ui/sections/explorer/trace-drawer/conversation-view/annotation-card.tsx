@@ -44,7 +44,7 @@ export function AnnotationCard({
         <PersonAvatar
           size="xs"
           background="gray.solid"
-          color="white"
+          color="gray.contrast"
           name={user.name ?? "?"}
           image={user.image}
         />
