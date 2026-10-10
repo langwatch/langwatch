@@ -116,6 +116,13 @@ afterEach(() => {
   cleanup();
 });
 
+/** Organization and Project each have a General entry, so the href picks the one meant. */
+function generalLink(href: string) {
+  return screen
+    .getAllByRole("link", { name: "General" })
+    .find((l) => l.getAttribute("href") === href);
+}
+
 describe("the settings shell in a new navigation mode", () => {
   describe("when Settings was entered from a Gateway page", () => {
     /** @scenario Settings keeps search first and Back immediately below it */
@@ -157,7 +164,8 @@ describe("the settings shell in a new navigation mode", () => {
 
       expect(screen.getByText("Organization")).toBeInTheDocument();
       expect(screen.getByText("People & access")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "General" })).toHaveAttribute("href", "/settings");
+      expect(generalLink("/settings")).toHaveAttribute("href", "/settings");
+      expect(generalLink("/settings/project")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
         "href",
         "/settings/directory",
@@ -315,7 +323,7 @@ describe("the settings shell in a new navigation mode", () => {
         "aria-expanded",
         "true",
       );
-      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+      expect(generalLink("/settings")).toBeInTheDocument();
 
       unmount();
       renderSettingsSidebar();
@@ -325,7 +333,7 @@ describe("the settings shell in a new navigation mode", () => {
         "false",
       );
       expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+      expect(generalLink("/settings")).toBeInTheDocument();
     });
 
     /** @scenario Quick Search stays above the menu without a divider */
