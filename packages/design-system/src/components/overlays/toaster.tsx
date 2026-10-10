@@ -92,20 +92,17 @@ function StatusIcon({ status }: { status: ToastStatus }) {
   );
 }
 
-/** A toast's lifetime drawn as a bar that drains, holding whenever its timer does. */
+/** A toast's lifetime on its bottom rim: it drains along the curve and pauses with the timer. */
 function LifetimeBar({ lifetime }: { lifetime: number }) {
   return (
     <Box
       data-toast-lifetime=""
       aria-hidden
       position="absolute"
-      insetInline="3.5"
-      bottom="1"
-      height="2px"
-      borderRadius="full"
-      bg="currentColor"
-      opacity={0.3}
-      transformOrigin="left"
+      inset="-1px"
+      borderRadius="inherit"
+      borderBottom="2px solid currentColor"
+      opacity={0.6}
       pointerEvents="none"
       css={{
         "--toast-lifetime": `${lifetime}ms`,
