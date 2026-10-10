@@ -2,7 +2,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
-  Box,
+  Alert,
   Button,
   Field,
   HStack,
@@ -266,21 +266,14 @@ function DrawerBody({
 function Problems({ problems }: { problems: string[] }) {
   if (problems.length === 0) return null;
   return (
-    <VStack
-      align="start"
-      gap={1}
-      borderWidth="1px"
-      borderColor="orange.muted"
-      borderRadius="md"
-      backgroundColor="orange.subtle"
-      padding={3}
-    >
-      {problems.map((problem) => (
-        <Text key={problem} fontSize="xs" color="orange.fg">
-          {problem}
-        </Text>
-      ))}
-    </VStack>
+    <Alert.Root status="warning" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        {problems.map((problem) => (
+          <Alert.Description key={problem}>{problem}</Alert.Description>
+        ))}
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
@@ -299,26 +292,17 @@ function SaveError({
   onDismiss: () => void;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.error"
-      borderRadius="md"
-      backgroundColor="red.subtle"
-      padding={3}
-    >
-      <HStack alignItems="start" gap={2}>
-        <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.error">
-            {isEditing ? "Couldn't save the policy" : "Couldn't create the policy"}
-          </Text>
-          <Text fontSize="xs" color="fg.error">
-            {message}
-          </Text>
-        </VStack>
-        <Button size="xs" variant="ghost" onClick={onDismiss} aria-label="Dismiss the error">
-          <X size={12} />
-        </Button>
-      </HStack>
-    </Box>
+    <Alert.Root status="error" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {isEditing ? "Couldn't save the policy" : "Couldn't create the policy"}
+        </Alert.Title>
+        <Alert.Description>{message}</Alert.Description>
+      </Alert.Content>
+      <Button size="xs" variant="ghost" onClick={onDismiss} aria-label="Dismiss the error">
+        <X size={12} />
+      </Button>
+    </Alert.Root>
   );
 }

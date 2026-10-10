@@ -1,7 +1,7 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { useMemo } from "react";
 
@@ -177,24 +177,16 @@ export function VirtualKeyProviderAccessSection({
         </Text>
       )}
       {showNoEligible && (
-        <VStack
-          align="stretch"
-          gap={1}
-          width="full"
-          borderWidth="1px"
-          borderColor="orange.muted"
-          borderRadius="md"
-          background="orange.subtle"
-          padding={3}
-        >
-          <Text fontSize="sm" fontWeight="medium">
-            No model providers reachable from this ownership.
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            Add one at <InlineCode>/settings/model-providers</InlineCode> first; the key cannot
-            route requests without a provider.
-          </Text>
-        </VStack>
+        <Alert.Root status="warning" size="sm" width="full">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>No model providers reachable from this ownership.</Alert.Title>
+            <Alert.Description>
+              Add one at <InlineCode>/settings/model-providers</InlineCode> first; the key cannot
+              route requests without a provider.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
       {showReady && (
         <VStack align="stretch" width="full" gap={1}>
