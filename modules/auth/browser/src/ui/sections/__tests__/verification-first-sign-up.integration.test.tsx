@@ -412,6 +412,9 @@ describe("given the sign-up screen", () => {
           /LangWatch is set up for a different web address than the one you are using/,
         ),
       ).toBeTruthy();
+      const alert = screen.getByRole("alert");
+      expect(alert.parentElement?.firstElementChild).toBe(alert);
+      expect(alert.querySelector("svg")).not.toBeNull();
       expect(signInMock).not.toHaveBeenCalled();
     });
 
@@ -490,6 +493,8 @@ describe("given the sign-up screen", () => {
       const { container } = renderScreen();
 
       expect(await screen.findByText("That confirmation link no longer works")).toBeTruthy();
+      expect(screen.getByText(/already opened once/i)).toBeTruthy();
+      expect(screen.queryByText(/we've been notified/i)).toBeNull();
       expect(screen.getByRole("button", { name: /send a new link/i })).toBeTruthy();
       expect(screen.queryByTestId("verified-address")).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
@@ -594,6 +599,10 @@ describe("given the sign-up screen", () => {
       const { container } = renderScreen();
 
       expect(await screen.findByText(/that verification link has expired/i)).toBeTruthy();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Request a new verification email and use the newest link.",
+      );
+      expect(screen.queryByText(/we've been notified/i)).toBeNull();
       expect(screen.getByRole("button", { name: /send a new link/i })).toBeTruthy();
 
       // Nothing was confirmed: no address is held, no method is offered, and
@@ -713,6 +722,45 @@ describe("given the sign-up screen", () => {
       const link = await screen.findByTestId("go-to-sign-in");
       expect(link).toHaveTextContent("Or log in instead");
       expect(link.getAttribute("href")).toBe("/auth/signin?callbackUrl=%2Fsettings");
+    });
+  });
+
+  describe("when account creation or its following log-in is refused", () => {
+    /** @scenario "Sign-up failures read the same way" */
+    it.each(["form validation", "log-in"])("shows %s at the top of the form", async (failure) => {
+      requestVerificationMock.mockResolvedValue({ sent: false, addressProof: "proof" });
+      const formMessage = "Please check your account details.";
+      if (failure === "form validation") {
+        registerMock.mockRejectedValue({
+          data: {
+            error: {
+              code: "validation_error",
+              httpStatus: 422,
+              meta: { formErrors: [formMessage] },
+            },
+          },
+        });
+      } else {
+        registerMock.mockResolvedValue({});
+        signInMock.mockResolvedValue({ error: "INVALID_EMAIL_OR_PASSWORD", status: 401 });
+      }
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findByTestId("unconfirmed-address");
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+      const alert = await screen.findByRole("alert");
+      expect(alert.parentElement?.firstElementChild).toBe(alert);
+      expect(alert.querySelector("svg")).not.toBeNull();
+      expect(alert).toHaveTextContent(
+        failure === "form validation" ? "Check your details" : "Your account was created",
+      );
+      expect(alert).toHaveTextContent(
+        failure === "form validation" ? formMessage : "Invalid email or password.",
+      );
     });
   });
 
