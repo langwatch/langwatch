@@ -25,8 +25,12 @@ export class WebhookEndpointsNotEntitledError extends HandledError {
 export class WebhookEndpointValidationError extends HandledError {
   declare readonly code: "webhook_endpoint_invalid";
 
-  constructor(message: string) {
-    super("webhook_endpoint_invalid", message, { httpStatus: 400, fault: "customer" });
+  constructor(message: string, reason?: "metadata_address" | "private_address") {
+    super("webhook_endpoint_invalid", message, {
+      httpStatus: 400,
+      fault: "customer",
+      ...(reason ? { meta: { reason } } : {}),
+    });
     this.name = "WebhookEndpointValidationError";
   }
 }

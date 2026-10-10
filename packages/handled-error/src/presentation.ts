@@ -5540,8 +5540,12 @@ const presentations = {
     // server's sentence: `meta.message` on this code can carry an internal
     // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
-    describe: () =>
-      "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
+    describe: (error) =>
+      strEq(error, "reason", "metadata_address")
+        ? "That address is reserved for the hosting platform's own services, so webhooks can't be sent to it. Use the address of your own receiving service."
+        : strEq(error, "reason", "private_address")
+          ? "That address is on a private network, so webhooks can't be sent to it. Use a publicly reachable HTTPS address."
+          : "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that

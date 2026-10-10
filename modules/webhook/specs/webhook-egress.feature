@@ -62,6 +62,12 @@ Feature: The fence a customer-supplied webhook leaves through
       Then the destination is refused as a cloud metadata endpoint
 
     @unit
+    Scenario: A refused cloud metadata destination says why on save
+      Given an endpoint saved with a cloud metadata address
+      When the save is refused
+      Then the refusal carries a reason that the endpoint form can word plainly
+
+    @unit
     Scenario: An endpoint save is judged by the rule its delivery is judged by
       Given a process composed with the escape hatch off
       When an endpoint is saved with a loopback or private address, or a non-default port

@@ -58,7 +58,7 @@ function describeHostAddress(url: string): HostAddress {
 }
 
 /** Whether a URL is admitted, or the sentence that says why not (without the caller's label). */
-type WebhookUrlVerdict = { admitted: true } | { admitted: false; reason: string };
+type WebhookUrlVerdict = { admitted: true } | { admitted: false; reason: string; blocked?: "metadata_address" | "private_address" };
 
 /**
  * Judges what the webhook channels refuse pre-connection: a failed shape
@@ -79,6 +79,7 @@ export function judgeWebhookUrl({
     return {
       admitted: false,
       reason: `the destination "${host.host}" is a cloud metadata endpoint, which is not allowed.`,
+      blocked: "metadata_address",
     };
   }
   if (allowInsecureLocal) return { admitted: true };
@@ -86,6 +87,7 @@ export function judgeWebhookUrl({
     return {
       admitted: false,
       reason: `the destination "${host.address}" is a private or loopback address, which is not allowed.`,
+      blocked: "private_address",
     };
   }
   return { admitted: true };

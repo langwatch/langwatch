@@ -400,6 +400,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
   async findOldestPendingInviteForAddress({ address }: { address: string }): Promise<{
     inviteCode: string;
     organizationName: string;
+    inviterName: string | null;
     role: OrganizationUserRole;
   } | null> {
     // Stored as the administrator typed it, so matched case-insensitively.
@@ -409,13 +410,19 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         status: "PENDING",
         OR: [{ expiration: null }, { expiration: { gt: new Date() } }],
       },
-      select: { inviteCode: true, role: true, organization: { select: { name: true } } },
+      select: {
+        inviteCode: true,
+        role: true,
+        organization: { select: { name: true } },
+        requestedByUser: { select: { name: true } },
+      },
       orderBy: { createdAt: "asc" },
     });
     if (invite === null) return null;
     return {
       inviteCode: invite.inviteCode,
       organizationName: invite.organization.name,
+      inviterName: invite.requestedByUser?.name ?? null,
       role: invite.role,
     };
   }

@@ -114,6 +114,7 @@ export const organizationPendingInvitationsForCallerSchema = z.array(
   z.object({
     inviteCode: z.string().min(1),
     organizationName: z.string(),
+    inviterName: z.string().nullable(),
     role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
   }),
 );

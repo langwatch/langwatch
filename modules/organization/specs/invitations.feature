@@ -170,3 +170,9 @@ Feature: Invitation acceptance and role recomputation
     Given an administrator typed an address in the inline invite box
     When the Add members drawer opens with that address
     Then its email field holds the address and has the focus
+
+  @unit
+  Scenario: A signed-in invitation names who invited the person
+    Given an invitation waiting on an address the person has proved
+    When the offer reads the invitation
+    Then it carries the name of the administrator who sent it
