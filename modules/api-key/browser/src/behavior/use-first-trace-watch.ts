@@ -51,6 +51,7 @@ export function useFirstTraceWatch({
     hasPriorTraces,
   });
 
+  const utils = apiKeyApi.useUtils();
   const hasFirstMessage = apiKeyApi.project.getHasFirstMessage.useQuery(
     { projectId: personalProject?.id ?? "" },
     { enabled: polling.enabled, refetchOnWindowFocus: false },
@@ -62,7 +63,16 @@ export function useFirstTraceWatch({
     { projectId: personalProject?.id ?? "" },
     {
       enabled: polling.enabled && hasSeenNeverSynced,
-      onData: () => setIsRedirecting(true),
+      onData: () => {
+        // The traces page we land on reads the same flag; tell it before the server can.
+        if (personalProject) {
+          utils.project.getHasFirstMessage.setData(
+            { projectId: personalProject.id },
+            { firstMessage: true },
+          );
+        }
+        setIsRedirecting(true);
+      },
     },
   );
 

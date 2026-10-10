@@ -79,3 +79,4 @@ Feature: Post-login first-trace watch on the CLI authorize page
     When the project's first trace is received
     Then the page learns of it from a server event, with no timer and without waiting for the stored flag
     And the redirect starts
+    And the traces page it lands on shows the trace, not the empty state

@@ -19,6 +19,7 @@ const { state } = vi.hoisted(() => ({
     firstMessage: void 0 as boolean | undefined,
     lastOptions: void 0 as Record<string, unknown> | undefined,
     refetches: 0,
+    setData: [] as unknown[],
     stream: {
       input: void 0 as unknown,
       enabled: false,
@@ -41,6 +42,13 @@ vi.mock("@langwatch/trace-client", () => ({
 
 vi.mock("../api-key-api.ts", () => ({
   apiKeyApi: {
+    useUtils: () => ({
+      project: {
+        getHasFirstMessage: {
+          setData: (input: unknown, data: unknown) => state.setData.push([input, data]),
+        },
+      },
+    }),
     project: {
       getHasFirstMessage: {
         useQuery: (_input: unknown, options: Record<string, unknown>) => {
@@ -97,6 +105,7 @@ beforeEach(() => {
   state.firstMessage = void 0;
   state.lastOptions = void 0;
   state.refetches = 0;
+  state.setData = [];
   state.stream = { input: void 0, enabled: false, onData: void 0 };
 });
 
@@ -230,6 +239,8 @@ describe("given the watch confirmed the project has never synced a trace", () =>
       rerender(watchElement(host));
       await screen.findByText(/First trace received/);
       expect(state.refetches).toBe(0);
+      // The traces page the redirect lands on reads the flag already true.
+      expect(state.setData).toEqual([[{ projectId: "proj-personal" }, { firstMessage: true }]]);
       expect(state.stream.enabled).toBe(false);
       await act(async () => {
         vi.advanceTimersByTime(FIRST_TRACE_REDIRECT_DELAY_MS);
