@@ -150,6 +150,10 @@
       "types": "./dist/components/brand/full-logo.d.ts",
       "default": "./src/components/brand/full-logo.tsx"
     },
+    "./logo-paths": {
+      "types": "./dist/components/brand/logo-paths.d.ts",
+      "default": "./src/components/brand/logo-paths.ts"
+    },
     "./logo-icon": {
       "types": "./dist/components/brand/logo-icon.d.ts",
       "default": "./src/components/brand/logo-icon.tsx"

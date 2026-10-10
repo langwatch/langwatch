@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
+import { bootSplash } from "./vite/boot-splash";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
@@ -276,6 +277,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // Skipped components are logged by the dev server only; a build stays quiet.
       react({ compiler: command === "serve" ? { logDiagnostics: true } : true }),
       patchObjectInspectBrowserStub(),
+      // The loading screen as plain HTML: before the bundle runs, and on Vite's bundling page.
+      bootSplash(),
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
