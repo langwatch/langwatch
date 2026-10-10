@@ -123,8 +123,8 @@ describe("a process whose module boot fails", () => {
           server.container("worker").boot({ classifyEventLogRetention: () => "traces" }),
         ).rejects.toThrow("module boot failed");
 
-        await expect(statusOf(port, "/readyz")).rejects.toThrow();
-        await expect(statusOf(port, "/healthz")).rejects.toThrow();
+        await expect(statusOf(port, "/readyz")).rejects.toThrow("fetch failed");
+        await expect(statusOf(port, "/healthz")).rejects.toThrow("fetch failed");
       } finally {
         await server.close();
       }
