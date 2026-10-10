@@ -55,25 +55,30 @@ export function AgentTestingPage() {
   const { casesCount, plansCount } = useTabCounts(project?.id ?? "");
   const openPlanTitle = useAgentTestingStore((state) => state.openPlanTitle);
 
+  const header = (
+    <AgentTestingHeader
+      tab={routing.tab}
+      onTabChange={routing.setTab}
+      casesCount={casesCount}
+      plansCount={plansCount}
+      openPlan={routing.tab === "results" ? openPlanTitle : null}
+    />
+  );
+
   return (
     <NowProvider>
-      <VStack width="full" height="full" gap={0}>
-        <AgentTestingHeader
-          tab={routing.tab}
-          onTabChange={routing.setTab}
-          casesCount={casesCount}
-          plansCount={plansCount}
-          openPlan={routing.tab === "results" ? openPlanTitle : null}
-        />
-
-        <Box flex={1} width="full" minHeight={0} overflow="hidden">
-          {routing.tab === "cases" ? (
-            <TestCasesTab />
-          ) : (
-            <ResultsTab isSseConnected={isSseConnected} />
-          )}
+      {routing.tab === "cases" ? (
+        <Box width="full" height="full" overflow="hidden">
+          <TestCasesTab header={header} />
         </Box>
-      </VStack>
+      ) : (
+        <VStack width="full" height="full" gap={0}>
+          {header}
+          <Box flex={1} width="full" minHeight={0} overflow="hidden">
+            <ResultsTab isSseConnected={isSseConnected} />
+          </Box>
+        </VStack>
+      )}
 
       <AgentTestingCaseEditor />
       <RunPlanDialogHost />

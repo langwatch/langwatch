@@ -156,9 +156,14 @@ export function SuiteRail(props: SuiteRailProps) {
   return (
     <Box data-testid="agent-testing-suite-rail" display="flex" flexShrink={0}>
       <SectionNavigationRail
-        label="Test Suites"
+        label="Agent Testing"
         groups={[
-          { links: suiteEntries.map((entry) => entry.link), extra: loadingRows, add: newSuite },
+          {
+            label: "Test Suites",
+            links: suiteEntries.map((entry) => entry.link),
+            extra: loadingRows,
+            add: newSuite,
+          },
           { label: FROM_CODE_HEADING, links: externalEntries.map((entry) => entry.link) },
         ]}
         activeHref={activeHref}
