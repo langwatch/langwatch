@@ -545,7 +545,8 @@ export const designSystemConfig = defineConfig({
         bg: {
           DEFAULT: { value: { _light: "{colors.white}", _dark: "{colors.black}" } },
           // Branch-only roles alias the production main palette.
-          card: { value: "{colors.bg.panel}" },
+          // Dark is the user's chosen ink, not a Chakra step.
+          card: { value: { _light: "{colors.bg.panel}", _dark: "#0f1116" } },
           overlay: { value: "{colors.bg.panel}" },
           nested: { value: "{colors.bg.muted}" },
           raised: { value: "{colors.bg.panel}" },
@@ -623,7 +624,7 @@ export const designSystemConfig = defineConfig({
         // Border semantic tokens - visible in dark mode
         border: {
           // Branch-only roles alias the production main palette.
-          card: { value: "{colors.border}" },
+          card: { value: { _light: "{colors.border}", _dark: "#3a3a44" } },
           nested: { value: "{colors.border.muted}" },
           control: { value: "{colors.border}" },
           strong: { value: "{colors.border.emphasized}" },
@@ -884,10 +885,7 @@ export const designSystemConfig = defineConfig({
           root: {
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
-            // Home's card: the panel at half strength, blurred, so the page shows through
-            // darker than a solid panel and the card reads as one quiet material.
-            background: "bg.card/50",
-            backdropFilter: "blur(12px)",
+            background: "bg.card",
             borderColor: "border.card",
             // Clip children to the rounded border. Square child paints —
             // table row hover/selection/tints, header bands, code blocks —
@@ -917,10 +915,13 @@ export const designSystemConfig = defineConfig({
                 borderColor: "border.nested",
               },
             },
+            // `bg` and `borderColor` by the same keys Chakra's own variants set, so ours win.
             outline: {
               root: {
+                bg: "bg.card",
                 borderWidth: "1px",
                 borderStyle: "solid",
+                borderColor: "border.card",
                 boxShadow: "2xs",
               },
             },
@@ -928,6 +929,7 @@ export const designSystemConfig = defineConfig({
             // governance figures use. A clickable card adds its own hover lift.
             elevated: {
               root: {
+                bg: "bg.card",
                 borderWidth: "1px",
                 borderStyle: "solid",
                 borderColor: "border.card",

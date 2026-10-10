@@ -77,8 +77,18 @@ describe("production main colour parity", () => {
     }
   });
 
+  // The card's dark ink and hairline are chosen, not main's: light still follows main.
   it.each([
-    ["bg.card", "bg.panel"],
+    ["bg.card", "#0f1116"],
+    ["border.card", "#3a3a44"],
+  ])("gives %s its chosen dark value and main's light one", (alias, dark) => {
+    expect(resolve(alias, "_dark")).toBe(dark);
+    expect(resolve(alias, "_light")).toBe(
+      resolve(alias === "bg.card" ? "bg.panel" : "border", "_light"),
+    );
+  });
+
+  it.each([
     ["bg.overlay", "bg.panel"],
     ["bg.raised", "bg.panel"],
     ["bg.nested", "bg.muted"],
@@ -87,7 +97,6 @@ describe("production main colour parity", () => {
     ["bg.selected", "nav.bgActive"],
     ["bg.stripe", "bg.subtle"],
     ["nav.marker", "fg.subtle"],
-    ["border.card", "border"],
     ["border.control", "border"],
     ["border.nested", "border.muted"],
     ["border.strong", "border.emphasized"],
