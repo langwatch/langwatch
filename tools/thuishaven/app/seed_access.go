@@ -18,7 +18,7 @@ type SeedLogin struct {
 	Password string `json:"password"`
 }
 
-// SeedAccess is what `haven seed` hands a tester: where the stack is, who to
+// SeedAccess is what `haven db seed` hands a tester: where the stack is, who to
 // sign in as, and the credentials haven made up for it. Secret values are
 // masked unless the caller asked for them, as `haven env` masks them.
 type SeedAccess struct {
@@ -128,8 +128,8 @@ func (o *Orchestrator) seedAccess(p UpParams, reveal bool) (SeedAccess, error) {
 	}, nil
 }
 
-// printSeedAccess is the block `haven seed` ends with, or its --json object.
-func (o *Orchestrator) printSeedAccess(p UpParams, asJSON, reveal bool) error {
+// PrintSeedAccess is the block `haven db seed` ends with, or its --json object.
+func (o *Orchestrator) PrintSeedAccess(p UpParams, asJSON, reveal bool) error {
 	access, err := o.seedAccess(p, reveal)
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func (o *Orchestrator) printSeedAccess(p UpParams, asJSON, reveal bool) error {
 		}
 	}
 	if !reveal {
-		fmt.Println("haven made these up for this stack; `haven seed --reveal` or `haven env --reveal` shows them")
+		fmt.Println("haven made these up for this stack; `haven db seed --reveal` or `haven env --reveal` shows them")
 	}
 	return nil
 }

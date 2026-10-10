@@ -13,7 +13,7 @@ import type { UserStandingFact } from "../../rules/user-standing.rules.ts";
 import { UserStandingRepository } from "../user-standing.repository.ts";
 
 /** The one read this repository takes off eventing's read seat. */
-type UserLifecycleEventReads = Pick<EventReadSeat, "getEvents">;
+type UserLifecycleEventReads = Pick<EventReadSeat, "findAggregateEvents">;
 type UserStandingEvent = UserDeactivatedEvent | UserReactivatedEvent;
 
 const USER_STANDING_EVENT_TYPES: ReadonlySet<unknown> = new Set([
@@ -36,7 +36,7 @@ export class EventingUserStandingRepository extends UserStandingRepository {
 
   /** The account's deactivated and reactivated facts, oldest first. */
   async findStandingFacts({ userId }: { userId: string }): Promise<UserStandingFact[]> {
-    const events: readonly unknown[] = await this.eventReadSeat.getEvents({
+    const events: readonly unknown[] = await this.eventReadSeat.findAggregateEvents({
       tenantId: createTenantId(userId),
       aggregateType: USER_AGGREGATE_TYPE,
       aggregateId: userId,

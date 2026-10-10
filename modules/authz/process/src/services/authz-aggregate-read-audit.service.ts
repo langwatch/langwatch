@@ -1,4 +1,7 @@
+import { isAggregateProjectKind, type Actor, type Authorization } from "@langwatch/authorization";
+import type { AuthzScopeRef } from "@langwatch/authz-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 
 import type { RecordAggregateReadCommandData } from "../eventing/authz-aggregate-read.events.ts";
 
@@ -13,6 +16,8 @@ type AggregateReadSender = Pick<EventingCommandSender<RecordAggregateReadCommand
 
 /** ADR-177 decision 9: one audit row per actor and aggregate per five minutes. */
 export const AGGREGATE_READ_AUDIT_WINDOW_MS = 5 * 60 * 1000;
+
+const logger = createLogger("langwatch:authz:aggregate-read-audit");
 
 /** Bound on remembered pairs; only caps memory, the window does the rest. */
 const MAX_REMEMBERED_READS = 10_000;
@@ -42,6 +47,36 @@ export class AuthzAggregateReadAuditService {
 
   connect(sender: AggregateReadSender): void {
     this.#sender = sender;
+  }
+
+  /**
+   * A user's read that crosses shared grants into an aggregate is audited. The audit never fails
+   * the read: a failure is logged and the read carries on.
+   */
+  async auditRead({
+    actor,
+    authorization,
+    projectId,
+    findScope,
+  }: {
+    actor: Actor;
+    authorization: Authorization;
+    projectId: string;
+    findScope: () => Promise<AuthzScopeRef | null>;
+  }): Promise<void> {
+    if (actor.type !== "user") return;
+    if (!authorization.grants.some((grant) => grant.kind === "shared")) return;
+    try {
+      const scope = await findScope();
+      if (scope?.type !== "project" || !isAggregateProjectKind(scope.kind)) return;
+      await this.record({
+        actorUserId: actor.id,
+        organizationId: authorization.scope.organizationId,
+        aggregateProjectId: projectId,
+      });
+    } catch (error) {
+      logger.warn({ error, projectId }, "aggregate read audit failed; the read carries on");
+    }
   }
 
   async record(read: AggregateRead): Promise<void> {

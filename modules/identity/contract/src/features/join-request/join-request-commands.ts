@@ -78,6 +78,8 @@ export const requestJoinCommandDataSchema = commandDataSchema({
   notifyAdmins: z.boolean().default(true),
   /** Where the request was made; see `JOIN_REQUEST_ORIGINS`. */
   origin: joinRequestOriginSchema.default(DEFAULT_JOIN_REQUEST_ORIGIN),
+  /** The connection a single sign-on arrival came in through. */
+  connectionId: z.string().min(1).nullable().default(null),
 });
 export type RequestJoinCommandData = z.infer<typeof requestJoinCommandDataSchema>;
 

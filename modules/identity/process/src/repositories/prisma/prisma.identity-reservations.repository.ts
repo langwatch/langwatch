@@ -1,4 +1,5 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 
@@ -43,8 +44,11 @@ export class PrismaIdentityReservationRepository implements IdentityReservationR
     commandId: string;
   }): Promise<IdentifierReservationHolder> {
     const [held] = await this.database.$queryRaw<IdentifierReservationHolder[]>`
-      -- @tenancy: the lock is keyed by a normalized address and claimed
-      -- before any user is known to hold it, which is what it decides.
+      ${skipTenantCheck({
+        // The lock is keyed by a normalized address and claimed before any user is known to hold
+        // it, which is what it decides.
+        SKIP_TENANT_CHECK: true,
+      })}
       INSERT INTO "IdentifierReservation"
         ("normalizedValue", "userId", "identifierId", "commandId")
       VALUES (${normalizedValue}, ${userId}, ${identifierId}, ${commandId})
@@ -87,8 +91,11 @@ export class PrismaIdentityReservationRepository implements IdentityReservationR
    */
   async reapOrphans({ olderThan, limit }: { olderThan: Instant; limit: number }): Promise<number> {
     const orphans = await this.database.$queryRaw<{ normalizedValue: string }[]>`
-      -- @tenancy: the sweep is fleet-wide by construction - it hunts locks
-      -- that no user's live identifier backs.
+      ${skipTenantCheck({
+        // The sweep is fleet-wide by construction - it hunts locks that no user's live identifier
+        // backs.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT r."normalizedValue"
       FROM "IdentifierReservation" r
       LEFT JOIN "Identifier" i

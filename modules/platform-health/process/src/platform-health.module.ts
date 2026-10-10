@@ -21,8 +21,6 @@ export const platformHealthProcessModule: PublishedProcessModule<
   .withChannels(platformHealthChannels)
   .withApi(PlatformHealthModule)
   .withTransports(platformHealthRest, platformHealthProbeRest, platformHealthLangyProbeRest)
-  .withTransportFacts(({ app }) => {
-    if (!(app instanceof PlatformHealthModule))
-      throw new TypeError("Platform health transport requires its constructed application");
-    return [bindRestCredential("internal_secret", () => app.monitorDoor)];
-  });
+  .provideMiddlewareBindings(({ app }) => [
+    bindRestCredential("internal_secret", () => app.monitorDoor),
+  ]);

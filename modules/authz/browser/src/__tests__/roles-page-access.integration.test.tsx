@@ -90,7 +90,7 @@ describe("the Roles & access page", () => {
       await openRolesPage(["organization:manage", "organization:view"]);
 
       expect(await screen.findByText("Admin")).toBeInTheDocument();
-      expect(screen.queryByText("Access Restricted")).not.toBeInTheDocument();
+      expect(screen.queryByText(/You need access to/)).not.toBeInTheDocument();
       expect(authzWeb.installation.screens[ROLES_PAGE]).toMatchObject({
         path: "/settings/roles",
         within: "settings",
@@ -103,8 +103,8 @@ describe("the Roles & access page", () => {
     it("is refused, naming the grant the page needs, and the page stays in the settings chrome", async () => {
       await openRolesPage(["organization:view"]);
 
-      expect(await screen.findByText("Access Restricted")).toBeInTheDocument();
-      expect(screen.getByText("Missing permission: organization:manage")).toBeInTheDocument();
+      expect(await screen.findByText(/You need access to/)).toBeInTheDocument();
+      expect(screen.getByText("organization:manage")).toBeInTheDocument();
       expect(screen.queryByText("Admin")).not.toBeInTheDocument();
       expect(authzWeb.installation.screens[ROLES_PAGE]).toMatchObject({
         requires: "organization:manage",

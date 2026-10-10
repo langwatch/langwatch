@@ -40,7 +40,7 @@ export function ScenarioRunExportDialog({
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Export Scenario Runs</Dialog.Title>
@@ -83,7 +83,7 @@ export function ScenarioRunExportDialog({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={() => onExport({ mode })}>
+            <Button colorPalette="orange" onClick={() => onExport({ mode })}>
               <Download size={16} />
               Export
             </Button>

@@ -115,6 +115,8 @@ export const projectTraceSharingDisabledEventDataSchema = z.object({
   organizationId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   disabledByUserId: z.string().min(1),
+  /** Absent on facts recorded before the choice existed; absent means revoke. */
+  revokeExistingLinks: z.boolean().optional(),
 });
 export type ProjectTraceSharingDisabledEventData = z.infer<
   typeof projectTraceSharingDisabledEventDataSchema

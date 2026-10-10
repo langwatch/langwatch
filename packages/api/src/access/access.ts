@@ -161,6 +161,8 @@ export type Credential =
   | "instance_admin"
   | "session_key"
   | "cli_token"
+  | "otlp_ingest"
+  | "licence_token"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -414,15 +416,26 @@ export function anyAuthenticated({ reason }: { reason: string }): AuthenticatedR
  * one is resolved as ever, one presenting none is handed a null actor and a
  * null scope. `reason` is why the answer is safe to give either way.
  */
-export type OptionalCredentialAccess = Readonly<{ kind: "optional"; reason: string }>;
+export type OptionalCredentialAccess = Readonly<{
+  kind: "optional";
+  reason: string;
+  /** `"anonymous"`: a credential the door refuses is answered as none (W02, Alex 2026-10-10). */
+  refused?: "anonymous";
+}>;
 
 /** Declares one route answerable with or without the family's credential. */
-export function optionalCredential({ reason }: { reason: string }): OptionalCredentialAccess {
+export function optionalCredential({
+  reason,
+  refused,
+}: {
+  reason: string;
+  refused?: "anonymous";
+}): OptionalCredentialAccess {
   if (reason.trim() === "") {
     throw new Error("optionalCredential needs a written reason for answering without a credential");
   }
 
-  return Object.freeze({ kind: "optional", reason });
+  return Object.freeze({ kind: "optional", reason, ...(refused ? { refused } : {}) });
 }
 
 /**
@@ -677,6 +690,7 @@ export function securityRequirement(credential: Credential): readonly Record<str
     case "project":
     case "api_key":
     case "session_key":
+    case "otlp_ingest":
       return [{ project_api_key: [] }];
     case "organization":
       return [{ admin_api_key: [] }];
@@ -694,6 +708,7 @@ export function securityRequirement(credential: Credential): readonly Record<str
       return [{ instance_admin_key: [] }];
     case "public":
       return [];
+    case "licence_token":
     case "browser":
       throw new Error(
         `a "${credential}" route has no security scheme an API client can satisfy, ` +
@@ -943,15 +958,38 @@ export function declaredPermissions(declaration: AccessDeclaration): readonly Au
   }
 }
 
-/** ADR-177 decision 8: a write under a project-tier permission is refused on an aggregate. */
+/** Whether a write is asked on an aggregate: a project-tier write, or a route that declared it. */
+export function asksAggregateWrite({
+  permissions,
+  scope,
+  refusedOnAggregate = false,
+}: {
+  permissions: readonly AuthzPermission[];
+  scope: AuthzDeclaredScopeId | AuthzHandlerScope | null;
+  refusedOnAggregate?: boolean;
+}): boolean {
+  return scope?.tier === "project" && (refusedOnAggregate || permissions.some(writesUnderProject));
+}
+
+/**
+ * ADR-177 decision 8: a write under a project-tier permission is refused on an aggregate, and so
+ * is a route that declared `refusedOnAggregate()` though its permission is exempt.
+ */
 export function refuseWriteUnderAggregate({
   permissions,
   scope,
+  refusedOnAggregate = false,
 }: {
   permissions: readonly AuthzPermission[];
   scope: AuthzHandlerScope | null;
+  refusedOnAggregate?: boolean;
 }): void {
-  if (scope?.tier !== "project" || !permissions.some(writesUnderProject)) return;
+  if (
+    scope?.tier !== "project" ||
+    !asksAggregateWrite({ permissions, scope, refusedOnAggregate })
+  ) {
+    return;
+  }
 
   assertProjectAcceptsWrites({ kind: scope.kind });
 }

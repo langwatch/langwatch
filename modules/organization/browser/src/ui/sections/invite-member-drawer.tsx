@@ -3,6 +3,7 @@
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { UiInviteMemberDrawerProps } from "@langwatch/organization-contract";
 import type React from "react";
+import { useRef } from "react";
 
 import { api } from "../../behavior/organization-api.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
@@ -20,6 +21,7 @@ export function InviteMemberDrawer({
   const { organization } = useOrganizationTeamProject();
   const host = useOrganizationHost();
   const { closeDrawer } = useDrawer();
+  const bodyRef = useRef<HTMLDivElement>(null);
   const queryClient = api.useUtils();
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY ?? false;
@@ -57,6 +59,8 @@ export function InviteMemberDrawer({
       open={open}
       placement="end"
       size="lg"
+      // Else the dialog focuses its Close button and typing from the inline box is lost.
+      initialFocusEl={() => bodyRef.current?.querySelector("input") ?? null}
       onOpenChange={({ open: isOpen }) => {
         if (!isOpen) closeDrawer();
       }}
@@ -68,7 +72,7 @@ export function InviteMemberDrawer({
           </Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>
-        <Drawer.Body>
+        <Drawer.Body ref={bodyRef}>
           {organization && (
             <AddMembersForm
               teamOptions={teamOptions}

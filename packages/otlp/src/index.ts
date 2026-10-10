@@ -42,6 +42,7 @@ export {
   type OtlpDoorRefusal,
   type OtlpDoorRequest,
   type OtlpSignal,
+  otlpSourcePolicySchema,
   type OtlpSourcePolicy,
 } from "./door.ts";
 export {

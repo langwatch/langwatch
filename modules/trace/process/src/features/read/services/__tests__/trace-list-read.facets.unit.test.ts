@@ -7,6 +7,7 @@
 import type { Authorization } from "@langwatch/authorization";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
+  type BatchedFacetResult,
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
   type TraceListRead,
@@ -246,7 +247,7 @@ describe("the sidebar's facet counts", () => {
         }),
         repositoryFor: () =>
           recordingRepository({
-            batchedFacets: async ({ table }) => ({
+            batchedFacets: async ({ table }): Promise<BatchedFacetResult> => ({
               categoricals:
                 table === "trace_summaries"
                   ? {

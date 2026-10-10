@@ -49,7 +49,14 @@ import type {
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst, pickHighestRelease } from "./release.ts";
 import { parseRunPhases } from "./run-phase-view.ts";
-import { filterSteps, mergeSteps, viewDeclaredStep, viewRecordedStep } from "./step-view.ts";
+import {
+  filterSteps,
+  imageReleaseRow,
+  mergeSteps,
+  UNRELEASED_IMAGE,
+  viewDeclaredStep,
+  viewRecordedStep,
+} from "./step-view.ts";
 
 const DEFAULT_RUN_PAGE = 25;
 const MAX_RUN_PAGE = 100;
@@ -120,8 +127,12 @@ function pickLiveLease({ leases }: { leases: readonly LedgerLeaseRow[] }): Ledge
   return newest[0] ?? null;
 }
 
-/** The installed release: the newest succeeded run's, else the highest a settled step carries. */
-function pickInstalled({
+/**
+ * The installed release: the newest succeeded run's, else the highest a settled step carries. An
+ * upgrade by an unreleased image installed past every release, so it reads unreleased, never a
+ * stale release below the floor (as the gate's `assertCurrent` treats an unreleased build).
+ */
+export function pickInstalled({
   succeededRun,
   stepFacts,
 }: {
@@ -134,6 +145,7 @@ function pickInstalled({
       origin: succeededRun.kind === "seed" ? "inferred" : "recorded",
     };
   }
+  if (succeededRun) return { installed: UNRELEASED_IMAGE, origin: "recorded" };
   const settled = stepFacts
     .filter((step) => step.status === "done" || step.status === "not-needed")
     .flatMap((step) => (step.release === null ? [] : [step.release]));
@@ -186,13 +198,14 @@ function summariseReleases({
   const byRelease = new Map<string | null, UpgradeStepView[]>();
   for (const step of steps)
     byRelease.set(step.release, [...(byRelease.get(step.release) ?? []), step]);
-  if (!byRelease.has(image.release)) byRelease.set(image.release, []);
+  const imageRow = imageReleaseRow({ release: image.release });
+  if (!byRelease.has(imageRow)) byRelease.set(imageRow, []);
   return [...byRelease.entries()]
     .toSorted(([left], [right]) => compareReleasesNewestFirst({ left, right }))
     .map(([release, members]) => ({
       release,
-      installed: release !== null && release === installed,
-      image: release === image.release,
+      installed: installed !== null && release === imageReleaseRow({ release: installed }),
+      image: release === imageRow,
       stepCount: members.length,
       counts: countBy({ items: members, key: (step) => step.status }),
     }));
@@ -214,13 +227,13 @@ function planFactsFrom({
     const kind = upgradeRunKindSchema.safeParse(run.kind);
     const outcome = upgradeRunOutcomeSchema.nullable().safeParse(run.outcome);
     if (!kind.success || !outcome.success) return [];
-    const { release, floor, started_at: startedAt } = run;
-    return [{ kind: kind.data, outcome: outcome.data, release, floor, startedAt }];
+    const { release, floor, plan, started_at: startedAt } = run;
+    return [{ kind: kind.data, outcome: outcome.data, release, floor, plan, startedAt }];
   });
   return { steps, runs };
 }
 
-/** The ledger as the planner reads it; an empty or absent one is read from the tools' records. */
+/** As the runner: the ledger once a seed run succeeded, else the tools' records. */
 async function readPlanFacts({
   repository,
   tables,
@@ -236,7 +249,8 @@ async function readPlanFacts({
     repository.findStepFacts({ tables }),
     repository.findRunFacts({ tables }),
   ]);
-  if (stepRows.length > 0 || runRows.length > 0) return planFactsFrom({ stepRows, runRows });
+  const seeded = runRows.some((run) => run.kind === "seed" && run.outcome === "succeeded");
+  if (seeded) return planFactsFrom({ stepRows, runRows });
   const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
   const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
   return { steps: [...prisma, ...goose], runs: [] };
@@ -305,6 +319,7 @@ export function createUpgradeReader({
       steps: facts.stepFacts,
       failedTargets: facts.failedTargets,
       holdsLease: facts.holdsLease,
+      lastRunFailed: facts.latestRun?.outcome === "failed",
     });
     return {
       ...verdict,

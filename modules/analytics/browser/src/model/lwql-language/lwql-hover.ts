@@ -1,6 +1,6 @@
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
 
-import { datasetsInScope, findDataset, LWQL_NAMESPACE, type LwqlScopeEntry } from "./lwql-scope.ts";
+import { datasetsInScope, findDataset, type LwqlScopeEntry } from "./lwql-scope.ts";
 
 export type LwqlHover = Readonly<{
   /** Markdown paragraphs, first is the heading line. */
@@ -10,6 +10,7 @@ export type LwqlHover = Readonly<{
 }>;
 
 const WORD = /[A-Za-z_]\w*/g;
+const RELATION_TAIL = /\b(?:from|join)\s+(?:[A-Za-z_]\w*\.)?$/i;
 
 function wordAt({ text, offset }: { text: string; offset: number }) {
   for (const match of text.matchAll(WORD)) {
@@ -88,7 +89,7 @@ function datasetHover({
   return {
     ...located,
     contents: paragraphs(
-      `**${LWQL_NAMESPACE}.${dataset.name}** · ${dataset.grain}`,
+      `**${dataset.name}** · ${dataset.grain}`,
       dataset.description,
       dataset.timeColumn && `Time column: \`${dataset.timeColumn}\``,
       dataset.freshness && `Freshness: ${dataset.freshness}`,
@@ -110,8 +111,9 @@ export function lwqlHoverAt({
   const found = schema && wordAt({ text, offset });
   if (!schema || !found) return undefined;
   const located = { start: found.start, end: found.end };
-  const qualifier = /([A-Za-z_]\w*)\.$/.exec(text.slice(0, found.start))?.[1]?.toLowerCase();
-  if (qualifier === LWQL_NAMESPACE) return datasetHover({ schema, word: found.word, located });
+  const head = text.slice(0, found.start);
+  if (RELATION_TAIL.test(head)) return datasetHover({ schema, word: found.word, located });
+  const qualifier = /([A-Za-z_]\w*)\.$/.exec(head)?.[1]?.toLowerCase();
   const entries = datasetsInScope({ schema, text }).filter(
     (entry) => qualifier === undefined || entry.qualifier.toLowerCase() === qualifier,
   );

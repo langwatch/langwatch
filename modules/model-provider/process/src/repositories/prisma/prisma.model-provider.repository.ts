@@ -7,6 +7,7 @@ import {
   type ModelProvider,
   type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type PrismaClient,
   type ModelProvider as PrismaModelProvider,
@@ -276,7 +277,10 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
         SELECT 1 FROM "ModelProviderScope" s
         WHERE s."modelProviderId" = p."id" AND s."scopeType" = 'PROJECT'
       )
-      -- @tenancy: model provider legacy-column sweep, every organization (upgrade step, worker)
+      ${skipTenantCheck({
+        // Model provider legacy-column sweep, every organization (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return legacyColumnsRowsSchema
       .parse(rows)

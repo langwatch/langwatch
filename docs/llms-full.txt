@@ -70500,6 +70500,12 @@ Check your existing PVC name:
 kubectl -n langwatch get pvc
 ```
 
+## Known Issues
+
+### 3.20.1 drops OTLP/JSON spans with no attributes
+
+LangWatch 3.20.1 drops an OTLP/JSON span that has no `attributes` array, but still answers `2xx`, so the SDK reports success. The api logs `Error parsing OTLP span, dropping` once per lost span. OTLP allows a span with no attributes, and later releases accept it. Spans sent to 3.20.1 this way are not recovered by upgrading; upgrade to stop the loss.
+
 ## Version Compatibility
 
 | Chart Version | App Version | Kubernetes | Helm  | Data Store                |

@@ -99,6 +99,8 @@ class TracesRoute extends UiRoute {
 
 class SilentFeedback extends UiFeedback {
   succeeded(): void {}
+  warned(): void {}
+  informed(): void {}
   failed(): void {}
 }
 

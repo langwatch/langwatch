@@ -618,8 +618,8 @@ func (run *session) havenBackendLog(ctx context.Context, stack Stack) string {
 // worktree that will not go must not stop the rest from being cleaned up.
 func (run *session) teardownHaven(ctx context.Context) error {
 	if run.request.Options.Keep {
-		fmt.Fprintf(run.streams.Err, "teardown: -keep set, leaving the stacks up - `haven destroy %s` when you are done\n",
-			strings.Join(run.havenSlugs, "` and `haven destroy "))
+		fmt.Fprintf(run.streams.Err, "teardown: -keep set, leaving the stacks up - `haven down --destroy --stack %s` when you are done\n",
+			strings.Join(run.havenSlugs, "` and `haven down --destroy --stack "))
 		return nil
 	}
 	run.releaseWorktrees()
@@ -628,10 +628,10 @@ func (run *session) teardownHaven(ctx context.Context) error {
 	}
 	var problems []string
 	for _, slug := range run.havenSlugs {
-		fmt.Fprintf(run.streams.Err, "teardown: haven destroy %s\n", slug)
+		fmt.Fprintf(run.streams.Err, "teardown: haven down --destroy --stack %s\n", slug)
 		spec := commandSpec{name: havenrun.Command, args: havenrun.DestroyArgs(slug), dir: run.request.Options.Root, env: havenEnv(run.request.Deps.Environ(), slug)}
 		if err := run.request.Deps.Run(ctx, spec, run.streams.Err); err != nil {
-			problems = append(problems, fmt.Sprintf("haven destroy %s: %v", slug, err))
+			problems = append(problems, fmt.Sprintf("haven down --destroy --stack %s: %v", slug, err))
 		}
 	}
 	for _, dir := range run.created {
@@ -663,10 +663,10 @@ func (run *session) detachDestroy() error {
 	log := filepath.Join(run.request.Options.RunDir, "teardown.log")
 	var problems []string
 	for _, slug := range run.havenSlugs {
-		fmt.Fprintf(run.streams.Err, "teardown: haven destroy %s in the background (log %s)\n", slug, log)
+		fmt.Fprintf(run.streams.Err, "teardown: haven down --destroy --stack %s in the background (log %s)\n", slug, log)
 		spec := commandSpec{name: havenrun.Command, args: havenrun.DestroyArgs(slug), dir: run.request.Options.Root, env: havenEnv(run.request.Deps.Environ(), slug)}
 		if err := run.request.Deps.Detach(spec, log); err != nil {
-			problems = append(problems, fmt.Sprintf("haven destroy %s: %v", slug, err))
+			problems = append(problems, fmt.Sprintf("haven down --destroy --stack %s: %v", slug, err))
 		}
 	}
 	if len(problems) == 0 {

@@ -14,11 +14,11 @@ import (
 type Selection struct {
 	// Mode is the sticky deployment mode (`haven up --mode <m>`); "" is none.
 	Mode string `json:"mode,omitempty"`
-	// Held is sticky `haven up --watch=false`: the Node host does not reload on
-	// a file change (LANGWATCH_DEV_WATCH=0); `haven reload` applies changes.
-	Held    bool `json:"held,omitempty"`
-	Gateway bool `json:"gateway"`
-	NLP     bool `json:"nlp"`
+	// Refresh is what this `haven up` refreshes on a file change (ADR-064
+	// amendment 2026-10-10 b). Never saved: a plain `up` is always still.
+	Refresh RefreshMode `json:"-"`
+	Gateway bool        `json:"gateway"`
+	NLP     bool        `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.
@@ -27,7 +27,7 @@ type Selection struct {
 	// SCIM + domain verification) is one small Go process, and having a
 	// login-capable IdP always routed makes identity flows testable without a
 	// setup step. Worktrees that don't want it say `haven up -idp` once.
-	// `haven idp` runs the simulator alone, with no stack at all.
+	// `haven sim idp` runs the simulator alone, with no stack at all.
 	IDP bool `json:"idp"`
 	// Mail is the local mail sink (mailsim), on by default for the same reason
 	// as IDP: it is one small Go process, and having it always routed means an
@@ -80,7 +80,37 @@ type Selection struct {
 	// small Go process that sends nothing until asked, and its console is
 	// always routed. Worktrees that don't want it say `haven up -telemetry`.
 	Telemetry bool `json:"telemetry"`
+	// Lambda is the NLP Lambda fleet stand-in (lambdasim). Off by default: it
+	// names a fleet, so studio runs take the per-project Lambda path through
+	// lambdasim to this stack's nlpgo. `haven up +lambda` once.
+	Lambda bool `json:"lambda"`
 }
+
+// RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
+// watch (`--watch`: one-shot UI builds, Node reload, Go rebuild) or hmr
+// (`--hmr`: the same with Vite bundledDev and HMR for the UI).
+type RefreshMode string
+
+const (
+	RefreshStill RefreshMode = ""
+	RefreshWatch RefreshMode = "watch"
+	RefreshHMR   RefreshMode = "hmr"
+)
+
+// Name is how status spells the mode: still, watch or hmr.
+func (m RefreshMode) Name() string {
+	if m == RefreshStill {
+		return "still"
+	}
+	return string(m)
+}
+
+// IsBuiltUI is whether app.<slug> is the api serving a production build of
+// apps/ui, as production does, with no Vite: every mode but hmr.
+func (s Selection) IsBuiltUI() bool { return s.Refresh != RefreshHMR }
+
+// IsStill is whether nothing refreshes on a file change; `haven reload` applies changes.
+func (s Selection) IsStill() bool { return s.Refresh == RefreshStill }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
 // gateway, nlp, the idp, mail, storage, payment and telemetry simulators — no
@@ -90,7 +120,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -192,6 +222,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Payment = on
 	case TelemetryService:
 		sel.Telemetry = on
+	case LambdaService:
+		sel.Lambda = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -201,7 +233,7 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 // SelectionFromStack derives what a running stack actually runs, so a plain
 // `up` can tell "already matches the selection" from "needs a restart".
 func SelectionFromStack(st Stack) Selection {
-	var sel Selection
+	sel := Selection{Refresh: st.Refresh}
 	for _, svc := range st.Services {
 		local := svc.Port != 0 && !svc.IsFallback
 		switch svc.Name {
@@ -235,6 +267,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Payment = local
 		case TelemetryService:
 			sel.Telemetry = local
+		case LambdaService:
+			sel.Lambda = local
 		}
 	}
 	return sel
@@ -301,6 +335,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Outbound, OutboundService)
 	add(s.Payment, PaymentService)
 	add(s.Telemetry, TelemetryService)
+	add(s.Lambda, LambdaService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)

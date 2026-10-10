@@ -11,8 +11,8 @@ import type { IdentityEvent } from "../../eventing/identity-state.projection.ts"
 import { identityHistoryEntries, linkProposalsOf } from "../../rules/identity-history.rules.ts";
 import { IdentityHistoryRepository } from "../identity-history.repository.ts";
 
-/** The one read this repository takes off eventing's read seat. */
-type IdentityEventReads = Pick<EventReadSeat, "getEvents">;
+/** The one read this repository takes: one person's user_identity stream. */
+type IdentityEventReads = Pick<EventReadSeat, "findAggregateEvents">;
 
 /** Every fact the user_identity aggregate states: the MFA facts share it and the panel. */
 const USER_IDENTITY_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set([
@@ -21,8 +21,8 @@ const USER_IDENTITY_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set([
 ]);
 
 /**
- * The identity log itself, read through eventing's read seat, which answers in a process that
- * only sends commands too: the history panel and the proposals are both folds of the same scan.
+ * The identity log itself, read through eventing's read seat so a producer-only api answers it
+ * too (WEB-9103): the history panel and the proposals are both folds of the same scan.
  */
 export class EventingIdentityHistoryRepository extends IdentityHistoryRepository {
   static create(deps: { eventReadSeat: IdentityEventReads }): EventingIdentityHistoryRepository {
@@ -47,9 +47,8 @@ export class EventingIdentityHistoryRepository extends IdentityHistoryRepository
     return linkProposalsOf({ userId, events: await this.readEvents({ userId }) });
   }
 
-  /** A person's identity facts live in their own tenant, on the aggregate named after them. */
   private async readEvents({ userId }: { userId: string }): Promise<readonly IdentityEvent[]> {
-    const events: readonly unknown[] = await this.eventReadSeat.getEvents({
+    const events = await this.eventReadSeat.findAggregateEvents({
       tenantId: createTenantId(userId),
       aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
       aggregateId: userId,

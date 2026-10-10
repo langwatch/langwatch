@@ -1,6 +1,6 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
@@ -78,7 +78,7 @@ type Credential =
   | { kind: "project" }
   | { kind: "apiKey"; holds: (input: { permission: string; scopeId: string }) => boolean };
 
-/** The credential is what the route's caller fact names; the grants are what authz answers. */
+/** The credential is what the route's caller context names; the grants are what authz answers. */
 async function mountedCreate(
   credential: Credential,
   { oneTimeReveals }: { oneTimeReveals?: SecretApi } = {},
@@ -102,6 +102,7 @@ async function mountedCreate(
           organizationId: ORGANIZATION_ID,
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         };
   };
   const app = await GatewayModule.create({
@@ -120,12 +121,20 @@ async function mountedCreate(
         findIdentity: async (id) => identity(id),
         listIdsByOrganization: async () => [...PROJECT_TEAMS.keys()],
         listTraceDestinations: async (projectIds) =>
-          projectIds.map((id) => ({ id, teamId: PROJECT_TEAMS.get(id) ?? "", archivedAt: null })),
+          projectIds.map((id) => ({
+            id,
+            teamId: PROJECT_TEAMS.get(id) ?? "",
+            archivedAt: null,
+            kind: "application",
+          })),
         resolveTraceDestination: async ({ projectScopeIds, traceProjectId }) => {
           const id = traceProjectId ?? (projectScopeIds.length === 1 ? projectScopeIds[0] : null);
           const teamId = id === null || id === undefined ? undefined : PROJECT_TEAMS.get(id);
           return id && teamId
-            ? { outcome: "resolved", project: { id, teamId, archivedAt: null } }
+            ? {
+                outcome: "resolved",
+                project: { id, teamId, archivedAt: null, kind: "application" },
+              }
             : { outcome: "no_destination" };
         },
       }),
@@ -138,6 +147,7 @@ async function mountedCreate(
       traces: createApiFixture({}),
       oneTimeReveals: oneTimeReveals ?? createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {
@@ -180,10 +190,10 @@ async function mountedCreate(
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayRestCredential, () => ({ kind: "legacyProjectKey" as const })),
-      bindRestMiddleware(gatewayKeyCaller, () => caller),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => caller),
+    middlewareContext: [
+      bindMiddlewareContext(gatewayRestCredential, () => ({ kind: "legacyProjectKey" as const })),
+      bindMiddlewareContext(gatewayKeyCaller, () => caller),
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => caller),
     ],
   });
   const call = async (

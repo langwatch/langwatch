@@ -88,6 +88,14 @@ export const stackHomeSchema = z.object({
   }),
   /** The upgrade gate's refusal while it holds the api, "" otherwise. */
   belowFloor: z.string(),
+  /** The seed console: what `haven db seed` takes, its last status line and log tail. */
+  seed: z.object({
+    canSeed: z.boolean(),
+    sizes: z.array(z.string()),
+    personas: z.array(z.string()),
+    status: z.string(),
+    log: z.array(z.string()),
+  }),
 });
 export type StackHome = z.infer<typeof stackHomeSchema>;
 
@@ -197,3 +205,120 @@ export const actionAnswerSchema = z.union([
 ]);
 
 export const revealedKeySchema = z.object({ apiKey: z.string() });
+
+/*
+ * `GET /api/stacks/<slug>/cli/<name>` (clireads.go): the {"v":1,...} envelope
+ * around the rows `haven <name> --json` prints for this stack.
+ */
+export const cliReadSchema = <Rows extends z.ZodType>({ rows }: { rows: Rows }) =>
+  z.object({ v: z.literal(1), stack: z.string(), rows });
+
+export const simRowSchema = z.object({
+  name: z.string(),
+  running: z.boolean(),
+  console: z.string().optional(),
+  start: z.string().optional(),
+  verbs: z.array(z.string()).nullable(),
+  skill: z.string(),
+});
+export type SimRow = z.infer<typeof simRowSchema>;
+
+/** A one-shot lane of the last up; duration is Go's nanoseconds. */
+export const jobRunSchema = z.object({
+  name: z.string(),
+  time: z.string(),
+  duration: z.number(),
+  exit: z.number(),
+  output: z.array(z.string()).optional(),
+});
+export type JobRun = z.infer<typeof jobRunSchema>;
+
+export const storeStatSchema = z.object({
+  name: z.string(),
+  measure: z.string(),
+  used: z.number(),
+  limit: z.number(),
+  unit: z.string(),
+});
+export type StoreStat = z.infer<typeof storeStatSchema>;
+
+/** One distinct failure of `haven errors`, grouped and counted. */
+export const errorGroupSchema = z.object({
+  signature: z.string(),
+  message: z.string(),
+  lane: z.string(),
+  app: z.string(),
+  count: z.number(),
+  firstSeen: z.string(),
+  lastSeen: z.string(),
+});
+export type ErrorGroup = z.infer<typeof errorGroupSchema>;
+
+/** The orb's page buffer and feedback (tools/thuishaven/adapters/orbstore). */
+export const consoleEntrySchema = z.object({ level: z.string(), text: z.string(), at: z.string() });
+export type ConsoleEntry = z.infer<typeof consoleEntrySchema>;
+
+export const pageRequestSchema = z.object({
+  method: z.string(),
+  url: z.string(),
+  status: z.number(),
+  durationMs: z.number(),
+  failed: z.boolean(),
+  at: z.string(),
+});
+export type PageRequest = z.infer<typeof pageRequestSchema>;
+
+export const feedbackSchema = z.object({
+  id: z.string(),
+  receivedAt: z.string(),
+  resolvedAt: z.string().optional(),
+  screenshot: z.string().optional(),
+  note: z.string(),
+  route: z.string(),
+  url: z.string(),
+});
+export type Feedback = z.infer<typeof feedbackSchema>;
+
+/** `haven browser status --json`: the stack's shared browser and its open lanes. */
+export const browserStatusSchema = z.object({
+  running: z.boolean(),
+  pid: z.number().optional(),
+  lanes: z.array(z.string()).optional(),
+});
+export type BrowserStatus = z.infer<typeof browserStatusSchema>;
+
+/** `haven browser snapshot --lane <lane> --json`: the page's accessibility tree. */
+export const browserSnapshotSchema = z.object({
+  url: z.string(),
+  title: z.string(),
+  snapshot: z.string(),
+});
+export type BrowserSnapshot = z.infer<typeof browserSnapshotSchema>;
+
+/** `haven obs traces|metrics|profiles --json`; durations are Go's nanoseconds. */
+export const rootSpanSchema = z.object({
+  traceId: z.string(),
+  time: z.string(),
+  service: z.string(),
+  name: z.string(),
+  duration: z.number(),
+  error: z.boolean(),
+});
+export type RootSpan = z.infer<typeof rootSpanSchema>;
+
+export const seriesSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  samples: z.array(z.number()).nullable(),
+});
+export type Series = z.infer<typeof seriesSchema>;
+
+const profileEntrySchema = z.object({ function: z.string(), share: z.number() });
+export type ProfileEntry = z.infer<typeof profileEntrySchema>;
+
+export const serviceProfileSchema = z.object({
+  service: z.string(),
+  cpu: z.array(profileEntrySchema).nullable(),
+  heap: z.array(profileEntrySchema).nullable(),
+});
+export type ServiceProfile = z.infer<typeof serviceProfileSchema>;

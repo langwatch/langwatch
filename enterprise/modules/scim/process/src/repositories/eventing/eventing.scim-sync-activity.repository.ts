@@ -11,15 +11,14 @@ import type { ScimSyncEvent } from "../../eventing/scim-sync-state.projection.ts
 import { scimSyncActivityOutcome } from "../../rules/scim-sync-activity.rules.ts";
 import { ScimSyncActivityRepository } from "../scim-sync-activity.repository.ts";
 
-/** The one read this repository takes off eventing's read seat. */
-type ScimSyncEventReads = Pick<EventReadSeat, "getEvents">;
+/** The one read this repository takes: one connection's scim_sync stream. */
+type ScimSyncEventReads = Pick<EventReadSeat, "findAggregateEvents">;
 
 const SCIM_SYNC_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SCIM_SYNC_EVENT_TYPES);
 
 /**
- * The directory-sync log itself, read through eventing's read seat, which answers in a process
- * that only sends commands too. Every scim_sync payload carries ids, enums and counts only
- * (ADR-101 §4).
+ * The directory-sync log itself, read through eventing's read seat so a producer-only api answers
+ * it too (WEB-9103). Every scim_sync payload carries ids, enums and counts only (ADR-101 §4).
  */
 export class EventingScimSyncActivityRepository extends ScimSyncActivityRepository {
   static create(deps: { eventReadSeat: ScimSyncEventReads }): EventingScimSyncActivityRepository {
@@ -39,7 +38,7 @@ export class EventingScimSyncActivityRepository extends ScimSyncActivityReposito
     connectionId: string;
     limit: number;
   }): Promise<readonly ScimSyncActivityEntry[]> {
-    const events: readonly unknown[] = await this.eventReadSeat.getEvents({
+    const events = await this.eventReadSeat.findAggregateEvents({
       tenantId: createTenantId(organizationId),
       aggregateType: SCIM_SYNC_AGGREGATE_TYPE,
       aggregateId: scimSyncIdFor({ connectionId }),

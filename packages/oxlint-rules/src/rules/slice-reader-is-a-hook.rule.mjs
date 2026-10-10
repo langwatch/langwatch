@@ -14,7 +14,7 @@ export const sliceReaderIsAHookRule = defineRule({
     sliceReaderName: {
       what: "`{{name}}` holds a `{{factory}}(...)` reader, which is a hook.",
       why: "The React Compiler caches a call to a non-`use` name, so the hook runs on one render and not the next.",
-      fix: "Rename it `use{{suggestion}}` and call it only where a hook may be called.",
+      fix: "Rename it `use{{suggestion}}` and call it only where a hook may be called. Read the `browser-module` skill.",
     },
   },
   create(context) {

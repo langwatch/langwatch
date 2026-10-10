@@ -17,8 +17,7 @@ import {
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
-  type RestTransportDeclaration,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
@@ -56,11 +55,7 @@ function response(
 
 export const AGENTS_ALIAS_SUCCESSOR = "/api/v1/agents";
 
-export const agentLegacyRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<AgentApi>;
-}> = defineRestRouter(AgentApi)
+export const agentLegacyRest = defineRestRouter(AgentApi)
   .withNamespace("agents")
   .withVersion(MANAGEMENT_API_VERSION)
   // The bare path was never aliased: `/api/v1/agents` is the SUCCESSOR family,
@@ -77,13 +72,13 @@ export const agentLegacyRest: Readonly<{
   .withPermission("project:view")
   .withOutput(legacyListResponse)
   .withDocs({ summary: "List agents; superseded by /api/v1/agents", hide: true })
-  .withMiddleware(projectRestFacts)
-  .handle(async ({ app, input, scope }, facts) => {
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, context) => {
     const page = await app.list({ ...input, projectId: scope.id });
 
     return {
       ...page,
-      data: page.data.map((agent) => response(agent, app, facts.projectSlug)),
+      data: page.data.map((agent) => response(agent, app, context.projectSlug)),
     };
   })
 
@@ -93,11 +88,11 @@ export const agentLegacyRest: Readonly<{
   .withOutput(legacyResponse)
   .withStatus(201)
   .withDocs({ summary: "Create an agent; superseded by /api/v1/agents", hide: true })
-  .withMiddleware(projectRestFacts)
-  .handle(async ({ app, input, scope }, facts) => {
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, context) => {
     const agent = await app.create({ ...input, projectId: scope.id });
 
-    return response(agent, app, facts.projectSlug);
+    return response(agent, app, context.projectSlug);
   })
 
   .get("/:id", "getAgent")
@@ -105,9 +100,9 @@ export const agentLegacyRest: Readonly<{
   .withPermission("project:view")
   .withOutput(legacyResponse)
   .withDocs({ summary: "Get an agent; superseded by /api/v1/agents", hide: true })
-  .withMiddleware(projectRestFacts)
-  .handle(async ({ app, input, scope }, facts) =>
-    response(await app.getById({ ...input, projectId: scope.id }), app, facts.projectSlug),
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, context) =>
+    response(await app.getById({ ...input, projectId: scope.id }), app, context.projectSlug),
   )
 
   .patch("/:id", "updateAgent")
@@ -116,9 +111,9 @@ export const agentLegacyRest: Readonly<{
   .withPermission("project:update")
   .withOutput(legacyResponse)
   .withDocs({ summary: "Update an agent; superseded by /api/v1/agents", hide: true })
-  .withMiddleware(projectRestFacts)
-  .handle(async ({ app, input, scope }, facts) =>
-    response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, context) =>
+    response(await app.update({ ...input, projectId: scope.id }), app, context.projectSlug),
   )
 
   .put("/:id", "replaceAgent")
@@ -130,9 +125,9 @@ export const agentLegacyRest: Readonly<{
     summary: "Update an agent (PUT keeps partial semantics); superseded by /api/v1/agents",
     hide: true,
   })
-  .withMiddleware(projectRestFacts)
-  .handle(async ({ app, input, scope }, facts) =>
-    response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, context) =>
+    response(await app.update({ ...input, projectId: scope.id }), app, context.projectSlug),
   )
 
   .delete("/:id", "archiveAgent")

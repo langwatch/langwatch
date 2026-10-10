@@ -183,7 +183,6 @@ export function DatasetModal({
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()} size="full">
       <Dialog.Content
-        bg="bg"
         css={{
           marginX: "32px",
           marginTop: "32px",

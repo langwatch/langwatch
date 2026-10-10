@@ -5,7 +5,11 @@
  */
 import { createHmac } from "crypto";
 
-import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
   ModelProviderNotFoundError,
@@ -216,9 +220,9 @@ async function mountWebhook(): Promise<MountableRestApp> {
         { error: { type: "internal_error", code: "internal_error", message: String(error) } },
         500,
       ),
-    facts: [
-      bindRestMiddleware(elevenLabsSignature, (context) => ({
-        signature: context.req.header("elevenlabs-signature"),
+    middlewareContext: [
+      bindMiddlewareContext(elevenLabsSignature, (request) => ({
+        signature: request.headers.get("elevenlabs-signature") ?? undefined,
       })),
     ],
   });

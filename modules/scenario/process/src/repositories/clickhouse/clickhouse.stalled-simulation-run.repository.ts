@@ -74,10 +74,9 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
         nonTerminalStatuses: [...NON_TERMINAL_STATUSES],
         maxRows: MAX_ROWS,
       },
-      unscoped: {
-        reason:
-          "Install-wide stalled-run sweep: a backfill has no single tenant to scope to, and each terminal write it triggers is scoped to that run's own tenant.",
-      },
+      // Install-wide stalled-run sweep: a backfill has no single tenant to scope to, and each
+      // terminal write it triggers is scoped to that run's own tenant.
+      SKIP_TENANT_CHECK: true,
     });
 
     if (rows.length >= MAX_ROWS) {

@@ -94,7 +94,7 @@ func (cell *run) privateClient() (Client, string, bool) {
 		for index := range cell.tenancy.Projects {
 			project := cell.tenancy.Projects[index]
 			if !project.Archived && slices.Contains(cell.tenancy.ProjectsOf(organization), project.ID) {
-				return Client{URL: cell.url(), APIKey: project.APIKey, Project: project.ID, Seed: cell.options.Seed + 1_000_000}, label, true
+				return Client{URL: cell.url(), APIKey: project.APIKey, Project: project.ID, Seed: RunSeed(cell.options.Seed+1_000_000, cell.origin)}, label, true
 			}
 		}
 	}

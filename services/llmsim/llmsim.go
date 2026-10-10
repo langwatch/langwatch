@@ -30,6 +30,7 @@ const (
 	HeaderSeed  = "X-Llmsim-Seed"
 	HeaderMode  = "X-Llmsim-Mode"
 	HeaderError = "X-Llmsim-Error"
+	HeaderTools = "X-Llmsim-Tools"
 )
 
 // maxBodyBytes caps one request body; agent transcripts run large.
@@ -195,14 +196,16 @@ func (s *Server) readProviderBody(pc *providerCall, r *http.Request) (map[string
 	return body, true
 }
 
-// routeProvider answers the call by its path: chat completions, messages,
-// token counts or embeddings.
+// routeProvider answers the call by its path: chat completions, responses,
+// messages, token counts or embeddings.
 func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[string]json.RawMessage) {
 	w, path := pc.w, pc.rec.Path
 	var req request
 	switch {
 	case strings.HasSuffix(path, "/chat/completions"):
 		req = parseOpenAI(body)
+	case strings.HasSuffix(path, "/responses"):
+		req = parseResponses(body)
 	case strings.HasSuffix(path, "/messages/count_tokens"):
 		writeJSON(w, map[string]int{"input_tokens": parseAnthropic(body).promptTokens()})
 		pc.rec.Mode = "count_tokens"
@@ -219,9 +222,12 @@ func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[strin
 	}
 	rep := s.answer(r.Header, req)
 	pc.rec.Mode, pc.rec.Stream, pc.rec.InputTokens, pc.rec.OutputTokens, pc.rec.Response = rep.Mode, req.stream, rep.In, rep.Out, &rep
-	if pc.anthropic {
+	switch {
+	case pc.anthropic:
 		s.writeAnthropic(w, req, rep)
-	} else {
+	case strings.HasSuffix(path, "/responses"):
+		s.writeResponses(w, req, rep)
+	default:
 		s.writeOpenAI(w, req, rep)
 	}
 }
@@ -298,7 +304,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 // Models are what /models lists; any model name is answered regardless.
-var Models = []string{"markov-small", "markov-json", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
+var Models = []string{"markov-small", "markov-json", "markov-tools", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
 
 // canned are the fixed answers a "canned-<name>" model returns, whatever the prompt.
 var canned = map[string]string{

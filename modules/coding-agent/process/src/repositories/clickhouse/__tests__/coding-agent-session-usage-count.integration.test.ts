@@ -9,7 +9,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -44,7 +44,7 @@ function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
     insert: () => Promise.reject(new Error("the usage count never inserts")),
     command: () => Promise.reject(new Error("the usage count never commands")),
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 const clock = (ms: number): string => new Date(ms).toISOString().replace("T", " ").replace("Z", "");

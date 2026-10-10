@@ -103,7 +103,7 @@ export class MemoryTeamRepository extends TeamRepository {
     const duplicate = this.activeTeamsOf(input.organizationId).find(
       (row) => row.slug === input.slug,
     );
-    if (duplicate) throw new TeamSlugConflictError();
+    if (duplicate) throw new TeamSlugConflictError(input.name);
     const now = nowInstant();
     const team: MemoryTeamRow = {
       id: input.teamId,

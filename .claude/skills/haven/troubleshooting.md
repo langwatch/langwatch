@@ -172,6 +172,20 @@ every `Secret.load("ID", …)` handle it finds by scanning `packages`, `modules`
 secret with an innocent name could print. If `haven env` ever shows a credential, stop
 and report which key.
 
+## Gotcha 8: "LangWatch is starting" and 502s that come and go
+
+Each app restart costs a full boot of about 40 s. During it, pages show "LangWatch is starting" and health answers 502. A browser command may also say `backend did not say ready`.
+
+- **Under the default dev UI,** a restart drops the UI with it, and the UI then logs `api not reachable` until the backend is back.
+- **On 2026-10-10 the app lane was relaunched every 2 to 4 minutes.** The log shows `graceful shutdown complete`, then `exited — restarting in 1s`, and the `sh -c while true` loop gets a new pid. The cause was still being traced; read the dev-runtime skill for what is known.
+- **Tell the shapes apart:**
+
+  ```bash
+  haven logs app --since 30m --grep "exited|backend ready|graceful shutdown"
+  ```
+
+- **As a tester:** wait about 60 s and retry. A restart is not a product finding.
+
 ## Signing in for a browser check
 
 The local-dev seed identity is documented in the header of

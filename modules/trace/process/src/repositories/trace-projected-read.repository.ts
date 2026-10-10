@@ -2,7 +2,6 @@ import type { Authorization } from "@langwatch/authorization";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 import type {
   EvaluationTraceEvent,
-  EvaluationTraceReadInput,
   EvaluationTraceSpan,
   SpanTreeCursor,
   SpanTreeNode,
@@ -26,11 +25,21 @@ export type TraceIngestLagSample = {
 
 /** The single projected Trace persistence boundary. */
 export abstract class TraceProjectedReadRepository {
-  abstract findEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
+  abstract findEvaluationSpans(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<EvaluationTraceSpan[]>;
 
-  abstract findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
+  abstract findEvaluationEvents(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<EvaluationTraceEvent[]>;
 
-  abstract findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null>;
+  abstract findIngestLag(input: {
+    authorization: Authorization;
+  }): Promise<TraceIngestLagSample | null>;
 
   abstract listSummaryPage(input: {
     authorization: Authorization;

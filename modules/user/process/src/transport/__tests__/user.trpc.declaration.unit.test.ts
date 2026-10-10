@@ -4,10 +4,27 @@
  * The names are the browser's cache keys, so a rename here is a wire change.
  * @see modules/user/specs/user.feature
  */
+import type { TrpcAccess, TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { userTrpc } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { userTrpcTransport } from "../user.trpc.ts";
+
+/** The access each procedure declared, by name, building nothing. */
+function accessByProcedure(): Record<string, TrpcAccess> {
+  const declared: TrpcAccess[] = [];
+  const runtime: TrpcProcedureFactory<object> = {
+    procedure: ({ access }) => {
+      declared.push(access);
+      return {};
+    },
+    router: (record) => record,
+  };
+  userTrpcTransport.router(runtime, () => {
+    throw new Error("This test mounts but never handles a request");
+  });
+  return Object.fromEntries(Object.keys(userTrpc.members).map((name, i) => [name, declared[i]!]));
+}
 
 describe("the user tRPC surface", () => {
   describe("given the declaration a process mounts", () => {
@@ -63,6 +80,13 @@ describe("the user tRPC surface", () => {
         updateName: "mutation",
         setAvatar: "mutation",
         unlinkAccount: "mutation",
+      });
+    });
+
+    it("lets the avatar URL read take the project id its address carries", () => {
+      expect(accessByProcedure().getAvatarUrl).toMatchObject({
+        kind: "no-permission",
+        allow: { projectId: expect.any(String) },
       });
     });
 

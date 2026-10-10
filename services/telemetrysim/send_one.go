@@ -1,7 +1,10 @@
 package telemetrysim
 
 import (
+	"bytes"
 	"cmp"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -123,7 +126,11 @@ func encodeOTLPJSON(body []byte, spec BatchSpec) (Payload, error) {
 	if spec.Encoding == EncodingJSON {
 		return finish(spec, body, contentType(EncodingJSON))
 	}
-	if err := protojson.Unmarshal(body, msg); err != nil {
+	pbJSON, err := base64IDs(body)
+	if err != nil {
+		return Payload{}, err
+	}
+	if err := protojson.Unmarshal(pbJSON, msg); err != nil {
 		return Payload{}, fmt.Errorf("the body is not OTLP JSON for %s, so it has no protobuf form: %w", signal, err)
 	}
 	wire, err := proto.Marshal(msg)
@@ -131,6 +138,38 @@ func encodeOTLPJSON(body []byte, spec BatchSpec) (Payload, error) {
 		return Payload{}, err
 	}
 	return finish(spec, wire, contentType(EncodingProtobuf))
+}
+
+// base64IDs rewrites OTLP/JSON's hex trace and span ids as the base64 protojson reads; read as
+// base64, a 32-char hex id is 24 bytes. A value that is not a 32 or 16 char hex id is kept.
+func base64IDs(body []byte) ([]byte, error) {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	var doc any
+	if err := dec.Decode(&doc); err != nil {
+		return nil, fmt.Errorf("the body is not JSON: %w", err)
+	}
+	var walk func(v any)
+	walk = func(v any) {
+		switch v := v.(type) {
+		case map[string]any:
+			for key, val := range v {
+				s, isString := val.(string)
+				isID := key == "traceId" || key == "spanId" || key == "parentSpanId"
+				if raw, err := hex.DecodeString(s); isString && isID && (len(s) == 32 || len(s) == 16) && err == nil {
+					v[key] = base64.StdEncoding.EncodeToString(raw)
+					continue
+				}
+				walk(val)
+			}
+		case []any:
+			for _, val := range v {
+				walk(val)
+			}
+		}
+	}
+	walk(doc)
+	return json.Marshal(doc)
 }
 
 func otlpMessageOf(body []byte) (Signal, proto.Message, error) {

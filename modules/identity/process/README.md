@@ -86,7 +86,7 @@ Spec: `specs/identity/identifier-model.feature`,
 
 ## Installation
 
-`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:25`.
+`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).provideMiddlewareBindings(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -280,7 +280,7 @@ type Output = z.infer<typeof lookupInvitationExpirySchema>; // ../contract/src/i
 
 ### `identity`
 
-Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:25`.
+Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:27`.
 
 | Procedure                               | Kind     | Gate                                                                                                                                                              | Input                             | Output                         |
 | --------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------ |
@@ -288,6 +288,7 @@ Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.t
 | `identity.myTestArrival`                | query    | No permission: answers where the session user's own sign-in leaves them; the caller usually belongs to no organization yet, which is the condition being reported | `emptyInputSchema`                | `ssoTestArrivalStandingSchema` |
 | `identity.myIdentifiers`                | query    | No permission: lists the session user's own sign-in identifiers; no organization scope applies and no other account is reachable                                  | `emptyInputSchema`                | inline                         |
 | `identity.myMethodsLastUsed`            | query    | No permission: reads when the session user's own sign-in methods last minted a session; no organization scope applies and no other account is reachable           | `emptyInputSchema`                | `methodsLastUsedSchema`        |
+| `identity.mySignInGovernance`           | query    | No permission: answers whether an organization's single sign-on governs the session user's own sign-in; no other account is reachable                             | `emptyInputSchema`                | inline                         |
 | `identity.addEmailIdentifier`           | mutation | No permission: adds an identifier to the session user's own account; no organization scope applies                                                                | inline                            | `emailIdentifierAddedSchema`   |
 | `identity.resendIdentifierConfirmation` | mutation | No permission: re-sends the session user's own address confirmation; the ceremony proves the identifier is theirs                                                 | inline                            | inline                         |
 | `identity.removeIdentifier`             | mutation | No permission: removes an identifier from the session user's own account; the identity guards decide, and no organization scope applies                           | inline                            | inline                         |
@@ -309,7 +310,7 @@ interface Output {
 // identity.myTestArrival
 // Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
 type Input = Record<string, unknown>;
-// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:73
+// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:74
 type Output =
   | {
       testing: true;
@@ -333,8 +334,15 @@ interface Output {
   secondFactorAt: string | null;
 }
 
+// identity.mySignInGovernance
+type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
+// Output: inline, ../contract/src/identity.trpc.ts:45
+interface Output {
+  governedBySso: boolean;
+}
+
 // identity.addEmailIdentifier
-// Input: inline, ../contract/src/identity.trpc.ts:43
+// Input: inline, ../contract/src/identity.trpc.ts:48
 interface Input {
   email: string;
   codeChallenge: string;
@@ -345,22 +353,22 @@ interface Output {
 }
 
 // identity.resendIdentifierConfirmation
-// Input: inline, ../contract/src/identity.trpc.ts:48
+// Input: inline, ../contract/src/identity.trpc.ts:53
 interface Input {
   identifierId: string;
   codeChallenge: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:50
+// Output: inline, ../contract/src/identity.trpc.ts:55
 interface Output {
   sent: true;
 }
 
 // identity.removeIdentifier
-// Input: inline, ../contract/src/identity.trpc.ts:53
+// Input: inline, ../contract/src/identity.trpc.ts:58
 interface Input {
   identifierId: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:54
+// Output: inline, ../contract/src/identity.trpc.ts:59
 interface Output {
   removed: true;
 }
@@ -528,6 +536,7 @@ type Output = {
   userId: string;
   domain: string;
   automatic: boolean;
+  connectionId: string | null;
 }[];
 ```
 
@@ -703,7 +712,7 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185
 
 | Kind   | Leaf                          | Environment variable           | Declared at                             |
 | ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:451`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:453`           |
 | config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
 | config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
 | config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |

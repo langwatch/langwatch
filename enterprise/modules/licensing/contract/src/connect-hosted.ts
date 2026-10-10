@@ -1,22 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * A connected customer's contract terms and seats, and the hosted usage answer billing still reads
- * through licensing (ADR-156). Install-facing fields are snake_case: the gateway relays them as is.
+ * A connected customer's contract terms and seats (ADR-156). The hosted wire is the connect
+ * module's contract.
  */
 
-import { z } from "zod";
-
-import { CONNECT_SERVICES, type ConnectService } from "./issued-license.ts";
-
-/**
- * Who the gateway resolved the caller to. Never read from the caller's body: a
- * key that could name another organization would be a claim nothing checks.
- */
-export interface HostedCaller {
-  virtualKeyId: string;
-  organizationId: string;
-  projectId: string | null;
-}
+import type { ConnectService } from "./issued-license.ts";
 
 /**
  * What a customer's licenses add up to commercially. The budget spans
@@ -46,37 +34,3 @@ export interface ConnectedSeats {
   /** The managed gateway key the customer's hosted calls run under, once one resolved. */
   managedVirtualKeyId: string | null;
 }
-
-const hostedBudgetSchema = z.object({
-  id: z.string(),
-  scope: z.string(),
-  window: z.string(),
-  on_breach: z.enum(["block", "warn"]),
-  cap_usd: z.number(),
-  /** Null when live spend could not be read. Never zero in that case. */
-  spent_usd: z.number().nullable(),
-  remaining_usd: z.number().nullable(),
-  period_started_at: z.string(),
-  is_contract: z.boolean(),
-});
-
-/** The contract budget, with the commercial terms behind it. */
-const hostedContractSchema = z.object({
-  ...hostedBudgetSchema.shape,
-  commit_usd: z.number(),
-  maximum_cap_usd: z.number(),
-  overage_enabled: z.boolean(),
-  term_ends_at: z.string().nullable(),
-});
-
-export const hostedUsageAnswerSchema = z.object({
-  services: z.array(z.enum(CONNECT_SERVICES)),
-  spend_available: z.boolean(),
-  read_at: z.string(),
-  contract: hostedContractSchema.nullable(),
-  budgets: z.array(hostedBudgetSchema),
-});
-
-export type HostedBudgetWire = z.infer<typeof hostedBudgetSchema>;
-export type HostedContractWire = z.infer<typeof hostedContractSchema>;
-export type HostedUsageAnswer = z.infer<typeof hostedUsageAnswerSchema>;

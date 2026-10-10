@@ -6,7 +6,6 @@
 import type { Actor } from "@langwatch/authorization";
 import {
   AuthzGrantsService as AuthzGrantsServiceContract,
-  DuplicateGrantError,
   GrantValidationError,
   type GrantEventSource,
   type AuthzAttachGrantInput,
@@ -62,7 +61,6 @@ import {
   SCOPE_TYPE_FOR_REF,
   grantLedgerActor,
   grantWriteRow,
-  knownWriteFailure,
 } from "../rules/grant-write.rules.ts";
 import { AuthzDirectoryGrantsService } from "./authz-directory-grants.service.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
@@ -204,7 +202,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         source,
       });
     } catch (error) {
-      this.rethrowKnownWriteFailure(error, {
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, {
         scopeType: where.type,
         scopeId: where.id,
       });
@@ -231,7 +229,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     } catch (error) {
       // A role change can collide with a sibling binding the principal
       // already holds at the same scope - same knowable failure as attach.
-      this.rethrowKnownWriteFailure(error, { bindingId });
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, { bindingId });
     }
 
     await this.options.epoch.bump({ organizationId });
@@ -248,7 +246,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         actor: grantLedgerActor(actor),
       });
     } catch (error) {
-      this.rethrowKnownWriteFailure(error, { bindingId });
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, { bindingId });
     }
 
     await this.options.epoch.bump({ organizationId });
@@ -306,7 +304,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         actor: grantLedgerActor(actor),
       });
     } catch (error) {
-      this.rethrowKnownWriteFailure(error, {
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, {
         scopeType: to.type,
         scopeId: to.id,
       });
@@ -465,27 +463,6 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
   private nowMs(): number {
     return nowInstant().epochMilliseconds;
-  }
-
-  private rethrowKnownWriteFailure(
-    error: unknown,
-    { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
-  ): never {
-    const failure = knownWriteFailure(error);
-    const errorMeta = { ...meta };
-    if (bindingId) {
-      errorMeta.bindingId = bindingId;
-    }
-
-    if (failure === "duplicate") {
-      throw new DuplicateGrantError(errorMeta);
-    }
-
-    if (failure === "not_found") {
-      throw AuthzGrantGuardsService.bindingNotFound(errorMeta);
-    }
-
-    throw error;
   }
 
   private principalWhere(who: GrantPrincipal): BindingPrincipalWhere {

@@ -50,7 +50,7 @@ import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.reposito
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
 import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verification.repository.ts";
 
-/** The live tier: every identity row over the one Prisma client, history over the read seat. */
+/** The live tier: every identity row over the one Prisma client, the logs over the read seat. */
 export class PostgresIdentityRepositories {
   static readonly requires = ["prisma", "encryption", "rateLimiter", "eventReadSeat"] as const;
 
@@ -59,7 +59,7 @@ export class PostgresIdentityRepositories {
       prisma: PrismaClient;
       encryption: Encryption;
       rateLimiter: RateLimiter;
-      eventReadSeat: Pick<EventReadSeat, "getEvents">;
+      eventReadSeat: EventReadSeat;
     }>,
   ): IdentityRepositories {
     const database = members.prisma;
@@ -90,9 +90,6 @@ export class PostgresIdentityRepositories {
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoRegistrationSlots: PrismaSsoConnectionRegistrationRepository.create(database),
       ssoAdmin: PrismaSsoConnectionAdminRepository.create(database),
-      ssoConnectionHistory: EventingSsoConnectionHistoryRepository.create({
-        eventReadSeat: members.eventReadSeat,
-      }),
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
       ssoEngineProviders: PrismaSsoEngineProviderRepository.create(database, members.encryption),
@@ -101,9 +98,6 @@ export class PostgresIdentityRepositories {
         database,
         newSsoAuthenticationActivityId,
       ),
-      identityHistory: EventingIdentityHistoryRepository.create({
-        eventReadSeat: members.eventReadSeat,
-      }),
       identityProjection: PrismaIdentityProjectionRepository.create({
         prisma: database,
         reservations,
@@ -119,6 +113,12 @@ export class PostgresIdentityRepositories {
       ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
       identityLookup: PrismaIdentityLookupRepository.create(database),
       rateLimits: RedisIdentityRateLimitRepository.create(members.rateLimiter),
+      identityHistory: EventingIdentityHistoryRepository.create({
+        eventReadSeat: members.eventReadSeat,
+      }),
+      ssoConnectionHistory: EventingSsoConnectionHistoryRepository.create({
+        eventReadSeat: members.eventReadSeat,
+      }),
     };
   }
 }

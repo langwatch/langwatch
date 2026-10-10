@@ -50,16 +50,12 @@ describe("given the front door's theme tokens", () => {
       }
     });
 
-    it("resolves the action colour on both grounds", () => {
-      const blocks = Object.values(layer());
-      const values = blocks
+    it("draws the action in the product's own primary, so the door and the app agree", () => {
+      const values = Object.values(layer())
         .map((block) => block["--chakra-colors-front-door-action"])
         .filter(Boolean);
 
-      // Two grounds, two answers. One would mean a token pinned to a single
-      // colour mode, which is the bug the custom properties had before the
-      // dark block was written.
-      expect(new Set(values).size).toBe(2);
+      expect(values).toEqual(["var(--chakra-colors-orange-solid)"]);
     });
 
     /**

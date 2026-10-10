@@ -6,6 +6,7 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import { PROMPT_CREATED_EVENT_TYPE } from "./prompt.commands.ts";
 import { nodeDatasetSchema } from "./prompt.field-schemas.ts";
 import {
   createPromptCreateTrpcInputSchema,
@@ -45,7 +46,10 @@ export type PromptCreateTrpcInput = z.infer<typeof promptCreateTrpcInputSchema>;
 export type PromptUpdateTrpcInput = z.infer<typeof promptUpdateTrpcInputSchema>;
 
 export const promptTrpc = defineTrpcContract("prompts")
-  .query("getAllPromptsForProject")
+  // A prompt written, copied or synced elsewhere joins the list; updates and deletes have no fact yet.
+  .query("getAllPromptsForProject", {
+    invalidatedBy: [{ event: PROMPT_CREATED_EVENT_TYPE, scope: "projectId" }],
+  })
   .withInput(promptProjectTrpcInputSchema)
   .withOutput(versionedPromptSchema.array())
 

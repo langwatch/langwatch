@@ -25,6 +25,10 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
+vi.mock("../../../behavior/use-all-model-providers-list.ts", () => ({
+  useAllModelProvidersList: () => ({ providers: [], isLoading: false }),
+}));
+
 const { default: ModelCostsScreen } = await import("../model-costs-screen.tsx");
 
 const CATALOGUE_ROW = {
@@ -76,7 +80,7 @@ describe("given the Model Costs screen in a real browser", () => {
   describe("when the reader types in the search box", () => {
     /** @scenario Searching narrows the table by model name or regex rule */
     it("narrows the rows and counts the match", async () => {
-      await userEvent.fill(page.getByRole("searchbox"), "CLAUDE");
+      await userEvent.fill(page.getByLabelText("Search model costs"), "CLAUDE");
 
       await countLine("Showing 2 of 3 models.");
       await expect.poll(() => bodyRows().length).toBe(2);
@@ -106,7 +110,7 @@ describe("given the Model Costs screen in a real browser", () => {
   describe("when nothing matches", () => {
     /** @scenario A filter that matches nothing shows an empty state */
     it("shows the empty state, and Clear filters restores every row", async () => {
-      await userEvent.fill(page.getByRole("searchbox"), "no-such-model");
+      await userEvent.fill(page.getByLabelText("Search model costs"), "no-such-model");
 
       await waitFor(() => expect(screen.getByText("No models match")).toBeVisible());
       await countLine("Showing 0 of 3 models.");

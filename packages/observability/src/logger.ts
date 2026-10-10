@@ -331,11 +331,12 @@ function buildTransport(configuration: ResolvedLoggerConfiguration): Destination
     isOtelExportEnabled: configuration.otelExportEnabled,
   });
   const consoleStream = transportOrStdout({ target: consoleTarget, fallback: process.stdout });
-  if (!configuration.otelExportEnabled) return consoleStream;
-
-  // One worker per target, filtered here: pino's in-worker multistream compares
-  // each threshold with the record's `level`, a string under our label formatter,
-  // so every line was dropped.
+  // One worker per target, filtered here: pino's in-worker filter compares each
+  // threshold with the record's `level`, a string under our label formatter, so it
+  // never filters (one target, WEB-9106) or drops every line (two).
+  if (!configuration.otelExportEnabled) {
+    return pino.multistream([{ level: consoleTarget.level, stream: consoleStream }]);
+  }
   const otel = buildOtelTransport(configuration);
   return pino.multistream([
     { level: consoleTarget.level, stream: consoleStream },

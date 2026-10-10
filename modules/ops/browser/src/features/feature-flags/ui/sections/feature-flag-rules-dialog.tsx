@@ -223,7 +223,7 @@ export function FeatureFlagRulesDialog({
               Cancel
             </Button>
           </Dialog.ActionTrigger>
-          <Button colorPalette="blue" loading={saving} onClick={() => void save()}>
+          <Button colorPalette="orange" loading={saving} onClick={() => void save()}>
             Save rules
           </Button>
         </Dialog.Footer>

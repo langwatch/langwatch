@@ -1024,7 +1024,7 @@ describe("AutomationDrawer", () => {
     describe("when the draft watches a graph", () => {
       it("shows the severity facet on the review overview", async () => {
         const user = userEvent.setup();
-        renderDrawer({ initialSource: "customGraph" });
+        renderDrawer({ initialSource: "customGraph", prefilledGraphId: "graph-1" });
 
         await waitFor(() => {
           expect(useAutomationStore.getState().draft.source).toBe("customGraph");
@@ -1032,6 +1032,16 @@ describe("AutomationDrawer", () => {
         await continueToReview(user);
 
         expect(screen.getByText(/Severity/)).toBeInTheDocument();
+      });
+
+      it("holds Continue on the watch step until a graph is picked", async () => {
+        renderDrawer({ initialSource: "customGraph" });
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.source).toBe("customGraph");
+        });
+
+        expect(await screen.findByRole("button", { name: "Continue" })).toBeDisabled();
       });
     });
 

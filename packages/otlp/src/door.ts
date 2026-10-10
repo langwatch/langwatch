@@ -6,11 +6,12 @@
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
 
 import { OtlpIngestSourceBillingUnavailableError } from "./errors.ts";
 import {
   applyOtlpReceiverPolicy,
-  type OtlpReceiverPolicy,
+  otlpReceiverPolicySchema,
   type OtlpReceiverRequest,
 } from "./receiver-policy.ts";
 
@@ -34,9 +35,14 @@ export type OtlpDoorRefusal =
 export type OtlpDoorAnswer = Readonly<{ status: 200 | 400 | 401 | 403 | 404 | 503; body: object }>;
 
 /** The source billing an ingestion key resolved, per signal, or why it could not. */
-export type OtlpSourcePolicy =
-  | { status: "ready"; policies: Record<OtlpSignal, OtlpReceiverPolicy> }
-  | { status: "failed"; error: unknown };
+export const otlpSourcePolicySchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("ready"),
+    policies: z.record(z.enum(["traces", "logs", "metrics"]), otlpReceiverPolicySchema),
+  }),
+  z.object({ status: z.literal("failed"), error: z.unknown() }),
+]);
+export type OtlpSourcePolicy = z.infer<typeof otlpSourcePolicySchema>;
 
 /** The credential refusals the ingestion doors answer in their own wire, and nothing else. */
 const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([

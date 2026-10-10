@@ -9,6 +9,7 @@ import {
 import { TraceFullRecordRepository } from "../../repositories/trace-full-record.repository.ts";
 import { TraceRecordRepository } from "../../repositories/trace-record.repository.ts";
 import type { TraceEventDerivation } from "../../services/trace.service.ts";
+import { ownProof } from "./authorization-proofs.fixture.ts";
 
 class MissingTraceRecords extends TraceRecordRepository {
   async getById(input: TraceByIdInput): Promise<never> {
@@ -37,5 +38,6 @@ export function traceReadPorts() {
     records: new MissingTraceRecords(),
     eventDerivation: new EmptyTraceEvents(),
     fullRecords: new MissingFullTraceRecords(),
+    authorize: async ({ projectId }: { projectId: string }) => ownProof({ projectId }),
   };
 }

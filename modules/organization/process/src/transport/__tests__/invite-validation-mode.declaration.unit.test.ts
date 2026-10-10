@@ -37,7 +37,7 @@ const KEY_ID = "key-1";
 
 /**
  * Runs one management route over the given application, as the runtime hands it over:
- * the key's owner as actor (null for a service key) and the key as organizationKeyFacts.
+ * the key's owner as actor (null for a service key) and the key as organizationKeyContext.
  */
 function answerRest(
   app: object,

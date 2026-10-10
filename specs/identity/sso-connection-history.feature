@@ -107,18 +107,6 @@ Feature: SSO connection history - the raw events, read and live
     Then only events appended under "acme"'s own tenant come back
     And naming "globex"'s connection under "acme"'s tenant finds nothing
 
-  # The api serves this read and only sends commands: its event store refuses
-  # every read by name. The history is read through eventing's read seat, which
-  # answers one aggregate's stream in every role
-  # (packages/eventing/specs/event-read-seat.feature).
-  @unit
-  Scenario: The connection history is readable from a process that only sends commands
-    Given the api process, whose own event store refuses every read
-    And "acme-okta" has facts the worker appended to the event log
-    When "acme"'s administrator reads the connection's history in the api process
-    Then the facts are listed newest first
-    And nothing is read through the refusing event store
-
   @integration
   Scenario: An administrator reads their own connection's history on the identity provider page
     Given "acme-okta" has a history of what happened to it

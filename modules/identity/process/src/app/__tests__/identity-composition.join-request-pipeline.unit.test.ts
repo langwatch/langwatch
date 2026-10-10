@@ -85,6 +85,7 @@ function foldedState(): JoinRequestFoldState {
     resolvedByType: null,
     resolvedById: null,
     withdrawalCause: null,
+    connectionId: null,
     CreatedAt: 1_600_000_000_000,
     UpdatedAt: 1_700_000_000_000,
     LastEventOccurredAt: 1_700_000_000_000,

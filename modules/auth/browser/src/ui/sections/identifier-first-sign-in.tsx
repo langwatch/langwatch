@@ -257,11 +257,7 @@ export function IdentifierFirstSignIn() {
   if (showPicker) {
     return (
       <AuthCard {...signInGreeting(recoveredEmail)}>
-        <HandledErrorAlert
-          error={passkeyError}
-          fallbackTitle="Could not use a passkey"
-          className="lw-front-door-alert"
-        />
+        <HandledErrorAlert error={passkeyError} fallbackTitle="Could not use a passkey" />
         <SignInMethodPicker
           methodSet={decision.methodSet}
           reasonCode={decision.reasonCode}
@@ -305,16 +301,8 @@ export function IdentifierFirstSignIn() {
           typing the address again — so taking the field away leaves somebody
           holding an apology and no way to act on it. It sits above the form,
           and the form stays live underneath. */}
-      <HandledErrorAlert
-        error={routing.error}
-        fallbackTitle="Could not start log-in"
-        className="lw-front-door-alert"
-      />
-      <HandledErrorAlert
-        error={passkeyError}
-        fallbackTitle="Could not use a passkey"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={routing.error} fallbackTitle="Could not start log-in" />
+      <HandledErrorAlert error={passkeyError} fallbackTitle="Could not use a passkey" />
       <IdentifierStepForm
         submitLabel="Continue"
         isSubmitting={routing.isDeciding}
@@ -462,7 +450,6 @@ function NoAccountYet({
         <HandledErrorAlert
           error={requestVerification.error}
           fallbackTitle="Couldn't start your sign-up"
-          className="lw-front-door-alert"
         />
         <FrontDoorPrimaryButton
           isBusy={requestVerification.isPending}

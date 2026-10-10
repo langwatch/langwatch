@@ -29,40 +29,33 @@ All UI elements should have a rounded, approachable feel.
 </Box>
 ```
 
-## 2. Translucent Overlays
+## 2. Overlays, dialogs and notices
 
-All overlays (drawers, popovers, dialogs) should have translucent backgrounds with blur effects.
+Drawers and popovers keep their translucent, blurred panel (`Drawer`, `Popover` from
+`@langwatch/design-system`). A dialog does not: its panel is opaque (`bg.panel`, set by the
+recipe) and the blur belongs to the backdrop behind it. Never set `bg`, `background` or a
+blur on `Dialog.Content`; never build a dialog from a fixed-position `Box`.
 
-### Visual Effect
+### One dialog
 
-- Semi-transparent white background
-- Backdrop blur for depth
-- Rounded floating corners with margin from edges
+| Part   | Standard                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------ |
+| Shell  | `Dialog` from `@langwatch/design-system/dialog`; width by `size` or one `maxWidth`, nothing else on `Content`. |
+| Header | `Dialog.Title` in sentence case, recipe style (no `fontSize`/`fontWeight`); optional `Dialog.Description` in `fg.muted`. |
+| Close  | `<Dialog.CloseTrigger />` on every dismissible dialog. Only a takeover, a command palette or a must-acknowledge reveal (`role="alertdialog"`) goes without. |
+| Body   | Field labels in sentence case (`Field.Label`, never an uppercase `SmallLabel` in a form).  |
+| Footer | Right-aligned in `Dialog.Footer`: `variant="outline"` Cancel, then one solid primary: `colorPalette="orange"` (the product primary, as `PageLayout.HeaderButton primary`), `red` when it destroys. Never a full-width button in the body. |
 
-### Implementation Details
+A plain confirmation is `ConfirmDialog`; a type-to-confirm delete is `DeleteConfirmationDialog`.
 
-The overlay components in `@langwatch/design-system` already implement these styles:
+### One notice
 
-| Property         | Value             |
-| ---------------- | ----------------- |
-| `background`     | `white/75`        |
-| `backdropFilter` | `blur(8px)`       |
-| `borderRadius`   | `lg`              |
-| `margin`         | `2` (for drawers) |
-
-### Code Pattern
-
-```tsx
-// These components already have the translucent effect built-in:
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Popover } from "@langwatch/design-system/popover";
-
-// If creating custom overlays, apply:
-<Box background="white/75" backdropFilter="blur(8px)" borderRadius="lg">
-  ...
-</Box>;
-```
+`Banner` from `@langwatch/design-system/banner` is the one notice: `status` info, warning,
+error or success; icon, `title`, optional sentence as children, optional one `BannerAction`.
+`placement="top"` sits flush at the top of the content panel, `inline` is a card inside it. A
+message says a thing once: a page that carries its own note hides the shell's top banner for
+the same fact. No hand-built tinted `Box` callouts; `Alert.Root` call sites are migrating to
+`Banner` (see [alerts-toasts-and-field-errors.md](../best_practices/alerts-toasts-and-field-errors.md)).
 
 ## 3. Prefer Drawers Over Modals
 
@@ -279,7 +272,8 @@ Save appears to do nothing.
 When implementing new features, verify:
 
 - [ ] Border radius uses `lg` for containers and interactive elements
-- [ ] Overlays use translucent backgrounds with blur
+- [ ] Drawers and popovers are translucent; dialogs are opaque, with the standard header, close X and footer (§2)
+- [ ] Notices use `Banner`, said once per screen
 - [ ] Resource management uses drawers, not modals
 - [ ] Page follows standard layout (header, title, actions)
 - [ ] Components imported from `@langwatch/design-system` where available

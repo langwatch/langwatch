@@ -72,7 +72,7 @@ Path-scoped rules in `.claude/rules/` load the details when you open those files
 6. **A route's authorization is declared, never hand-rolled.** Name the
    permission with `.withPermission(...)`; the door asks it before the handler
    runs. `.withAccess(anyAuthenticated(...))` followed by a permission check in
-   a middleware fact, the handler or the `*Api` is a bypass. When the library
+   a middleware context, the handler or the `*Api` is a bypass. When the library
    cannot express the check, extend `packages/api` and the door; don't route
    around them. The application asks only what depends on the loaded row.
 7. **Product analytics and lifecycle messaging belong to nurturing.** A module
@@ -127,7 +127,7 @@ Nx (ADR-150) sits beside the root scripts, not in front of them: prefer the
 
 `make haven up` starts this worktree's stack at
 `app.<slug>.langwatch.localhost` (UI; `/api` for the API). `haven status`,
-`haven logs api|ui|go -t`; add `--agent` when driving haven as an agent. Plain
+`haven logs api|ui|go -f`; add `--agent` when driving haven as an agent. Plain
 `pnpm dev` also works (ports derive from `PORT`, default 5560). Full reference,
 including the no-container setup: `dev/docs/LOCAL_STACK.md`; when it won't come
 up, the `haven` skill (`troubleshooting.md`).

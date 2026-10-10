@@ -3,7 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PersonalAccessTokenBanner } from "./personal-access-token-banner.tsx";
 
 const meta = {
-  title: "Components/Personal access token banner",
+  title: "Feedback/Personal access token banner",
+  parameters: {
+    usage: { use: "In a snippet that needs a personal access token the reader has not created." },
+  },
   component: PersonalAccessTokenBanner,
   tags: ["autodocs"],
   args: { token: null, isCreating: false, onCreate: () => void 0 },

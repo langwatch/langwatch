@@ -129,6 +129,25 @@ export type AuthzRoleBindingFilter = Record<string, unknown> & {
   organizationId?: unknown;
 };
 
+/** Each fresh binding is attached when its own id holds its identity, else the holder is its duplicate. */
+function splitByHeld({
+  fresh,
+  held,
+  duplicates,
+}: {
+  fresh: LedgerBindingAttach[];
+  held: Map<string, string>;
+  duplicates: string[];
+}): AttachOutcome {
+  const attached: string[] = [];
+  for (const binding of fresh) {
+    const heldId = held.get(bindingIdentityKey(binding));
+    if (heldId === undefined || heldId === binding.bindingId) attached.push(binding.bindingId);
+    else duplicates.push(heldId);
+  }
+  return { attached, duplicates };
+}
+
 /** The organization-scoped writes never address the platform tier's tenant. */
 function refusePlatformTenant(organizationId: string): void {
   if (organizationId === PLATFORM_TENANT_ID) {
@@ -248,36 +267,71 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
             actor,
             occurredAtMs,
             ...membershipFenceFields(binding, membershipStamps),
+            ...(onDuplicate === "skip" ? { onDuplicate } : {}),
           },
         }),
       ),
     );
 
     const wanted = fresh.map((binding) => binding.bindingId);
-    if (awaitProjection || requireProjection) {
-      await this.awaitProjection({
-        what: `attach of ${wanted.length} binding(s)`,
-        organizationId,
-        // The CANONICAL Grant head, not the compat RoleBinding rows: a
-        // compatibility-only row is one the fold has not authored, and a
-        // revoked one confirms an attach that no longer grants anything.
-        check: async () => {
-          const present = await this.options.reads.countLandedGrants({
+    const held =
+      awaitProjection || requireProjection
+        ? await this.confirmAttach({
             organizationId,
-            grants: fresh.map((binding) => ({
-              id: binding.bindingId,
-              ...grantIdentityWhere(binding),
-            })),
-            occurredSince: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
-          });
-          return present === wanted.length;
-        },
-        required: requireProjection,
-      });
-    }
+            fresh,
+            occurredAtMs,
+            onDuplicate,
+            requireProjection,
+          })
+        : new Map<string, string>();
     await this.options.epoch.bump({ organizationId });
-    return { attached: wanted, duplicates };
+    if (held.size === 0) return { attached: wanted, duplicates };
+    return splitByHeld({ fresh, held, duplicates });
   };
+
+  /**
+   * Hold until the attach landed. A skipping attach the fold dropped because an
+   * identical grant landed first is confirmed by that grant: the answer maps each
+   * identity to the id holding it, and is empty when every own id landed.
+   */
+  private async confirmAttach({
+    organizationId,
+    fresh,
+    occurredAtMs,
+    onDuplicate,
+    requireProjection,
+  }: {
+    organizationId: string;
+    fresh: LedgerBindingAttach[];
+    occurredAtMs: number;
+    onDuplicate: "attach" | "skip";
+    requireProjection: boolean;
+  }): Promise<Map<string, string>> {
+    const held = new Map<string, string>();
+    await this.awaitProjection({
+      what: `attach of ${fresh.length} binding(s)`,
+      organizationId,
+      // The CANONICAL Grant head, not the compat RoleBinding rows: a
+      // compatibility-only row is one the fold has not authored, and a
+      // revoked one confirms an attach that no longer grants anything.
+      check: async () => {
+        const present = await this.options.reads.countLandedGrants({
+          organizationId,
+          grants: fresh.map((binding) => ({
+            id: binding.bindingId,
+            ...grantIdentityWhere(binding),
+          })),
+          occurredSince: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
+        });
+        if (present === fresh.length || onDuplicate !== "skip") return present === fresh.length;
+        const byIdentity = await this.findExistingByIdentity({ organizationId, bindings: fresh });
+        for (const [key, heldId] of byIdentity) held.set(key, heldId);
+        return fresh.every((binding) => byIdentity.has(bindingIdentityKey(binding)));
+      },
+      required: requireProjection,
+    });
+    return held;
+  }
 
   /**
    * Each USER principal's current lifetime, read under its membership row

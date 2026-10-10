@@ -251,7 +251,7 @@ function refusingEventReadSeat(): EventReadSeat {
         "give this role's eventing the event log (set CLICKHOUSE_URL)",
       ),
     );
-  return { getEvent: refuse, getEvents: refuse };
+  return { getEvent: refuse, findAggregateEvents: refuse };
 }
 
 /** Eventing's seat where this role's eventing reads the event log; a refusing one otherwise. */

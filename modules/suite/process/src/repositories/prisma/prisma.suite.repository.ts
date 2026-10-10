@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { parseEvaluatorAttachments, type EvaluatorAttachment } from "@langwatch/scenario-contract";
@@ -137,7 +138,10 @@ export class PrismaSuiteRepository extends SuiteRepository {
   async findProjectIdsHoldingSuites(): Promise<string[]> {
     const rows = await this.database.$queryRaw<unknown[]>`
       SELECT DISTINCT "projectId" FROM "SimulationSuite" ORDER BY "projectId" ASC
-      -- @tenancy: suite replay walks every project holding suites (upgrade step, worker)
+      ${skipTenantCheck({
+        // Suite replay walks every project holding suites (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return projectIdRowsSchema.parse(rows).map((row) => row.projectId);
   }
@@ -262,7 +266,10 @@ export class PrismaSuiteRepository extends SuiteRepository {
       this.database.$transaction(
         async (transaction) => {
           const lockKey = `${PLAN_NAME_LOCK_PREFIX}${input.projectId}:${planNameKey(input.name)}`;
-          await transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+          await transaction.$executeRaw` ${skipTenantCheck({
+            // Advisory lock only, the key is project-bounded.
+            SKIP_TENANT_CHECK: true,
+          })}
 SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
           const existing = await transaction.simulationSuite.findFirst({
@@ -354,7 +361,10 @@ SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
   }): Promise<Suite> {
     const row = await this.database.$transaction(async (transaction) => {
       const lockKey = `suite-managed:${input.projectId}:${input.label}`;
-      await transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+      await transaction.$executeRaw` ${skipTenantCheck({
+        // Advisory lock only, the key is project-bounded.
+        SKIP_TENANT_CHECK: true,
+      })}
 SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
       const existing = await transaction.simulationSuite.findFirst({

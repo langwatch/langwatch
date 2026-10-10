@@ -28,8 +28,8 @@ interface SsoConnectionPayloadShape {
   source?: unknown;
 }
 
-/** The one read this repository takes off eventing's read seat. */
-type SsoConnectionEventReads = Pick<EventReadSeat, "getEvents">;
+/** The one read this repository takes: one connection's sso_connection stream. */
+type SsoConnectionEventReads = Pick<EventReadSeat, "findAggregateEvents">;
 
 const SSO_CONNECTION_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SSO_CONNECTION_EVENT_TYPES);
 
@@ -46,9 +46,8 @@ function sourceOf(value: unknown): SsoConnectionSource {
 }
 
 /**
- * The connection log itself, read through eventing's read seat, which answers in a process
- * that only sends commands too. The events ARE the panel, so it shows nothing the log cannot
- * re-derive. Spec: specs/identity/sso-connection-history.feature.
+ * The connection log itself, read through eventing's read seat so a producer-only api answers it
+ * too (WEB-9103). The events ARE the panel: rebuildable for free, nothing the log cannot re-derive.
  */
 export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistoryRepository {
   static create(deps: {
@@ -70,7 +69,7 @@ export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistory
     connectionId: string;
     limit: number;
   }): Promise<readonly SsoConnectionHistoryEntry[]> {
-    const events: readonly unknown[] = await this.eventReadSeat.getEvents({
+    const events = await this.eventReadSeat.findAggregateEvents({
       tenantId: createTenantId(organizationId),
       aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
       aggregateId: connectionId,

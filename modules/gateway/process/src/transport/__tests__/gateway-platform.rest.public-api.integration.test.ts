@@ -8,7 +8,7 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
@@ -146,15 +146,15 @@ function mount(
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayRestCredential, (): GatewayRequestCredential => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayRestCredential, (): GatewayRequestCredential => ({
         kind: "legacyProjectKey",
       })),
-      bindRestMiddleware(gatewayKeyCaller, () => ({
+      bindMiddlewareContext(gatewayKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),

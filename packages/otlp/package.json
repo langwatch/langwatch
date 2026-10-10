@@ -15,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./door": {
+      "types": "./dist/door.d.ts",
+      "default": "./src/door.ts"
     }
   },
   "scripts": {

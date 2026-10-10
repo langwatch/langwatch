@@ -1,4 +1,4 @@
-import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import type { IdentityApi, IdentityServerConfig } from "@langwatch/identity-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -14,7 +14,7 @@ import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts
 import { identityTrpcTransport } from "./transport/identity.trpc.ts";
 import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 import {
-  twoStepRequestHeadersFact,
+  twoStepRequestHeadersContext,
   twoStepVerificationTrpcTransport,
 } from "./transport/two-step-verification.trpc.ts";
 
@@ -32,9 +32,9 @@ export const identityProcessModule: PublishedProcessModule<
     joinRequestTrpcTransport,
     twoStepVerificationTrpcTransport,
   )
-  .withTransportFacts(() => [
-    bindTrpcFact(
-      twoStepRequestHeadersFact,
+  .provideMiddlewareBindings(() => [
+    bindTrpcMiddlewareContext(
+      twoStepRequestHeadersContext,
       (context: TrpcRuntimeContext) => context.req?.headers ?? null,
     ),
   ])

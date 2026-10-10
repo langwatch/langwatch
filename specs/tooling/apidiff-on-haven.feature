@@ -8,7 +8,7 @@
 # 2026-09-10 addendum: booting the branch instance IN the invoking checkout was
 # its own version of the same defect. haven registers one stack per directory,
 # so `haven up` there replaced a developer's own stack registration for that
-# directory, and the run's teardown `haven destroy` took it down with it (an
+# directory, and the run's teardown `haven down --destroy` took it down with it (an
 # incident at 01:36 that day). The branch side now checks out its own HEAD into
 # a worktree of its own, the same way the base side always has, and a run
 # refuses outright if either worktree path would resolve to the invoking
@@ -73,7 +73,7 @@ Feature: apidiff boots its instances through haven
     Scenario: Teardown names its own two slugs
       Given both instances are up
       When the run tears down
-      Then it runs haven destroy for exactly the two apidiff slugs
+      Then it runs haven down --destroy for exactly the two apidiff slugs
       And no other stack is stopped, restarted or flushed
 
     @unit
@@ -141,7 +141,7 @@ Feature: apidiff boots its instances through haven
       When apidiff run boots both instances through haven
       Then the base instance checks out its ref into .apidiff/worktrees/main, its persistent worktree
       And the branch instance checks out HEAD into .apidiff/worktrees/branch, a worktree of its own
-      And every haven up and haven destroy command names one of those two worktree directories
+      And every haven up and haven down --destroy command names one of those two worktree directories
       And no haven command ever runs with the invoking checkout as its directory
       And the developer's own stack in the invoking checkout is never started, restarted or destroyed
 
@@ -158,8 +158,8 @@ Feature: apidiff boots its instances through haven
     Scenario: Teardown never runs from the invoking checkout
       Given both instances are up as haven stacks under worktrees added for this run alone
       When the run tears down
-      Then haven destroy runs for exactly the branch and base slugs
-      And neither haven destroy command's directory is the invoking checkout
+      Then haven down --destroy runs for exactly the branch and base slugs
+      And neither haven down --destroy command's directory is the invoking checkout
       And both owned worktrees leave git's list at once and are deleted in the background, and the invoking checkout is not a worktree this run owns
 
   Rule: -dry-run prints the plan and starts nothing

@@ -70,6 +70,8 @@ class BareRoute extends UiRoute {
 }
 class SilentFeedback extends UiFeedback {
   succeeded(): void {}
+  warned(): void {}
+  informed(): void {}
   failed(): void {}
 }
 class OrgScope extends UiScope {

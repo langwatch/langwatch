@@ -1,14 +1,6 @@
 import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Link } from "@langwatch/browser-host/link";
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { useEffect, useState } from "react";
 
@@ -22,6 +14,7 @@ import {
   governingConnectionFrom,
 } from "../../model/sign-in-error-code.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import { FRONT_DOOR_PRIMARY_STYLE } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
@@ -190,25 +183,13 @@ export function SignInErrorScreen() {
           <Spinner size="sm" color="frontDoor.detail" />
           <Text color="fg.muted">One moment.</Text>
         </HStack>
-        <Text fontSize="13px" color="fg.muted" textAlign="center">
-          If nothing happens,{" "}
-          <Box
-            asChild
-            color="fg"
-            fontWeight={600}
-            textDecoration="underline"
-            textUnderlineOffset="3px"
-          >
-            <Link href="/">go to sign in</Link>
-          </Box>
-          .
-        </Text>
+        <FrontDoorLinkButton href="/" label="Go to sign in" tone="secondary" />
       </VStack>
     </AuthCard>
   );
 }
 
-/** The alert body for one sign-in error code. */
+/** The card body for one sign-in error code: what happened, then the one way on. */
 function SignInErrorDescription({
   error,
   callbackUrl,
@@ -220,127 +201,114 @@ function SignInErrorDescription({
 }) {
   if (governingConnection) {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>
-            An account with this email address already exists, and your organization requires its
-            single sign-on for it. Sign in with your organization&apos;s single sign-on instead.
-          </Text>
-          <Button
-            {...FRONT_DOOR_PRIMARY_STYLE}
-            marginTop={4}
-            onClick={() => void signIn(governingConnection, { callbackUrl: callbackUrl ?? "/" })}
-          >
-            Continue with your organization&apos;s sign-in
-          </Button>
-          <Button asChild variant="outline">
-            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>
+          An account with this email address already exists, and your organization requires its
+          single sign-on for it. Sign in with your organization&apos;s single sign-on instead.
+        </Text>
+        <Button
+          {...FRONT_DOOR_PRIMARY_STYLE}
+
+          onClick={() => void signIn(governingConnection, { callbackUrl: callbackUrl ?? "/" })}
+        >
+          Continue with your organization&apos;s sign-in
+        </Button>
+        <FrontDoorLinkButton
+          href={FEDERATED_LOGOUT_PATH}
+          label="Sign out and try again"
+          tone="secondary"
+        />
+      </VStack>
     );
   }
 
   if (error === "OAuthAccountNotLinked") {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>
-            An account with this email address already exists, and this sign-in method can&apos;t be
-            added to it because the provider didn&apos;t confirm the address. Sign in with the
-            method you used before, then connect this one in Settings &gt; Security.
-            <br />
-            <br />
-            If your organization uses single sign-on, enter your work email and choose your company
-            login.
-          </Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>
+          This email already has an account. Sign in the way you did before, then connect this
+          method in Settings &gt; Security.
+        </Text>
+        <Text fontSize="13px" color="fg.muted">
+          If your organization uses single sign-on, enter your work email and choose your company
+          login.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+        </Button>
+      </VStack>
     );
   }
 
   if (error === "DIFFERENT_EMAIL_NOT_ALLOWED") {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>
-            You cannot link an account with a different email address. Please use the same email
-            address as your current account.
-          </Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <Link href="/settings/authentication">Back to Settings</Link>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>
+          You cannot link an account with a different email address. Please use the same email
+          address as your current account.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/settings/authentication">Back to Settings</Link>
+        </Button>
+      </VStack>
     );
   }
 
   if (error === "SSO_PROVIDER_NOT_ALLOWED" || error === "SSO_REQUIRED_BY_ORGANIZATION") {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>
-            Your organization requires single sign-on. Sign out and sign in again by entering your
-            company email address, then choose your organization's login.
-          </Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>
+          Your organization requires single sign-on. Sign out and sign in again by entering your
+          company email address, then choose your organization's login.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+        </Button>
+      </VStack>
     );
   }
 
   if (error === "signed_in_as_another_user") {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>
-            You are already signed in as someone else. Sign out, then sign in again from your
-            identity provider.
-          </Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <a href={FEDERATED_LOGOUT_PATH}>Sign out</a>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>
+          You are already signed in as someone else. Sign out, then sign in again from your identity
+          provider.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <a href={FEDERATED_LOGOUT_PATH}>Sign out</a>
+        </Button>
+      </VStack>
     );
   }
 
   if (error === "LINK_NEEDS_APPROVAL") {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>
-            We could not confirm that this login belongs to your LangWatch account, so it has not
-            been added to it.
-            <br />
-            <br />
-            An administrator in your organization can review the request and approve it. In the
-            meantime, sign in with a method you have used before.
-          </Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>
+          We could not confirm that this login belongs to your LangWatch account, so it has not been
+          added to it.
+        </Text>
+        <Text fontSize="13px" color="fg.muted">
+          An administrator in your organization can review the request and approve it. In the
+          meantime, sign in with a method you have used before.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+        </Button>
+      </VStack>
     );
   }
 
   const refusal = cutoverSignInRefusal(error);
   if (refusal) {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>{refusal.body}</Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <Link href="/auth/signin">Back to sign in</Link>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>{refusal.body}</Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/auth/signin">Back to sign in</Link>
+        </Button>
+      </VStack>
     );
   }
 
@@ -348,29 +316,26 @@ function SignInErrorDescription({
   const admitted = admittedCopyFor(error);
   if (admitted) {
     return (
-      <Alert.Description>
-        <VStack gap={1} align="start">
-          <Text>{admitted.description}</Text>
-          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
-            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-          </Button>
-        </VStack>
-      </Alert.Description>
+      <VStack gap={4} align="stretch">
+        <Text>{admitted.description}</Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+        </Button>
+      </VStack>
     );
   }
 
   return (
-    <Alert.Description>
-      Redirecting back to sign in, please try again...
-      <br />
-      <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
+    <VStack gap={4} align="stretch">
+      <Text>Please try signing in again.</Text>
+      <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
         <Link
           href={`/auth/signin${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
         >
-          Try Sign In Again
+          Back to sign in
         </Link>
       </Button>
-    </Alert.Description>
+    </VStack>
   );
 }
 
@@ -387,19 +352,11 @@ export function SignInError({ error: rawError }: { error: string }) {
 
   return (
     <AuthCard title={errorTitle(error)}>
-      <Alert.Root
-        className="lw-front-door-alert"
-        status={error === "OAuthAccountNotLinked" ? "warning" : "error"}
-      >
-        <Alert.Indicator />
-        <Alert.Content gap={4}>
-          <SignInErrorDescription
-            error={error}
-            callbackUrl={callbackUrl}
-            governingConnection={governingConnection}
-          />
-        </Alert.Content>
-      </Alert.Root>
+      <SignInErrorDescription
+        error={error}
+        callbackUrl={callbackUrl}
+        governingConnection={governingConnection}
+      />
       {trace && (
         <Text
           fontSize="11.5px"

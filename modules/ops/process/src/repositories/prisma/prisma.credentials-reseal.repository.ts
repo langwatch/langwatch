@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { SEALED_VALUE_PATTERN } from "../../rules/credentials-reseal.rules.ts";
@@ -15,7 +16,8 @@ import {
  */
 type CredentialsResealDatabase = Pick<PrismaClient, "$queryRawUnsafe" | "$transaction">;
 
-const TENANCY = "-- @tenancy: cross-tenant credential re-seal; operator task";
+// A cross-tenant credential re-seal: an operator task over every sealed column.
+const TENANCY = skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql;
 
 type ColumnRow = {
   table: string;

@@ -3,7 +3,11 @@
  * per-scope and data-dependent, so every procedure declares itself
  * service-authorized; the plaintext key answers only from create and rotate.
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { GatewayApi, virtualKeyTrpc } from "@langwatch/gateway-contract";
 import { type Instant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
@@ -20,7 +24,7 @@ function toExpiryInstant(value: TimeInput | null | undefined): Instant | null | 
  * a session IS belongs to the process's authentication, not to this module, so
  * the handlers pass it straight to the checks and never read it.
  */
-export const gatewaySessionFact = defineTrpcFact("gatewaySession", z.unknown());
+export const gatewaySessionContext = defineMiddlewareContext("gatewaySession", z.unknown());
 
 /**
  * The reason every procedure here declares. Each one names the permissions the
@@ -80,7 +84,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     // Takes a draft (picked scopes, no key row yet) so the list is answerable
     // before the key is created.
     .procedure("applicableBudgets")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; for an existing key, its visibility in this organization, and for a draft, manage on every scope in it, both checked before any budget data is read`,
       permissions: ["virtualKeys:view", "virtualKeys:manage"],
@@ -91,7 +95,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
 
     .procedure("create")
     .mintsCredential("virtualKeys:create")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; manage on every requested scope, and every scope anchored to this organization, both before the key is minted`,
       permissions: ["virtualKeys:manage"],
@@ -133,7 +137,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     })
 
     .procedure("update")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes, plus manage on every new scope when re-scoping`,
       permissions: ["virtualKeys:update", "virtualKeys:manage"],
@@ -171,7 +175,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
 
     .procedure("rotate")
     .mintsCredential("virtualKeys:rotate")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; rotate on one of the key's existing scopes`,
       permissions: ["virtualKeys:rotate"],
@@ -195,7 +199,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     })
 
     .procedure("revoke")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; delete on one of the key's existing scopes`,
       permissions: ["virtualKeys:delete"],
@@ -217,7 +221,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     })
 
     .procedure("disable")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
       permissions: ["virtualKeys:update"],
@@ -240,7 +244,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     })
 
     .procedure("enable")
-    .withFacts(gatewaySessionFact)
+    .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
       permissions: ["virtualKeys:update"],

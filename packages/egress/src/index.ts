@@ -2,6 +2,7 @@ export { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrf/blocked-ho
 export {
   createSsrfUrlValidator,
   isBlockedCloudDomain,
+  isCloudMetadataHost,
   isPrivateOrLocalhostIP,
 } from "./ssrf/url-validator.ts";
 export type {

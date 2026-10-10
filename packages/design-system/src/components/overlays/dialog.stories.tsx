@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Dialog } from "./dialog.tsx";
 
 const meta = {
-  title: "Components/Dialog",
+  title: "Overlays/Dialog",
+  parameters: {
+    usage: {
+      use: "A short, focused task or decision that blocks the page: confirm, rename, a small form.",
+      avoid:
+        "Long forms, details or anything with its own navigation: use Drawer (design/components.md).",
+    },
+  },
   component: Dialog.Root,
   tags: ["autodocs"],
   args: { open: true, children: null },

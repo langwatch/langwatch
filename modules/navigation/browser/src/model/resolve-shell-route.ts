@@ -1,3 +1,5 @@
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+
 import {
   isOrganizationScopedProduct,
   isPathUnder,
@@ -62,6 +64,24 @@ function seatRefusalAt({
   if (seatReachesProduct({ product, organizationRole })) return null;
   const permission = product.gates.find((gate) => gate.permission)?.permission ?? product.label;
   return { productId, permission };
+}
+
+/**
+ * Whether the address names a product whose page-closing flag answered off. Main drew
+ * that 404 with no product chrome around it (WithFeatureFlagGuard outside the layout).
+ */
+export function isSwitchedOffProductAt({
+  pathname,
+  isFlagOff,
+}: {
+  pathname: string;
+  isFlagOff: (flag: FrontendFeatureFlag) => boolean;
+}): boolean {
+  const productId = isSettingsShellRoute(pathname) ? null : productFromPathname(pathname);
+  if (!productId) return false;
+  return productById(productId).gates.some(
+    (gate) => gate.closesPages === true && gate.flag !== void 0 && isFlagOff(gate.flag),
+  );
 }
 
 /** Product and scope resolver; settings detour is not a product; match on segment boundary */

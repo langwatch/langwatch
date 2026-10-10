@@ -38,7 +38,10 @@ export const createNodes = [
       const outputs = dirs.map((dir) => `{workspaceRoot}/${dir}/dist`);
       const target = {
         executor: "nx:run-commands",
-        options: { cwd: "{workspaceRoot}", command: "tsc -b --builders 16 tsconfig.build.json" },
+        options: {
+          cwd: "{workspaceRoot}",
+          command: "GOMEMLIMIT=2GiB tsc -b --builders 1 tsconfig.build.json",
+        },
         cache: true,
         inputs,
         outputs,

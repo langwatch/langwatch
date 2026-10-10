@@ -32,25 +32,24 @@ Feature: Identity's four pipelines are declared, and connected by the process
     Then the answer is that the command is not commandable on this process
 
   @unit
-  Scenario: Identity appends to its own aggregates through each pipeline's own event store
+  Scenario: Identity appends and reads its own aggregates through each pipeline's own event store
     Given the process builds identity's pipelines over their own event stores
     When a join-request command states a fact
     Then the fact is appended through the join-request pipeline's store in the organization's tenant
     And a pipeline built only to be listed hands its store to nobody
 
   @unit
-  Scenario: A ledger whose pipeline this process never built refuses by name
+  Scenario: A ledger or history whose pipeline this process never built refuses by name
     Given this process never built identity's join-request pipeline
     When a join-request command commits
     Then it is refused naming the pipeline, and no command is staged
 
   @unit
-  Scenario: A person's identity history is readable from a process that only sends commands
-    Given a process whose event store refuses every read, as the API's does
-    And a person whose identity log holds an attached identifier and an MFA enrollment
-    When that person's identity history and link proposals are read
-    Then they are answered through the event read seat, in the person's own tenant, MFA facts included
-    And the same read through the identity pipeline's own event store is refused by name
+  Scenario: Identity's history is read through eventing's read seat on a process that only produces
+    Given the api process, whose event store refuses every read
+    When a person's identity history or an SSO connection's history is read
+    Then one aggregate's stream is read through eventing's read seat in its own tenant, MFA facts included
+    And where the process has no event log the read refuses by name rather than reading as empty
 
   @unit
   Scenario: An SSO connection command commits on a process that only produces commands

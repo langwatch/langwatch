@@ -142,7 +142,7 @@ async function main() {
 
     // Step 2: Register test user via tRPC API
     console.log("Step 2: Registering test user...");
-    const regResp = await page.request.post(`${baseUrl}/api/trpc/user.register?batch=1`, {
+    const regResp = await page.request.post(`${baseUrl}/api/trpc/auth.register?batch=1`, {
       data: {
         0: {
           json: {

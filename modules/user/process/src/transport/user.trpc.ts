@@ -4,7 +4,7 @@
  * Spec: modules/user/specs/user.feature, specs/settings/user-avatar.feature.
  */
 import {
-  browserSessionFact,
+  browserSessionContext,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
@@ -38,7 +38,13 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   userTrpc,
 )
   .procedure("getAvatarUrl")
-  .noPermission({ reason: ANY_SIGNED_IN })
+  .noPermission({
+    reason: ANY_SIGNED_IN,
+    allow: {
+      projectId:
+        "part of the avatar object's address; the read serves only an avatar-purpose, user-owned object",
+    },
+  })
   .handle(({ app, input }) => app.getAvatarUrl(input))
 
   .procedure("getTraceExplorerTourPreference")
@@ -97,9 +103,9 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     return { success: true as const };
   })
 
-  // The session travels as a fact: the offer follows how THIS sign-in happened.
+  // The session travels as middleware context: the offer follows how THIS sign-in happened.
   .procedure("secureAccountNudge")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(({ app, actor }, browserSession) =>
     app.getPasskeyOffer({ id: actor.id, sessionId: browserSession ?? null }),

@@ -89,6 +89,7 @@ import {
   LAST_USED_METHOD_STORAGE_KEY,
   promotePendingMethod,
 } from "../../../model/last-used-method.ts";
+import { PASSKEY_ON_THIS_DEVICE_STORAGE_KEY } from "../../../model/passkey-on-this-device.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 
@@ -283,7 +284,7 @@ describe("given the identifier-first sign-in screen", () => {
       routeMock.mockResolvedValue(soleConnection);
       renderScreen();
 
-      expect(await screen.findByRole("link", { name: /try sign in again/i })).toBeTruthy();
+      expect(await screen.findByRole("link", { name: /back to sign in/i })).toBeTruthy();
       expect(signInMock).not.toHaveBeenCalled();
     });
 
@@ -794,6 +795,7 @@ describe("given the identifier-first sign-in screen", () => {
         ],
         reasonCode: "no_domain_match",
       } satisfies RoutingDecision);
+      window.localStorage.setItem(PASSKEY_ON_THIS_DEVICE_STORAGE_KEY, "1");
 
       renderScreen();
 

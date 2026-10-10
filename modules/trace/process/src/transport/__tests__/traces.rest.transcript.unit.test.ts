@@ -1,8 +1,8 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /**
  * `GET /api/v1/traces/:traceId/transcript`: main's REST read of one trace's coding-agent
@@ -42,13 +42,13 @@ function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({
+      bindMiddlewareContext(tracesRestCredential, () => ({
         principal: { type: "apiKey" as const, id: "key-1" },
       })),
     ],

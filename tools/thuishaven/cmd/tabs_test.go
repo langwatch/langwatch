@@ -15,8 +15,15 @@ import (
 // tabs are printed by a command that already existed, because ADR-064 allows
 // exactly one name per command.
 var tabCommandFor = map[string]string{
-	"session": "status",
-	"logs":    "logs",
+	"session":  "status",
+	"logs":     "logs",
+	"jobs":     "status",
+	"stores":   "status",
+	"traces":   "obs traces",
+	"metrics":  "obs metrics",
+	"profiles": "obs profiles",
+	"mail":     "sim mail",
+	"idp":      "sim idp",
 }
 
 // @scenario "Every tab has a plain form for agents"

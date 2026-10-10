@@ -123,13 +123,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
     {
       reader: "trace",
       table: "instant_eval_judgments",
-      file: "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts",
+      file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
       reason: SUBQUERY,
     },
     {
       reader: "trace",
       table: "simulation_runs",
-      file: "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts",
+      file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
       reason: SUBQUERY,
     },
     {
@@ -179,6 +179,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       readers: ["billing"],
       reason:
         "billing sums a connected customer's confirmed spend per request type for its statement and term cap (round 37 D5, EF-5)",
+    },
+    {
+      table: "gateway_budget_ledger_events",
+      owner: "gateway",
+      readers: ["billing"],
+      reason:
+        "billing sums the contract budget's bucket since its window opened, the spend the gateway enforces (C3a D5, Alex 2026-10-10)",
     },
     {
       table: "log_records",
@@ -495,6 +502,26 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
   return ts.isIdentifier(value) ? reader.constant(value.text) : void 0;
 }
 
+function isInsertOptions(node: ts.Node): boolean {
+  const call = node.parent;
+
+  return (
+    ts.isCallExpression(call) &&
+    ts.isPropertyAccessExpression(call.expression) &&
+    call.expression.name.text === "insert"
+  );
+}
+
+/** `{ table: CONSTANT }` handed to a read helper: the constant names the table read. */
+function readTable(reader: Reader, property: ts.Node): string | undefined {
+  if (!ts.isPropertyAssignment(property) || isInsertOptions(property.parent)) return void 0;
+
+  const { name, initializer } = property;
+  if (!ts.isIdentifier(name) || name.text !== "table") return void 0;
+
+  return ts.isIdentifier(initializer) ? reader.constant(initializer.text) : void 0;
+}
+
 /** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
 function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): string | undefined {
   const spans = template.templateSpans;
@@ -543,6 +570,9 @@ function readFile({
       const table = insertedTable(reader, node);
       if (table) record({ reader, node, table, write: true });
     }
+
+    const read = readTable(reader, node);
+    if (read) record({ reader, node, table: read, write: false });
 
     ts.forEachChild(node, visit);
   };

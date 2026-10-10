@@ -75,34 +75,4 @@ describe("EventLogReadSeat over the ClickHouse event log", () => {
       });
     });
   });
-
-  describe("when asked for one aggregate's events", () => {
-    /** @scenario "The event log stream read names the tenant first and the whole stream key" */
-    it("names the tenant first, then the aggregate type and id", async () => {
-      const { client, statements } = recordingClient("event-1");
-      const seat = EventLogReadSeat.create({
-        repository: EventingClickHouseEventRepository.createForEventReads({
-          resolveClient: async () => client,
-        }),
-      });
-
-      const events = await seat.getEvents({
-        tenantId: createTenantId("organization-1"),
-        aggregateType: "sso_connection",
-        aggregateId: "connection-1",
-      });
-
-      const [statement] = statements;
-      const where = statement!.query.replace(/\s+/g, " ");
-      expect(where).toMatch(
-        /WHERE TenantId = \{tenantId:String\} AND AggregateType = \{aggregateType:String\} AND AggregateId = \{aggregateId:String\} ORDER BY/,
-      );
-      expect(statement!.query_params).toEqual({
-        tenantId: "organization-1",
-        aggregateType: "sso_connection",
-        aggregateId: "connection-1",
-      });
-      expect(events.map((event) => event.id)).toEqual(["event-1"]);
-    });
-  });
 });

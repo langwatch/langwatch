@@ -115,7 +115,8 @@ export const TemplateLogicMenu = ({
         flip: true,
         slide: true,
       }}
-
+      // A typed-trigger menu has no search input: focus stays in the textarea.
+      {...(onQueryChange ? {} : { autoFocus: false })}
       lazyMount
       unmountOnExit
     >

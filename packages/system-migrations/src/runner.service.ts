@@ -96,6 +96,27 @@ export class SystemMigrationRunnerService {
     return summary;
   }
 
+  /**
+   * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row
+   * for `migrationName`. Read from state, never from a pass: a tenant claimed elsewhere, or by
+   * nobody while the lease store is down, counts until its row is finished.
+   */
+  async hasUnfinishedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
+    let cursor: string | null = null;
+    for (;;) {
+      const page = await this.deps.tenants.findTenantIdsAfter({ cursor, limit: TENANT_PAGE_SIZE });
+      if (page.length === 0) return false;
+      cursor = page[page.length - 1] ?? null;
+      for (const tenantId of page) {
+        if (!(await this.deps.cohort({ tenantId, migrationName }))) continue;
+        const record = await this.deps.state
+          .getRecord({ migrationName, tenantId })
+          .catch(undefinedWhenNotFound);
+        if (!isTerminalTenantStatus(record?.status)) return true;
+      }
+    }
+  }
+
   /** Every cohort tenant, a page at a time, until abort. */
   private async driveTenants(args: {
     summary: MigrationPassSummary;

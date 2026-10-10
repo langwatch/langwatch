@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SmallLabel } from "./small-label.tsx";
 
 const meta = {
-  title: "Primitives/Small label",
+  title: "Inputs and forms/Small label",
+  parameters: {
+    usage: {
+      use: "The small label above a group of values in a panel.",
+      avoid: "A field's own label: use Field.Label from primitives.",
+    },
+  },
   component: SmallLabel,
   tags: ["autodocs"],
   args: {

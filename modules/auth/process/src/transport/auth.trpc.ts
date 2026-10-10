@@ -5,9 +5,9 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
-  browserSessionFact,
-  callerAddressFact,
-  defineTrpcFact,
+  browserSessionContext,
+  callerAddressContext,
+  defineMiddlewareContext,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
@@ -21,13 +21,13 @@ import { z } from "zod";
  * `sendMyAddressConfirmation` mails it, so it may come from nowhere the
  * caller controls.
  */
-export const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
+export const callerEmailContext = defineMiddlewareContext("callerEmail", z.string().nullable());
 
 /**
  * The headers this request arrived with, bound by auth's own install. The
  * procedures that read it hand better-auth the caller's own cookie, nothing else.
  */
-export const authRequestHeadersFact = defineTrpcFact(
+export const authRequestHeadersContext = defineMiddlewareContext(
   "authRequestHeaders",
   z
     .record(z.string(), z.union([z.string(), z.array(z.string())]).optional())
@@ -103,7 +103,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * router itself cannot tell the two apart either (ADR-117 §2).
    */
   .procedure("route")
-  .withFacts(callerAddressFact)
+  .withMiddlewareContext(callerAddressContext)
   .withAccess(ANONYMOUS_ROUTING)
   .handle(async ({ app, input }, address) => {
     await spend({
@@ -123,7 +123,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * no-oracle invariant covers sign-in and reset, not sign-up.
    */
   .procedure("requestSignUpVerification")
-  .withFacts(callerAddressFact, authRequestHeadersFact)
+  .withMiddlewareContext(callerAddressContext, authRequestHeadersContext)
   .withAccess(OWN_SIGN_UP)
   .handle(async ({ app, input }, address, headers) => {
     // The sign-in this sign-up ends in is refused on a foreign origin, so refuse before mailing.
@@ -151,7 +151,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * refusal, being recoverable in one click by the inviter (D11).
    */
   .procedure("inviteLanding")
-  .withFacts(callerAddressFact)
+  .withMiddlewareContext(callerAddressContext)
   .withAccess(INVITE_CODE_IS_THE_AUTHORIZATION)
   .handle(async ({ app, input }, address) => {
     await spend({
@@ -171,7 +171,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * members table. A stale code refreshing itself would make expiry decorative.
    */
   .procedure("requestFreshInvite")
-  .withFacts(callerAddressFact)
+  .withMiddlewareContext(callerAddressContext)
   .withAccess(FRESH_INVITE_REQUEST)
   .handle(async ({ app, input }, address) => {
     await spend({
@@ -189,7 +189,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
 
   /** Whether the caller's own address is confirmed, behind the "not confirmed yet" nudge. */
   .procedure("myAddressConfirmation")
-  .withFacts(callerEmailFact)
+  .withMiddlewareContext(callerEmailContext)
   .noPermission({ reason: OWN_ADDRESS_STATE })
   .handle(({ app }, email) => app.getMyAddressConfirmation({ email }))
 
@@ -199,7 +199,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * pointed at any address anybody types.
    */
   .procedure("sendMyAddressConfirmation")
-  .withFacts(callerEmailFact)
+  .withMiddlewareContext(callerEmailContext)
   .noPermission({ reason: OWN_ADDRESS })
   .handle(async ({ app, actor, input }, email) => {
     const { identifierId } = await app.sendMyAddressConfirmation({
@@ -213,7 +213,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
 
   /** Why a signed-out visitor is here: only an expired session of theirs names its address. */
   .procedure("priorSession")
-  .withFacts(authRequestHeadersFact)
+  .withMiddlewareContext(authRequestHeadersContext)
   .withAccess(OWN_SESSION_COOKIE)
   .handle(({ app }, headers) => app.getPriorSession({ headers }))
 
@@ -226,9 +226,9 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
     return { success: true as const };
   })
 
-  /** The session row travels as a fact, so the reading browser is marked and refused by name. */
+  /** The session row travels as middleware context: the reading browser is refused by name. */
   .procedure("browserSessions")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor }, browserSession) => [
     ...(await app.listBrowserSessions({
@@ -238,7 +238,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
   ])
 
   .procedure("endBrowserSession")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(({ app, actor, input }, browserSession) =>
     app.endBrowserSession({
@@ -251,7 +251,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
   // `register` predates the account it creates, so it runs with no caller at all and the
   // address it arrived from is the only thing to throttle on (D-A1U-2, wire from `user.*`).
   .procedure("register")
-  .withFacts(callerAddressFact, authRequestHeadersFact)
+  .withMiddlewareContext(callerAddressContext, authRequestHeadersContext)
   .withAccess(
     publicRoute({
       reason:
@@ -270,10 +270,11 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
     }),
   )
 
-  // The session row travels as a fact: one person on two tabs is one actor and two sessions,
-  // so "end every session but this one" asks about the request (D-A1U-4, wire from `user.*`).
+  // The session row travels as middleware context: one person on two tabs is one actor and two
+  // sessions, so "end every session but this one" asks about the request (D-A1U-4, wire from
+  // `user.*`).
   .procedure("setPassword")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor, input }, browserSession) => {
     await app.setOwnFirstPassword({
@@ -287,7 +288,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
   })
 
   .procedure("changePassword")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor, input }, browserSession) => {
     await app.changeOwnPassword({

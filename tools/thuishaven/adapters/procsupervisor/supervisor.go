@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -247,7 +249,7 @@ func containsAny(value string, needles []string) bool {
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 	c := proc{
 		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain,
-		preview: s.recent, sink: newLogSinkSince(ac.LogPath, s.startedAt), crash: &crashDedup{},
+		preview: s.recent, sink: newCapture(ac, s.startedAt), crash: &crashDedup{},
 	}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
@@ -332,7 +334,7 @@ type proc struct {
 	// sink captures every line (timestamped) to the per-service log file the
 	// `haven logs` command reads — nil for one-shot lanes. Capture always
 	// gets the full line, dedup or not: only the live echo below is folded.
-	sink *logSink
+	sink *capture
 	// crash collapses a fatal line repeated across consecutive restarts into
 	// a short counter instead of the same failure once per restart — nil for
 	// a proc that never restarts (RunOnce, RunOnceBounded, WaitReady).
@@ -473,6 +475,9 @@ func (c proc) stream(r io.Reader) {
 		case err == nil:
 			c.captureLine(&w, string(line))
 			line = line[:0]
+			if br.Buffered() == 0 { // a crash dump arrives in one burst; a pause ends the raw run
+				c.flushRaw(&w)
+			}
 		case errors.Is(err, bufio.ErrBufferFull):
 			// No newline yet. Emit a segment once the line is over the cap and
 			// keep reading the rest of it, so memory stays bounded and the pipe
@@ -510,7 +515,7 @@ type rawWindow struct {
 // line to the window instead of rendering it immediately.
 func (c proc) captureLine(w *rawWindow, line string) {
 	line = strings.TrimRight(line, "\r\n")
-	c.sink.writeLine(line)
+	c.sink.write(line, false)
 	if logfmt.Muted(c.name, line) {
 		return
 	}
@@ -527,11 +532,16 @@ func (c proc) captureLine(w *rawWindow, line string) {
 // how many more followed, with the raw run still readable in full through
 // `haven logs <lane> --raw` (the sink already has every one of them).
 func (c proc) flushRaw(w *rawWindow) {
-	switch len(w.lines) {
-	case 0:
+	switch {
+	case len(w.lines) == 0:
 		return
-	case 1:
-		c.render(w.lines[0])
+	case len(w.lines) <= plainRunLines && !slices.ContainsFunc(w.lines, crashLine.MatchString):
+		for _, line := range w.lines { // plain output (a build note, a summary) is not a crash
+			c.render(line)
+		}
+	case !slices.ContainsFunc(w.lines, crashLine.MatchString):
+		c.render(levelRecordLine("info", fmt.Sprintf("%s (+%d lines in haven logs %s --raw)",
+			w.lines[0], len(w.lines)-1, c.name), time.Time{}))
 	default:
 		msg := fmt.Sprintf(
 			"%s (+%d lines, stack in haven logs %s --raw)",
@@ -542,13 +552,20 @@ func (c proc) flushRaw(w *rawWindow) {
 	w.lines = nil
 }
 
+// plainRunLines is the longest burst of plain lines shown line by line; a longer one (a build's
+// output) folds into one info line.
+const plainRunLines = 8
+
+// crashLine is a line only a crash dump prints: a JS or Go stack frame, an Error: header, a panic.
+var crashLine = regexp.MustCompile(`^\s+at |\w*Error:|^panic:|^goroutine \d+ \[`)
+
 // logln captures one line and echoes it live. Used for the supervisor's own
 // synthetic lines (a restart notice, a start failure) — never for a child's
 // raw stream, which goes through captureLine/flushRaw instead so a burst of
 // unstructured output collapses to one line rather than one per frame.
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
-	c.sink.writeLine(line)
+	c.sink.write(line, true)
 	// Captured first, echoed second: a tool banner — or a fatal line about to
 	// be folded into a repeat counter below — is still in the log file
 	// `haven logs --raw` replays in full, it just does not reach the terminal

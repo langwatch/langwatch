@@ -17,7 +17,7 @@ export function useTraceHeader({
   full,
   tenantId,
   enabled = true,
-}: TraceHeaderReadInput & {
+}: Omit<TraceHeaderReadInput, "tenantId"> & {
   full: boolean;
   /** The member that owns the trace on an aggregate (ADR-177 block F). */
   tenantId?: string | null;

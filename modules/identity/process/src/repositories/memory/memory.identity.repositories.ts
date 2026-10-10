@@ -89,14 +89,12 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
     ssoRegistrationSlots: MemorySsoConnectionRegistrationRepository.create(store),
     ssoAdmin: MemorySsoConnectionAdminRepository.create(store),
-    ssoConnectionHistory: MemorySsoConnectionHistoryRepository.create(),
     ssoReproofTargets: MemorySsoDomainReproofTargetRepository.create(store),
     ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
     ssoCredentials: MemorySsoCredentialRepository.create(store),
     ssoEngineProviders: MemorySsoEngineProviderRepository.create(store),
     ssoRegistrants: MemorySsoRegistrantReadRepository.create(store),
     ssoMigrationEvidence: MemorySsoMigrationEvidenceRepository.create(store),
-    identityHistory: MemoryIdentityHistoryRepository.create(store),
     identityProjection: MemoryIdentityProjectionRepository.create(),
     mfaProjection: MemoryStateProjectionRepository.create<MfaFoldState>(),
     joinRequestProjection: MemoryStateProjectionRepository.create<JoinRequestFoldState>(),
@@ -108,5 +106,7 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
     identityLookup: MemoryIdentityLookupRepository.create(store),
     rateLimits: MemoryIdentityRateLimitRepository.create(),
+    identityHistory: MemoryIdentityHistoryRepository.create(store),
+    ssoConnectionHistory: MemorySsoConnectionHistoryRepository.create(store),
   };
 }

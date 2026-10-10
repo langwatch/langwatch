@@ -1,13 +1,13 @@
 import { moduleApi } from "@langwatch/module";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
-import type { PrivacyPolicyRequestMemo } from "./data-privacy.request-memo.ts";
 import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 import type {
   DataPrivacyConfig,
   DataPrivacyPiiRedactionLevel,
   DataPrivacyPolicy,
   DataPrivacyScope,
+  PrivacyPolicyRequestMemo,
   ResolvedDataPrivacy,
 } from "./data-privacy.ts";
 

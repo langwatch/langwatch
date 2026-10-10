@@ -96,6 +96,10 @@ Feature: storagesim, a local S3 stand-in run by haven
     And the overlay sets STORED_OBJECTS_BACKEND, S3_BUCKET_NAME, S3_ENDPOINT and dummy S3 credentials for it
     And "haven up -storage" once turns it off for the worktree
 
+  Scenario: haven gives storagesim a private bucket for a private-storage organization
+    When the developer runs "haven up"
+    Then storagesim holds bucket langwatch and bucket langwatch-private from the start
+
   Scenario: A developer's own object storage choice wins
     Given the worktree's environment already names S3_BUCKET_NAME, S3_ENDPOINT, STORED_OBJECTS_BACKEND or LANGWATCH_LOCAL_STORAGE_PATH
     When the developer runs "haven up"
@@ -148,8 +152,8 @@ Feature: storagesim, a local S3 stand-in run by haven
     When the developer deletes it, clears its bucket, adds the demo objects and copies a presigned URL
     Then each action calls its control route and the lists refresh
 
-  Scenario: haven storage presigns, seeds and reads the request log for agents
-    When an agent runs "haven storage presign <bucket> <key> --put", "haven storage seed" and "haven storage requests"
+  Scenario: haven sim storage presigns, seeds and reads the request log for agents
+    When an agent runs "haven sim storage presign <bucket> <key> --put", "haven sim storage seed" and "haven sim storage list"
     Then each calls its control route, and the requests verb prints auth and request id per line
 
   Scenario: The console serves its bundle beside the S3 paths

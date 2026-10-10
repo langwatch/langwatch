@@ -12,7 +12,7 @@ import {
 /** Every offloaded trace field is recorded on the trace aggregate; no other is asked. */
 const TRACE_AGGREGATE_TYPE = "trace";
 
-/** The one read this repository takes off the seat. */
+/** Trace reads one event by id; the seat's stream read is identity's alone. */
 type TraceEventReads = Pick<EventReadSeat, "getEvent">;
 
 /**

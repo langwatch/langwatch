@@ -52,7 +52,7 @@
     "@langwatch/user-contract": "workspace:*",
     "@slack/webhook": "catalog:",
     "better-auth": "catalog:",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "prom-client": "catalog:",
     "samlify": "2.13.1",
     "zod": "catalog:"

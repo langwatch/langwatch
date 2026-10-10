@@ -26,7 +26,7 @@ what it expects. There is no ambient auth: the proof goes down by hand.
 | ⚠️ A witness type exists and nothing takes it                                          | `Authorized<Tier, Permission>`, `authz-contract/src/authz.ts:207` | ADR-092's L3 was never wired                                                 |
 | ⚠️ Events carry `tenantId` and no actor                                                | `packages/eventing/src/domain/types.ts:34`                        | Workers act as nobody                                                        |
 | ⚠️ A grant change bumps the epoch after the row, and an expiring binding bumps nothing | `authz-grant.store.ts:292`, `authz-collector.service.ts:308`      | A cached snapshot can answer for up to 30s after a revoke                    |
-| ⚠️ Raw SQL bypasses the guard                                                          | 77 `-- @tenancy:` opt-outs in 36 files                            | Out of reach of any client-side check                                        |
+| ⚠️ Raw SQL bypasses the guard                                                          | 84 `SKIP_TENANT_CHECK` skips in 42 files (2026-10-10)            | Out of reach of any client-side check                                        |
 
 ## Decision
 
@@ -254,7 +254,7 @@ The budget is under 5% of p50 store time, measured on the guard test corpus befo
 
 |                                                 | `Authorization` at the store | Postgres RLS (`SET LOCAL app.tenant`)                                               |
 | ----------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
-| Covers raw SQL (77 opt-outs)                    | ❌ lint and `@tenancy:` only | ✅                                                                                  |
+| Covers raw SQL (84 skips)                       | ❌ lint and the skip flag only | ✅                                                                                  |
 | Covers ClickHouse, shares, memory twins         | ✅ one proof                 | ❌ Postgres only                                                                    |
 | Carries actor, principal, permission, condition | ✅                           | ❌ tenant only                                                                      |
 | A mismatch                                      | Loud, named refusal          | Silently empty result                                                               |

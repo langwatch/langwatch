@@ -1,6 +1,6 @@
 // Package orbstore keeps what the haven dev orb sends from a stack's app page:
 // one JSON file per feedback item, and the page's latest console and network
-// buffer. It lives in the stack's log directory, so `haven destroy` takes it.
+// buffer. It lives in the stack's log directory, so `haven down --destroy` takes it.
 package orbstore
 
 import (

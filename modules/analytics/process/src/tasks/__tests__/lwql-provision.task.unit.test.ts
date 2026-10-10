@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { LwqlProvisionTask, type LwqlProvisioningDatabase } from "../lwql-provision.task.ts";
+import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import { LwqlProvisionTask } from "../lwql-provision.task.ts";
 
 function untouchedDatabase(): LwqlProvisioningDatabase {
   return { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };

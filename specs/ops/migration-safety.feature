@@ -39,6 +39,12 @@ Feature: Migration safety
     Then the scanner reports nothing
 
   @unit
+  Scenario: A Postgres drop without an archive note is refused by name
+    When the migration drops a column or table and carries no "-- archive:" note
+    Then the scanner names the migration and the object
+    And the fix says to name the archived table or write "-- archive: none (<reason>)"
+
+  @unit
   Scenario: A new NOT NULL column without a default is refused by name
     When the migration adds a NOT NULL column with no DEFAULT
     Then the scanner names the migration and the column

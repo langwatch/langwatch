@@ -235,11 +235,11 @@ test_resources() {
     fail "Deployment ${RELEASE}-app missing"
   fi
 
-  # Workers Deployment present with no pod (the chart refuses enabled: false)
+  # workers.enabled=false: the worker is a sidecar in the app pod, no Deployment
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    pass "Deployment ${RELEASE}-workers (replicaCount=0)"
+    fail "Deployment ${RELEASE}-workers present (worker should be a sidecar)"
   else
-    fail "Deployment ${RELEASE}-workers missing"
+    pass "No workers Deployment (worker runs as an app sidecar)"
   fi
 }
 

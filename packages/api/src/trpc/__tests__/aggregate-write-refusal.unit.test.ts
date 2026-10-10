@@ -17,6 +17,8 @@ import {
 
 interface RowsApi {
   create(input: { projectId: string }): Promise<{ created: boolean }>;
+  cluster(input: { projectId: string }): Promise<{ created: boolean }>;
+  rename(input: { projectId: string }): Promise<{ created: boolean }>;
   list(input: { projectId: string }): Promise<{ created: boolean }>;
 }
 
@@ -24,6 +26,12 @@ const RowsApi = moduleApi<RowsApi>()("dataset");
 
 const rowsContract = defineTrpcContract("aggregateRows")
   .mutation("create")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(z.object({ created: z.boolean() }))
+  .mutation("cluster")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(z.object({ created: z.boolean() }))
+  .mutation("rename")
   .withInput(z.object({ projectId: z.string() }))
   .withOutput(z.object({ created: z.boolean() }))
   .query("list")
@@ -68,6 +76,16 @@ function callerFor({ kind, ran }: { kind: string; ran: string[] }) {
 
       return { created: true };
     },
+    cluster: async () => {
+      ran.push("cluster");
+
+      return { created: true };
+    },
+    rename: async () => {
+      ran.push("rename");
+
+      return { created: true };
+    },
     list: async () => {
       ran.push("list");
 
@@ -78,6 +96,13 @@ function callerFor({ kind, ran }: { kind: string; ran: string[] }) {
     .procedure("create")
     .withPermission("datasets:create", { via: "projectId" })
     .handle(({ app, input }) => app.create(input))
+    .procedure("cluster")
+    .refusedOnAggregate()
+    .withPermission("project:update", { via: "projectId" })
+    .handle(({ app, input }) => app.cluster(input))
+    .procedure("rename")
+    .withPermission("project:update", { via: "projectId" })
+    .handle(({ app, input }) => app.rename(input))
     .procedure("list")
     .withPermission("datasets:create", { via: "projectId" })
     .handle(({ app, input }) => app.list(input))
@@ -124,5 +149,50 @@ describe("a query under the same permission on an aggregate", () => {
     await callerFor({ kind: "aggregate", ran }).list({ projectId: "proj_aggregate" });
 
     expect(ran).toEqual(["list"]);
+  });
+});
+
+describe("a mutation under an exempt permission that declared refusedOnAggregate", () => {
+  describe("when the project is an aggregate", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("refuses FORBIDDEN aggregate_project_is_read_only before the handler runs", async () => {
+      const ran: string[] = [];
+
+      const failure: unknown = await callerFor({ kind: "aggregate", ran })
+        .cluster({ projectId: "proj_aggregate" })
+        .catch((error) => error);
+
+      expect(failure).toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "aggregate_project_is_read_only" },
+      });
+      expect(ran).toEqual([]);
+    });
+
+    it("still runs an exempt mutation that declared nothing", async () => {
+      const ran: string[] = [];
+
+      await callerFor({ kind: "aggregate", ran }).rename({ projectId: "proj_aggregate" });
+
+      expect(ran).toEqual(["rename"]);
+    });
+  });
+
+  describe("when the project is an ordinary member project", () => {
+    it("runs the handler", async () => {
+      const ran: string[] = [];
+
+      await callerFor({ kind: "application", ran }).cluster({ projectId: "proj_member" });
+
+      expect(ran).toEqual(["cluster"]);
+    });
+  });
+});
+
+describe("declaring refusedOnAggregate on a query", () => {
+  it("is refused when the router is declared", () => {
+    expect(() =>
+      defineTrpcRouter(RowsApi, rowsContract).procedure("list").refusedOnAggregate(),
+    ).toThrow(/refusedOnAggregate on a query or twice/);
   });
 });

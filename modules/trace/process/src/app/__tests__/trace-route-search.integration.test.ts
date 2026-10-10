@@ -4,11 +4,13 @@
  * stays closed unless the browser says it is open.
  * @see specs/traces-v2/instant-eval-search.feature
  */
+import type { Authorization } from "@langwatch/authorization";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RouteSearchInput } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TracesListReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
@@ -37,9 +39,12 @@ const emptyProject = {
   ),
 };
 
-function submit(overrides: Partial<RouteSearchInput> = {}): RouteSearchInput {
+function submit(
+  overrides: Partial<RouteSearchInput> = {},
+): RouteSearchInput & { authorization: Authorization } {
   return {
     projectId: "project-1",
+    authorization: ownProof({ projectId: "project-1" }),
     text: "frustrated users",
     timeRange: RANGE,
     activeQuery: "",

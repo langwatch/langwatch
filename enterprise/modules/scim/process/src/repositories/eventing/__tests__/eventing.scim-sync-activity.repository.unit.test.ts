@@ -3,7 +3,6 @@ import {
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_EVENT_VERSION_LATEST,
-  SCIM_SYNC_PIPELINE_NAME,
   SCIM_USER_PUSHED_EVENT_TYPE,
 } from "@langwatch/enterprise-scim-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
@@ -12,20 +11,10 @@ import {
  * A connection's directory-sync log, read: newest first, tenant-scoped, ids only.
  * Corresponds to enterprise/modules/scim/specs/scim.feature.
  */
-import {
-  EventLogReadSeat,
-  type EventReadSeat,
-  EventStoreProducerOnly,
-  PipelineEventStore,
-  createTenantId,
-  eventToRecord,
-} from "@langwatch/eventing";
-import { EventRepositoryMemory } from "@langwatch/eventing/testing";
+import { createTenantId, type EventReadSeat } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import type { ScimSyncEvent } from "../../../eventing/scim-sync-state.projection.ts";
-import { composeScimSyncPipeline } from "../../../eventing/scim-sync.pipeline.ts";
-import { MemoryScimSyncProjectionRepository } from "../../memory/memory.scim-sync-projection.repository.ts";
 import { EventingScimSyncActivityRepository } from "../eventing.scim-sync-activity.repository.ts";
 
 const ACME = "org_acme";
@@ -88,10 +77,10 @@ function repositoryOver(eventsByTenant: Record<string, ScimSyncEvent[]>): {
   requestedTenants: string[];
 } {
   const requestedTenants: string[] = [];
-  const getEvents: EventReadSeat["getEvents"] = async ({
+  const findAggregateEvents: EventReadSeat["findAggregateEvents"] = async ({
     tenantId,
-    aggregateId,
     aggregateType,
+    aggregateId,
   }) => {
     requestedTenants.push(tenantId);
     return (eventsByTenant[tenantId] ?? []).filter(
@@ -99,34 +88,10 @@ function repositoryOver(eventsByTenant: Record<string, ScimSyncEvent[]>): {
     );
   };
   return {
-    repository: EventingScimSyncActivityRepository.create({ eventReadSeat: { getEvents } }),
-    requestedTenants,
-  };
-}
-
-const API_PROCESS = "langwatch-api";
-
-function isAnyEvent(_event: unknown): _event is unknown {
-  return true;
-}
-
-/** What the api composes: a store refusing every read, and a read seat over the same log. */
-async function apiProcessOver(events: ScimSyncEvent[]) {
-  const log = EventRepositoryMemory.createForTesting();
-  await log.insertEventRecords(events.map((event) => eventToRecord(event)));
-  const refusingStore = EventStoreProducerOnly.create({ processName: API_PROCESS });
-  const ownStore = PipelineEventStore.create({
-    pipeline: SCIM_SYNC_PIPELINE_NAME,
-    log: () => refusingStore,
-  });
-  ownStore.bindTo(
-    composeScimSyncPipeline({ scimSyncs: MemoryScimSyncProjectionRepository.create() }),
-  );
-  return {
-    ownStore,
     repository: EventingScimSyncActivityRepository.create({
-      eventReadSeat: EventLogReadSeat.create({ repository: log }),
+      eventReadSeat: { findAggregateEvents },
     }),
+    requestedTenants,
   };
 }
 
@@ -160,6 +125,7 @@ describe("given a connection the directory pushed to and then failed on", () => 
       expect(activity[2]).toMatchObject({ externalId: "okta-sam", op: "create", groupId: null });
     });
 
+    /** @scenario "Directory activity reads the sync log through the event read seat" */
     it("keeps at most the limit, dropping the oldest", async () => {
       const { repository } = repositoryOver({ [ACME]: events });
 
@@ -186,39 +152,6 @@ describe("given a connection the directory pushed to and then failed on", () => 
 
       expect(activity).toEqual([]);
       expect(requestedTenants).toEqual([GLOBEX]);
-    });
-  });
-
-  describe("when it is read in a process that only sends commands", () => {
-    /** @scenario "Directory activity is readable from a process that only sends commands" */
-    it("lists the facts newest first while the process's own store refuses the read", async () => {
-      const { repository, ownStore } = await apiProcessOver(events);
-
-      const activity = await repository.findActivity({
-        organizationId: ACME,
-        connectionId: CONNECTION,
-        limit: 25,
-      });
-
-      expect(activity.map((entry) => entry.eventId)).toEqual(["evt_3", "evt_2", "evt_1"]);
-      await expect(
-        ownStore.read({ tenantId: ACME, aggregateId: CONNECTION, accepts: isAnyEvent }),
-      ).rejects.toMatchObject({
-        name: "ConfigurationError",
-        context: { processName: API_PROCESS, operation: "getEvents" },
-      });
-    });
-
-    it("finds nothing for the same connection named under another organization's tenant", async () => {
-      const { repository } = await apiProcessOver(events);
-
-      const activity = await repository.findActivity({
-        organizationId: GLOBEX,
-        connectionId: CONNECTION,
-        limit: 25,
-      });
-
-      expect(activity).toEqual([]);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { bindTrpcFact, browserSessionFact } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, browserSessionContext } from "@langwatch/api/trpc";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -46,7 +46,11 @@ function mount() {
   const router = governanceTrpcRuntime(governanceTrpcMembers({ permits: () => true, asked })).mount(
     personalSessionsTrpcTransport,
     () => app,
-    { facts: [bindTrpcFact(browserSessionFact, () => "session_current")] },
+    {
+      middlewareContext: [
+        bindTrpcMiddlewareContext(browserSessionContext, () => "session_current"),
+      ],
+    },
   );
   return { router, asked, calls, caller: router.createCaller({ actor: { id: "user_1" } }) };
 }

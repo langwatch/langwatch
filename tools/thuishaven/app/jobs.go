@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// JobRow is one agent job as `haven clean` considers it: the record's own facts
+// JobRow is one agent job as `haven machine clean` considers it: the record's own facts
 // plus the verdict on its scratch. Size is filled in separately (ScanJobSizes),
 // the same split the worktree picker uses — the classification is instant and the
 // `du` is not.
@@ -78,7 +78,7 @@ const (
 	// ColdJobsOnly reclaims only jobs classified cold — the default everywhere.
 	ColdJobsOnly JobReclaimScope = false
 	// IncludeRecentJobs also reclaims terminal jobs younger than
-	// domain.JobScratchRecent. Only `haven clean --include-recent` passes it.
+	// domain.JobScratchRecent. Only `haven machine clean --include-recent` passes it.
 	IncludeRecentJobs JobReclaimScope = true
 )
 

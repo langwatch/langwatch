@@ -293,7 +293,6 @@ export function EvaluateModalContent({
   return (
     <FormProvider {...form}>
       <Dialog.Content
-        bg="bg"
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"

@@ -36,7 +36,7 @@ export default function AuthenticationSettingsScreen() {
   const { organizationId } = host.scope();
   if (!organizationId) return null;
   if (!host.hasOrganizationPermission(AUTHENTICATION_PAGE_PERMISSION)) {
-    return <PermissionAlert permission={AUTHENTICATION_PAGE_PERMISSION} />;
+    return <PermissionAlert permission={AUTHENTICATION_PAGE_PERMISSION} area="authentication settings" />;
   }
 
   return (

@@ -18,9 +18,6 @@ const mutationRowsSchema = z.array(
     .transform((row) => updatedAtIndexMutationSchema.parse({ ...row, isDone: row.isDone === 1 })),
 );
 
-const UNSCOPED_REASON =
-  "materialising a skip index is a whole-table mutation on the shared target, which no tenant owns";
-
 /** Reads and starts the `idx_updated_at` mutation on the shared ClickHouse target. */
 export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMaterialisationRepository {
   readonly #clickhouse: ClickHouseQueryClient;
@@ -51,7 +48,9 @@ export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMat
           AND position(command, 'MATERIALIZE INDEX idx_updated_at') > 0
         ORDER BY create_time DESC
       `,
-      unscoped: { reason: UNSCOPED_REASON },
+      // Materialising a skip index is a whole-table mutation on the shared target, which no tenant
+      // owns.
+      SKIP_TENANT_CHECK: true,
     });
     return mutationRowsSchema.parse(rows);
   }
@@ -62,7 +61,9 @@ export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMat
       table: "trace_summaries",
       kind: "write",
       sql: "ALTER TABLE trace_summaries MATERIALIZE INDEX IF EXISTS idx_updated_at",
-      unscoped: { reason: UNSCOPED_REASON },
+      // Materialising a skip index is a whole-table mutation on the shared target, which no tenant
+      // owns.
+      SKIP_TENANT_CHECK: true,
     });
   }
 }

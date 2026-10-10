@@ -4,7 +4,11 @@
  * @see modules/dashboard/specs/dashboard-widget-validation.feature
  * @vitest-environment node
  */
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -30,7 +34,9 @@ function mountKey() {
   });
   const hono = runtime.mount(dashboardWidgetRest.router(), {
     app: () => app,
-    facts: [bindRestMiddleware(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards")],
+    middlewareContext: [
+      bindMiddlewareContext(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards"),
+    ],
     onError: canonicalErrorResponse,
   });
   const base = "/api/v1/projects/project-1/analytics/dashboard-widgets";

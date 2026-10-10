@@ -6,7 +6,8 @@
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
@@ -52,14 +53,16 @@ function wireOf(params: {
   };
 }
 
-type WorkflowRestDeclaration = Readonly<{
+/** The `/api/workflows` collection and item endpoints. */
+export function createWorkflowRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<WorkflowApi>;
-}>;
-
-/** The `/api/workflows` collection and item endpoints. */
-export function createWorkflowRest(): WorkflowRestDeclaration {
+  router: () => RestTransportDeclaration<
+    WorkflowApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
+}> {
   return (
     defineRestRouter(WorkflowApi)
       .withNamespace("workflows")
@@ -70,7 +73,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       .withPermission("workflows:view")
       .withOutput(z.array(workflowRestDetailSchema))
       .withDocs({ description: "List all non-archived workflows for the project" })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, scope }, project) => {
         logger.info({ projectId: scope.id }, "Listing workflows");
         const listed = await app.list({ projectId: scope.id });
@@ -89,7 +92,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
         description: "Get a workflow by its ID",
         errors: [{ status: 404, description: "The project holds no workflow with this id" }],
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => {
         logger.info({ projectId: scope.id, workflowId: input.id }, "Getting workflow");
         const workflow = await app.getById({ id: input.id, projectId: scope.id });
@@ -108,7 +111,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
         description: "Update a workflow's metadata (name, icon, description)",
         errors: [{ status: 404, description: "The project holds no workflow with this id" }],
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => {
         const { id, ...changes } = input;
         logger.info({ projectId: scope.id, workflowId: id }, "Updating workflow");

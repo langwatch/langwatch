@@ -14,6 +14,10 @@ function keyedOutbox() {
   const rows = new Map<string, unknown>();
   const appendIntents: ProcessStore["appendIntents"] = async ({ messages }) => {
     for (const message of messages) rows.set(message.messageKey, message.payload);
+    return {
+      insertedMessageKeys: messages.map((message) => message.messageKey),
+      duplicateMessageKeys: [],
+    };
   };
   return { rows, outbox: OutboxAggregateReconcile.create({ appendIntents }) };
 }

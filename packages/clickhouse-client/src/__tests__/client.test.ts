@@ -37,6 +37,7 @@ describe("ClickHouseQueryClient", () => {
       it("passes it straight to the driver", async () => {
         const execute = vi.fn(async () => ({ rows: [1] }));
         const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: { execute, insert: unusedInsert, command: unusedCommand },
         });
 
@@ -98,6 +99,7 @@ describe("ClickHouseQueryClient", () => {
         });
 
         const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: { execute, insert: unusedInsert, command: unusedCommand },
           limiter,
           retries: new RetryPolicy({
@@ -144,6 +146,7 @@ describe("ClickHouseQueryClient", () => {
         });
         let release: (() => void) | undefined;
         const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: {
             insert: unusedInsert,
             command: unusedCommand,
@@ -193,6 +196,7 @@ describe("ClickHouseQueryClient", () => {
         await vi.waitFor(() => expect(release).toBeDefined());
 
         const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: {
             insert: unusedInsert,
             command: unusedCommand,
@@ -308,6 +312,7 @@ describe("ClickHouseQueryClient", () => {
       it("reaches no driver at all", async () => {
         const insert = vi.fn(async () => {});
         const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: { execute: unusedExecute, insert, command: unusedCommand },
         });
 

@@ -21,7 +21,7 @@ export type AnnotationTraceBackfillPeers = Readonly<{
 
 type Totals = { organizations: number; projects: number; traces: number; annotations: number };
 
-export type AnnotationTraceBackfillReport = Totals & { afterOrganizationId: string | null };
+type AnnotationTraceBackfillReport = Totals & { afterOrganizationId: string | null };
 
 export class AnnotationTraceBackfillService {
   private constructor(private readonly peers: AnnotationTraceBackfillPeers) {}

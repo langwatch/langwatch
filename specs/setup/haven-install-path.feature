@@ -1,4 +1,4 @@
-Feature: haven install offers to put the Go bin dir on PATH
+Feature: haven self install offers to put the Go bin dir on PATH
   `make haven install` runs `go install ./cmd/haven`, which drops the binary
   in the Go bin dir (GOBIN, or GOPATH/bin). If that dir is not on PATH, the
   freshly installed `haven` command doesn't work and the "run 'haven ...'
@@ -8,7 +8,7 @@ Feature: haven install offers to put the Go bin dir on PATH
 
   # Being able to RUN haven is the one prerequisite the catalogue in
   # specs/setup/haven-install-prerequisites.feature cannot express, so
-  # `haven install` reports it first and this is its spec.
+  # `haven self install` reports it first and this is its spec.
   #
   # Behaviour was a bash script (dev/scripts/haven-install-path.sh) run by the
   # Makefile between two Go programs, which is why `make haven install` read

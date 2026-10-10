@@ -1,6 +1,6 @@
 ---
 name: storagesim
-description: "Use haven's local S3, storagesim, to store, inspect and assert on uploaded files. Use when someone says 'where did the upload go', 'presigned URL', 'S3 locally', 'storagesim', 'check the object exists', 'NoSuchKey', 'storage console', or needs to load-test uploads."
+description: "Use haven's local S3, storagesim, to store, inspect and assert on uploaded files. Use when someone says 'haven storage', 'where did the upload go', 'presigned URL', 'S3 locally', 'storagesim', 'check the object exists', 'NoSuchKey', 'storage console', 'haven sim storage', or needs to load-test uploads."
 user-invocable: true
 ---
 
@@ -25,10 +25,14 @@ key. Code: `services/storagesim`, console `apps/storagesim-web`.
 GET    /_sim/api/buckets   /objects   /object?bucket=&key=   /object/raw?bucket=&key=
 GET    /_sim/api/requests            recent S3 calls: status, auth (presigned|header|none), requestId
 GET    /_sim/api/presign?bucket=&key=[&method=PUT][&expires=s]   a presigned URL for this host
+GET|PUT /_sim/api/settings   {"forcedError": 0|4xx|5xx}: PUT, GET and HEAD object answer an S3 InternalError with that status
 POST   /_sim/api/seed                adds the demo objects, answers {"seeded": n}
 DELETE /_sim/api/object?bucket=&key=   one object
 DELETE /_sim/api/objects[?bucket=]     every object (in one bucket), answers {"deleted": n}
 ```
+
+Private-storage org: bucket `langwatch-private` always exists; export `DATAPLANE_S3__dev__<orgId>=` main's JSON
+(`endpoint` = the stack's S3 endpoint, that bucket, keys `storagesim`) before `haven up`.
 
 Or use any S3 client with path-style addressing, region `auto`, the dev key. A missing
 key answers `NoSuchKey`.
@@ -37,9 +41,9 @@ key answers `NoSuchKey`.
 
 - `STORAGESIM_SEED=1` (haven sets it) stores `seed/hello.txt` and `seed/sample.json` in
   `langwatch`; existing objects are left alone. The console's "Add demo objects" and
-  `haven storage seed` do the same on demand.
+  `haven sim storage seed` do the same on demand.
 - Objects live in `STORAGESIM_DATA_DIR` (haven: `storage/<slug>/` under its home);
-  `haven db reset` removes it. `haven storage clear [bucket]` empties it without a reset.
+  `haven db reset` removes it. `haven sim storage clear [bucket]` empties it without a reset.
 
 ## Tests and load
 
@@ -54,10 +58,11 @@ key answers `NoSuchKey`.
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven storage buckets | objects [bucket] | requests
-haven storage object <bucket> <key> [--raw]     # --raw writes the stored bytes to stdout
-haven storage delete <bucket> <key>
-haven storage clear [bucket]                    # every bucket without one
-haven storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
-haven storage seed                              # the demo objects, as STORAGESIM_SEED does
+haven sim storage buckets | objects [bucket] | list
+haven sim storage object <bucket> <key> [--raw]     # --raw writes the stored bytes to stdout
+haven sim storage delete <bucket> <key>
+haven sim storage clear [bucket]                    # every bucket without one
+haven sim storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
+haven sim storage fault --error <0|4xx|5xx>      # PUT/GET object refused with that status; 0 clears it
+haven sim storage seed                              # the demo objects, as STORAGESIM_SEED does
 ```

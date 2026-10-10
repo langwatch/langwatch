@@ -1,11 +1,8 @@
-import { collectAuthDiagnostics } from "@langwatch/api/rest";
 import type { MetricOtlpDoorResult } from "@langwatch/metric-contract";
 import { canonicalOtlpPath, createLogger } from "@langwatch/observability";
 import {
   applyReceiverProvenance,
   decodeOtlpBody,
-  ingestDoorRefusalStatus,
-  isIngestDoorRefusal,
   logCorrectedOtlpPath,
   otlpBodyForensics,
   parseOtlpMetrics,
@@ -16,18 +13,15 @@ import {
   type OtlpIngestCredential,
   type TraceApi,
 } from "@langwatch/trace-contract";
-import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
+import { SpanKind, type Span } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import type { MetricRequestCollectionService } from "./metric-request-collection.service.ts";
 
 const CANONICAL_METRICS_PATH = "/api/otel/v1/metrics";
 
-/** Trace's share of the door: the key, the allowance and the key's clock. */
-type MetricReceiverTraceSlice = Pick<
-  TraceApi,
-  "otlpCredential" | "otlpUsageLimit" | "otlpMarkCredentialUsed"
->;
+/** Trace's share of the receiver: the allowance and the key's clock. */
+type MetricReceiverTraceSlice = Pick<TraceApi, "otlpUsageLimit" | "otlpMarkCredentialUsed">;
 
 interface OtlpMetricReceiverDeps {
   traces: MetricReceiverTraceSlice;
@@ -48,7 +42,14 @@ export class OtlpMetricReceiverService {
     return new OtlpMetricReceiverService(deps);
   }
 
-  receive(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult> {
+  /** `credential` is the key the `otlp_ingest` door already verified, before the body. */
+  receive({
+    request,
+    credential,
+  }: {
+    request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
+  }): Promise<MetricOtlpDoorResult> {
     if (canonicalOtlpPath(request.path) !== CANONICAL_METRICS_PATH) {
       return Promise.resolve({ outcome: "not-found" });
     }
@@ -56,44 +57,21 @@ export class OtlpMetricReceiverService {
     return this.#tracer.withActiveSpan(
       "[POST] /api/otel/v1/metrics",
       { kind: SpanKind.SERVER },
-      (span) => this.#receive({ request, span }),
+      (span) => this.#receive({ request, credential, span }),
     );
   }
 
   async #receive({
     request,
+    credential,
     span,
   }: {
     request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
     span: Span;
   }): Promise<MetricOtlpDoorResult> {
     const { traces, collection } = this.#deps;
     const header = (name: string): string | undefined => request.headers[name];
-
-    let credential: OtlpIngestCredential;
-    try {
-      credential = await traces.otlpCredential({
-        authorization: header("authorization") ?? null,
-        xAuthToken: header("x-auth-token") ?? null,
-        xProjectId: header("x-project-id") ?? null,
-      });
-    } catch (error) {
-      if (!isIngestDoorRefusal(error)) throw error;
-
-      const diagnostics = collectAuthDiagnostics({
-        path: request.path,
-        method: request.method,
-        header,
-      });
-      this.#logger.warn(
-        { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
-        diagnostics.hasEmptyAuthToken
-          ? "Authentication failed: X-Auth-Token sent but empty"
-          : "Authentication failed",
-      );
-      span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
-      return { outcome: "refused", refusal: error };
-    }
 
     const { project, identity } = credential;
     logCorrectedOtlpPath({

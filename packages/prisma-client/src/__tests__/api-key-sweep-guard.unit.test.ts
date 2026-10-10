@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { guardOrganizationId } from "../organization-guard.ts";
 
-/** The api-key module declares its sweeps as `@tenancy` SQL; the guard keeps no hatch for them. */
+/** The api-key module's sweeps are raw SQL that skips the tenant check; the guard keeps no hatch. */
 const elapsed = { not: null, lte: new Date("2026-10-01T00:00:00.000Z") };
 
 function guarded(action: string, where: Record<string, unknown>) {

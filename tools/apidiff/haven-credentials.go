@@ -2,7 +2,6 @@ package apidiff
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -48,8 +47,8 @@ func fillHavenCredentials(ctx context.Context, baseURL string, keys *Keys) ([]st
 	if err != nil {
 		return nil, fmt.Errorf("haven env for %s: %w", slug, err)
 	}
-	overlay := map[string]string{}
-	if err := json.Unmarshal(envOut, &overlay); err != nil {
+	overlay, err := havenrun.ParseEnv(envOut)
+	if err != nil {
 		return nil, fmt.Errorf("haven env for %s: %w", slug, err)
 	}
 	return applyHavenCredentials(overlay, keys, func(path, token string) int {

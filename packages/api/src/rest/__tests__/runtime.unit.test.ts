@@ -21,20 +21,18 @@ import {
   RestVersionSelector,
   restVersionSelectorMiddleware,
 } from "../addressing.ts";
-import { defineRestRouter, projectRestFacts } from "../declaration.ts";
+import { defineRestRouter, projectRequestContext } from "../declaration.ts";
 import { withIdempotency } from "../idempotency.ts";
 import type {
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
 } from "../repositories/prisma/prisma.idempotency-receipt.ts";
 import {
-  bindRestHeader,
-  bindRestMiddleware,
-  defineRestMiddleware,
-  type RestTransportMiddlewareBinding,
+  bindMiddlewareContext,
+  defineMiddlewareContext,
+  type MiddlewareContextBinding,
 } from "../request.ts";
 import { createRestRuntime } from "../runtime.ts";
-import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 
 describe("defineRestRouter", () => {
   /** @scenario "A REST endpoint is one complete declaration in the server" */
@@ -605,9 +603,9 @@ describe("defineRestRouter", () => {
   });
 });
 
-describe("a mount binding the facts a declaration names", () => {
+describe("a mount given the middleware context a declaration names", () => {
   const OpsApi = moduleApi<{ ping(): Promise<void> }>("ops");
-  const surface = defineRestMiddleware("surface", z.string().nullable());
+  const surface = defineMiddlewareContext("surface", z.string().nullable());
 
   function declaration() {
     return defineRestRouter(OpsApi)
@@ -615,19 +613,19 @@ describe("a mount binding the facts a declaration names", () => {
       .withVersion("2026-08-07")
       .get("/health", "readOpsHealth")
       .withPermission("project:view")
-      .withMiddleware(projectRestFacts, surface)
+      .withMiddlewareContext(projectRequestContext, surface)
       .handle(() => {})
       .build()
       .router();
   }
 
-  const project = bindRestMiddleware(projectRestFacts, () => ({
+  const project = bindMiddlewareContext(projectRequestContext, () => ({
     projectSlug: "acme",
     viewerUserId: null,
     actorId: "user-1",
   }));
 
-  function mountWith(facts: readonly RestTransportMiddlewareBinding[]): () => void {
+  function mountWith(middlewareContext: readonly MiddlewareContextBinding[]): () => void {
     const runtime = createRestRuntime({
       authorization: authorizationPort,
       identity: {
@@ -642,21 +640,26 @@ describe("a mount binding the facts a declaration names", () => {
         onError: (error) => {
           throw error;
         },
-        facts,
+        middlewareContext,
       });
     };
   }
 
-  /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-  it("refuses a mount that bound no value for a declared fact, naming the fact and the route", () => {
+  /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+  it("refuses a mount with no value for a declared middleware context, naming it and the route", () => {
     expect(mountWith([project])).toThrow(
-      /GET \/api\/ops\/health declares the fact "surface", and this mount bound no value for it/,
+      /GET \/api\/ops\/health declares the middleware context "surface", and its module provides no value for it/,
     );
   });
 
-  /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-  it("mounts once every declared fact is bound", () => {
-    expect(mountWith([project, bindRestHeader(surface, "x-langwatch-surface")])).not.toThrow();
+  /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+  it("mounts once every declared middleware context has a value", () => {
+    expect(
+      mountWith([
+        project,
+        bindMiddlewareContext(surface, (request) => request.headers.get("x-langwatch-surface")),
+      ]),
+    ).not.toThrow();
   });
 });
 
@@ -918,19 +921,19 @@ describe("a create declared replayable under a caller's key", () => {
     let next = 0;
 
     return {
-      $executeRaw: async (sql, ...values) => {
-        const write = readFencedReceiptWrite(sql, values);
-        const row = [...rows.values()].find(
-          (candidate) => candidate.id === write.id && candidate.claimId === write.claimId,
-        );
-
-        if (!row) return 0;
-
-        Object.assign(row, write.data);
-
-        return 1;
-      },
       idempotencyReceipt: {
+        updateMany: async ({ where, data }) => {
+          const row = [...rows.values()].find(
+            (candidate) => candidate.id === where.id && candidate.claimId === where.claimId,
+          );
+
+          if (!row) return { count: 0 };
+          if (where.responseStatus === null && row.responseStatus !== null) return { count: 0 };
+
+          Object.assign(row, data);
+
+          return { count: 1 };
+        },
         create: async ({ data }) => {
           const at = `${data.scopeId} ${data.key}`;
 

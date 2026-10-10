@@ -121,6 +121,12 @@ function world({ sessionUserId = MANAGER }: { sessionUserId?: string } = {}) {
     },
     attachResourceGrant: async () => {},
     revokeResourceGrants: async () => {},
+    findLiveSharedProjectGrants: async () => [],
+    attachSharedProjectGrant: async () => {
+      throw new Error("unused");
+    },
+    awaitSharedProjectGrants: async () => {},
+    revokeSharedProjectGrants: async () => [],
     revokeBindingsWhere: async () => 0,
     offboardMember: async () => {},
     defineRole: async () => {},
@@ -169,6 +175,7 @@ function world({ sessionUserId = MANAGER }: { sessionUserId?: string } = {}) {
           input: member.input.parse(input),
           actor: { type: "user", id: sessionUserId },
           scope: null,
+          authorization: null,
           signal: undefined,
         });
 

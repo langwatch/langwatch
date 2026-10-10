@@ -2,7 +2,11 @@ import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 import { httpComponentSchema } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { DEMO_HTTP_AGENT_CONFIG, DEMO_PROMPT_CONFIG_DATA } from "../demo-platform-ids.ts";
+import {
+  DEMO_HTTP_AGENT_CONFIG,
+  DEMO_PROMPT_CONFIG_DATA,
+  demoHttpAgentConfig,
+} from "../demo-platform-ids.ts";
 
 // The demo platform seeds these configs as raw JSON, and the app re-validates
 // that JSON on every read (agent repository / prompt version repository), so
@@ -25,6 +29,15 @@ describe("demo platform seed configs", () => {
       const url = new URL(DEMO_HTTP_AGENT_CONFIG.url);
       expect(url.protocol).toBe("https:");
       expect(url.hostname).toBe("httpbin.org");
+    });
+
+    it("targets llmsim's loopback port when the stack names one, and still parses", () => {
+      const config = demoHttpAgentConfig({
+        environment: { OPENAI_BASE_URL: "http://127.0.0.1:4010/v1" },
+      });
+      expect(config.url).toBe("http://127.0.0.1:4010/v1/chat/completions");
+      expect(() => httpComponentSchema.parse(config)).not.toThrow();
+      expect(demoHttpAgentConfig({ environment: {} })).toBe(DEMO_HTTP_AGENT_CONFIG);
     });
   });
 

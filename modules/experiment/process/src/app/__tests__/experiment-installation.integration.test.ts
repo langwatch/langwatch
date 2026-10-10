@@ -11,6 +11,7 @@ import {
   type InsertRequest,
   type QueryDriver,
   type QueryResult,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -83,7 +84,7 @@ const RETAINED = { traces: 91, scenarios: 63, experiments: 126 };
 function liveStores(driver: EmptyDriver): StoresMemberSource {
   const clients: Record<string, unknown> = {
     prisma: createApiFixture<PrismaClient>({}, "prisma (unused at boot)"),
-    clickhouse: new ClickHouseQueryClient({ driver }),
+    clickhouse: new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }),
     redis: memoryRedisDouble(),
   };
   return { tier: "live", order: Object.keys(clients), read: (name) => clients[name] };

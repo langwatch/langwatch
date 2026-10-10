@@ -6,7 +6,10 @@ import { Tooltip } from "./tooltip.tsx";
 import { TriggerAnchor } from "./trigger-anchor.tsx";
 
 const meta = {
-  title: "Primitives/Trigger anchor",
+  title: "Overlays/Trigger anchor",
+  parameters: {
+    usage: { use: "A trigger that is both a tooltip target and a menu or popover trigger." },
+  },
   component: TriggerAnchor,
   tags: ["autodocs"],
   argTypes: { children: { control: false } },

@@ -10,14 +10,9 @@ import {
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 
-export const annotationRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<AnnotationApi>;
-}> = defineRestRouter(AnnotationApi)
+export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
   .withVersion(MANAGEMENT_API_VERSION)
 

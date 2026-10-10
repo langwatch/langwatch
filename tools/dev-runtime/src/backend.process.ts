@@ -1,5 +1,7 @@
 import net from "node:net";
 
+import type { BootFailure } from "./boot-failure.ts";
+
 /**
  * The two halves of the backend process, each as its own app's start seam
  * answered: a server this launcher drains. Neither owns the process.
@@ -68,6 +70,11 @@ export type BackendHalfOptions = Readonly<{
 }>;
 
 /** What each hosted application is booted with, injectable for tests. */
+/** A boot's outcome: the api always serves; a worker that refused boot is named, not thrown. */
+export type BootedBackend = Readonly<{ halves: BackendHalves; workerFailure?: unknown }>;
+
+const IDLE_WORKER: BackendWorkerHalf = { close: async () => {} };
+
 export type BackendStartOptions = {
   startApi: (options: BackendHalfOptions & { port?: number }) => Promise<BackendApiHalf>;
   startWorker: (options: BackendHalfOptions) => Promise<BackendWorkerHalf>;
@@ -75,28 +82,24 @@ export type BackendStartOptions = {
 
 /**
  * Start both halves together: the api answers at once while the worker runs the upgrade, and a
- * queue with no consumer yet is fine (Alex, 2026-10-09, API-UP-DURING-UPGRADE). If either half
- * refuses, drain the one that started before rethrowing.
+ * queue with no consumer yet is fine (Alex, 2026-10-09, API-UP-DURING-UPGRADE). A refused api
+ * drains the worker and throws; a refused worker never takes the api down (Alex, 2026-10-10).
  */
-export async function startBackend(options: BackendStartOptions): Promise<BackendHalves> {
+export async function startBackend(options: BackendStartOptions): Promise<BootedBackend> {
   // One graph per process: the worker sets the telemetry SDK up and the API joins it.
   const [worker, api] = await Promise.allSettled([
     bootHalf("worker", () => options.startWorker({ ownsProcess: false, ownsTelemetry: true })),
     bootHalf("api", () => options.startApi({ ownsProcess: false, ownsTelemetry: false })),
   ]);
-  if (worker.status === "fulfilled" && api.status === "fulfilled") {
-    return { api: api.value, worker: worker.value };
+  if (api.status === "rejected") {
+    if (worker.status === "fulfilled") await worker.value.close();
+    throw api.reason;
   }
-  if (worker.status === "fulfilled") await worker.value.close();
-  if (api.status === "fulfilled") await api.value.close();
-  throw [worker, api].find((half): half is PromiseRejectedResult => half.status === "rejected")
-    ?.reason;
+  if (worker.status === "rejected") {
+    return { halves: { api: api.value, worker: IDLE_WORKER }, workerFailure: worker.reason };
+  }
+  return { halves: { api: api.value, worker: worker.value } };
 }
-
-/** A reload's outcome: the api always serves; a worker that refused boot is named, not thrown. */
-export type ReplacedBackend = Readonly<{ halves: BackendHalves; workerFailure?: unknown }>;
-
-const IDLE_WORKER: BackendWorkerHalf = { close: async () => {} };
 
 /**
  * A reload beside a serving generation: the next api boots on `apiPort`, `route` moves the port
@@ -113,7 +116,7 @@ export async function replaceBackend({
   apiPort: number;
   route: (port: number) => void;
   disposeOld: () => Promise<void>;
-}): Promise<ReplacedBackend> {
+}): Promise<BootedBackend> {
   const api = await bootHalf("api", () =>
     startApi({ ownsProcess: false, ownsTelemetry: false, port: apiPort }),
   );
@@ -142,36 +145,12 @@ export async function freeLoopbackPort(): Promise<number> {
   return address.port;
 }
 
-export type PortForwarder = Readonly<{ route(port: number): void; close(): Promise<void> }>;
-
-/**
- * Owns the api's stable port and pipes each connection to the generation serving now, so a
- * reload moves the target and never closes the listener. Unrouted, a connection is refused.
- */
-export async function forwardPort({ port }: { port: number }): Promise<PortForwarder> {
-  let target: number | undefined;
-  const server = net.createServer((client) => {
-    if (target === undefined) return void client.destroy();
-    const upstream = net.connect(target, "127.0.0.1");
-    const end = (): void => {
-      client.destroy();
-      upstream.destroy();
-    };
-    client.on("error", end).on("close", end);
-    upstream.on("error", end).on("close", end);
-    client.pipe(upstream).pipe(client);
-  });
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, resolve);
-  });
-  return {
-    route(next) {
-      target = next;
-    },
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-  };
-}
+/** The api's stable port: `route` moves it to a generation, `report` says why it is not whole. */
+export type PortForwarder = Readonly<{
+  route(port: number): void;
+  report(failure: BootFailure | undefined): void;
+  close(): Promise<void>;
+}>;
 
 /** A process listener, as `EventEmitter.listeners` hands it back. */
 type Listener = ReturnType<NodeJS.EventEmitter["listeners"]>[number];

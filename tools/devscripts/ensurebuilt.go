@@ -191,7 +191,16 @@ func staleTargets(root string, selected []buildTarget) ([]buildTarget, []string,
 	return stale, hashes, nil
 }
 
-// buildStale builds each stale target with its own build script, in target
+// nxEnv is the root scripts' Nx prefix: no .env loaded into tasks, no colour.
+var nxEnv = []string{"FORCE_COLOR=0", "NX_LOAD_DOT_ENV_FILES=false"}
+
+// nxBuildArgs runs the cached Nx build: a miss builds, a hit restores what
+// another worktree built. Only a stale stamp gets here, so the graph cost is paid on a miss.
+func nxBuildArgs(name string) []string {
+	return []string{"exec", "nx", "run", name + ":build", "--outputStyle=static"}
+}
+
+// buildStale builds each stale target through its cached Nx build, in target
 // order, and stamps it with the hash taken before the build began.
 func buildStale(root string, selected []buildTarget, stderr io.Writer) error {
 	stale, hashes, err := staleTargets(root, selected)
@@ -201,9 +210,10 @@ func buildStale(root string, selected []buildTarget, stderr io.Writer) error {
 	for i, target := range stale {
 		start := time.Now()
 		fmt.Fprintf(stderr, "ensure-built: building %s (%s missing or stale)\n", target.name, target.entry)
-		args := []string{"--filter", target.name, "build"}
+		args := nxBuildArgs(target.name)
 		cmd := exec.CommandContext(context.Background(), "pnpm", args...)
 		cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
+		cmd.Env = append(os.Environ(), nxEnv...)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("pnpm %s: %w", strings.Join(args, " "), err)
 		}

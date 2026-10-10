@@ -5,8 +5,8 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { ProjectInvalidCredentialsError } from "@langwatch/api";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { BugReportRateLimitedError, type BugReport } from "@langwatch/ops-contract";
@@ -17,7 +17,6 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -25,7 +24,7 @@ import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
 import type { BugReportNotifier } from "../../app/ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import { PrismaBugReportRepository } from "../../repositories/prisma/prisma.bug-report.repository.ts";
-import { bugReportCredential, opsBugReportRest } from "../ops-bug-report.rest.ts";
+import { opsBugReportRest } from "../ops-bug-report.rest.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -70,12 +69,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   });
 
   /** The application, over the real rows and whatever the test wants watched. */
-  function opsApp(
-    options: {
-      apiKeys?: ApiKeyApi;
-      notifier?: BugReportNotifier;
-    } = {},
-  ) {
+  function opsApp(options: { notifier?: BugReportNotifier } = {}) {
     const { app } = createOpsTestApp({
       repositories: {
         ...MemoryOpsRepositories.create({
@@ -85,7 +79,6 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
         bugReports: repository,
         processStore: InMemoryProcessStore.createForTesting(),
       },
-      ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
       members: {
         bugReportNotifier: options.notifier ?? silentNotifier(),
       },
@@ -94,28 +87,27 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     return app;
   }
 
-  function mountApp(options: { apiKeys?: ApiKeyApi } = {}) {
-    const app = opsApp(options);
+  /** The intake behind a project door that verifies one key, `keys`, as `projectId`'s. */
+  function mountApp(options: { keys?: Readonly<{ token: string; projectId: string }> } = {}) {
+    const app = opsApp();
     const runtime = createRestRuntime({
       authorization: restTestAuthorization(),
       identity: {
         authenticate: () => {
-          throw new Error("The intake resolves its own credential.");
+          throw new Error("The intake asks no permission of its credential.");
+        },
+        identify: ({ request }) => {
+          const token = request.headers.get("x-auth-token");
+          if (!token || token !== options.keys?.token) throw new ProjectInvalidCredentialsError();
+
+          return { actor: null, scope: { tier: "project", id: options.keys.projectId } };
         },
       },
     });
 
     return runtime.mount(opsBugReportRest.router(), {
       app: () => app,
-      credential: "public",
       onError: (error, context) => canonicalErrorResponse(error, context),
-      facts: [
-        bindRestMiddleware(bugReportCredential, (request) => {
-          const token = request.req.raw.headers.get("x-auth-token");
-
-          return token ? { token, projectId: null } : null;
-        }),
-      ],
     });
   }
 
@@ -244,12 +236,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
 
     /** @scenario "Reports with a valid project API key are linked to the project" */
     it("links the report to the project", async () => {
-      const app = mountApp({
-        apiKeys: createApiFixture<ApiKeyApi>({
-          findResolvedToken: async ({ token }) =>
-            token === legacyApiKey ? ({ project: { id: projectId } } as never) : null,
-        }),
-      });
+      const app = mountApp({ keys: { token: legacyApiKey, projectId } });
       const response = await postReport(baseReport(), { "x-auth-token": legacyApiKey }, app);
       expect(response.status).toBe(201);
       const { id } = (await response.json()) as { id: string };
@@ -263,9 +250,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   describe("when an invalid API key is presented", () => {
     /** @scenario "Reports with an invalid API key are still accepted, unlinked" */
     it("still accepts the report, unlinked", async () => {
-      const app = mountApp({
-        apiKeys: createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
-      });
+      const app = mountApp();
       const response = await postReport(
         baseReport(),
         { "x-auth-token": "sk-lw-definitely-not-a-real-key-000000" },

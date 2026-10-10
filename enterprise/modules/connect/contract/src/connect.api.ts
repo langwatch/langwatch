@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { HostedCaller, HostedUsageAnswer } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
 
-import type { HostedCapAnswer, HostedClassifyAnswer } from "./connect-hosted.ts";
+import type {
+  HostedCaller,
+  HostedCapAnswer,
+  HostedClassifyAnswer,
+  HostedUsageAnswer,
+} from "./connect-hosted.ts";
 
 /**
  * The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud serves: a

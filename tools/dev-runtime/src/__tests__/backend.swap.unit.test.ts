@@ -2,7 +2,8 @@ import http from "node:http";
 
 import { describe, expect, it } from "vitest";
 
-import { forwardPort, freeLoopbackPort, replaceBackend } from "../backend.process.ts";
+import { freeLoopbackPort, replaceBackend } from "../backend.process.ts";
+import { forwardPortWithOrb } from "../haven-orb.ts";
 
 const closed = { close: async () => {} };
 
@@ -31,7 +32,7 @@ describe("given an api generation serving behind the stable port", () => {
     it("boots the next api beside the old, moves the port, then drains the old and starts the worker", async () => {
       const steps: string[] = [];
       const stable = await freeLoopbackPort();
-      const forwarder = await forwardPort({ port: stable });
+      const forwarder = await forwardPortWithOrb({ port: stable });
       const oldPort = await freeLoopbackPort();
       const old = await generationOn({ port: oldPort, name: "old" });
       forwarder.route(oldPort);

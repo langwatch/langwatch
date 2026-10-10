@@ -1922,6 +1922,11 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	}
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
+		// The stored trace is the customer one; the ops ids set earlier name another.
+		if parts := strings.Split(meta.CustomerTraceparent, "-"); len(parts) == 4 {
+			h.Set(gatewaytracer.HeaderTraceID, parts[1])
+			h.Set(gatewaytracer.HeaderSpanID, parts[2])
+		}
 	}
 	if meta.GuardrailsNotApplied != "" {
 		h.Set("X-LangWatch-Guardrails-Not-Applied", meta.GuardrailsNotApplied)

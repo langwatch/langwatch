@@ -1,10 +1,10 @@
-import type { LwqlProvisioningDatabase } from "../tasks/lwql-provision.task.ts";
 import type { AnalyticsEvaluationRepository } from "./analytics-persistence.repository.ts";
 import type { AnalyticsRateLimitRepository } from "./analytics-rate-limit.repository.ts";
 import type { AnalyticsRecencyRepository } from "./analytics-recency.repository.ts";
 import type { AnalyticsSessionsRepository } from "./analytics-sessions.repository.ts";
 import type { AnalyticsRepository } from "./analytics.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
+import type { LwqlProvisioningDatabase } from "./langwatch-ql-postgres.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
 
 /**

@@ -15,12 +15,12 @@ Feature: Machine resource limits are settable from the CLI and the hub
     Then the computed default applies and is reported as the default
     And only the limits' own knobs ever read the settings file
 
-  Scenario: haven limits set and unset round-trip through the settings file
-    When I run haven limits set redis-maxmemory-mb 256
+  Scenario: haven machine limits set and unset round-trip through the settings file
+    When I run haven machine limits set redis-maxmemory-mb 256
     Then the value is saved in haven's home and every reader of the knob sees it
-    And haven limits --json reports it with the source "settings" and when it applies
+    And haven machine limits --json reports it with the source "settings" and when it applies
     And the environment still wins over it
-    When I run haven limits unset redis-maxmemory-mb
+    When I run haven machine limits unset redis-maxmemory-mb
     Then no settings file is left and the default applies
     And a value under the floor, over the machine, or a ClickHouse cap the colima VM cannot hold is refused
     And an unknown limit name is refused
@@ -28,7 +28,7 @@ Feature: Machine resource limits are settable from the CLI and the hub
 
   Scenario: The hub reads and edits the machine limits over HTTP
     When the page GETs /api/limits
-    Then it receives the same report as haven limits --json
+    Then it receives the same report as haven machine limits --json
     When the page PUTs a value to /api/limits/<name> from the dashboard itself
     Then the limit is saved and the answer says when it applies
     When the page DELETEs /api/limits/<name>

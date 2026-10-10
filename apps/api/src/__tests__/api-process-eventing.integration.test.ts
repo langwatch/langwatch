@@ -105,32 +105,6 @@ describe("the api process's Eventing runtime", () => {
         await runtime.stop();
       }
     });
-
-    /** @scenario "The API process answers one aggregate's events through its read seat" */
-    it("answers an aggregate's events through the seat while its store still refuses reads", async () => {
-      const eventing = await apiEventingWithReadSeat();
-      const { runtime } = await bootApi({ eventing });
-      const stream = {
-        tenantId: createTenantId("project-1"),
-        aggregateType: "trace" as const,
-        aggregateId: "trace-1",
-      };
-
-      try {
-        const events = await eventing.eventReadSeat?.getEvents(stream);
-
-        expect(events?.map((event) => event.id)).toEqual(["event-1"]);
-        await expect(
-          eventing.eventStore!.getEvents({
-            aggregateId: stream.aggregateId,
-            aggregateType: stream.aggregateType,
-            context: { tenantId: stream.tenantId },
-          }),
-        ).rejects.toThrow(new RegExp(`${PROCESS_NAME}.*getEvents`, "s"));
-      } finally {
-        await runtime.stop();
-      }
-    });
   });
 
   describe("when every installed module registers its pipelines on it", () => {

@@ -130,6 +130,7 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
   private upsertGrant(write: Extract<GrantProjectionWrite, { kind: "grant.upsert" }>): number {
     const { row } = write;
     if (!this.admitsMembership(write)) return 0;
+    if (write.onDuplicate === "skip" && this.holdsIdentical(row)) return 0;
     if (!holdsResourceTerms(row)) {
       throw new Error(`Grant "${row.id}" violates check constraint "Grant_resource_terms_check".`);
     }
@@ -154,6 +155,21 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     if (msOf(existing.occurredAt) >= msOf(row.occurredAt)) return 0;
     Object.assign(existing, stored, { updatedAt: now() });
     return 1;
+  }
+
+  /** The identity guard the Prisma insert carries for a skipping attach. */
+  private holdsIdentical(row: Extract<GrantProjectionWrite, { kind: "grant.upsert" }>["row"]) {
+    return this.memory.grants.some(
+      (stored) =>
+        stored.id !== row.id &&
+        stored.revokedAt === null &&
+        stored.organizationId === row.organizationId &&
+        stored.principalType === row.principalType &&
+        stored.principalId === row.principalId &&
+        stored.roleKey === row.roleKey &&
+        stored.scopeType === row.scopeType &&
+        stored.scopeId === row.scopeId,
+    );
   }
 
   /** The membership fence the Prisma insert carries in its leading WHERE. */

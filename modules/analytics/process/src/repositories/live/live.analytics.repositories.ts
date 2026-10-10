@@ -1,13 +1,13 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { RateLimiter } from "@langwatch/process-stores";
 
-import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
 import type { AnalyticsRepositories, LangWatchQlSupply } from "../analytics.repositories.ts";
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsRecencyRepository } from "../clickhouse/clickhouse.analytics-recency.repository.ts";
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse/clickhouse.analytics-sessions.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
+import type { LwqlProvisioningDatabase } from "../langwatch-ql-postgres.repository.ts";
 import { RedisAnalyticsRateLimitRepository } from "../redis/redis.analytics-rate-limit.repository.ts";
 
 /** Analytics' live stores: rows in ClickHouse, windows in Redis, LangWatchQL's server targets. */

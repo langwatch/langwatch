@@ -233,7 +233,7 @@ export function composeIdentityPipeline({
 }: {
   repositories: IdentityGuardRepositories &
     Pick<IdentityRepositories, "identityProjection" | "mfaProjection">;
-  /** A person's identity log, read off the event log. */
+  /** A person's identity log, read through eventing's read seat. */
   history: IdentityHistoryRepository;
 }): IdentityPipeline {
   const { identityGuards, mfaGuards } = composeIdentityGuards(repositories);

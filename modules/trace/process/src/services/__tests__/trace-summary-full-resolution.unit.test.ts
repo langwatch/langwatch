@@ -5,8 +5,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
-import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
+import { aggregateProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -286,18 +286,18 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
             },
           }),
         ]);
-        const blobStore = fakeBlobStore({ "langwatch.input": "member body" });
-        const service = new TraceSummaryService(
-          {
+        const blobStore = blobStoreResolving({ "langwatch.input": "member body" });
+        const service = TraceSummaryService.create({
+          repository: {
             findByTraceId: vi.fn().mockResolvedValue(makeSummary("member-1")),
             upsert: vi.fn(),
           } as never,
-          {
+          fullResolutionDeps: {
             spanStorageRepository: spanRepo,
             blobStore,
             ioExtractionService: realIOService,
           },
-        );
+        });
 
         const result = await service.getByTraceId({
           authorization: aggregateProof({
@@ -313,7 +313,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
         expect(result.computedInput).toBe("member body");
         expect(result.tenantId).toBe("member-1");
-        const spanRead = vi.mocked(spanRepo.getNormalizedSpansByTraceId).mock.calls[0]?.[0];
+        const spanRead = vi.mocked(spanRepo.findNormalizedSpansByTraceId).mock.calls[0]?.[0];
         expect(spanRead?.authorization.narrowedTo).toBe("member-1");
         expect(vi.mocked(blobStore.getFromEventLog).mock.calls[0]?.[0]).toMatchObject({
           tenantId: "member-1",

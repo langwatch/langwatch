@@ -138,6 +138,7 @@ type selectionFields struct {
 	// that key is no longer decoded (the "workers" precedent above).
 	Payment   *bool `json:"paymentsim"`
 	Telemetry *bool `json:"telemetry"`
+	Lambda    *bool `json:"lambda"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -164,6 +165,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Outbound, nil, &sel.Outbound},
 		{f.Payment, nil, &sel.Payment},
 		{f.Telemetry, nil, &sel.Telemetry},
+		{f.Lambda, nil, &sel.Lambda},
 	} {
 		switch {
 		case field.stated != nil:
@@ -194,7 +196,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	}
 	sel := domain.DefaultSelection()
 	f.Services.applyTo(&sel)
-	sel.Mode = f.Mode
+	sel.Mode = f.Mode // the retired held, watch, watch-ui and bundled-ui keys are not decoded
 	return sel, true
 }
 
@@ -222,6 +224,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Outbound:     &sel.Outbound,
 		Payment:      &sel.Payment,
 		Telemetry:    &sel.Telemetry,
+		Lambda:       &sel.Lambda,
 	}}, "", "  ")
 	if err != nil {
 		return err
@@ -241,7 +244,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 // answer from every checkout, and so is the developer's decision about it.
 func (s *Store) prereqSkipsPath() string { return filepath.Join(s.home, "install-skips.json") }
 
-// prereqSkipsFile is the on-disk shape: what `haven install` was told about
+// prereqSkipsFile is the on-disk shape: what `haven self install` was told about
 // this machine. A list for the skips rather than a map, so the file reads as
 // the sentence it is ("never ask me about these") and a hand edit is obvious.
 type prereqSkipsFile struct {
@@ -642,7 +645,7 @@ func readWaiterClaim(path string) (WaiterClaim, bool) {
 
 func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "holders", name) }
 
-// HolderClaim is one `haven slot run` holding name's slot: the label a waiter
+// HolderClaim is one `haven machine slot run` holding name's slot: the label a waiter
 // sees it under and when it took the slot.
 type HolderClaim struct {
 	Label     string    `json:"label"`

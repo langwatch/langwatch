@@ -1,8 +1,8 @@
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /**
  * `POST /api/v1/traces/search`: digest/json formats, evaluations, pagination,
@@ -160,13 +160,13 @@ function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({ principal: null })),
+      bindMiddlewareContext(tracesRestCredential, () => ({ principal: null })),
     ],
   });
 

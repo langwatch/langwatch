@@ -68,3 +68,18 @@ export const saasWebConfigSchema = z.strictObject({
 });
 
 export type SaasWebConfig = z.infer<typeof saasWebConfigSchema>;
+
+/** saas's facts about self-hosted usage reports; nurturing sends them on to PostHog (rule 7). */
+export const SAAS_USAGE_REPORT_PIPELINE_NAME = "saas_usage_report" as const;
+export const SAAS_USAGE_REPORT_AGGREGATE_TYPE = "saas_usage_report" as const;
+export const USAGE_REPORT_RECEIVED_EVENT_TYPE = "lw.saas.usage_report_received" as const;
+export const USAGE_REPORT_RECEIVED_EVENT_VERSION = "2026-10-10" as const;
+
+/** One accepted report, as product analytics receives it: the event against the install id. */
+export const usageReportReceivedEventDataSchema = z.object({
+  instanceId: z.string().min(1),
+  event: z.string().min(1),
+  properties: z.record(z.string(), z.unknown()),
+  unknownFields: z.number().int().nonnegative(),
+});
+export type UsageReportReceivedEventData = z.infer<typeof usageReportReceivedEventDataSchema>;

@@ -9,7 +9,7 @@ Feature: A tenant step's ledger row follows its tenants' state
 
   @unit
   Scenario: A tenant step's ledger row is done once no tenant is held or parked
-    Given a tenant step whose tenants are all migrated or finalized
+    Given a tenant step whose eligible tenants have all finalized or rolled back
     When the step is settled after a pass
     Then its ledger row is done
 

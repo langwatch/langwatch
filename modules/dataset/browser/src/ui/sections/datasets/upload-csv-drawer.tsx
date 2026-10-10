@@ -261,7 +261,6 @@ export function DatasetUploadProcessing({
     { projectId, datasetId },
     {
       enabled: !!projectId && !!datasetId,
-      // needs a read hint: dataset normalisation finished (ready or failed)
     },
   );
 

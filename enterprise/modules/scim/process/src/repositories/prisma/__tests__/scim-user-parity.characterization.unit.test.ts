@@ -455,7 +455,7 @@ describe("SCIM user parity", () => {
   });
 
   /** @scenario A leaver loses their access however membership is being written */
-  it("revokes a leaver's grants on the previous write path and keeps them a member", async () => {
+  it("revokes a leaver's grants on the previous write path and removes their membership", async () => {
     const { writer, service, members } = harness({ membership: { user: user() } });
     writer.listUserBindings.mockResolvedValue([
       listedGrant({
@@ -489,7 +489,10 @@ describe("SCIM user parity", () => {
         revokedGrantIds: ["grant-1"],
       }),
     );
-    expect(members.deleteMember).not.toHaveBeenCalled();
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
   });
 
   it("deactivates a user through an active=false PATCH", async () => {
@@ -508,8 +511,11 @@ describe("SCIM user parity", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(members.deleteMember).not.toHaveBeenCalled();
+    // A leaver's membership goes with their access (scim-connection-sync.feature).
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
   });
 
   it("deactivates a user through a full replace", async () => {
@@ -527,8 +533,11 @@ describe("SCIM user parity", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(members.deleteMember).not.toHaveBeenCalled();
+    // A leaver's membership goes with their access (scim-connection-sync.feature).
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
   });
 
   /**

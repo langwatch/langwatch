@@ -69,7 +69,8 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
         startDate: input.startDate,
         endDate: input.endDate,
       },
-      unscoped: { reason: "The organization's meter counts every project the organization owns." },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
     });
     return numberOf(result.rows[0]?.total);
   }
@@ -98,7 +99,8 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
         startDate: input.window.startDate,
         endDate: input.window.endDate,
       },
-      unscoped: { reason: "The organization's meter counts every project the organization owns." },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({ projectId: row.projectId, count: numberOf(row.total) }));
   }

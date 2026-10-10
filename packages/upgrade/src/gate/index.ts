@@ -19,7 +19,12 @@ export {
   spawnFirstInstallUpgrade,
   TASKS_APP_DIRECTORY,
 } from "./first-install-upgrade.ts";
-export { IMAGE_MIGRATION_DIRECTORIES, imageGateSteps, readImageTree } from "./image-tree.ts";
+export {
+  IMAGE_MIGRATION_DIRECTORIES,
+  imageGateSteps,
+  imageRelease,
+  readImageTree,
+} from "./image-tree.ts";
 export {
   IMAGE_CODE_STEPS_COMMAND,
   IMAGE_CODE_STEPS_FILE,

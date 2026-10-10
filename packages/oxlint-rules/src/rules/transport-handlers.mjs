@@ -11,7 +11,7 @@ const FLUENT_ENDPOINT_METHODS = new Set([
   "withPermission",
   "withoutPermission",
   "withStatus",
-  "withMiddleware",
+  "withMiddlewareContext",
   "withRateLimit",
   "withoutRateLimit",
   "withResourceLimit",
@@ -210,11 +210,26 @@ function isFluentEndpointHandle(call) {
 function fieldsProducedBy(link) {
   const name = propertyName(link.callee);
   if (name === "withPermission") return declaresPermissionTarget(link) ? ["target"] : [];
+  if (name === "withCredential") return declaresKey(link) ? ["key"] : [];
   if (name !== "withResponse") return PRODUCED_BY_DECLARATION.get(name) ?? [];
   const [kind] = link.arguments;
   const readsRequest = kind?.type === "Literal" && REQUEST_READING_KINDS.has(kind.value);
 
   return readsRequest ? ["response", "request"] : ["response"];
+}
+
+/** `.withCredential(door, { key: true })` hands the handler the key its door resolved (E5). */
+function declaresKey(link) {
+  const options = link.arguments[1];
+  return (
+    options?.type === "ObjectExpression" &&
+    options.properties.some(
+      (property) =>
+        (property.key?.name === "key" || property.key?.value === "key") &&
+        property.value?.type === "Literal" &&
+        property.value.value === true,
+    )
+  );
 }
 
 /** `.withPermission(perm, { at })` hands the handler the target its door authorised. */

@@ -298,6 +298,14 @@ describe("chart-grid", () => {
               colSpan: 4,
               rowSpan: 3,
             }),
+            // Full width, so the grid is a deliberate layout, not a bare stack.
+            place({
+              graphId: "c",
+              gridColumn: 0,
+              gridRow: 6,
+              colSpan: 8,
+              rowSpan: 3,
+            }),
           ],
           withIframe: true,
         });

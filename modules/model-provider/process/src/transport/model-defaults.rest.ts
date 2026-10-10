@@ -5,7 +5,7 @@
  */
 import {
   baseResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -39,7 +39,7 @@ const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
  * The credential this request arrived on: its principal (a key row, or a person for a
  * project-bound access token). Null for a legacy API key, which has no principal.
  */
-export const modelDefaultsRestCredential = defineRestMiddleware(
+export const modelDefaultsRestCredential = defineMiddlewareContext(
   "modelDefaultsRestCredential",
   z
     .object({
@@ -57,7 +57,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .get("/", "getApiModelDefaults")
   .withPermission("project:view")
   .withOutput(apiResponseModelDefaultsSchema)
-  .withMiddleware(modelDefaultsRestCredential)
+  .withMiddlewareContext(modelDefaultsRestCredential)
   .withDocs({
     description:
       "Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read.",
@@ -97,7 +97,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withInput(createModelDefaultConfigInputSchema)
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
   .withOutput(apiResponseConfigCreatedSchema)
-  .withMiddleware(modelDefaultsRestCredential)
+  .withMiddlewareContext(modelDefaultsRestCredential)
   .withDocs({
     description:
       "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
@@ -126,7 +126,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withInput(updateModelDefaultConfigInputSchema)
   .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
-  .withMiddleware(modelDefaultsRestCredential)
+  .withMiddlewareContext(modelDefaultsRestCredential)
   .withDocs({
     description:
       "Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config.",
@@ -158,7 +158,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withParams(modelDefaultsRestParamsSchema)
   .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
-  .withMiddleware(modelDefaultsRestCredential)
+  .withMiddlewareContext(modelDefaultsRestCredential)
   .withDocs({
     description: "Delete a default-model config. Scope attachments cascade.",
     responses: { ...baseResponses, 204: { description: "Deleted", content: {} } },

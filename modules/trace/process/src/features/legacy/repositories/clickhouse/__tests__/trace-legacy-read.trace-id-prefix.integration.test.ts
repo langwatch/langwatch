@@ -6,8 +6,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
-
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -81,7 +79,6 @@ describe.skipIf(!clickHouseConfigured)(
       ch = await startMigratedTraceClickHouse();
       service = TraceLegacyReadClickHouseRepository.create({
         resolveClickHouseClient: async () => ch,
-        traceCanonicalisation: TraceCanonicalisationService.create(),
       });
     }, 60_000);
 

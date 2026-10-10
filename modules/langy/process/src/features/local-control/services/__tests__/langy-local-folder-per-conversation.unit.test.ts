@@ -129,6 +129,7 @@ beforeEach(() => {
         organizationId: "organization-1",
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       }),
     }),
     baseHost: "https://app.langwatch.test",

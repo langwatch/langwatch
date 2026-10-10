@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"maps"
 	"os"
 	"path/filepath"
@@ -220,12 +221,22 @@ func (store *fakeClickHouse) Facts(context.Context) (ClickHouseFacts, error) {
 
 type fakeRedis struct{ keys []RedisKey }
 
-func (store *fakeRedis) Keys(context.Context) ([]RedisKey, error) {
-	return slices.Clone(store.keys), nil
+func (store *fakeRedis) Scan(_ context.Context, visit func(RedisKey) error) error {
+	for _, key := range store.keys {
+		if err := visit(key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (store *fakeRedis) Size(context.Context) (int, error) { return len(store.keys), nil }
-func (store *fakeRedis) Restore(_ context.Context, keys []RedisKey) error {
-	store.keys = append(store.keys, keys...)
+func (store *fakeRedis) Restore(_ context.Context, keys iter.Seq2[RedisKey, error]) error {
+	for key, err := range keys {
+		if err != nil {
+			return err
+		}
+		store.keys = append(store.keys, key)
+	}
 	return nil
 }
 
@@ -406,7 +417,8 @@ func TestManifestMissingFieldIsRefused(t *testing.T) {
 	required, _ := requiredFields()
 	fields := reflect.TypeFor[Manifest]()
 	for index := range fields.NumField() {
-		if tag := strings.Split(fields.Field(index).Tag.Get("json"), ",")[0]; !slices.Contains(required, tag) {
+		parts := strings.Split(fields.Field(index).Tag.Get("json"), ",")
+		if tag := parts[0]; !slices.Contains(required, tag) && !slices.Contains(parts, "omitempty") {
 			t.Errorf("snapshot.schema.json does not require %q", tag)
 		}
 	}
@@ -468,5 +480,26 @@ func TestObjectsTravelWithTheirKeys(t *testing.T) {
 	var scrub *ScrubError
 	if !errors.As(err, &scrub) || !strings.Contains(err.Error(), "exports/config.json") || strings.Contains(err.Error(), key) {
 		t.Fatalf("planted key: want a refusal naming the object key, never the value; got %v", err)
+	}
+}
+
+func TestRedisFingerprintIgnoresShortTTLKeys(t *testing.T) {
+	durable := RedisKey{Key: "bull:a", Type: "hash", PTTL: -1, Dump: []byte{1}}
+	fingerprint := func(keys ...RedisKey) TableFingerprint {
+		got, err := redisFingerprint(&fakeRedis{keys: keys})(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got["keys"]
+	}
+	base := fingerprint(durable, RedisKey{Key: "fold:x", PTTL: 5000, Dump: []byte{2}})
+	if got := fingerprint(durable, RedisKey{Key: "fold:y", PTTL: 900, Dump: []byte{3}}); got != base {
+		t.Fatalf("short-TTL difference changed the fingerprint: %v vs %v", got, base)
+	}
+	if got := fingerprint(RedisKey{Key: "bull:a", Type: "hash", PTTL: -1, Dump: []byte{9}}); got == base {
+		t.Fatal("durable key difference was not caught")
+	}
+	if !isVolatileRedisKey(RedisKey{Key: "fold:x", PTTL: 5000}) || isVolatileRedisKey(durable) {
+		t.Fatal("volatile split is wrong")
 	}
 }

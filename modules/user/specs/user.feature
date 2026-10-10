@@ -108,6 +108,12 @@ Feature: Canonical user lifecycle
     Then the mint fails and its transaction rolls back, leaving no account
 
   @unit
+  Scenario: A mint that loses a race for its address answers that the address is taken
+    Given another mint of the same address committed first
+    When the account is minted
+    Then the mint is refused as email_already_registered rather than failing
+
+  @unit
   Scenario: The fact outbox records each committed fact on user's pipeline
     Given created, registered or erased intents committed to user's fact outbox
     When the worker's outbox delivers them, however often the write appended them
@@ -353,3 +359,26 @@ Feature: Canonical user lifecycle
       Given a reader without "langy:create", or where Langy is not rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers no
+
+  @integration
+  Scenario: A person whose organization's single sign-on governs sign-in is not offered a passkey
+    Given one of "ivy"'s confirmed addresses routes to "acme"'s single sign-on connection
+    When "ivy" opens her Passkeys settings, or the account-security offer appears after sign-in
+    Then neither offers to create a passkey
+    And each says "Your organization's single sign-on handles sign-in for this account."
+    And the offer still includes two-step verification when that is on offer
+
+  @integration
+  Scenario: A person whose organization's single sign-on governs sign-in is not offered a password
+    Given one of "ivy"'s confirmed addresses routes to "acme"'s single sign-on connection
+    And "ivy" holds no password
+    When "ivy" opens her Password settings
+    Then they do not offer to set a password
+    And say "Your organization's single sign-on handles sign-in for this account."
+
+  @integration
+  Scenario: An account its single sign-on created is governed through its own address
+    Given "ivy" signed up through "acme"'s single sign-on connection and has no address attached
+    And her account address routes to that connection
+    When "ivy" opens her Password settings
+    Then they do not offer to set a password

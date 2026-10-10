@@ -12,7 +12,7 @@ import {
 } from "./prisma.scim-sync-projection.repository.ts";
 import { PrismaScimRepository } from "./prisma.scim.repository.ts";
 
-/** SCIM's live store: its Postgres rows, its declared operator read, the sync log's read seat. */
+/** SCIM's live store: the Postgres rows the directory writes, and its declared operator read. */
 export class PostgresScimRepositories {
   static readonly requires = ["prisma", "operatorReads", "eventReadSeat"] as const;
 
@@ -22,7 +22,7 @@ export class PostgresScimRepositories {
     eventReadSeat,
   }: {
     prisma: PrismaClient;
-    eventReadSeat: Pick<EventReadSeat, "getEvents">;
+    eventReadSeat: EventReadSeat;
   } & ScimOperatorReadsMember): ScimRepositories {
     return {
       scim: PrismaScimRepository.create(prisma),

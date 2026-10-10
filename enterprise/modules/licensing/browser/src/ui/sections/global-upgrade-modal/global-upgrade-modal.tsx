@@ -17,7 +17,7 @@ export function GlobalUpgradeModal({ isSaaS }: { isSaaS: boolean }) {
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(event) => !event.open && close()}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         {variant.mode === "limit" && (
           <LimitContent variant={variant} isSaaS={isSaaS} onClose={close} />

@@ -24,7 +24,7 @@ type Naming struct {
 const HubService = "hub"
 
 // IdPService is the IdP simulator's routed name. Per-worktree stacks carry the
-// slug (idp.<slug>.langwatch.localhost); the standalone `haven idp` runner
+// slug (idp.<slug>.langwatch.localhost); the standalone `haven sim idp` runner
 // routes it slugless, as the machine-wide idp.langwatch.localhost.
 const IdPService = "idp"
 
@@ -85,6 +85,11 @@ const PaymentService = "payment"
 // telemetry.<slug>.langwatch.localhost. Opt-in like voice and llm.
 const TelemetryService = "telemetry"
 
+// LambdaService is the NLP Lambda fleet stand-in (services/lambdasim), routed at
+// lambda.<slug>.langwatch.localhost. Opt-in: it moves studio runs onto the
+// per-project Lambda path, which a developer must never get by surprise.
+const LambdaService = "lambda"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)
@@ -124,7 +129,7 @@ func (n Naming) RouteName(service, slug string) string {
 // MailAddressDomain is the domain half of this worktree's own inbox address —
 // deliberately NOT the routed hostname's order (mail.<slug>...): an email
 // address domain carries no scheme or port, so there is no ambiguity in
-// leading with the slug. `haven mail address` builds on this convention; haven
+// leading with the slug. `haven sim mail address` builds on this convention; haven
 // itself never sets SEED_EMAIL_DOMAIN — the seeded login stays the stable
 // global address so a saved credential keeps working, and a developer who
 // wants per-stack seeded addresses sets that variable themselves.

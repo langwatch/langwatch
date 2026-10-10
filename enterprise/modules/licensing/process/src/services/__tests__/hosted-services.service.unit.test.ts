@@ -55,19 +55,6 @@ function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseReco
 function serviceOver(rows: IssuedLicenseRecord[]) {
   return HostedServicesService.create({
     licenses: MemoryIssuedLicenseRepository.create(rows),
-    usage: {
-      read: async () => ({ budgets: [], spendAvailable: true, readAt: NOW }),
-    },
-    contractBudgets: {
-      termsOf: async () => ({
-        commitUsdCents: 100_000,
-        maximumUsdCents: 100_000,
-        overageEnabled: false,
-        services: ["instant_evals"],
-        termEndsAt: null,
-        termStartsAt: null,
-      }),
-    },
     now: () => NOW,
   });
 }
@@ -99,17 +86,5 @@ describe("the active licence behind a managed key", () => {
     await expect(
       serviceOver([rowFor({ services: ["future_service"] })]).findManagedKeyLicense(KEY),
     ).resolves.toEqual([{ services: [] }]);
-  });
-});
-
-describe("the hosted usage billing reads through licensing", () => {
-  it("names the contract's services only where the key's licence is active", async () => {
-    const caller = { ...KEY, projectId: null };
-
-    const licensed = await serviceOver([rowFor()]).usage({ caller });
-    const unlicensed = await serviceOver([]).usage({ caller });
-
-    expect(licensed.services).toEqual(["instant_evals"]);
-    expect(unlicensed.services).toEqual([]);
   });
 });

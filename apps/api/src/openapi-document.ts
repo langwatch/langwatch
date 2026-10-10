@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 
 import type { Authorize } from "@langwatch/api/access";
 import { buildOpenApiDocument, type RestIdentity } from "@langwatch/api/hosting";
-import { RestHost, type RestTransportDeclaration } from "@langwatch/api/rest";
+import { bindRestCredential, RestHost, type RestTransportDeclaration } from "@langwatch/api/rest";
 
 import { processModules } from "./process-modules.generated.ts";
 
@@ -17,7 +17,7 @@ export const OPENAPI_DOCUMENT_PATH = "specs/api-reference/openapi-document.json"
 
 const REPOSITORY_ROOT = join(import.meta.dirname, "../../..");
 
-/** Describing a route answers no request, so every door and every fact refuses. */
+/** Describing a route answers no request, so every door and every middleware context refuses. */
 function refuse(): never {
   throw new Error("the OpenAPI generator describes routes and answers no request");
 }
@@ -62,12 +62,12 @@ function restDeclarations(
  */
 export function describedRestApplication(modules: readonly InstalledModule[] = processModules) {
   const declarations = restDeclarations(modules);
-  const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
 
   for (const declaration of declarations) {
     for (const route of declaration.routes) {
-      for (const fact of route.middleware ?? []) {
-        facts.set(fact.name, { middleware: fact, resolve: refuse });
+      for (const declared of route.middleware ?? []) {
+        contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
       }
     }
   }
@@ -77,7 +77,6 @@ export function describedRestApplication(modules: readonly InstalledModule[] = p
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -85,12 +84,19 @@ export function describedRestApplication(modules: readonly InstalledModule[] = p
     audit: { record: async () => {} },
     idempotency: refuse,
     rateLimiter: { check: refuse },
-    facts: [...facts.values()] as never,
+    middlewareContext: [...contexts.values()] as never,
     entitlements: { holds: refuse },
     authz: undecided,
   });
 
-  for (const declaration of declarations) rest.mount(declaration, refuse);
+  // A module binds these on a booted process; here every one is closed, as the host's are.
+  const moduleDoors = (
+    ["scim_token", "session_key", "cli_token", "otlp_ingest", "licence_token"] as const
+  ).map((credential) => bindRestCredential(credential, () => closed));
+
+  for (const declaration of declarations) {
+    rest.mount(declaration, refuse, { middlewareBindings: moduleDoors });
+  }
 
   return rest.app;
 }

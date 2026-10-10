@@ -4,7 +4,14 @@ import { useState } from "react";
 import { ScopeChipPicker, type ScopeTriadEntry } from "./scope-chip-picker.tsx";
 
 const meta = {
-  title: "Components/Scope chip picker",
+  title: "Inputs and forms/Scope chip picker",
+  parameters: {
+    usage: {
+      use: "Choosing the organization, team, project or department a resource applies to.",
+      avoid:
+        "Never a hand-rolled Select for scopes (scope-selector-and-badges.md). Showing scopes read-only: use Provider scope chips.",
+    },
+  },
   tags: ["autodocs"],
 } satisfies Meta;
 

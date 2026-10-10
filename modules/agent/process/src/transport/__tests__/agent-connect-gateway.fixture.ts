@@ -42,11 +42,11 @@ export class ConnectGatewayFixture {
     this.#protocol = WebSocketProtocol.create({
       path: CONNECT_PATH,
       maxPayloadBytes: relayPayloadCaps(options.relayMaxPayloadMb).frameBytes,
-      facts: agentConnectHeadersSchema,
+      middlewareContext: agentConnectHeadersSchema,
       headers: { instanceToken: "x-agent-instance-token" },
-      handle: (connections: ConnectedAgentConnectionService, socket, facts) => {
+      handle: (connections: ConnectedAgentConnectionService, socket, context) => {
         connections.accept(socket, {
-          admitted: { ...facts, caller: options.caller ?? DEFAULT_CALLER },
+          admitted: { ...context, caller: options.caller ?? DEFAULT_CALLER },
         });
         return Promise.resolve();
       },

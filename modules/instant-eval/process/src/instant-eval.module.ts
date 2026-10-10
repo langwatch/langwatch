@@ -1,9 +1,4 @@
-import {
-  bindRestMiddleware,
-  credentialPrincipalOfToken,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
-import { instantEvalRestCredential } from "@langwatch/instant-eval-contract";
+import { credentialPrincipalOfToken, projectCredentialOfRequest } from "@langwatch/api/rest";
 import type { InstantEvalApi, InstantEvalServerConfig } from "@langwatch/instant-eval-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -28,11 +23,10 @@ export const instantEvalProcessModule: PublishedProcessModule<
   // Every route of the family runs the statement as the KEY's own cut of the
   // project's content, so the door resolves the credential once and the
   // handlers never reach for it.
-  .withTransportFacts(() => [
-    bindRestMiddleware(instantEvalRestCredential, (context) =>
-      credentialPrincipalOfToken(projectCredentialOfRequest(context.req.raw)),
-    ),
-  ])
+  .provideMiddlewareContext({
+    instantEvalRestCredential: (request) =>
+      credentialPrincipalOfToken(projectCredentialOfRequest(request)),
+  })
   .withEventing(instantEvalEventing)
   // Background, after old writers are gone and after billing's usage-billing catch-up.
   .withMigrations(({ app, dependencies }) => [

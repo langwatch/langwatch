@@ -5,7 +5,7 @@
  * Spec: specs/ai-gateway/governance/me-usage-rest-api.feature
  */
 import { createErrorHandler, ProjectMissingCredentialsError } from "@langwatch/api";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
 import type {
   GovernanceRestApi,
   MePersonalCredential,
@@ -40,6 +40,7 @@ const workspace = (overrides: Partial<ProjectIdentity>): ProjectIdentity => ({
   organizationId: ORGANIZATION_ID,
   isPersonal: true,
   ownerUserId: OWNER_ID,
+  kind: "application",
   ...overrides,
 });
 
@@ -136,7 +137,7 @@ async function mounted({
   }).mount(meUsageRest.router(), {
     app: () => app,
     onError: createErrorHandler(),
-    facts: [bindRestMiddleware(mePersonalCredential, () => credential)],
+    middlewareContext: [bindMiddlewareContext(mePersonalCredential, () => credential)],
   });
 
   return { hono, personalUsage };

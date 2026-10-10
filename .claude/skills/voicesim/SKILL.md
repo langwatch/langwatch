@@ -1,6 +1,6 @@
 ---
 name: voicesim
-description: "Run ElevenLabs voice calls locally against voicesim, haven's voice-provider stand-in. Use when someone says 'voicesim', 'haven up +voice', 'test a voice agent without ElevenLabs', 'signed URL', 'convai socket', 'fake ElevenLabs', 'voice call console', or needs a deterministic voice call in a test."
+description: "Run ElevenLabs voice calls locally against voicesim, haven's voice-provider stand-in. Use when someone says 'haven voice', 'voicesim', 'haven up +voice', 'test a voice agent without ElevenLabs', 'signed URL', 'convai socket', 'fake ElevenLabs', 'voice call console', 'haven sim voice', or needs a deterministic voice call in a test."
 user-invocable: true
 ---
 
@@ -14,6 +14,7 @@ shim, never expose it. Code: `services/voicesim`, console `apps/voicesim-web`.
 ## Run it
 
 - Opt-in: `haven up +voice` (sticky). Hosted in the `sims` lane.
+- Already on? `haven sim voice status` answers with the base URLs; the seeded org then has an ElevenLabs provider at voicesim, no clean instance needed.
 - Console: `https://voice.<slug>.langwatch.localhost` (calls, transcripts, events, Clear calls); `haven status` shows the loopback port.
 - Unless `.env` names `ELEVENLABS_BASE_URL`, the overlay sets it to `http://127.0.0.1:<port>`,
   a dummy `ELEVENLABS_API_KEY` when none is set, and `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1`.
@@ -63,5 +64,5 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven voice status | calls | call <id> | clear
+haven sim voice status | list | get <id> | clear
 ```

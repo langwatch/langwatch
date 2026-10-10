@@ -277,7 +277,7 @@ export const TeamForm = ({
                 <Input width="full" type="text" data-testid="team-form-name" {...field} />
               )}
             />
-            <Field.ErrorText>Name is required</Field.ErrorText>
+            <Field.ErrorText>{errors.name?.message || "Name is required"}</Field.ErrorText>
           </HorizontalFormControl>
           {team && (
             <HorizontalFormControl label="Slug" helper="The unique ID of your team">

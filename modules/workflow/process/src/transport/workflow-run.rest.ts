@@ -1,6 +1,6 @@
 import { PayloadTooLargeError } from "@langwatch/api";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -25,7 +25,7 @@ const bodyLimit = {
  * The API key a run was started with, so the run's own key holds no more; null for a legacy
  * API key or a project-bound access token, which have no key row.
  */
-export const workflowRunCallerKey = defineRestMiddleware(
+export const workflowRunCallerKey = defineMiddlewareContext(
   "workflowRunCallerKey",
   z.string().min(1).nullable(),
 );
@@ -66,7 +66,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunCallerKey)
+  .withMiddlewareContext(workflowRunCallerKey)
   .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, versionId, ...inputs } = input;
 
@@ -94,7 +94,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunCallerKey)
+  .withMiddlewareContext(workflowRunCallerKey)
   .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, ...inputs } = input;
 
@@ -121,7 +121,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunCallerKey)
+  .withMiddlewareContext(workflowRunCallerKey)
   .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, versionId, ...inputs } = input;
 

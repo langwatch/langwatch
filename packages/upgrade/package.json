@@ -32,17 +32,17 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "pg": "^8.22.0",
+    "pg": "catalog:",
     "prisma": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
-    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
     "@types/node": "catalog:",
-    "@types/pg": "^8.20.3",
+    "@types/pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

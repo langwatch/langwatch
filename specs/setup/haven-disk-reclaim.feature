@@ -6,7 +6,7 @@ Feature: Reclaiming disk — temporary and merged worktrees, and agent job scrat
   directory under ~/.claude/jobs holding its record and the scratch it produced
   getting there — a single finished run can hold thirteen gigabytes of tmp/.
   Both classes are regenerable, so haven reclaims them on its own cadence and
-  offers them pre-ticked in "haven clean", instead of waiting for the disk to
+  offers them pre-ticked in "haven machine clean", instead of waiting for the disk to
   hit 100%.
 
   # Behavior lives in tools/thuishaven:
@@ -23,7 +23,7 @@ Feature: Reclaiming disk — temporary and merged worktrees, and agent job scrat
   #   domain/reclaimkind.go — the nouns each kind is counted in, and the tally
   #     one cleanup ends with.
   #   cmd/clean.go          — the output mode, the two pickers, the picker rows,
-  #     the agent report's two new categories, and what "haven clean --yes"
+  #     the agent report's two new categories, and what "haven machine clean --yes"
   #     reclaims.
   #   adapters/prunetui/    — the picker: newest-first order, the pre-ticks it is
   #     given, and the one-screen confirmation.

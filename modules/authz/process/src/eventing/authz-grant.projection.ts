@@ -74,6 +74,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
       kind: "grant.upsert",
       ...(data.membershipStamp ? { membershipStamp: data.membershipStamp } : {}),
       ...(data.membershipBootstrap ? { membershipBootstrap: data.membershipBootstrap } : {}),
+      ...(data.onDuplicate ? { onDuplicate: data.onDuplicate } : {}),
       row: {
         id: data.grantId,
         organizationId: event.tenantId,

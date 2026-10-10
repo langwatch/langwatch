@@ -11,7 +11,7 @@ import (
 // How long a queued run should expect to wait, and how much longer an active
 // one has left. Both read the same short history of completed heavy runs
 // (RunRecord) and both degrade to silence rather than a guess: with nothing
-// recorded, neither the gate's queue message nor `haven slot explain` says
+// recorded, neither the gate's queue message nor `haven machine slot explain` says
 // anything about time at all.
 
 // HistoryKind is the coarse bucket a completed run is filed under - coarser

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "postgres:DataPrivacyProjectScope",
+    "what": "Postgres table DataPrivacyProjectScope",
+    "kind": "postgres-table",
+    "deprecatedIn": null,
+    "removedIn": null,
+    "successor": "Project and Team placement",
+    "notice": "Data privacy reads where a project sits from Project and Team; nothing reads or writes this table any more. It is kept for now and dropped in a future release."
+  },
+  {
+    "id": "postgres:DataRetentionProjectScope",
+    "what": "Postgres table DataRetentionProjectScope",
+    "kind": "postgres-table",
+    "deprecatedIn": null,
+    "removedIn": null,
+    "successor": "Project and Team placement",
+    "notice": "Data retention reads where a project sits from Project and Team; nothing reads or writes this table any more. It is kept for now and dropped in a future release."
+  }
+]

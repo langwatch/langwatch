@@ -5,7 +5,7 @@
  * @see specs/rbac/role-bindings-rest-api.feature
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
-import { authzRoleBindingRest, roleBindingRestFacts } from "../authz-role-binding.rest.ts";
+import { authzRoleBindingRest, roleBindingRestContext } from "../authz-role-binding.rest.ts";
 
 const ORGANIZATION_ID = "org-1";
 const CREDENTIAL = "organization-credential";
@@ -104,8 +104,8 @@ function world({ rows = [] as AuthzManagedOrganizationBinding[] } = {}) {
       loggerName: "langwatch:test:role-bindings:errors",
       label: "Role Bindings API Error",
     }),
-    facts: [
-      bindRestMiddleware(roleBindingRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(roleBindingRestContext, () => ({
         organizationId: ORGANIZATION_ID,
         actor: { type: "user" as const, id: "user-owner" },
         caller: { type: "apiKey" as const, id: "key-1" },

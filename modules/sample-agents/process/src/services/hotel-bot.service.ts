@@ -1,4 +1,4 @@
-import { ProjectMissingCredentialsError } from "@langwatch/api";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Logger } from "@langwatch/observability";
 import {
@@ -36,7 +36,11 @@ function mintId(resource: string): string {
   return generate(resource).toString();
 }
 
-type Conversation = Readonly<{ authToken: string; threadId: string; userId: string }>;
+/** `authToken` is null when no ingest key could be minted; the turns then post nothing. */
+type Conversation = Readonly<{ authToken: string | null; threadId: string; userId: string }>;
+
+/** All the demo key may do: record traces (Alex 2026-10-10 HOTEL-BOT-KEY). */
+const HOTEL_BOT_KEY_PERMISSIONS = ["traces:create"];
 
 type TurnTrace = Readonly<{
   completion: ChatCompletion;
@@ -48,6 +52,7 @@ type TurnTrace = Readonly<{
 export class HotelBotService {
   readonly #chat: OpenAiChatChannel;
   readonly #collector: TraceCollectorChannel;
+  readonly #apiKeys: Pick<ApiKeyApi, "mintRunKey">;
   readonly #logger: Logger;
   readonly #random: () => number;
   readonly #nowMs: () => number;
@@ -55,6 +60,7 @@ export class HotelBotService {
   private constructor(deps: Parameters<typeof HotelBotService.create>[0]) {
     this.#chat = deps.chat;
     this.#collector = deps.collector;
+    this.#apiKeys = deps.apiKeys;
     this.#logger = deps.logger;
     this.#random = deps.random;
     this.#nowMs = deps.nowMs;
@@ -63,6 +69,7 @@ export class HotelBotService {
   static create(deps: {
     chat: OpenAiChatChannel;
     collector: TraceCollectorChannel;
+    apiKeys: Pick<ApiKeyApi, "mintRunKey">;
     logger: Logger;
     random: () => number;
     nowMs: () => number;
@@ -70,12 +77,11 @@ export class HotelBotService {
     return new HotelBotService(deps);
   }
 
-  async run({ authToken }: HotelBotRunInput): Promise<HotelBotReply> {
-    if (!authToken) throw new ProjectMissingCredentialsError();
+  async run(input: HotelBotRunInput): Promise<HotelBotReply> {
     if (hotelBotDeclines(this.#random())) throw new HotelBotDeclinedError();
 
     const conversation = {
-      authToken,
+      authToken: await this.#ingestKey(input),
       threadId: mintId(THREAD_KSUID_RESOURCE),
       userId: mintId(USER_KSUID_RESOURCE),
     };
@@ -140,15 +146,39 @@ export class HotelBotService {
     await this.#sendTrace(conversation, { completion: second, input: guestReply });
   }
 
+  /**
+   * A short-lived key for this project, traces only, default life, capped by the starting key
+   * (ARCHITECTURE.md §8, a key-started run carries that key's principal).
+   */
+  async #ingestKey({
+    projectId,
+    startedByApiKeyId,
+    startedByUserId,
+  }: HotelBotRunInput): Promise<string | null> {
+    try {
+      return await this.#apiKeys.mintRunKey({
+        userId: startedByUserId,
+        ...(startedByApiKeyId ? { callerApiKeyId: startedByApiKeyId } : {}),
+        projectId,
+        permissions: HOTEL_BOT_KEY_PERMISSIONS,
+      });
+    } catch (error) {
+      this.#logger.warn({ error }, "hotel bot ingest key was not minted; no trace will be sent");
+      return null;
+    }
+  }
+
   #complete(messages: readonly ChatMessage[]): Promise<ChatCompletion> {
     return this.#chat.complete({ model: HOTEL_BOT_MODEL, messages });
   }
 
   /** Main ignored a failed post: the demo answers alike whether the collector took the trace. */
   async #sendTrace(conversation: Conversation, turn: TurnTrace): Promise<void> {
+    const { authToken } = conversation;
+    if (!authToken) return;
     try {
       await this.#collector.post({
-        authToken: conversation.authToken,
+        authToken,
         trace: this.#collectorTrace(conversation, turn),
       });
     } catch (error) {

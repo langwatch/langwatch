@@ -33,7 +33,7 @@ export function JoinYourTeamTakeover({
     return (
       <Takeover
         title={`You’re invited to join ${invitation.organizationName}`}
-        intro={`An administrator has already invited you, with the ${seat} seat.`}
+        intro={`${invitation.inviterName ?? "An administrator"} has already invited you, with the ${seat} seat.`}
         testId="join-team-invitation"
       >
         <Button
@@ -145,7 +145,7 @@ function Takeover({
       closeOnEscape={false}
       onOpenChange={() => void 0}
     >
-      <Dialog.Content data-testid={testId} bg="bg" borderRadius={0}>
+      <Dialog.Content data-testid={testId} borderRadius={0}>
         <Dialog.Body display="flex" alignItems="center" justifyContent="center" padding={6}>
           <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
             <Box>

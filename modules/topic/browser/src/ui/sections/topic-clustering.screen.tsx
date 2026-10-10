@@ -248,8 +248,11 @@ function ClusteringStatusBody({
             const modeCopy = copyFor(RUN_MODE_COPY, data.lastRunMode);
             return modeCopy ? `${modeCopy}. ` : null;
           })()}
-          Organized {data.lastRunTracesProcessed} traces into {data.lastRunTopicsCount} topics and{" "}
-          {data.lastRunSubtopicsCount} subtopics.
+          {organizedSummary({
+            tracesProcessed: data.lastRunTracesProcessed,
+            topicsCount: data.lastRunTopicsCount,
+            subtopicsCount: data.lastRunSubtopicsCount,
+          })}
         </Text>
       )}
       {data.lastRunOutcome === "skipped" && data.lastRunSkippedReason && (
@@ -292,6 +295,17 @@ function ClusteringStatusCard({ projectId }: { projectId: string }) {
  * server never sends raw error text (ADR-051 §8) — a failed run's detail is
  * the same fixed guidance the status card uses.
  */
+function organizedSummary(run: {
+  tracesProcessed: number;
+  topicsCount: number;
+  subtopicsCount: number;
+}): string {
+  if (run.topicsCount === 0 && run.subtopicsCount === 0) {
+    return `Found no new topics in ${run.tracesProcessed} traces. Existing topics were kept.`;
+  }
+  return `Organized ${run.tracesProcessed} traces into ${run.topicsCount} topics and ${run.subtopicsCount} subtopics.`;
+}
+
 function runDetail(run: {
   outcome: string;
   mode: string | null;
@@ -305,7 +319,7 @@ function runDetail(run: {
   switch (run.outcome) {
     case "completed": {
       const modeCopy = copyFor(RUN_MODE_COPY, run.mode);
-      const summary = `Organized ${run.tracesProcessed} traces into ${run.topicsCount} topics and ${run.subtopicsCount} subtopics.`;
+      const summary = organizedSummary(run);
       return modeCopy ? `${modeCopy}. ${summary}` : summary;
     }
     case "skipped":

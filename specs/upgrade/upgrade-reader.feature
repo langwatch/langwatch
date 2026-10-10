@@ -127,6 +127,14 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     When the status is read
     Then the origin is "inferred"
 
+  @unit @integration
+  Scenario: An upgrade by an unreleased image reads as installed unreleased
+    Given a seed run recorded release 3.19.0, below the floor 3.20.1
+    And a later upgrade by an image no release names succeeded
+    When the status is read
+    Then the installed release is "unreleased", recorded
+    And the state is not unsupported
+
   @integration
   Scenario: An unknown step status is shown raw
     Given a step row whose status is "quarantined"
@@ -158,6 +166,13 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     When the releases are listed
     Then the releases are ordered newest first with a count per status
     And the image release is marked as the image
+
+  @unit
+  Scenario: An unreleased image marks the Unreleased row as this image
+    Given an image no release names, declaring a step in no manifest and a step of release 3.20.1
+    When the releases are listed
+    Then the Unreleased row is marked as the image and lists the unlisted step
+    And release 3.20.1 is not marked as the image
 
   @integration
   Scenario: A step lists no targets before the target table exists

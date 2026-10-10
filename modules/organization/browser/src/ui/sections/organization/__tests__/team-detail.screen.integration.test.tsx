@@ -8,7 +8,10 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { updateTeam } = vi.hoisted(() => ({ updateTeam: vi.fn() }));
+const { updateTeam, readFailure } = vi.hoisted(() => ({
+  updateTeam: vi.fn(),
+  readFailure: { current: null as unknown },
+}));
 
 vi.mock("../../../../behavior/organization-api.ts", () => {
   const team = {
@@ -39,7 +42,10 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       }),
       team: {
         getTeamWithMembers: {
-          useQuery: () => ({ data: team, isLoading: false, error: null }),
+          useQuery: () =>
+            readFailure.current
+              ? { data: undefined, isLoading: false, error: readFailure.current }
+              : { data: team, isLoading: false, error: null },
         },
         update: { useMutation: () => ({ mutate: updateTeam, isPending: false }) },
         archiveById: mutation,
@@ -65,6 +71,17 @@ class TeamAddressHost extends FakeOrganizationHost {
 describe("given the team settings page", () => {
   afterEach(() => {
     cleanup();
+    readFailure.current = null;
+  });
+
+  describe("when the team read answers not found, as for an archived team", () => {
+    /** @scenario "An archived team's address says the team was not found" */
+    it("shows a not-found message instead of a loading skeleton", async () => {
+      readFailure.current = { data: { code: "NOT_FOUND" }, message: "Team not found" };
+      renderWithOrganizationHost(<TeamDetailScreen />, new TeamAddressHost());
+
+      expect(await screen.findByText("Team not found")).toBeInTheDocument();
+    });
   });
 
   describe("when it opens for a team the reader may edit", () => {
@@ -97,6 +114,29 @@ describe("given the team settings page", () => {
           expect.anything(),
         ),
       );
+    });
+
+    /** @scenario "The team settings page shows a taken name under the name field" */
+    it("shows a taken name under the name field", async () => {
+      const message = "A team called Taken already exists";
+      updateTeam.mockImplementationOnce((_input, { onError }) =>
+        onError({
+          data: {
+            error: {
+              code: "team_name_taken",
+              httpStatus: 409,
+              meta: { fieldErrors: { name: message } },
+            },
+          },
+        }),
+      );
+      renderWithOrganizationHost(<TeamDetailScreen />, new TeamAddressHost());
+      const name = await screen.findByTestId("team-form-name");
+
+      fireEvent.input(name, { target: { value: "Taken" } });
+      await userEvent.type(name, "{Enter}");
+
+      expect(await screen.findByText(message)).toBeVisible();
     });
   });
 });

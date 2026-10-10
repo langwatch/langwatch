@@ -5,7 +5,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CachedView } from "./cached-view.tsx";
 
 const meta = {
-  title: "Components/Cached view",
+  title: "Feedback/Cached view",
+  parameters: { usage: { use: "Data drawn from the saved copy while the network confirms it." } },
   component: CachedView,
   tags: ["autodocs"],
   args: {

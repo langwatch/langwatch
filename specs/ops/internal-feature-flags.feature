@@ -328,11 +328,24 @@ Feature: Internal feature flag system for system-level kill switches
 
     @unit
     Scenario: Self-hosted installs do not offer the Feature Flags page
-      Given an operator on an install where ops's cloud-ops capability is off
+      Given an operator on a self-hosted production install where ops's cloud-ops capability is off
       Then the Ops menu has no Feature Flags entry
       And /ops/feature-flags answers as an unknown page
       But an environment override still sets a flag
       And the flag procedures still answer an operator with ops permissions
+
+    @unit
+    Scenario: A developer's local stack offers the Feature Flags page
+      Given an operator on a development build where ops's cloud-ops capability is off
+      Then the Ops menu has a Feature Flags entry
+      And /ops/feature-flags shows the flags
+
+    @unit
+    Scenario: Cloud, self-hosted and local development are told apart
+      Given a build's mode and deployment
+      Then a development build reads as local, even when it runs SaaS-shaped
+      And a production SaaS build reads as cloud
+      And any other production build reads as self-hosted
 
     Scenario: Operator without ops:manage permission cannot toggle flags
       Given an operator with only ops:view permission opens the page

@@ -6,7 +6,7 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsEventLogTrpc } from "@langwatch/ops-contract";
 
-import { opsOperatorFact } from "#transport/ops-operator.trpc";
+import { opsOperatorContext } from "#transport/ops-operator.trpc";
 
 export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsEventLogTrpc> =
   defineTrpcRouter(OpsApi, opsEventLogTrpc)
@@ -66,7 +66,7 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .handle(({ app, input }) => app.findHistoryEntry({ runId: input.runId }))
 
     .procedure("startReplay")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }, operator) =>
       app.startReplay({

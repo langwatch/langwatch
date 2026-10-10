@@ -6,17 +6,19 @@ import {
 } from "@langwatch/automation-contract";
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { CronSchedule } from "@langwatch/design-system/cron-schedule";
 import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
   Button,
   HStack,
-  SimpleGrid,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AggregateReadOnlyGate } from "@langwatch/error-views";
@@ -25,7 +27,18 @@ import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { type NamedSlackConnection } from "@langwatch/slack-contract";
 import { toEpochMs } from "@langwatch/time";
 import { useMemo, useState } from "react";
-import { Calendar, Edit2, Eye, Filter, MoreVertical, Plus, Trash, Zap } from "react-feather";
+import {
+  Activity,
+  Bell,
+  Calendar,
+  Edit2,
+  Eye,
+  Filter,
+  MoreVertical,
+  Plus,
+  Trash,
+  Zap,
+} from "react-feather";
 
 import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
 import { useAutomationToaster, useShowErrorToast } from "../../behavior/automation-feedback.ts";
@@ -51,7 +64,6 @@ import { type TriggerActionParams } from "../../features/overview/model/trigger-
 import { AutomationHistory } from "../../features/overview/ui/elements/automation-history.tsx";
 import {
   AlertRuleCell,
-  describeSchedule,
   EmailList,
   EmptyHint,
   FiringStatus,
@@ -478,7 +490,16 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   };
 
   return (
-    <AutomationsLayout title={details.title} basePath={basePath} section={section}>
+    <AutomationsLayout
+      title={details.title}
+      basePath={basePath}
+      section={section}
+      actions={
+        section === "overview" && !projectIsAggregate ? (
+          <OverviewCreateMenu openCreate={openCreate} />
+        ) : undefined
+      }
+    >
       <Box width="full">
         <VStack align="stretch" gap={6} width="full">
           <Text textStyle="sm" color="fg.muted">
@@ -626,7 +647,38 @@ function RowActionsMenu({
   );
 }
 
-/** The tiles, the Create menu, recent activity and the popular uses. */
+/** Two kinds can be created (ADR-093 §1); what an automation watches is its first step. */
+function OverviewCreateMenu({
+  openCreate,
+}: {
+  openCreate: (prefill: AutomationCreatePrefill) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <PageLayout.HeaderButton primary>
+          <Plus size={14} aria-hidden="true" /> Create
+        </PageLayout.HeaderButton>
+      </Menu.Trigger>
+      <Menu.Content>
+        <Menu.Item value="automation" onClick={() => openCreate({})}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Zap size={14} aria-hidden="true" />
+            New automation
+          </Box>
+        </Menu.Item>
+        <Menu.Item value="report" onClick={() => openCreate({ initialSource: "report" })}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Calendar size={14} aria-hidden="true" />
+            New report
+          </Box>
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+/** The tiles, recent activity and the popular uses. */
 function OverviewSection({
   overview,
   activity,
@@ -644,49 +696,33 @@ function OverviewSection({
 }) {
   return (
     <VStack align="stretch" gap={8} width="full">
-      {/* Two kinds can be created (ADR-093 §1); what an automation watches is its first step. */}
-      <HStack justify="flex-end">
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button size="sm" colorPalette="orange">
-              <Plus size={14} aria-hidden="true" /> Create
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content>
-            <Menu.Item value="automation" onClick={() => openCreate({})}>
-              <Box display="flex" alignItems="center" gap={2}>
-                <Zap size={14} aria-hidden="true" />
-                New automation
-              </Box>
-            </Menu.Item>
-            <Menu.Item value="report" onClick={() => openCreate({ initialSource: "report" })}>
-              <Box display="flex" alignItems="center" gap={2}>
-                <Calendar size={14} aria-hidden="true" />
-                New report
-              </Box>
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Root>
-      </HStack>
-
-      <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+      <StatTileGrid columns={3}>
         <StatTile
           label="Firing now"
-          value={overview.firingNow}
-          sub={overview.firingNow > 0 ? "automations over their threshold" : "all clear"}
-          alert={overview.firingNow > 0}
-        />
+          icon={<Bell size={12} aria-hidden="true" />}
+          hint={overview.firingNow > 0 ? "automations over their threshold" : "all clear"}
+        >
+          <Box color={overview.firingNow > 0 ? "red.fg" : undefined}>
+            <StatTileFigure>{overview.firingNow}</StatTileFigure>
+          </Box>
+        </StatTile>
         <StatTile
           label="Fired (30 days)"
-          value={overview.fired30d.toLocaleString()}
-          sub="across every automation"
-        />
+          icon={<Activity size={12} aria-hidden="true" />}
+          hint="across every automation"
+        >
+          <StatTileFigure>{overview.fired30d.toLocaleString()}</StatTileFigure>
+        </StatTile>
         <StatTile
           label="Next scheduled"
-          value={overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
-          sub={overview.nextName ?? "no reports queued"}
-        />
-      </SimpleGrid>
+          icon={<Calendar size={12} aria-hidden="true" />}
+          hint={overview.nextName ?? "no reports queued"}
+        >
+          <StatTileFigure>
+            {overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
+          </StatTileFigure>
+        </StatTile>
+      </StatTileGrid>
 
       <VStack align="stretch" gap={3} width="full">
         <OverviewSectionHeading
@@ -801,13 +837,12 @@ function ReportsSection({
                         graphNameById={graphNameById}
                       />
                     </Table.Cell>
-                    {/* No nowrap: a cadence plus an IANA zone is wider than this column. */}
-                    <Table.Cell>
-                      <Text textStyle="sm">
-                        {schedule?.cron
-                          ? describeSchedule(schedule.cron, schedule.timezone ?? "UTC")
-                          : "Not set"}
-                      </Text>
+                    <Table.Cell maxWidth="240px">
+                      {schedule?.cron ? (
+                        <CronSchedule cron={schedule.cron} timezone={schedule.timezone ?? "UTC"} />
+                      ) : (
+                        <Text textStyle="sm">Not set</Text>
+                      )}
                     </Table.Cell>
                     <ReportRunCells
                       schedule={scheduleByTriggerId.get(trigger.id)}
@@ -1020,50 +1055,6 @@ function OverviewSectionHeading({ title, summary }: { title: string; summary: st
         {summary}
       </Text>
     </VStack>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  sub,
-  alert = false,
-}: {
-  label: string;
-  value: React.ReactNode;
-  sub: string;
-  alert?: boolean;
-}) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor={alert ? "red.solid" : "border"}
-      borderRadius="lg"
-      padding={4}
-      bg="bg.panel"
-    >
-      <Text
-        textStyle="2xs"
-        textTransform="uppercase"
-        letterSpacing="0.04em"
-        fontWeight="600"
-        color={alert ? "red.fg" : "fg.muted"}
-      >
-        {label}
-      </Text>
-      <Text
-        fontSize="2xl"
-        fontWeight="semibold"
-        lineHeight="1.2"
-        marginTop={1}
-        color={alert ? "red.fg" : "fg"}
-      >
-        {value}
-      </Text>
-      <Text textStyle="xs" color="fg.muted" marginTop={0.5} lineClamp={1}>
-        {sub}
-      </Text>
-    </Box>
   );
 }
 

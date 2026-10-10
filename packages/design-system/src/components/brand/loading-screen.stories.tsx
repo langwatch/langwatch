@@ -4,10 +4,16 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { LoadingScreen } from "./loading-screen.tsx";
 
 const meta = {
-  title: "Patterns/Loading screen",
+  title: "Feedback/Loading screen",
   component: LoadingScreen,
   tags: ["autodocs"],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    usage: {
+      use: "The full-page wait before the application shell is ready.",
+      avoid: "Inside a page: Skeleton or Spinner from primitives.",
+    },
+    layout: "fullscreen",
+  },
 } satisfies Meta<typeof LoadingScreen>;
 
 export default meta;

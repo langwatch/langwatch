@@ -93,3 +93,53 @@ describe("given an organization's audit trail", () => {
     });
   });
 });
+
+describe("given an audit row written under an impersonation", () => {
+  const stored = {
+    id: "audit_1",
+    createdAt: new Date("2026-10-10T09:00:00.000Z"),
+    userId: "user_alice",
+    projectId: null,
+    organizationId: "org_acme",
+    action: "organization.member.add",
+    args: null,
+    error: null,
+    ipAddress: "198.51.100.12",
+    userAgent: null,
+    targetKind: null,
+    targetId: null,
+    before: null,
+    after: null,
+  };
+
+  beforeEach(() => {
+    userFindMany.mockResolvedValue([
+      { id: "user_alice", name: "Alice", email: "alice@acme.test" },
+      { id: "user_operator", name: "Operator", email: "op@langwatch.test" },
+    ]);
+  });
+
+  /** @scenario An impersonated entry names the operator as well as the person */
+  it.each([
+    ["the stored column", { actorUserId: "user_operator", metadata: null }],
+    [
+      "the tRPC door's metadata",
+      { actorUserId: null, metadata: { impersonatorId: "user_operator" } },
+    ],
+  ])("names the operator read from %s", async (_source, impersonation) => {
+    auditLogFindMany.mockResolvedValue([{ ...stored, ...impersonation }]);
+    auditLogCount.mockResolvedValue(1);
+
+    const { auditLogs } = await repository.getAuditLogs({
+      organizationId: "org_acme",
+      pageOffset: 0,
+      pageSize: 25,
+    });
+
+    expect(auditLogs[0]).toMatchObject({
+      actorUserId: "user_operator",
+      actorUser: { id: "user_operator", name: "Operator", email: "op@langwatch.test" },
+      user: { id: "user_alice" },
+    });
+  });
+});

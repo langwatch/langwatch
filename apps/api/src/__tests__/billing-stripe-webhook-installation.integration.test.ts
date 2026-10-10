@@ -30,7 +30,6 @@ describe("the api process installation", () => {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },

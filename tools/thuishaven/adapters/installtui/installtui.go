@@ -1,4 +1,4 @@
-// Package installtui is the picker `haven install` shows a developer with a
+// Package installtui is the picker `haven self install` shows a developer with a
 // terminal: what this machine is missing, and a tick beside the ones it is
 // about to install.
 //
@@ -7,7 +7,7 @@
 // nine rows to find the one that needed answering — the satisfied majority
 // dominating a screen whose whole purpose was the minority. What is already
 // installed is one line at the bottom, and the full per-entry report is what
-// `haven install --list` is for.
+// `haven self install --list` is for.
 //
 // It chooses and nothing more. The installs run AFTER it closes, with the
 // terminal to themselves — an installer that asks for a password cannot do
@@ -275,7 +275,7 @@ func (m model) renderHeader() string {
 	if len(m.rows) == 1 {
 		missing = "one thing this machine is missing"
 	}
-	return havenui.Title.Render("haven install") + "\n" +
+	return havenui.Title.Render("haven self install") + "\n" +
 		m.wrap(missing+" "+havenui.Bullet+" enter installs what is ticked", 2, havenui.Muted) + "\n"
 }
 

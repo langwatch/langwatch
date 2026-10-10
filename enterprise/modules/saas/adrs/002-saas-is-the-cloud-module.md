@@ -28,8 +28,10 @@ Routes that only Cloud answers live here, always mounted, refusing off Cloud.
 The first is the usage-report receiver: `POST /api/track_usage` (the legacy
 address every open-source install posts to) and `POST /api/v1/connect/stats`
 (the connect host), one operation behind both. It records through
-`LicensingApi.recordUsageReport` and sends product analytics through its own
-channel, targeted by `OpsApi.findProductAnalyticsTargets()`.
+`LicensingApi.recordUsageReport` and records a `usage_report_received` fact on
+its `saas_usage_report` pipeline. Superseded (ruling SAAS-ANALYTICS, 2026-10-10):
+saas no longer holds a product-analytics channel; nurturing subscribes to the
+fact and sends it to PostHog (CLAUDE.md rule 7).
 
 ## Consequences
 

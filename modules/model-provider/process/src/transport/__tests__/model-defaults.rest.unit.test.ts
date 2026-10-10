@@ -3,7 +3,11 @@
  * What `/api/model-defaults` refuses, and for whom.
  * @see specs/model-providers/model-default-config-cascade.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import type { AuthzPermission, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -77,7 +81,7 @@ function mount(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(modelDefaultsRestCredential, () => credential)],
+    middlewareContext: [bindMiddlewareContext(modelDefaultsRestCredential, () => credential)],
   });
 
   const send = (method: string, path: string, body?: unknown) =>

@@ -19,7 +19,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// haven play: run a GitHub PR in a throwaway sandbox. Everything here is
+// haven pr --throwaway: run a GitHub PR in a throwaway sandbox. Everything here is
 // deliberately disjoint from the shared local-dev estate: the sandbox gets its
 // own checkout, its own Postgres/ClickHouse/Redis containers and volumes
 // (play-prefixed names, freshly allocated loopback ports), and its own play-<n>
@@ -38,9 +38,9 @@ func ResolvePlayPR(ctx context.Context, repoRoot, ref string) (PlayPR, error) {
 	ref = strings.TrimSpace(ref)
 	if !ValidPlayRef(ref) {
 		return PlayPR{}, fmt.Errorf(
-			"usage: haven play [number|github-pr-url] [--allow-untrusted]\n" +
-				"  e.g. haven play 4913  |  haven play https://github.com/langwatch/langwatch/pull/4913\n" +
-				"  with no argument (in a terminal) haven play offers the open PRs to pick from")
+			"usage: haven pr --throwaway [number|github-pr-url] [--allow-untrusted]\n" +
+				"  e.g. haven pr --throwaway 4913  |  haven pr --throwaway https://github.com/langwatch/langwatch/pull/4913\n" +
+				"  with no argument (in a terminal) haven pr --throwaway offers the open PRs to pick from")
 	}
 	view, err := resolvePR(ctx, repoRoot, ref)
 	if err != nil {
@@ -274,7 +274,7 @@ func DecidePlayTrust(untrustedCount int, isAgent, allowUntrusted bool) PlayTrust
 func PlayTrustError(untrusted []string) error {
 	return fmt.Errorf(
 		"PR authors without write access to this repo: %s\n"+
-			"haven play runs their code on this machine as you, from this shell's environment,\n"+
+			"haven pr --throwaway runs their code on this machine as you, from this shell's environment,\n"+
 			"so it will not proceed unprompted.\n"+
 			"Re-run with --allow-untrusted to accept that explicitly.",
 		strings.Join(untrusted, ", "))
@@ -567,7 +567,7 @@ func playRedisShell(number, hostPort int) string {
 
 // --- the sandbox record ---
 // Written BEFORE any resource is created, so a play that dies hard is always
-// discoverable: `haven clean` reads these records and finishes the teardown
+// discoverable: `haven machine clean` reads these records and finishes the teardown
 // for any whose owner process is gone.
 
 // PlayRecord is one sandbox's on-disk record (<home>/play/pr-<n>.json).
@@ -669,7 +669,7 @@ type playStep struct {
 // the databases), then routes (the hostname must not point at a corpse), then
 // containers before their volumes (docker refuses to remove a volume in use),
 // then the checkout, then the record last - so a half-finished teardown is
-// still discoverable and re-runnable by `haven clean`.
+// still discoverable and re-runnable by `haven machine clean`.
 func playTeardownPlan(h PlayTeardownHooks) []playStep {
 	return []playStep{
 		{name: "stop processes", run: h.StopProcesses},
@@ -693,7 +693,7 @@ func runPlayTeardown(steps []playStep, report func(step string, err error)) erro
 		}
 		if s.onlyIfClean && len(errs) > 0 {
 			if report != nil {
-				report(s.name+" (kept: teardown was incomplete, so `haven clean` can finish it)", nil)
+				report(s.name+" (kept: teardown was incomplete, so `haven machine clean` can finish it)", nil)
 			}
 			continue
 		}
@@ -710,7 +710,7 @@ func runPlayTeardown(steps []playStep, report func(step string, err error)) erro
 
 // PlayTeardown destroys one sandbox completely: processes, hostnames,
 // containers, volumes, checkout, record. Idempotent - every step tolerates
-// the resource already being gone, so `haven clean` can finish a teardown a
+// the resource already being gone, so `haven machine clean` can finish a teardown a
 // crash interrupted.
 func (o *Orchestrator) PlayTeardown(ctx context.Context, rec PlayRecord) error {
 	hooks := PlayTeardownHooks{
@@ -825,7 +825,7 @@ func runQuiet(ctx context.Context, dir, name string, args ...string) error {
 }
 
 // ReapOrphanPlays finishes the teardown of every sandbox whose owner process
-// is gone - the `haven clean` tail for plays that died hard. Returns how many
+// is gone - the `haven machine clean` tail for plays that died hard. Returns how many
 // were reaped.
 func (o *Orchestrator) ReapOrphanPlays(ctx context.Context) (int, error) {
 	orphans := PlaysToReap(ReadPlayRecords(o.cfg.Home), o.sys.ProcessAlive)
@@ -840,7 +840,7 @@ func (o *Orchestrator) ReapOrphanPlays(ctx context.Context) (int, error) {
 }
 
 // OrphanPlays lists the sandboxes whose owner process is gone, without
-// touching them - the read-only view `haven clean` shows agents.
+// touching them - the read-only view `haven machine clean` shows agents.
 func (o *Orchestrator) OrphanPlays() []PlayRecord {
 	return PlaysToReap(ReadPlayRecords(o.cfg.Home), o.sys.ProcessAlive)
 }
@@ -909,11 +909,11 @@ func gitTracksFile(checkout, rel string) bool {
 	return cmd.Run() == nil
 }
 
-// PlayDisclosure is the upfront data-loss disclosure `haven play` prints
+// PlayDisclosure is the upfront data-loss disclosure `haven pr --throwaway` prints
 // before creating anything - the sandbox's contract in one banner.
 func PlayDisclosure(number int) string {
 	return fmt.Sprintf(
-		"haven play pr-%d: an EPHEMERAL sandbox.\n"+
+		"haven pr %d --throwaway: an EPHEMERAL sandbox.\n"+
 			"  Everything it creates is destroyed when you quit the view (q) or the process exits:\n"+
 			"  databases and their volumes, containers, the checkout, and the hostname.\n"+
 			"  It gets its own databases and hostnames, and none of your .env files.\n"+
@@ -924,7 +924,7 @@ func PlayDisclosure(number int) string {
 // PlayLaunch provisions and supervises one sandbox in the current process:
 // dedicated containers, play hostnames, overlay, dependency install,
 // migrations, seed, then the supervised service set until ctx is cancelled.
-// It never cleans up - the owning `haven play` process (or `haven clean`)
+// It never cleans up - the owning `haven pr --throwaway` process (or `haven machine clean`)
 // owns the teardown, so a hard death here can never skip it.
 //
 // preset ("" = the plain identity seed) picks a variant from the same registry
@@ -1037,7 +1037,7 @@ func (o *Orchestrator) ensurePlayRuntime(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("could not start the portless proxy: %w", err)
 	}
 	if o.container == nil {
-		return "", fmt.Errorf("haven play needs the container runtime (colima) for its dedicated databases")
+		return "", fmt.Errorf("haven pr --throwaway needs the container runtime (colima) for its dedicated databases")
 	}
 	dockerHost, err := o.container.Ensure(ctx)
 	if err != nil {

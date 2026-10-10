@@ -144,6 +144,22 @@ describe("source folder shape", () => {
     });
   });
 
+  describe("given the build-stamped release file that only the index reads", () => {
+    it("leaves it alone, and still folds a look-alike in another package", () => {
+      for (const pkg of ["config", "widget"]) {
+        write(`packages/${pkg}/src/release-build.ts`, "export const isReleaseBuild = false;\n");
+        write(
+          `packages/${pkg}/src/index.ts`,
+          'export { isReleaseBuild } from "./release-build.ts";\n',
+        );
+      }
+
+      expect(collectSourceFolderShapeFindings(root).map((finding) => finding.path)).toEqual([
+        "packages/widget/src/release-build.ts",
+      ]);
+    });
+  });
+
   describe("given a small file its neighbour reads only for types", () => {
     it("leaves it alone, since a type import reads nothing at runtime", () => {
       write("packages/widget/src/rules/shapes.ts", "export type Shape = { id: string };\n");

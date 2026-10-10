@@ -18,7 +18,7 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%);
-  opacity: 0.72;
+  opacity: 0.3;
 }
 
 .dark .lw-ambient-ground-static {

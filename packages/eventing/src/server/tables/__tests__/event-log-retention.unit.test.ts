@@ -115,7 +115,8 @@ describe("EventLogRetention", () => {
             "EventType IN ('lw.governance.vk_lifecycle') OR " +
             "AggregateType NOT IN ('experiment_run', 'simulation_run', 'suite_run', 'trace'))" +
             " AND length('langwatch:event-log-retention-category:indefinite') > 0",
-          unscoped: expect.objectContaining({ reason: expect.any(String) }),
+          // The retention TTL is one rule over every tenant's events.
+          SKIP_TENANT_CHECK: true,
         },
       ]);
       expect(

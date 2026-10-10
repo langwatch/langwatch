@@ -53,12 +53,12 @@ type Orchestrator struct {
 	// transcripts, session files, caches — for the report that attributes them to
 	// a worktree. Nil when no Claude home is configured; it never deletes.
 	claudeState ClaudeState
-	// claude edits Claude Code's own settings, which only `haven setup` does.
+	// claude edits Claude Code's own settings, which only `haven self setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
 	claude AgentHookSettings
 	codex  AgentHookSettings
 	// prereqs looks at (and installs onto) the machine itself, which only
-	// `haven install` does. Nil elsewhere; see prereqTools for what a graph
+	// `haven self install` does. Nil elsewhere; see prereqTools for what a graph
 	// without one reports.
 	prereqs PrereqTools
 	// goos is the platform prerequisites are planned and installed for. Empty
@@ -220,6 +220,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		ModeEnv:              opts.DeploymentMode.Env,
 		ModeOverriddenBy:     opts.ModeOverriddenBy,
 		EffectiveMode:        domain.EffectiveMode(opts.DeploymentMode.Name, opts.ModeOverriddenBy),
+		Refresh:              opts.Selection.Refresh,
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
@@ -242,6 +243,15 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// socket). The app is always local.
 		if r.Name == domain.IdPService {
 			svc.DNSPort = ports[nSvc+2]
+		}
+		// A built UI (still or watch): no Vite, the api serves the bundle, so the app hostname is the API port.
+		if r.Name == "app" && opts.Selection.IsBuiltUI() && !st.Layout.IsMonolith() {
+			svc.Port = st.APIPort
+		}
+		if r.Name == domain.LLMService && runsLocally(r.Name, opts) {
+			if port := o.stableLLMPort(slug); port != 0 {
+				svc.Port = port
+			}
 		}
 		if r.Name == domain.MailService {
 			svc.SMTPPort = ports[nSvc+3]
@@ -493,6 +503,9 @@ func (o *Orchestrator) serviceEndpoint(proxyScheme string, proxyPort, ownPort in
 // Up is the launcher hook `make haven up` runs, in either routing mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
 	p.StartedAt = time.Now()
+	if err := domain.RefuseLiveStripe(resolvedDevEnv(p.WorktreeDir)); err != nil {
+		return err
+	}
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
 	}
@@ -892,7 +905,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	portlessMatches := st.PortlessDisabled == o.cfg.PortlessDisabled
 	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && modeMatches && imageMatches && tierMatches && portlessMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
-		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
+		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up --force · stop: haven down\n")
 		return false, nil
 	}
 	switch {
@@ -908,6 +921,8 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
 	case !imageMatches:
 		fmt.Printf("stack %q is running an older langy image (its build inputs changed) — restarting it\n", slug)
+	case st.Refresh != opts.Selection.Refresh:
+		fmt.Printf("stack %q is running %s — restarting it %s\n", slug, st.Refresh.Name(), opts.Selection.Refresh.Name())
 	default:
 		fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
 	}
@@ -976,7 +991,7 @@ func inParallel(calls []func()) {
 // routes, and drops the registry entry. Databases are KEPT, always — no flag
 // on down can discard data; fresh data is `haven db reset`, and long-unused
 // databases are pruned in the background by the daemon (DBIdleTTL) or via
-// `haven clean`.
+// `haven machine clean`.
 func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
@@ -1250,6 +1265,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Payment
 	case domain.TelemetryService:
 		return opts.Selection.Telemetry
+	case domain.LambdaService:
+		return opts.Selection.Lambda
 	default:
 		return true
 	}
@@ -1289,6 +1306,31 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 	}
 	scheme, port := o.proxy.Endpoint()
 	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
+}
+
+// stableLLMPort is the port llmsim keeps for a slug across restarts and
+// reconciles: its registered one while the stack is registered, else the slug's
+// own, probed past every port another stack holds and any live listener.
+func (o *Orchestrator) stableLLMPort(slug string) int {
+	taken := map[int]bool{}
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		port := llmPortOf(stacks[i])
+		if stacks[i].Slug == slug && port != 0 {
+			return port
+		}
+		taken[port] = true
+	}
+	return domain.AllocateLLMPort(slug, func(port int) bool { return taken[port] || o.sys.PortInUse(port) })
+}
+
+func llmPortOf(st domain.Stack) int {
+	for _, svc := range st.Services {
+		if svc.Name == domain.LLMService {
+			return svc.Port
+		}
+	}
+	return 0
 }
 
 // allocateRedisDB picks this stack's Redis database, keeping the one it already

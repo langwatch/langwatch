@@ -441,6 +441,21 @@ describe("the worker process installation", () => {
           (definition.globalProjections ?? []).map(({ name }) => name),
         ),
       ).toContain("licensing_customer.licensingManagedKeyProvisioned");
+      const managedKey = eventing.definitions.find(
+        (definition) => definition.metadata.name === "gateway_connect_managed_key",
+      );
+      expect(
+        managedKey?.open((definition) =>
+          (definition.globalProjections ?? []).map(({ name }) => name),
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          "gateway_connect_managed_key.gatewayConnectManagedKeyLicenseSet",
+          "gateway_connect_managed_key.gatewayConnectManagedKeyServicesSet",
+          "gateway_connect_managed_key.gatewayConnectUpstreamSet",
+          "gateway_connect_managed_key.gatewayConnectUpstreamCleared",
+        ]),
+      );
     } finally {
       await runtime.stop();
     }

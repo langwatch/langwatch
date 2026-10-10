@@ -239,6 +239,21 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       expect(status).toMatchObject({ installed: "3.21.0", origin: "inferred" });
     });
 
+    /** @scenario "An upgrade by an unreleased image reads as installed unreleased" */
+    it("reads an upgrade by an unreleased image as unreleased, not a stale seed", async () => {
+      await insertRun({
+        scratch,
+        id: "run_seed",
+        kind: "seed",
+        release: "3.19.0",
+        startedAt: "2026-10-01 10:00:00",
+      });
+      await insertRun({ scratch, id: "run_up", release: null, startedAt: "2026-10-05 10:00:00" });
+      const status = await readerOver({ scratch }).status();
+      expect(status).toMatchObject({ installed: "unreleased", origin: "recorded" });
+      expect(status.state).not.toBe("unsupported");
+    });
+
     /** @scenario "An unknown step status is shown raw" */
     it("shows an unknown step status raw and does not throw", async () => {
       await insertRun({
@@ -297,6 +312,27 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
         finished: false,
       });
       expect((await readerOver({ scratch }).status()).state).toBe("upgrading");
+    });
+
+    /** @scenario "A failed last run with every step settled reads as needs attention" */
+    it("reads a newest run that failed after its steps settled as needs attention", async () => {
+      await scratch.widen();
+      await insertRun({
+        scratch,
+        id: "run_a",
+        release: "3.21.0",
+        startedAt: "2026-10-05 10:00:00",
+      });
+      await insertRun({
+        scratch,
+        id: "run_b",
+        release: "3.21.0",
+        startedAt: "2026-10-05 11:00:00",
+        outcome: "failed",
+      });
+      await insertStep({ scratch, id: "prisma:1", kind: "postgres-schema", status: "done" });
+      const status = await readerOver({ scratch }).status();
+      expect(status).toMatchObject({ state: "needs-attention", reason: "failed-run" });
     });
 
     /** @scenario "A failed target reads as needs attention" */
@@ -635,6 +671,75 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       expect(preview.installed).toBeNull();
       expect(preview.plan.outcome).toBe("planned");
       expect(preview.preflight.map((row) => row.id)).toContain("floor");
+    });
+
+    const step = (id: string) => ({
+      id,
+      kind: "postgres-schema" as const,
+      mode: "blocking" as const,
+      owner: null,
+      description: id,
+    });
+    const manifests = [
+      { release: "3.21.0", previous: "3.20.1", cutAt: "2026-10-06T12:00:00+02:00" },
+      { release: "3.22.0", previous: "3.21.0", cutAt: "2026-10-07T12:00:00+02:00" },
+    ].map((manifest, index) => ({ ...manifest, steps: [step(`prisma:2026110${index}000000_m`)] }));
+    const previewOver = () =>
+      createUpgradeReader({
+        postgres: scratch.postgres,
+        image: IMAGE,
+        floor: FLOOR,
+        planning: {
+          image: { release: "3.22.0", steps: manifests.flatMap((manifest) => manifest.steps) },
+          releases: { manifests, floor: { release: "3.21.0", namedAt: "2026-10-01" } },
+        },
+      }).preview({ to: "3.22.0" });
+
+    /** @scenario "The preview plans a cut first install as fresh, as the runner does" */
+    it("plans a first install cut below the floor as fresh rather than refusing", async () => {
+      await insertRun({
+        scratch,
+        id: "run_seed",
+        kind: "seed",
+        release: null,
+        startedAt: "2026-10-05 09:00:00",
+      });
+      await insertRun({
+        scratch,
+        id: "run_cut",
+        release: "3.22.0",
+        startedAt: "2026-10-05 10:00:00",
+        outcome: "failed",
+        plan: { outcome: "planned", fresh: true, releases: [], notNeeded: [] },
+      });
+      await insertStep({ scratch, id: "prisma:20200101000000_ancient", kind: "postgres-schema" });
+      const preview = await previewOver();
+      expect(preview.installed).toBeNull();
+      expect(preview.plan.outcome).toBe("planned");
+    });
+
+    /** @scenario "The preview reads the tools' records until a seed run has succeeded" */
+    it("reads Prisma's history while the only seed run was cut", async () => {
+      await insertRun({
+        scratch,
+        id: "run_seed",
+        kind: "seed",
+        release: null,
+        startedAt: "2026-10-05 09:00:00",
+        finished: false,
+      });
+      await scratch.postgres.query(
+        `CREATE TABLE "_prisma_migrations" ("migration_name" TEXT NOT NULL, "started_at" TIMESTAMP,
+          "finished_at" TIMESTAMP, "rolled_back_at" TIMESTAMP, "logs" TEXT)`,
+      );
+      for (const manifest of manifests) {
+        await scratch.postgres.query(
+          `INSERT INTO "_prisma_migrations" VALUES ($1, now(), now(), NULL, NULL)`,
+          [manifest.steps[0]?.id.slice("prisma:".length)],
+        );
+      }
+      const preview = await previewOver();
+      expect(preview.installed).toBe("3.22.0");
     });
   });
 });

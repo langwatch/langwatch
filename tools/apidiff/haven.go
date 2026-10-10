@@ -415,10 +415,10 @@ func (state *bootState) havenBackendLog(ctx context.Context, plan havenPlan, ins
 // must never run a haven command from the directory it was started in.
 func (state *bootState) destroyHavenStacks(ctx context.Context) {
 	for _, slug := range state.havenSlugs {
-		state.logf("teardown: haven destroy %s", slug)
+		state.logf("teardown: haven down --destroy --stack %s", slug)
 		spec := commandSpec{name: havenCommand, args: havenDestroyArgs(slug), dir: state.workRoot, env: havenEnv(state.environ(), slug)}
 		if err := state.run(ctx, spec, state.stderr); err != nil {
-			state.logf("teardown: haven destroy %s: %v", slug, err)
+			state.logf("teardown: haven down --destroy --stack %s: %v", slug, err)
 		}
 	}
 }

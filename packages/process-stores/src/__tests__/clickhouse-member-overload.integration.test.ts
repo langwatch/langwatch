@@ -66,7 +66,8 @@ describe("given the ClickHouse member bounded at one statement in flight", () =>
     client.query({
       tenantId: "project-1",
       sql: `SELECT ${index}`,
-      unscoped: { reason: "a slot-bound probe with no tenant table" },
+      // A slot-bound probe that reads no tenant table.
+      SKIP_TENANT_CHECK: true,
     });
 
   const refusalOf = (pending: Promise<unknown>) =>

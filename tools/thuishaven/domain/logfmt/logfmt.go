@@ -121,6 +121,13 @@ var numericLevels = map[int]Level{
 	40: LevelWarn, 50: LevelError, 60: LevelFatal,
 }
 
+// Failed reports whether a record is a failure: error or worse, or a boot that
+// failed, which dev-runtime writes at warn while an older generation serves on.
+func Failed(rec Record) bool {
+	return rec.Level == LevelError || rec.Level == LevelFatal ||
+		(rec.Level == LevelWarn && strings.Contains(rec.Message, "boot failed"))
+}
+
 // Parse reads one line as the shared structured format. ok is false for
 // anything that is not a JSON object — those lines are passed through.
 func Parse(line string) (Record, bool) {

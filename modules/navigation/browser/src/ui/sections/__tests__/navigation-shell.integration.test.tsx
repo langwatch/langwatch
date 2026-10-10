@@ -289,6 +289,76 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
+describe("an address naming a product whose release flag is off", () => {
+  afterEach(() => cleanup());
+
+  const governanceOff = {
+    ...BASE_READINGS.flags,
+    release_ui_ai_governance_enabled: { enabled: false, isLoading: false },
+  };
+
+  describe("when governance is switched off", () => {
+    /** @scenario A governance address with the flag off is a 404 with no product sidebar */
+    it("draws the not-found page with no product sidebar around it", () => {
+      renderShell({
+        readings: {
+          pathname: "/governance/costs",
+          flags: governanceOff,
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+      expect(screen.queryByTestId("product-sidebar")).toBeNull();
+      expect(screen.queryByTestId("page-body")).toBeNull();
+    });
+
+    it("still draws a project page in its chrome", () => {
+      renderShell({ readings: { pathname: "/demo/traces", flags: governanceOff } });
+
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the gateway menu flag is off", () => {
+    it("still draws a gateway page in its chrome, the flag hiding only the menu", () => {
+      renderShell({
+        readings: {
+          pathname: "/gateway/virtual-keys",
+          flags: {
+            ...BASE_READINGS.flags,
+            release_ui_ai_gateway_menu_enabled: { enabled: false, isLoading: false },
+          },
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.queryByTestId("not-found")).toBeNull();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the flag has not answered yet", () => {
+    it("keeps the chrome and leaves the wait to the page", () => {
+      renderShell({
+        readings: {
+          pathname: "/governance/costs",
+          flags: {
+            ...BASE_READINGS.flags,
+            release_ui_ai_governance_enabled: { enabled: false, isLoading: true },
+          },
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.queryByTestId("not-found")).toBeNull();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("the seat gate on a page", () => {
   afterEach(() => cleanup());
 
@@ -301,7 +371,7 @@ describe("the seat gate on a page", () => {
         });
 
         expect(screen.queryByTestId("page-body")).toBeNull();
-        expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+        expect(screen.getByText(/You don't have access to/)).toBeInTheDocument();
         expect(screen.getByText("Missing permission: virtualKeys:view")).toBeInTheDocument();
       });
     });
@@ -315,7 +385,7 @@ describe("the seat gate on a page", () => {
         });
 
         expect(screen.getByTestId("page-body")).toBeInTheDocument();
-        expect(screen.queryByText("Access Restricted")).toBeNull();
+        expect(screen.queryByText(/You don't have access to/)).toBeNull();
       });
     });
 

@@ -43,7 +43,7 @@ export class TraceExportDownloadService {
   }
 
   async download(input: TraceExportDownloadInput): Promise<TraceExportDownload> {
-    const { request, userId } = input;
+    const { request, userId, authorization } = input;
     await this.#bounds.assertExportWithinRate({ projectId: request.projectId });
     const protections = await this.#protections.resolve({
       projectId: request.projectId,
@@ -55,11 +55,11 @@ export class TraceExportDownloadService {
     const lease = TraceExportDownloadLease.create(slot);
 
     try {
-      const totalCount = await this.#exports.getTotalCount({ request, protections });
+      const totalCount = await this.#exports.getTotalCount({ request, protections, authorization });
       return {
         exportId,
         totalCount,
-        stream: this.#stream({ request, protections, exportId, lease }),
+        stream: this.#stream({ request, protections, authorization, exportId, lease }),
         cancel: () => lease.release(),
       };
     } catch (error) {
@@ -72,6 +72,7 @@ export class TraceExportDownloadService {
   async *#stream(input: {
     request: TraceExportDownloadInput["request"];
     protections: Awaited<ReturnType<TraceViewerProtectionService["resolve"]>>;
+    authorization: TraceExportDownloadInput["authorization"];
     exportId: string;
     lease: TraceExportDownloadLease;
   }): AsyncGenerator<Uint8Array> {
@@ -95,6 +96,7 @@ export class TraceExportDownloadService {
       for await (const { chunk, progress } of this.#exports.exportTraces({
         request: input.request,
         protections: input.protections,
+        authorization: input.authorization,
       })) {
         publish({
           exportId: input.exportId,

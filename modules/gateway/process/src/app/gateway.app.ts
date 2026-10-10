@@ -7,6 +7,7 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
@@ -105,7 +106,6 @@ import {
   gatewayBrowserConfig,
   gatewayConfig,
   type GatewayDeploymentAddresses,
-  type GatewayConnectUpstream,
   type GatewayLicenseTokenResolution,
   type GatewayServerConfig,
   type GatewayResolvedBudget,
@@ -1137,6 +1137,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     oneTimeReveals: SecretApi,
     /** Mints the ownerless key each trace project's gateway spans are exported with. */
     apiKeys: ApiKeyApi,
+    /** Derives the install's Connect upstream token; gateway pulls it on licensing's fact. */
+    licensing: LicensingApi,
   };
   static readonly config = gatewayConfig;
   static readonly publicConfig = gatewayBrowserConfig.project;
@@ -1192,6 +1194,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const graceMs = settlementGraceMs(setup.config?.spendSettlementGraceMs);
     const connectUpstream = GatewayConnectUpstreamService.create({
       repository: repositories.connectUpstream,
+      licensing: setup.dependencies.licensing,
     });
     const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
     const spend = {
@@ -1462,7 +1465,10 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   /** gateway_connect_managed_key: ends or re-resolves a licence's managed key from its facts. */
   connectManagedKeyPipeline(): GatewayConnectManagedKeyPipeline {
-    return buildGatewayConnectManagedKeyPipeline({ managedKeys: this.#connectManagedKeyService() });
+    return buildGatewayConnectManagedKeyPipeline({
+      managedKeys: this.#connectManagedKeyService(),
+      upstream: this.#connectUpstreamService(),
+    });
   }
 
   /** Binds the sender the managed-key service records the provisioned fact through. */
@@ -2208,47 +2214,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   revokeVirtualKey(input: GatewayVirtualKeyRevokeInput): Promise<GatewayVirtualKeyRecord> {
     return this.#dependencies.virtualKeys.revoke(input);
-  }
-
-  revokeManagedInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    actorId: string;
-  }): Promise<void> {
-    return this.#connectManagedKeyService().retire(input);
-  }
-
-  invalidateManagedInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-  }): Promise<void> {
-    return this.#connectManagedKeyService().invalidate(input);
-  }
-
-  setManagedKeyConnectServicesInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    services: readonly string[];
-  }): Promise<void> {
-    return this.#connectManagedKeyService().setConnectServices(input);
-  }
-
-  setManagedKeyLicenseInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    tokenHash: string;
-    instanceId: string | null;
-    expiresAt: Instant | null;
-  }): Promise<void> {
-    return this.#connectManagedKeyService().setLicense(input);
-  }
-
-  setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void> {
-    return this.#connectUpstreamService().set(input);
-  }
-
-  clearConnectUpstreamInternal(input: { organizationId: string }): Promise<void> {
-    return this.#connectUpstreamService().clear(input);
   }
 
   #connectUpstreamService(): GatewayConnectUpstreamService {

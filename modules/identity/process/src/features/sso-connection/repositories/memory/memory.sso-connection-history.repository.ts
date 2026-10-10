@@ -1,28 +1,17 @@
+import type { MemoryIdentityStore } from "../../../../repositories/memory/memory.identity.store.ts";
 import {
   SsoConnectionHistoryRepository,
   type SsoConnectionHistoryEntry,
 } from "../sso-connection-history.repository.ts";
 
-interface HeldFact {
-  organizationId: string;
-  connectionId: string;
-  entry: SsoConnectionHistoryEntry;
-}
-
-/** A connection's history over the facts a test hands it; a fresh one holds none. */
+/** The connection log's twin: entries the store holds per connection, newest first. */
 export class MemorySsoConnectionHistoryRepository extends SsoConnectionHistoryRepository {
-  static create(): MemorySsoConnectionHistoryRepository {
-    return new MemorySsoConnectionHistoryRepository();
+  static create(store: MemoryIdentityStore): MemorySsoConnectionHistoryRepository {
+    return new MemorySsoConnectionHistoryRepository(store);
   }
 
-  readonly #facts: HeldFact[] = [];
-
-  private constructor() {
+  private constructor(private readonly store: MemoryIdentityStore) {
     super();
-  }
-
-  add(fact: HeldFact): void {
-    this.#facts.push(fact);
   }
 
   async findHistory({
@@ -34,12 +23,7 @@ export class MemorySsoConnectionHistoryRepository extends SsoConnectionHistoryRe
     connectionId: string;
     limit: number;
   }): Promise<readonly SsoConnectionHistoryEntry[]> {
-    return this.#facts
-      .filter(
-        (fact) => fact.organizationId === organizationId && fact.connectionId === connectionId,
-      )
-      .map((fact) => fact.entry)
-      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs || b.eventId.localeCompare(a.eventId))
-      .slice(0, limit);
+    const entries = this.store.ssoConnectionHistory.get(`${organizationId}:${connectionId}`) ?? [];
+    return entries.slice(0, limit);
   }
 }

@@ -157,6 +157,10 @@ func (c *chunker) send(kind string, parts []telemetrysim.Part) bool {
 	}
 	id := c.id + "." + strconv.Itoa(c.k)
 	c.k++
+	count := 0
+	for i := range parts {
+		count += parts[i].Count
+	}
 	return c.yield(Action{ID: id, Kind: kind, Org: c.cell.Org, Project: c.cell.Project, Key: id,
-		Input: payload.Body, At: c.cell.Start.Format(time.RFC3339)}, nil)
+		Input: payload.Body, At: c.cell.Start.Format(time.RFC3339), Count: count}, nil)
 }

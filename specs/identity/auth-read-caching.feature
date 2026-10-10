@@ -30,6 +30,13 @@ Feature: Authentication reads are remembered briefly and never past a revocation
       When "kim" is signed in on another browser
       Then her session carries her own address, never his
 
+    @unit
+    Scenario: The browser's session poll shows a saved photo at once
+      Given "sam"'s details are remembered
+      When he saves a new profile photo and his browser polls the session
+      Then the poll carries the new photo
+      And his next request reads the remembered details as the new photo
+
   # An API key's check moved to modules/api-key/specs/auth-check-cache.feature (Alex, 2026-10-01).
 
   Rule: one request asks each authorization question once

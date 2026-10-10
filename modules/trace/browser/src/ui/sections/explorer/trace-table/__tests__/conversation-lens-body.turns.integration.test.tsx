@@ -35,6 +35,9 @@ vi.mock("../../../../../behavior/explorer/utils/map-trace-list-payload.ts", () =
   mapTraceListPayload: (data: unknown[] | undefined) => data ?? [],
 }));
 vi.mock("../../trace-id-peek.tsx", () => ({ TraceIdPeek: () => null }));
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
+}));
 
 const START_MS = 1_700_000_000_000;
 
@@ -58,6 +61,7 @@ function turn(over: Partial<TraceListItem> & { traceId: string }): TraceListItem
 async function expandConversation() {
   const group = mapSessionGroupToConversationGroup({
     conversationId: "conv-1",
+    projectId: "project-1",
     traceCount: harness.turns.length,
     totalCost: 0.5,
     totalTokens: 900,

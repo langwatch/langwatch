@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The organization-keyed rollup: its one address, its door, and the fact it
- * asks the process for instead of a permission.
+ * The organization-keyed rollup: its one address, its door, and the middleware
+ * context it asks the process for instead of a permission.
  */
 import { describe, expect, it } from "vitest";
 

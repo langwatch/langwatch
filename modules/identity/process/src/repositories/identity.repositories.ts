@@ -81,8 +81,6 @@ export interface IdentityRepositories {
   /** The per-organization registration slots a new connection claims first. */
   readonly ssoRegistrationSlots: SsoConnectionRegistrationRepository;
   readonly ssoAdmin: SsoConnectionAdminRepository;
-  /** What happened to a connection, read off the event log in every role. */
-  readonly ssoConnectionHistory: SsoConnectionHistoryRepository;
   /** Which proved domains are due a re-read, and the look itself (ADR-123). */
   readonly ssoReproofTargets: SsoDomainReproofTargetRepository;
   /** Where a connection's identity-provider credentials are kept (D09). */
@@ -95,8 +93,6 @@ export interface IdentityRepositories {
   readonly ssoRegistrants: SsoRegistrantReadRepository;
   readonly ssoMigrationEvidence: SsoMigrationEvidenceRepository;
   /** The folded heads each identity pipeline writes, under the queue's per-aggregate lock. */
-  /** A person's identity facts and link proposals, read off the event log in every role. */
-  readonly identityHistory: IdentityHistoryRepository;
   readonly identityProjection: StateProjectionStore<IdentityFoldState> & ProvisionalHeadsWriter;
   readonly mfaProjection: StateProjectionStore<MfaFoldState>;
   readonly joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
@@ -115,4 +111,8 @@ export interface IdentityRepositories {
   readonly identityLookup: IdentityLookupRepository;
   /** Identity's throttles: join requests, confirmation mails and the lookup's attempt budget. */
   readonly rateLimits: IdentityRateLimitRepository;
+  /** A person's identity log and the link proposals folded from it (WEB-9103). */
+  readonly identityHistory: IdentityHistoryRepository;
+  /** A connection's log, read as its history panel (WEB-9103). */
+  readonly ssoConnectionHistory: SsoConnectionHistoryRepository;
 }

@@ -84,7 +84,7 @@ const PROPERTY_NODES = new Set([
 ]);
 
 const HANDLER_FIELDS_FIX =
-  'Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route\'s own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`; the framework resolves the session and the headers before the handler runs.';
+  'Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route\'s own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`, `key` from `.withCredential(door, { key: true })`; the framework resolves the session and the headers before the handler runs.';
 const PLAIN_RESULT_FIX =
   "Return the plain value `.withOutput()` declares, or nothing for an empty response, and throw a `HandledError` to refuse; the framework serialises both.";
 const DECLARE_ROUTE_FIX =

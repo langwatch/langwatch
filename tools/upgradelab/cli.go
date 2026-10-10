@@ -39,6 +39,10 @@ const usage = `upgradelab: upgrade snapshots and matrix cells
   upgradelab cell -deployment cloud|hybrid|self-hosted [-tier S] [-shape typical] [-seed N] [-from-dir DIR] [-head-dir DIR]
                                   one matrix cell from source: old release on upgradelab_<cell> stores, seeded, then
                                   head's api and worker with traffic through the switch; exit 1 when an invariant fails
+                                  [-from-snapshot DIR|KEY] restores a produce entry instead of seeding
+  upgradelab produce -deployment cloud|hybrid|self-hosted [-tier S] [-shape typical] [-seed N] [-from-dir DIR] [-out DIR] [-force]
+                                  main built and seeded, traffic, its worker paused so jobs queue, then every store captured
+                                  into -out (default ${XDG_CACHE_HOME:-~/.cache}/langwatch/upgrade-snapshots/<key>); a cached key is skipped
 
 stores: -postgres URL   -clickhouse TARGET=URL (repeatable; TARGET is shared or private-<label>)   -redis URL   -objects URL
         -objects http(s)://host[:port]/<bucket>[?region=R&addressing=path|virtual]; credentials from AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN
@@ -72,6 +76,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		code, err := cell.Command(ctx, args[1:], stdout)
 		if err != nil {
 			fmt.Fprintf(stderr, "upgradelab cell: %v\n", err)
+		}
+		return code
+	}
+	if len(args) > 0 && args[0] == "produce" {
+		code, err := cell.ProduceCommand(ctx, args[1:], stdout)
+		if err != nil {
+			fmt.Fprintf(stderr, "upgradelab produce: %v\n", err)
 		}
 		return code
 	}

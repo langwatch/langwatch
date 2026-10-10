@@ -77,7 +77,7 @@ describe("installReadHints", () => {
           feature: "organization",
           transports: [trpcTransport, restTransport],
           provided: () => ({}),
-          facts: [],
+          middlewareBindings: [],
         },
       ],
     });
@@ -92,7 +92,12 @@ describe("installReadHints", () => {
     installReadHints({
       eventing: host,
       declared: [
-        { feature: "rest-only", transports: [restTransport], provided: () => ({}), facts: [] },
+        {
+          feature: "rest-only",
+          transports: [restTransport],
+          provided: () => ({}),
+          middlewareBindings: [],
+        },
       ],
     });
 
@@ -109,7 +114,12 @@ describe("installReadHints", () => {
         register: (definition) => host.register(definition),
       },
       declared: [
-        { feature: "organization", transports: [trpcTransport], provided: () => ({}), facts: [] },
+        {
+          feature: "organization",
+          transports: [trpcTransport],
+          provided: () => ({}),
+          middlewareBindings: [],
+        },
       ],
     });
 

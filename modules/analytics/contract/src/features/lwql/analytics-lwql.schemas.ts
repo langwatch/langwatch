@@ -4,7 +4,7 @@
  * accepted steps ARE the published contract, so both doors read one copy.
  */
 import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwatch/authorization";
-import { defineRestMiddleware } from "@langwatch/module";
+import { defineMiddlewareContext } from "@langwatch/module";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
@@ -30,7 +30,7 @@ export const langWatchQLProtectionsSchema: z.ZodType<LangWatchQLProtections> = z
  * an operation: the answer is the KEY's own cut, shared by every REST family
  * that layers LangWatchQL content gates over its own routes.
  */
-export const langWatchQLCallerProtections = defineRestMiddleware(
+export const langWatchQLCallerProtections = defineMiddlewareContext(
   "langWatchQLCallerProtections",
   langWatchQLProtectionsSchema,
 );
@@ -61,7 +61,7 @@ export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discr
 );
 
 /** The key the query door authenticated, resolved by the process rather than the handler. */
-export const langWatchQLKeyReach = defineRestMiddleware(
+export const langWatchQLKeyReach = defineMiddlewareContext(
   "langWatchQLKeyReach",
   langWatchQLKeyReachSchema,
 );

@@ -58,14 +58,12 @@ export class AnomalyWebhookDestinationMigrationService {
         ...(cursor === undefined ? {} : { after: cursor }),
         limit: ORGANIZATION_ID_PAGE_LIMIT,
       });
-      let completed = true;
       for (const organizationId of page.ids) {
-        if (signal?.aborted) {
-          completed = false;
-          break;
-        }
-        await this.migrateOrganization({ organizationId, dryRun, totals });
+        if (signal?.aborted) break;
+        await this.migrateOrganization({ organizationId, dryRun, totals, signal });
       }
+      // A page an abort reached is redone from the last saved cursor.
+      const completed = !signal?.aborted;
       const last = page.ids.at(-1);
       if (completed && last !== undefined) {
         cursor = last;
@@ -80,13 +78,16 @@ export class AnomalyWebhookDestinationMigrationService {
     organizationId,
     dryRun,
     totals,
+    signal,
   }: {
     organizationId: string;
     dryRun: boolean;
     totals: MigrationTotals;
+    signal: AbortSignal | undefined;
   }): Promise<void> {
     totals.organizations += 1;
     for (const rule of await this.collaborators.rules.findAll(organizationId)) {
+      if (signal?.aborted) return;
       const parsed = destinationConfigSchema.safeParse(rule.destinationConfig);
       if (!parsed.success) continue;
       const inline = parsed.data.destinations.filter(isUnmigrated).length;
@@ -94,21 +95,23 @@ export class AnomalyWebhookDestinationMigrationService {
       totals.rules += 1;
       totals.endpoints += inline;
       if (dryRun) continue;
-      await this.migrateRule({ organizationId, rule });
+      await this.migrateRule({ organizationId, rule, signal });
     }
   }
 
   private async migrateRule({
     organizationId,
     rule,
+    signal,
   }: {
     organizationId: string;
     rule: AnomalyRule;
+    signal: AbortSignal | undefined;
   }): Promise<void> {
     const made = new Set<string>();
     let kept = new Set<string>();
     let current: AnomalyRule | null = rule;
-    while (current !== null && current.archivedAt === null) {
+    while (current !== null && current.archivedAt === null && !signal?.aborted) {
       const parsed = destinationConfigSchema.safeParse(current.destinationConfig);
       if (!parsed.success || !parsed.data.destinations.some(isUnmigrated)) break;
       const attempt = new Set<string>();
@@ -138,6 +141,20 @@ export class AnomalyWebhookDestinationMigrationService {
       }
       current = await this.collaborators.rules.findById(current.id);
     }
+    // Stopped as a crash would: a rerun reuses the endpoints made so far by their keys.
+    if (signal?.aborted) return;
+    await this.archiveUnkept({ organizationId, made, kept });
+  }
+
+  private async archiveUnkept({
+    organizationId,
+    made,
+    kept,
+  }: {
+    organizationId: string;
+    made: ReadonlySet<string>;
+    kept: ReadonlySet<string>;
+  }): Promise<void> {
     for (const endpointId of made) {
       if (!kept.has(endpointId)) {
         await this.collaborators.archiveEndpoint({ organizationId, endpointId });

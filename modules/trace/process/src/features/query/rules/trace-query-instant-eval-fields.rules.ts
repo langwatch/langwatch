@@ -14,8 +14,8 @@ import {
   UNSUPPORTED,
 } from "@langwatch/trace-contract";
 
-import { instantEvalJudgmentsSubquery } from "../repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.rules.ts";
+import { instantEvalJudgmentsSubquery } from "./trace-query-subquery.rules.ts";
 import {
   extractStringValue,
   nextParam,

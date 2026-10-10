@@ -33,7 +33,6 @@ export type UiRootHostServices = {
   commandBar: Awaited<ReturnType<typeof navigation.commandBar.load>>;
   presenceMenuItem: Awaited<ReturnType<typeof trace.presenceMenuItem.load>>;
   impersonationBanner: Awaited<ReturnType<typeof ops.impersonationBanner.load>>;
-  upgradeBanner: Awaited<ReturnType<typeof ops.upgradeBanner.load>>;
 };
 
 export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
@@ -50,7 +49,6 @@ export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
     commandBar,
     presenceMenuItem,
     impersonationBanner,
-    upgradeBanner,
   ] = await Promise.all([
     auth.session.load(),
     auth.frontDoorTheme.load(),
@@ -64,7 +62,6 @@ export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
     navigation.commandBar.load(),
     trace.presenceMenuItem.load(),
     ops.impersonationBanner.load(),
-    ops.upgradeBanner.load(),
   ]);
   return {
     session,
@@ -79,7 +76,6 @@ export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
     commandBar,
     presenceMenuItem,
     impersonationBanner,
-    upgradeBanner,
   };
 }
 

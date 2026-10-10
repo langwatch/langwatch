@@ -31,9 +31,10 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
+import { ICON_RAIL_WIDTH } from "@langwatch/design-system/app-shell";
+
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
 import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
-import { ICON_RAIL_WIDTH } from "../icon-rail.tsx";
 import { NavigationShell } from "../navigation-shell.tsx";
 
 const teamA = {

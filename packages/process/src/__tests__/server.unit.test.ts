@@ -112,7 +112,7 @@ describe("Server", () => {
           name: "app",
           start: () => undefined,
           stop: () => undefined,
-          handler: (_request, response) => {
+          handler: (_request: http.IncomingMessage, response: http.ServerResponse) => {
             response.writeHead(200).end("application");
           },
         });

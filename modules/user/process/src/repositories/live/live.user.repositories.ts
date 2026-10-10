@@ -19,7 +19,7 @@ export class LiveUserRepositories {
   }: Readonly<{
     prisma: Parameters<typeof PostgresUserRepositories.create>[0]["prisma"];
     redis: RedisConnection;
-    eventReadSeat: Pick<EventReadSeat, "getEvents">;
+    eventReadSeat: EventReadSeat;
   }>): UserRepositories {
     return {
       ...PostgresUserRepositories.create({ prisma }),

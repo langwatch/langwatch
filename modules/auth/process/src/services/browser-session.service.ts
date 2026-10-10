@@ -77,8 +77,10 @@ export class BrowserSessionService {
     return this.deps.sessions.countSignedInUsersAmong(input);
   }
 
+  /** `fresh` re-reads the person: the browser's session poll follows the user's own save. */
   async resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
+    fresh?: boolean;
   }): Promise<BrowserSessionResolution> {
     const verified = verifiedBrowserSessionSchema.parse(input.verified);
 
@@ -87,7 +89,10 @@ export class BrowserSessionService {
 
     if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
 
-    const { user, identityEmail } = await this.person({ userId: verified.user.id });
+    const { user, identityEmail } = await this.person({
+      userId: verified.user.id,
+      fresh: input.fresh ?? false,
+    });
     // Name and photo come from the stored person: Better Auth's cached copy of
     // the user is written at sign-in and never told when the user module saves.
     const session = browserSessionSchema.parse({
@@ -113,10 +118,10 @@ export class BrowserSessionService {
    * The stored person behind a session, remembered briefly: a page load asks once per request,
    * and none of it decides access. Revocation stays with the session row, read every time.
    */
-  private person({ userId }: { userId: string }): Promise<SessionPerson> {
+  private person({ userId, fresh }: { userId: string; fresh: boolean }): Promise<SessionPerson> {
     const nowMs = this.deps.now().epochMilliseconds;
     const remembered = this.#people.get(userId);
-    if (remembered && remembered.until > nowMs) return remembered.value;
+    if (!fresh && remembered && remembered.until > nowMs) return remembered.value;
 
     const value = Promise.all([
       this.deps.users.findById({ id: userId }),
@@ -164,7 +169,10 @@ export class BrowserSessionService {
     }
 
     // The subject is read fresh, never copied at start: a retired subject is not acted for.
-    const { user: subject, identityEmail } = await this.person({ userId: subjectUserId });
+    const { user: subject, identityEmail } = await this.person({
+      userId: subjectUserId,
+      fresh: false,
+    });
     if (!subject || subject.deactivatedAt !== null) return session;
 
     return browserSessionSchema.parse({

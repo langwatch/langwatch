@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { z } from "zod";
@@ -105,7 +106,10 @@ export class PrismaSlackConnectionClaimRepository extends SlackConnectionClaimRe
          OR ("connectionId", "claimantId") > (${afterConnectionId}::text, ${afterClaimantId}::text)
       ORDER BY "connectionId" ASC, "claimantId" ASC
       LIMIT ${limit}
-      -- @tenancy: Slack claim reconcile cross-tenant sweep (upgrade step, worker)
+      ${skipTenantCheck({
+        // Slack claim reconcile cross-tenant sweep (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return claimRowsSchema.parse(rows);
   }

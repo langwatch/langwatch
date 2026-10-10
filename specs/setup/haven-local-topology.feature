@@ -36,11 +36,13 @@ Feature: The local development topology
     Then the API application is started beside the worker, not after it
     And work the API enqueues meanwhile waits for the worker (Alex, 2026-10-09)
 
+  # A refused worker no longer drains the api (Alex, 2026-10-10): see
+  # "A worker that fails to boot never takes the api down" in dev-process-topology.feature.
   @unit
   Scenario: A half-started backend drains what it did start
-    Given one half that started and another that refuses to boot
+    Given a worker that started and an api that refuses to boot
     When the backend launcher boots
-    Then the half that started is closed before the failure is reported
+    Then the worker is closed before the api's failure is reported
     And the caller is left with no half-started process to handle
 
   # The worker's jobs call back into the API's in-process graph. Closing the

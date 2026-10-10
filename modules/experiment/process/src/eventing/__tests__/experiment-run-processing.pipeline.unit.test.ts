@@ -3,6 +3,7 @@ import {
   type InsertRequest,
   type QueryDriver,
   type QueryResult,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
@@ -55,7 +56,7 @@ function build() {
   const commands = ExperimentRunCommandDispatcherService.create();
   const eventing = ClickHouseExperimentRunProcessingRepository.create({
     resolveClient: ClickHouseExperimentSession.resolverOver(
-      new ClickHouseQueryClient({ driver: new SilentDriver() }),
+      new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver: new SilentDriver() }),
     ),
     clickhouseEnabled: true,
   });

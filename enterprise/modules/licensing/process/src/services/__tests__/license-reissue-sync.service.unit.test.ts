@@ -111,12 +111,16 @@ class RegistryHost extends ConnectLicenseChannel {
     throw new Error("a sync never redeems an activation code");
   }
 
-  syncLicense({ credential, version, seats }: Parameters<ConnectLicenseChannel["syncLicense"]>[0]) {
-    return this.sync.answer({
-      authorization: `Bearer ${credential.token}`,
+  async syncLicense({
+    credential,
+    version,
+    seats,
+  }: Parameters<ConnectLicenseChannel["syncLicense"]>[0]) {
+    const caller = await this.sync.verify({
+      bearer: credential.token,
       instanceId: credential.instanceId,
-      body: { version, seats },
     });
+    return this.sync.answer({ caller, body: { version, seats } });
   }
 }
 

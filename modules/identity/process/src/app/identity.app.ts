@@ -13,6 +13,7 @@ import {
   identityConfig,
   type IdentityEmailResolution,
   JOIN_REQUEST_PIPELINE_NAME,
+  SSO_CONNECTION_PIPELINE_NAME,
   type IdentityLookupAnswer,
   type IdentityLookupApi,
   type IdentityLookupOperator,
@@ -87,6 +88,7 @@ import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts
 import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
 import { TwoStepAccountService } from "../features/mfa/services/two-step-account.service.ts";
+import { SignInGovernanceService } from "../features/signin/services/sign-in-governance.service.ts";
 import { SignUpIdentifierService } from "../features/signin/services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../features/signin/services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
@@ -236,6 +238,7 @@ type IdentityAppParts = {
   twoStepAccounts: TwoStepAccountService;
   organizationMfa: OrganizationMfaService;
   signInRouter: SignInRouterService;
+  signInGovernance: SignInGovernanceService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -463,6 +466,7 @@ export class IdentityModule
     });
     const identityEventing = ConnectedIdentityEventing.create();
     const eventStores = IdentityEventStores.create();
+    // The lookup, the link proposals and the pipeline read one log through the read seat.
     const identityHistory = setup.repositories.identityHistory;
     const ledger = IdentityLedgerStore.create({
       projectionStore: setup.repositories.identityProjection,
@@ -790,6 +794,10 @@ export class IdentityModule
           }),
         })
       : null;
+    const accountAddress = async ({ userId }: { userId: string }) => {
+      const user = await setup.dependencies.users.findById({ id: userId });
+      return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
+    };
     const signInRouter = SignInRouterService.create({
       legacy: legacyDomainRouting,
       domains: connectionDomainRouting,
@@ -815,6 +823,18 @@ export class IdentityModule
       beforeAccountDelete: (account) => bridge.beforeAccountDelete(account),
     };
 
+    const accountIdentifiers = AccountIdentifiersService.create({
+      heads: setup.repositories.heads,
+      identity,
+      ceremony: verification,
+      mail: setup.channels.addressConfirmationMail,
+      rateLimiter: setup.repositories.rateLimits,
+      sessions: setup.channels.authReads,
+      accountAddress,
+      hasMailDelivery: async () =>
+        (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
+    });
+
     return new IdentityModule({
       emails,
       ceremonies: hookCeremonies,
@@ -828,20 +848,7 @@ export class IdentityModule
         heads: setup.repositories.heads,
         identifiers: CryptoIdentifierIdentityService.create(),
       }),
-      accountIdentifiers: AccountIdentifiersService.create({
-        heads: setup.repositories.heads,
-        identity,
-        ceremony: verification,
-        mail: setup.channels.addressConfirmationMail,
-        rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.channels.authReads,
-        accountAddress: async ({ userId }) => {
-          const user = await setup.dependencies.users.findById({ id: userId });
-          return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
-        },
-        hasMailDelivery: async () =>
-          (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
-      }),
+      accountIdentifiers,
       microsoftAccountRekey: MicrosoftAccountRekeyService.create({
         accounts: setup.repositories.accountRekey,
       }),
@@ -926,6 +933,11 @@ export class IdentityModule
           ),
       }),
       signInRouter,
+      signInGovernance: SignInGovernanceService.create({
+        identifiers: accountIdentifiers,
+        accountAddress,
+        router: signInRouter,
+      }),
       pipelines: {
         eventing: identityEventing,
         stores: eventStores,
@@ -1035,6 +1047,11 @@ export class IdentityModule
     profile: Readonly<Record<string, unknown>>;
   }): Promise<void> {
     return this.#parts.microsoftAccountRekey.moveOnSignIn(input);
+  }
+
+  /** Whether an organization's single sign-on governs this person's own sign-in. */
+  isSignInGovernedBySso(input: { userId: string }): Promise<boolean> {
+    return this.#parts.signInGovernance.isGovernedBySso(input);
   }
 
   routeSignIn(
@@ -1178,14 +1195,22 @@ export class IdentityModule
   }
 
   ssoAdmin(): SsoConnectionAdminService {
-    if (!this.#parts.ssoAdmin) {
+    if (!this.#parts.ssoAdmin || !this.#holdsSsoConnectionLog()) {
       throw new IdentityCapabilityUnavailableError("SSO connection admin");
     }
     return this.#parts.ssoAdmin;
   }
 
   ssoConnectionHistory(): SsoConnectionHistoryService {
+    if (!this.#holdsSsoConnectionLog()) {
+      throw new IdentityCapabilityUnavailableError("SSO connection history");
+    }
     return this.#parts.ssoConnectionHistory;
+  }
+
+  /** Whether this process built sso_connection over a store: without it there is no log to read. */
+  #holdsSsoConnectionLog(): boolean {
+    return this.#parts.pipelines.stores.holds({ pipeline: SSO_CONNECTION_PIPELINE_NAME });
   }
 
   ssoConnectionReads(): OrganizationSsoConnectionsService {

@@ -12,11 +12,13 @@ import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const PROJECT_ID = "project-1";
+const OWN_READ = ownProof({ projectId: PROJECT_ID });
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
 function guardRefusals(
@@ -41,7 +43,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           json: async (): Promise<unknown[]> => [],
         }),
       );
-      const repository = new TraceLegacyReadClickHouseRepository({
+      const repository = mappedLegacyRead({
         resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
@@ -59,6 +61,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
         {
           filterWhere: filterWhere ?? undefined,
           authorization: ownProof({ projectId: PROJECT_ID }),
+          ownRead: OWN_READ,
         },
       );
 
@@ -83,7 +86,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           json: async (): Promise<unknown[]> => [],
         }),
       );
-      const repository = new TraceLegacyReadClickHouseRepository({
+      const repository = mappedLegacyRead({
         resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
@@ -99,7 +102,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           filters: {},
         },
         PROTECTIONS,
-        { authorization: ownProof({ projectId: PROJECT_ID }) },
+        { authorization: ownProof({ projectId: PROJECT_ID }), ownRead: OWN_READ },
       );
 
       expect(query).toHaveBeenCalled();
@@ -115,7 +118,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           json: async (): Promise<unknown[]> => [],
         }),
       );
-      const repository = new TraceLegacyReadClickHouseRepository({
+      const repository = mappedLegacyRead({
         resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
@@ -130,10 +133,52 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           filters: { "spans.type": ["llm"], "evaluations.evaluator_id": ["evaluator-1"] },
         },
         PROTECTIONS,
-        { authorization: ownProof({ projectId: PROJECT_ID }) },
+        { authorization: ownProof({ projectId: PROJECT_ID }), ownRead: OWN_READ },
       );
 
       expect(query).toHaveBeenCalled();
+      expect(guardRefusals(query.mock.calls)).toEqual([]);
+    });
+  });
+
+  describe("given a free-text term that matches a trace, with its spans asked for", () => {
+    /** @scenario "A trace search by free text over the API answers its matches" */
+    it("reads the page's summaries, spans and evaluations through statements the guard admits", async () => {
+      const query = vi.fn(
+        async (input: { query: string; query_params?: Record<string, unknown> }) => ({
+          json: async (): Promise<unknown[]> => {
+            if (input.query.includes("uniq(ts.TraceId)")) return [{ total: "1" }];
+            if (input.query.includes("SELECT s.TraceId")) return [{ TraceId: "trace-1" }];
+            if (input.query.includes("ts_SpanCount")) {
+              return [traceSummaryRow({ ts_OccurredAt: String(Date.now() - 60_000) })];
+            }
+            return [];
+          },
+        }),
+      );
+      const repository = mappedLegacyRead({
+        resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
+      const endDate = Date.now();
+
+      const page = await repository.listAllTracesForProject(
+        {
+          projectId: PROJECT_ID,
+          query: "hello",
+          startDate: endDate - 86_400_000,
+          endDate,
+          pageSize: 10,
+          filters: {},
+        },
+        PROTECTIONS,
+        { includeSpans: true, authorization: OWN_READ, ownRead: OWN_READ },
+      );
+
+      expect(page.groups.flat().map((trace) => trace.trace_id)).toEqual(["trace-1"]);
+      const statements = query.mock.calls.map(([statement]) => statement.query);
+      expect(statements.some((sql) => sql.includes("FROM stored_spans AS t"))).toBe(true);
+      expect(statements.some((sql) => sql.includes("FROM evaluation_runs"))).toBe(true);
       expect(guardRefusals(query.mock.calls)).toEqual([]);
     });
   });

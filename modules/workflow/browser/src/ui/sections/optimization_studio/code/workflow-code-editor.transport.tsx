@@ -58,7 +58,6 @@ export const WorkflowCodeEditorModalHost: WorkflowCodeEditorModalHostApi = ({
     closeOnEscape={false}
   >
     <Dialog.Content
-      bg="bg"
       margin="32px"
       minWidth="calc(100vw - 64px)"
       height="calc(100vh - 64px)"

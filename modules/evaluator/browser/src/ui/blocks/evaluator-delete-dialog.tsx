@@ -95,12 +95,10 @@ export function EvaluatorDeleteDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Content bg="bg" maxWidth="500px" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content maxWidth="500px" onClick={(event) => event.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Delete evaluator?
-          </Dialog.Title>
+          <Dialog.Title>Delete evaluator?</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           {isLoadingRelated ? (

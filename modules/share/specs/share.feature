@@ -197,6 +197,12 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the holder opens the link
       Then the payload carries no conversation
 
+    @unit
+    Scenario: A shared link never reveals which API key sent the trace
+      Given a share link for a trace ingested with a project API key
+      When the holder opens the link
+      Then the payload carries no API key identifier
+
   Rule: The shared link renders the new Trace Explorer, read-only
 
     @integration
@@ -238,6 +244,12 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When a visitor presents the link
       Then the link grants nothing
 
+    @unit
+    Scenario: A cut-over organization's new share link answers the link alone
+      Given an organization served by the authorization engine
+      When a member creates a share link for a trace
+      Then the answer is the link as the share contract declares it, with no project context
+
   Rule: Legacy links keep working; the legacy UI no longer offers sharing
 
     @integration @unimplemented
@@ -259,6 +271,33 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When an admin disables trace sharing for the project
       Then none of the existing links resolve
       And no new share links can be created
+
+    @unit
+    Scenario: Turning sharing off and revoking the links removes them for good
+      Given a project with two trace share links
+      When an admin turns trace sharing off and chooses "Revoke 2 links"
+      Then share revokes every trace link of that project
+      And turning sharing back on brings none of them back
+
+    @unit
+    Scenario: Turning sharing off and keeping the links paused leaves them in place
+      Given a project with trace share links
+      When an admin turns trace sharing off and chooses "Keep links paused"
+      Then project records the choice on its trace sharing disabled fact
+      And share leaves every link in place, unresolvable until sharing is on again
+
+    @integration @unimplemented
+    Scenario: Turning sharing off with no links asks nothing
+      Given a project with no trace share links
+      When an admin turns trace sharing off
+      Then no revoke question is shown
+
+    @unit
+    Scenario: Turning sharing off in Ops goes through project's sharing door
+      Given an operator editing a project in Ops
+      When the operator turns trace sharing off
+      Then project switches it and records its fact, with the operator's revoke choice
+      And the generic admin write never carries the sharing field
 
     @unit
     Scenario: project's trace sharing disabled fact revokes that project's trace links

@@ -9,12 +9,15 @@ import {
   isUiNavigatingAway,
   lazyRoute,
   nextUiApiPollDelay,
+  RELOAD_IDLE_KEY,
   registerChunkReloadListener,
+  reloadOnBundleSwap,
   reloadOnChunkError,
   uiLeaveTo,
   uiOpenExternal,
   warmChunk,
 } from "../navigation.ts";
+import { setUiStorage, UiStorage } from "../storage.ts";
 
 // jsdom locks down window.location (non-configurable, can't be deleted, redefined
 // or spied), and location.reload() is a harmless no-op there. So rather than
@@ -440,6 +443,112 @@ describe("given a full-page departure", () => {
       uiLeaveTo("/auth/signin");
 
       expect(isUiNavigatingAway()).toBe(true);
+    });
+  });
+});
+
+/** A storage port holding only the idle-reload knob. */
+class IdleKnob extends UiStorage {
+  constructor(private readonly ms: number) {
+    super();
+  }
+  read(key: string): string | undefined {
+    return key === RELOAD_IDLE_KEY ? String(this.ms) : void 0;
+  }
+  write(): void {}
+  remove(): void {}
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const WATCH_META = '<meta name="haven-ui-watch" content="1">';
+
+describe("reloading only when the reader is idle", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  });
+
+  afterEach(() => {
+    setUiStorage(undefined);
+    vi.unstubAllGlobals();
+    document.head.innerHTML = "";
+  });
+
+  describe("given a watch-mode page whose reader pressed a key just now", () => {
+    describe("when a stale chunk fails to preload", () => {
+      /** @scenario "An open watch-mode page reloads after a swap only once idle" */
+      it("waits until they stop before reloading", async () => {
+        setUiStorage(new IdleKnob(80));
+        document.head.innerHTML = WATCH_META;
+        registerChunkReloadListener();
+        window.dispatchEvent(new KeyboardEvent("keydown"));
+
+        const event = preloadErrorEvent(staleChunkError());
+        window.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+        expect(reloaded()).toBe(false);
+
+        await wait(150);
+        expect(reloaded()).toBe(true);
+      });
+    });
+  });
+
+  describe("given a page that is not a watch-mode page", () => {
+    /** @scenario "An open watch-mode page reloads after a swap only once idle" */
+    it("reloads at once on a stale route chunk, whoever is typing", () => {
+      setUiStorage(new IdleKnob(60_000));
+      window.dispatchEvent(new KeyboardEvent("keydown"));
+      expect(reloadOnChunkError(staleChunkError())).toBe(true);
+      expect(reloaded()).toBe(true);
+    });
+
+    /** @scenario "An open watch-mode page reloads after a swap only once idle" */
+    it("never polls for a new bundle", async () => {
+      document.head.innerHTML = '<script type="module" src="/assets/index-old.js"></script>';
+      const fetchSpy = vi.fn(async () => new Response(""));
+      vi.stubGlobal("fetch", fetchSpy);
+      reloadOnBundleSwap({ pollMs: 10 });
+
+      await wait(40);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a watch-mode page whose served index names a new entry chunk", () => {
+    /** @scenario "An open watch-mode page reloads after a swap only once idle" */
+    it("reloads once the reader is idle", async () => {
+      setUiStorage(new IdleKnob(1));
+      document.head.innerHTML = `${WATCH_META}<script type="module" src="/assets/index-old.js"></script>`;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response('<script type="module" crossorigin src="/assets/index-new.js"></script>'),
+        ),
+      );
+      reloadOnBundleSwap({ pollMs: 10 });
+
+      await wait(60);
+      expect(reloaded()).toBe(true);
+    });
+  });
+
+  describe("given the served index still names the watch-mode page's own entry chunk", () => {
+    it("does not reload", async () => {
+      setUiStorage(new IdleKnob(1));
+      document.head.innerHTML = `${WATCH_META}<script type="module" src="/assets/index-old.js"></script>`;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () => new Response('<script type="module" src="/assets/index-old.js"></script>'),
+        ),
+      );
+      reloadOnBundleSwap({ pollMs: 10 });
+
+      await wait(60);
+      expect(reloaded()).toBe(false);
     });
   });
 });

@@ -14,6 +14,8 @@ const OWN_IDENTIFIERS =
   "lists the session user's own sign-in identifiers; no organization scope applies and no other account is reachable";
 const OWN_METHODS_LAST_USED =
   "reads when the session user's own sign-in methods last minted a session; no organization scope applies and no other account is reachable";
+const OWN_SIGN_IN_GOVERNANCE =
+  "answers whether an organization's single sign-on governs the session user's own sign-in; no other account is reachable";
 const OWN_ADD_IDENTIFIER =
   "adds an identifier to the session user's own account; no organization scope applies";
 const OWN_RESEND_CONFIRMATION =
@@ -42,6 +44,12 @@ export const identityTrpcTransport: TrpcRouterDeclaration<IdentityApi, typeof id
     .procedure("myMethodsLastUsed")
     .noPermission({ reason: OWN_METHODS_LAST_USED })
     .handle(({ app, actor }) => app.getMethodsLastUsed({ userId: actor.id }))
+
+    .procedure("mySignInGovernance")
+    .noPermission({ reason: OWN_SIGN_IN_GOVERNANCE })
+    .handle(async ({ app, actor }) => ({
+      governedBySso: await app.isSignInGovernedBySso({ userId: actor.id }),
+    }))
 
     .procedure("addEmailIdentifier")
     .noPermission({ reason: OWN_ADD_IDENTIFIER })

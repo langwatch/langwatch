@@ -7,6 +7,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { RedisTraceAnalyticsFoldCacheRepository } from "../../repositories/redis/redis.trace-analytics-fold-cache.repository.ts";
@@ -22,6 +23,7 @@ function compose() {
   const redis = createApiFixture<RedisConnection>({ get, set }, "redis");
   const pipeline = TraceProcessingRuntimeAdapter.create({
     role: "worker",
+    authorizeFoldRead: ownProofAuthorizer,
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
     peers: createApiFixture<TraceProcessingPipelineInput["peers"]>({
       dataRetention: createApiFixture<TraceProcessingPipelineInput["peers"]["dataRetention"]>({

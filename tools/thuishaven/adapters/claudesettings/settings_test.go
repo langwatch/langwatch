@@ -381,7 +381,7 @@ func TestOffRemovesTheGateAndLeavesItOffForLater(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+		t.Run("when haven self setup gate-hook --off runs", func(t *testing.T) {
 			turnedOff, err := New().Off(root)
 
 			t.Run("it removes the existing registration", func(t *testing.T) {
@@ -417,7 +417,7 @@ func TestOffRemovesTheGateAndLeavesItOffForLater(t *testing.T) {
 			]}
 		]}}`)
 
-		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+		t.Run("when haven self setup gate-hook --off runs", func(t *testing.T) {
 			if _, err := New().Off(root); err != nil {
 				t.Fatal(err)
 			}
@@ -437,7 +437,7 @@ func TestOffRemovesTheGateAndLeavesItOffForLater(t *testing.T) {
 	t.Run("given a worktree with no gate registered at all", func(t *testing.T) {
 		root := t.TempDir()
 
-		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+		t.Run("when haven self setup gate-hook --off runs", func(t *testing.T) {
 			turnedOff, err := New().Off(root)
 
 			t.Run("it still records the opt-out, so haven up never enrolls this worktree", func(t *testing.T) {

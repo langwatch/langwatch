@@ -28,7 +28,7 @@ questions:
                |
                v
    +-----------------------+     will the laptop survive it?
-   |      haven slot       |     heavy runs queue for a machine-wide
+   |   haven machine slot  |     heavy runs queue for a machine-wide
    |  (tsc/oxlint/vitest   |     slot instead of all starting at once
    |   shims, tsgo caps)   |
    +-----------------------+
@@ -111,7 +111,7 @@ is what makes the cache trustworthy.
 
 The cache lives per user, not per checkout, so every worktree shares it. Don't
 set `NX_CACHE_DIRECTORY` locally: it turns the sharing off. The one exception is
-haven's: a fork under `haven pr` or a `haven play` sandbox gets a private cache
+haven's: a fork under `haven pr` or a `haven pr --throwaway` sandbox gets a private cache
 and no daemon, because Nx runs that checkout's own plugins and trusted worktrees
 replay whatever lands in the shared cache.
 

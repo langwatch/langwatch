@@ -78,11 +78,13 @@ async function setup() {
       {
         userId: "user_ada",
         departmentId: research.id,
+        disabledAt: null,
         user: { name: "Ada", email: "ada@example.com" },
       },
       {
         userId: "user_nameless",
         departmentId: null,
+        disabledAt: null,
         user: { name: null, email: "anon@example.com" },
       },
     ],

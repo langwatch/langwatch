@@ -6,7 +6,7 @@ The server half of [platform-health](../README.md). Platform health: checks of t
 
 ## Installation
 
-`defineProcessModule("platform-health").withChannels(platformHealthChannels).withApi(PlatformHealthModule).withTransports(platformHealthRest, platformHealthProbeRest, platformHealthLangyProbeRest).withTransportFacts(…)`, `src/platform-health.module.ts:20`.
+`defineProcessModule("platform-health").withChannels(platformHealthChannels).withApi(PlatformHealthModule).withTransports(platformHealthRest, platformHealthProbeRest, platformHealthLangyProbeRest).provideMiddlewareBindings(…)`, `src/platform-health.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

@@ -43,7 +43,6 @@ export type LogPreparationInput = {
   piiRedactionLevel: LogPiiRedactionLevel;
   acceptedAt?: number;
 };
-const unknownRecordSchema = z.record(z.string(), z.unknown());
 const exportLogsRequestSchema = z
   .object({ resourceLogs: z.array(z.unknown()).optional() })
   .passthrough();
@@ -84,15 +83,14 @@ export class CanonicalLogService {
 
     const request = exportLogsRequestSchema.safeParse(args.request);
     for (const resourceLogRaw of request.success ? (request.data.resourceLogs ?? []) : []) {
-      const resourceLogParsed = unknownRecordSchema.safeParse(resourceLogRaw);
-      if (!resourceLogParsed.success) continue;
-      const resourceLog = structuredClone(resourceLogParsed.data);
+      // isRecord, not a zod record: protobuf decodes to class instances, which zod refuses.
+      if (!isRecord(resourceLogRaw)) continue;
+      const resourceLog = structuredClone(resourceLogRaw);
       const scopeLogs = Array.isArray(resourceLog.scopeLogs) ? resourceLog.scopeLogs : [];
       for (const scopeLogRaw of scopeLogs) {
-        const scopeLogParsed = unknownRecordSchema.safeParse(scopeLogRaw);
-        if (!scopeLogParsed.success) continue;
+        if (!isRecord(scopeLogRaw)) continue;
         await CanonicalLogService.prepareScopeLog({
-          place: { resourceLog, scopeLog: structuredClone(scopeLogParsed.data) },
+          place: { resourceLog, scopeLog: structuredClone(scopeLogRaw) },
           context: { args, redaction, acceptedAt },
           tally,
         });

@@ -5,7 +5,7 @@
  */
 import type { AgentTestRunResult } from "@langwatch/agent-contract";
 import { allRegisteredRoutes } from "@langwatch/api";
-import { bindRestMiddleware, canonicalErrorResponse } from "@langwatch/api/rest";
+import { bindMiddlewareContext, canonicalErrorResponse } from "@langwatch/api/rest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -21,13 +21,16 @@ const runResult: AgentTestRunResult = {
 
 async function startTestRun(caller: { viewerUserId: string | null; callerKey: string | null }) {
   const testAgentRun = vi.fn(async () => runResult);
-  const { runtime, projectFacts } = createScenarioRestTestRuntime({
+  const { runtime, projectContext } = createScenarioRestTestRuntime({
     viewerUserId: caller.viewerUserId,
   });
   const mounted = runtime.mount(scenarioAgentTestRest.router(), {
     app: () => createApiFixture<ScenarioApi>({ testAgentRun }),
     onError: canonicalErrorResponse,
-    facts: [projectFacts, bindRestMiddleware(agentTestCallerKey, () => caller.callerKey)],
+    middlewareContext: [
+      projectContext,
+      bindMiddlewareContext(agentTestCallerKey, () => caller.callerKey),
+    ],
   });
   const response = await mounted.request("http://api.test/api/v1/agents/agent_http/test", {
     method: "POST",

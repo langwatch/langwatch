@@ -5,7 +5,7 @@
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box } from "@langwatch/design-system/primitives";
+import { Spacer } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -35,6 +35,7 @@ export function AutomationsLayout({
   title,
   basePath,
   section = "overview",
+  actions,
   children,
 }: {
   /** The page heading, rendered in the content column beside the rail. */
@@ -42,6 +43,8 @@ export function AutomationsLayout({
   basePath: string;
   /** The tab this page is. */
   section?: AutomationSection;
+  /** The page's own buttons, at the header's end. */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   const host = useAutomationHost();
@@ -53,20 +56,24 @@ export function AutomationsLayout({
   const active = AUTOMATION_SECTIONS.find((item) => item.section === section);
 
   return (
-    <Box width="full" data-testid="section-navigation-layout">
-      <SectionNavigationFrame
-        label="Automations"
-        header={
-          <PageLayout.Header>
-            <PageLayout.Heading>{title}</PageLayout.Heading>
-          </PageLayout.Header>
-        }
-        links={links}
-        activeHref={`${basePath}${active?.suffix ?? ""}`}
-        onNavigate={(href) => host.navigate(href)}
-      >
-        <Box data-testid="section-navigation-content">{children}</Box>
-      </SectionNavigationFrame>
-    </Box>
+    <SectionNavigationFrame
+      label="Automations"
+      header={
+        <PageLayout.Header>
+          <PageLayout.Heading>{title}</PageLayout.Heading>
+          {actions ? (
+            <>
+              <Spacer />
+              {actions}
+            </>
+          ) : null}
+        </PageLayout.Header>
+      }
+      links={links}
+      activeHref={`${basePath}${active?.suffix ?? ""}`}
+      onNavigate={(href) => host.navigate(href)}
+    >
+      {children}
+    </SectionNavigationFrame>
   );
 }

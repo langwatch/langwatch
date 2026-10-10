@@ -111,14 +111,10 @@ type BillingSetup = FeatureSetup<
   BillingChannels
 >;
 
-/** The license registry's view of a customer's terms, budget, seats and hosted spend. */
+/** The license registry's view of a customer's terms and seats. */
 type ConnectedLicensing = Pick<
   LicensingApi,
-  | "getContractTerms"
-  | "raiseContractCommit"
-  | "getConnectedSeats"
-  | "getHostedUsage"
-  | "findSeatChanges"
+  "getContractTerms" | "raiseContractCommit" | "getConnectedSeats" | "findSeatChanges"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -340,6 +336,7 @@ export class BillingModule
     repositories: Pick<
       BillingRepositories,
       | "connectedBilling"
+      | "contractBudgets"
       | "checkpoints"
       | "reportOrganizations"
       | "organizationCache"
@@ -378,6 +375,7 @@ export class BillingModule
       licensing: peers.licensing,
       organizations: repositories.organizations,
       gateway: repositories.gatewaySpend,
+      contractBudgets: repositories.contractBudgets,
       projects: repositories.projects,
     });
     const overview = ConnectedBillingOverviewService.create({

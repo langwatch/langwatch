@@ -13,7 +13,7 @@ export interface ScimRepositories {
   readonly scim: ScimRepository;
   /** The directory-sync head and the reads over it (D08). */
   readonly scimSyncs: StateProjectionStore<ScimSyncFoldState> & ScimSyncReadRepository;
-  /** What the directory did to one connection, read off the event log in every role. */
+  /** A connection's directory-sync log, read as words (WEB-9103). */
   readonly scimSyncActivity: ScimSyncActivityRepository;
   /** SCIM's folded copy of identity's SSO connections (a peer fold, §9). */
   readonly scimSsoConnections: ScimSsoConnectionRepository;

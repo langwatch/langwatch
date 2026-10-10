@@ -414,6 +414,9 @@ function failedCallLogLevel({
 }) {
   if (!handledCause) return getLogLevelFromStatusCode(resolvedStatus);
 
+  // An upgrade in progress is an expected, self-healing 503: warn, not an incident.
+  if (handledCause.code === "upgrade_in_progress") return "warn";
+
   return handledCause.fault === "customer" ? "warn" : "error";
 }
 

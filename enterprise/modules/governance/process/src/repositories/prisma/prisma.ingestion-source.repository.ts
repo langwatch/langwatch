@@ -1,4 +1,5 @@
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type Prisma,
   type IngestionSource,
@@ -240,14 +241,20 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
       const matched =
         input.cursor === null
           ? await database.$executeRaw`
-              -- @tenancy: an ingestion source is addressed by its own primary key.
+              ${skipTenantCheck({
+                // An ingestion source is addressed by its own primary key.
+                SKIP_TENANT_CHECK: true,
+              })}
               UPDATE "IngestionSource"
                  SET "updatedAt" = now()
                WHERE "id" = ${input.id}
                  AND ("pollerCursor" IS NULL OR "pollerCursor" = 'null'::jsonb)
             `
           : await database.$executeRaw`
-              -- @tenancy: an ingestion source is addressed by its own primary key.
+              ${skipTenantCheck({
+                // An ingestion source is addressed by its own primary key.
+                SKIP_TENANT_CHECK: true,
+              })}
               UPDATE "IngestionSource"
                  SET "updatedAt" = now()
                WHERE "id" = ${input.id}

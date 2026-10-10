@@ -16,6 +16,12 @@ export interface ConnectCredential {
   readonly instanceId: string;
 }
 
+/** Where an install's own gateway reaches LangWatch-hosted models, with the credential it presents. */
+export interface ConnectUpstream extends ConnectCredential {
+  /** The Connect gateway endpoint; the slot calls its `/v1`. */
+  readonly baseUrl: string;
+}
+
 /** The seats in use, as the install counts them. */
 export interface LicenseSeatCounts {
   readonly members: number;

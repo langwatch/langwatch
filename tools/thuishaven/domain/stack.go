@@ -123,6 +123,8 @@ type Stack struct {
 	ModeEnv          []string `json:"modeEnv,omitempty"`
 	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
 	EffectiveMode    string   `json:"effectiveMode,omitempty"`
+	// Refresh is the mode this stack was brought up in: still, watch or hmr.
+	Refresh RefreshMode `json:"refresh,omitempty"`
 	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
 	// Evals judge with the app's deterministic stand-in and need no classifier
 	// key or license. Off by default; the instant-eval-mock-judge setting.
@@ -197,6 +199,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{OutboundService, "Slack, webhooks and SQS (outboundsim)"},
 	{PaymentService, "Stripe (paymentsim)"},
 	{TelemetryService, "OTLP sender (telemetrysim)"},
+	{LambdaService, "NLP Lambda fleet (lambdasim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
 	{LangevalsService, "Evaluators (Python)"},

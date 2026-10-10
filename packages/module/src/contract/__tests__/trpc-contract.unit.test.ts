@@ -56,9 +56,9 @@ describe("defineTrpcContract", () => {
       // Every file this surface offers, and each one a leaf. A module contract
       // is imported by every browser that installs it, so one server import
       // here is `node:async_hooks` in the browser bundle — which is what
-      // `defineRestMiddleware` living in rest/request.ts actually did.
+      // `defineMiddlewareContext` living in rest/request.ts actually did.
       expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual([]);
-      expect(valueImports(sourceOf("rest-middleware.ts"))).toEqual([]);
+      expect(valueImports(sourceOf("middleware-context.ts"))).toEqual([]);
       expect(valueImports(sourceOf("ui-tokens.ts"))).toEqual([]);
       expect(valueImports(sourceOf("release-flags.ts"))).toEqual([]);
       expect(valueImports(sourceOf("schema-hash.ts"))).toEqual(["zod"]);
@@ -68,7 +68,7 @@ describe("defineTrpcContract", () => {
         "./module-namespace.ts",
         "./contract/trpc-contract.ts",
         "./contract/schema-hash.ts",
-        "./contract/rest-middleware.ts",
+        "./contract/middleware-context.ts",
         "./contract/ui-tokens.ts",
         "./contract/release-flags.ts",
       ]);

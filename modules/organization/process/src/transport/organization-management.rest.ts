@@ -1,8 +1,7 @@
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
@@ -42,8 +41,8 @@ const deriveCaller = (actor: { type: string; id?: string } | null): Organization
   actor && actor.type === "user" && actor.id ? { id: actor.id } : null;
 
 /** The organization key a request arrived on, bound from its credential at boot. */
-export const organizationKeyFacts = defineRestMiddleware(
-  "organizationKeyFacts",
+export const organizationKeyContext = defineMiddlewareContext(
+  "organizationKeyContext",
   z.object({ apiKeyId: z.string() }),
 );
 
@@ -157,11 +156,7 @@ const requestedTeamRole = (team: { role: string; customRoleId?: string | undefin
     ? (`custom:${team.customRoleId}` as const)
     : (team.role as "ADMIN" | "MEMBER" | "VIEWER");
 
-export const organizationManagementRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<OrganizationApi>;
-}> = defineRestRouter(OrganizationApi)
+export const organizationManagementRest = defineRestRouter(OrganizationApi)
   .withNamespace("organization")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
@@ -187,6 +182,7 @@ export const organizationManagementRest: Readonly<{
       "Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.organization.update")
   .handle(async ({ app, input, scope, actor }) => {
     await app.updateSettings({ organizationId: scope.id, ...input }, deriveCaller(actor));
 
@@ -270,8 +266,9 @@ export const organizationManagementRest: Readonly<{
     description:
       "Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.",
   })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.organization.update-member-role")
   .handle(async ({ app, input, scope, actor }, key) =>
     updatedMemberWire(
       await app.updateMember(
@@ -296,6 +293,7 @@ export const organizationManagementRest: Readonly<{
       "Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.organization.delete-member")
   .handle(async ({ app, input, scope, actor }) => {
     await app.deleteMember({ organizationId: scope.id, userId: input.userId }, deriveCaller(actor));
 
@@ -327,8 +325,9 @@ export const organizationManagementRest: Readonly<{
     description:
       "Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered.",
   })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.invite.create-invites")
   .handle(async ({ app, input, scope, actor }, key) => {
     const created = await app.createInvitations(
       {
@@ -371,6 +370,7 @@ export const organizationManagementRest: Readonly<{
       "Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.invite.delete-invite")
   .handle(async ({ app, input, scope }) => {
     await app.revokeInvitation({ organizationId: scope.id, inviteId: input.inviteId });
 

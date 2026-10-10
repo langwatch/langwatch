@@ -9,10 +9,12 @@ const PRISMA = "prisma:20261006180000_add_column";
 const GOOSE = "clickhouse:00042";
 const DATA = "trace:fill-cost";
 const image = { release: "3.21.0", blockingSteps: [PRISMA, GOOSE] };
+const BACKGROUND = "trace:backfill-cost";
 const allDone = [
   { id: PRISMA, status: "done" as const },
   { id: GOOSE, status: "done" as const },
 ];
+const registered = [...allDone, { id: BACKGROUND, status: "pending" as const }];
 
 function memoryServingRosterLedger(): ServingRosterLedger & {
   rows: Map<string, ServingRosterEntry>;
@@ -40,7 +42,7 @@ function memoryServingRosterLedger(): ServingRosterLedger & {
 function gateOver({
   role = "worker",
   release = "3.21.0",
-  steps = allDone,
+  steps = registered,
   runs = [],
   schemaIsEmpty = false,
   blockingSteps = [PRISMA, GOOSE],
@@ -65,7 +67,7 @@ function gateOver({
       name: release ?? "git-abc1234",
       release,
       blockingSteps: [...blockingSteps],
-      declaredSteps: ["trace:backfill-cost"],
+      declaredSteps: [BACKGROUND],
     },
     ledger: {
       findSteps: async () =>
@@ -217,6 +219,7 @@ describe("createUpgradeGate", () => {
     const steps = [
       { id: PRISMA, status: "done" as const },
       { id: GOOSE, status: "pending" as const },
+      { id: BACKGROUND, status: "pending" as const },
     ];
     const { gate, rows } = gateOver({ role: "worker", steps });
     await expect(gate.admit()).resolves.toMatchObject({
@@ -235,10 +238,28 @@ describe("createUpgradeGate", () => {
       role: "worker",
       image: "3.21.0",
       release: "3.21.0",
-      steps: ["trace:backfill-cost"],
+      steps: [BACKGROUND],
     });
     await gate.release();
     expect(rows.size).toBe(0);
+  });
+
+  describe("given every blocking step done and a declared background step the ledger lacks", () => {
+    /** @scenario "A worker runs the upgrade for a background step the ledger has not registered" */
+    it("answers behind to the worker, naming the unregistered step", async () => {
+      const { gate, rows } = gateOver({ role: "worker", steps: allDone });
+      await expect(gate.admit()).resolves.toMatchObject({
+        outcome: "behind",
+        outstanding: [BACKGROUND],
+      });
+      expect(rows.size).toBe(0);
+    });
+
+    /** @scenario "An api serves while a background step is unregistered" */
+    it("admits the api", async () => {
+      const { gate } = gateOver({ role: "api", steps: allDone });
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+    });
   });
 
   /** @scenario "A refused process writes no roster entry" */

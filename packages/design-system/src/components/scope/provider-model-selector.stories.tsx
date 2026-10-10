@@ -3,7 +3,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ProviderModelSelector } from "./provider-model-selector.tsx";
 
 const meta = {
-  title: "Components/Provider model selector",
+  title: "Inputs and forms/Provider model selector",
+  parameters: {
+    usage: {
+      use: "Choosing a model from the configured providers, each with its icon.",
+      avoid:
+        "No provider configured yet: show No models configured callout instead of an empty picker.",
+    },
+  },
   component: ProviderModelSelector,
   tags: ["autodocs"],
   args: {

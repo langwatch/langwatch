@@ -1,9 +1,8 @@
 // Role-bindings REST family; custom role scope validation; actor bound not claimed.
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { ledgerActorSchema } from "@langwatch/authorization";
 import {
@@ -26,8 +25,8 @@ import { z } from "zod";
 import { bindingWire, optimisticBindingWire } from "../rules/role-binding-read-back.rules.ts";
 
 /** What the organization credential resolved, as this family reads it. */
-export const roleBindingRestFacts = defineRestMiddleware(
-  "roleBindingRestFacts",
+export const roleBindingRestContext = defineMiddlewareContext(
+  "roleBindingRestContext",
   z.object({
     organizationId: z.string(),
     actor: ledgerActorSchema,
@@ -64,16 +63,12 @@ const findWrittenBindings = async ({
   return rows.filter((candidate) => candidate.id === bindingId).map(bindingWire);
 };
 
-export const authzRoleBindingRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<AuthzApi>;
-}> = defineRestRouter(AuthzApi)
+export const authzRoleBindingRest = defineRestRouter(AuthzApi)
   .withNamespace("role-bindings")
   .withVersion(MANAGEMENT_API_VERSION)
-  // The family reads the ORGANIZATION credential (roleBindingRestFacts calls
+  // The family reads the ORGANIZATION credential (roleBindingRestContext calls
   // organizationCredentialOfRequest), so it must answer behind that door —
-  // on the default project door the fact throws where the door should 401.
+  // on the default project door the context throws where the door should 401.
   .withCredential("organization")
   .withDeprecated({
     successor: "/api/grants",
@@ -90,7 +85,7 @@ export const authzRoleBindingRest: Readonly<{
     description:
       "List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set.",
   })
-  .withMiddleware(roleBindingRestFacts)
+  .withMiddlewareContext(roleBindingRestContext)
   .handle(async ({ app, input }, organization) => {
     const rows = await app.listManagedBindingsForOrganization({
       organizationId: organization.organizationId,
@@ -116,7 +111,7 @@ export const authzRoleBindingRest: Readonly<{
     description:
       "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
   })
-  .withMiddleware(roleBindingRestFacts)
+  .withMiddlewareContext(roleBindingRestContext)
   .handle(async ({ app, input }, organization) => {
     const organizationId = organization.organizationId;
 
@@ -159,7 +154,7 @@ export const authzRoleBindingRest: Readonly<{
     description:
       "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.",
   })
-  .withMiddleware(roleBindingRestFacts)
+  .withMiddlewareContext(roleBindingRestContext)
   .handle(async ({ app, input }, organization) => {
     const organizationId = organization.organizationId;
     return app.updateRoleBinding({
@@ -182,7 +177,7 @@ export const authzRoleBindingRest: Readonly<{
     description:
       "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.",
   })
-  .withMiddleware(roleBindingRestFacts)
+  .withMiddlewareContext(roleBindingRestContext)
   .handle(async ({ app, input }, organization) => {
     await app.deleteBinding({
       organizationId: organization.organizationId,

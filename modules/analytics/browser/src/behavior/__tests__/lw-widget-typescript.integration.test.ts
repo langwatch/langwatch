@@ -19,13 +19,13 @@ const STARTER_COLUMNS = [
   { name: "events", type: "UInt64" },
 ];
 
-async function diagnose({
+async function languageService({
   code,
   columns = [],
 }: {
   code: string;
   columns?: readonly { name: string; type: string }[];
-}): Promise<string[]> {
+}) {
   const files = new Map<string, string>();
   for (const lib of [...(await loadReactLibs()), ...WIDGET_STATIC_LIBS]) {
     files.set(lib.uri, lib.text);
@@ -36,7 +36,7 @@ async function diagnose({
   );
   files.set(WIDGET_URI, code);
   const options = widgetCompilerOptions({ enums: ts });
-  const service = ts.createLanguageService({
+  return ts.createLanguageService({
     getCompilationSettings: () => options,
     getScriptFileNames: () => [...files.keys()],
     getScriptVersion: () => "1",
@@ -49,6 +49,13 @@ async function diagnose({
     fileExists: (name) => files.has(name) || libFileMap[name.replace(/^.*\//, "")] !== undefined,
     readFile: (name) => files.get(name) ?? libFileMap[name.replace(/^.*\//, "")],
   });
+}
+
+async function diagnose(input: {
+  code: string;
+  columns?: readonly { name: string; type: string }[];
+}): Promise<string[]> {
+  const service = await languageService(input);
   return [
     ...service.getSyntacticDiagnostics(WIDGET_URI),
     ...service.getSemanticDiagnostics(WIDGET_URI),
@@ -102,6 +109,44 @@ export default function Widget() {
       expect(await diagnose({ code: `export default () => LW.nope();` })).toEqual([
         expect.stringContaining("'nope'"),
       ]);
+    });
+  });
+
+  describe("given widget code that has typed `LW.`", () => {
+    /** @scenario "The LW global completes with its members and their types" */
+    it("offers every LW member, with useChartQuery's typed signature", async () => {
+      const code = `export default () => LW.`;
+      const service = await languageService({ code });
+      const completions = service.getCompletionsAtPosition(WIDGET_URI, code.length, undefined);
+      const names = completions?.entries.map((entry) => entry.name) ?? [];
+      expect(names).toEqual(
+        expect.arrayContaining(["useChartQuery", "query", "params", "useDashboardContext"]),
+      );
+      const details = service.getCompletionEntryDetails(
+        WIDGET_URI,
+        code.length,
+        "useChartQuery",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+      const signature = ts.displayPartsToString(details?.displayParts);
+      expect(signature).toContain("LwChartQueryState");
+    });
+  });
+
+  describe("given widget code asking for React", () => {
+    /** @scenario "React completes with its hooks" */
+    it.each([
+      ['import { use } from "react";', 'import { use'.length],
+      ["export default () => React.", "export default () => React.".length],
+    ])("offers React's hooks in %s", async (code, offset) => {
+      const service = await languageService({ code });
+      const names = service.getCompletionsAtPosition(WIDGET_URI, offset, undefined)?.entries;
+      expect(names?.map((entry) => entry.name)).toEqual(
+        expect.arrayContaining(["useState", "useEffect", "useMemo"]),
+      );
     });
   });
 

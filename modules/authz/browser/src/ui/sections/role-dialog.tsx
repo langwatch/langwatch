@@ -54,7 +54,7 @@ export function RoleDialog(props: RoleDialogProps) {
 
   return (
     <Dialog.Root open={props.open} onOpenChange={({ open }) => !open && props.onClose()}>
-      <Dialog.Content bg="bg" maxWidth="1040px" maxHeight="90vh" overflowY="auto">
+      <Dialog.Content maxWidth="1040px" maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{props.editing ? "Edit role" : "New role"}</Dialog.Title>
         </Dialog.Header>

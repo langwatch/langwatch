@@ -53,8 +53,9 @@ describe("<SignInError/>", () => {
     /** @scenario "Recovery works the same when the org's required method is not yet known" */
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
-      expect(screen.getByText(/provider didn't confirm the address/i)).toBeTruthy();
-      expect(screen.getByText(/method you used before/i)).toBeTruthy();
+      expect(screen.getByText(/already has an account/i)).toBeTruthy();
+      expect(screen.getByText(/sign in the way you did before/i)).toBeTruthy();
+      expect(screen.getByText(/single sign-on/i)).toBeTruthy();
     });
   });
 
@@ -173,6 +174,19 @@ describe("given a sign-in refused because an unconfirmed account holds the addre
 
     expect(screen.getByText(/An account with this address already exists/i)).toBeTruthy();
     expect(screen.getByText(/Sign in the way you did before/i)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
+
+describe("given a sign-in refused because the directory turned the member off", () => {
+  /** @scenario "The deactivated refusal reaches the sign-in screen in plain words" */
+  it("crosses as itself and tells them to ask an administrator", () => {
+    expect(signInErrorMayCross("sso_member_deactivated")).toBe(true);
+
+    renderError("sso_member_deactivated");
+
+    expect(screen.getByText(/Your access has been turned off/i)).toBeTruthy();
+    expect(screen.getByText(/Ask an administrator of your organization/i)).toBeTruthy();
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });

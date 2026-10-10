@@ -113,7 +113,7 @@ The **process mounts declarations; a module never mounts anything.** Listing
 a declaration on `.withTransports(...)` is the whole act of publishing it —
 no per-module mount file, no hand-assembled router. `boot()` opens the REST
 family, the tRPC namespace and the SSE lane for every installed module's
-role; auth binds the one API door from its own transport facts (record §4)
+role; auth binds the one API door from its own middleware bindings (record §4)
 — a declaration names a permission, never a credential source.
 
 ```ts

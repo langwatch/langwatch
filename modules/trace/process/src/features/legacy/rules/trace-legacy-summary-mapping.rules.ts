@@ -241,6 +241,13 @@ export function extractEventsFromSpans({
  * Maps a TraceSummaryData (from ClickHouse trace_summaries) and its associated spans
  * to the legacy Trace type used by the pre-ClickHouse trace system.
  */
+/** The trace's `started_at`: its span timing baseline, else its storage anchor (ADR-087). */
+export function traceStartedAt(
+  summary: Pick<TraceSummaryData, "occurredAt" | "storageAnchorMs">,
+): number {
+  return summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0);
+}
+
 export function mapTraceSummaryToTrace({
   summary,
   spans,
@@ -270,7 +277,7 @@ export function mapTraceSummaryToTrace({
       // start to report; before the anchor existed it reported the epoch, which
       // rendered as 1970 in the drawer and the list. The anchor is the time that
       // trace's first signal was accepted, which is the honest answer.
-      started_at: summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0),
+      started_at: traceStartedAt(summary),
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },

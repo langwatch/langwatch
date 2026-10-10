@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
@@ -21,7 +21,7 @@ import { organizationModuleSetup } from "../../app/__tests__/support/organizatio
 import { OrganizationModule } from "../../app/organization.app.ts";
 import type { RecordMemberDisabledCommandData } from "../../eventing/organization-lifecycle.events.ts";
 import {
-  organizationKeyFacts,
+  organizationKeyContext,
   organizationManagementRest,
 } from "../organization-management.rest.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
@@ -134,6 +134,7 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   });
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {
@@ -161,7 +162,9 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   const hono = runtime.mount(organizationManagementRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: "key-1" })),
+    ],
   });
   const send = (path: string, init: { method?: string; body?: unknown } = {}) =>
     hono.fetch(

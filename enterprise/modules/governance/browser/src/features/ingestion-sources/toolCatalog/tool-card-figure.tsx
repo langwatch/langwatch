@@ -52,6 +52,7 @@ export function ToolCardFigure({
       <Tooltip content={emptyReason} showArrow positioning={{ placement: "top" }}>
         <Text
           fontSize="xs"
+          fontWeight="normal"
           color="fg.subtle"
           cursor="help"
           textAlign={align}
@@ -69,8 +70,9 @@ export function ToolCardFigure({
     return (
       <Tooltip content={`${exact} exactly`} showArrow positioning={{ placement: "top" }}>
         <Text
-          fontSize="xs"
+          fontSize="sm"
           fontWeight="medium"
+          color="fg"
           fontVariantNumeric="tabular-nums"
           textAlign={align}
           cursor="help"
@@ -83,7 +85,13 @@ export function ToolCardFigure({
   }
 
   return (
-    <Text fontSize="xs" fontWeight="medium" fontVariantNumeric="tabular-nums" textAlign={align}>
+    <Text
+      fontSize="sm"
+      fontWeight="medium"
+      color="fg"
+      fontVariantNumeric="tabular-nums"
+      textAlign={align}
+    >
       {value}
     </Text>
   );

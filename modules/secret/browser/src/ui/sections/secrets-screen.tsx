@@ -320,7 +320,7 @@ export default function SecretsScreen() {
             }
           }}
         >
-          <Dialog.Content bg="bg">
+          <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title>Add Secret</Dialog.Title>
             </Dialog.Header>
@@ -374,7 +374,7 @@ export default function SecretsScreen() {
             if (!details.open) setSecretToDelete(null);
           }}
         >
-          <Dialog.Content bg="bg">
+          <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
             </Dialog.Header>
@@ -408,7 +408,7 @@ export default function SecretsScreen() {
             }
           }}
         >
-          <Dialog.Content bg="bg">
+          <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title>Update Value for {secretToUpdate?.name ?? ""}</Dialog.Title>
             </Dialog.Header>

@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { BillingApi, BillingStaff } from "@langwatch/enterprise-billing-contract";
 import { AdminSurfaceHiddenError, type OpsOperator } from "@langwatch/ops-contract";
 /**
@@ -12,7 +12,7 @@ import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-import { connectedBillingTrpcTransport, operatorFact } from "../connected-billing.trpc.ts";
+import { connectedBillingTrpcTransport, operatorContext } from "../connected-billing.trpc.ts";
 import type { BillingTrpcTestContext } from "./billing.trpc.harness.ts";
 
 const CUSTOMER = { id: "user_customer", email: "admin@acme.example" };
@@ -42,7 +42,7 @@ function mounted() {
     procedure: trpc.procedure,
     members,
   }).mount(connectedBillingTrpcTransport, () => billing, {
-    facts: [bindTrpcFact(operatorFact, (ctx) => ctx.operator ?? null)],
+    middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx) => ctx.operator ?? null)],
   });
   const read = async (operator: OpsOperator) => {
     const failure = await router

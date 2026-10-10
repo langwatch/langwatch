@@ -304,6 +304,19 @@ Feature: Billing a connected self-hosted customer
     Then the billing contact of "ACME" receives the spend for the month by service, the commit drawn down so far, the credit remaining and the seats licensed and reported
 
   @unit
+  Scenario: The commit drawdown reads the contract budget without calling the hosted route
+    Given connect has synced the contract budget of "ACME" and its window opened on its last renewal
+    When the commit drawn down is read
+    Then it is the contract budget's successful debits since that window opened, as the gateway enforces them
+    And billing calls no licensing or hosted operation to read it
+
+  @unit
+  Scenario: The commit drawdown is unavailable before a contract budget exists
+    Given connect has not synced a contract budget for "ACME"
+    When the commit drawn down is read
+    Then it is unavailable rather than zero
+
+  @unit
   Scenario: A month with no usage sends no statement
     Given "ACME" used no hosted services during the month
     When the monthly statement runs

@@ -37,7 +37,7 @@ func Preflight(estimate Estimate, size string, capacity Capacity) error {
 	if floor := ClickHouseFloors[size]; clickHouseCap > 0 && clickHouseCap < floor {
 		return &PreflightError{
 			Shortfall: fmt.Sprintf("the %s tier needs ClickHouse capped at %d MB or more; it is %d MB", size, floor>>20, clickHouseCap>>20),
-			Raise:     fmt.Sprintf("raise it with `haven limits set clickhouse-memory-mb %d`, then `haven up`", floor>>20),
+			Raise:     fmt.Sprintf("raise it with `haven machine limits set clickhouse-memory-mb %d`, then `haven up`", floor>>20),
 		}
 	}
 	return nil

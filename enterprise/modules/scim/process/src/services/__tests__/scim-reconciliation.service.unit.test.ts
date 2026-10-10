@@ -402,4 +402,40 @@ describe("the organization's directory sync panel", () => {
       expect(reads.people.getProfiles).toHaveBeenCalledWith({ userIds: ["user_sam"] });
     });
   });
+
+  describe("when an administrator asks which members a directory created", () => {
+    /** @scenario "The members a directory created are named with its provider" */
+    it("names each claimed member once with the connection's provider", async () => {
+      service = ScimReconciliationService.create(
+        createReads({
+          ownership: [
+            { connectionId: ACME_OKTA, userId: "user_sam" },
+            { connectionId: ACME_OKTA, userId: "user_sam" },
+            { connectionId: ACME_OKTA, userId: "user_ana" },
+          ],
+        }),
+      );
+
+      await expect(
+        service.findDirectoryMembers({
+          organizationId: ACME,
+          userIds: ["user_sam", "user_lee", "user_ana"],
+        }),
+      ).resolves.toEqual([
+        { userId: "user_sam", providerId: "okta" },
+        { userId: "user_ana", providerId: "okta" },
+      ]);
+    });
+
+    /** @scenario "Another organization's directory never explains a member" */
+    it("asks for nothing when the organization holds no connection", async () => {
+      const empty = createReads({ connections: [] });
+      service = ScimReconciliationService.create(empty);
+
+      await expect(
+        service.findDirectoryMembers({ organizationId: ACME, userIds: ["user_sam"] }),
+      ).resolves.toEqual([]);
+      expect(empty.directory.findDirectoryOwnership).not.toHaveBeenCalled();
+    });
+  });
 });

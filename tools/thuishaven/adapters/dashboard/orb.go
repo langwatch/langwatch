@@ -73,7 +73,7 @@ func (s *Server) handleOrbFeedback(w http.ResponseWriter, r *http.Request) {
 	writeOrbJSON(w, http.StatusCreated, map[string]string{"id": item.ID})
 }
 
-// handleOrbPage replaces the page buffer an agent reads with `haven page`.
+// handleOrbPage replaces the page buffer an agent reads with `haven orb console|network`.
 func (s *Server) handleOrbPage(w http.ResponseWriter, r *http.Request) {
 	st, ok := s.orbStack(w, r)
 	if !ok {

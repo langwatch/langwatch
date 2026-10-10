@@ -65,6 +65,7 @@ import {
 import { useDatasetName } from "../../behavior/use-dataset-name.ts";
 import { useDiscardGuard } from "../../behavior/use-discard-guard.ts";
 import { useSlackConnectionName } from "../../behavior/use-slack-connection-name.ts";
+import { describeCron } from "../../model/report-schedule.ts";
 import { withSlackConnectionName } from "../../model/slack-connection-name.ts";
 import { findNextStep, findPreviousStep, type WizardStep } from "../../model/wizard-steps.ts";
 import { DiscardChangesDialog } from "../blocks/discard-changes-dialog.tsx";
@@ -391,6 +392,7 @@ export function AutomationDrawer({
     alertType: draft.alertType,
     graphAlert: draft.graphAlert,
     reportSourceKind: draft.report.sourceKind,
+    scheduleLabel: describeCron(draft.report.cron, draft.report.timezone),
     graphName,
     seriesLabel,
   });
@@ -414,7 +416,12 @@ export function AutomationDrawer({
           timePeriodMinutes: draft.graphAlert.timePeriod,
         }
       : null,
-    report: isReport ? { sourceKind: draft.report.sourceKind } : null,
+    report: isReport
+      ? {
+          sourceKind: draft.report.sourceKind,
+          scheduleLabel: describeCron(draft.report.cron, draft.report.timezone),
+        }
+      : null,
   });
   const localPreview = useNotifyPreview({
     channel: section === "configuration" && channel !== "email" ? channel : null,
@@ -596,7 +603,12 @@ export function AutomationDrawer({
             <HStack width="full">
               <Spacer />
               {showStepNavigation ? (
-                <StepNavigation step={step} isEdit={!!automationId} onStep={setStep} />
+                <StepNavigation
+                  step={step}
+                  isEdit={!!automationId}
+                  draft={draft}
+                  onStep={setStep}
+                />
               ) : (
                 <DrawerFooterActions
                   showTestFire={!!channel && !editLoading && !editError}
@@ -786,12 +798,15 @@ function useResetOnIdentityChange({
 function StepNavigation({
   step,
   isEdit,
+  draft,
   onStep,
 }: {
   step: WizardStep;
   isEdit: boolean;
+  draft: AutomationDraft;
   onStep: (step: WizardStep) => void;
 }) {
+  const canContinue = step !== "watch" || draft.source !== "customGraph" || !!draft.customGraphId;
   if (isEdit) {
     return (
       <Button colorPalette="orange" onClick={() => onStep("review")}>
@@ -807,7 +822,12 @@ function StepNavigation({
         </Button>
       ))}
       {findNextStep(step).map((next) => (
-        <Button key={next} colorPalette="orange" onClick={() => onStep(next)}>
+        <Button
+          key={next}
+          colorPalette="orange"
+          disabled={!canContinue}
+          onClick={() => onStep(next)}
+        >
           Continue
         </Button>
       ))}
@@ -1519,6 +1539,7 @@ type PreviewContextInput = {
   alertType: AutomationDraft["alertType"];
   graphAlert: AutomationDraft["graphAlert"];
   reportSourceKind: AutomationDraft["report"]["sourceKind"];
+  scheduleLabel: string;
   graphName: string | null;
   seriesLabel: string | null;
 };
@@ -1545,7 +1566,7 @@ function usePreviewContext(input: PreviewContextInput): PreviewContext {
   );
 
   const { isReport, isGraphAlert, name, alertType, graphAlert, reportSourceKind } = input;
-  const { graphName, seriesLabel } = input;
+  const { graphName, seriesLabel, scheduleLabel } = input;
 
   return useMemo(
     () =>
@@ -1559,6 +1580,7 @@ function usePreviewContext(input: PreviewContextInput): PreviewContext {
         alertType,
         graphAlert,
         reportSourceKind,
+        scheduleLabel,
         graphName,
         seriesLabel,
         exampleContext,
@@ -1573,6 +1595,7 @@ function usePreviewContext(input: PreviewContextInput): PreviewContext {
       alertType,
       graphAlert,
       reportSourceKind,
+      scheduleLabel,
       graphName,
       seriesLabel,
       exampleContext,
@@ -1590,6 +1613,7 @@ function previewContextOf({
   alertType,
   graphAlert,
   reportSourceKind,
+  scheduleLabel,
   graphName,
   seriesLabel,
   exampleContext,
@@ -1605,6 +1629,7 @@ function previewContextOf({
       },
       trigger: { name: name || "Example report" },
       sourceKind: reportSourceKind,
+      scheduleLabel,
       chartTitles: graphName ? [graphName] : undefined,
     });
   }

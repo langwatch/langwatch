@@ -8,6 +8,7 @@ import type { JoinLookupDecision, JoinOffer } from "@langwatch/identity-contract
 export type JoinOfferInvitation = Readonly<{
   inviteCode: string;
   organizationName: string;
+  inviterName: string | null;
   role: string;
 }>;
 

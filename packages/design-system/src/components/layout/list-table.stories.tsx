@@ -10,7 +10,14 @@ const ROWS = [
 ];
 
 const meta = {
-  title: "Components/List table",
+  title: "Data display/List table",
+  parameters: {
+    usage: {
+      use: "Every list of rows on a list page: the rounded border, tall header and grid lines are the one list look.",
+      avoid:
+        "Never a bare Table.Root with its own borders (list-table.md). Facts about one thing: use Settings card rows.",
+    },
+  },
   component: ListTable,
   tags: ["autodocs"],
   argTypes: { children: { control: false }, containerProps: { control: false } },

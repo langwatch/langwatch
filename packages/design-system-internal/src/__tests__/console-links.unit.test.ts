@@ -62,6 +62,11 @@ describe("consoleLinks", () => {
           group: "Sims",
         },
         {
+          label: "Lambda",
+          href: "https://lambda.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
+        {
           label: "Design system",
           href: "https://design-system.feat-x.langwatch.localhost:1355",
           group: "Tools",

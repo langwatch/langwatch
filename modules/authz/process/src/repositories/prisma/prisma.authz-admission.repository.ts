@@ -1,4 +1,5 @@
 import type { AuthzAdmissionScope, AuthzResolveAdmissionInput } from "@langwatch/authz-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { z } from "zod";
 
 import {
@@ -102,7 +103,10 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
     grantId,
   }: AuthzResolveAdmissionInput): Promise<boolean> {
     const updated = await this.database.$executeRaw`
-      -- @tenancy: organization-scoped atomic SSO admission completion
+      ${skipTenantCheck({
+        // Organization-scoped atomic SSO admission completion.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "OrganizationUser" AS membership
       SET "pendingSsoGrantId" = NULL,
           "updatedAt" = NOW()
@@ -141,7 +145,10 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
     grantId,
   }: AuthzResolveAdmissionInput): Promise<boolean> {
     const updated = await this.database.$executeRaw`
-      -- @tenancy: organization-scoped revoked SSO admission cleanup
+      ${skipTenantCheck({
+        // Organization-scoped revoked SSO admission cleanup.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "OrganizationUser"
       SET "pendingSsoGrantId" = NULL,
           "updatedAt" = NOW()
@@ -155,7 +162,10 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
   /** Deactivated or erased, as authz's own standing table says (never the User table). */
   private async isInactive(userId: string): Promise<boolean> {
     const rows = await this.database.$queryRaw`
-      -- @tenancy: platform-wide; a user's standing belongs to no organization
+      ${skipTenantCheck({
+        // Platform-wide; a user's standing belongs to no organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT "userId" FROM "AuthzUserStanding"
       WHERE "userId" = ${userId}
         AND ("deactivatedAt" IS NOT NULL OR "erasedAt" IS NOT NULL)

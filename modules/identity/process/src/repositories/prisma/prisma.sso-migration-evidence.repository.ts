@@ -1,4 +1,5 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -179,7 +180,11 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
     if (lowered.length === 0) return new Map();
 
     const rows = await this.database.$queryRaw<{ address: string; holders: bigint }[]>`
-      -- @tenancy: an address names one account fleet-wide or it names nobody; only a migrating organization's members' addresses are counted.
+      ${skipTenantCheck({
+        // An address names one account fleet-wide or it names nobody; only a migrating
+        // organization's members' addresses are counted.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT lower("email") AS "address", count(*) AS "holders"
         FROM "User"
        WHERE lower("email") = ANY(${lowered}::text[])

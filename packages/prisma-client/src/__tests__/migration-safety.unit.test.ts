@@ -149,11 +149,28 @@ describe("Postgres migration safety", () => {
     /** @scenario "A drop retired a release earlier is accepted" */
     it("accepts a drop carrying a retirement note above it", () => {
       expect(
-        rules('-- contract: retired in 1.42.0\nALTER TABLE "Project" DROP COLUMN "legacyKey";'),
+        rules(
+          '-- contract: retired in 1.42.0\n-- archive: none (empty)\nALTER "Project" DROP COLUMN "legacyKey";',
+        ),
       ).toEqual([]);
       expect(
-        rules('ALTER TABLE "Project" DROP COLUMN "legacyKey";\n-- contract: retired in 1.42.0'),
+        rules(
+          'ALTER TABLE "Project" DROP COLUMN "legacyKey";\n-- contract: retired in 1.42.0\n-- archive: none (empty)',
+        ),
       ).toEqual(["drop-without-retirement-note"]);
+    });
+
+    /** @scenario "A Postgres drop without an archive note is refused by name" */
+    it("refuses a retired drop with no archive note, naming the fix", () => {
+      const findings = scan('-- contract: retired in 1.42.0\nALTER TABLE "P" DROP COLUMN "old";');
+      expect(findings.map((finding) => finding.rule)).toEqual(["contract-without-archive-note"]);
+      expect(findings[0]?.fix).toContain("-- archive: none (<reason>)");
+      expect(rules('-- contract: retired in 1.42.0\n-- archive: none\nDROP TABLE "T";')).toEqual([
+        "contract-without-archive-note",
+      ]);
+      expect(rules('-- contract: retired in 1.42.0\n-- archive: Thing\nDROP TABLE "T";')).toEqual(
+        [],
+      );
     });
 
     /** @scenario "A new NOT NULL column without a default is refused by name" */
@@ -193,20 +210,21 @@ describe("Postgres migration safety", () => {
 
     /** @scenario "A retirement note above the LTS floor is refused by name" */
     it("refuses a drop whose note names a release above the floor, naming both", () => {
-      const sql = '-- contract: retired in 3.21.0\nALTER TABLE "P" DROP COLUMN "old";';
+      const sql =
+        '-- contract: retired in 3.21.0\n-- archive: none (empty)\nALTER TABLE "P" DROP COLUMN "old";';
       const findings = scan(sql);
       expect(findings.map((finding) => finding.rule)).toEqual(["retirement-note-above-floor"]);
       expect(findings[0]?.problem).toContain("3.21.0");
       expect(findings[0]?.problem).toContain(FIXTURE_FLOOR);
       expect(findings[0]?.fix).toContain("lts-floor.json names 3.21.0 or later");
-      expect(rules('-- contract: retired in soon\nDROP TABLE "T";')).toEqual([
-        "retirement-note-above-floor",
-      ]);
+      expect(
+        rules('-- contract: retired in soon\n-- archive: none (empty)\nDROP TABLE "T";'),
+      ).toEqual(["retirement-note-above-floor"]);
     });
 
     /** @scenario "A retirement note at or below the LTS floor is accepted" */
     it("accepts a drop whose note names the floor itself or an older release", () => {
-      const drop = 'ALTER TABLE "P" DROP COLUMN "old";';
+      const drop = '-- archive: none (empty)\nALTER TABLE "P" DROP COLUMN "old";';
       expect(rules(`-- contract: retired in 3.20.1\n${drop}`)).toEqual([]);
       expect(rules(`-- contract: retired in v3.19.9\n${drop}`)).toEqual([]);
       expect(rules(`-- contract: retired in 2.99.0\n${drop}`)).toEqual([]);

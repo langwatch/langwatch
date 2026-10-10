@@ -103,7 +103,7 @@ export function AmbientGround({
       {live && colorMode !== "dark" ? (
         <div
           className="lw-ambient-ground-arrive"
-          style={{ position: "absolute", inset: 0, opacity: 0.95 }}
+          style={{ position: "absolute", inset: 0, opacity: 0.4 }}
         >
           <MeshGradient
             colors={MESH_COLORS}

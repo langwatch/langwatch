@@ -18,6 +18,7 @@ const project: ProjectIdentity = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 const keyCaller: LangyKeyCaller = { actor: { type: "user", id: "user-1" }, projectId: "project-1" };

@@ -8,7 +8,7 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { AuthorizedClickHouse, setWindowedReadMetrics } from "@langwatch/clickhouse-client";
-import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
@@ -35,8 +35,8 @@ setWindowedReadMetrics(windowedReadMetrics);
 function readsOver(client: TraceClickHouseWriteClient): AuthorizedClickHouse {
   return new AuthorizedClickHouse({
     resolveClient: async () =>
-      clickHouseClientDouble({
-        query: async ({ sql, params }: { sql: string; params: Record<string, unknown> }) => {
+      clickHouseQueryClientDouble({
+        query: async ({ sql, params = {} }: { sql: string; params?: Record<string, unknown> }) => {
           const result = await client.query({
             query: sql,
             query_params: params,

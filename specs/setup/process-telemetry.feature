@@ -110,6 +110,14 @@ Feature: One OpenTelemetry setup every process uses
       When its configuration is parsed
       Then the endpoint is treated as unconfigured, not refused
 
+  Rule: A process profiles only when a Pyroscope address is configured
+
+    @unit
+    Scenario: A Pyroscope address reaches the telemetry settings
+      Given a process with PYROSCOPE_SERVER_ADDRESS set, or set blank
+      When its configuration is parsed
+      Then the address is carried to the telemetry settings, and a blank value carries none
+
   Rule: The collector's credential is a secret, never a config field
 
     @unit

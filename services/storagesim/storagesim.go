@@ -102,6 +102,7 @@ type Server struct {
 	console  http.Handler
 	log      *requestLog
 	requests atomic.Uint64
+	fault    forcedError
 }
 
 // meta is what S3 answers about an object beyond its bytes.
@@ -226,6 +227,10 @@ func (s *Server) serveObject(x exchange, obj object) {
 		return
 	}
 	var e *s3Error
+	if status := int(s.fault.status.Load()); status != 0 && (r.Method == http.MethodPut || r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		x.fail(obj.fail(status, "InternalError", "storagesim: forced error"))
+		return
+	}
 	switch r.Method {
 	case http.MethodPut:
 		e = s.putObject(w, r, obj)

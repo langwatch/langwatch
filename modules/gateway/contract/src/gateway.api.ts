@@ -782,49 +782,6 @@ export interface GatewayApi extends GatewayInternalProtocol {
   rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualKey>;
   revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 
-  /**
-   * Ends a managed key for the feature that owns it; customer-facing revocation
-   * refuses one. A key already gone is left alone, so this is safe to repeat,
-   * which is what makes revoking a license retryable.
-   */
-  revokeManagedInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    actorId: string;
-  }): Promise<void>;
-  /**
-   * Tells every gateway to resolve a managed key again, unchanged, through the
-   * change feed each already polls — for cached state outside the key row,
-   * such as the install a license is bound to.
-   */
-  invalidateManagedInternal(input: { virtualKeyId: string; organizationId: string }): Promise<void>;
-  /**
-   * The platform services a CONNECT key may serve, replaced whole; empty serves none.
-   * Only the feature holding the license gate writes it, never a transport.
-   */
-  setManagedKeyConnectServicesInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    services: readonly string[];
-  }): Promise<void>;
-  /**
-   * The license a CONNECT key serves: the registry hash of its token, the bound
-   * install and its end. Written by licensing at activation and on every sync.
-   */
-  setManagedKeyLicenseInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    tokenHash: string;
-    instanceId: string | null;
-    expiresAt: Instant | null;
-  }): Promise<void>;
-  /**
-   * Where one organization's gateway reaches LangWatch-hosted models, replaced whole.
-   * Only licensing writes it, and it clears it on every change of license, service or Connect.
-   */
-  setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void>;
-  /** Drops the organization's hosted provider slot. Safe to repeat. */
-  clearConnectUpstreamInternal(input: { organizationId: string }): Promise<void>;
   disableVirtualKey(input: GatewayVirtualKeyDisableCommand): Promise<GatewayVirtualKeyRecord>;
   enableVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 

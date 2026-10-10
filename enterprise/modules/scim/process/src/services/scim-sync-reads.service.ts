@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
-  ScimCapabilityUnavailableError,
   type ScimSyncActivityEntry,
   type ScimSyncState,
 } from "@langwatch/enterprise-scim-contract";
@@ -15,14 +14,14 @@ import type { ScimSyncReadRepository } from "../repositories/scim-sync.repositor
 export class ScimSyncReadsService {
   static create(deps: {
     syncs: ScimSyncReadRepository;
-    activity: ScimSyncActivityRepository | null;
+    activity: ScimSyncActivityRepository;
   }): ScimSyncReadsService {
     return new ScimSyncReadsService(deps.syncs, deps.activity);
   }
 
   private constructor(
     private readonly syncs: ScimSyncReadRepository,
-    private readonly activity: ScimSyncActivityRepository | null,
+    private readonly activity: ScimSyncActivityRepository,
   ) {}
 
   /** Newest first. Empty where the organization has never synced. */
@@ -62,15 +61,11 @@ export class ScimSyncReadsService {
     return this.syncs.findByConnectionForOperator(input);
   }
 
-  /** Refused by name where this service was built over no sync log: an empty log would read
-   *  as a quiet directory. */
   async findActivity(input: {
     organizationId: string;
     connectionId: string;
     limit: number;
   }): Promise<ScimSyncActivityEntry[]> {
-    const activity = this.activity;
-    if (!activity) throw new ScimCapabilityUnavailableError("SCIM directory activity");
-    return [...(await activity.findActivity(input))];
+    return [...(await this.activity.findActivity(input))];
   }
 }

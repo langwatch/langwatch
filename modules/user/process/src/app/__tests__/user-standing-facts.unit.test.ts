@@ -72,8 +72,8 @@ function lifecycleLog() {
     recordUserDeactivated: append("deactivated"),
     recordUserReactivated: append("reactivated"),
   };
-  const eventReadSeat: Pick<EventReadSeat, "getEvents"> = {
-    getEvents: async ({ aggregateId }) =>
+  const eventReadSeat: Pick<EventReadSeat, "findAggregateEvents"> = {
+    findAggregateEvents: async ({ aggregateId }) =>
       facts.filter(({ data }) => data.userId === aggregateId).map(standingEventOf),
   };
   return { senders: logged, facts, eventReadSeat };

@@ -12,12 +12,13 @@ import {
   relayPayloadCaps,
 } from "@langwatch/agent-contract";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
   type RestProtocolProducer,
   type RestProtocolRefusal,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
@@ -34,7 +35,7 @@ import {
 import { describeOutputFailure } from "../rules/connected-agent-output.rules.ts";
 
 /** The caller the project door admitted, and the instance token a poll or frames post carries. */
-export const agentConnectCredentials = defineRestMiddleware(
+export const agentConnectCredentials = defineMiddlewareContext(
   "agentConnectCredentials",
   agentConnectCredentialsSchema,
 );
@@ -93,7 +94,11 @@ function frameRefusal(refusalOf: (failure: Error) => AgentConnectRefusal): RestP
 export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<AgentApi>;
+  router: () => RestTransportDeclaration<
+    AgentApi,
+    RestDoorCredential,
+    typeof agentConnectCredentials
+  >;
 }> {
   const relayCaps = relayPayloadCaps(relayMaxPayloadMb);
 
@@ -125,7 +130,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
           "Returns a registered frame and instance token, or refuses at the status of the reason.",
         responses: documentedResponses({ 200: agentConnectRegisterOutputSchema }),
       })
-      .withMiddleware(agentConnectCredentials)
+      .withMiddlewareContext(agentConnectCredentials)
       .handle(async ({ app, input, response }, credentials) =>
         protocolAnswer({
           endpoint: "POST /connect/register",
@@ -148,7 +153,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
         summary: "Wait for call and cancel frames while refreshing this instance's presence",
         responses: documentedResponses({ 200: agentConnectPollOutputSchema }),
       })
-      .withMiddleware(agentConnectCredentials)
+      .withMiddlewareContext(agentConnectCredentials)
       .handle(async ({ app, input, signal, response }, credentials) =>
         protocolAnswer({
           endpoint: "GET /connect/poll",
@@ -179,7 +184,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
         summary: "Accept this instance's acknowledgements, results and deregistration",
         responses: documentedResponses({ 200: agentConnectFramesOutputSchema }),
       })
-      .withMiddleware(agentConnectCredentials)
+      .withMiddlewareContext(agentConnectCredentials)
       .handle(async ({ app, input, response }, credentials) =>
         protocolAnswer({
           endpoint: "POST /connect/frames",

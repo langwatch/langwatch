@@ -19,7 +19,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// The `haven auth` noun: haven signs in to this checkout's own stack through
+// The `haven browser login --as` noun: haven signs in to this checkout's own stack through
 // the app's normal email sign-in and writes a Playwright storage-state file
 // (owner-only). The password never leaves haven, so an agent can hold a
 // signed-in browser without ever seeing it.
@@ -41,7 +41,7 @@ func authSpec() commandSpec {
 	}
 }
 
-// authResult is what `haven auth` reports: never the password.
+// authResult is what `haven browser login --as` reports: never the password.
 type authResult struct {
 	Who   string `json:"who"`
 	Email string `json:"email"`
@@ -51,7 +51,7 @@ type authResult struct {
 
 func runAuth(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) != 1 {
-		return errors.New("usage: haven auth <admin|email> [--out file] — member and viewer logins are listed by `haven seed --json`")
+		return errors.New("usage: haven browser login --as <admin|email> [--out file] — member and viewer logins are listed by `haven db seed --json`")
 	}
 	who := inv.args[0]
 	overlay := telemetryOverlay(d, inv)
@@ -92,7 +92,7 @@ func authParams(d deps, inv invocation) app.UpParams {
 
 // authCredentials is the login for who: the stack's admin, or a seeded login by
 // email, which the seed gives the same dev password. A key the overlay lacks
-// yielded to the developer's .env, as `haven seed` reads it.
+// yielded to the developer's .env, as `haven db seed` reads it.
 func authCredentials(who string, overlay []string) (string, string, error) {
 	value := func(key, fallback string) string {
 		if v := telemetryOverlayValue(overlay, key); v != "" {
@@ -110,7 +110,7 @@ func authCredentials(who string, overlay []string) (string, string, error) {
 	case strings.Contains(who, "@") && !strings.ContainsAny(who, `/\`):
 		return who, password, nil
 	}
-	return "", "", fmt.Errorf("haven auth %q: name admin or a seeded login's email (`haven seed --json` lists them)", who)
+	return "", "", fmt.Errorf("haven browser login --as %q: name admin or a seeded login's email (`haven db seed --json` lists them)", who)
 }
 
 // signInToFile signs in at app's email sign-in and writes the session cookies
@@ -143,7 +143,7 @@ func localApp(appURL string) (*url.URL, error) {
 	}
 	host := u.Hostname()
 	if host != "localhost" && host != "127.0.0.1" && !strings.HasSuffix(host, ".localhost") {
-		return nil, fmt.Errorf("refusing to sign in to %s: haven auth only signs in to a local stack (*.localhost)", host)
+		return nil, fmt.Errorf("refusing to sign in to %s: haven browser login --as only signs in to a local stack (*.localhost)", host)
 	}
 	return u, nil
 }

@@ -60,13 +60,13 @@ const families = [
   experimentWorkbenchRunLegacyRest,
 ].map((family) => family.router() as RestTransportDeclaration<unknown>);
 
-/** The document, with every middleware fact the families name left unanswerable. */
+/** The document, with every middleware context the families name left unanswerable. */
 async function generate(): Promise<Document> {
-  const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
   for (const family of families) {
     for (const route of family.routes) {
-      for (const fact of route.middleware ?? []) {
-        facts.set(fact.name, { middleware: fact, resolve: refuse });
+      for (const declared of route.middleware ?? []) {
+        contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
       }
     }
   }
@@ -77,7 +77,6 @@ async function generate(): Promise<Document> {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -85,7 +84,7 @@ async function generate(): Promise<Document> {
     audit: { record: async () => {} },
     idempotency: refuse,
     rateLimiter: { check: refuse },
-    facts: [...facts.values()] as never,
+    middlewareContext: [...contexts.values()] as never,
     entitlements: { holds: refuse },
   });
   for (const family of families) rest.mount(family, refuse);

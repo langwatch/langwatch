@@ -1710,8 +1710,8 @@ func (state *bootState) teardownOnceOnly() {
 	}
 	if state.cfg.Keep {
 		if state.cfg.UseHaven {
-			state.logf("teardown: -keep set, leaving the stacks up - `haven destroy %s` when you are done",
-				strings.Join(state.havenSlugs, "` and `haven destroy "))
+			state.logf("teardown: -keep set, leaving the stacks up - `haven down --destroy --stack %s` when you are done",
+				strings.Join(state.havenSlugs, "` and `haven down --destroy --stack "))
 			return
 		}
 		state.logf("teardown: -keep set, leaving infra, databases and worktree in place")

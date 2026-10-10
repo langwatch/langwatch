@@ -111,6 +111,8 @@ func (s *Server) consoleAPI(urlPath string) (http.HandlerFunc, bool) {
 		return s.handleRequests, true
 	case "/_sim/api/presign":
 		return s.handlePresign, true
+	case "/_sim/api/settings":
+		return s.handleSettings, true
 	case "/_sim/api/seed":
 		return s.handleSeed, true
 	}

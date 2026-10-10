@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
@@ -224,11 +225,8 @@ export function EligibleModelProvidersPreview({
           No model providers visible at this scope.
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Ask an admin to add one at{" "}
-          <Text as="span" fontFamily="mono">
-            /settings/model-providers
-          </Text>
-          . The key cannot route requests until at least one provider is in scope.
+          Ask an admin to add one at <InlineCode>/settings/model-providers</InlineCode>. The key
+          cannot route requests until at least one provider is in scope.
         </Text>
       </VStack>
     );

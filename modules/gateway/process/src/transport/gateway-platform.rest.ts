@@ -2,7 +2,7 @@ import {
   apiErrorSchema,
   canonicalBaseResponses,
   canonicalConflictResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   RequestValidationError,
@@ -71,16 +71,16 @@ const canonicalGoneResponses = {
 } as const;
 
 /** The credential this request arrived on, as the project door resolved it. */
-export const gatewayRestCredential = defineRestMiddleware(
+export const gatewayRestCredential = defineMiddlewareContext(
   "gatewayRestCredential",
   gatewayRequestCredentialSchema,
 );
 
 /** The key an organization-owned route was called with, as the key door resolved it. */
-export const gatewayKeyCaller = defineRestMiddleware("gatewayKeyCaller", gatewayKeyCallerSchema);
+export const gatewayKeyCaller = defineMiddlewareContext("gatewayKeyCaller", gatewayKeyCallerSchema);
 
 /** Who a virtual key route was called by, as the key door resolved it. */
-export const gatewayVirtualKeyCaller = defineRestMiddleware(
+export const gatewayVirtualKeyCaller = defineMiddlewareContext(
   "gatewayVirtualKeyCaller",
   gatewayVirtualKeyCallerSchema,
 );
@@ -261,7 +261,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Returns the virtual keys the caller can see. A credential that names a project (a project key, or an API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole organization. An API key that names no project sees every key in its organization it holds virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before the walk is done.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const authorized = await app.getVirtualKeyCaller({ caller });
     const rows = await app.getVirtualKeyPage({
@@ -311,7 +311,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the project the caller names; an API key that names no project must send scopes. Org- and team-scoped keys require virtualKeys:manage at each requested scope.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { actor, actorUserId, organizationId, projectId } = await app.getVirtualKeyCaller({
       caller,
@@ -351,7 +351,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withPermission("virtualKeys:view", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({ summary: "Get virtual key", responses: canonicalBaseResponses })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const authorized = await app.getVirtualKeyCaller({ caller });
     const vk = await app.getVirtualKeyForCaller({
@@ -374,7 +374,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Returns 412 spend_source_unavailable on deploys without a ClickHouse spend source.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const authorized = await app.getVirtualKeyCaller({ caller });
     const { fromDate, toDate } = resolveVirtualKeySpendWindow({
@@ -411,7 +411,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Partial update: send only the fields you want to change.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { actor, actorUserId, organizationId, projectId } = await app.getVirtualKeyCaller({
       caller,
@@ -457,7 +457,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Mints a fresh secret for an existing VK. The old secret remains valid for 24h.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
@@ -486,7 +486,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Reversible stop: requests on the key are rejected with virtual_key_disabled until it is enabled again. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
@@ -515,7 +515,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Reverses disable: the key returns to active exactly as it was. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
@@ -539,7 +539,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Marks the virtual key as revoked and archives its own budgets. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayVirtualKeyCaller)
+  .withMiddlewareContext(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
@@ -571,7 +571,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Returns the non-archived budgets in the caller's organization across all seven scope types, with live spent_usd from the spend ledger. Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayKeyCaller)
+  .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId } = await app.getKeyCaller({ caller });
     const { budgets, spendAvailable, scopeReach } = await app.listBudgetPageWithHealth({
@@ -609,7 +609,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayKeyCaller)
+  .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId } = await app.getKeyCaller({ caller });
     return liveBudgetAnswer({ app, id: input.id, organizationId });
@@ -628,7 +628,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Creates an organization-owned budget across all seven scope types. Spend is counted from the moment the budget is created, so spend earlier in the current window is not included. Requires gatewayBudgets:create at the organization; a project key or an organization key may call it.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .withMiddleware(gatewayKeyCaller)
+  .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.createBudget({
@@ -672,7 +672,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the organization.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayKeyCaller)
+  .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.updateBudget({
@@ -702,7 +702,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires gatewayBudgets:delete at the organization.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayKeyCaller)
+  .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.archiveBudget({ id: input.id, organizationId, actorUserId });
@@ -722,7 +722,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Moves the budget's period boundary to now; recorded spend is never mutated. Requires gatewayBudgets:update at the organization.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayKeyCaller)
+  .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.resetBudget({
@@ -801,7 +801,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Matchers are ANDed across non-null fields; at least one matcher is required.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .withMiddleware(gatewayRestCredential)
+  .withMiddlewareContext(gatewayRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
@@ -833,7 +833,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Partial update. matchers and action REPLACE the stored value when provided.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
+  .withMiddlewareContext(gatewayRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
@@ -865,7 +865,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Soft-delete: sets archivedAt. The rule stops matching new requests.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
+  .withMiddlewareContext(gatewayRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);

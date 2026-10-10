@@ -45,7 +45,7 @@ const SHARED_READS_CACHE_MAX_AGE_MS = 30_000;
 /** Bounds the cache's memory; the oldest entry goes first. */
 const SHARED_READS_CACHE_MAX_ENTRIES = 5_000;
 
-export type AuthorizationServiceDeps = {
+type AuthorizationServiceDeps = {
   authz: Pick<AuthzService, "effectivePermissions">;
   collector: Pick<AuthzCollectorService, "findScopeRef">;
   sharedReads: Pick<AuthzReadRepository, "findLiveSharedReads">;

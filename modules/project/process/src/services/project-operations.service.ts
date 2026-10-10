@@ -4,7 +4,9 @@ import {
   assertNotGovernanceProject,
   ProjectNotFoundError,
   ProjectS3SecretRequiredError,
+  setTraceSharingInputSchema,
   type Project,
+  type SetTraceSharingInput,
   type UpdateProjectInput,
   type ProjectLegacyKeyStatus,
   type AggregateRule,
@@ -99,7 +101,6 @@ export class ProjectOperationsService {
         userLinkTemplate: input.userLinkTemplate,
       }),
       ...(input.teamId !== undefined && { teamId: input.teamId }),
-      traceSharingEnabled: input.traceSharingEnabled,
       presenceEnabled: input.presenceEnabled,
     };
     const settings: ProjectStorageSettings = {
@@ -120,14 +121,16 @@ export class ProjectOperationsService {
       organizationId,
       settings,
     });
-    const updated: Project = { ...written, ...stored };
+    let updated: Project = { ...written, ...stored };
 
-    if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
-      await this.dependencies.lifecycle.traceSharingDisabled({
+    if (input.traceSharingEnabled !== undefined) {
+      await this.setTraceSharing({
         projectId: input.projectId,
-        organizationId,
-        disabledByUserId: by.id,
+        enabled: input.traceSharingEnabled,
+        revokeExistingLinks: true,
+        by,
       });
+      updated = { ...updated, traceSharingEnabled: input.traceSharingEnabled };
     }
     if (input.presenceEnabled !== undefined && input.presenceEnabled !== project.presenceEnabled) {
       await this.dependencies.lifecycle.presenceSettingChanged({
@@ -139,6 +142,30 @@ export class ProjectOperationsService {
     }
 
     return updated;
+  }
+
+  /** A no-op when the switch already reads `enabled`, so a resubmitted form records no second fact. */
+  async setTraceSharing(input: SetTraceSharingInput): Promise<void> {
+    const { projectId, enabled, revokeExistingLinks, by } = setTraceSharingInputSchema.parse(input);
+    const project = await this.dependencies.projects.findWithTeam(projectId);
+    if (!project) throw new ProjectNotFoundError();
+    if (project.traceSharingEnabled === enabled) return;
+
+    const organizationId = project.team.organizationId;
+    await this.dependencies.projects.update({
+      id: projectId,
+      organizationId,
+      data: { traceSharingEnabled: enabled },
+      by: { type: "user", id: by.id },
+    });
+    if (!enabled) {
+      await this.dependencies.lifecycle.traceSharingDisabled({
+        projectId,
+        organizationId,
+        disabledByUserId: by.id,
+        revokeExistingLinks,
+      });
+    }
   }
 
   async archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }> {

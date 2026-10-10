@@ -1,3 +1,4 @@
+import { CommandBarFooter, CommandBarInput } from "@langwatch/design-system/app-shell";
 import { Box } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useTheme } from "next-themes";
@@ -13,6 +14,7 @@ import { useCommandBarKeyboard } from "../../behavior/use-command-bar-keyboard.t
 import { useCommandSearch } from "../../behavior/use-command-search.ts";
 import { useEasterEggEffects } from "../../behavior/use-easter-egg-effects.ts";
 import { useFilteredCommands } from "../../behavior/use-filtered-commands.ts";
+import { MIN_SEARCH_QUERY_LENGTH } from "../../model/command-bar-constants.ts";
 import type { Command } from "../../model/command-bar-types.ts";
 import { findEasterEgg, type EasterEgg } from "../../model/command-easter-eggs.ts";
 import type { ListItem } from "../../model/command-icon-info.ts";
@@ -28,9 +30,7 @@ import {
   type OpenDrawerByToken,
 } from "../../model/command-select-handlers.ts";
 import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode.tsx";
-import { CommandBarFooter } from "../elements/command-bar-footer.tsx";
 import { HintsSection } from "../elements/command-bar-hints.tsx";
-import { CommandBarInput } from "../elements/command-bar-input.tsx";
 import { CommandBarResults } from "./command-bar-results.tsx";
 
 /** Never collapse the results to a sliver, however little room is left. */
@@ -561,7 +561,7 @@ export function CommandPalette({
         query={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        isLoading={searchLoading}
+        isSearching={searchLoading && query.length >= MIN_SEARCH_QUERY_LENGTH}
         placeholder={placeholder}
         onFocus={onFocus}
         onBlur={onBlur}

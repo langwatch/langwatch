@@ -8,6 +8,7 @@ import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, statusHairline } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
+import { toastGlass } from "./status-glass.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -34,6 +35,18 @@ const toastPanel = {
   "--toast-trigger-bg": "colors.bg.muted",
   "--toast-border-color": "colors.border.muted",
 } as const;
+
+/** A light-mode solid badge is quiet glass on its palette's solid colour: a fine rim, a light. */
+const badgeGlass = {
+  color: "white",
+  bg: "colorPalette.solid",
+  backgroundImage:
+    "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)",
+  boxShadow: [
+    "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-color-palette-700) 35%, transparent)",
+    "inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+  ].join(", "),
+};
 
 export const designSystemConfig = defineConfig({
   globalCss: {
@@ -71,8 +84,8 @@ export const designSystemConfig = defineConfig({
     keyframes: {
       // A toast's remaining lifetime, drained left to right; see toaster.tsx.
       "toast-drain": {
-        from: { transform: "scaleX(1)" },
-        to: { transform: "scaleX(0)" },
+        from: { clipPath: "inset(0 0 0 0)" },
+        to: { clipPath: "inset(0 100% 0 0)" },
       },
       // A toast card rising into the stack and sinking out of it. It runs on
       // `transform`, so it composes with the stack's own translate and scale.
@@ -81,10 +94,12 @@ export const designSystemConfig = defineConfig({
         from: { transform: "translateY(24px)", opacity: 0, filter: "blur(4px)" },
         to: { transform: "none", opacity: 1, filter: "none" },
       },
+      // A dismissed card sinks into the page like going under water: it swells, blurs and fades.
       "toast-sink": {
         from: { transform: "none", opacity: 1, filter: "none" },
-        to: { transform: "translateY(16px) scale(0.96)", opacity: 0, filter: "blur(2px)" },
+        to: { transform: "scale(1.04)", opacity: 0, filter: "blur(6px)" },
       },
+      "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
     tokens: {
       fonts: {
@@ -763,6 +778,7 @@ export const designSystemConfig = defineConfig({
           minWidth: 0,
           overflow: "hidden",
         },
+        variants: { variant: { solid: { _light: badgeGlass } } },
       }),
     },
     slotRecipes: {
@@ -1127,10 +1143,9 @@ export const designSystemConfig = defineConfig({
             textStyle: "md",
             fontWeight: "500",
           },
+          // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
           content: {
-            background:
-              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 60%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
+            background: "bg.panel",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1272,7 +1287,8 @@ export const designSystemConfig = defineConfig({
             // loses `data-fan`) lets Chakra's full list show.
             "[data-fan] &": {
               "&[data-stack]": {
-                translate: "var(--x) calc(var(--lift) * var(--index) * 32px)",
+                translate: "var(--x) var(--toast-shift)",
+                "--toast-shift": "calc(var(--lift) * var(--index) * 32px)",
                 scale: "calc(1 - var(--index) * 0.03)",
                 height: "var(--first-height)",
                 opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
@@ -1284,21 +1300,36 @@ export const designSystemConfig = defineConfig({
             // card measured sizes every card behind the front, so a back card
             // measured at its 0.85 would shrink them all. It scales on mount.
             "&:not([data-mounted])": { scale: "1" },
-            // Cards glide when the stack fans out, collapses or moves up.
-            transitionProperty: "translate, scale, opacity, height, box-shadow",
+            // How far the card sits from its slot; light glass reads its tint from it.
+            "--toast-shift": "var(--y)",
+            // Cards glide when the stack fans out, collapses or moves up, and their tint with them.
+            transitionProperty:
+              "translate, scale, opacity, height, box-shadow, background-position",
             transitionDuration: "450ms",
             transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
             "&[data-state=open]": {
               animation: "toast-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
             },
             "&[data-state=closed]": {
-              animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
+              animation: "toast-sink 300ms cubic-bezier(0.4, 0, 0.2, 1) both",
             },
-            _motionReduce: { transition: "none", animation: "none" },
-            // A hairline around a solid fill reads as an outline; the fill is
-            // already the edge.
-            "&:is([data-type=error], [data-type=warning], [data-type=success])": {
-              borderColor: "transparent",
+            _motionReduce: {
+              transition: "none",
+              animation: "none",
+              "&[data-state=closed]": { animation: "toast-fade 200ms linear both" },
+            },
+            // Light mode: status toasts are deep tinted glass with white text.
+            _light: {
+              "&:is([data-type=error], [data-type=warning], [data-type=success], [data-type=info])":
+                {
+                  color: "white",
+                  "--toast-trigger-bg": "rgba(255, 255, 255, 0.14)",
+                  "--toast-border-color": "rgba(255, 255, 255, 0.26)",
+                },
+              "&[data-type=error]": toastGlass("red"),
+              "&[data-type=warning]": toastGlass("orange"),
+              "&[data-type=success]": toastGlass("green"),
+              "&[data-type=info]": toastGlass("blue"),
             },
             _dark: {
               ...toastPanel,

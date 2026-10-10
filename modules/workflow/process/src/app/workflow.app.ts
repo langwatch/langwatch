@@ -72,6 +72,7 @@ import {
   type WorkflowServerConfig,
   type WorkflowUsageCount,
   LlmModelNotSetError,
+  WorkflowModelProviderUnavailableError,
   WorkflowOptimizationRemovedError,
   WorkflowStudioEventInvalidError,
   workflowStudioRestEventSchema,
@@ -1445,7 +1446,11 @@ export interface WorkflowAgentMapping {
 
 /** Matched on the handled CODE: the dataset module's own class is not this module's to name. */
 function isCallerFixable(error: unknown): boolean {
-  if (error instanceof LlmModelNotSetError || error instanceof ApiKeyPermissionDeniedError) {
+  if (
+    error instanceof LlmModelNotSetError ||
+    error instanceof WorkflowModelProviderUnavailableError ||
+    error instanceof ApiKeyPermissionDeniedError
+  ) {
     return true;
   }
   return (

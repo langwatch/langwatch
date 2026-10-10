@@ -13,10 +13,10 @@ import { z } from "zod";
 import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   bindTrpcHeader,
-  browserSessionFact,
-  callerAddressFact,
+  browserSessionContext,
+  callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcRuntime,
   defineTrpcRouter,
@@ -230,7 +230,7 @@ describe("a mounted contract procedure", () => {
     });
 
     /** @scenario "A tRPC call runs one execution path" */
-    it("hands the handler input, app, actor, scope and signal, and keeps facts out of input", async () => {
+    it("hands the handler input, app, actor, scope and signal, and keeps middleware context out of input", async () => {
       const { runtime } = harness();
       const seen: Record<string, unknown>[] = [];
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
@@ -607,8 +607,8 @@ describe("the tRPC error formatter", () => {
 
 // ───────────────────────────────────────────────────────────────────────────── The four
 // capabilities the declared path grew for the surfaces that could not state themselves honestly: a
-// procedure with no caller, the facts a mount resolves, and an AND-composed permission. Spec:
-// packages/api/specs/trpc-framework.feature.
+// procedure with no caller, the middleware context a mount resolves, and an AND-composed
+// permission. Spec: packages/api/specs/trpc-framework.feature.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AccountApi {
@@ -813,19 +813,19 @@ describe("a procedure that runs with no caller", () => {
   });
 });
 
-describe("a procedure that declares a fact", () => {
+describe("a procedure that declares middleware context", () => {
   const sessionRouter = () =>
     accountRouter((builder) =>
       builder
         .procedure("register")
-        .withFacts(callerAddressFact)
+        .withMiddlewareContext(callerAddressContext)
         .withAccess(publicRoute({ reason: "signing up predates the account it creates" }))
         .handle((async (_args: never, address: string | null) => ({
           id: address ?? "none",
         })) as never)
 
         .procedure("changePassword")
-        .withFacts(browserSessionFact, callerAddressFact)
+        .withMiddlewareContext(browserSessionContext, callerAddressContext)
         .withPermission("annotations:update")
         .handle((async (_args: never, session: string | null, address: string | null) => ({
           done: session === "session-1" && address === "203.0.113.7",
@@ -837,16 +837,19 @@ describe("a procedure that declares a fact", () => {
     );
 
   describe("given the mount bound one value for each", () => {
-    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    /** @scenario "A tRPC procedure reads middleware context its mount resolved, never the request" */
     it("hands them to the handler after its arguments, in the order it declared them", async () => {
       const harness = accountHarness();
 
       const caller = harness
         .runtime(accountRoot.procedure)
         .mount(sessionRouter(), () => accountApp, {
-          facts: [
-            bindTrpcFact(browserSessionFact, (ctx: AccountContext) => ctx.sessionId ?? null),
-            bindTrpcHeader(callerAddressFact, "x-forwarded-for"),
+          middlewareContext: [
+            bindTrpcMiddlewareContext(
+              browserSessionContext,
+              (ctx: AccountContext) => ctx.sessionId ?? null,
+            ),
+            bindTrpcHeader(callerAddressContext, "x-forwarded-for"),
           ],
         })
         .createCaller({
@@ -860,16 +863,16 @@ describe("a procedure that declares a fact", () => {
       });
     });
 
-    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    /** @scenario "A tRPC procedure reads middleware context its mount resolved, never the request" */
     it("reads the address off the header the mount named, for an anonymous procedure too", async () => {
       const harness = accountHarness();
 
       const caller = harness
         .runtime(accountRoot.procedure)
         .mount(sessionRouter(), () => accountApp, {
-          facts: [
-            bindTrpcFact(browserSessionFact, () => null),
-            bindTrpcHeader(callerAddressFact, "x-forwarded-for"),
+          middlewareContext: [
+            bindTrpcMiddlewareContext(browserSessionContext, () => null),
+            bindTrpcHeader(callerAddressContext, "x-forwarded-for"),
           ],
         })
         .createCaller({ actor: null, req: { headers: { "x-forwarded-for": "198.51.100.4" } } });
@@ -881,16 +884,16 @@ describe("a procedure that declares a fact", () => {
   });
 
   describe("given the mount bound no value for one of them", () => {
-    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
-    it("refuses the mount, naming the fact and the procedure", () => {
+    /** @scenario "A tRPC procedure reads middleware context its mount resolved, never the request" */
+    it("refuses the mount, naming the middleware context and the procedure", () => {
       const harness = accountHarness();
 
       expect(() =>
         harness.runtime(accountRoot.procedure).mount(sessionRouter(), () => accountApp, {
-          facts: [bindTrpcFact(browserSessionFact, () => null)],
+          middlewareContext: [bindTrpcMiddlewareContext(browserSessionContext, () => null)],
         }),
       ).toThrow(
-        /account\.register declares the fact "callerAddress", and this mount bound no value for it/,
+        /account\.register declares the middleware context "callerAddress", and this mount bound no value for it/,
       );
     });
   });

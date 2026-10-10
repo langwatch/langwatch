@@ -70,7 +70,8 @@ export const CopyExperimentDialog = ({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content bg="bg" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Content onClick={(e) => e.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Replicate Experiment</Dialog.Title>
         </Dialog.Header>
@@ -125,11 +126,11 @@ export const CopyExperimentDialog = ({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={handleCopy}
             loading={isCopying}
             disabled={

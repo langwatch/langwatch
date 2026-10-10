@@ -26,3 +26,11 @@ export {
   treeStepIds,
 } from "./stamp.ts";
 export type { DeclaredStepSource, ReleaseTreeSteps } from "./stamp.ts";
+export {
+  DEPRECATIONS_FILE,
+  deprecationSchema,
+  deprecationsSchema,
+  loadDeprecations,
+  parseDeprecations,
+} from "./deprecation.ts";
+export type { Deprecation } from "./deprecation.ts";

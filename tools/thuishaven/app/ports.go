@@ -18,7 +18,7 @@ type Proxy interface {
 	Running() bool
 	// Installed reports whether a real portless binary is resolvable (a global
 	// install, a project-local one, or PORTLESS_BIN) rather than the on-demand
-	// `npx` fallback — so `haven setup` can tell the user to install it once.
+	// `npx` fallback — so `haven self setup` can tell the user to install it once.
 	Installed() bool
 	// EnsureReady boots the proxy if it is not already running and trusts its CA
 	// on first run, so `haven up` self-bootstraps with no setup command at all.
@@ -58,7 +58,7 @@ type Store interface {
 	ReadSelection(worktreeDir string) (domain.Selection, bool)
 	WriteSelection(worktreeDir string, sel domain.Selection) error
 	// The machine-wide "never ask me about this prerequisite again" set that
-	// `haven install` records. Machine-wide, not worktree-local, because the
+	// `haven self install` records. Machine-wide, not worktree-local, because the
 	// prerequisites are properties of the machine: a developer who declined
 	// the ClickHouse client once should not be asked by the next checkout.
 	// An absent or unreadable file is an empty set, never an error — a
@@ -130,7 +130,7 @@ type Store interface {
 // AgentHookSettings writes another tool's configuration, which is why it is not on
 // Store: everything Store persists is haven's OWN state — stacks, slugs,
 // selections, the daemon record, heavy-run slots. This edits a file in the
-// developer's repo that belongs to an agent client, and only `haven setup` uses it.
+// developer's repo that belongs to an agent client, and only `haven self setup` uses it.
 type AgentHookSettings interface {
 	// EnsureHook registers command as a PreToolUse hook in repoRoot's
 	// local agent configuration — untracked and per worktree. It merges: an
@@ -182,6 +182,9 @@ type Child struct {
 	// size-capped with one rotated generation — whether the stack runs attached
 	// or detached. It is what `haven logs` reads (ADR-064: logs are a tap).
 	LogPath string
+	// SplitLog captures a Node host lane per application (ui, api, worker) beside
+	// LogPath instead of into it, so logs list what a developer thinks about.
+	SplitLog bool
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
@@ -282,7 +285,7 @@ type ClickHouse interface {
 	HTTPPort() int
 	// Running reports whether the managed server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
@@ -307,7 +310,7 @@ type Postgres interface {
 	Port() int
 	// Running reports whether the server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
@@ -327,7 +330,7 @@ type Redis interface {
 	Port() int
 	// Running reports whether the server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// FlushDB empties one logical database (FLUSHDB, never FLUSHALL).
 	FlushDB(ctx context.Context, db int) error
@@ -349,7 +352,7 @@ type Observability interface {
 	Stop(ctx context.Context) error
 	// IsRunning reports whether the stack is answering right now, without starting it.
 	IsRunning(ctx context.Context) bool
-	// Health returns a one-line status for `haven doctor`.
+	// Health returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Endpoints reports the stack's ports without touching the runtime.
 	Endpoints() domain.ObservabilityEndpoints

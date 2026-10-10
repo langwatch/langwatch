@@ -79,7 +79,7 @@ interface EventLogRow {
  * Rows to records, normalizing the payload so numeric fields stay numeric
  * whichever way ClickHouse serialized the JSON column.
  */
-function mapEventLogRows({
+export function mapEventLogRows({
   rows,
   tenantId,
   aggregateType,

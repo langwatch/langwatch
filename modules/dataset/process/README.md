@@ -388,7 +388,7 @@ Answers at `/api/dataset/imports`, `/api/v1/dataset/imports`; also, undocumented
 
 ```typescript
 type Body = z.infer<typeof datasetRestImportSchema>; // ../contract/src/dataset-rest.schemas.ts:90
-// Response: datasetImportStartedSchema, ../contract/src/dataset.ts:419
+// Response: datasetImportStartedSchema, ../contract/src/dataset.ts:434
 interface Response {
   datasetId: string;
   slug: string;
@@ -411,7 +411,7 @@ type Body = BodyDatasetAppendImport;
 type BodyDatasetAppendImport = {
   storedObjectId: string;
 };
-// Response: datasetImportAppendedSchema, ../contract/src/dataset.ts:436
+// Response: datasetImportAppendedSchema, ../contract/src/dataset.ts:451
 interface Response {
   datasetId: string;
   recordsCreated: number;
@@ -442,7 +442,7 @@ Answers at `/api/dataset/:slugOrId/upload`, `/api/v1/dataset/:slugOrId/upload`; 
 ```typescript
 type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:75
 // Multipart: { fields: datasetRestNoUploadFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:295)
-type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:436
+type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:451
 ```
 
 #### `POST /attachments` · `postApiDatasetAttachments`
@@ -459,7 +459,7 @@ interface Query {
   projectId: string;
 }
 // Multipart: { fields: datasetRestAttachmentFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:318)
-// Response: storedDatasetAttachmentSchema, ../contract/src/dataset.ts:363
+// Response: storedDatasetAttachmentSchema, ../contract/src/dataset.ts:378
 type Response = ResponseDatasetAttachment;
 type ResponseDatasetAttachment = {
   url: string;
@@ -484,7 +484,7 @@ interface Body {
   mediaType: string;
   byteLength: number;
 }
-// Response: datasetAttachmentUploadSchema, ../contract/src/dataset.ts:389
+// Response: datasetAttachmentUploadSchema, ../contract/src/dataset.ts:404
 interface Response {
   objectId: string;
   uploadUrl: string;
@@ -650,7 +650,7 @@ interface Input {
   recordId: string;
   updatedRecord: Record<string, unknown>;
 }
-// Output: datasetRecordMutationResultSchema, ../contract/src/dataset.ts:228
+// Output: datasetRecordMutationResultSchema, ../contract/src/dataset.ts:243
 interface Output {
   record: {
     id: string;
@@ -705,7 +705,7 @@ interface Output {
 
 ### `dataset`
 
-Contract `../contract/src/dataset.trpc.ts:39`, router `src/transport/dataset.trpc.ts:11`.
+Contract `../contract/src/dataset.trpc.ts:40`, router `src/transport/dataset.trpc.ts:11`.
 
 | Procedure                        | Kind     | Gate                         | Input                                      | Output                          |
 | -------------------------------- | -------- | ---------------------------- | ------------------------------------------ | ------------------------------- |
@@ -725,8 +725,8 @@ Contract `../contract/src/dataset.trpc.ts:39`, router `src/transport/dataset.trp
 
 ```typescript
 // dataset.upsert
-// Input: z.object({ ...datasetApiUpsertBaseInputSchema.shape, ...datasetApiUpsertTargetInputSchema… (inline, ../contract/src/dataset.trpc.ts:43)
-type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:145
+// Input: z.object({ ...datasetApiUpsertBaseInputSchema.shape, ...datasetApiUpsertTargetInputSchema… (inline, ../contract/src/dataset.trpc.ts:44)
+type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:160
 
 // dataset.validateDatasetName
 // Input: datasetApiValidateNameInputSchema, ../contract/src/dataset.schemas.ts:39
@@ -735,7 +735,7 @@ interface Input {
   proposedName: string;
   excludeDatasetId?: string;
 }
-// Output: datasetNameResultSchema, ../contract/src/dataset.ts:254
+// Output: datasetNameResultSchema, ../contract/src/dataset.ts:269
 interface Output {
   available: boolean;
   slug: string;
@@ -747,7 +747,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: z.array(datasetSummaryWireSchema) (inline, ../contract/src/dataset.trpc.ts:58)
+// Output: z.array(datasetSummaryWireSchema) (inline, ../contract/src/dataset.trpc.ts:59)
 
 // dataset.getById
 // Input: datasetApiDatasetInputSchema, ../contract/src/dataset.schemas.ts:49
@@ -755,7 +755,7 @@ interface Input {
   projectId: string;
   datasetId: string;
 }
-// Output: datasetWireSchema.nullable() (inline, ../contract/src/dataset.trpc.ts:63)
+// Output: datasetWireSchema.nullable() (inline, ../contract/src/dataset.trpc.ts:64)
 
 // dataset.deleteById
 // Input: datasetApiDeleteInputSchema, ../contract/src/dataset.schemas.ts:54
@@ -764,7 +764,7 @@ interface Input {
   datasetId: string;
   undo?: boolean;
 }
-// Output: datasetDeletedSchema, ../contract/src/dataset.trpc.ts:37
+// Output: datasetDeletedSchema, ../contract/src/dataset.trpc.ts:38
 interface Output {
   success: true;
 }
@@ -782,7 +782,7 @@ interface Input {
     mapping: Record<string, unknown>;
   };
 }
-type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:145
+type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:160
 
 // dataset.findNextName
 // Input: datasetApiFindNextNameInputSchema, ../contract/src/dataset.schemas.ts:76
@@ -790,7 +790,7 @@ interface Input {
   projectId: string;
   proposedName: string;
 }
-// Output: inline, ../contract/src/dataset.trpc.ts:78
+// Output: inline, ../contract/src/dataset.trpc.ts:79
 type Output = string;
 
 // dataset.copy
@@ -800,20 +800,20 @@ interface Input {
   sourceProjectId: string;
   projectId: string;
 }
-type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:145
+type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:160
 
 // dataset.createFromStoredObject
-type Input = z.infer<typeof createDatasetFromStoredObjectInputSchema>; // ../contract/src/dataset.ts:409
-type Output = z.infer<typeof datasetImportStartedSchema>; // ../contract/src/dataset.ts:419
+type Input = z.infer<typeof createDatasetFromStoredObjectInputSchema>; // ../contract/src/dataset.ts:424
+type Output = z.infer<typeof datasetImportStartedSchema>; // ../contract/src/dataset.ts:434
 
 // dataset.appendStoredObject
-// Input: appendStoredObjectToDatasetInputSchema, ../contract/src/dataset.ts:427
+// Input: appendStoredObjectToDatasetInputSchema, ../contract/src/dataset.ts:442
 interface Input {
   projectId: string;
   slugOrId: string;
   storedObjectId: string;
 }
-type Output = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:436
+type Output = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:451
 
 // dataset.getLimits
 type Input = z.infer<typeof datasetApiProjectInputSchema>; // ../contract/src/dataset.schemas.ts:46
@@ -829,22 +829,22 @@ interface Output {
 }
 
 // dataset.createAttachmentUpload
-// Input: createDatasetAttachmentUploadInputSchema, ../contract/src/dataset.ts:376
+// Input: createDatasetAttachmentUploadInputSchema, ../contract/src/dataset.ts:391
 interface Input {
   projectId: string;
   filename: string;
   mediaType: string;
   byteLength: number;
 }
-type Output = z.infer<typeof datasetAttachmentUploadSchema>; // ../contract/src/dataset.ts:389
+type Output = z.infer<typeof datasetAttachmentUploadSchema>; // ../contract/src/dataset.ts:404
 
 // dataset.retryNormalize
-// Input: retryNormalizeInputSchema, ../contract/src/dataset.ts:449
+// Input: retryNormalizeInputSchema, ../contract/src/dataset.ts:464
 interface Input {
   projectId: string;
   datasetId: string;
 }
-// Output: uploadProcessingSchema, ../contract/src/dataset.ts:442
+// Output: uploadProcessingSchema, ../contract/src/dataset.ts:457
 interface Output {
   datasetId: string;
   status: "processing";
@@ -859,12 +859,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `dataset_normalization` (aggregate `dataset`)
 
-Declared at `src/eventing/dataset-normalization.pipeline.ts:28`.
+Declared at `src/eventing/dataset-normalization.pipeline.ts:33`. Events: `datasetNormalizationSettledEventSchema`.
 
 | Kind         | Name                                                                                           | Handles | Declared at                                         |
 | ------------ | ---------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
-| command      | –                                                                                              | –       | `src/eventing/dataset-normalization.pipeline.ts:33` |
-| lane aliases | `≈ [ { from: "trace_processing:job:datasetNormalize", to: { jobType: "command", lane: "datas…` | –       | `src/eventing/dataset-normalization.pipeline.ts:40` |
+| command      | –                                                                                              | –       | `src/eventing/dataset-normalization.pipeline.ts:38` |
+| lane aliases | `≈ [ { from: "trace_processing:job:datasetNormalize", to: { jobType: "command", lane: "datas…` | –       | `src/eventing/dataset-normalization.pipeline.ts:45` |
 
 ## Configuration
 

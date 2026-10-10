@@ -52,7 +52,12 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
   const authorization = McpAuthorizationService.create({
     collaborators: {
       findProject: () =>
-        Promise.resolve({ id: PROJECT_ID, organizationId: "org-1", archivedAt: null }),
+        Promise.resolve({
+          id: PROJECT_ID,
+          organizationId: "org-1",
+          kind: "application",
+          archivedAt: null,
+        }),
       mayApprove: (input) => {
         probed.push(input.permission);
 

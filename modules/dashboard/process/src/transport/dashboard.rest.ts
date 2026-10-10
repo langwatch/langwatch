@@ -6,7 +6,6 @@
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   dashboardDeletedResponseSchema,
@@ -21,11 +20,7 @@ import {
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 
-export const dashboardRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<DashboardApi>;
-}> = defineRestRouter(DashboardApi)
+export const dashboardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
 

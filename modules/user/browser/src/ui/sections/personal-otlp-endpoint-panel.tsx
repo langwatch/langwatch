@@ -1,4 +1,5 @@
 import { useMintPersonalToken } from "@langwatch/api-key-client";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   API_KEY_PLACEHOLDER,
   PersonalAccessTokenBanner,
@@ -106,8 +107,8 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token ?? API_KEY_PLACE
 
       <Text fontSize="xs" color="fg.muted">
         For ad-hoc / custom telemetry. Spans land as-emitted; cost / tokens / model are not
-        auto-populated unless your spans already follow <code>gen_ai.*</code> conventions. For
-        tool-specific auto-shape, use the catalog tiles on /me when available.
+        auto-populated unless your spans already follow <InlineCode>gen_ai.*</InlineCode>{" "}
+        conventions. For tool-specific auto-shape, use the catalog tiles on /me when available.
       </Text>
     </VStack>
   );

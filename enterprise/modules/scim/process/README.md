@@ -6,13 +6,13 @@ The server half of [scim](../README.md). SCIM provisioning: directory connection
 
 ## Installation
 
-`defineProcessModule("scim").withRepositories(scimRepositories).withChannels(scimChannels).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:38`.
+`defineProcessModule("scim").withRepositories(scimRepositories).withChannels(scimChannels).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).provideMiddlewareBindings(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:38`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ScimApi`)
 
-Peers call these through the token, declared at `../contract/src/scim.api.ts:70`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scim.api.ts:72`; nothing else in this package is public.
 
 #### `listTokens`
 
@@ -140,6 +140,14 @@ What one connection's directory did, newest first, in words (ADR-126). Scanned i
 
 ```typescript
 findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]>;
+```
+
+#### `findDirectoryMembers`
+
+Which of these members this organization's directories created (port of main's `directoryProvisioned`); built from the organization's own connections.
+
+```typescript
+findDirectoryMembers(input: ScimDirectoryMembersInput): Promise<ScimDirectoryMember[]>;
 ```
 
 #### `listOversightSyncs`
@@ -546,7 +554,7 @@ interface Response {
 
 Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Declared at `src/transport/scim-token.rest.ts:112`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Declared at `src/transport/scim-token.rest.ts:113`.
 
 Answers at `/api/scim-tokens/:id`, `/api/v1/scim-tokens/:id`; also, undocumented, `/api/scim-tokens/2026-08-07/:id`, `/api/v1/scim-tokens/2026-08-07/:id`, `/api/scim-tokens/latest/:id`, `/api/v1/scim-tokens/latest/:id`.
 
@@ -555,7 +563,7 @@ Answers at `/api/scim-tokens/:id`, `/api/v1/scim-tokens/:id`; also, undocumented
 interface Params {
   id: string;
 }
-// Response: inline, src/transport/scim-token.rest.ts:116
+// Response: inline, src/transport/scim-token.rest.ts:117
 interface Response {
   success: true;
 }
@@ -639,14 +647,15 @@ interface Output {
 
 ### `scimReconciliation`
 
-Contract `../contract/src/scim-reconciliation.trpc.ts:20`, router `src/transport/scim-reconciliation.trpc.ts:20`.
+Contract `../contract/src/scim-reconciliation.trpc.ts:22`, router `src/transport/scim-reconciliation.trpc.ts:20`.
 
-| Procedure                        | Kind  | Gate                                                             | Input                               | Output                             |
-| -------------------------------- | ----- | ---------------------------------------------------------------- | ----------------------------------- | ---------------------------------- |
-| `scimReconciliation.getAll`      | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimReconciliationScopeSchema`     | `organizationReconciliationSchema` |
-| `scimReconciliation.getActivity` | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
-| `scimReconciliation.getRequests` | query | Permission `sso:view`                                            | `scimConnectionRequestsInputSchema` | inline                             |
-| `scimReconciliation.getById`     | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
+| Procedure                             | Kind  | Gate                                                             | Input                               | Output                             |
+| ------------------------------------- | ----- | ---------------------------------------------------------------- | ----------------------------------- | ---------------------------------- |
+| `scimReconciliation.getAll`           | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimReconciliationScopeSchema`     | `organizationReconciliationSchema` |
+| `scimReconciliation.getActivity`      | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
+| `scimReconciliation.getRequests`      | query | Permission `sso:view`                                            | `scimConnectionRequestsInputSchema` | inline                             |
+| `scimReconciliation.getById`          | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
+| `scimReconciliation.directoryMembers` | query | Permission `organization:manage`                                 | `scimDirectoryMembersInputSchema`   | inline                             |
 
 ```typescript
 // scimReconciliation.getAll
@@ -662,7 +671,7 @@ interface Input {
   organizationId: string;
   connectionId: string;
 }
-// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:35
+// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:37
 type Output = {
   eventId: string;
   summary: string;
@@ -672,11 +681,23 @@ type Output = {
 
 // scimReconciliation.getRequests
 type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
-// Output: scimRequestEntrySchema.array() (inline, ../contract/src/scim-reconciliation.trpc.ts:45)
+// Output: scimRequestEntrySchema.array() (inline, ../contract/src/scim-reconciliation.trpc.ts:47)
 
 // scimReconciliation.getById
 type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
-// Output: connectionReconciliationSchema.nullable() (inline, ../contract/src/scim-reconciliation.trpc.ts:49)
+// Output: connectionReconciliationSchema.nullable() (inline, ../contract/src/scim-reconciliation.trpc.ts:51)
+
+// scimReconciliation.directoryMembers
+// Input: scimDirectoryMembersInputSchema, ../contract/src/scim-reconciliation.ts:104
+interface Input {
+  organizationId: string;
+  userIds: string[];
+}
+// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:55
+type Output = {
+  userId: string;
+  providerId: string | null;
+}[];
 ```
 
 ### `scimToken`

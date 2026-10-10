@@ -23,7 +23,7 @@ export const AGGREGATE_RULE_NO_LONGER_MATCHES = "aggregate_rule_no_longer_matche
 export const AGGREGATE_ARCHIVED = "aggregate_archived";
 
 /** Member project ids, each in one list; a `failed` attach is tried again by the next reconcile. */
-export type AggregateReconcileResult = {
+type AggregateReconcileResult = {
   attached: string[];
   revoked: string[];
   unchanged: string[];

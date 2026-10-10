@@ -1,30 +1,38 @@
 /**
  * @vitest-environment node
- * Identity appends to its own aggregates through each pipeline's own event store.
+ * Identity appends to and reads its own aggregates through each pipeline's own event store
+ * (record §7, Alex 2026-10-05).
  * Spec: modules/identity/specs/identity-pipeline-registration-ownership.feature
  */
 import {
+  createTenantId,
   type Event,
   type EventStore,
   type EventingParticipation,
+  type EventReadSeat,
   PipelineEventStore,
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import {
   EXPIRE_JOIN_COMMAND_TYPE,
+  IDENTIFIER_ATTACHED_EVENT_TYPE,
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
   type JoinRequestCommand,
+  MFA_ENROLLED_EVENT_TYPE,
+  USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppendingJoinRequestLedgerStore } from "../../features/join-request/eventing/join-request-appending-ledger.store.ts";
 import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
+import { EventingIdentityHistoryRepository } from "../../repositories/eventing/eventing.identity-history.repository.ts";
 import { ConnectedIdentityEventing } from "../identity-command-senders.store.ts";
 import { IdentityEventStores } from "../identity-event-stores.store.ts";
 
 const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
+const SAM = "user_sam";
 const T0 = 1_700_000_000_000;
 
 type Asked = { tenantId: string; aggregateId: string; aggregateType: string };
@@ -117,7 +125,7 @@ describe("given identity's pipelines are built over their own event stores", () 
       },
     );
 
-    /** @scenario "Identity appends to its own aggregates through each pipeline's own event store" */
+    /** @scenario "Identity appends and reads its own aggregates through each pipeline's own event store" */
     it("keeps nothing from a build only to be listed", () => {
       const stores = IdentityEventStores.create();
       const { eventStore } = ownStore({
@@ -132,7 +140,7 @@ describe("given identity's pipelines are built over their own event stores", () 
   });
 
   describe("when a join-request command states a fact", () => {
-    /** @scenario "Identity appends to its own aggregates through each pipeline's own event store" */
+    /** @scenario "Identity appends and reads its own aggregates through each pipeline's own event store" */
     it("appends it through the join_request pipeline's own store, in the organization's tenant", async () => {
       const stores = IdentityEventStores.create();
       const { eventStore, stored } = ownStore({
@@ -153,7 +161,7 @@ describe("given identity's pipelines are built over their own event stores", () 
       expect(send).toHaveBeenCalledOnce();
     });
 
-    /** @scenario "A ledger whose pipeline this process never built refuses by name" */
+    /** @scenario "A ledger or history whose pipeline this process never built refuses by name" */
     it("refuses by name, staging nothing, where the process never built the pipeline", async () => {
       const { ledger, send } = joinRequestLedger(IdentityEventStores.create());
 
@@ -164,6 +172,55 @@ describe("given identity's pipelines are built over their own event stores", () 
         }),
       ).rejects.toThrow(/join-requests pipeline cannot append/);
       expect(send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a person's identity history is read", () => {
+    const fact = (input: { id: string; type: string; occurredAt: number }) => ({
+      ...input,
+      aggregateId: SAM,
+      aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
+      tenantId: createTenantId(SAM),
+      createdAt: input.occurredAt,
+      version: "2026-08-20",
+      data: { identifierId: "idf_1", provider: "email", value: "sam@acme.com" },
+    });
+
+    /** @scenario "Identity's history is read through eventing's read seat on a process that only produces" */
+    it("reads the user_identity stream through the read seat in the person's own tenant, MFA facts included", async () => {
+      const asked: Parameters<EventReadSeat["findAggregateEvents"]>[0][] = [];
+      const history = EventingIdentityHistoryRepository.create({
+        eventReadSeat: {
+          findAggregateEvents: async (input) => {
+            asked.push(input);
+            return [
+              fact({ id: "evt_1", type: IDENTIFIER_ATTACHED_EVENT_TYPE, occurredAt: T0 }),
+              fact({ id: "evt_2", type: MFA_ENROLLED_EVENT_TYPE, occurredAt: T0 + 1 }),
+              fact({ id: "evt_other", type: "lw.other.unrelated", occurredAt: T0 + 2 }),
+            ];
+          },
+        },
+      });
+
+      const entries = await history.findHistory({ userId: SAM, limit: 10 });
+
+      expect(entries.map((entry) => entry.eventId)).toEqual(["evt_2", "evt_1"]);
+      expect(asked).toEqual([
+        { tenantId: SAM, aggregateId: SAM, aggregateType: USER_IDENTITY_AGGREGATE_TYPE },
+      ]);
+    });
+
+    /** @scenario "Identity's history is read through eventing's read seat on a process that only produces" */
+    it("refuses rather than reading as empty where the seat has no event log", async () => {
+      const history = EventingIdentityHistoryRepository.create({
+        eventReadSeat: {
+          findAggregateEvents: () => Promise.reject(new Error("eventReadSeat is not configured")),
+        },
+      });
+
+      await expect(history.findHistory({ userId: SAM, limit: 10 })).rejects.toThrow(
+        /eventReadSeat/,
+      );
     });
   });
 });

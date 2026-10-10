@@ -365,7 +365,7 @@ export class PrismaScimRepository extends ScimRepository {
   }
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     const row = await this.prisma.group.findFirst({
-      where: { id: input.id, organizationId: input.organizationId },
+      where: { id: input.id, organizationId: input.organizationId, scimSource: { not: null } },
     });
 
     return row ? scimGroupRecordOf(row) : null;

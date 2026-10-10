@@ -39,6 +39,8 @@ export type FakeOpsHostOptions = {
   hasOpsAccess?: boolean;
   sharedInstall?: boolean;
   cloudOps?: boolean;
+  /** Defaults to `cloudOps`: the page shows wherever cloud ops is on. */
+  offersFeatureFlags?: boolean;
   /** Whether the reader may see instance and Cloud admin, which is strictly narrower. */
   isOpsAdmin?: boolean;
   project?: OpsProject | null;
@@ -127,6 +129,10 @@ export class FakeOpsHost extends OpsHostApi {
 
   cloudOps(): boolean {
     return this.options.cloudOps ?? false;
+  }
+
+  offersFeatureFlags(): boolean {
+    return this.options.offersFeatureFlags ?? this.cloudOps();
   }
 
   project(): OpsProject | undefined {

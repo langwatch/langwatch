@@ -135,9 +135,14 @@ function isMetadataAddress(host: string): boolean {
   return isIP(host) !== 0 && classifyEgressAddress(host) === "metadata";
 }
 
+/** Whether a bare, lowercased host names a cloud metadata endpoint, by name or by address. */
+export function isCloudMetadataHost(hostname: string): boolean {
+  const byName = BLOCKED_METADATA_HOSTS.some((host) => host === hostname);
+  return byName || isMetadataAddress(hostname);
+}
+
 function validateNotMetadataEndpoint(ctx: ValidationContext): void {
-  const byName = BLOCKED_METADATA_HOSTS.some((host) => host === ctx.hostname);
-  if (byName || isMetadataAddress(ctx.hostname)) {
+  if (isCloudMetadataHost(ctx.hostname)) {
     logger.error(
       { url: ctx.logUrl, hostname: ctx.hostname, reason: "metadata_endpoint" },
       "SSRF attempt blocked: cloud metadata endpoint",

@@ -7,6 +7,7 @@ import type {
   SeedAiToolStarterPackInput,
   UpdateAiToolEntryInput,
 } from "@langwatch/enterprise-governance-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type Prisma,
   type AiToolEntry as PrismaAiToolEntry,
@@ -160,7 +161,10 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     if (count > 0) return { hasSeeded: false, created: 0 };
     return this.database.$transaction(
       async (transaction) => {
-        await transaction.$executeRaw`-- @tenancy: advisory-lock helper, key is organization-bounded
+        await transaction.$executeRaw` ${skipTenantCheck({
+          // Advisory-lock helper, key is organization-bounded.
+          SKIP_TENANT_CHECK: true,
+        })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input.organizationId}`}, 0))`;
         const lockedCount = await transaction.aiToolEntry.count({
           where: { organizationId: input.organizationId },

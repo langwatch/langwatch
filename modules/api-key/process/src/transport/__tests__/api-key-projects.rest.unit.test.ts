@@ -6,7 +6,7 @@
  */
 import type { ApiKey, ApiKeyApi, ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   ForbiddenError,
@@ -146,6 +146,7 @@ function mount(
   };
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
@@ -161,8 +162,8 @@ function mount(
   const hono = runtime.mount(apiKeyProjectsRest.router(), {
     app: () => apis.reference(ApiKeyProjectsDoorApi),
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(apiKeyRestCredential, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(apiKeyRestCredential, () => ({
         apiKeyId: API_KEY_ID,
         userId: ownerUserId,
       })),

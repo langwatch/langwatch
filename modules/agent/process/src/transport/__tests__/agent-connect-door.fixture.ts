@@ -1,6 +1,6 @@
 import type { RestCaller, RestIdentity } from "@langwatch/api/hosting";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   projectCredentialOfRequest,
   recordProjectCredential,
 } from "@langwatch/api/rest";
@@ -43,8 +43,11 @@ export function connectDoor({ refusal }: { refusal?: Error } = {}): RestIdentity
   };
 }
 
-/** The connect facts as the agent module binds them, off what the door recorded. */
-export const connectCredentialsFact = bindRestMiddleware(agentConnectCredentials, (context) => ({
-  caller: connectCallerOf(projectCredentialOfRequest(context.req.raw)),
-  instanceToken: context.req.header("x-agent-instance-token"),
-}));
+/** The connect middleware context as the agent module provides it, off what the door recorded. */
+export const connectCredentialsContext = bindMiddlewareContext(
+  agentConnectCredentials,
+  (request) => ({
+    caller: connectCallerOf(projectCredentialOfRequest(request)),
+    instanceToken: request.headers.get("x-agent-instance-token") ?? undefined,
+  }),
+);

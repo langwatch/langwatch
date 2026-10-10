@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SearchInput } from "./search-input.tsx";
 
 const meta = {
-  title: "Components/Search input",
+  title: "Inputs and forms/Search input",
+  parameters: {
+    usage: {
+      use: "Filtering a list or table by text. It carries the search icon and the searchbox role.",
+      avoid: "Any other text field: use Input from primitives inside a Field.",
+    },
+  },
   component: SearchInput,
   tags: ["autodocs"],
   args: {

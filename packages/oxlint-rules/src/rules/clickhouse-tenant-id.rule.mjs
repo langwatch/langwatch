@@ -32,7 +32,7 @@ function hasPredicateInScope(text, scope, predicate) {
 }
 
 function isUnscopedKey(node) {
-  return node.type === "Property" && !node.computed && node.key?.name === "unscoped";
+  return node.type === "Property" && !node.computed && node.key?.name === "SKIP_TENANT_CHECK";
 }
 
 function objectDeclaresUnscoped(node) {
@@ -62,7 +62,7 @@ function thisMethodOf(call) {
   );
 }
 
-/** The statement travels with `unscoped: { reason }`, inline or through a method of this class. */
+/** The statement travels with `SKIP_TENANT_CHECK`, inline or through a method of this class. */
 function declaresUnscoped(node) {
   for (
     let current = node.parent;

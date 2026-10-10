@@ -10,9 +10,17 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./formatted-number": {
+      "types": "./dist/components/values/formatted-number.d.ts",
+      "default": "./src/components/values/formatted-number.tsx"
+    },
+    "./formatted-date": {
+      "types": "./dist/components/values/formatted-date.d.ts",
+      "default": "./src/components/values/formatted-date.tsx"
+    },
     "./format-money-display": {
-      "types": "./dist/components/display/format-money-display.d.ts",
-      "default": "./src/components/display/format-money-display.tsx"
+      "types": "./dist/components/values/format-money-display.d.ts",
+      "default": "./src/components/values/format-money-display.tsx"
     },
     "./code-preview": {
       "types": "./dist/components/display/code-preview.d.ts",
@@ -122,6 +130,14 @@
       "types": "./dist/components/brand/langy-mark.d.ts",
       "default": "./src/components/brand/langy-mark.tsx"
     },
+    "./restricted-access": {
+      "types": "./dist/components/states/restricted-access.d.ts",
+      "default": "./src/components/states/restricted-access.tsx"
+    },
+    "./banner": {
+      "types": "./dist/components/states/banner.d.ts",
+      "default": "./src/components/states/banner.tsx"
+    },
     "./personal-access-token-banner": {
       "types": "./dist/components/states/personal-access-token-banner.d.ts",
       "default": "./src/components/states/personal-access-token-banner.tsx"
@@ -208,8 +224,8 @@
       "default": "./src/metric-value-formatters.ts"
     },
     "./pass-rate-indicator": {
-      "types": "./dist/components/display/pass-rate-indicator.d.ts",
-      "default": "./src/components/display/pass-rate-indicator.tsx"
+      "types": "./dist/components/values/pass-rate-indicator.d.ts",
+      "default": "./src/components/values/pass-rate-indicator.tsx"
     },
     "./dialog": {
       "types": "./dist/components/overlays/dialog.d.ts",
@@ -256,8 +272,8 @@
       "default": "./src/components/overlays/menu.tsx"
     },
     "./meter-bar": {
-      "types": "./dist/components/display/meter-bar.d.ts",
-      "default": "./src/components/display/meter-bar.tsx"
+      "types": "./dist/components/values/meter-bar.d.ts",
+      "default": "./src/components/values/meter-bar.tsx"
     },
     "./page-layout": {
       "types": "./dist/components/layout/page-layout.d.ts",
@@ -351,6 +367,10 @@
       "types": "./dist/components/brand/hero-lead-pill.d.ts",
       "default": "./src/components/brand/hero-lead-pill.tsx"
     },
+    "./inline-code": {
+      "types": "./dist/components/display/inline-code.d.ts",
+      "default": "./src/components/display/inline-code.tsx"
+    },
     "./kbd": {
       "types": "./dist/components/display/kbd.d.ts",
       "default": "./src/components/display/kbd.tsx"
@@ -360,12 +380,16 @@
       "default": "./src/format-milliseconds.ts"
     },
     "./stat-tile": {
-      "types": "./dist/components/display/stat-tile.d.ts",
-      "default": "./src/components/display/stat-tile.tsx"
+      "types": "./dist/components/values/stat-tile.d.ts",
+      "default": "./src/components/values/stat-tile.tsx"
     },
     "./tab-count": {
-      "types": "./dist/components/display/tab-count.d.ts",
-      "default": "./src/components/display/tab-count.tsx"
+      "types": "./dist/components/values/tab-count.d.ts",
+      "default": "./src/components/values/tab-count.tsx"
+    },
+    "./cron-schedule": {
+      "types": "./dist/components/display/cron-schedule.d.ts",
+      "default": "./src/components/display/cron-schedule.tsx"
     },
     "./settings-section": {
       "types": "./dist/components/layout/settings-section.d.ts",
@@ -430,6 +454,10 @@
     "./workflow-card": {
       "types": "./dist/components/layout/workflow-card.d.ts",
       "default": "./src/components/layout/workflow-card.tsx"
+    },
+    "./app-shell": {
+      "types": "./dist/components/layout/app-shell.d.ts",
+      "default": "./src/components/layout/app-shell.tsx"
     }
   },
   "scripts": {
@@ -487,5 +515,29 @@
   },
   "langwatch": {
     "group": "browser"
+  },
+  "nx": {
+    "targets": {
+      "build:storybook": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild",
+          "{projectRoot}/.storybook/**/*",
+          "{workspaceRoot}/apps/ui/public/**/*",
+          "{workspaceRoot}/apps/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/modules/*/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/enterprise/modules/*/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/packages/*/src/**/*.{ts,tsx}"
+        ],
+        "outputs": [
+          "{projectRoot}/storybook-static"
+        ]
+      }
+    }
   }
 }

@@ -224,7 +224,7 @@ type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract
 
 List webhook endpoints
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:190`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:191`.
 
 Answers at `/api/webhooks/v1/endpoints`.
 
@@ -236,7 +236,7 @@ type Response = z.infer<typeof endpointListResponseSchema>; // ../contract/src/w
 
 Get a webhook endpoint
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:205`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:206`.
 
 Answers at `/api/webhooks/v1/endpoints/:id`.
 
@@ -252,7 +252,7 @@ type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webho
 
 Update a webhook endpoint
 
-Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:221`.
+Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:222`.
 
 Answers at `/api/webhooks/v1/endpoints/:id`.
 
@@ -266,7 +266,7 @@ type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webho
 
 Archive a webhook endpoint
 
-Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:251`.
+Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:253`.
 
 Answers at `/api/webhooks/v1/endpoints/:id`.
 
@@ -284,7 +284,7 @@ interface Response {
 
 Roll an endpoint's signing secret
 
-Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:267`.
+Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:270`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/roll-secret`.
 
@@ -299,7 +299,7 @@ type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract
 
 Send a test event to an endpoint
 
-Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:288`.
+Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts:292`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/test`.
 
@@ -322,7 +322,7 @@ interface Response {
 
 List an endpoint's delivery attempts
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:320`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:324`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/deliveries`.
 
@@ -340,7 +340,7 @@ type Response = z.infer<typeof deliveryListResponseSchema>; // ../contract/src/w
 
 Read an endpoint's delivery health
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:359`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:363`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/health`.
 
@@ -353,7 +353,7 @@ type Response = z.infer<typeof healthResponseSchema>; // ../contract/src/webhook
 
 List subscribable event types
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:389`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:393`.
 
 Answers at `/api/webhooks/v1/event-types`.
 
@@ -374,7 +374,7 @@ interface Response {
 
 List emitted events
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:412`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:416`.
 
 Answers at `/api/webhooks/v1/events`.
 
@@ -404,7 +404,7 @@ interface Response {
 
 Get one emitted event
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:440`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:444`.
 
 Answers at `/api/webhooks/v1/events/:id`.
 

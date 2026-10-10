@@ -21,6 +21,7 @@ import {
   type SignInMethodRemovalTarget,
 } from "../../behavior/use-sign-in-method-removal.ts";
 import { refusalCopy } from "../../features/account-identifiers/model/refusal-copy.ts";
+import { SSO_HANDLES_SIGN_IN } from "../../model/last-way-in.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { isCredentialAccount, passwordOfferFor } from "../../model/sign-in-methods.ts";
 import { ChangePasswordDialog } from "./change-password-dialog.tsx";
@@ -65,6 +66,28 @@ function RemovePasswordButton({
   );
 }
 
+function SetPasswordAction({
+  governedBySso,
+  onSet,
+}: {
+  governedBySso: boolean | undefined;
+  onSet: () => void;
+}) {
+  if (governedBySso === undefined) return null;
+  if (governedBySso) {
+    return (
+      <Text fontSize="sm" color="fg.muted" data-testid="password-sso-governed">
+        {SSO_HANDLES_SIGN_IN}
+      </Text>
+    );
+  }
+  return (
+    <Button variant="outline" onClick={onSet} data-testid="password-action">
+      Set a password
+    </Button>
+  );
+}
+
 export function PasswordSection() {
   const host = usePersonalWorkspaceHost();
   const deployment = host.deployment();
@@ -74,6 +97,7 @@ export function PasswordSection() {
     successTitle: "Password removed",
     failureTitle: "Couldn't remove your password",
   });
+  const governance = api.identity.mySignInGovernance.useQuery({});
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const offer = passwordOfferFor({
@@ -133,16 +157,17 @@ export function PasswordSection() {
           <SettingsEmptyState
             icon={<KeyRound size={20} />}
             title="No password set"
-            description="You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
+            description={
+              governance.data?.governedBySso
+                ? "You sign in without one."
+                : "You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
+            }
             data-testid="password-empty"
             action={
-              <Button
-                variant="outline"
-                onClick={() => setDialogOpen(true)}
-                data-testid="password-action"
-              >
-                Set a password
-              </Button>
+              <SetPasswordAction
+                governedBySso={governance.data?.governedBySso}
+                onSet={() => setDialogOpen(true)}
+              />
             }
           />
         )}

@@ -34,7 +34,7 @@ export {
 
 export { SCHEMA_HASH_HEADER, schemaHashOf, schemaHashesOf } from "./contract/schema-hash.ts";
 
-export { defineRestMiddleware, type RestTransportMiddleware } from "./contract/rest-middleware.ts";
+export { defineMiddlewareContext, type MiddlewareContext } from "./contract/middleware-context.ts";
 
 export {
   uiTokens,

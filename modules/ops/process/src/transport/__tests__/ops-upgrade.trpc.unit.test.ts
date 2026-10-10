@@ -5,7 +5,7 @@
  * Spec: modules/ops/specs/upgrades.feature
  */
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcProcedureFactory,
@@ -13,14 +13,17 @@ import {
 } from "@langwatch/api/trpc";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OpsOperator } from "@langwatch/ops-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UpgradeReader, UpgradeRunDetail, UpgradeStepDetail } from "@langwatch/upgrade/reader";
 import { describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp, OPS_STAFF_ADDRESS } from "../../app/__tests__/ops.fixture.ts";
+import { SystemMigrationsService } from "../../features/system-migrations/services/system-migrations.service.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
+import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
 import { statusOf, stepOf } from "../../services/__tests__/support/upgrade-ledger.ts";
-import { opsOperatorFact } from "../ops-operator.trpc.ts";
+import { opsOperatorContext } from "../ops-operator.trpc.ts";
 import { opsUpgradeTrpcTransport } from "../ops-upgrade.trpc.ts";
 import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
@@ -112,17 +115,30 @@ function mount({
     }),
     upgradeLedger: ledger ?? MemoryUpgradeLedgerRepository.create(reader ? { reader } : {}),
   };
-  const { app } = createOpsTestApp({ repositories });
+  const { app } = createOpsTestApp({
+    repositories,
+    members: {
+      createSystemMigrations: () =>
+        SystemMigrationsService.create(
+          createApiFixture<SystemMigrationsServiceDependencies>({
+            state: repositories.migrationState,
+          }),
+        ),
+    },
+  });
   const root = TrpcRootDefinition.forContext<OpsTrpcTestContext>().create();
   const router = createTrpcRuntime<OpsTrpcTestContext>({
     root,
     procedure: root.procedure,
     members: opsTrpcMembers({ holders }),
   }).mount(opsUpgradeTrpcTransport, () => app, {
-    facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsTrpcTestContext) => ctx.operator)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(opsOperatorContext, (ctx: OpsTrpcTestContext) => ctx.operator),
+    ],
   });
 
   return {
+    repositories,
     operator: router.createCaller({ actor: { id: OPERATOR.id }, operator: OPERATOR }),
     outsider: router.createCaller({ actor: { id: OUTSIDER.id }, operator: OUTSIDER }),
     manager: router.createCaller({ actor: { id: MANAGER.id }, operator: MANAGER }),
@@ -148,7 +164,7 @@ function boundAccess(): Record<string, string> {
 
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
-  it("declares each of the eight reads behind ops:view at the platform scope", () => {
+  it("declares each of the nine reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
         ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
@@ -164,6 +180,7 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getRun": "permission-platform:ops:view",
       "ops.upgrade.preview": "permission-platform:ops:view",
       "ops.upgrade.listTargets": "permission-platform:ops:view",
+      "ops.upgrade.listTenants": "permission-platform:ops:view",
     });
   });
 
@@ -184,7 +201,7 @@ describe("the ops.upgrade reads", () => {
       const reader = readerOfOneRelease();
       const { operator } = mount({ reader });
 
-      expect(await operator.status()).toEqual(await reader.status());
+      expect(await operator.status()).toEqual({ ...(await reader.status()), deprecations: [] });
       expect(await operator.listReleases()).toEqual(await reader.listReleases());
       expect(await operator.listSteps({ release: "3.23.0" })).toEqual(
         await reader.listSteps({ release: "3.23.0" }),
@@ -304,6 +321,65 @@ describe("ops.upgrade.retryStep", () => {
       await expect(manager.retryStep({ id: "ops:missing" })).rejects.toMatchObject({
         cause: { code: "upgrade_not_found" },
       });
+    });
+  });
+});
+
+describe("ops.upgrade.listTenants", () => {
+  describe("given three parked tenants and one finalized in one step, one parked in another", () => {
+    async function seeded() {
+      const mounted = mount();
+      const tenants = [
+        { migrationName: "ops:first", tenantId: "org_a", status: "parked" },
+        { migrationName: "ops:first", tenantId: "org_b", status: "parked" },
+        { migrationName: "ops:first", tenantId: "org_c", status: "parked" },
+        { migrationName: "ops:first", tenantId: "org_d", status: "finalized" },
+        { migrationName: "ops:second", tenantId: "org_a", status: "parked" },
+      ] as const;
+      for (const tenant of tenants) {
+        await mounted.repositories.migrationState.upsertRecord({ ...tenant, report: null });
+      }
+      return mounted;
+    }
+
+    /** @scenario "Tenant rows are listed by step and state, one page at a time" */
+    it("pages the first step's parked tenants two at a time and ends with no cursor", async () => {
+      const { operator } = await seeded();
+
+      const first = await operator.listTenants({ step: "ops:first", state: "parked", limit: 2 });
+      const last = await operator.listTenants({
+        step: "ops:first",
+        state: "parked",
+        limit: 2,
+        cursor: first.cursor,
+      });
+
+      expect(first.items).toHaveLength(2);
+      expect(first.cursor).not.toBeNull();
+      expect(last.items).toHaveLength(1);
+      expect(last.cursor).toBeNull();
+      expect([...first.items, ...last.items].map((row) => row.tenantId).toSorted()).toEqual([
+        "org_a",
+        "org_b",
+        "org_c",
+      ]);
+    });
+
+    /** @scenario "Tenant rows are listed by step and state, one page at a time" */
+    it("lists every step's rows when no filter is named", async () => {
+      const { operator } = await seeded();
+
+      const page = await operator.listTenants({});
+
+      expect(page.items).toHaveLength(5);
+      expect(page.cursor).toBeNull();
+    });
+
+    /** @scenario "A non-operator asking for the tenant list is refused by the door" */
+    it("refuses a user without ops:view", async () => {
+      const { outsider } = await seeded();
+
+      await expect(outsider.listTenants({})).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 });

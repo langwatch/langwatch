@@ -5,7 +5,11 @@ import { getRoutePolicy } from "@langwatch/api";
  * process mounts the declaration on.
  * Spec: specs/coding-agent/pull-request-linkage.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import type { CodingAgentApi, CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -183,7 +187,7 @@ interface Overrides {
 
 /**
  * The whole door on the runtime a process mounts it on: the organization the
- * credential resolved, the caller fact the process binds, and an application
+ * credential resolved, the caller context the module provides, and an application
  * that only answers this one question.
  */
 function mount(overrides: Overrides) {
@@ -221,11 +225,11 @@ function mount(overrides: Overrides) {
       }),
     ...(overrides.credential ? { credential: overrides.credential } : {}),
     onError: canonicalErrorResponse,
-    facts: [
-      // The same fact the module's own server declaration binds: the key, the
+    middlewareContext: [
+      // The same context the module's own server declaration provides: the key, the
       // member it acts as, and the one stable actor string the read is
       // recorded under.
-      bindRestMiddleware(codingAgentV1RestCaller, () => ({
+      bindMiddlewareContext(codingAgentV1RestCaller, () => ({
         apiKeyId: "key-1",
         userId: apiKeyUserId,
         actorId: apiKeyUserId ?? "apikey:key-1",

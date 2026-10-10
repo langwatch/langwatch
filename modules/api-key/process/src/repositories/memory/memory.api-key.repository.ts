@@ -102,9 +102,13 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
   }
 
   /** The cause of the FIRST revocation stands, as the fenced `updateMany` keeps it. */
-  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<ApiKeyRow> {
+  async revoke(input: {
+    id: string;
+    organizationId: string;
+    cause: ApiKeyRevocationCause;
+  }): Promise<ApiKeyRow> {
     return this.#write(input.id, (key) =>
-      key.revokedAt === null
+      key.revokedAt === null && key.organizationId === input.organizationId
         ? { ...key, revokedAt: toDate(nowInstant()), revocationCause: input.cause }
         : key,
     );

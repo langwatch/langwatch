@@ -66,6 +66,9 @@ export abstract class OpsHostApi {
   /** True when ops offers the Cloud admin capability (LangWatch's own cloud). */
   abstract cloudOps(): boolean;
 
+  /** True where the Feature Flags page shows: with cloud ops, or on a developer's local stack. */
+  abstract offersFeatureFlags(): boolean;
+
   /** The project this page is about, when the reader is standing in one. */
   abstract project(): OpsProject | undefined;
 

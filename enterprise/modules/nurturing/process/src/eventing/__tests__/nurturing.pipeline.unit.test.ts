@@ -1,5 +1,10 @@
 import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import {
+  SAAS_USAGE_REPORT_AGGREGATE_TYPE,
+  USAGE_REPORT_RECEIVED_EVENT_TYPE,
+  USAGE_REPORT_RECEIVED_EVENT_VERSION,
+} from "@langwatch/enterprise-saas-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
@@ -99,6 +104,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     deliver: (input) => delivery.deliver(input),
     projectCreated: async () => undefined,
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
+    usageReportReceived: (input) => delivery.deliverUsageReport(input),
     evaluationCompleted: async () => [],
     simulationRunFinished: async () => [],
   });
@@ -467,6 +473,87 @@ describe("nurturing's guidedOnboardingTurnFailed peer subscriber", () => {
       const uuids = posthog.tracked.map(({ uuid }) => uuid);
       expect(posthog.tracked).toHaveLength(2);
       expect(new Set(uuids).size).toBe(2);
+    });
+  });
+});
+
+/** saas's fact for one accepted usage report, as its saas_usage_report pipeline records it. */
+function usageReportFact(id = "evt-usage-report"): Event {
+  return {
+    id,
+    aggregateId: "install-1",
+    aggregateType: SAAS_USAGE_REPORT_AGGREGATE_TYPE,
+    tenantId: createTenantId("platform"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: USAGE_REPORT_RECEIVED_EVENT_TYPE,
+    version: USAGE_REPORT_RECEIVED_EVENT_VERSION,
+    data: {
+      instanceId: "install-1",
+      event: "daily_usage_stats",
+      properties: { version: "3.1.0" },
+      unknownFields: 1,
+    },
+    idempotencyKey: "install-1:1000",
+  };
+}
+
+describe("nurturing's usageReportReceived peer subscriber", () => {
+  describe("when saas records a received usage report", () => {
+    /** @scenario "A received usage report is tracked against the install id" */
+    it("tracks the report's event in PostHog against the install id and tells Customer.io nothing", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(usageReportFact());
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "install-1",
+          event: "daily_usage_stats",
+          uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
+          properties: { version: "3.1.0", unknown_fields: 1 },
+        },
+      ]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A redelivered usage report fact is tracked once" */
+    it("tracks one event for a fact delivered twice", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(usageReportFact());
+      await deliverFact(usageReportFact());
+      await deliverFact(usageReportFact("evt-usage-report-2"));
+      await settle();
+
+      expect(posthog.tracked).toHaveLength(2);
+      expect(new Set(posthog.tracked.map(({ uuid }) => uuid)).size).toBe(2);
+    });
+  });
+
+  describe("when the deployment names no PostHog key", () => {
+    /** @scenario "A usage report where no PostHog target is configured sends nothing" */
+    it("sends nothing and claims nothing", async () => {
+      const claim = vi.fn(async () => true);
+      const delivery = NurturingDeliveryService.create({
+        claims: { claim },
+        customerIo: undefined,
+        posthog: undefined,
+        users: createApiFixture<UserApi>({}),
+      });
+
+      await delivery.deliverUsageReport({
+        data: {
+          instanceId: "install-1",
+          event: "daily_usage_stats",
+          properties: {},
+          unknownFields: 0,
+        },
+        eventId: "evt-usage-report",
+      });
+
+      expect(claim).not.toHaveBeenCalled();
     });
   });
 });

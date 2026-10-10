@@ -5,6 +5,7 @@ package snapshot
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
@@ -60,6 +61,7 @@ type Manifest struct {
 	Fingerprint       Fingerprint       `json:"fingerprint"`
 	EventHistogram    []EventCount      `json:"eventHistogram"`
 	RedisKeysByPrefix map[string]int    `json:"redisKeysByPrefix"`
+	RedisTopPrefixes  []RedisPrefixSize `json:"redisTopPrefixes,omitempty"`
 	ObjectCount       int               `json:"objectCount"`
 	Expect            Expect            `json:"expect"`
 	SizeBytes         int64             `json:"sizeBytes"`
@@ -230,4 +232,51 @@ func sizeOf(dir string) (int64, error) {
 		return err
 	})
 	return total, err
+}
+
+// RedisPrefixSize is the key count and DUMP bytes under one key prefix.
+type RedisPrefixSize struct {
+	Prefix string `json:"prefix"`
+	Keys   int    `json:"keys"`
+	Bytes  int64  `json:"bytes"`
+}
+
+const redisTopPrefixCount = 20
+
+// redisPrefix is the key up to the first ":{" or the second ":", whichever comes first.
+func redisPrefix(key string) string {
+	if index := strings.Index(key, ":{"); index >= 0 {
+		return key[:index]
+	}
+	first := strings.Index(key, ":")
+	if first < 0 {
+		return key
+	}
+	if second := strings.Index(key[first+1:], ":"); second >= 0 {
+		return key[:first+1+second]
+	}
+	return key
+}
+
+type redisPrefixSizes map[string]*RedisPrefixSize
+
+func (sizes redisPrefixSizes) add(key RedisKey) {
+	prefix := redisPrefix(key.Key)
+	if sizes[prefix] == nil {
+		sizes[prefix] = &RedisPrefixSize{Prefix: prefix}
+	}
+	sizes[prefix].Keys++
+	sizes[prefix].Bytes += int64(len(key.Dump))
+}
+
+// top is the n largest prefixes by bytes, ties by name.
+func (sizes redisPrefixSizes) top(n int) []RedisPrefixSize {
+	all := make([]RedisPrefixSize, 0, len(sizes))
+	for _, size := range sizes {
+		all = append(all, *size)
+	}
+	slices.SortFunc(all, func(a, b RedisPrefixSize) int {
+		return cmp.Or(cmp.Compare(b.Bytes, a.Bytes), cmp.Compare(a.Prefix, b.Prefix))
+	})
+	return all[:min(n, len(all))]
 }

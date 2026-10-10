@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog.tsx";
 
 const meta = {
-  title: "Components/Delete confirmation dialog",
+  title: "Overlays/Delete confirmation dialog",
+  parameters: { usage: { use: "Confirming a destructive delete." } },
   component: DeleteConfirmationDialog,
   tags: ["autodocs"],
   args: {

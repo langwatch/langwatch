@@ -4,11 +4,11 @@
  * so the handler receives an already-resolved scope, not a raw caller.
  */
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
   type RestAnswer,
   type RestEvent,
   type RestNegotiatedProducer,
@@ -65,7 +65,7 @@ export interface ExperimentV3RestApi {
 export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>()("experiment");
 
 /** The resolved project credential used to attribute workbench writes. */
-export const experimentWorkbenchCredential = defineRestMiddleware(
+export const experimentWorkbenchCredential = defineMiddlewareContext(
   "experimentWorkbenchCredential",
   z.discriminatedUnion("kind", [
     z
@@ -121,7 +121,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment or run in this project" },
     },
   })
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(async ({ app, input, raw, response, scope }, project, credential) =>
     negotiatedRunAnswer(
       response,
@@ -249,7 +249,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       },
     },
   })
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(({ app, input, scope }, _project, credential) =>
     app.saveWorkbenchStateBySlug(
       { ...input, projectId: scope.id },
@@ -300,7 +300,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       },
     },
   })
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => {
     const restored = await app.restoreWorkbenchVersionBySlug(
       { projectId: scope.id, slug: input.slug, version: input.version },

@@ -31,7 +31,7 @@ export default function DirectoryScreen() {
   const { organizationId } = host.scope();
   if (!organizationId) return null;
   if (!host.hasOrganizationPermission(DIRECTORY_PERMISSION)) {
-    return <PermissionAlert permission={DIRECTORY_PERMISSION} />;
+    return <PermissionAlert permission={DIRECTORY_PERMISSION} area="the directory" />;
   }
 
   return <Directory host={host} organizationId={organizationId} />;

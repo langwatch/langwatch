@@ -2,8 +2,7 @@
 Feature: Upgrade alerts reach platform operators
   An upgrade that fails, or a runner that dies holding the lease, is told once to this
   installation's own platform operators by email through the notification edge. Upgrades are a
-  self-hosted concern, so nothing goes to LangWatch's Slack. Operators also see a banner while the
-  installation is Behind, Unsupported or Needs attention. Plan: dev/docs/plans/upgrade-ui-2026-10-06.md 6.2, W9.
+  self-hosted concern, so nothing goes to LangWatch's Slack. Plan: dev/docs/plans/upgrade-ui-2026-10-06.md 6.2, W9.
 
   Rule: The hourly check alerts on what changed since the last wake
 
@@ -52,17 +51,3 @@ Feature: Upgrade alerts reach platform operators
       Given no step failed and no lease expired since the last wake
       When the upgrade alert check runs
       Then no email is sent
-
-  Rule: The operator banner reads the upgrade status already served to operators
-
-    @integration
-    Scenario: The banner shows while the installation needs an operator
-      Given the upgrade status is Behind, Unsupported or Needs attention
-      When a platform operator opens any page
-      Then a banner names the state and links to the Upgrades page
-
-    @integration
-    Scenario: The banner stays hidden while the installation is up to date
-      Given the upgrade status is Up to date
-      When a platform operator opens any page
-      Then no upgrade banner is shown

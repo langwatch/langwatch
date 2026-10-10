@@ -17,6 +17,7 @@ import { createRoot } from "react-dom/client";
 
 import { GalleryView, type Density } from "./gallery-view.tsx";
 import { InspectView } from "./inspect-view.tsx";
+import { galleryUrl, templatesUrl } from "./studio-endpoints.ts";
 import {
   galleryResponseSchema,
   templatesResponseSchema,
@@ -57,7 +58,7 @@ const Studio = (): JSX.Element => {
   }, [previewScheme]);
 
   useEffect(() => {
-    fetch("/__templates")
+    fetch(templatesUrl())
       .then((response) => response.json())
       .then((json: unknown) => {
         const body = templatesResponseSchema.parse(json);
@@ -222,7 +223,7 @@ function useGalleryEntries({ view, everyFixture }: { view: View; everyFixture: b
     setGalleryEntries(null);
     setGalleryFailure(null);
     const controller = new AbortController();
-    fetch(`/__gallery${everyFixture ? "?fixtures=all" : ""}`, { signal: controller.signal })
+    fetch(galleryUrl({ everyFixture }), { signal: controller.signal })
       .then((response) => response.json())
       .then((json: unknown) => {
         const body = galleryResponseSchema.parse(json);

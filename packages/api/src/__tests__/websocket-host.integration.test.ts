@@ -16,15 +16,15 @@ import {
   WebSocketProtocol,
 } from "../websocket.ts";
 
-const facts = z.object({ authorization: z.string().optional() });
+const headerContext = z.object({ authorization: z.string().optional() });
 
 type EchoApp = { name: string };
 
-function echoProtocol(path: string): WebSocketProtocol<EchoApp, typeof facts> {
+function echoProtocol(path: string): WebSocketProtocol<EchoApp, typeof headerContext> {
   return WebSocketProtocol.create({
     path,
     maxPayloadBytes: 1024,
-    facts,
+    middlewareContext: headerContext,
     headers: { authorization: "authorization" },
     handle: async (app: EchoApp, connection, credentials) => {
       connection.send(JSON.stringify({ app: app.name, authorization: credentials.authorization }));
@@ -89,7 +89,7 @@ describe("WebSocketHost", () => {
 
   describe("when an upgrade names a mounted protocol's path", () => {
     /** @scenario "An upgrade to a mounted protocol's path reaches that protocol" */
-    it("reaches that protocol with its own app and declared facts", async () => {
+    it("reaches that protocol with its own app and declared middleware context", async () => {
       await expect(firstMessage(`ws://127.0.0.1:${port}/api/v1/agents/connect`)).resolves.toEqual({
         app: "agent",
         authorization: "Bearer key",
@@ -174,11 +174,11 @@ describe("WebSocketHost", () => {
       },
     };
 
-    function dooredProtocol(): WebSocketProtocol<EchoApp, typeof facts> {
+    function dooredProtocol(): WebSocketProtocol<EchoApp, typeof headerContext> {
       return WebSocketProtocol.create({
         path: "/doored",
         maxPayloadBytes: 1024,
-        facts,
+        middlewareContext: headerContext,
         headers: { authorization: "authorization" },
         door: {
           credential: "project",
@@ -295,11 +295,11 @@ describe("WebSocketHost", () => {
       },
     };
 
-    function sessionProtocol(): WebSocketProtocol<EchoApp, typeof facts, typeof session> {
+    function sessionProtocol(): WebSocketProtocol<EchoApp, typeof headerContext, typeof session> {
       return WebSocketProtocol.create({
         path: "/session-keyed",
         maxPayloadBytes: 1024,
-        facts,
+        middlewareContext: headerContext,
         headers: { authorization: "authorization" },
         door: { credential: "session_key", session },
         handle: async (
@@ -320,7 +320,7 @@ describe("WebSocketHost", () => {
       host.mount(
         sessionProtocol(),
         () => ({ name: "langy" }),
-        bound ? { facts: [bindRestCredential("session_key", () => door)] } : {},
+        bound ? { middlewareBindings: [bindRestCredential("session_key", () => door)] } : {},
       );
       const listener = createServer((_request, response) => response.writeHead(404).end());
       listener.on("upgrade", (request, socket, head) => host.upgrade(request, socket, head));

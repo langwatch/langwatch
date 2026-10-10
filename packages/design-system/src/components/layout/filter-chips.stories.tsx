@@ -4,7 +4,13 @@ import { useState } from "react";
 import { FilterChips } from "./filter-chips.tsx";
 
 const meta = {
-  title: "Components/FilterChips",
+  title: "Data display/Filter chips",
+  parameters: {
+    usage: {
+      use: "Quick cuts of a list, such as All, Failed and Mine, with their row counts.",
+      avoid: "Narrowing by scope: use Scope filter. Free text: use Search input.",
+    },
+  },
   component: FilterChips,
   tags: ["autodocs"],
   args: {

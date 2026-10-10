@@ -1,6 +1,8 @@
 import { type FeatureRestHost, type FeatureTrpcHost } from "@langwatch/api";
+import { defineMiddlewareContext } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { ApplicationBuilder } from "../src/application.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
@@ -28,11 +30,20 @@ class CatalogueApp implements CatalogueApi {
   }
 }
 
+const catalogueSize = defineMiddlewareContext("catalogueSize", z.string());
+
 /** One declared family, standing in for a REST declaration builder's output. */
 const catalogueRest = {
   protocol: "rest",
   namespace: "dataset",
   router: () => ({ family: "dataset" }),
+} as const;
+
+/** The same family, declaring the middleware context its module must provide. */
+const sizedCatalogueRest = {
+  protocol: "rest",
+  namespace: "dataset",
+  router: () => ({ family: "dataset", needs: catalogueSize }),
 } as const;
 
 /** One declared namespace, standing in for a tRPC declaration. */
@@ -45,7 +56,7 @@ const catalogueTrpc = {
 type MountedRest = Readonly<{
   declaration: object;
   app: unknown;
-  options: Readonly<{ onError?: unknown; facts?: readonly unknown[] }> | undefined;
+  options: Readonly<{ onError?: unknown; middlewareBindings?: readonly unknown[] }> | undefined;
 }>;
 
 /** A process's REST door, recording every mount it was asked for. */
@@ -65,7 +76,7 @@ function recordingRestHost(): FeatureRestHost<MountedRest> & { mounted: MountedR
 
 type MountedTrpc = Readonly<{
   app: unknown;
-  options: Readonly<{ facts?: readonly object[] }> | undefined;
+  options: Readonly<{ middlewareBindings?: readonly object[] }> | undefined;
 }>;
 
 /** A process's tRPC root, answering the namespace it was handed. */
@@ -83,18 +94,9 @@ function recordingTrpcHost(): FeatureTrpcHost<MountedTrpc> & { mounted: MountedT
   };
 }
 
-/**
- * One binding in the shape `bindRestMiddleware` answers with: the middleware a
- * route declared, and how this process resolves it. The REST door reads a
- * binding by its `middleware`, which is what tells the two doors apart.
- */
-function restBinding(read: () => string) {
-  return { middleware: { name: "catalogueSize" }, resolve: () => read() };
-}
-
-/** One binding in the shape `bindTrpcFact` answers with, keyed by its `fact`. */
+/** One binding in the shape `bindTrpcMiddlewareContext` answers with. */
 function trpcBinding(read: () => string) {
-  return { fact: { name: "catalogueSize" }, resolve: () => read() };
+  return { trpcMiddlewareContext: { name: "catalogueSize" }, resolve: () => read() };
 }
 
 describe("given a feature whose server declares transports", () => {
@@ -157,41 +159,41 @@ describe("given a feature whose server declares transports", () => {
     });
   });
 
-  describe("when the module binds the facts its own declarations name", () => {
+  describe("when the module provides the middleware context its own declarations name", () => {
     it("mounts the family with what the module bound", async () => {
       const rest = recordingRestHost();
       const server = defineProcessModule("dataset")
         .withApi(CatalogueApp)
-        .withTransports(catalogueRest)
-        .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
+        .withTransports(sizedCatalogueRest)
+        .provideMiddlewareContext({ catalogueSize: (_request, { app }) => app.read() });
 
       await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
 
-      const bound = rest.mounted[0]?.options?.facts ?? [];
+      const bound = rest.mounted[0]?.options?.middlewareBindings ?? [];
 
       expect(bound).toHaveLength(1);
     });
 
-    it("reads the value off the module's own App, not off the process", async () => {
+    it("resolves the value off the module's own App, not off the process", async () => {
       const rest = recordingRestHost();
       const server = defineProcessModule("dataset")
         .withApi(CatalogueApp)
-        .withTransports(catalogueRest)
-        .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
+        .withTransports(sizedCatalogueRest)
+        .provideMiddlewareContext({ catalogueSize: (_request, { app }) => app.read() });
 
       await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
 
-      const [binding] = (rest.mounted[0]?.options?.facts ?? []) as readonly {
-        resolve(): string;
+      const [binding] = (rest.mounted[0]?.options?.middlewareBindings ?? []) as readonly {
+        resolve(request: Request): string;
       }[];
 
-      expect(binding?.resolve()).toBe("one dataset");
+      expect(binding?.resolve(new Request("https://app.test/api/dataset"))).toBe("one dataset");
     });
 
     it("hands each door only the bindings of its own protocol", async () => {
@@ -199,23 +201,23 @@ describe("given a feature whose server declares transports", () => {
       const trpc = recordingTrpcHost();
       const server = defineProcessModule("dataset")
         .withApi(CatalogueApp)
-        .withTransports(catalogueRest, catalogueTrpc)
-        .withTransportFacts(({ app }) => [
-          restBinding(() => app.read()),
-          trpcBinding(() => app.read()),
-        ]);
+        .withTransports(sizedCatalogueRest, catalogueTrpc)
+        .provideMiddlewareBindings(({ app }) => [trpcBinding(() => app.read())])
+        .provideMiddlewareContext({ catalogueSize: (_request, { app }) => app.read() });
 
       await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
         .withTransports({ rest, trpc })
         .withModules([server])
         .boot();
 
-      const bound = (rest.mounted[0]?.options?.facts ?? []) as readonly object[];
+      const bound = (rest.mounted[0]?.options?.middlewareBindings ?? []) as readonly object[];
 
       expect(bound).toHaveLength(1);
-      expect(bound[0]).toHaveProperty("middleware");
-      expect(trpc.mounted[0]?.options?.facts).toHaveLength(1);
-      expect(trpc.mounted[0]?.options?.facts?.[0]).toHaveProperty("fact");
+      expect(bound[0]).toHaveProperty("middlewareContext", "catalogueSize");
+      expect(trpc.mounted[0]?.options?.middlewareBindings).toHaveLength(1);
+      expect(trpc.mounted[0]?.options?.middlewareBindings?.[0]).toHaveProperty(
+        "trpcMiddlewareContext",
+      );
     });
 
     it("binds nothing in a role that serves no doors", async () => {
@@ -223,7 +225,7 @@ describe("given a feature whose server declares transports", () => {
       const server = defineProcessModule("dataset")
         .withApi(CatalogueApp)
         .withTransports(catalogueRest)
-        .withTransportFacts(() => {
+        .provideMiddlewareBindings(() => {
           bound += 1;
 
           return [];

@@ -1,10 +1,10 @@
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Tabs, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "../../api-snippet/openapi-snippet.types.ts";
-import { CodePreview } from "../../onboarding/observability/code-preview.tsx";
 
 // Add context for dialog state
 const ApiSnippetDialogContext = createContext<{
@@ -96,7 +96,6 @@ export function GenerateApiSnippetDialog({
       {children}
       <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="lg">
         <Dialog.Content
-          bg="bg"
           borderWidth="1px"
           borderColor="border"
           borderRadius="lg"
@@ -138,7 +137,7 @@ export function GenerateApiSnippetDialog({
                     ))}
                   </Tabs.List>
                 </Tabs.Root>
-                <CodePreview
+                <SnippetPreview
                   code={code}
                   filename={fileNameForLanguage(language)}
                   codeLanguage={language}

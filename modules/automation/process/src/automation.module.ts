@@ -1,3 +1,5 @@
+import { ClientAddress } from "@langwatch/api/policy";
+import { projectRequestContextOf } from "@langwatch/api/rest";
 import type { AutomationApi, AutomationServerConfig } from "@langwatch/automation-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep, type MigrationStepRun } from "@langwatch/upgrade/step";
@@ -29,6 +31,10 @@ export const automationProcessModule: PublishedProcessModule<
     slackAutomationRest,
     unsubscribeRest,
   )
+  .provideMiddlewareContext({
+    projectRequestContext: projectRequestContextOf,
+    unsubscribeCallerAddress: (request) => ClientAddress.resolvedFor(request) ?? null,
+  })
   .withTasks(({ config }) => [SlackAlertTask.create({ baseHost: config.publicBaseUrl ?? "" })])
   .withMigrations(({ app }) => {
     const slack = app.slackConnectionMigration();

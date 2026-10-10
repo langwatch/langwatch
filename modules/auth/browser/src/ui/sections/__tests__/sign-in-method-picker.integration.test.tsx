@@ -9,8 +9,9 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { passkeyMock } = vi.hoisted(() => ({
+const { passkeyMock, navigateMock } = vi.hoisted(() => ({
   passkeyMock: vi.fn(),
+  navigateMock: vi.fn(),
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
@@ -18,10 +19,12 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
   return {
     ...actual,
     authClient: { signIn: { passkey: passkeyMock } },
+    navigate: navigateMock,
   };
 });
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
+import { PASSKEY_ON_THIS_DEVICE_STORAGE_KEY } from "../../../model/passkey-on-this-device.ts";
 import { WithTestAuthHost } from "../../../testing.tsx";
 import { AlternativeMethods, SignInMethodPicker } from "../sign-in-method-picker.tsx";
 
@@ -61,9 +64,88 @@ const renderAlternatives = () =>
     />,
   );
 
+beforeEach(() => {
+  window.localStorage.clear();
+  window.localStorage.setItem(PASSKEY_ON_THIS_DEVICE_STORAGE_KEY, "1");
+});
+
 afterEach(() => {
   cleanup();
   passkeyMock.mockReset();
+});
+
+describe("given a browser that has never used or made a passkey", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  /** @scenario "The passkey button waits until this browser has used a passkey" */
+  it("offers no passkey button on the picker or the rail", () => {
+    renderPicker();
+    renderAlternatives();
+
+    expect(screen.queryByTestId("passkey-sign-in")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Google/i })).toHaveLength(2);
+  });
+
+  it("still offers it where the account itself holds a passkey", () => {
+    renderWithDesignSystem(
+      <SignInMethodPicker
+        methodSet={METHOD_SET}
+        reasonCode="account_methods"
+        onFederatedMethodChosen={vi.fn()}
+        onPasskeyError={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("passkey-sign-in")).toBeTruthy();
+  });
+
+  it("keeps a passkey-only installation's one way in", () => {
+    renderWithDesignSystem(
+      <SignInMethodPicker
+        methodSet={[{ id: "passkey", kind: "passkey", connectionId: null }]}
+        reasonCode="no_domain_match"
+        onFederatedMethodChosen={vi.fn()}
+        onPasskeyError={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("passkey-sign-in")).toBeTruthy();
+  });
+});
+
+describe("given a browser that has used a passkey before", () => {
+  /** @scenario "A browser that has used a passkey is offered the passkey button" */
+  it("offers the passkey button on the picker and the rail", () => {
+    renderPicker();
+    renderAlternatives();
+
+    expect(screen.getAllByTestId("passkey-sign-in")).toHaveLength(2);
+  });
+});
+
+describe("when a passkey sign-in succeeds", () => {
+  /** @scenario "A passkey that works here is remembered without naming anybody" */
+  it("remembers a bare flag, with no address or account id", async () => {
+    window.localStorage.clear();
+    passkeyMock.mockResolvedValue({ data: { user: { id: "user_1", email: "sam@example.com" } } });
+    renderWithDesignSystem(
+      <SignInMethodPicker
+        methodSet={METHOD_SET}
+        reasonCode="account_methods"
+        onFederatedMethodChosen={vi.fn()}
+        onPasskeyError={vi.fn()}
+      />,
+    );
+
+    await userEvent.setup().click(screen.getByTestId("passkey-sign-in"));
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalled());
+    expect(window.localStorage.getItem(PASSKEY_ON_THIS_DEVICE_STORAGE_KEY)).toBe("1");
+    const everything = Object.keys(window.localStorage)
+      .map((key) => `${key}=${window.localStorage.getItem(key)}`)
+      .join(";");
+    expect(everything).not.toMatch(/sam@example\.com|user_1/);
+  });
 });
 
 describe("given the full method picker", () => {

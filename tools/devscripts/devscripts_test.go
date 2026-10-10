@@ -183,8 +183,8 @@ func TestEnsureBuilt(t *testing.T) {
 			t.Fatalf("code %d: %s", code, stderr.String())
 		}
 		got, _ := os.ReadFile(calls)
-		want := "--filter langwatch build\n--filter @langwatch/mcp-server build\n" +
-			"--filter @langwatch/ksuid build\n--filter @langwatch/mail build\n"
+		want := "exec nx run langwatch:build --outputStyle=static\nexec nx run @langwatch/mcp-server:build --outputStyle=static\n" +
+			"exec nx run @langwatch/ksuid:build --outputStyle=static\nexec nx run @langwatch/mail:build --outputStyle=static\n"
 		if string(got) != want {
 			t.Errorf("pnpm calls = %q, want %q", got, want)
 		}
@@ -202,7 +202,7 @@ func TestEnsureBuilt(t *testing.T) {
 			t.Fatalf("code %d", code)
 		}
 		got, _ := os.ReadFile(calls)
-		if want := "--filter @langwatch/ksuid build\n--filter @langwatch/mail build\n"; string(got) != want {
+		if want := "exec nx run @langwatch/ksuid:build --outputStyle=static\nexec nx run @langwatch/mail:build --outputStyle=static\n"; string(got) != want {
 			t.Errorf("pnpm calls = %q, want %q", got, want)
 		}
 	})
@@ -226,7 +226,7 @@ func TestEnsureBuilt(t *testing.T) {
 		got := builtAgain(t, func(root string) {
 			writeTree(t, root, map[string]string{"mcp/typescript/src/a.ts": "y"})
 		})
-		if got != "--filter @langwatch/mcp-server build\n" {
+		if got != "exec nx run @langwatch/mcp-server:build --outputStyle=static\n" {
 			t.Errorf("pnpm calls = %q", got)
 		}
 	})
@@ -234,7 +234,7 @@ func TestEnsureBuilt(t *testing.T) {
 		got := builtAgain(t, func(root string) {
 			writeTree(t, root, map[string]string{"feature-map.json": `{"features":[]}`})
 		})
-		if got != "--filter langwatch build\n" {
+		if got != "exec nx run langwatch:build --outputStyle=static\n" {
 			t.Errorf("pnpm calls = %q", got)
 		}
 	})
@@ -242,7 +242,7 @@ func TestEnsureBuilt(t *testing.T) {
 		got := builtAgain(t, func(root string) {
 			writeTree(t, root, map[string]string{"packages/ksuid/src/a.ts": "y"})
 		})
-		if got != "--filter @langwatch/ksuid build\n--filter @langwatch/mail build\n" {
+		if got != "exec nx run @langwatch/ksuid:build --outputStyle=static\nexec nx run @langwatch/mail:build --outputStyle=static\n" {
 			t.Errorf("pnpm calls = %q", got)
 		}
 	})
@@ -254,7 +254,7 @@ func TestEnsureBuilt(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if got != "--filter @langwatch/mcp-server build\n--filter @langwatch/ksuid build\n" {
+		if got != "exec nx run @langwatch/mcp-server:build --outputStyle=static\nexec nx run @langwatch/ksuid:build --outputStyle=static\n" {
 			t.Errorf("pnpm calls = %q", got)
 		}
 	})

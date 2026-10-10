@@ -1,5 +1,5 @@
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -15,7 +15,7 @@ const WEBHOOK_PUBLIC_REASON =
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
-export const elevenLabsSignature = defineRestMiddleware(
+export const elevenLabsSignature = defineMiddlewareContext(
   "elevenLabsSignature",
   gatewayElevenLabsSignatureSchema,
 );
@@ -34,7 +34,7 @@ export const elevenLabsWebhookRest = defineRestRouter(GatewayApi)
     because:
       "ElevenLabs reads its own delivery acknowledgement, status and body, as the provider defines it.",
   })
-  .withMiddleware(elevenLabsSignature)
+  .withMiddlewareContext(elevenLabsSignature)
   .handle(async ({ app, input, raw, response }, headers) => {
     const answer = await app.receiveElevenLabsWebhook({
       modelProviderId: input.modelProviderId,

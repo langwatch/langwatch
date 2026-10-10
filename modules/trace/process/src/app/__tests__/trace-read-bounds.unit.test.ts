@@ -10,6 +10,7 @@ import type { Evaluation, TracesForProjectResult } from "@langwatch/trace-contra
 import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
@@ -51,6 +52,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
   const summary: TraceSummaryReader = { getByTraceId: async () => ({}) as never };
 
   const app = TraceModule.fromDependencies({
+    authorizeRead: async ({ projectId }) => ownProof({ projectId }),
     storedObjects: createApiFixture<StoredObjectApi>(),
     spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
@@ -232,6 +234,7 @@ describe("trace read bounds", () => {
       });
 
       expect(getTracesWithSpans).toHaveBeenCalledWith({
+        authorization: expect.anything(),
         projectId: "project-1",
         traceIds: ids(2000),
         protections: PROTECTIONS,
@@ -265,6 +268,7 @@ describe("trace read bounds", () => {
       });
 
       expect(getTracesWithSpansByThreadIds).toHaveBeenCalledWith({
+        authorization: expect.anything(),
         projectId: "project-1",
         threadIds,
         protections: PROTECTIONS,

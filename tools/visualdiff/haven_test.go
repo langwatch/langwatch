@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -61,6 +62,22 @@ func (fake *fakeHavenRunner) statusJSON() string {
 }
 
 // argv joins one recorded command back into the line a person would type.
+// destroyedSlug is the slug a `haven down --destroy --stack <slug>` call names.
+func destroyedSlug(spec commandSpec) (string, bool) {
+	if len(spec.args) == 0 || spec.args[0] != "down" || !slices.Contains(spec.args, "--destroy") {
+		return "", false
+	}
+	if at := slices.Index(spec.args, "--stack"); at >= 0 && at+1 < len(spec.args) {
+		return spec.args[at+1], true
+	}
+	return "", false
+}
+
+func isDestroy(spec commandSpec) bool {
+	_, ok := destroyedSlug(spec)
+	return ok
+}
+
 func haventArgv(spec commandSpec) string {
 	return spec.name + " " + strings.Join(spec.args, " ")
 }
@@ -288,7 +305,7 @@ func TestTeardownNamesItsOwnTwoSlugsVisualdiff(t *testing.T) {
 	var destroys, removes []string
 	for _, spec := range fake.commands[before:] {
 		switch {
-		case len(spec.args) > 0 && spec.args[0] == "destroy":
+		case isDestroy(spec):
 			destroys = append(destroys, haventArgv(spec))
 		case len(spec.args) > 0 && spec.args[0] == "worktree":
 			removes = append(removes, haventArgv(spec))
@@ -297,8 +314,8 @@ func TestTeardownNamesItsOwnTwoSlugsVisualdiff(t *testing.T) {
 		}
 	}
 	wantDestroys := []string{
-		"haven destroy visualdiff-20260909t2230-base --agent --yes",
-		"haven destroy visualdiff-20260909t2230-candidate --agent --yes",
+		"haven down --destroy --stack visualdiff-20260909t2230-base --agent --yes",
+		"haven down --destroy --stack visualdiff-20260909t2230-candidate --agent --yes",
 	}
 	if strings.Join(destroys, "\n") != strings.Join(wantDestroys, "\n") {
 		t.Errorf("teardown ran\n%s\nwant\n%s", strings.Join(destroys, "\n"), strings.Join(wantDestroys, "\n"))
@@ -333,8 +350,8 @@ func TestAFailedBootTearsDownOnlyItsOwnSlugsVisualdiff(t *testing.T) {
 	}
 	var destroyed []string
 	for _, spec := range fake.commands[before:] {
-		if len(spec.args) > 1 && spec.args[0] == "destroy" {
-			destroyed = append(destroyed, spec.args[1])
+		if slug, ok := destroyedSlug(spec); ok {
+			destroyed = append(destroyed, slug)
 		}
 	}
 	want := []string{"visualdiff-20260909t2230-base", "visualdiff-20260909t2230-candidate"}
@@ -418,7 +435,7 @@ func TestReadyMeansBothLanesAreHealthy(t *testing.T) {
 		if err := run.havenWaitReady(context.Background(), &stack); err != nil {
 			t.Fatalf("havenWaitReady: %v", err)
 		}
-		if got := haventArgv(fake.commands[0]); got != "haven status --agent --json" {
+		if got := haventArgv(fake.commands[0]); got != "haven status --agent --json stacks" {
 			t.Errorf("readiness asked %q, want the machine-readable status", got)
 		}
 	})

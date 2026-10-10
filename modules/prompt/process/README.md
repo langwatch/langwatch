@@ -6,7 +6,7 @@ The server half of [prompt](../README.md). Prompts: versioned prompt configurati
 
 ## Installation
 
-`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withMigrations(…).withTransportFacts(…)`, `src/prompt.module.ts:17`.
+`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withMigrations(…).provideMiddlewareBindings(…)`, `src/prompt.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -663,7 +663,7 @@ interface Output {
 
 ### `prompts`
 
-Contract `../contract/src/prompt.trpc.ts:47`, router `src/transport/prompt.trpc.ts:15`.
+Contract `../contract/src/prompt.trpc.ts:48`, router `src/transport/prompt.trpc.ts:15`.
 
 | Procedure                         | Kind     | Gate                        | Input                                   | Output                           |
 | --------------------------------- | -------- | --------------------------- | --------------------------------------- | -------------------------------- |
@@ -691,7 +691,7 @@ Contract `../contract/src/prompt.trpc.ts:47`, router `src/transport/prompt.trpc.
 interface Input {
   projectId: string;
 }
-// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:50)
+// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:54)
 
 // prompts.getCopies
 // Input: promptIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:24
@@ -699,7 +699,7 @@ interface Input {
   projectId: string;
   idOrHandle: string;
 }
-// Output: inline, ../contract/src/prompt.trpc.ts:55
+// Output: inline, ../contract/src/prompt.trpc.ts:59
 type Output = {
   id: string;
   handle: string;
@@ -720,11 +720,11 @@ interface Input {
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
 
 // prompts.create
-type Input = z.infer<typeof promptCreateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:35
+type Input = z.infer<typeof promptCreateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:36
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
 
 // prompts.update
-type Input = z.infer<typeof promptUpdateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:40
+type Input = z.infer<typeof promptUpdateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:41
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
 
 // prompts.updateHandle
@@ -748,7 +748,7 @@ interface Input {
   version?: number;
   tag?: string;
 }
-// Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:79)
+// Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:83)
 
 // prompts.checkHandleUniqueness
 // Input: promptHandleUniquenessTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:188
@@ -757,7 +757,7 @@ interface Input {
   projectId: string;
   scope: "PROJECT" | "ORGANIZATION";
 }
-// Output: inline, ../contract/src/prompt.trpc.ts:83
+// Output: inline, ../contract/src/prompt.trpc.ts:87
 type Output = boolean;
 
 // prompts.checkModifyPermission
@@ -770,7 +770,7 @@ interface Output {
 
 // prompts.getAllVersionsForPrompt
 type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:91)
+// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:95)
 
 // prompts.delete
 type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
@@ -808,7 +808,7 @@ interface Input {
   projectId: string;
   configId: string;
 }
-// Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:117)
+// Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:121)
 
 // prompts.assignTag
 // Input: promptAssignTagTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:211

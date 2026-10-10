@@ -49,4 +49,30 @@ describe("given the Create New Team drawer", () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the server refuses the name as taken", () => {
+    /** @scenario "The create-team drawer shows a taken name under the name field" */
+    it("shows the message under the name field", async () => {
+      const message = "A team called Platform already exists";
+      mocks.create.mockImplementation((_input, { onError }) =>
+        onError({
+          data: {
+            error: {
+              code: "team_name_taken",
+              httpStatus: 409,
+              meta: { fieldErrors: { name: message } },
+            },
+          },
+        }),
+      );
+      renderWithOrganizationHost(<CreateTeamDrawer />);
+
+      fireEvent.change(await screen.findByTestId("team-form-name"), {
+        target: { value: "Platform" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(await screen.findByText(message)).toBeVisible();
+    });
+  });
 });

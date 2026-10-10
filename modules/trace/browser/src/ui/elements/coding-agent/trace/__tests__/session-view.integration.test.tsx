@@ -324,6 +324,15 @@ describe("SessionView", () => {
     });
   });
 
+  describe("given a session that reported no context data", () => {
+    it("shows a dash for peak context and cache misses, not zero", () => {
+      renderSession({ peakContextTokens: 0, cacheRebuildCount: 0 });
+
+      expect(screen.getByText("Peak context").parentElement).toHaveTextContent("—");
+      expect(screen.getByText("Cache misses").parentElement).toHaveTextContent("—");
+    });
+  });
+
   describe("given a session that was never compacted", () => {
     it("omits the Context noise section rather than showing a zero", () => {
       renderSession();

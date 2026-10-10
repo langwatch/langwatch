@@ -21,7 +21,8 @@ Rules of thumb:
 
 ## How an alert looks
 
-Use Chakra's `Alert` as is. The design system's recipe
+New notices use `Banner` (`@langwatch/design-system/banner`; guidelines §2). Existing
+`Alert` call sites keep the recipe below until they move; never restyle one. The design system's recipe
 (`packages/design-system/src/system/alert.recipe.ts`) gives every alert the
 card material with a faint wash of its status colour, a hairline in that colour
 and a status-coloured icon, with the text in the ordinary foreground colours.
@@ -49,7 +50,7 @@ Do not restyle an alert at the call site. `bg`, `borderColor`, `color`,
 `fontSize` on its title or description all fight the recipe, and one screen
 drifts from the rest. Margins, width and position are layout and belong to the
 call site. The workshop shows every status in every variant in both colour
-modes: `Primitives/Alert` in `pnpm --filter @langwatch/design-system storybook`.
+modes: `Feedback/Alert` in `pnpm --filter @langwatch/design-system storybook`.
 
 ## How toasts stack
 

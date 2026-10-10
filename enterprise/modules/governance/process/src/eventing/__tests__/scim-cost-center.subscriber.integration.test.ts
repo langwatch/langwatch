@@ -42,10 +42,16 @@ describe.skipIf(!databaseUrl)("SCIM cost-center facts landing as departments", (
 
   const memberDepartments = createApiFixture<OrganizationApi>({
     findMembersWithDepartments: ({ organizationId }) =>
-      prisma.organizationUser.findMany({
-        where: { organizationId },
-        select: { userId: true, departmentId: true, user: { select: { name: true, email: true } } },
-      }),
+      prisma.organizationUser
+        .findMany({
+          where: { organizationId },
+          select: {
+            userId: true,
+            departmentId: true,
+            user: { select: { name: true, email: true } },
+          },
+        })
+        .then((rows) => rows.map((row) => ({ ...row, disabledAt: null }))),
     assignMemberDepartment: async ({ organizationId, userId, departmentId }) =>
       (
         await prisma.organizationUser.updateMany({

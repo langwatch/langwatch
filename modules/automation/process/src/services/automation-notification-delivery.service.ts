@@ -84,7 +84,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     clock?: Readonly<{ now(): Instant }>;
     /** The webhook module's `sendRequest`; absent where no webhook action can be delivered. */
     webhookTransport?: WebhookDeliveryTransport;
-    slackWebhookClient?: SlackWebhookClientChannel;
+    slackWebhookClient?: Pick<SlackWebhookClientChannel, "send">;
     slackApiTransport?: SlackApiTransport;
     logger?: Logger;
   }): AutomationNotificationDeliveryService {

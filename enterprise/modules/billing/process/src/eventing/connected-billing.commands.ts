@@ -24,7 +24,7 @@ export const connectedCustomerOnboardedEventSchema = z.object({
   version: z.literal(CONNECTED_BILLING_EVENT_VERSION),
   data: connectedCustomerOnboardedEventDataSchema,
 });
-export type ConnectedCustomerOnboardedEvent = z.infer<typeof connectedCustomerOnboardedEventSchema>;
+type ConnectedCustomerOnboardedEvent = z.infer<typeof connectedCustomerOnboardedEventSchema>;
 
 export const connectedTermRenewedEventSchema = z.object({
   ...EventSchema.shape,
@@ -32,7 +32,7 @@ export const connectedTermRenewedEventSchema = z.object({
   version: z.literal(CONNECTED_BILLING_EVENT_VERSION),
   data: connectedTermRenewedEventDataSchema,
 });
-export type ConnectedTermRenewedEvent = z.infer<typeof connectedTermRenewedEventSchema>;
+type ConnectedTermRenewedEvent = z.infer<typeof connectedTermRenewedEventSchema>;
 
 export type ConnectedBillingEvent = ConnectedCustomerOnboardedEvent | ConnectedTermRenewedEvent;
 

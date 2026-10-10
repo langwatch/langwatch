@@ -14,7 +14,14 @@ const models = createListCollection({
 const empty = createListCollection<{ label: string; value: string }>({ items: [] });
 
 const meta = {
-  title: "Components/Select",
+  title: "Inputs and forms/Select",
+  parameters: {
+    usage: {
+      use: "One choice from a list too long to show at once, or loaded from data.",
+      avoid:
+        "Two to five options: use Radio or Segmented control. A scope: use Scope chip picker (never a hand-rolled Select). A model: use Provider model selector.",
+    },
+  },
   component: Select.Root,
   tags: ["autodocs"],
   args: { collection: models },

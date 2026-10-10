@@ -77,8 +77,11 @@ describe("given a settings page", () => {
   });
 
   describe("when it is the authentication family", () => {
-    it("fills the card", () => {
-      expect(measureAt({ pathname: "/settings/authentication/provider" })).toBe("100%");
-    });
+    it.each(["/settings/authentication", "/settings/authentication/provider"])(
+      "leaves %s unmeasured, so its section rail fills the card",
+      (pathname) => {
+        expect(measureAt({ pathname })).toBe("");
+      },
+    );
   });
 });

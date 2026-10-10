@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ProcessRef } from "../../../process-manager/processManager.types.ts";
@@ -81,7 +82,10 @@ export class PrismaProcessAdmin {
       this.prisma.$queryRaw<
         { processName: string; instances: number; overdueWakes: number }[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops fleet counts; the surface is operator-gated
+        ${skipTenantCheck({
+          // Cross-tenant ops fleet counts; the surface is operator-gated.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "processName",
                COUNT(*)::int AS "instances",
                COUNT(*) FILTER (WHERE "nextWakeAt" < ${overdueWakeBefore})::int AS "overdueWakes"
@@ -97,7 +101,10 @@ export class PrismaProcessAdmin {
           deadMessages: number;
         }[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops fleet counts; the surface is operator-gated
+        ${skipTenantCheck({
+          // Cross-tenant ops fleet counts; the surface is operator-gated.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "processName",
                COUNT(*) FILTER (WHERE "status" = 'pending')::int AS "pendingMessages",
                COUNT(*) FILTER (
@@ -176,7 +183,10 @@ export class PrismaProcessAdmin {
           updatedAt: Date;
         }[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops listing; rows carry their project identity
+        ${skipTenantCheck({
+          // Cross-tenant ops listing; rows carry their project identity.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "processName", "projectId", "processKey", "tenantId",
                "revision", "nextWakeAt", "updatedAt"
         FROM "ProcessManagerInstance"
@@ -188,7 +198,10 @@ export class PrismaProcessAdmin {
         OFFSET ${(params.page - 1) * params.pageSize}
       `),
       this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
-        -- @tenancy: cross-tenant ops listing; rows carry their project identity
+        ${skipTenantCheck({
+          // Cross-tenant ops listing; rows carry their project identity.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT COUNT(*)::int AS "total"
         FROM "ProcessManagerInstance"
         WHERE 1 = 1
@@ -214,7 +227,10 @@ export class PrismaProcessAdmin {
           dead: number;
         }[]
       >(Prisma.sql`
-        -- @tenancy: scoped to the page's (processName, projectId, processKey) tuples above
+        ${skipTenantCheck({
+          // Scoped to the page's (processName, projectId, processKey) tuples above.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "processName", "projectId", "processKey",
                COUNT(*) FILTER (WHERE "status" = 'pending')::int AS "pending",
                COUNT(*) FILTER (WHERE "status" = 'dead')::int AS "dead"
@@ -259,7 +275,10 @@ export class PrismaProcessAdmin {
         nextWakeAt: Date;
       }[]
     >(Prisma.sql`
-      -- @tenancy: cross-tenant ops listing; rows carry their project identity
+      ${skipTenantCheck({
+        // Cross-tenant ops listing; rows carry their project identity.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT "processName", "projectId", "processKey", "nextWakeAt"
       FROM "ProcessManagerInstance"
       WHERE "nextWakeAt" IS NOT NULL
@@ -321,9 +340,8 @@ export class PrismaProcessAdmin {
   }): Promise<{ messages: DeadOutboxMessageView[]; total: number }> {
     // Raw, like every other fleet-wide read here: the multitenancy guard
     // rejects a Prisma query on this model without a `projectId`, and a
-    // dead-letter sweep has no single project to name. The `@tenancy` marker
-    // is the same declaration `countByProcessName` makes, and the surface is
-    // ops-gated.
+    // dead-letter sweep has no single project to name. It skips the tenant
+    // check as `countByProcessName` does, and the surface is ops-gated.
     const nameFilter = params.processName
       ? Prisma.sql`AND "processName" = ${params.processName}`
       : Prisma.empty;
@@ -341,7 +359,10 @@ export class PrismaProcessAdmin {
           traceCarrier: unknown;
         })[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops dead-letter read; the surface is operator-gated
+        ${skipTenantCheck({
+          // Cross-tenant ops dead-letter read; the surface is operator-gated.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "id", "processName", "projectId", "processKey", "messageKey",
                "intentType", "status", "attempts", "nextAttemptAt",
                "leasedUntil", "createdAt", "updatedAt", "sourceEventId",
@@ -354,7 +375,10 @@ export class PrismaProcessAdmin {
         OFFSET ${(params.page - 1) * params.pageSize}
       `),
       this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
-        -- @tenancy: cross-tenant ops dead-letter read; the surface is operator-gated
+        ${skipTenantCheck({
+          // Cross-tenant ops dead-letter read; the surface is operator-gated.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT COUNT(*)::int AS "total"
         FROM "ProcessManagerOutbox"
         WHERE "status" = 'dead'
@@ -391,7 +415,10 @@ export class PrismaProcessAdmin {
     const rows = await this.prisma.$queryRaw<
       { processName: string; count: number; oldestUpdatedAt: Date }[]
     >(Prisma.sql`
-      -- @tenancy: cross-tenant ops dead-letter totals; the surface is operator-gated
+      ${skipTenantCheck({
+        // Cross-tenant ops dead-letter totals; the surface is operator-gated.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT "processName",
              COUNT(*)::int AS "count",
              MIN("updatedAt") AS "oldestUpdatedAt"
@@ -507,7 +534,10 @@ export class PrismaProcessAdmin {
     // Raw, like the fleet-wide reads: a dead-letter sweep has no single
     // project to name for the tenancy guard, and the surface is operator-gated.
     return this.prisma.$executeRaw(Prisma.sql`
-      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is operator-gated
+      ${skipTenantCheck({
+        // Cross-tenant ops dead-letter recovery; the surface is operator-gated.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'pending',
           "attempts" = 0,
@@ -541,7 +571,10 @@ export class PrismaProcessAdmin {
       ? Prisma.sql`AND "processName" = ${params.processName}`
       : Prisma.empty;
     return this.prisma.$executeRaw(Prisma.sql`
-      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is operator-gated
+      ${skipTenantCheck({
+        // Cross-tenant ops dead-letter recovery; the surface is operator-gated.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'discarded',
           "updatedAt" = ${now}

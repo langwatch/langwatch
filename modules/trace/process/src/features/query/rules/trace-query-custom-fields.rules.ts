@@ -1,6 +1,6 @@
 import { type FieldDef, UNSUPPORTED } from "@langwatch/trace-contract";
 
-import { boundedSubquery } from "../repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
+import { boundedSubquery } from "./trace-query-subquery.rules.ts";
 import {
   extractStringValue,
   likeMatch,

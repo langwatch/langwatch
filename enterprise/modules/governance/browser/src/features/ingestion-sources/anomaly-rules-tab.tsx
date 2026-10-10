@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Drawer } from "@langwatch/design-system/drawer";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
@@ -800,8 +801,9 @@ function RuleComposer({
                   ))}
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
-                  Only <code>spend_spike</code> is evaluated by the anomaly subscriber today. Other
-                  rule types (<code>rate_limit</code>,<code>after_hours</code>, …) are{" "}
+                  Only <InlineCode>spend_spike</InlineCode> is evaluated by the anomaly subscriber
+                  today. Other rule types (<InlineCode>rate_limit</InlineCode>,
+                  <InlineCode>after_hours</InlineCode>, …) are{" "}
                   <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.600">
                     preview
                   </Link>{" "}

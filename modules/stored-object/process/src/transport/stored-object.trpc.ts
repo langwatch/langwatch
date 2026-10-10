@@ -29,10 +29,12 @@ export const storedObjectTrpcTransport: TrpcRouterDeclaration<
   .handle(async ({ app, input, actor }) => app.getReadUrl(input, actor))
 
   .procedure("createUpload")
+  .refusedOnAggregate()
   .withPermission("project:update")
   .handle(async ({ app, input }) => app.createUpload(input))
 
   .procedure("confirmUpload")
+  .refusedOnAggregate()
   .withPermission("project:update")
   .handle(async ({ app, input }) => app.confirmUpload(input))
   .build();

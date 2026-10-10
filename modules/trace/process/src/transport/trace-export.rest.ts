@@ -33,8 +33,12 @@ export const traceExportRest = defineRestRouter(TraceApi)
   .withPermission("traces:view", { at: "route", param: "projectId" })
   .withResponse("bytes", { produces: ["text/csv; charset=utf-8", "application/x-ndjson"] })
   .withDocs({ hide: true })
-  .handle(async ({ app, input: request, actor, response }) => {
-    const download = await app.downloadTraceExport({ request, userId: actor.id });
+  .handle(async ({ app, input: request, actor, authorization, response }) => {
+    const download = await app.downloadTraceExport({
+      request,
+      userId: actor.id,
+      authorization,
+    });
     const headers = exportHeaders({
       exportId: download.exportId,
       totalCount: download.totalCount,
