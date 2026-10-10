@@ -140,10 +140,10 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 }
 
 // queueDepthScript sums the waiting work in Redis: lists, sorted sets and streams, never a
-// completed, failed or bookkeeping key. ponytail: KEYS over a test-sized db; SCAN if a tier grows.
+// completed, failed or bookkeeping key (the gq ready index and stats, known pipelines). ponytail: KEYS over a test-sized db; SCAN if a tier grows.
 const queueDepthScript = `local total = 0
 for _, key in ipairs(redis.call('KEYS', '*')) do
-  if not (string.find(key, ':completed$') or string.find(key, ':failed$') or string.find(key, ':events$') or string.find(key, ':meta$') or string.find(key, ':repeat$') or string.find(key, ':stalled') or string.find(key, 'dedup') or string.find(key, 'lock')) then
+  if not (string.find(key, ':completed$') or string.find(key, ':failed$') or string.find(key, ':events$') or string.find(key, ':meta$') or string.find(key, ':repeat$') or string.find(key, ':stalled') or string.find(key, 'dedup') or string.find(key, 'lock') or string.find(key, 'known%-pipelines') or string.find(key, ':gq:stats:') or string.find(key, ':gq:ready$')) then
     local kind = redis.call('TYPE', key).ok
     if kind == 'zset' then total = total + redis.call('ZCARD', key)
     elseif kind == 'list' then total = total + redis.call('LLEN', key)
