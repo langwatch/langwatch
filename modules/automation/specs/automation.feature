@@ -379,3 +379,10 @@ Feature: Automation ownership
     Given a process that sets the webhook module's local-URL dev switch
     When a webhook automation is saved with an http URL on a high port
     Then the save is accepted
+
+  @unit
+  Scenario: A test fire to a revoked bot token names the remediation
+    Given an automation delivering through a bot token Slack has revoked
+    When the author test-fires it
+    Then the test fire is refused as test_fire_unavailable with the token remediation, not an internal error
+
