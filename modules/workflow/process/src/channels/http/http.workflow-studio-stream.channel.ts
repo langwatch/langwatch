@@ -69,7 +69,7 @@ export class UnconfiguredWorkflowStudioStreamAdapter implements WorkflowStudioSt
   static create(input: { reason?: string } = {}): UnconfiguredWorkflowStudioStreamAdapter {
     return new UnconfiguredWorkflowStudioStreamAdapter(
       input.reason ??
-        "This process was composed without an NLP engine address, so it cannot run the optimization studio.",
+        "This process was composed without an NLP engine address, so it cannot run the workflow studio.",
     );
   }
 

@@ -55,7 +55,7 @@ export default function WorkflowsScreen() {
       {showEmptyState ? (
         <NoDataInfoBlock
           title="No workflows yet"
-          description="Create reusable workflows with the Optimization Studio."
+          description="Create reusable workflows with the workflow studio."
           icon={<Workflow size={24} />}
           color="blue.fg"
         >

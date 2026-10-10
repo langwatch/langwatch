@@ -1,6 +1,6 @@
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { type RefObject, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -9,6 +9,10 @@ import { serializeWorkflow } from "../../behavior/workflow-store.ts";
 
 type WorkflowAutosaveResult = { version: string; id: string };
 type TimerRef = RefObject<ReturnType<typeof setTimeout> | undefined>;
+
+/** A save that did not go through waits this long, doubling to the cap, then tries again. */
+const RETRY_FIRST_MS = 5_000;
+const RETRY_MAX_MS = 60_000;
 
 function clearTimer(ref: TimerRef) {
   if (ref.current) clearTimeout(ref.current);
@@ -32,15 +36,19 @@ async function refreshThenMoveBaseline({
 }
 
 /**
- * Browser-side Workflow autosave. The application provides the two transport
- * actions while this component owns change detection, debounce, and status UI.
+ * Browser-side Workflow autosave: the application provides the two transport actions,
+ * this owns change detection, debounce and status. Edits queue while disconnected and
+ * save once the studio is back; a save that does not go through retries, never failing.
  */
 export function WorkflowAutosave({
   isWorkflowReady,
+  isConnected,
   onSave,
   onRefreshVersions,
 }: {
   isWorkflowReady: boolean;
+  /** Whether the studio is connected; saves wait for it rather than fail. */
+  isConnected: boolean;
   onSave: (input: {
     dsl: StudioWorkflow;
     setAsLatestVersion: boolean;
@@ -49,10 +57,12 @@ export function WorkflowAutosave({
 }) {
   const [recentlySaved, setRecentlySaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasSaveError, setHasSaveError] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const maxWaitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const savedIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const retryDelayRef = useRef(RETRY_FIRST_MS);
+  const canSave = isWorkflowReady && isConnected;
 
   const {
     setWorkflow,
@@ -83,11 +93,13 @@ export function WorkflowAutosave({
   const clearScheduledSave = useEffectEvent(() => {
     clearTimer(saveTimeoutRef);
     clearTimer(maxWaitTimeoutRef);
+    clearTimer(retryTimeoutRef);
   });
 
   const saveIfChanged = useEffectEvent(async () => {
     clearScheduledSave();
-    if (!isWorkflowReady) {
+    // Not ready or not connected: the change stays queued until the effect re-arms.
+    if (!canSave) {
       return;
     }
 
@@ -104,7 +116,6 @@ export function WorkflowAutosave({
 
     const setAsLatestVersion = hasDSLChanged(autosavedWorkflow, currentWorkflow, false);
     setIsSaving(true);
-    setHasSaveError(false);
 
     try {
       const saved = await onSave({
@@ -115,6 +126,7 @@ export function WorkflowAutosave({
         setWorkflow({ version: saved.version });
       }
       setCurrentVersionId(saved.id);
+      retryDelayRef.current = RETRY_FIRST_MS;
       setRecentlySaved(true);
       clearTimer(savedIndicatorTimeoutRef);
       savedIndicatorTimeoutRef.current = setTimeout(() => setRecentlySaved(false), 5000);
@@ -123,14 +135,17 @@ export function WorkflowAutosave({
         moveBaseline: () => setAutosavedWorkflow(currentWorkflow),
       });
     } catch {
-      setHasSaveError(true);
+      // Still queued: the baseline did not move, so the next attempt sends the same change.
+      const delay = retryDelayRef.current;
+      retryDelayRef.current = Math.min(delay * 2, RETRY_MAX_MS);
+      retryTimeoutRef.current = setTimeout(() => void saveIfChanged(), delay);
     } finally {
       setIsSaving(false);
     }
   });
 
   useEffect(() => {
-    if (!isWorkflowReady) {
+    if (!canSave) {
       clearScheduledSave();
       return;
     }
@@ -143,7 +158,7 @@ export function WorkflowAutosave({
     }
 
     return () => clearTimer(saveTimeoutRef);
-  }, [isWorkflowReady, stateWorkflow]);
+  }, [canSave, stateWorkflow]);
 
   useEffect(
     () => () => {
@@ -153,22 +168,17 @@ export function WorkflowAutosave({
     [],
   );
 
-  return (
-    <AutosaveStatus isSaving={isSaving} hasSaveError={hasSaveError} recentlySaved={recentlySaved} />
-  );
+  return <AutosaveStatus isSaving={isSaving} recentlySaved={recentlySaved} />;
 }
 
 function AutosaveStatus({
   isSaving,
-  hasSaveError,
   recentlySaved,
 }: {
   isSaving: boolean;
-  hasSaveError: boolean;
   recentlySaved: boolean;
 }) {
-  const showSaveError = !isSaving && hasSaveError;
-  const showSaved = !isSaving && !hasSaveError && recentlySaved;
+  const showSaved = !isSaving && recentlySaved;
 
   return (
     <Box paddingLeft={2}>
@@ -176,12 +186,6 @@ function AutosaveStatus({
         <HStack>
           <Spinner size="xs" />
           <Text textStyle="bodySm">Saving...</Text>
-        </HStack>
-      )}
-      {showSaveError && (
-        <HStack color="status.error">
-          <X size={16} />
-          <Text textStyle="bodySm">Failed to autosave</Text>
         </HStack>
       )}
       {showSaved && (

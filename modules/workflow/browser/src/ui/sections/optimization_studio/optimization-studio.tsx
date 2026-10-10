@@ -15,14 +15,11 @@ import {
   Center,
   Flex,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 
 import "@xyflow/react/dist/style.css";
-import { titleCase } from "@langwatch/design-system/string-casing";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import {
@@ -72,12 +69,13 @@ import {
 } from "../../../behavior/use-workflow-prompt-picker-flow.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
-import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
+import type { WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { isConnectionAllowed } from "../../../model/control-flow.ts";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
 import { DatasetImagePreviewTable } from "../../blocks/dataset/dataset-image-preview-table.tsx";
 import Head from "../../elements/compat/next-head.tsx";
 import { EvaluationProgressBar } from "../../elements/experiment/BatchEvaluationV2/evaluation-progress-bar.tsx";
+import { StudioConnectionStatus } from "../../elements/studio-connection-status.tsx";
 import { WorkflowCanvasControls } from "../../elements/workflow-canvas-controls.tsx";
 import { ComponentIcon } from "../../elements/workflow-icons.tsx";
 import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
@@ -249,7 +247,7 @@ export default function OptimizationStudio() {
     <WorkflowNodeHostProvider value={studioNodeHost}>
       <div style={{ width: "100vw", height: "100vh" }}>
         <Head>
-          <title>LangWatch - Optimization Studio - {name}</title>
+          <title>LangWatch - Workflow studio - {name}</title>
         </Head>
         <ReactFlowProvider>
           <DndProvider backend={HTML5Backend}>
@@ -263,15 +261,12 @@ export default function OptimizationStudio() {
                     </Link>
                     <StudioWorkflowRunningStatus />
                     {!["waiting", "running"].includes(executionStatus ?? "") && (
-                      <StudioWorkflowAutosave />
+                      <StudioWorkflowAutosave isConnected={socketStatus === "connected"} />
                     )}
                   </HStack>
                   <HStack width="full" justify="center">
                     <StudioWorkflowNamePopover />
-                    <StatusCircle
-                      status={socketStatus}
-                      tooltip={<SocketStatusTooltip socketStatus={socketStatus} />}
-                    />
+                    <StudioConnectionStatus isConnected={socketStatus === "connected"} />
                   </HStack>
                   <HStack width="full" justify="end">
                     <StudioWorkflowUndoRedo />
@@ -439,35 +434,6 @@ function controlsMarginLeft({
   return isResultsPanelCollapsed ? "262px" : "180px";
 }
 
-function statusCircleColor({ status }: { status: string }): string {
-  if (status === "connected") return "green.fg";
-  if (status === "disconnected") return "red.fg";
-  return "yellow.fg";
-}
-
-function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {
-  return (
-    <Tooltip content={tooltip}>
-      <HStack>
-        <Box
-          minWidth="12px"
-          maxWidth="12px"
-          minHeight="12px"
-          maxHeight="12px"
-          background={statusCircleColor({ status })}
-          borderRadius="full"
-        />
-        {status !== "connected" && status !== "disconnected" && (
-          <HStack>
-            <Text>Connecting...</Text>
-            <Spinner size="sm" />
-          </HStack>
-        )}
-      </HStack>
-    </Tooltip>
-  );
-}
-
 export function OptimizationStudioCanvas({
   children,
   defaultZoom = 1,
@@ -613,7 +579,7 @@ function StudioWorkflowNodeSelectionPanel({
   );
 }
 
-function StudioWorkflowAutosave() {
+function StudioWorkflowAutosave({ isConnected }: { isConnected: boolean }) {
   const { project } = useOrganizationTeamProject();
   const { workflow } = useLoadWorkflow();
   const autosave = workflowApi.workflow.autosave.useMutation();
@@ -649,6 +615,7 @@ function StudioWorkflowAutosave() {
   return (
     <WorkflowAutosave
       isWorkflowReady={!!project && !!workflow.data}
+      isConnected={isConnected}
       onSave={onSave}
       onRefreshVersions={onRefreshVersions}
     />
@@ -762,20 +729,4 @@ function applyResultsPanelRequest({
   if (request === "closed" && !isCollapsed) {
     panelRef.current?.collapse();
   }
-}
-
-function SocketStatusTooltip({ socketStatus }: { socketStatus: SocketStatus }) {
-  if (socketStatus !== "connecting-python") return <>{titleCase(socketStatus)}</>;
-  return (
-    <VStack align="start" gap={1} padding={2}>
-      <HStack>
-        <StatusCircle status="connected" />
-        <Text>Socket Connection</Text>
-      </HStack>
-      <HStack>
-        <StatusCircle status="connecting" />
-        <Text>Python Runtime</Text>
-      </HStack>
-    </VStack>
-  );
 }

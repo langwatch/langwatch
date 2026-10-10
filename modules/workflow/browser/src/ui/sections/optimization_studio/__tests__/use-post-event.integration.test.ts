@@ -247,6 +247,47 @@ describe("useHandleServerMessage", () => {
   });
 });
 
+describe("given the heartbeat stream", () => {
+  beforeEach(() => {
+    toastCreate.mockClear();
+  });
+
+  describe("when the engine answers is_alive with an error", () => {
+    /** @scenario The heartbeat never reports a run */
+    it("raises no run toast, stops nothing, and only moves the connection status", () => {
+      const store = createMockStore();
+      const { result } = renderHook(() =>
+        useHandleServerMessage({ workflowStore: store, alertOnComponent: vi.fn() }),
+      );
+
+      result.current(
+        { type: "error", payload: { message: "runtime is unreachable" } },
+        { isHeartbeat: true },
+      );
+
+      expect(toastCreate).not.toHaveBeenCalled();
+      expect(store.stopWorkflowIfRunning).not.toHaveBeenCalled();
+      const moveStatus = vi.mocked(store.setSocketStatus).mock.calls[0]?.[0];
+      expect(typeof moveStatus === "function" ? moveStatus("connected") : moveStatus).toBe(
+        "connecting-python",
+      );
+    });
+  });
+
+  describe("when the engine answers is_alive", () => {
+    it("marks the studio connected", () => {
+      const store = createMockStore();
+      const { result } = renderHook(() =>
+        useHandleServerMessage({ workflowStore: store, alertOnComponent: vi.fn() }),
+      );
+
+      result.current({ type: "is_alive_response" }, { isHeartbeat: true });
+
+      expect(store.setSocketStatus).toHaveBeenCalledWith("connected");
+    });
+  });
+});
+
 /**
  * `alertOnError` decides what a failed run SAYS. Every branch of it — the
  * words, where they come from, whether the toast is red, and whether a second
