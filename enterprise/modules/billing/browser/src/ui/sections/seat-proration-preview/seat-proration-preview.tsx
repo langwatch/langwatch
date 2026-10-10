@@ -1,7 +1,7 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
-  Box,
+  Alert,
   Button,
   HStack,
   Separator,
@@ -155,14 +155,17 @@ export function SeatProrationPreview({ variant, open, onClose }: SeatProrationPr
           </HStack>
         )}
         {isPreviewError && (
-          <Box role="alert" borderWidth="1px" borderColor="red.solid" borderRadius="md" padding={3}>
-            <Text>
-              {describeError({
-                error: preview.error,
-                fallbackTitle: "Couldn't load the price preview",
-              })}
-            </Text>
-          </Box>
+          <Alert.Root status="error" role="alert">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>
+                {describeError({
+                  error: preview.error,
+                  fallbackTitle: "Couldn't load the price preview",
+                })}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
         {isPreviewReady && (
           <PreviewBody
