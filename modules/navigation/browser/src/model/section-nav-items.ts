@@ -47,14 +47,14 @@ export interface SectionNavItemData {
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
   {
-    label: "Virtual Keys",
+    label: "Virtual keys",
     href: "/gateway/virtual-keys",
     includePath: "/gateway/virtual-keys",
     icon: KeyRound,
     tourId: "nav-virtual-keys",
   },
   {
-    label: "Model Providers",
+    label: "Model providers",
     href: "/settings/model-providers",
     includePath: "/settings/model-providers",
     icon: Brain,
@@ -66,13 +66,13 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     icon: Gauge,
   },
   {
-    label: "Routing Policies",
+    label: "Routing policies",
     href: "/gateway/routing-policies",
     includePath: "/gateway/routing-policies",
     icon: Route,
   },
   {
-    label: "Cache Rules",
+    label: "Cache rules",
     href: "/gateway/cache-rules",
     includePath: "/gateway/cache-rules",
     icon: Zap,
@@ -90,7 +90,7 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     icon: LineChart,
   },
   {
-    label: "Billing Events",
+    label: "Billing events",
     href: "/gateway/billing-events",
     includePath: "/gateway/billing-events",
     icon: ReceiptText,
