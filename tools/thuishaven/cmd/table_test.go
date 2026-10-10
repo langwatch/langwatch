@@ -108,6 +108,19 @@ func TestRetiredPointerCarriesTheArguments(t *testing.T) {
 	}
 }
 
+// @scenario "The retired stack-mode spellings point at the one switch"
+func TestRetiredStackModeSpellingsPointAtTheOneSwitch(t *testing.T) {
+	for _, argv := range [][]string{{"--ui=watch"}, {"--ui", "bundled"}, {"--watch=false"}, {"--watch=true"}, {"-w=false"}} {
+		err := deps{}.dispatch(context.Background(), "up", argv)
+		if ExitCode(err) != exitUsage || !strings.Contains(err.Error(), "now: haven up [--watch|--hmr]") {
+			t.Errorf("haven up %s = %d %v, want 64 and the one switch", strings.Join(argv, " "), ExitCode(err), err)
+		}
+	}
+	if err := (deps{}).dispatch(context.Background(), "up", []string{"--watch", "--hmr"}); ExitCode(err) != exitUsage {
+		t.Errorf("haven up --watch --hmr = %d %v, want 64", ExitCode(err), err)
+	}
+}
+
 // @scenario "An unknown command fails with a pointer, not a guess"
 func TestUnknownCommandSuggestsNearMisses(t *testing.T) {
 	if code := ExitCode(deps{}.dispatch(context.Background(), "upp", nil)); code != exitUsage {

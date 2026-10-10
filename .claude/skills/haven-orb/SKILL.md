@@ -27,6 +27,6 @@ haven orb network --failed --agent
 - `--json` and `--stack <slug>` work on all of them.
 - The page buffer is whichever tab pushed last, and is empty until someone opens the app with the
   orb showing. The files live in `.haven/logs/<slug>/orb/`.
-- On a `--ui=built` stack the dev runtime injects the orb into the built page
+- On a built-UI stack (`haven up` or `--watch`) the dev runtime injects the orb into the built page
   (`tools/dev-runtime/src/haven-orb.ts`); the first page load waits a few seconds while it builds.
-  A `--ui=bundled` stack has none. Without a person's tab, drive the page with `haven-browser`.
+  A `--hmr` stack has none. Without a person's tab, drive the page with `haven-browser`.

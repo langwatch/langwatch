@@ -127,7 +127,7 @@ type PlanOptions struct {
 	// IsForegroundClient marks an up that stays the stack's owner after the
 	// hand-over, following its log and downing it when it goes (D7).
 	IsForegroundClient bool
-	ShouldGoWatch      bool // rebuild and swap the Go services (haven go-watch; air for langyagent); on unless LANGWATCH_GO_WATCH=0 or --watch=false
+	ShouldGoWatch      bool // rebuild and swap the Go services (haven go-watch; air for langyagent); only under up --watch or --hmr, and never with LANGWATCH_GO_WATCH=0
 	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
 	// lane: Vite, api and worker in one Node process (ADR-168, B1). On unless
 	// LANGWATCH_DEV_ONE_PROCESS=0.

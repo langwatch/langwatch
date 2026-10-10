@@ -240,11 +240,11 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change: Go rebuilds and Node reloads (the UI rebuilds only under --ui=watch). Off by default for the built UI, on for watch and bundled; --watch=false holds any stack. Sticks; `haven reload` applies changes"},
+			{long: "--watch", short: "-w", summary: "rebuild and reload on a change: one-shot UI builds (open pages reload once idle), Node reload, Go rebuild. Without it nothing reloads; `haven reload` applies changes. Not sticky"},
+			{long: "--hmr", summary: "as --watch, but the UI runs Vite bundledDev with HMR. Not sticky"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
-			{long: "--ui", takesValue: true, value: "<built|watch|bundled>", summary: "built (the default) serves a production build of apps/ui from the api, built once at up and on `haven reload ui`; watch rebuilds it on a change and open pages reload once idle; bundled runs Vite bundledDev with HMR. `pnpm dev` runs the Vite dev server outside haven; sticks"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 			{long: "--no-mail", summary: "the app sees no mail provider, even one .env names (HAVEN_NO_MAIL=1 does too); not sticky"},
@@ -273,18 +273,13 @@ var baseTable = []commandSpec{
 			if err := applyDeploymentMode(&d.opts, mode, d.worktree); err != nil {
 				return err
 			}
-			if inv.has("--watch") {
-				d.opts.ShouldGoWatch = inv.value("--watch") != "false" && inv.value("--watch") != "0"
-				if sel, err = d.orch.ResolveHold(d.worktree, sel, !d.opts.ShouldGoWatch); err != nil {
-					return err
-				}
+			switch {
+			case inv.has("--watch"):
+				sel.Refresh = domain.RefreshWatch
+			case inv.has("--hmr"):
+				sel.Refresh = domain.RefreshHMR
 			}
-			if inv.has("--ui") {
-				if sel, err = d.orch.ResolveUI(d.worktree, sel, inv.value("--ui")); err != nil {
-					return err
-				}
-			}
-			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.IsHeld()
+			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.IsStill()
 			d.opts.Selection = sel
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")

@@ -26,7 +26,7 @@ export function injectOrb({ html, entry }: { html: string; entry: string }): str
   return html.replace(/<\/head>/iu, `<script type="module" src="${ORB_PATH}${entry}"></script>$&`);
 }
 
-/** Marks a page a `--ui=watch` stack served; browser-host reloads it once idle after a swap. */
+/** Marks a page a `haven up --watch` stack served; browser-host reloads it once idle after a swap. */
 export const UI_WATCH_META = '<meta name="haven-ui-watch" content="1">';
 
 /** Builds apps/ui/vite/haven-orb.config.ts in memory; undefined when it cannot. */

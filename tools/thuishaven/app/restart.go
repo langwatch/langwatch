@@ -285,38 +285,6 @@ func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, req
 	return sel, mode, nil
 }
 
-// ResolveHold applies `up --watch[=false]` to the sticky selection: a held
-// stack's Node host does not reload on a file change. Persists only a change.
-func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, held bool) (domain.Selection, error) {
-	if sel.Held == held && sel.Watch == !held {
-		return sel, nil
-	}
-	sel.Held, sel.Watch = held, !held
-	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
-		return sel, fmt.Errorf("saving the hold: %w", err)
-	}
-	return sel, nil
-}
-
-// ResolveUI applies `up --ui=built|watch|bundled` to the sticky selection. Persists only a change.
-// The Vite dev server left haven: `pnpm dev` runs it on its own.
-func (o *Orchestrator) ResolveUI(worktreeDir string, sel domain.Selection, ui string) (domain.Selection, error) {
-	if ui == "dev" {
-		return sel, fmt.Errorf("--ui=dev is retired: --ui=bundled keeps HMR in haven, and `pnpm dev` runs the Vite dev server outside it")
-	}
-	if ui != "built" && ui != "watch" && ui != "bundled" {
-		return sel, fmt.Errorf("--ui takes built, watch or bundled, not %q", ui)
-	}
-	if sel.WatchUI == (ui == "watch") && sel.BundledUI == (ui == "bundled") {
-		return sel, nil
-	}
-	sel.WatchUI, sel.BundledUI = ui == "watch", ui == "bundled"
-	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
-		return sel, fmt.Errorf("saving the ui mode: %w", err)
-	}
-	return sel, nil
-}
-
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing
 // its hostname. Telemetry starts fresh — the stack keeps no volume by design.
 func (o *Orchestrator) restartObservability(ctx context.Context) error {

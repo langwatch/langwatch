@@ -1,6 +1,6 @@
 ---
 name: haven-lifecycle
-description: "Start, stop, reconcile and clean up haven stacks: `haven up`, `down`, `restart`, `reload`, `status`, `down --destroy`, `machine clean`, `self install`, `self setup`, `switch`, `self shell-init`, lanes, +svc/-svc, the UI modes (built, watch, bundled) and the hold. Use when someone says 'haven destroy', 'haven clean', 'haven install', 'haven setup', 'haven shell-init', 'haven up', 'start the stack', 'stop the stack', 'haven down', 'restart the api lane', 'haven reload', 'hold the stack', 'add a service', 'haven up +langy', 'built or bundled UI', 'haven status', 'haven down --destroy', 'haven machine clean', 'free disk from worktrees', 'haven self install', 'haven self setup', 'haven switch', or 'a stack is running somewhere else'."
+description: "Start, stop, reconcile and clean up haven stacks: `haven up`, `down`, `restart`, `reload`, `status`, `down --destroy`, `machine clean`, `self install`, `self setup`, `switch`, `self shell-init`, lanes, +svc/-svc, the stack modes (still, --watch, --hmr). Use when someone says 'haven destroy', 'haven clean', 'haven install', 'haven setup', 'haven shell-init', 'haven up', 'start the stack', 'stop the stack', 'haven down', 'restart the api lane', 'haven reload', 'haven up --watch', 'haven up --hmr', 'add a service', 'haven up +langy', 'built UI or HMR', 'haven status', 'haven down --destroy', 'haven machine clean', 'free disk from worktrees', 'haven self install', 'haven self setup', 'haven switch', or 'a stack is running somewhere else'."
 user-invocable: true
 argument-hint: "[up | down | restart <lane> | reload | status | down --destroy --stack <slug> | machine clean | self install]"
 ---
@@ -34,8 +34,9 @@ haven up --mode <mode>            # a deployment mode from dev/tests/modes; stic
 haven up --rebuild                # rebuild container images even when unchanged
 ```
 
-`-w/--watch` rebuilds Go and reloads Node (off by default for the built UI, on for watch and
-bundled); `--watch=false` holds the stack (sticky). Only `--ui=watch` rebuilds the UI on a change. The simulators are `+name` services too: `haven sim` lists them (`sims` skill).
+One mode switch, never sticky (ADR-064 amendment 2026-10-10 b): plain `haven up` is still,
+`--watch` rebuilds and reloads everything on a change, `--hmr` does too with Vite HMR for the UI.
+Switching needs no `--force`; `--ui=...` and `--watch=false` exit 64. The simulators are `+name` services too: `haven sim` lists them (`sims` skill).
 Do not run `haven up` or `down` on a checkout another session uses without asking; as an agent a
 `haven up --force` or `make haven self install` on a stack that testers drive is refused by the safety check.
 
@@ -45,34 +46,32 @@ Do not run `haven up` or `down` on a checkout another session uses without askin
 `haven logs api` and `haven logs worker` each show half of it. Under the default, ui, api and
 worker are one `app` lane: see `dev-runtime`. The `go` lane also hosts the simulators and no
 `sims` lane runs; `LANGWATCH_DEV_ONE_PROCESS=0` splits both (`LANGWATCH_GO_ONE_PROCESS` is a
-deprecated alias). The Go lane rebuilds and swaps its child on a Go change;
-`LANGWATCH_GO_WATCH=0` or `haven up --watch=false` turns that off; `haven logs <sim>` still reads
+deprecated alias). The Go lane rebuilds and swaps its child on a Go change
+only under `--watch` or `--hmr`, and `LANGWATCH_GO_WATCH=0` keeps it off; `haven logs <sim>` still reads
 each one. Langy stays its own lane.
 
 ```bash
 haven restart api                 # restart the whole lane
-haven up --watch=false --force         # hold the stack (sticky): no Go rebuild, no backend reload, no UI rebuild
-haven reload [app|api|worker]     # apply changes to the held stack in place
+haven reload [app|api|worker]     # apply changes to a still stack in place
 haven reload ui                   # built UI: rebuild the bundle and swap it in
 ```
 
-## UI modes
+## Stack modes
 
 ```bash
-haven up                          # default: built UI served by the api, no Vite, built once at up
-haven up --ui=watch --force       # the built UI rebuilt on a change; open pages reload once idle (sticky)
-haven up --ui=bundled --force     # editing and testing visually: Vite 8 bundled dev, HMR kept (sticky)
-haven up --ui=built --force       # back to the default
+haven up                          # still: built UI served by the api, no Vite, nothing reloads
+haven up --watch                  # UI one-shot builds (open pages reload once idle), Node reload, Go rebuild
+haven up --hmr                    # as --watch, but the UI is Vite 8 bundled dev with HMR
 ```
 
-`built` builds the bundle once at `up` (cached by Nx) and never again until `haven reload ui`;
-open pages never reload. `watch` adds a `ui` lane, `haven ui-watch`: one build per settled burst
+`haven status` names the mode (`refresh still|watch|hmr`, `"refresh"` in `--json`).
+Still builds the bundle once at `up` (cached by Nx) and never again until `haven reload ui`;
+open pages never reload. `--watch` adds a `ui` lane, `haven ui-watch`: one build per settled burst
 of edits, swapped in whole (`haven logs ui` shows each; a failed build keeps the last good
 bundle). An open page then reloads once nobody has touched it for 60 s, or at once when hidden.
-Old chunks stay loadable for 24 h after a swap. `--ui=dev` is refused: `pnpm dev` runs the Vite
-dev server outside haven. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
+Old chunks stay loadable for 24 h after a swap. `pnpm dev` runs the Vite dev server outside haven. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
 
-|             | dev (`pnpm dev`) | built                         |
+|             | dev (`pnpm dev`) | built (still, --watch)        |
 | ----------- | ---------------- | ----------------------------- |
 | Role        | almost never     | testing without changing code |
 | Page memory | 708 MB           | 396 MB                        |

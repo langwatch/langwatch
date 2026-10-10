@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -145,7 +146,7 @@ func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
 			if err := s.WriteSelection(dir, sel); err != nil {
 				t.Fatalf("WriteSelection: %v", err)
 			}
-			b, err := os.ReadFile(filepath.Join(dir, ".haven.json"))
+			b, err := os.ReadFile(selectionPath(dir))
 			if err != nil {
 				t.Fatalf("read back: %v", err)
 			}
@@ -201,7 +202,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 				t.Fatalf("WriteSelection: %v", err)
 			}
 
-			b, err := os.ReadFile(filepath.Join(dir, ".haven.json"))
+			b, err := os.ReadFile(selectionPath(dir))
 			if err != nil {
 				t.Fatalf("read back: %v", err)
 			}
@@ -436,30 +437,25 @@ func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
 	}
 }
 
-// @scenario "A stack left on the retired --ui=dev serves the built UI"
-// The sticky stack modes (--watch=false, --ui=watch|bundled) survive a write and a read.
-func TestSelectionKeepsTheStickyModes(t *testing.T) {
+// @scenario "The stack mode is not sticky"
+// A file an older haven wrote with a saved mode reads as still, and the next write drops the keys.
+func TestSelectionIgnoresAndDropsTheRetiredModes(t *testing.T) {
 	s, dir := New(t.TempDir()), t.TempDir()
-	want := domain.DefaultSelection()
-	want.Held, want.WatchUI = true, true
-	if err := s.WriteSelection(dir, want); err != nil {
+	writeSelectionJSON(t, dir, `{"held":true,"watch":true,"watch-ui":true,"bundled-ui":true,"dev-ui":true,"services":{}}`)
+	got, ok := s.ReadSelection(dir)
+	if !ok || !got.IsStill() || !got.IsBuiltUI() {
+		t.Fatalf("a saved mode should read as still, got %+v ok=%v", got, ok)
+	}
+	if err := s.WriteSelection(dir, got); err != nil {
 		t.Fatalf("WriteSelection: %v", err)
 	}
-	got, ok := s.ReadSelection(dir)
-	if watching := (domain.Selection{Watch: true}); s.WriteSelection(dir, watching) != nil {
-		t.Fatal("WriteSelection with --watch")
-	} else if back, _ := s.ReadSelection(dir); !back.Watch {
-		t.Fatal("--watch did not survive a write and a read")
+	b, err := os.ReadFile(selectionPath(dir))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !ok || !got.Held || !got.WatchUI || got.BundledUI || !got.IsBuiltUI() {
-		t.Fatalf("read back held=%v watch-ui=%v bundled=%v ok=%v", got.Held, got.WatchUI, got.BundledUI, ok)
-	}
-	writeSelectionJSON(t, dir, `{"dev-ui":true,"services":{}}`)
-	if got, _ := s.ReadSelection(dir); !got.IsBuiltUI() || got.WatchUI {
-		t.Error("a file left on the retired --ui=dev should serve the built UI")
-	}
-	writeSelectionJSON(t, dir, `{"built-ui":true,"services":{}}`)
-	if got, _ := s.ReadSelection(dir); !got.IsBuiltUI() {
-		t.Error("a file from before built was the default stopped serving the built UI")
+	for _, key := range []string{"held", `"watch"`, "watch-ui", "bundled-ui", "dev-ui"} {
+		if strings.Contains(string(b), key) {
+			t.Errorf("the next write kept %s:\n%s", key, b)
+		}
 	}
 }

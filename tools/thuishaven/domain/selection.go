@@ -14,21 +14,11 @@ import (
 type Selection struct {
 	// Mode is the sticky deployment mode (`haven up --mode <m>`); "" is none.
 	Mode string `json:"mode,omitempty"`
-	// Held is sticky `haven up --watch=false`: the Node host does not reload on
-	// a file change (LANGWATCH_DEV_WATCH=0); `haven reload` applies changes.
-	Held bool `json:"held,omitempty"`
-	// Watch is sticky `haven up --watch`: a built-UI stack refreshes on a change
-	// only when asked, so its pages never move under a tester (IsHeld).
-	Watch bool `json:"watch,omitempty"`
-	// WatchUI is sticky `haven up --ui=watch`: the built UI, rebuilt by `haven
-	// ui-watch` on a change; open pages reload once idle. Neither WatchUI nor
-	// BundledUI is the default, the built UI built once at up (IsBuiltUI).
-	WatchUI bool `json:"watch-ui,omitempty"`
-	// BundledUI is sticky `haven up --ui=bundled`: Vite serves incrementally
-	// rebuilt bundles from memory (LANGWATCH_UI_BUNDLED=1); HMR stays. Not with WatchUI.
-	BundledUI bool `json:"bundled-ui,omitempty"`
-	Gateway   bool `json:"gateway"`
-	NLP       bool `json:"nlp"`
+	// Refresh is what this `haven up` refreshes on a file change (ADR-064
+	// amendment 2026-10-10 b). Never saved: a plain `up` is always still.
+	Refresh RefreshMode `json:"-"`
+	Gateway bool        `json:"gateway"`
+	NLP     bool        `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.
@@ -96,14 +86,31 @@ type Selection struct {
 	Lambda bool `json:"lambda"`
 }
 
-// IsBuiltUI is whether app.<slug> is the api serving a production build of
-// apps/ui, as production does, with no Vite: the built and watch UI modes.
-// `--ui=watch` rebuilds it on a change; `--ui=built` only on `haven reload ui`.
-func (s Selection) IsBuiltUI() bool { return !s.BundledUI }
+// RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
+// watch (`--watch`: one-shot UI builds, Node reload, Go rebuild) or hmr
+// (`--hmr`: the same with Vite bundledDev and HMR for the UI).
+type RefreshMode string
 
-// IsHeld is whether nothing refreshes on a file change: `--watch=false`, or a
-// built UI neither `--watch` nor `--ui=watch` asked to refresh. `haven reload` applies changes.
-func (s Selection) IsHeld() bool { return s.Held || (s.IsBuiltUI() && !s.Watch && !s.WatchUI) }
+const (
+	RefreshStill RefreshMode = ""
+	RefreshWatch RefreshMode = "watch"
+	RefreshHMR   RefreshMode = "hmr"
+)
+
+// Name is how status spells the mode: still, watch or hmr.
+func (m RefreshMode) Name() string {
+	if m == RefreshStill {
+		return "still"
+	}
+	return string(m)
+}
+
+// IsBuiltUI is whether app.<slug> is the api serving a production build of
+// apps/ui, as production does, with no Vite: every mode but hmr.
+func (s Selection) IsBuiltUI() bool { return s.Refresh != RefreshHMR }
+
+// IsStill is whether nothing refreshes on a file change; `haven reload` applies changes.
+func (s Selection) IsStill() bool { return s.Refresh == RefreshStill }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
 // gateway, nlp, the idp, mail, storage, payment and telemetry simulators — no
@@ -226,7 +233,7 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 // SelectionFromStack derives what a running stack actually runs, so a plain
 // `up` can tell "already matches the selection" from "needs a restart".
 func SelectionFromStack(st Stack) Selection {
-	var sel Selection
+	sel := Selection{Refresh: st.Refresh}
 	for _, svc := range st.Services {
 		local := svc.Port != 0 && !svc.IsFallback
 		switch svc.Name {

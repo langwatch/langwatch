@@ -34,21 +34,21 @@ func TestWaitForLineSeesOnlyNewOutput(t *testing.T) {
 	}
 }
 
-// @scenario "A held stack runs its Node host without a backend reload on change"
-func TestHeldStackSetsWatchOffOnTheNodeLane(t *testing.T) {
+// @scenario "A still stack runs its Node host without a backend reload on change"
+func TestStillStackSetsWatchOffOnTheNodeLane(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
-	for _, held := range []bool{false, true} {
+	for _, mode := range []domain.RefreshMode{domain.RefreshStill, domain.RefreshWatch, domain.RefreshHMR} {
 		sel := domain.DefaultSelection()
-		sel.Held, sel.Watch = held, !held
+		sel.Refresh = mode
 		children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo, ShouldRunOneProcess: true}, repo)
 		child, ok := findChild(children, AppLane)
 		if !ok {
-			t.Fatalf("no app lane with held=%v", held)
+			t.Fatalf("no app lane in %s", mode.Name())
 		}
-		if got := slices.Contains(child.Env, "LANGWATCH_DEV_WATCH=0"); got != held {
-			t.Fatalf("held=%v but LANGWATCH_DEV_WATCH=0 present=%v", held, got)
+		if got := slices.Contains(child.Env, "LANGWATCH_DEV_WATCH=0"); got != (mode == domain.RefreshStill) {
+			t.Fatalf("%s but LANGWATCH_DEV_WATCH=0 present=%v", mode.Name(), got)
 		}
 	}
 }
@@ -156,45 +156,31 @@ func assertNoStaging(t *testing.T, repo string) {
 	}
 }
 
-// @scenario "A bundled UI stack runs Vite on bundled output and leaves the other modes"
-func TestBundledUISetsTheViteEnvAndIsExclusiveWithBuilt(t *testing.T) {
+// @scenario "An hmr stack runs Vite on bundled output with HMR"
+func TestHMRStackRunsBundledViteAndRefusesReloadUI(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}, store: &fakeStore{}}
-	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
+	st := domain.Stack{Slug: "branch", WorktreeDir: repo, Refresh: domain.RefreshHMR}
 	sel := domain.DefaultSelection()
-	sel.BundledUI = true
+	sel.Refresh = domain.RefreshHMR
 	children := o.planChildren(st, PlanOptions{Selection: sel, ShouldRunOneProcess: true, RepoRoot: repo}, repo)
 	child, ok := findChild(children, AppLane)
-	if !ok || !slices.Contains(child.Env, "LANGWATCH_UI_BUNDLED=1") {
-		t.Fatalf("want LANGWATCH_UI_BUNDLED=1 on the app lane, got %+v", child)
+	if !ok || !slices.Contains(child.Env, "LANGWATCH_UI_BUNDLED=1") || slices.Contains(child.Env, "LANGWATCH_DEV_WATCH=0") || sel.IsBuiltUI() {
+		t.Fatalf("want LANGWATCH_UI_BUNDLED=1 and a reloading backend on the app lane, got %+v", child)
 	}
-	sel.WatchUI, sel.BundledUI = true, false
-	sel, err := o.ResolveUI(repo, sel, "bundled")
-	if err != nil || !sel.BundledUI || sel.WatchUI || sel.IsBuiltUI() {
-		t.Fatalf("bundled should replace watch: %+v, %v", sel, err)
-	}
-	if sel, err = o.ResolveUI(repo, sel, "watch"); err != nil || !sel.WatchUI || sel.BundledUI || !sel.IsBuiltUI() || sel.IsHeld() {
-		t.Fatalf("--ui=watch should serve the built UI and refresh it: %+v, %v", sel, err)
-	}
-	if sel, err = o.ResolveUI(repo, sel, "built"); err != nil || !sel.IsBuiltUI() || sel.WatchUI {
-		t.Fatalf("--ui=built should return to the default: %+v, %v", sel, err)
-	}
-	if _, err := o.ResolveUI(repo, sel, "turbo"); err == nil {
-		t.Fatal("an unknown --ui value should be refused")
-	}
-	if _, err := o.ResolveUI(repo, sel, "dev"); err == nil || !strings.Contains(err.Error(), "pnpm dev") {
-		t.Fatalf("--ui=dev left haven and should point at `pnpm dev`, got %v", err)
+	if err := o.reloadUI(context.Background(), st); err == nil || !strings.Contains(err.Error(), "reloads itself") {
+		t.Fatalf("haven reload ui on an hmr stack should be refused, got %v", err)
 	}
 }
 
-// @scenario "A fresh stack serves the built UI and holds it still"
+// @scenario "A plain haven up serves the built UI and holds it still"
 func TestBuiltUIIsTheDefaultAndHoldsWithoutWatch(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), UIWatchArgv: []string{"/opt/haven", "ui-watch"}}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
 	sel := domain.DefaultSelection()
-	if !sel.IsBuiltUI() || !sel.IsHeld() {
-		t.Fatal("a fresh worktree should serve the built UI, held")
+	if !sel.IsBuiltUI() || !sel.IsStill() {
+		t.Fatal("a plain haven up should serve the built UI, still")
 	}
 	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	child, ok := findChild(children, AppLane)
@@ -204,10 +190,6 @@ func TestBuiltUIIsTheDefaultAndHoldsWithoutWatch(t *testing.T) {
 	if _, ok := findChild(children, "ui"); ok {
 		t.Fatal("a built stack runs no ui-watch lane")
 	}
-	sel.Watch = true // --watch reloads the backend; only --ui=watch rebuilds the UI
-	if _, ok := findChild(o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo), "ui"); ok {
-		t.Fatal("a built stack with --watch still runs no ui-watch lane")
-	}
 }
 
 // @scenario "A watch UI stack rebuilds the built UI on a change"
@@ -216,7 +198,7 @@ func TestWatchUIRebuildsWithOneShotBuilds(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), UIWatchArgv: []string{"/opt/haven", "ui-watch"}}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
 	sel := domain.DefaultSelection()
-	sel.WatchUI = true
+	sel.Refresh = domain.RefreshWatch
 	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	child, ok := findChild(children, AppLane)
 	if !ok || !strings.HasPrefix(child.Shell, uiPruneStaleShell+"("+UIBuildShell+") && ") || !strings.HasSuffix(child.Shell, BackendPackage+" dev") {
@@ -233,19 +215,18 @@ func TestWatchUIRebuildsWithOneShotBuilds(t *testing.T) {
 	}
 }
 
-// @scenario "A held built UI stack runs no Vite and routes the app hostname to the api"
+// @scenario "A plain haven up serves the built UI and holds it still"
 func TestHeldBuiltUIPlansTheBackendOnlyHost(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
 	sel := domain.DefaultSelection()
-	sel.Held = true
 	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	child, ok := findChild(children, AppLane)
 	if !ok || !strings.HasPrefix(child.Shell, uiPruneStaleShell+"("+UIBuildShell+") && ") || !strings.HasSuffix(child.Shell, BackendPackage+" dev") {
 		t.Fatalf("want build then the backend-only host, got %+v", child)
 	}
 	if _, ok := findChild(children, "ui"); ok {
-		t.Fatal("a held stack rebuilds the UI only on `haven reload ui`")
+		t.Fatal("a still stack rebuilds the UI only on `haven reload ui`")
 	}
 }

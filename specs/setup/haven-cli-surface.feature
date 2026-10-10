@@ -12,6 +12,11 @@ Feature: haven CLI surface
     And a spelling removed with no successor says so in one line
     And no retired spelling is also a live command
 
+  Scenario: The retired stack-mode spellings point at the one switch
+    When the developer runs "haven up --ui=watch", "haven up --ui bundled", "haven up --watch=false", "haven up --watch=true" or "haven up -w=false"
+    Then it exits 64 with "now: haven up [--watch|--hmr]"
+    And "haven up --watch --hmr" exits 64
+
   Scenario: A flag shorthand means one thing across the whole CLI
     Then "-f" is accepted only where it means "--follow"
     And "--force" forces the lifecycle on up and down only, in its long form

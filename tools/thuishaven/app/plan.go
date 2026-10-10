@@ -151,7 +151,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	}
 	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.IsBuiltUI())
 	out := []Child{p.frontChild(mono, isOneProcess)}
-	if isOneProcess && opts.Selection.WatchUI && !opts.Selection.IsHeld() && len(p.o.cfg.UIWatchArgv) > 0 {
+	if isOneProcess && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
 		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui"), p.o.cfg.UIWatchArgv))
 	}
 	out = append(out, p.goLanes(mono)...)
@@ -273,15 +273,15 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	env := append(domain.LaneDatabaseEnv(p.base, lane),
 		"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
 		p.o.compileCacheEnv(p.st.Slug))
-	if p.opts.Selection.IsHeld() {
+	if p.opts.Selection.IsStill() {
 		env = append(env, "LANGWATCH_DEV_WATCH=0")
 	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
-		if p.opts.Selection.BundledUI {
+		if p.opts.Selection.Refresh == domain.RefreshHMR {
 			env = append(env, "LANGWATCH_UI_BUNDLED=1")
 		}
-		if p.opts.Selection.WatchUI && !p.opts.Selection.IsHeld() {
+		if p.opts.Selection.Refresh == domain.RefreshWatch {
 			env = append(env, "LANGWATCH_UI_WATCH=1") // the api's port marks pages, which then reload once idle
 		}
 		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {

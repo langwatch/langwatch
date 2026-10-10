@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // @scenario "LANGWATCH_GO_ONE_PROCESS is a warned alias of the one switch"
@@ -58,7 +60,7 @@ func TestTheGoOneProcessNameIsAWarnedAlias(t *testing.T) {
 	})
 }
 
-// @scenario "The Go watcher is on unless switched off"
+// @scenario "The Go watcher runs only when the stack watches"
 func TestTheGoWatcherIsOnUnlessSwitchedOff(t *testing.T) {
 	t.Run("when LANGWATCH_GO_WATCH is unset", func(t *testing.T) {
 		t.Setenv("LANGWATCH_GO_WATCH", "")
@@ -75,22 +77,20 @@ func TestTheGoWatcherIsOnUnlessSwitchedOff(t *testing.T) {
 			t.Error("LANGWATCH_GO_WATCH=0 still watches")
 		}
 	})
-	t.Run("when up gets --watch=false", func(t *testing.T) {
+	t.Run("when up gets --watch or --hmr", func(t *testing.T) {
 		var spec commandSpec
 		for _, c := range table {
 			if c.name == "up" {
 				spec = c
 			}
 		}
-		inv, err := parse(spec, []string{"--watch=false"})
-		if err != nil {
-			t.Fatal(err)
+		for flag, long := range map[string]string{"--watch": "--watch", "-w": "--watch", "--hmr": "--hmr"} {
+			if inv, err := parse(spec, []string{flag}); err != nil || !inv.has(long) {
+				t.Errorf("%s did not parse as %s: %v", flag, long, err)
+			}
 		}
-		if inv.value("--watch") != "false" {
-			t.Errorf("--watch=false parsed as %q", inv.value("--watch"))
-		}
-		if _, err := parse(spec, []string{"--watch=maybe"}); err == nil {
-			t.Error("--watch=maybe was accepted")
+		if !(domain.Selection{}).IsStill() || (domain.Selection{Refresh: domain.RefreshWatch}).IsStill() {
+			t.Error("a plain up should be still and --watch should not")
 		}
 	})
 }

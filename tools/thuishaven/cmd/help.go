@@ -183,9 +183,9 @@ var envHelpText = `Environment variables.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.
-    LANGWATCH_GO_WATCH=0         Turn off the Go watcher (default on: haven rebuilds
-                                 and swaps the Go child on a change); also
-                                 haven up --watch=false.
+    LANGWATCH_GO_WATCH=0         Keep the Go watcher off even under haven up --watch
+                                 or --hmr (where haven rebuilds and swaps the Go
+                                 child on a change).
     LANGWATCH_DEV_ONE_PROCESS=0  Split both defaults: the app lane (ui + api +
                                  worker, ADR-168) into ui and api lanes, and the
                                  go lane (data plane + sims) into go and sims.

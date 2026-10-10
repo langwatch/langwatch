@@ -12,7 +12,7 @@ import (
 // the lanes have something to bind, under the given selection.
 func devToolsPlan(t *testing.T, sel domain.Selection) []Child {
 	t.Helper()
-	sel.BundledUI = true // the split lanes these tests name
+	sel.Refresh = domain.RefreshHMR // the split lanes these tests name
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.DesignSystemService, Port: 46006},

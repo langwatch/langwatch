@@ -60,13 +60,13 @@ generation serving. A failed boot waits for the next change. Each generation log
 
 ## Reload knobs
 
-| Variable                            | Effect                                                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `LANGWATCH_DEV_WATCH=0`             | held: no reload on a change; `haven reload` (SIGUSR2) applies them (haven sets it on `up --watch=false`) |
-| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`   | quiet window before a reload (2000)                                                                      |
-| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`   | never defer longer than this after the first change (30000)                                              |
-| `LANGWATCH_DEV_RECYCLE_GENERATIONS` | api lane: after this many generations, the next edit restarts the process (50)                           |
-| `LANGWATCH_DEV_RECYCLE_RSS_MIB`     | api lane: past this RSS, the next edit restarts the process (4096)                                       |
+| Variable                            | Effect                                                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `LANGWATCH_DEV_WATCH=0`             | still: no reload on a change; `haven reload` (SIGUSR2) applies them (haven sets it unless `up --watch`/`--hmr`) |
+| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`   | quiet window before a reload (2000)                                                                             |
+| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`   | never defer longer than this after the first change (30000)                                                     |
+| `LANGWATCH_DEV_RECYCLE_GENERATIONS` | api lane: after this many generations, the next edit restarts the process (50)                                  |
+| `LANGWATCH_DEV_RECYCLE_RSS_MIB`     | api lane: past this RSS, the next edit restarts the process (4096)                                              |
 
 There is no agent-turn hold (retired 2026-10-09, ADR-168): the debounce alone coalesces a
 turn's edits, and `haven hmr` no longer exists. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,

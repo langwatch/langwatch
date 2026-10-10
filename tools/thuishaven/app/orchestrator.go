@@ -220,6 +220,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		ModeEnv:              opts.DeploymentMode.Env,
 		ModeOverriddenBy:     opts.ModeOverriddenBy,
 		EffectiveMode:        domain.EffectiveMode(opts.DeploymentMode.Name, opts.ModeOverriddenBy),
+		Refresh:              opts.Selection.Refresh,
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
@@ -243,7 +244,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		if r.Name == domain.IdPService {
 			svc.DNSPort = ports[nSvc+2]
 		}
-		// --ui=built: no Vite, the api serves the bundle, so the app hostname is the API port.
+		// A built UI (still or watch): no Vite, the api serves the bundle, so the app hostname is the API port.
 		if r.Name == "app" && opts.Selection.IsBuiltUI() && !st.Layout.IsMonolith() {
 			svc.Port = st.APIPort
 		}
@@ -920,6 +921,8 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
 	case !imageMatches:
 		fmt.Printf("stack %q is running an older langy image (its build inputs changed) — restarting it\n", slug)
+	case st.Refresh != opts.Selection.Refresh:
+		fmt.Printf("stack %q is running %s — restarting it %s\n", slug, st.Refresh.Name(), opts.Selection.Refresh.Name())
 	default:
 		fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
 	}

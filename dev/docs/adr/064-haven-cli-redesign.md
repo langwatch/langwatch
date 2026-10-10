@@ -653,6 +653,37 @@ refuse `--stack`; `logs -f` follows, `-t` is retired and `up`/`down` keep
 verbs are optional and settings live under `config`; `play-launch` folds into
 `pr --throwaway`. The verb choices in the simulator table stand as written.
 
+## Amendment 2026-10-10 (b): one mode switch
+
+Ruled by Alex. `--ui=built|watch|bundled` (sticky) and `-w/--watch` with its
+`--watch=false` hold were two switches nobody could hold in their head. One
+switch replaces both, for the whole app, and it is never saved: each `haven up`
+uses only the flags passed, a plain `haven up` is always still, and switching
+mode restarts the stack without `--force`.
+
+| command            | UI                                                       | backend Node | Go       |
+| ------------------ | -------------------------------------------------------- | ------------ | -------- |
+| `haven up` (still) | built once at up; `haven reload ui` rebuilds             | no reload    | no watch |
+| `haven up --watch` | `haven ui-watch` one-shot builds, open pages reload idle | reloads      | rebuilds |
+| `haven up --hmr`   | Vite bundledDev with HMR                                 | reloads      | rebuilds |
+
+`haven reload [app|api|worker|ui]` and `haven restart <lane>` work on a still
+stack; anything needing the running mode reads the stack record, which status
+reports as one field, `refresh`: still, watch or hmr. Saved `held`, `watch`,
+`watch-ui`, `bundled-ui` and `dev-ui` keys are ignored on read and dropped on
+the next write. `--watch` with `--hmr` exits 64.
+
+| old                                   | new                                           |
+| ------------------------------------- | --------------------------------------------- |
+| `haven up --ui=built`, `--ui built`   | `haven up`                                    |
+| `haven up --ui=watch`                 | `haven up --watch`                            |
+| `haven up --ui=bundled`               | `haven up --hmr`                              |
+| `haven up --watch=false`, `-w=false`  | `haven up`                                    |
+| `haven up --watch=true`               | `haven up --watch`                            |
+| `haven up -w` / `--watch` on built UI | `haven up --watch` (now also rebuilds the UI) |
+
+Every retired spelling exits 64 with `now: haven up [--watch|--hmr]`.
+
 ## Rationale / Trade-offs
 
 The alternative — deprecate aliases gradually, keep env vars working, add the

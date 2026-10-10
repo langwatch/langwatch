@@ -314,8 +314,8 @@ the web dashboard.
 
 After updating Haven, run `haven up --force` in an existing stack to load the
 new launcher and bundled simulators. `haven restart mail` or `haven restart idp`
-bounces a child but does not replace an older launcher. The application's Go services are watched by default
-(`LANGWATCH_GO_WATCH=0` or `up --watch=false` turns it off); to develop the simulators with live reload,
+bounces a child but does not replace an older launcher. The application's Go services are watched under `up --watch` or `--hmr`
+(`LANGWATCH_GO_WATCH=0` keeps them unwatched); to develop the simulators with live reload,
 use `make service-watch svc=mailsim` or `make service-watch svc=idpsim`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
@@ -428,7 +428,7 @@ haven holds, sent as `X-Auth-Token`:
 
 - `--key project` (the default) is the seeded project key
   (`HAVEN_SEED_LANGWATCH_API_KEY`) for `local-dev-project`. With `--project
-  <slug>` naming another project, haven mints a service key bound to that one
+<slug>` naming another project, haven mints a service key bound to that one
   project through `POST /api/api-keys`.
 - `--key org` is a service key over the whole organization, minted once through
   `POST /api/api-keys` as the seeded admin.

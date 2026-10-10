@@ -106,10 +106,10 @@ Feature: The local development process topology
 
   # haven's own watch replaced air: it builds ./cmd/service into
   # .bin/combined/<lane> and runs `combined` from it. Tests are not watched.
-  # It is on by default (HAVEN-WATCH-DEFAULT); LANGWATCH_GO_WATCH=0 or --watch=false turns it off.
+  # It runs under "haven up --watch" and "--hmr" (HAVEN-WATCH-DEFAULT); LANGWATCH_GO_WATCH=0 keeps it off.
   @unit
   Scenario: A watched go lane runs haven's own Go watch, not air
-    Given a stack started with no watch setting
+    Given a stack started with "haven up --watch"
     When haven plans the go lane
     Then the lane runs "haven go-watch" with the lane's binary path and services
     And no lane runs "make service-watch"
@@ -135,10 +135,10 @@ Feature: The local development process topology
     And the running child keeps serving until a later change builds
 
   @unit
-  Scenario: The Go watcher is on unless switched off
+  Scenario: The Go watcher runs only when the stack watches
     Given LANGWATCH_GO_WATCH is unset
-    Then haven watches the Go services
-    And LANGWATCH_GO_WATCH=0 or "haven up --watch=false" runs them without a watcher
+    Then "haven up --watch" and "haven up --hmr" watch the Go services
+    And a plain "haven up", or LANGWATCH_GO_WATCH=0, runs them without a watcher
 
   # --- The api lane reloads in-process (ADR-168, B1) ---
 
@@ -321,46 +321,61 @@ Feature: The local development process topology
     Then the new api keeps serving and the worker's failure is logged by name
     And the next code change retries the boot
 
-  # --- A held stack reloads on demand (ADR-168, amendment 2026-10-10) ---
+  # --- One mode switch, and a still stack reloads on demand (ADR-064 amendment 2026-10-10 b) ---
 
-  # `haven up --watch=false` sticks for the stack: the Node host gets
-  # LANGWATCH_DEV_WATCH=0 and does not reload the backend on a file change (the
-  # UI's HMR is untouched). `haven reload` applies the changes in place and
-  # waits for the host's own "backend reload finished" line.
+  # `haven up` is still: nothing reloads on a file change, and the Node host
+  # gets LANGWATCH_DEV_WATCH=0. `haven up --watch` rebuilds and reloads
+  # everything; `haven up --hmr` does too, with Vite HMR for the UI. The mode
+  # is never saved: each `haven up` uses only the flags passed.
   @unit
-  Scenario: A held stack runs its Node host without a backend reload on change
-    Given a stack started with "haven up --watch=false"
+  Scenario: A still stack runs its Node host without a backend reload on change
+    Given a stack started with "haven up"
     When haven plans the Node lanes
     Then each lane's env sets LANGWATCH_DEV_WATCH=0
-    And the hold is remembered for the next "haven up"
+    And a stack started with "--watch" or "--hmr" reloads its backend on a change
+
+  @unit
+  Scenario: The stack mode is not sticky
+    Given a stack running with "haven up --watch"
+    When the developer runs a plain "haven up"
+    Then the stack restarts still, with no "--force"
+    And a .haven.json that names "held", "watch", "watch-ui", "bundled-ui" or "dev-ui" is read as still
+    And the next write of .haven.json drops those keys
+
+  @unit
+  Scenario: Status names the stack mode
+    Given a running stack
+    When the developer runs "haven status" or "haven status --json"
+    Then each stack names its mode as one field: still, watch or hmr
 
   @unit
   Scenario: Reload waits for the host to finish, not for a pause
-    Given a running held stack and a log with an old ready line
+    Given a running still stack and a log with an old ready line
     When "haven reload" signals the host
     Then it returns only once a new "backend reload finished" or "backend ready" line is logged
 
   # --- A built UI serves the production bundle from the api (2026-10-10) ---
 
-  # Three UI modes (Alex 2026-10-10). built, the default: one backend-only Node
-  # lane, no Vite; the api serves apps/ui/dist/client, built once at up and on
-  # `haven reload ui`. watch: the same, rebuilt by `haven ui-watch` on a change.
-  # bundled: Vite bundledDev with HMR. `--ui=dev` left haven; `pnpm dev` runs it.
+  # Still and watch serve the built UI: one backend-only Node lane, no Vite;
+  # the api serves apps/ui/dist/client, built once at up and on `haven reload
+  # ui`. watch rebuilds it with `haven ui-watch` on a change. hmr runs Vite
+  # bundledDev with HMR. `pnpm dev` runs the Vite dev server outside haven.
   @unit
-  Scenario: A fresh stack serves the built UI and holds it still
-    Given a worktree with no UI mode chosen
+  Scenario: A plain haven up serves the built UI and holds it still
+    Given a stack started with "haven up"
     When haven plans the Node lanes
-    Then one backend-only host runs after a fresh build, with no ui lane
-    And no file change rebuilds the bundle until "haven reload ui", even with "--watch"
+    Then one backend-only host runs after a fresh build, with no Vite server and no ui lane
+    And the app hostname routes to the api port
+    And no file change rebuilds the bundle until "haven reload ui"
 
   @unit
   Scenario: A watch UI stack rebuilds the built UI on a change
-    Given a stack started with "haven up --ui=watch"
+    Given a stack started with "haven up --watch"
     When haven plans the Node lanes
     Then one backend-only host runs after a fresh build and marks its pages as watch-mode pages
     And a ui lane runs "haven ui-watch", one build per settled burst of edits
     And a failed rebuild leaves the last good bundle serving
-    And a backend change reloads the host in place, as on any watching stack
+    And a backend change reloads the host in place
 
   @unit
   Scenario: An open watch-mode page reloads after a swap only once idle
@@ -370,26 +385,12 @@ Feature: The local development process topology
     And a page from a built or production server reloads at once on a stale chunk and never polls
 
   @unit
-  Scenario: A held built UI stack runs no Vite and routes the app hostname to the api
-    Given a stack started with "haven up --watch=false"
-    When haven plans the Node lanes
-    Then one backend-only host runs after a fresh build, with no Vite server and no ui lane
-    And the app hostname routes to the api port
-    And only "haven reload ui" rebuilds the bundle
-
-  @unit
-  Scenario: A stack left on the retired --ui=dev serves the built UI
-    Given a .haven.json that names "dev-ui"
-    When haven reads the selection
-    Then the built UI serves the page
-    And "haven up --ui=dev" is refused with a pointer to "--ui=bundled" and "pnpm dev"
-
-  @unit
-  Scenario: A bundled UI stack runs Vite on bundled output and leaves the other modes
-    Given a stack started with "haven up --ui=bundled"
+  Scenario: An hmr stack runs Vite on bundled output with HMR
+    Given a stack started with "haven up --hmr"
     When haven plans the Node lanes
     Then the app lane runs with LANGWATCH_UI_BUNDLED=1 and keeps its Vite server
-    And choosing "--ui=bundled" replaces "--ui=watch", "--ui=built" returns to the default, and an unknown value is refused
+    And the backend reloads on a change
+    And "haven reload ui" is refused, because Vite reloads itself
 
   @unit
   Scenario: A built UI is rebuilt beside the served one and swapped in

@@ -251,31 +251,29 @@ exported or in `.env`) splits it back into a `ui` lane and a `backend` lane
 (haven: `api`). Ports are the same either way. Under haven the same switch also
 folds the simulators into the `go` lane (`=0` gives them a `sims` lane);
 `LANGWATCH_GO_ONE_PROCESS` is a deprecated alias, warned once and refused when it
-disagrees. The Go lane is watched by default (`haven go-watch` rebuilds and swaps
-the child); `LANGWATCH_GO_WATCH=0` turns it off.
+disagrees. The Go lane is watched under `haven up --watch` or `--hmr` (`haven go-watch`
+rebuilds and swaps the child); `LANGWATCH_GO_WATCH=0` keeps it off.
 
-**Holding a stack.** Commits and cherry-picks reload the backend under anyone using the
-stack, so a built-UI stack (the default) is held unless `haven up --watch -f` asked it to
-refresh. `haven up --watch=false -f` holds any stack: no Go rebuilds and no backend reloads
-(`LANGWATCH_DEV_WATCH=0` in the Node lane; Vite HMR still works), and the hold sticks for the
-stack (`haven up --watch -f` lifts it). `haven reload [app|api|worker]` then re-links the
-backend in place on demand (SIGUSR2; the UI and sessions stay up) and returns when the host
-logs `backend reload finished`. A changed env still needs `haven up -f`.
+**Stack modes.** One switch, never saved: each `haven up` uses only the flags passed, and
+switching needs no `--force` (ADR-064 amendment 2026-10-10 b). `haven status` names the mode.
 
-**UI modes.** `haven up --ui=<mode>` picks how apps/ui is served, and the choice sticks:
+| command            | what serves `app.<slug>`                                          | after an edit                                                                        |
+| ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `haven up` (still) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing reloads; `haven reload [app\|api\|worker\|ui]` applies changes on demand     |
+| `haven up --watch` | the same, plus a `ui` lane, `haven ui-watch`                      | one UI build that exits, swapped in, open pages reload once idle; Node and Go reload |
+| `haven up --hmr`   | Vite 8 `bundledDev`, bundles rebuilt in memory                    | HMR updates the page in place; Node and Go reload                                    |
 
-| mode              | what serves `app.<slug>`                                          | after a `.tsx` edit                                           |
-| ----------------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
-| `built` (default) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing until `haven reload ui`; pages never reload           |
-| `watch`           | the same, plus a `ui` lane, `haven ui-watch`                      | one build that exits, swapped in; open pages reload once idle |
-| `bundled`         | Vite 8 `bundledDev`, bundles rebuilt in memory                    | HMR updates the page in place                                 |
+Commits and cherry-picks would reload the backend under anyone using the stack, so the default
+is still: `LANGWATCH_DEV_WATCH=0` in the Node lane and no Go rebuilds. `haven reload
+[app|api|worker]` re-links the backend in place (SIGUSR2; the UI and sessions stay up) and
+returns when the host logs `backend reload finished`. A changed env still needs `haven up -f`.
+`--ui=...` and `--watch=false` are retired and exit 64. `pnpm dev` runs the Vite dev server
+outside haven.
 
-The Vite dev server has left haven (`--ui=dev` is refused); `pnpm dev` still runs it on its own.
-
-**Built and watch.** The api serves `apps/ui/dist/client` the way production does, at the same
+**Still and watch.** The api serves `apps/ui/dist/client` the way production does, at the same
 `app.<slug>` URL, so sessions, cookies and routes are unchanged. There is no HMR. Both build at
 `up`; `haven reload ui` rebuilds beside the served bundle, swaps it in and returns once the swap
-is done. A `watch` stack also runs a `ui` lane (`haven ui-watch`) that polls the browser source
+is done. A `--watch` stack also runs a `ui` lane (`haven ui-watch`) that polls the browser source
 (`apps/ui`, `modules`, `enterprise/modules`, `packages`; tests and `process/` halves ignored) and,
 once edits settle (`LANGWATCH_UI_WATCH_DEBOUNCE_MS`, default 5 s quiet,
 `LANGWATCH_UI_WATCH_MAX_WAIT_MS`, default 60 s), runs one build that exits and swaps the bundle in
@@ -288,12 +286,12 @@ per-build staging dir and is renamed over `dist/client`.
 **Open pages across a swap.** Each swap carries the previous build's hashed chunks forward, so a
 page opened before it never 404s on a lazy chunk; a chunk superseded more than 24 h ago is
 dropped at the next swap, and stack start drops every chunk the served build does not list
-(`dist/client/.build-assets`). On a `watch` stack the api's port marks each page
+(`dist/client/.build-assets`). On a `--watch` stack the api's port marks each page
 (`<meta name="haven-ui-watch">`); a marked page polls the served index and, when its entry chunk
 changed, reloads once nobody has touched it for 60 s (or at once when the tab is hidden). A stale
 chunk (a route or a `vite:preloadError`) waits the same way there; everywhere else, production
 included, it reloads at once and nothing polls. The idle time is the `haven-reload-idle-ms` key
-in the page's local storage. `haven reload app` still reloads the backend. Use `built` for test
+in the page's local storage. `haven reload app` still reloads the backend. Use a still stack for test
 drives and shared headless browsers: measured on `/governance`, a signed-in page costs about
 400 MB of browser RSS instead of 710 MB, with a quarter of the requests.
 
@@ -301,11 +299,11 @@ Measured 2026-10-10 on a 10-core, 64 GB Mac under heavy load (load average 40 to
 
 | mode      | edit to new bundle                                                        | RSS at rest                    | peak RSS                |
 | --------- | ------------------------------------------------------------------------- | ------------------------------ | ----------------------- |
-| `built`   | none (`haven reload ui`: a 21.5 to 25 s build, seconds from the Nx cache) | 0                              | 4.5 GB during a build   |
-| `watch`   | 33.5 s (about 12 s to notice and settle, then a 21.5 s build)             | about 35 MB (`haven ui-watch`) | 4.7 GB during the build |
-| `bundled` | not measured: the run was stopped                                         | about 5.5 GB                   | 5.6 GB                  |
+| still     | none (`haven reload ui`: a 21.5 to 25 s build, seconds from the Nx cache) | 0                              | 4.5 GB during a build   |
+| `--watch` | 33.5 s (about 12 s to notice and settle, then a 21.5 s build)             | about 35 MB (`haven ui-watch`) | 4.7 GB during the build |
+| `--hmr`   | not measured: the run was stopped                                         | about 5.5 GB                   | 5.6 GB                  |
 
-On `watch`, add up to 5 s for the open page to see the swap, then the idle wait. A kept-warm
+On `--watch`, add up to 5 s for the open page to see the swap, then the idle wait. A kept-warm
 `vite build --watch` was measured and dropped: an 18.8 s rebuild for 3.4 GB held at rest.
 
 A backend edit that touches a loaded file re-links only what it reaches, then

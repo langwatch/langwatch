@@ -52,7 +52,7 @@ func buildTable() []commandSpec {
 	}
 
 	up, down := take("up"), take("down")
-	up.rewrite, down.rewrite = retireShortForce("up"), retireShortForce("down")
+	up.rewrite, down.rewrite = retireUpSpellings, retireShortForce("down")
 	top := []commandSpec{
 		hidden("simulator"), hidden("static"), hidden("go-watch"), hidden("ui-watch"), hidden("keep"), hidden("daemon"), hidden("gate"),
 		up, down, take("restart"), take("reload"), statusCommand(take("status")), take("logs"), take("errors"), take("env"),
@@ -175,6 +175,23 @@ func retireShortForce(name string) func(rest []string) ([]string, error) {
 		now[slices.Index(now, "-f")] = "--force"
 		return nil, retiredError(append([]string{name}, rest...), append([]string{name}, now...))
 	}
+}
+
+// retireUpSpellings refuses up's retired -f and its retired mode spellings
+// (--ui, --watch=<bool>), and --watch with --hmr: one mode switch (ADR-064).
+func retireUpSpellings(rest []string) ([]string, error) {
+	hasWatch, hasHMR := false, false
+	for _, a := range rest {
+		if a == "--ui" || strings.HasPrefix(a, "--ui=") || strings.HasPrefix(a, "--watch=") || strings.HasPrefix(a, "-w=") {
+			return nil, retiredError(append([]string{"up"}, rest...), []string{"up", "[--watch|--hmr]"})
+		}
+		hasWatch = hasWatch || a == "--watch" || a == "-w"
+		hasHMR = hasHMR || a == "--hmr"
+	}
+	if hasWatch && hasHMR {
+		return nil, usageErr("haven up takes --watch or --hmr, not both")
+	}
+	return retireShortForce("up")(rest)
 }
 
 // retireLogsTail points the retired -t/--tail at -f.

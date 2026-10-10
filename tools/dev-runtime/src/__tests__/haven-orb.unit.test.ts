@@ -131,7 +131,7 @@ describe("haven orb on a built-UI stack", () => {
     });
   });
 
-  describe("given a --ui=watch stack's api port", () => {
+  describe("given a --watch stack's api port", () => {
     /** @scenario "A watch UI stack rebuilds the built UI on a change" */
     it("marks every page as a watch-mode page, orb or not", async () => {
       expect((await get(await stableWithOrb(undefined, true), "/")).body).toContain(
