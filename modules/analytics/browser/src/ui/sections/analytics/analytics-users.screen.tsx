@@ -218,7 +218,7 @@ const userEmptyState = (
 
 function UsersContent() {
   return (
-    <AnalyticsLayout title="Users" railEntry="users">
+    <AnalyticsLayout tab="users">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={2} display="inline-grid">

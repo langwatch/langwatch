@@ -206,10 +206,12 @@ function ReportsContent() {
 
   return (
     <AnalyticsLayout
-      title={dashboardTitle}
-      railEntry="reports"
+      tab="reports"
       activeDashboardId={activeDashboardId}
-      analyticsHeaderProps={{
+      dashboard={{
+        title: dashboardTitle,
+        projectSlug: project?.slug ?? "",
+        dashboardId: isMissingDashboard ? void 0 : (activeDashboardId ?? void 0),
         isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}

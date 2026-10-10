@@ -36,7 +36,7 @@ function AnalyticsContent() {
   const project = host.project();
 
   return (
-    <AnalyticsLayout title="Overview" railEntry="overview">
+    <AnalyticsLayout tab="overview">
       {project && !project.hasFirstMessage && (
         <Alert.Root status="warning" marginBottom={6}>
           <Alert.Indicator />

@@ -419,7 +419,7 @@ function EvaluationsContent() {
   );
 
   return (
-    <AnalyticsLayout title="Online Evaluations" railEntry="evaluations">
+    <AnalyticsLayout tab="evaluations">
       {checks.data && checks.data?.length === 0 && (
         <Alert.Root status="warning" variant="surface" marginBottom={6}>
           <Alert.Indicator />

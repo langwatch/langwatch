@@ -47,7 +47,7 @@ const mostDiscussedTopics = {
 
 function TopicsContent() {
   return (
-    <AnalyticsLayout title="Topics" railEntry="topics">
+    <AnalyticsLayout tab="topics">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={1} display="inline-grid">
