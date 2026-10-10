@@ -5,12 +5,12 @@
  */
 
 import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Button,
-  Card,
   Code,
   HStack,
   NativeSelect,
@@ -302,94 +302,86 @@ export default function ModelCostsScreen() {
           </NoDataInfoBlock>
         )}
         {!noCosts && !noMatches && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body padding={0} overflowX="auto">
-              <Table.Root variant="line" width="full" maxWidth="100%">
-                <Table.Header width="full">
-                  <Table.Row width="full">
-                    <SortHeader
-                      label="Model name"
-                      sortKey="model"
-                      sort={sort}
-                      onSort={onSort}
-                      minWidth="160px"
-                    />
-                    <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
-                    <SortHeader
-                      label="Input cost"
-                      sortKey="inputCostPerToken"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <SortHeader
-                      label="Output cost"
-                      sortKey="outputCostPerToken"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">
-                      Cache write (5 minutes)
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">
-                      Cache write (1 hour)
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
-                    <Table.ColumnHeader width="64px" padding={1} />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body width="full">
-                  {llmModelCosts.isLoading &&
-                    Array.from({ length: 3 }).map((_, rowIndex) => (
-                      <Table.Row key={rowIndex}>
-                        {Array.from({ length: 9 }).map((__, cellIndex) => (
-                          <Table.Cell key={cellIndex}>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                        ))}
-                        <Table.Cell padding={1} />
-                      </Table.Row>
+          <ListTable width="full" maxWidth="100%">
+            <Table.Header width="full">
+              <Table.Row width="full">
+                <SortHeader
+                  label="Model name"
+                  sortKey="model"
+                  sort={sort}
+                  onSort={onSort}
+                  minWidth="160px"
+                />
+                <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
+                <SortHeader
+                  label="Input cost"
+                  sortKey="inputCostPerToken"
+                  sort={sort}
+                  onSort={onSort}
+                />
+                <SortHeader
+                  label="Output cost"
+                  sortKey="outputCostPerToken"
+                  sort={sort}
+                  onSort={onSort}
+                />
+                <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Cache write (5 minutes)</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Cache write (1 hour)</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
+                <Table.ColumnHeader width="64px" padding={1} />
+              </Table.Row>
+            </Table.Header>
+            <Table.Body width="full">
+              {llmModelCosts.isLoading &&
+                Array.from({ length: 3 }).map((_, rowIndex) => (
+                  <Table.Row key={rowIndex}>
+                    {Array.from({ length: 9 }).map((__, cellIndex) => (
+                      <Table.Cell key={cellIndex}>
+                        <Skeleton height="20px" />
+                      </Table.Cell>
                     ))}
-                  {visibleRows.map((row) => (
-                    <Table.Row
-                      key={row.model}
-                      width="full"
-                      cursor="pointer"
-                      _hover={{ bg: "bg.muted" }}
-                      onClick={() =>
-                        host.openPlatformDrawer({
-                          drawer: "llmModelCost",
-                          params: editorParams(row),
-                        })
-                      }
-                    >
-                      <Table.Cell>
-                        <ModelNameCell
-                          model={row.model}
-                          isCustom={!!row.updatedAt}
-                          modelProviderId={providerRows.get(providerOf(row))}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <RegexHighlight pattern={row.regex} />
-                      </Table.Cell>
-                      <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
-                      <Table.Cell padding={1} onClick={(event) => event.stopPropagation()}>
-                        <ActionsMenu id={row.id} model={row.model} />
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
+                    <Table.Cell padding={1} />
+                  </Table.Row>
+                ))}
+              {visibleRows.map((row) => (
+                <Table.Row
+                  key={row.model}
+                  width="full"
+                  cursor="pointer"
+                  _hover={{ bg: "bg.muted" }}
+                  onClick={() =>
+                    host.openPlatformDrawer({
+                      drawer: "llmModelCost",
+                      params: editorParams(row),
+                    })
+                  }
+                >
+                  <Table.Cell>
+                    <ModelNameCell
+                      model={row.model}
+                      isCustom={!!row.updatedAt}
+                      modelProviderId={providerRows.get(providerOf(row))}
+                    />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <RegexHighlight pattern={row.regex} />
+                  </Table.Cell>
+                  <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
+                  <Table.Cell padding={1} onClick={(event) => event.stopPropagation()}>
+                    <ActionsMenu id={row.id} model={row.model} />
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </ListTable>
         )}
       </VStack>
     </>

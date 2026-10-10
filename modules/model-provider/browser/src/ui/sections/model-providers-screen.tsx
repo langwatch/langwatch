@@ -5,13 +5,13 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
   Button,
-  Card,
   HStack,
   Skeleton,
   Spacer,
@@ -261,32 +261,28 @@ function ProvidersPanel({
   }
 
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Provider</Table.ColumnHeader>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {enabledProviders.map((provider) => (
-              <ProviderRow
-                key={provider.id ?? `system-${provider.provider}`}
-                connectionTests={connectionTests}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                provider={provider}
-                rowActionsDisabledReason={rowActionsDisabledReason}
-                scopeNameById={scopeNameById}
-              />
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <ListTable size="md" width="full">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Provider</Table.ColumnHeader>
+          <Table.ColumnHeader>Scope</Table.ColumnHeader>
+          <Table.ColumnHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {enabledProviders.map((provider) => (
+          <ProviderRow
+            key={provider.id ?? `system-${provider.provider}`}
+            connectionTests={connectionTests}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            provider={provider}
+            rowActionsDisabledReason={rowActionsDisabledReason}
+            scopeNameById={scopeNameById}
+          />
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }
 
@@ -658,36 +654,32 @@ function AddModelProviderMenu({
  */
 function ProvidersTableSkeleton() {
   return (
-    <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Provider</Table.ColumnHeader>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {[0, 1, 2].map((index) => (
-              <Table.Row key={index}>
-                <Table.Cell>
-                  <HStack gap={3} align="center">
-                    <Skeleton width="24px" height="24px" borderRadius="sm" />
-                    <Skeleton width="120px" height="16px" />
-                  </HStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="80px" height="20px" borderRadius="full" />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
-                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <ListTable size="md" width="full" data-testid="providers-table-skeleton">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Provider</Table.ColumnHeader>
+          <Table.ColumnHeader>Scope</Table.ColumnHeader>
+          <Table.ColumnHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {[0, 1, 2].map((index) => (
+          <Table.Row key={index}>
+            <Table.Cell>
+              <HStack gap={3} align="center">
+                <Skeleton width="24px" height="24px" borderRadius="sm" />
+                <Skeleton width="120px" height="16px" />
+              </HStack>
+            </Table.Cell>
+            <Table.Cell>
+              <Skeleton width="80px" height="20px" borderRadius="full" />
+            </Table.Cell>
+            <Table.Cell textAlign="right">
+              <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }
