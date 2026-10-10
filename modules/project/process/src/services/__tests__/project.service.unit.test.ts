@@ -560,7 +560,31 @@ describe("ProjectService", () => {
       slug: "governance-org",
       apiKey: "secret-api-key",
       teamId: "oldest-team",
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      framework: "governance",
     });
+  });
+
+  /** @scenario "A feature ensures an internal project" */
+  it("creates the checkup project under its own slug and kind", async () => {
+    const repository = new StubRepository();
+
+    await createService(repository).ensureInternal({
+      organizationId: "org",
+      kind: PROJECT_KIND.INTERNAL_CHECKUP,
+    });
+
+    expect(repository.findInternalByOrganization).toHaveBeenCalledWith({
+      organizationId: "org",
+      kind: PROJECT_KIND.INTERNAL_CHECKUP,
+    });
+    expect(repository.createInternalOrFindWinner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slug: "checkup-org",
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        framework: "checkup",
+      }),
+    );
   });
 
   /** @scenario "A feature ensures an internal project" */

@@ -2,7 +2,6 @@ import type { PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
-  PROJECT_KIND,
   activeProjectsByScopesInputSchema,
   internalProjectKindSchema,
   internalProjectQuerySchema,
@@ -65,6 +64,23 @@ export abstract class ProjectDiagnostics {
   abstract error(context: Record<string, unknown>, message: string): void;
   abstract capture(error: Error, context: Record<string, unknown>): void;
 }
+
+/** How each internal project kind is named when it is first created. */
+const INTERNAL_PROJECT_NAMING: Record<
+  InternalProjectKind,
+  { name: string; slugPrefix: string; framework: string }
+> = {
+  internal_governance: {
+    name: "Governance (internal)",
+    slugPrefix: "governance",
+    framework: "governance",
+  },
+  internal_checkup: {
+    name: "Checkup canary (internal)",
+    slugPrefix: "checkup",
+    framework: "checkup",
+  },
+};
 
 export class ProjectService {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
@@ -144,7 +160,7 @@ export class ProjectService {
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     const parsed = internalProjectQuerySchema.parse(input);
 
-    return this.repository.findInternalByOrganization(parsed.organizationId);
+    return this.repository.findInternalByOrganization(parsed);
   }
 
   findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
@@ -200,7 +216,7 @@ export class ProjectService {
 
   async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
     const parsed = internalProjectQuerySchema.parse(input);
-    const existing = await this.repository.findInternalByOrganization(parsed.organizationId);
+    const existing = await this.repository.findInternalByOrganization(parsed);
     if (existing) {
       return existing;
     }
@@ -208,18 +224,21 @@ export class ProjectService {
     const teamId = await this.organizations.getOldestTeamId({
       organizationId: parsed.organizationId,
     });
-    const slug = `governance-${parsed.organizationId}`;
+    const naming = INTERNAL_PROJECT_NAMING[parsed.kind];
+    const slug = `${naming.slugPrefix}-${parsed.organizationId}`;
     const bySlug = await this.repository.findInternalBySlug(slug);
-    if (bySlug?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+    if (bySlug?.kind === parsed.kind) {
       return bySlug;
     }
 
     return this.repository.createInternalOrFindWinner({
       id: this.credentials.generateProjectId(),
-      name: "Governance (internal)",
+      name: naming.name,
       slug,
       apiKey: this.credentials.generateApiKey(),
       teamId,
+      kind: parsed.kind,
+      framework: naming.framework,
     });
   }
 

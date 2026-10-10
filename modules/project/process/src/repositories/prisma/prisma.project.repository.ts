@@ -18,6 +18,7 @@ import {
   type CreateProjectInput,
   type InternalProject,
   type InternalProjectKind,
+  internalProjectKindSchema,
   type PaginatedProjects,
   type ArchivedProject,
   type Project,
@@ -221,11 +222,17 @@ export class PrismaProjectRepository
     return projects.map((project) => project.slug);
   }
 
-  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+  async findInternalByOrganization({
+    organizationId,
+    kind,
+  }: {
+    organizationId: string;
+    kind: InternalProjectKind;
+  }): Promise<InternalProject | null> {
     return this.mapInternal(
       await this.prisma.project.findFirst({
         where: {
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          kind,
           team: { organizationId },
           archivedAt: null,
         },
@@ -252,15 +259,15 @@ export class PrismaProjectRepository
     slug: string;
     apiKey: string;
     teamId: string;
+    kind: InternalProjectKind;
+    framework: string;
   }): Promise<InternalProject> {
     try {
       return this.mapInternalRequired(
         await this.prisma.project.create({
           data: {
             ...input,
-            kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
             language: "internal",
-            framework: "governance",
             traceSharingEnabled: false,
           },
         }),
@@ -938,7 +945,7 @@ export class PrismaProjectRepository
   }
 
   private mapInternal(row: PrismaProject | null): InternalProject | null {
-    if (!row || row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+    if (!row || !internalProjectKindSchema.validate(row.kind)) return null;
     return this.mapInternalRequired(row);
   }
 

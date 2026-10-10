@@ -58,7 +58,10 @@ export interface ProjectRepository {
     projectId: string;
     departmentId: string | null;
   }): Promise<boolean>;
-  findInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
+  findInternalByOrganization(input: {
+    organizationId: string;
+    kind: InternalProjectKind;
+  }): Promise<InternalProject | null>;
   findInternalBySlug(slug: string): Promise<InternalProject | null>;
   findLiveInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;
   createInternalOrFindWinner(input: {
@@ -67,6 +70,8 @@ export interface ProjectRepository {
     slug: string;
     apiKey: string;
     teamId: string;
+    kind: InternalProjectKind;
+    framework: string;
   }): Promise<InternalProject>;
   isPresenceEnabled(projectId: string): Promise<boolean>;
 
