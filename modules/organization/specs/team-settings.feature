@@ -57,3 +57,9 @@ Feature: The team settings page reads as main's does
     Given the server refuses a new team with "team_name_taken"
     When Create is pressed
     Then the name field shows "A team called Platform already exists"
+
+  @integration
+  Scenario: The team settings page shows a taken name under the name field
+    Given the server refuses a rename with "team_name_taken"
+    When the new name is saved
+    Then the name field shows "A team called Taken already exists"

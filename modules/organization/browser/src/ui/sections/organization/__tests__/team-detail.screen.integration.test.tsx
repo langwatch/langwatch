@@ -115,5 +115,28 @@ describe("given the team settings page", () => {
         ),
       );
     });
+
+    /** @scenario "The team settings page shows a taken name under the name field" */
+    it("shows a taken name under the name field", async () => {
+      const message = "A team called Taken already exists";
+      updateTeam.mockImplementationOnce((_input, { onError }) =>
+        onError({
+          data: {
+            error: {
+              code: "team_name_taken",
+              httpStatus: 409,
+              meta: { fieldErrors: { name: message } },
+            },
+          },
+        }),
+      );
+      renderWithOrganizationHost(<TeamDetailScreen />, new TeamAddressHost());
+      const name = await screen.findByTestId("team-form-name");
+
+      fireEvent.input(name, { target: { value: "Taken" } });
+      await userEvent.type(name, "{Enter}");
+
+      expect(await screen.findByText(message)).toBeVisible();
+    });
   });
 });

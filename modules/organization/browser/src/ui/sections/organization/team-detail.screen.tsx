@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 
+import { applyHandledErrorToForm } from "../../../behavior/handled-error-form.tsx";
 import { api, type RouterOutputs } from "../../../behavior/organization-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
@@ -207,6 +208,8 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
    * that silently did not happen.
    */
   function reportTeamSaveFailure(error: unknown): void {
+    // A refused name stays typed, with the reason under it, so it can be fixed in place.
+    if (applyHandledErrorToForm({ error, form })) return;
     restorePersistedTeamValues();
 
     const code = trpcErrorCode(error);
