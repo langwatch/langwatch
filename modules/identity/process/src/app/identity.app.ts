@@ -102,6 +102,7 @@ import { ssoMethodDialWith } from "../features/sso-arrival/rules/sso-method-dial
 import { InProcessBreakGlassLimiterService } from "../features/sso-arrival/services/in-process-break-glass-limiter.service.ts";
 import { LegacySsoDomainRoutingService } from "../features/sso-arrival/services/legacy-sso-domain-routing.service.ts";
 import { SsoArrivalAdoptionService } from "../features/sso-arrival/services/sso-arrival-adoption.service.ts";
+import { SsoArrivalNoticeService } from "../features/sso-arrival/services/sso-arrival-notice.service.ts";
 import { SsoArrivalService } from "../features/sso-arrival/services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../features/sso-arrival/services/sso-assertion.service.ts";
 import { SsoAuthenticationActivityService } from "../features/sso-arrival/services/sso-authentication-activity.service.ts";
@@ -675,6 +676,13 @@ export class IdentityModule
     });
     // `notifications` is unanswered on purpose: an automatic admission's
     // durable notice needs a mail this process does not compose.
+    const joinRequestNotifier = JoinRequestNotifierService.create({
+      audience: setup.repositories.joinRequestAudience,
+      context: setup.repositories.joinRequestNotificationContext,
+      mail: setup.channels.joinRequestMail,
+      baseHost: setup.config.publicBaseUrl ?? "",
+      plans: setup.dependencies.entitlements,
+    });
     const ssoArrival = SsoArrivalService.create({
       joinRequests,
       connections: setup.repositories.ssoConnections,
@@ -685,6 +693,7 @@ export class IdentityModule
         latch: setup.repositories.latch,
       }),
       signups: signupAnnouncements,
+      notifications: SsoArrivalNoticeService.create({ notifier: joinRequestNotifier }),
     });
     const ssoTestArrival = SsoTestArrivalService.create({
       accounts: testArrivalAccounts(setup.channels.authReads),
@@ -948,13 +957,7 @@ export class IdentityModule
             repositories: setup.repositories,
             eventStore: eventStores.of({ pipeline: JOIN_REQUEST_PIPELINE_NAME }),
             commands: identityEventing,
-            notifier: JoinRequestNotifierService.create({
-              audience: setup.repositories.joinRequestAudience,
-              context: setup.repositories.joinRequestNotificationContext,
-              mail: setup.channels.joinRequestMail,
-              baseHost: setup.config.publicBaseUrl ?? "",
-              plans: setup.dependencies.entitlements,
-            }),
+            notifier: joinRequestNotifier,
           }),
         ssoConnections: ssoConnectionGraph.pipeline,
       },
