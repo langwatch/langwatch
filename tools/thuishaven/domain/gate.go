@@ -119,6 +119,32 @@ func classifyDetail(command string) (kind RunKind, heavy bool, bucket string) {
 	return SingleProcessRun, false, ""
 }
 
+// launcherBuckets are the heavy buckets whose runs take their own slot in the
+// tsc and vitest launchers (plan haven-exec-policy D4): the gate only refuses
+// them at red, it no longer predicts a queue or a width for them.
+var launcherBuckets = []string{
+	TypeScriptCompilerClass, "vitest",
+	"typecheck", "typecheck:one", "typecheck:all",
+	"test", "test:unit", "test:integration",
+}
+
+// LauncherOwned reports whether every heavy segment of a command is one the
+// launchers count themselves; one lint or build segment keeps the whole gate.
+func LauncherOwned(command string) bool {
+	owned := false
+	for _, segment := range commandSegments(command) {
+		bucket, ok := heavyInvocationBucket(segment)
+		if !ok {
+			continue
+		}
+		if !slices.Contains(launcherBuckets, bucket) {
+			return false
+		}
+		owned = true
+	}
+	return owned
+}
+
 // Watches cannot hold a finite check slot for the lifetime of a dev session.
 // Informational flags bypass admission only for a single shell command, so
 // `tsc --version && pnpm typecheck` still counts the check that follows.

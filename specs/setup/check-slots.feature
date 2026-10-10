@@ -217,6 +217,17 @@ Feature: Machine-wide slots for whole-repo checks
     Then its GOMAXPROCS is the number of units it holds
     And a green machine caps it too, because a run counted as two cores must not take ten
 
+  # Measured 2026-10-11 at load 33 (2,298-file typecheck, five alternating
+  # rounds): utility medians 0.78 s against 0.70 s plain; background (-b) was
+  # eight to thirty times slower in the plan's own rounds, so it is never used.
+  @unit
+  Scenario: An agent's run on macOS runs in the utility band
+    Given a run started from an agent shell on macOS, with CLAUDECODE or HAVEN_AGENT_ID set
+    When it runs through the queue
+    Then it runs under taskpolicy -c utility, never in the background band
+    And HAVEN_AGENT_QOS=off keeps the default band
+    And a person's shell, or any other operating system, is never clamped
+
   # --- Slot classes: one budget in core units (dev/docs/plans/haven-exec-policy.md) ---
 
   @unit

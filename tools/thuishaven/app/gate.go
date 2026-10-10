@@ -179,6 +179,10 @@ func (o *Orchestrator) decideHeavyMessage(p hookPayload, command string, kind do
 		CanBackground: false,
 	})
 
+	if decision != domain.Refuse && domain.LauncherOwned(command) {
+		// The tsc and vitest launchers take their own slot; only red refusal stays here.
+		return deferReply()
+	}
 	if decision == domain.Refuse {
 		var hint *domain.RetryHint
 		if h, ok := domain.NewRetryHint(queueDepth, o.observedDuration(command), caller); ok {

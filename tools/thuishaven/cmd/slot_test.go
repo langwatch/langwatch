@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -862,4 +863,41 @@ func TestSlotPressureReadsThePublishedLevel(t *testing.T) {
 			t.Fatalf("resolveSlotPressure() = %s, want the published amber", got)
 		}
 	})
+}
+
+// @scenario "An agent's run on macOS runs in the utility band"
+func TestAgentQoSArgvClampsOnlyAnAgentOnMacOS(t *testing.T) {
+	argv := []string{"sh", "-c", "true"}
+	env := func(pairs ...string) func(string) string {
+		m := map[string]string{}
+		for i := 0; i+1 < len(pairs); i += 2 {
+			m[pairs[i]] = pairs[i+1]
+		}
+		return func(k string) string { return m[k] }
+	}
+	utility := []string{"/usr/sbin/taskpolicy", "-c", "utility", "sh", "-c", "true"}
+	cases := []struct {
+		name   string
+		goos   string
+		getenv func(string) string
+		argv   []string
+		want   []string
+	}{
+		{"claude agent on darwin", "darwin", env("CLAUDECODE", "1"), argv, utility},
+		{"sub-agent id on darwin", "darwin", env("HAVEN_AGENT_ID", "a1"), argv, utility},
+		{"explicit utility", "darwin", env("CLAUDECODE", "1", "HAVEN_AGENT_QOS", "utility"), argv, utility},
+		{"opted out", "darwin", env("CLAUDECODE", "1", "HAVEN_AGENT_QOS", "off"), argv, argv},
+		{"a person's shell", "darwin", env(), argv, argv},
+		{"linux agent", "linux", env("CLAUDECODE", "1"), argv, argv},
+		{"command not found stays bare", "darwin", env("CLAUDECODE", "1"), []string{"no-such-binary-haven-qos"}, []string{"no-such-binary-haven-qos"}},
+	}
+	for _, c := range cases {
+		got := agentQoSArgv(c.goos, c.getenv, c.argv)
+		if strings.Join(got, " ") != strings.Join(c.want, " ") {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+		if slices.Contains(got, "-b") {
+			t.Errorf("%s: the background band is never used: %q", c.name, got)
+		}
+	}
 }

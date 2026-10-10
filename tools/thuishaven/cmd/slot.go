@@ -701,7 +701,8 @@ func (j *slotJob) activeNote() string {
 func slotExec(ctx context.Context, argv []string, run slotRunEnv) int {
 	// The whole command is the caller's own argv — this is a process wrapper,
 	// running exactly what it was asked to run, as the same user.
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: wrapper runs the caller's own command
+	spawn := agentQoSArgv(runtime.GOOS, os.Getenv, argv)
+	cmd := exec.CommandContext(ctx, spawn[0], spawn[1:]...) //nolint:gosec // G204: wrapper runs the caller's own command
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	cmd.Env = append(os.Environ(),
 		"CHECK_SLOTS=0",
@@ -723,6 +724,24 @@ func slotExec(ctx context.Context, argv []string, run slotRunEnv) int {
 	death := slotDeath{forwarded: relay.close(), canceled: ctx.Err() != nil}
 	reportOutsideKill(err, argv[0], death)
 	return slotExitCode(err, argv[0])
+}
+
+// agentQoSArgv runs an agent's command (CLAUDECODE or HAVEN_AGENT_ID set) on
+// macOS under `taskpolicy -c utility`, never -b (plan haven-exec-policy section
+// 6), so the person's UI keeps the cores. HAVEN_AGENT_QOS=off keeps the default
+// band; a person's shell is never clamped. A command that is not found stays
+// bare, so the run still fails with 127.
+func agentQoSArgv(goos string, getenv func(string) string, argv []string) []string {
+	if goos != "darwin" || (getenv("CLAUDECODE") == "" && getenv("HAVEN_AGENT_ID") == "") {
+		return argv
+	}
+	if qos := strings.ToLower(strings.TrimSpace(getenv("HAVEN_AGENT_QOS"))); qos != "" && qos != "utility" {
+		return argv
+	}
+	if _, err := exec.LookPath(argv[0]); err != nil {
+		return argv
+	}
+	return append([]string{"/usr/sbin/taskpolicy", "-c", "utility"}, argv...)
 }
 
 // slotDeath is what the wrapper knows about how the child ended beyond the

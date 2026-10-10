@@ -261,6 +261,32 @@ Feature: Heavy runs are admitted, queued, or refused
     Then it runs
     Because red throttles admission, it does not stop the machine working
 
+  # --- Compile and test runs belong to their launchers ---
+
+  # The tsc and vitest launchers take their own slot per run (plan
+  # dev/docs/plans/haven-exec-policy.md, D4), so a gate prediction for them
+  # would count one Nx run of many tasks as one slot. Lint and builds stay
+  # gated until they have launchers of their own.
+  @unit
+  Scenario: The gate leaves compile and test runs to their launchers
+    Given pressure is not red, or a slot is free
+    When an agent runs tsc, vitest, pnpm typecheck, pnpm typecheck:src, pnpm test:affected, a filtered package typecheck or test, or nx run-many -t typecheck
+    Then the gate answers with no decision and no message
+    And the command runs as asked, taking its slot in the launcher
+
+  @unit
+  Scenario: At critical pressure a compile or test run with no slot is still refused
+    Given pressure is red and no slot is free
+    When an agent runs pnpm test:unit or tsc
+    Then the gate refuses it with the pressure and the queue depth, as for any heavy run
+
+  @unit
+  Scenario: Lint and builds keep the gate until they have launchers
+    Given the machine is full
+    When an agent runs pnpm lint, or a command that chains a typecheck with a lint
+    Then the gate still describes the queue it expects
+    Because one segment without a launcher keeps the whole command gated
+
   # --- A tightened ceiling, only where it is earned ---
 
   @unit

@@ -476,7 +476,7 @@
       }
     }
   },
-  "parallel": 2,
+  "parallel": 4,
   "maxCacheSize": "10GB",
   "analytics": false,
   "pluginsConfig": {

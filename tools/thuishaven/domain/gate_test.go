@@ -439,3 +439,48 @@ func TestBackgroundDescriptionSaysItIsNotAResult(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "The gate leaves compile and test runs to their launchers"
+// @scenario "Lint and builds keep the gate until they have launchers"
+func TestLauncherOwnedCoversOnlyCompileAndTestRuns(t *testing.T) {
+	owned := []string{
+		"tsc --noEmit --ignoreConfig f.ts",
+		"pnpm exec tsc -b",
+		"npx vitest run src/x",
+		"vitest run",
+		"pnpm typecheck",
+		"pnpm --filter @langwatch/time typecheck",
+		"pnpm --filter @langwatch/time test src/x.unit.test.ts",
+		"VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/time test",
+		"pnpm test:unit run src/x",
+		"cd modules/x && pnpm typecheck",
+	}
+	for _, command := range owned {
+		if !LauncherOwned(command) {
+			t.Errorf("LauncherOwned(%q) = false, want true: the launcher takes its slot", command)
+		}
+	}
+	gated := []string{
+		"pnpm lint",
+		"oxlint --quiet src",
+		"pnpm exec oxfmt --write f.ts",
+		"golangci-lint run",
+		"go build ./...",
+		"docker build .",
+		"pnpm typecheck && pnpm lint",
+		"git status",
+		"pnpm typecheck:src",
+		"pnpm test:affected",
+		"nx run-many -t typecheck -p @langwatch/time",
+	}
+	for _, command := range gated {
+		if LauncherOwned(command) {
+			t.Errorf("LauncherOwned(%q) = true, want false", command)
+		}
+	}
+	for _, command := range []string{"pnpm typecheck:src", "pnpm test:affected", "nx run-many -t test -p @langwatch/time"} {
+		if _, heavy := ClassifyCommand(command); heavy {
+			t.Errorf("ClassifyCommand(%q) is heavy; an Nx entry point is not the gate's to hold", command)
+		}
+	}
+}
