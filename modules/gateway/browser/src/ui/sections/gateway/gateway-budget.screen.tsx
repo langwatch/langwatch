@@ -120,6 +120,16 @@ function budgetStanding(
   return { spent, limit, pct, seatsSeen, seatsOver, seatsOverPct };
 }
 
+function BudgetResets({ budget }: { budget: GatewayBudgetDetailResponse }) {
+  if (budget.window === "TOTAL") return "never";
+  if (budget.window === "MANUAL") return "on request";
+  return (
+    <Tooltip content={readableDate(budget.resetsAt).toLocaleString()}>
+      <span>{formatTimeAgo(toEpochMs(budget.resetsAt))}</span>
+    </Tooltip>
+  );
+}
+
 function BudgetDetailPage() {
   const showErrorToast = useShowErrorToast();
   const { organization, project } = useOrganizationTeamProject();
@@ -282,15 +292,7 @@ function BudgetDetailPage() {
                     <Text>
                       Resets:{" "}
                       <strong>
-                        {budget.window === "TOTAL" ? (
-                          "never"
-                        ) : budget.window === "MANUAL" ? (
-                          "on request"
-                        ) : (
-                          <Tooltip content={readableDate(budget.resetsAt).toLocaleString()}>
-                            <span>{formatTimeAgo(toEpochMs(budget.resetsAt))}</span>
-                          </Tooltip>
-                        )}
+                        <BudgetResets budget={budget} />
                       </strong>
                     </Text>
                     <Text>·</Text>
