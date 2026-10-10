@@ -102,4 +102,66 @@ describe("studioBackendPostEvent abort during an in-flight read", () => {
       expect(cancel).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the abort poll's Redis check rejects (langwatch#8534)", () => {
+    /**
+     * A pod shutting down mid-poll can close the Redis connection the abort
+     * check reads from, so `isAborted()` rejects instead of resolving. The
+     * poll timer runs detached from any awaited call chain (it is driven by
+     * `setInterval`, not the `Promise.race` it feeds), so an unhandled
+     * rejection there escapes `studioBackendPostEvent`'s own try/catch
+     * entirely and crashes the process — this is what prod saw. The initial
+     * per-iteration `isAborted()` check (before each read) is already inside
+     * an awaited chain the surrounding try/catch covers; only the detached
+     * poll timer needed the fix.
+     */
+    it("does not raise an unhandled rejection when the poll's abort check rejects", async () => {
+      // A read that never resolves: only the abort race (the poll timer) can
+      // end the loop, so the test proves behavior purely through the timer's
+      // side effects, not the pre-read check.
+      currentReader = {
+        read: () => new Promise<ReadableStreamReadResult<Uint8Array>>(() => {}),
+        cancel: vi.fn(async () => {}),
+        releaseLock: vi.fn(),
+      } as unknown as ReadableStreamDefaultReader<Uint8Array>;
+
+      const unhandled: unknown[] = [];
+      const onUnhandledRejection = (reason: unknown) => {
+        unhandled.push(reason);
+      };
+      process.on("unhandledRejection", onUnhandledRejection);
+
+      let callCount = 0;
+      const redisClosed = new Error("Connection is closed.");
+      // The pre-read check (call 1) passes; every poll tick after that
+      // (call 2+) rejects, as a closed Redis connection would on every call
+      // until the pod finishes shutting down.
+      const isAborted = vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) return false;
+        throw redisClosed;
+      });
+      const onEvent = vi.fn();
+
+      const { studioBackendPostEvent } = await import("../post-event");
+      try {
+        // One real 1000ms poll tick, plus margin, is enough to exercise the
+        // timer callback at least once.
+        await Promise.race([
+          studioBackendPostEvent({
+            projectId: "p",
+            message: blockedCell,
+            onEvent,
+            isAborted,
+          }),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } finally {
+        process.off("unhandledRejection", onUnhandledRejection);
+      }
+
+      expect(unhandled).toEqual([]);
+      expect(callCount).toBeGreaterThanOrEqual(2);
+    }, 10_000);
+  });
 });
