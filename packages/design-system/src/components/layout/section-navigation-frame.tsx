@@ -310,7 +310,7 @@ export function SectionNavigationHeader({ children }: { children: ReactNode }) {
   return (
     <PageLayout.Header
       paddingY={0}
-      height={SECTION_HEADER_HEIGHT}
+      height={{ base: "auto", md: SECTION_HEADER_HEIGHT }}
       minHeight={SECTION_HEADER_HEIGHT}
       flexWrap="nowrap"
       css={{
