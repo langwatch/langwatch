@@ -10,21 +10,39 @@ export interface VirtualAuthenticator {
   session: CDPSession;
 }
 
+/** The kinds `haven browser authenticator add --kind` offers, with the same defaults. */
+const KINDS = {
+  passkey: {
+    protocol: "ctap2",
+    transport: "internal",
+    hasResidentKey: true,
+    hasUserVerification: true,
+  },
+  "security-key": {
+    protocol: "ctap2",
+    transport: "usb",
+    hasResidentKey: false,
+    hasUserVerification: false,
+  },
+  u2f: { protocol: "u2f", transport: "usb", hasResidentKey: false, hasUserVerification: false },
+} as const;
+
 /**
- * Attaches a resident-key, user-verifying authenticator. `hasResidentKey`
- * lets a discoverable-credential request (no email, no allowCredentials)
- * find anything; `isUserVerified` auto-answers the fingerprint/PIN prompt.
+ * Attaches a virtual authenticator; the default passkey is resident and user-verifying, so a
+ * discoverable request finds anything and the fingerprint/PIN prompt answers itself.
+ * Fail user verification with `session.send("WebAuthn.setUserVerified", ...)`.
  */
-export async function addVirtualAuthenticator(page: Page): Promise<VirtualAuthenticator> {
+export async function addVirtualAuthenticator(
+  page: Page,
+  { kind = "passkey" }: { kind?: keyof typeof KINDS } = {},
+): Promise<VirtualAuthenticator> {
   const session = await page.context().newCDPSession(page);
   await session.send("WebAuthn.enable");
+  const options = KINDS[kind];
   const { authenticatorId } = await session.send("WebAuthn.addVirtualAuthenticator", {
     options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
+      ...options,
+      isUserVerified: options.hasUserVerification,
       automaticPresenceSimulation: true,
     },
   });

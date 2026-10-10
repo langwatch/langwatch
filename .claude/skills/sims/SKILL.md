@@ -28,6 +28,9 @@ built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 | `paymentsim`   | Stripe (API, signed webhooks, meters)               | default      | `paymentsim`                               | `PAYMENTSIM_CATALOG`   |
 | `lambdasim`    | AWS Lambda + CloudWatch Logs (NLP Lambda fleet)     | `+lambda`    | [`lambdasim`](../lambdasim/SKILL.md)       | none                   |
 
+Passkeys, security keys and U2F tokens are emulated in the browser, not by a Go sim:
+[`webauthnsim`](../webauthnsim/SKILL.md) (`haven browser authenticator`).
+
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
 `analytics`, `idp`, `voice`, `outbound`, `telemetry`, `lambda`) and logs via `haven logs <name>`. `haven up +llm +analytics`
 selects (sticky); `-mail` deselects. haven sets every `*_SEED=1`. Two shared console packages,

@@ -28,7 +28,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|authenticator|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -36,7 +36,7 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | authenticator | close | status | stop",
 		args:    "<verb> [ref|selector|url|text|key|expression|file] [text|file...]",
 		maxArgs: -1,
 		flags: []flagSpec{
@@ -49,6 +49,9 @@ func browserSpec() commandSpec {
 			{long: "--grep", takesValue: true, value: "<text>", summary: "snapshot: only nodes whose role or name contain text, plus their ancestors"},
 			{long: "--depth", takesValue: true, value: "<n>", summary: "snapshot: only the first n levels of the tree"},
 			{long: "--max-chars", takesValue: true, value: "<n>", summary: "snapshot: cut after n characters with a truncated footer"},
+			{long: "--kind", takesValue: true, value: "<passkey|security-key|u2f>", summary: "authenticator add: the virtual authenticator to attach (default passkey)"},
+			{long: "--uv", takesValue: true, value: "<yes|no>", summary: "authenticator add: whether it verifies the user (fingerprint or PIN)"},
+			{long: "--resident", takesValue: true, value: "<yes|no>", summary: "authenticator add: whether it keeps discoverable credentials"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "how long a command may wait on the page (default 30s)"},
 			{long: "--json", summary: "machine-readable"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
@@ -79,6 +82,12 @@ func runBrowser(ctx context.Context, d deps, inv invocation) error {
 		}
 		if verb == "export" {
 			return exportScript(inv)
+		}
+	}
+	if verb == "authenticator" {
+		var err error
+		if verb, inv, err = authenticatorVerb(inv); err != nil {
+			return err
 		}
 	}
 	slug, err := d.orch.ResolveSlug(authParams(d, inv))
@@ -148,6 +157,9 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 		return nil, err
 	}
 	if err := browserExtras(verb, inv, req); err != nil {
+		return nil, err
+	}
+	if err := authenticatorExtras(verb, inv, req); err != nil {
 		return nil, err
 	}
 	if err := absolutise(req); err != nil {
@@ -240,6 +252,7 @@ var browserVerbArgs = map[string][]string{
 	"click": {"ref"}, "hover": {"ref"}, "drag": {"ref", "targetRef?"}, "upload": {"ref"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
 	"eval": {"expression"}, "state-load": {"file"},
 	"record-start": nil, "record-stop": nil, "replay": {"file"},
+	"authenticator-add": nil, "authenticator-list": nil, "authenticator-remove": {"authenticatorId"}, "authenticator-uv": {"authenticatorId", "verified"},
 }
 
 func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {
@@ -256,6 +269,12 @@ func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {
 		fmt.Println(string(value))
 	case "close":
 		fmt.Println("closed")
+	case "authenticator-add":
+		fmt.Println(reply["authenticatorId"])
+	case "authenticator-list":
+		printAuthenticators(reply)
+	case "authenticator-remove", "authenticator-uv":
+		fmt.Println("ok")
 	default:
 		fmt.Printf("%v  %v\n", reply["url"], reply["title"])
 	}

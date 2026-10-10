@@ -18,7 +18,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 
-import { chromium, type BrowserContext, type Page } from "playwright";
+import { chromium, type BrowserContext, type CDPSession, type Page } from "playwright";
 
 import {
   REDACTED,
@@ -84,6 +84,9 @@ type Lane = {
   seen: Query[];
   inflight: number;
   recording?: Script;
+  /** The CDP session holding this lane's virtual authenticators; detaching it drops them. */
+  webauthn?: CDPSession;
+  authenticators: Map<string, { kind: string; userVerified: boolean }>;
 };
 const lanes = new Map<string, Lane>();
 /** Lanes closed for idling, told once on their next command. */
@@ -274,7 +277,16 @@ async function laneFor({
     viewport: { width: 1280, height: 800 },
   });
   const page = await context.newPage();
-  const lane: Lane = { name, as, context, page, signedOut: false, seen: [], inflight: 0 };
+  const lane: Lane = {
+    name,
+    as,
+    context,
+    page,
+    signedOut: false,
+    seen: [],
+    inflight: 0,
+    authenticators: new Map(),
+  };
   watchLane({ lane });
   lanes.set(name, lane);
   return lane;
@@ -383,6 +395,18 @@ type Request = {
   grep?: string;
   depth?: number;
   maxChars?: number;
+  kind?: string;
+  /** CDP's VirtualAuthenticatorOptions, built by haven (browser_authenticator.go). */
+  options?: {
+    protocol: "ctap2" | "u2f";
+    transport: "usb" | "nfc" | "ble" | "internal";
+    hasResidentKey: boolean;
+    hasUserVerification: boolean;
+    isUserVerified: boolean;
+    automaticPresenceSimulation: boolean;
+  };
+  authenticatorId?: string;
+  verified?: boolean;
 };
 
 type Act = (args: { page: Page; body: Request; timeout: number }) => Promise<unknown>;
@@ -703,6 +727,70 @@ async function recordCommand({
   throw new Error(`unknown verb ${verb}`);
 }
 
+/** `haven browser authenticator`: Chromium's virtual WebAuthn authenticators on the lane's page. */
+async function authenticatorCommand({
+  lane,
+  verb,
+  body,
+}: {
+  lane: Lane;
+  verb: string;
+  body: Request;
+}) {
+  if (!lane.webauthn) {
+    lane.webauthn = await lane.context.newCDPSession(lane.page);
+    await lane.webauthn.send("WebAuthn.enable");
+  }
+  const session = lane.webauthn;
+  if (verb === "authenticator-add") {
+    if (!body.options) throw new Error("authenticator add needs options");
+    const { authenticatorId } = await session.send("WebAuthn.addVirtualAuthenticator", {
+      options: body.options,
+    });
+    const userVerified = body.options.isUserVerified;
+    lane.authenticators.set(authenticatorId, { kind: body.kind ?? "passkey", userVerified });
+    return { authenticatorId };
+  }
+  if (verb === "authenticator-list") {
+    const authenticators = [];
+    for (const [id, about] of lane.authenticators) {
+      const { credentials } = await session.send("WebAuthn.getCredentials", {
+        authenticatorId: id,
+      });
+      // Never the private key: only what identifies a credential.
+      const listed = credentials.map(
+        ({ credentialId, rpId, userHandle, signCount, isResidentCredential }) => ({
+          credentialId,
+          rpId,
+          userHandle,
+          signCount,
+          isResidentCredential,
+        }),
+      );
+      authenticators.push({ id, ...about, credentials: listed });
+    }
+    return { authenticators };
+  }
+  const authenticatorId = body.authenticatorId ?? "";
+  const about = lane.authenticators.get(authenticatorId);
+  if (!about)
+    throw new Error(
+      `lane ${lane.name} has no authenticator ${authenticatorId} (authenticator list)`,
+    );
+  if (verb === "authenticator-remove") {
+    await session.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    lane.authenticators.delete(authenticatorId);
+    return { removed: authenticatorId };
+  }
+  if (verb === "authenticator-uv") {
+    const isUserVerified = body.verified === true;
+    await session.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified });
+    about.userVerified = isUserVerified;
+    return { authenticatorId, userVerified: isUserVerified };
+  }
+  throw new Error(`unknown verb ${verb}`);
+}
+
 async function handle({ verb, body }: { verb: string; body: Request }): Promise<unknown> {
   if (verb === "status") return { running: true, pid: process.pid, lanes: [...lanes.keys()] };
   if (verb === "stop") {
@@ -717,7 +805,12 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
     await closeLane({ name });
     return { closed: name };
   }
-  if (!actions[verb] && !["record-start", "record-stop", "replay"].includes(verb))
+  const authenticatorVerb = verb.startsWith("authenticator-");
+  if (
+    !actions[verb] &&
+    !authenticatorVerb &&
+    !["record-start", "record-stop", "replay"].includes(verb)
+  )
     throw new Error(`unknown verb ${verb}`);
   if (idled.delete(name) && verb !== "open" && !lanes.has(name))
     throw new Error(`lane ${name} was closed after idling; reopen with open`);
@@ -727,6 +820,7 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
   touch({ lane });
   if (verb === "record-start" || verb === "record-stop" || verb === "replay")
     return recordCommand({ lane, verb, body, timeout });
+  if (authenticatorVerb) return authenticatorCommand({ lane, verb, body });
   return withSlot({ run: () => perform({ lane, verb, body, timeout }) });
 }
 
