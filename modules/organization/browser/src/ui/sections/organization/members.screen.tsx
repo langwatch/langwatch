@@ -535,7 +535,7 @@ function PeopleHeader({
         hint="Everybody in this organization, and everybody on their way in."
         right={
           canManage ? (
-            <HStack gap={2}>
+            <HStack gap={2} flexWrap="wrap">
               <InlineInviteBox value={draft} onChange={setDraft} onSubmit={openInvite} />
               <Button
                 size="sm"
