@@ -103,7 +103,9 @@ type ActorFields = Pick<
 >;
 type Person = { id: string; name: string; email: string | null };
 
-/** Who a row names: a person (maybe through their key), an operator as someone, a key, the system. */
+/**
+ * Who a row names: a person (maybe through their key), an operator as someone, a key, the system.
+ */
 export type AuditActor =
   | ({ kind: "user"; viaKeyId: string | null } & Person)
   | { kind: "apiKey"; id: string }

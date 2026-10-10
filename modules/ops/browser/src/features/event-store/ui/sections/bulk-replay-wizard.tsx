@@ -1,4 +1,3 @@
-import { Stat } from "@langwatch/design-system/primitives";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Badge,
@@ -9,6 +8,7 @@ import {
   HStack,
   Input,
   Spinner,
+  Stat,
   Table,
   Text,
   Textarea,
