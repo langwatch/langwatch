@@ -294,7 +294,10 @@ export class MemoryScimRepository extends ScimRepository {
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     return (
       this.groups.find(
-        (row) => row.id === input.id && row.organizationId === input.organizationId,
+        (row) =>
+          row.id === input.id &&
+          row.organizationId === input.organizationId &&
+          row.scimSource !== null,
       ) ?? null
     );
   }

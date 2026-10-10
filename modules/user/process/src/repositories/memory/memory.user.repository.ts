@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 import {
+  EmailAlreadyRegisteredError,
   createdUserSchema,
   userAccountInfoSchema,
   userFullProfileSchema,
@@ -125,6 +126,10 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
+    // The store's email is unique as written, so only an exact twin collides.
+    if (this.#database.usersWithEmail(input.email).some((row) => row.email === input.email)) {
+      throw new EmailAlreadyRegisteredError();
+    }
     const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
     await this.#appendMintFacts({ row });
 

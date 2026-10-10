@@ -7,6 +7,7 @@ import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
@@ -536,5 +537,27 @@ describe("an existing account the directory pushes", () => {
 
     expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
     expect(created).toMatchObject({ id: "user-1", active: true });
+  });
+});
+
+describe("when two pushes of one new person arrive together", () => {
+  /** @scenario "The push that loses the mint of a new person answers 409" */
+  it("answers the loser with the duplicate's 409 and writes no resource for it", async () => {
+    const store = new DirectoryStore();
+    const { service, users } = directory(store);
+    vi.mocked(users.create).mockRejectedValueOnce(new EmailAlreadyRegisteredError());
+
+    const refusal = await refusalOf(
+      service.createUser({
+        organizationId: ORGANIZATION,
+        request: { schemas: [USER_SCHEMA], userName: "racer@example.test", active: true },
+      }),
+    );
+
+    expect(refusal.response).toMatchObject({
+      status: "409",
+      detail: "User already exists in this organization",
+    });
+    expect(store.resources.size).toBe(0);
   });
 });

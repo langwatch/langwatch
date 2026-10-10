@@ -9,7 +9,11 @@ import {
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { UserProfile, UserApi } from "@langwatch/user-contract";
+import {
+  EmailAlreadyRegisteredError,
+  type UserProfile,
+  type UserApi,
+} from "@langwatch/user-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type {
@@ -214,6 +218,17 @@ export class ScimProvisioningService {
     }
   }
 
+  /** A concurrent push that loses the mint answers as the sequential duplicate does. */
+  private async mintUser(input: { name: string; email: string }): Promise<UserProfile> {
+    try {
+      return await this.userService.create(input);
+    } catch (error) {
+      if (!(error instanceof EmailAlreadyRegisteredError)) throw error;
+
+      return this.scimError({ status: "409", detail: "User already exists in this organization" });
+    }
+  }
+
   async createUser({
     request,
     organizationId,
@@ -268,7 +283,7 @@ export class ScimProvisioningService {
 
     const name = nameFromScimRequest(request);
     // Minting the account is the only global state a directory push writes.
-    const user = existingUser ?? (await this.userService.create({ name, email: request.userName }));
+    const user = existingUser ?? (await this.mintUser({ name, email: request.userName }));
     const active = request.active !== false;
     if (active && !returning) {
       await this.admission.admit({ userId: user.id, organizationId });

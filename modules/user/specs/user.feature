@@ -108,6 +108,12 @@ Feature: Canonical user lifecycle
     Then the mint fails and its transaction rolls back, leaving no account
 
   @unit
+  Scenario: A mint that loses a race for its address answers that the address is taken
+    Given another mint of the same address committed first
+    When the account is minted
+    Then the mint is refused as email_already_registered rather than failing
+
+  @unit
   Scenario: The fact outbox records each committed fact on user's pipeline
     Given created, registered or erased intents committed to user's fact outbox
     When the worker's outbox delivers them, however often the write appended them

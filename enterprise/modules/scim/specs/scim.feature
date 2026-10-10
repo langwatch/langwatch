@@ -86,6 +86,18 @@ Feature: Enterprise SCIM package boundary
       When the directory creates that user
       Then the account becomes a member at once
 
+  Rule: Pushes of one new person at once read as one creation
+
+    A provider that retries in parallel sends the same new person twice. One
+    push mints the account; the other answers the conflict a duplicate sent
+    afterwards gets, never a failure.
+
+    @unit
+    Scenario: The push that loses the mint of a new person answers 409
+      Given two pushes of the same new person arrive together
+      When the second loses the race to mint the account
+      Then it answers 409 as a duplicate sent afterwards does
+
   Rule: A name is patched one half at a time
 
     SCIM carries a name as two parts and this product stores one string, so a
@@ -216,6 +228,12 @@ Feature: Enterprise SCIM package boundary
       Given a token belonging to no connection
       When it reads a group another connection pushed
       Then the group is returned
+
+    @unit
+    Scenario: A group made in LangWatch is out of a directory token's reach by id
+      Given a group an administrator made in LangWatch
+      When a directory token reads, patches or deletes it by id
+      Then each answers not found and the group is unchanged
 
     @unit
     Scenario: A write to a sibling connection's group is refused by authority
