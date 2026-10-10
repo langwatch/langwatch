@@ -55,7 +55,7 @@ const badgeGlass = {
 export const designSystemConfig = defineConfig({
   globalCss: {
     body: {
-      background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
+      background: "bg.page",
       fontSize: "14px",
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
@@ -509,49 +509,34 @@ export const designSystemConfig = defineConfig({
           },
         },
 
-        // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
+        // Surface ladder: page, card, nested group, then small control.
         bg: {
           // Page/sidebar background
           page: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
+            value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.950}" },
           },
-          // Main content area - deepest in dark mode
-          surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
-          // Cards and panels - float above surface
-          panel: { value: { _light: "white", _dark: "{colors.zinc.800}" } },
-          // Raised cards and floating controls above a panel.
-          raised: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.750}" },
+          // Four levels: page, card, nested group, then a small control.
+          card: { value: { _light: "white", _dark: "{colors.zinc.750}" } },
+          nested: {
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.600}" },
           },
-          // Muted background for hover states, selections
-          muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
+          control: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.500}" },
           },
+          surface: { value: { _light: "{colors.bg.page}", _dark: "{colors.bg.page}" } },
+          panel: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
+          raised: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
+          muted: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
           // Navigation rail: one step off the page, so the rail reads as
           // its own surface next to the sidebar
           rail: {
             value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.850}" },
           },
-          // Emphasized background for active states
-          emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
-          },
-          // Subtle background for table headers, zebra rows
-          subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.900}" },
-          },
-          // Softer hover/open lift — sits between subtle and muted, used when
-          // bg.muted reads too heavy (e.g. accordion triggers).
-          softHover: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
-          },
-          // Form inputs - sunken below panel in dark
-          input: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.900}" },
-          },
-          inputHover: {
-            value: { _light: "white", _dark: "{colors.zinc.800}" },
-          },
+          emphasized: { value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" } },
+          subtle: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
+          softHover: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
+          input: { value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" } },
+          inputHover: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
           // Status surfaces, one per meaning.
           error: { value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" } },
           success: { value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" } },
@@ -569,36 +554,32 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.900}", _dark: "{colors.gray.100}" },
           },
           muted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.300}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.200}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.300}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Status text, one per meaning.
-          error: { value: { _light: "{colors.red.600}", _dark: "{colors.red.300}" } },
-          success: { value: { _light: "{colors.green.700}", _dark: "{colors.green.300}" } },
-          warning: { value: { _light: "{colors.yellow.700}", _dark: "{colors.yellow.300}" } },
-          info: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.300}" } },
+          error: { value: { _light: "{colors.red.700}", _dark: "{colors.red.100}" } },
+          success: { value: { _light: "{colors.green.700}", _dark: "{colors.green.200}" } },
+          warning: { value: { _light: "{colors.yellow.800}", _dark: "{colors.yellow.300}" } },
+          info: { value: { _light: "{colors.blue.700}", _dark: "{colors.blue.100}" } },
         },
 
         // Border semantic tokens - visible in dark mode
         border: {
-          DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
-          },
-          muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
-          },
-          subtle: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.800}" },
-          },
+          card: { value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.600}" } },
+          nested: { value: { _light: "{colors.gray.400}", _dark: "{colors.zinc.500}" } },
+          control: { value: { _light: "{colors.gray.450}", _dark: "{colors.gray.300}" } },
+          DEFAULT: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
+          muted: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
+          subtle: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
           emphasized: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.500}" },
+            value: { _light: "{colors.border.nested}", _dark: "{colors.border.nested}" },
           },
-          // Outlines that must remain distinct from the surrounding ground.
           strong: {
-            value: { _light: "{colors.gray.450}", _dark: "{colors.gray.450}" },
+            value: { _light: "{colors.border.control}", _dark: "{colors.border.control}" },
           },
           // Status borders, one per meaning.
           error: { value: { _light: "{colors.red.300}", _dark: "{colors.red.700}" } },
@@ -818,7 +799,8 @@ export const designSystemConfig = defineConfig({
           root: {
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
-            background: "bg.panel",
+            background: "bg.card",
+            borderColor: "border.card",
             // Clip children to the rounded border. Square child paints —
             // table row hover/selection/tints, header bands, code blocks —
             // otherwise overlap the border's curve at the corners. Floating
@@ -829,8 +811,12 @@ export const designSystemConfig = defineConfig({
         },
         variants: {
           variant: {
+            subtle: {
+              root: { background: "bg.nested", border: "1px solid", borderColor: "border.nested" },
+            },
             outline: {
               root: {
+                border: "1px solid",
                 boxShadow: "2xs",
               },
             },
@@ -839,7 +825,7 @@ export const designSystemConfig = defineConfig({
             elevated: {
               root: {
                 border: "1px solid",
-                borderColor: "border.muted",
+                borderColor: "border.card",
                 boxShadow: "md",
               },
             },

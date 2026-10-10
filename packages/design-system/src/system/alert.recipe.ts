@@ -54,8 +54,8 @@ export const statusMesh = (level: MeshLevel) => {
       : meshImage(amount);
   return {
     bg: {
-      _light: statusTint({ color: "color-palette-solid", ground: "bg-surface", amount: base[0] }),
-      _dark: statusTint({ color: "color-palette-solid", ground: "bg-panel", amount: base[1] }),
+      _light: statusTint({ color: "color-palette-solid", ground: "bg-card", amount: base[0] }),
+      _dark: statusTint({ color: "color-palette-solid", ground: "bg-card", amount: base[1] }),
     },
     backgroundImage: { _light: image(spot[0]), _dark: image(spot[1]) },
     borderColor: { _light: edge(rim[0]), _dark: edge(rim[1]) },
@@ -97,6 +97,14 @@ export const alertSlotRecipe = defineSlotRecipe({
     },
   },
   variants: {
+    status: {
+      neutral: {
+        root: {
+          // A neutral wash must separate from the brighter card ground too.
+          "--chakra-colors-color-palette-solid": "{colors.fg.subtle}",
+        },
+      },
+    },
     variant: {
       outline: {
         root: { ...statusMesh("outline"), color: "fg", shadow: "none" },
@@ -155,4 +163,11 @@ export const alertSlotRecipe = defineSlotRecipe({
       },
     },
   },
+  compoundVariants: [
+    {
+      status: "neutral",
+      variant: "solid",
+      css: { root: { bg: { _dark: "bg.control" }, color: { _dark: "fg" } } },
+    },
+  ],
 });

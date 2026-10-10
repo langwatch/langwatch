@@ -1,7 +1,8 @@
-import { Box, Grid, Heading, HStack, Stack, Table, Text } from "@chakra-ui/react";
+import { Box, Card, Grid, Heading, HStack, Stack, Table, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 
+import { DarkMode, LightMode } from "../color-mode/index.tsx";
 import { CopyButton } from "../components/display/copy-button.tsx";
 import { system } from "./create-system.ts";
 
@@ -22,11 +23,13 @@ const isSemantic = ([name, token]: [string, Token]) =>
 const isScaleStep = ([name]: [string, Token]) => /^[a-z]+(Alpha)?\.\d+$/.test(name);
 
 /** `{colors.gray.600}` to the value it names, so a light or dark chip shows its real colour. */
-function resolveColour({ reference }: { reference: string }): string {
+function resolveColour({ reference, mode }: { reference: string; mode: "light" | "dark" }): string {
   return reference.replace(/\{colors\.([^}/]+)(?:\/(\d+))?\}/g, (whole, name: string, alpha) => {
-    const value = colours.find(([candidate]) => candidate === name)?.[1].value;
+    const token = colours.find(([candidate]) => candidate === name)?.[1];
+    const value = token ? (referenceOf({ token, mode }) ?? token.value) : void 0;
     if (typeof value !== "string") return whole;
-    return alpha ? `color-mix(in srgb, ${value} ${alpha}%, transparent)` : value;
+    const resolved = resolveColour({ reference: value, mode });
+    return alpha ? `color-mix(in srgb, ${resolved} ${alpha}%, transparent)` : resolved;
   });
 }
 
@@ -53,7 +56,7 @@ const shortReference = (reference?: string) =>
 function SplitSwatch({ token }: { token: Token }) {
   const half = (mode: "light" | "dark") => {
     const reference = referenceOf({ token, mode }) ?? referenceOf({ token, mode: "light" });
-    return reference ? resolveColour({ reference }) : "transparent";
+    return reference ? resolveColour({ reference, mode }) : "transparent";
   };
   return (
     <HStack
@@ -145,7 +148,7 @@ const SEMANTIC_GROUPS: { title: string; note: string; matches: (name: string) =>
   },
   {
     title: "Background",
-    note: "Surfaces, including bg.raised for cards above a panel.",
+    note: "Four nested levels: bg.page, bg.card, bg.nested, bg.control.",
     matches: (n) => n === "bg" || n.startsWith("bg."),
   },
   {
@@ -303,6 +306,74 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Colour: Story = { render: () => <SemanticColours /> };
+
+function NestedSurfaces() {
+  return (
+    <Stack bg="bg.page" color="fg" padding={5} gap={4} borderRadius="xl">
+      <Text fontSize="sm">Page · bg.page</Text>
+      <Card.Root variant="outline">
+        <Card.Body gap={4}>
+          <Text>Card · bg.card / border.card</Text>
+          <Stack
+            bg="bg.nested"
+            borderWidth="1px"
+            borderColor="border.nested"
+            borderRadius="lg"
+            padding={4}
+            gap={3}
+          >
+            <Text fontSize="sm">Connection row · bg.nested / border.nested</Text>
+            <Box
+              bg="bg.control"
+              borderWidth="1px"
+              borderColor="border.control"
+              borderRadius="md"
+              padding={3}
+            >
+              <Text fontSize="sm">Chip / input · bg.control / border.control</Text>
+              <Text color="fg.subtle" fontSize="xs">
+                Secondary text remains AA at this brightest dark level.
+              </Text>
+            </Box>
+          </Stack>
+        </Card.Body>
+      </Card.Root>
+      <Grid templateColumns="repeat(3, minmax(0, 1fr))" gap={3}>
+        {(["outline", "elevated", "subtle"] as const).map((variant) => (
+          <Card.Root key={variant} variant={variant}>
+            <Card.Body padding={3}>
+              <Text fontSize="xs">{variant}</Text>
+            </Card.Body>
+          </Card.Root>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+export const SurfaceLadder: Story = {
+  render: () => (
+    <Stack gap={4}>
+      <Text>
+        Page → card → nested row → small control. Dark CIELAB L* steps: 10.22 / 12.12 / 12.26.
+      </Text>
+      <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
+        <Stack gap={2}>
+          <Heading size="sm">Light</Heading>
+          <LightMode>
+            <NestedSurfaces />
+          </LightMode>
+        </Stack>
+        <Stack gap={2}>
+          <Heading size="sm">Dark</Heading>
+          <DarkMode>
+            <NestedSurfaces />
+          </DarkMode>
+        </Stack>
+      </Grid>
+    </Stack>
+  ),
+};
 
 export const Palette: Story = { render: () => <PaletteScale /> };
 

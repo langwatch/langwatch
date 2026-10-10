@@ -130,10 +130,7 @@ function paint({
   const indicator = slotIn({ styles: slots.indicator, mode }).color;
   const text = read(root.color);
   const own = read(root.background);
-  const ground =
-    own === "transparent"
-      ? read(mode === "light" ? "var(--chakra-colors-bg-surface)" : "var(--chakra-colors-bg-panel)")
-      : own;
+  const ground = own === "transparent" ? read("var(--chakra-colors-bg-card)") : own;
   return {
     root,
     ground,
@@ -146,20 +143,19 @@ function paint({
 describe("the alert recipe", () => {
   describe("given an alert with the default variant", () => {
     /** @scenario "An alert wears the card material in either colour mode" */
-    it("tints the surface in light and the panel in dark", () => {
+    it("tints the card in both modes", () => {
       const light = paint({ status: "error", variant: "subtle", mode: "light" });
       const dark = paint({ status: "error", variant: "subtle", mode: "dark" });
 
-      expect(light.root.background).toContain("var(--chakra-colors-bg-surface)");
-      expect(dark.root.background).toContain("var(--chakra-colors-bg-panel)");
+      expect(light.root.background).toContain("var(--chakra-colors-bg-card)");
+      expect(dark.root.background).toContain("var(--chakra-colors-bg-card)");
       expect(light.ground).not.toBe(dark.ground);
     });
 
     /** @scenario "A status tints its alert in either colour mode" */
     it.each(["light", "dark"] as const)("gives every status its own tint in %s", (mode) => {
       const plain = resolve({
-        value:
-          mode === "light" ? "var(--chakra-colors-bg-surface)" : "var(--chakra-colors-bg-panel)",
+        value: "var(--chakra-colors-bg-card)",
         mode,
         root: {},
       });
@@ -246,10 +242,7 @@ describe("the alert recipe", () => {
         const painted = paint({ status, variant: "subtle", mode });
         const plain = channels(
           resolve({
-            value:
-              mode === "light"
-                ? "var(--chakra-colors-bg-surface)"
-                : "var(--chakra-colors-bg-panel)",
+            value: "var(--chakra-colors-bg-card)",
             mode,
             root: painted.root,
           }),

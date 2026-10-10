@@ -33,7 +33,7 @@ function contrast(foreground: string, background: string): number {
 const colours = designSystemConfig.theme?.semanticTokens?.colors;
 
 function token(name: string, mode: Mode): string {
-  const [group, role] = name.split(".");
+  const [group, role = "DEFAULT"] = name.split(".");
   const category = Object.entries(colours ?? {}).find(([key]) => key === group)?.[1];
   const entry = Object.entries(category ?? {}).find(([key]) => key === role)?.[1];
   if (!entry || typeof entry !== "object" || !("value" in entry)) {
@@ -45,20 +45,26 @@ function token(name: string, mode: Mode): string {
   }
   const reference = Reflect.get(value, mode);
   if (typeof reference !== "string") throw new Error(`Invalid ${mode} for ${name}`);
-  return reference;
+  const alias = /^\{colors\.(bg|border)\.([^}]+)\}$/.exec(reference);
+  return alias ? token(`${alias[1]}.${alias[2]}`, mode) : reference;
 }
 
 describe("semantic colour contrast", () => {
   it.each(["_light", "_dark"] satisfies Mode[])("keeps text readable in %s", (mode) => {
     for (const status of ["error", "success", "warning", "info"]) {
-      for (const ground of [`bg.${status}`, "bg.panel", "bg.page", "bg.raised"]) {
+      for (const ground of [`bg.${status}`, "bg.page", "bg.card", "bg.nested", "bg.control"]) {
         expect(contrast(token(`fg.${status}`, mode), token(ground, mode))).toBeGreaterThanOrEqual(
           4.5,
         );
       }
     }
-    for (const text of ["fg.muted", "fg.subtle"]) {
-      expect(contrast(token(text, mode), token("bg.raised", mode))).toBeGreaterThanOrEqual(4.5);
+    for (const text of ["fg", "fg.muted", "fg.subtle"]) {
+      for (const ground of ["bg.page", "bg.card", "bg.nested", "bg.control"]) {
+        expect(
+          contrast(token(text, mode), token(ground, mode)),
+          `${text} on ${ground}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
     }
     expect(contrast(token("cyan.fg", mode), token("cyan.subtle", mode))).toBeGreaterThanOrEqual(
       4.5,
@@ -66,5 +72,56 @@ describe("semantic colour contrast", () => {
     expect(contrast(token("border.strong", mode), token("bg.raised", mode))).toBeGreaterThanOrEqual(
       3,
     );
+  });
+});
+
+function lightness(reference: string): number {
+  const y = luminance(reference);
+  return y > (6 / 29) ** 3 ? 116 * Math.cbrt(y) - 16 : (29 / 3) ** 3 * y;
+}
+
+describe("nested surface separation", () => {
+  it("keeps dark levels visibly and evenly spaced", () => {
+    const levels = ["bg.page", "bg.card", "bg.nested", "bg.control"];
+    const gaps = levels
+      .slice(1)
+      .map(
+        (name, index) =>
+          lightness(token(name, "_dark")) - lightness(token(levels[index] ?? "bg.page", "_dark")),
+      );
+    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(10);
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(3);
+  });
+
+  it.each(["_light", "_dark"] satisfies Mode[])(
+    "separates edges from their parent in %s",
+    (mode) => {
+      for (const [edge, parent] of [
+        ["card", "page"],
+        ["nested", "card"],
+        ["control", "nested"],
+      ]) {
+        expect(
+          contrast(token(`border.${edge}`, mode), token(`bg.${parent}`, mode)),
+        ).toBeGreaterThanOrEqual(1.2);
+      }
+      for (const ground of ["bg.nested", "bg.control"]) {
+        expect(contrast(token("border.control", mode), token(ground, mode))).toBeGreaterThanOrEqual(
+          3,
+        );
+      }
+    },
+  );
+
+  it("keeps light neighbouring grounds distinct", () => {
+    for (const [a, b] of [
+      ["page", "card"],
+      ["card", "nested"],
+      ["nested", "control"],
+    ]) {
+      expect(
+        Math.abs(luminance(token(`bg.${a}`, "_light")) - luminance(token(`bg.${b}`, "_light"))),
+      ).toBeGreaterThanOrEqual(0.08);
+    }
   });
 });
