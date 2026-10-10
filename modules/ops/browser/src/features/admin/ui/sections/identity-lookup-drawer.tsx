@@ -1,8 +1,22 @@
+import { ActivityTimeline } from "@langwatch/design-system/activity-timeline";
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { ResourceRow } from "@langwatch/design-system/resource-row";
+import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type { LookupPerson, LookupPersonDetail } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
-import { useState } from "react";
+import { KeyRound, UserRound } from "lucide-react";
+import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
@@ -36,6 +50,7 @@ export function IdentityLookupDrawer({
     { enabled: !!userId && address.length > 0, retry: false },
   );
   const held = detail.data;
+  const contentRef = useRef<HTMLDivElement>(null);
 
   return (
     <Drawer.Root
@@ -43,15 +58,58 @@ export function IdentityLookupDrawer({
       onOpenChange={({ open }) => {
         if (!open) onClose();
       }}
-      size="xl"
+      size="2xl"
+      initialFocusEl={() => contentRef.current}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{held?.person.name ?? held?.person.email ?? "Person"}</Drawer.Title>
+      <Drawer.Content ref={contentRef} tabIndex={-1} width="calc(100vw - 16px)">
+        <Drawer.Header borderBottomWidth="1px" borderColor="border.muted" padding={6}>
+          <DetailDrawerHeader
+            kind="Person"
+            icon={<UserRound size={20} />}
+            title={held?.person.name ?? held?.person.email ?? "Person details"}
+          >
+            {held?.person.email ?? address}
+          </DetailDrawerHeader>
         </Drawer.Header>
         <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {held && (
+        <Drawer.Body padding={6}>
+          {detail.error && (
+            <VStack align="stretch" gap={4}>
+              <Alert.Root status="error" role="alert">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Couldn't load this person</Alert.Title>
+                  <Alert.Description>
+                    The person's details are unavailable. Try again.
+                  </Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+              <Button
+                alignSelf="start"
+                variant="outline"
+                loading={detail.isFetching}
+                onClick={() => void detail.refetch()}
+              >
+                Try again
+              </Button>
+            </VStack>
+          )}
+          {!detail.error && !held && address.length > 0 && (
+            <VStack align="stretch" gap={4} as="output" aria-label="Loading person details">
+              <Text color="fg.muted" fontSize="sm">
+                Loading person details…
+              </Text>
+              <Skeleton height="24" />
+              <Skeleton height="32" />
+              <Skeleton height="32" />
+            </VStack>
+          )}
+          {!detail.error && !held && !address && (
+            <Text color="fg.muted">
+              Close this panel and enter an email address to load this person.
+            </Text>
+          )}
+          {!detail.error && held && (
             <VStack align="stretch" gap={6}>
               <PersonFacts person={held.person} />
               <MethodsPanel detail={held} canRepair={canRepair} userId={held.person.userId} />
@@ -67,24 +125,19 @@ export function IdentityLookupDrawer({
 
 function PersonFacts({ person }: { person: LookupPerson }) {
   return (
-    <VStack align="start" gap={1}>
-      <HStack gap={2}>
-        <Text color="fg.muted" fontSize="sm">
-          Identifier
-        </Text>
+    <SummaryList>
+      <SummaryListItem label="Identifier">
         <ShortId id={person.userId} />
-      </HStack>
-      <Text fontSize="sm">
-        {person.organizations.length === 0
-          ? "Belongs to no organization."
-          : `Belongs to ${person.organizations
-              .map(
-                (organization) =>
-                  organization.name ?? shortenIdentifier(organization.organizationId),
-              )
-              .join(", ")}.`}
-      </Text>
-    </VStack>
+      </SummaryListItem>
+      <SummaryListItem label="Email">{person.email}</SummaryListItem>
+      <SummaryListItem label="Organizations">
+        {person.organizations
+          .map(
+            (organization) => organization.name ?? shortenIdentifier(organization.organizationId),
+          )
+          .join(", ") || "No organizations"}
+      </SummaryListItem>
+    </SummaryList>
   );
 }
 
@@ -104,49 +157,57 @@ function IdentifierRow({
   onEndSessions: () => void;
   onRemove: () => void;
 }) {
+  const removed = identifier.state === "DETACHED";
+
   return (
-    <Box borderWidth="1px" borderRadius="md" padding={3}>
-      <HStack justify="space-between" align="start">
-        <VStack align="start" gap={0}>
-          <Text>
-            {identifier.value ?? identifier.provider} · {identifierStateLabel(identifier.state)}
+    <VStack align="stretch" gap={2}>
+      <ResourceRow
+        icon={<KeyRound size={16} />}
+        name={
+          <Text as="span" color={removed ? "fg.muted" : "fg"}>
+            {identifier.value ?? identifier.provider}
           </Text>
-          <Text fontSize="sm" color="fg.muted">
+        }
+        status={
+          <Badge variant="subtle">
+            {removed ? "Removed" : identifierStateLabel(identifier.state)}
+          </Badge>
+        }
+        description={
+          <>
             Attached {formatDateTime(identifier.attachedAtMs)}
             {identifier.verifiedAtMs
               ? ` · proved by ${identifier.provider} on ${formatDateTime(identifier.verifiedAtMs)}`
               : " · nothing has proved it"}
-            {identifier.detachedAtMs
-              ? ` · stopped counting ${formatDateTime(identifier.detachedAtMs)}`
-              : ""}
-          </Text>
+            {identifier.detachedAtMs ? ` · Removed ${formatDateTime(identifier.detachedAtMs)}` : ""}
+          </>
+        }
+        meta={
+          sessions.length > 0
+            ? `${sessions.length} signed-in ${sessions.length === 1 ? "device" : "devices"}`
+            : void 0
+        }
+      />
+      {canRepair && !removed && (
+        <HStack gap={2}>
           {sessions.length > 0 && (
-            <Text fontSize="sm" color="fg.muted">
-              {sessions.length} signed-in {sessions.length === 1 ? "device" : "devices"}
+            <Button size="xs" variant="outline" onClick={onEndSessions}>
+              End its sessions
+            </Button>
+          )}
+          {nameable ? (
+            <Button size="xs" variant="outline" colorPalette="red" onClick={onRemove}>
+              Remove
+            </Button>
+          ) : (
+            <Text fontSize="xs" color="fg.muted" maxWidth="220px">
+              Repairs are unavailable: this person's organization cannot be named, so there is no
+              way to confirm which customer this would affect.
             </Text>
           )}
-        </VStack>
-        {canRepair && (
-          <HStack gap={2}>
-            {sessions.length > 0 && (
-              <Button size="xs" variant="outline" onClick={onEndSessions}>
-                End its sessions
-              </Button>
-            )}
-            {nameable ? (
-              <Button size="xs" variant="outline" colorPalette="red" onClick={onRemove}>
-                Remove
-              </Button>
-            ) : (
-              <Text fontSize="xs" color="fg.muted" maxWidth="220px">
-                Repairs are unavailable: this person's organization cannot be named, so there is no
-                way to confirm which customer this would affect.
-              </Text>
-            )}
-          </HStack>
-        )}
-      </HStack>
-    </Box>
+        </HStack>
+      )}
+    </VStack>
   );
 }
 
@@ -437,34 +498,25 @@ function WaitingPanel({
  *  secrets (ADR-101 §4). */
 function HistoryPanel({ history }: { history: LookupPersonDetail["history"] }) {
   return (
-    <Box>
-      <Text fontWeight="semibold" marginBottom={2}>
-        History
-      </Text>
-      {history.length === 0 && (
-        <Text color="fg.muted" fontSize="sm">
-          Nothing has happened to this person's identity yet.
-        </Text>
-      )}
-      <VStack align="stretch" gap={2} data-testid="identity-history">
-        {history.map((entry) => (
-          <HStack key={entry.eventId} justify="space-between" align="start">
-            <VStack align="start" gap={0}>
-              <Text fontSize="sm">{identityFactLabel(entry.type)}</Text>
-              <Text fontSize="sm" color="fg.muted">
-                {entry.actor.type === "system"
-                  ? "by LangWatch"
-                  : `by ${entry.actor.id ?? "somebody"}`}
-                {entry.value ? ` · ${entry.value}` : ""}
-                {entry.detail ? ` · ${entry.detail}` : ""}
-              </Text>
-            </VStack>
-            <Text fontSize="sm" color="fg.muted">
-              {formatDateTime(entry.occurredAtMs)}
-            </Text>
-          </HStack>
-        ))}
-      </VStack>
+    <Box data-testid="identity-history">
+      <ActivityTimeline
+        title="History"
+        emptyState="Nothing has happened to this person's identity yet."
+        entries={history.map((entry) => ({
+          id: entry.eventId,
+          occurredAtMs: entry.occurredAtMs,
+          content: identityFactLabel(entry.type),
+          meta: (
+            <>
+              {entry.actor.type === "system"
+                ? "by LangWatch"
+                : `by ${entry.actor.id ?? "somebody"}`}
+              {entry.value ? ` · ${entry.value}` : ""}
+              {entry.detail ? ` · ${entry.detail}` : ""}
+            </>
+          ),
+        }))}
+      />
     </Box>
   );
 }
