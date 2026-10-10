@@ -13,9 +13,11 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
  * Spec: specs/ai-gateway/governance/departments.feature
  */
 import type { PrismaClient } from "~/generated/prisma/client";
+import { tryGetApp } from "~/server/app-layer/app";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
+import { projectKindsHiddenFrom } from "~/server/app-layer/projects/project-kinds";
 
 import { DepartmentRepository } from "../../repositories/department.repository";
-import { PROJECT_KIND } from "../governanceProject.service";
 
 export class DepartmentNotFoundError extends Error {
   readonly code = "department_not_found" as const;
@@ -68,10 +70,31 @@ export interface DepartmentAssignments {
 }
 
 export class DepartmentService {
+  private readonly repo: DepartmentRepository;
+  private readonly aggregateMembers?: Pick<
+    AggregateReconciler,
+    "reconcileOrganizationOrLog"
+  >;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly repo: DepartmentRepository = new DepartmentRepository(),
-  ) {}
+    deps: {
+      repo?: DepartmentRepository;
+      /**
+       * ADR-144 block E: an aggregate may read the personal projects of one
+       * department, so a member's move re-reads the organisation's
+       * aggregates. Unset means the App's reconciler, resolved when a member
+       * moves.
+       */
+      aggregateMembers?: Pick<
+        AggregateReconciler,
+        "reconcileOrganizationOrLog"
+      >;
+    } = {},
+  ) {
+    this.repo = deps.repo ?? new DepartmentRepository();
+    this.aggregateMembers = deps.aggregateMembers;
+  }
 
   static create(prisma: PrismaClient): DepartmentService {
     return new DepartmentService(prisma);
@@ -102,11 +125,17 @@ export class DepartmentService {
    * department currently stored on it. The admin UI joins these against
    * `getAll` to render the assignment pickers. A user shows the email when
    * no display name is set so the row is never blank.
+   *
+   * `governance:view` reaches a non-admin through a custom role, so the
+   * project list hides what `callerOrganizationRole` may not see: the
+   * governance project for everyone, the aggregate for non-admins.
    */
   async getAssignments({
     organizationId,
+    callerOrganizationRole,
   }: {
     organizationId: string;
+    callerOrganizationRole: string | null | undefined;
   }): Promise<DepartmentAssignments> {
     const [members, teams, projects] = await Promise.all([
       this.prisma.organizationUser.findMany({
@@ -125,7 +154,7 @@ export class DepartmentService {
       this.prisma.project.findMany({
         where: {
           team: { organizationId },
-          kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+          kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
         },
         select: { id: true, name: true, departmentId: true },
         orderBy: { name: "asc" },
@@ -237,7 +266,7 @@ export class DepartmentService {
     // the dated link is what the cost reads resolve a PAST day against
     // (ADR-128 §13, #7882). Written apart they drift, and a drifted history
     // quietly re-files January's spend under today's reorg.
-    await this.prisma.$transaction(async (tx) => {
+    const moved = await this.prisma.$transaction(async (tx) => {
       const result = await tx.organizationUser.updateMany({
         where: { userId: params.userId, organizationId: params.organizationId },
         data: { departmentId: params.departmentId },
@@ -256,7 +285,7 @@ export class DepartmentService {
       // Idempotent on the daily directory read: re-asserting the standing
       // assignment must not close and reopen the link, or every sync day
       // becomes a fake reorg and no read can tell a real one apart.
-      if (open?.departmentId === params.departmentId) return;
+      if (open?.departmentId === params.departmentId) return false;
 
       const now = new Date();
       if (open) {
@@ -277,7 +306,23 @@ export class DepartmentService {
           },
         });
       }
+      return true;
     });
+
+    // Only a real move: the daily directory read re-asserts every member's
+    // standing department, and re-reading every aggregate once per member
+    // per day would be work that changes nothing. Never throws, so the
+    // assignment stands even when the reconcile fails; the nightly sweep is
+    // the retry. Only the user's department can move a member today: no
+    // rule kind reads a team's or a project's department.
+    if (moved) {
+      await (
+        this.aggregateMembers ?? tryGetApp()?.projects.aggregateReconciler
+      )?.reconcileOrganizationOrLog({
+        organizationId: params.organizationId,
+        trigger: "department-assigned",
+      });
+    }
   }
 
   /**

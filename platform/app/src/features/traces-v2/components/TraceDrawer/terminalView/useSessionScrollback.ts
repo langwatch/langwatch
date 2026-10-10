@@ -82,16 +82,20 @@ export interface SessionScrollback {
 async function readTurn({
   utils,
   projectId,
+  tenantId,
   target,
 }: {
   utils: ReturnType<typeof api.useUtils>;
   projectId: string;
+  /** The member the drawer is on, on an aggregate; its session's turns. */
+  tenantId: string | null;
   target: TurnTarget;
 }): Promise<LoadedTurn> {
   const input = {
     projectId,
     traceId: target.traceId,
     occurredAtMs: target.timestamp,
+    ...(tenantId !== null ? { tenantId } : {}),
   };
   const [transcript, spans, events] = await Promise.all([
     utils.tracesV2.codingAgentTranscript.fetch(input, EARLIER_TURN_FETCH),
@@ -169,6 +173,7 @@ function deriveStatus({
 async function loadTurnIntoLedger({
   utils,
   projectId,
+  tenantId,
   target,
   key,
   epoch,
@@ -177,6 +182,7 @@ async function loadTurnIntoLedger({
 }: {
   utils: ReturnType<typeof api.useUtils>;
   projectId: string;
+  tenantId: string | null;
   target: TurnTarget;
   key: string;
   epoch: number;
@@ -184,7 +190,7 @@ async function loadTurnIntoLedger({
   setLedger: (update: (prev: Ledger) => Ledger) => void;
 }): Promise<void> {
   try {
-    const loaded = await readTurn({ utils, projectId, target });
+    const loaded = await readTurn({ utils, projectId, tenantId, target });
     if (epochRef.current !== epoch) return;
     setLedger((prev) => ({
       key,
@@ -207,13 +213,18 @@ async function loadTurnIntoLedger({
  * resolving after the reader moved to another trace.
  */
 function useTurnLedger({
-  key,
   projectId,
+  tenantId,
+  traceId,
+  conversationId,
 }: {
-  key: string;
   projectId: string;
+  tenantId: string | null;
+  traceId: string;
+  conversationId: string | null | undefined;
 }): { current: Ledger; loadTurn: (target: TurnTarget) => void } {
   const utils = api.useUtils();
+  const key = ledgerKeyOf({ projectId, traceId, conversationId, tenantId });
   const [ledger, setLedger] = useState<Ledger>(() => ({
     key,
     turns: [],
@@ -248,6 +259,7 @@ function useTurnLedger({
       void loadTurnIntoLedger({
         utils,
         projectId,
+        tenantId,
         target,
         key,
         epoch,
@@ -257,7 +269,7 @@ function useTurnLedger({
         inFlightRef.current = false;
       });
     },
-    [utils, key, projectId],
+    [utils, key, projectId, tenantId],
   );
 
   return { current, loadTurn };
@@ -292,6 +304,11 @@ function useMergedTurns({
 /** What the tab knows about the turn it opened on. */
 interface SessionScrollbackInput {
   projectId: string;
+  /**
+   * On an aggregate, the member the drawer is on: the session's earlier turns
+   * are that member's. Null on a plain project, whose reads are unchanged.
+   */
+  tenantId: string | null;
   traceId: string;
   occurredAtMs?: number;
   /** The agent's session id, which is the conversation these turns share. */
@@ -410,26 +427,41 @@ function useSessionBaseline({
 }
 
 /**
+ * Which trace of which session, on which member, a ledger is built for. The
+ * member is appended only on an aggregate, so a plain project's key is as it
+ * was.
+ */
+function ledgerKeyOf({
+  projectId,
+  traceId,
+  conversationId,
+  tenantId,
+}: {
+  projectId: string;
+  traceId: string;
+  conversationId: string | null | undefined;
+  tenantId: string | null;
+}): string {
+  const base = `${projectId}|${traceId}|${conversationId ?? ""}`;
+  return tenantId === null ? base : `${base}|${tenantId}`;
+}
+
+/**
  * The session behind the opened turn, read backwards on demand.
  *
  * The opened turn is always the newest thing on screen and is never re-read
  * here: it arrives already loaded from the tab, and this hook only ever
  * prepends older turns to it.
  */
-export function useSessionScrollback({
-  projectId,
-  traceId,
-  occurredAtMs,
-  conversationId,
-  openedTranscript,
-  openedToolSpans,
-}: SessionScrollbackInput): SessionScrollback {
+export function useSessionScrollback(
+  input: SessionScrollbackInput,
+): SessionScrollback {
+  const { traceId, occurredAtMs, conversationId, openedTranscript } = input;
   const { turns, isLoading: isTurnListLoading } = useConversationContext(
     conversationId,
     traceId,
   );
-  const key = `${projectId}|${traceId}|${conversationId ?? ""}`;
-  const { current, loadTurn } = useTurnLedger({ key, projectId });
+  const { current, loadTurn } = useTurnLedger(input);
 
   const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({
     turns,
@@ -456,7 +488,7 @@ export function useSessionScrollback({
       openedTranscript[0]?.atMs ??
       0,
     entries: openedTranscript,
-    toolSpans: openedToolSpans,
+    toolSpans: input.openedToolSpans,
   });
 
   const merged = useMergedTurns({

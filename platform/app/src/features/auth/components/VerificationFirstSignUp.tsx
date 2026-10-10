@@ -6,6 +6,7 @@ import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { signIn } from "~/utils/auth-client";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { hardRedirect } from "~/utils/hardRedirect";
 import {
   useAuthAnalytics,
@@ -68,7 +69,10 @@ import {
  */
 export function VerificationFirstSignUp() {
   const query = useSearchParams();
-  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  // A redirect target that arrived on the query string, so it is held to a
+  // path on this site before anything follows it or mails it onward.
+  const callbackUrl =
+    getSafeReturnToPath(query?.get("callbackUrl")) ?? undefined;
   const verifyToken = query?.get("verify");
   // Carried in the FRAGMENT, so the address the log-in door hands over never
   // travelled on a request line. Read at first paint because the field it
@@ -273,7 +277,13 @@ export function VerificationFirstSignUp() {
     email: string,
   ): Promise<"link_sent" | "unconfirmed" | null> => {
     try {
-      const result = await requestVerification.mutateAsync({ email });
+      // The continuation rides on the emailed link, so a sign-up finished in
+      // a fresh tab still lands where this one was going; the server keeps
+      // only a path on this site.
+      const result = await requestVerification.mutateAsync({
+        email,
+        callbackUrl,
+      });
       if (!result.sent) {
         // No link can be mailed here, so the password step comes straight
         // away, over an unconfirmed proof.

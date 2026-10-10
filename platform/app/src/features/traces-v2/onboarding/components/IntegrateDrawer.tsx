@@ -3,6 +3,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { AggregateReadOnlyNotice } from "~/components/projects/AggregateReadOnlyNotice";
 import { Drawer } from "~/components/ui/drawer";
 import {
   PromptList,
@@ -15,6 +16,7 @@ import {
   ActiveProjectProvider,
 } from "~/features/onboarding/contexts/ActiveProjectContext";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { ApiKeyIntegrationInfoCard } from "./ApiKeyIntegrationInfoCard";
 import { SdkSetup } from "./SdkSetup";
 
@@ -117,18 +119,24 @@ export function IntegrateDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <ActiveProjectProvider value={activeProjectContext}>
-            <IntegrationContent
-              organizationId={organization.id}
-              projectId={project.id}
-              token={token}
-              onTokenGenerated={setToken}
-              segment={segment}
-              onSegmentChange={setSegment}
-              activeSegmentDescription={activeSegment?.description ?? ""}
-              enabled={open}
-            />
-          </ActiveProjectProvider>
+          {/* An aggregate (ADR-144) is never sent traces and owns no key,
+              so the drawer mints nothing on it. */}
+          {isAggregateProjectKind(project.kind) ? (
+            <AggregateReadOnlyNotice />
+          ) : (
+            <ActiveProjectProvider value={activeProjectContext}>
+              <IntegrationContent
+                organizationId={organization.id}
+                projectId={project.id}
+                token={token}
+                onTokenGenerated={setToken}
+                segment={segment}
+                onSegmentChange={setSegment}
+                activeSegmentDescription={activeSegment?.description ?? ""}
+                enabled={open}
+              />
+            </ActiveProjectProvider>
+          )}
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>

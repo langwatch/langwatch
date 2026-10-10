@@ -120,6 +120,23 @@ describe("given the integrated Langy composer", () => {
         screen.getByPlaceholderText("Search models").hasAttribute("disabled"),
       ).toBe(false);
     });
+
+    /** @scenario The model list opens above the panel when Langy rides beside a drawer */
+    it("puts the model list on the overlay layer, above a panel riding beside a drawer", async () => {
+      const user = userEvent.setup();
+
+      renderComposer();
+      await user.click(screen.getByTestId("langy-model-picker"));
+
+      const positioner = (
+        await screen.findByPlaceholderText("Search models")
+      ).closest<HTMLElement>('[data-part="positioner"]');
+      // The panel sits at z 1600 beside a drawer and the drawer at 1500.
+      expect(Number(positioner?.style.getPropertyValue("z-index"))).toBe(2010);
+      expect(positioner?.style.getPropertyPriority("z-index")).toBe(
+        "important",
+      );
+    });
   });
 
   describe("when Langy is working", () => {

@@ -19,6 +19,14 @@
 export const REQUEST_CAUSE_FIELD = "requestError";
 
 /**
+ * Non-enumerable brand marking an object as a bounded error summary, so the
+ * `errorSerializer` can pass it through untouched while any other plain object
+ * still goes through pino's err serializer. Symbol.for keeps it identical
+ * across module copies; non-enumerable keeps it out of the JSON.
+ */
+export const ERROR_SUMMARY = Symbol.for("langwatch.errorSummary");
+
+/**
  * OpenTelemetry span attribute keys used across LangWatch services.
  */
 export const OTEL_ATTR = {
