@@ -1,5 +1,5 @@
 # ── Stage 0: the dev-script binary ──────────────────────────────────
-# generate:modules, sync:references and ensure:built are Go (cmd/devscripts,
+# generate:modules is Go (cmd/devscripts,
 # stdlib only). Built here so the builder carries the binary and no Go
 # toolchain, and so this layer caches until those two directories change.
 # `go mod download` is skipped on purpose: the binary imports no module.
@@ -100,20 +100,18 @@ COPY enterprise ./enterprise
 COPY skills ./skills
 COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
-# Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
-COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./
+# Every package tsconfig extends the root ones; build:types builds the contract build configs.
+COPY tsconfig.base.json tsconfig.shared.json tsconfig.emit.json ./
 COPY apps/worker ./apps/worker
 COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
 COPY apps/tasks ./apps/tasks
 COPY apps/scenario-child ./apps/scenario-child
 # What `start:prepare:files` and `ensure:built` read: the generator scripts (and
-# their Go binary, below) and the web declarations project the browser packages
-# reference.
+# their Go binary, below).
 COPY dev/scripts ./dev/scripts
 # dev/scripts/devscripts.sh runs this binary when Go is not on PATH.
 COPY --from=devscripts /out/devscripts /app/.bin/devscripts/devscripts
-COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
 # The trailing `...` on each filter makes pnpm build each application's
 # workspace DEPENDENCIES first, in topological order, and pnpm skips the
 # members that declare no `build`. That order is load-bearing twice over: the
@@ -138,7 +136,7 @@ RUN if [ "$LANGWATCH_RELEASE_BUILD" = "true" ]; then \
     fi
 
 # `build:types` first: the module contracts' declarations now come from one
-# `tsc -b` over the generated root solution rather than a compiler process per
+# `tsc -b` over every contract's build config rather than a compiler process per
 # package, so the filtered application builds below find their dependencies'
 # .d.ts already on disk instead of emitting them 38 processes at a time.
 # The same preparation the CI build runs: generated files (modules, Prisma client,
@@ -147,7 +145,7 @@ RUN if [ "$LANGWATCH_RELEASE_BUILD" = "true" ]; then \
 # `build:types` script goes through nx, whose workspace project is registered by
 # dev/nx plugins this stage does not copy, so run its tsc command directly.
 RUN pnpm start:prepare:files && pnpm ensure:built \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 tsconfig.build.json \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a

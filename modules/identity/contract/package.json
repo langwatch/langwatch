@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.json tsconfig.test.json",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

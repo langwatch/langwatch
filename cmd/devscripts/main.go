@@ -1,5 +1,5 @@
 // Command devscripts runs the repository's small dev scripts as one binary:
-// generate-modules and sync-references.
+// generate-modules.
 //
 // Usage: devscripts [-cpuprofile file] [-memprofile file] <subcommand> [args]
 //

@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "composite": false
   },
   // The suite, plus the sources it exercises. `vitest` resolves from the
   // package's own devDependency, so the test types are checked here and
@@ -13,25 +14,7 @@
 
   "references": [
     {
-      "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/system-migrations/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     }
   ]
 }

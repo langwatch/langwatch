@@ -24,10 +24,13 @@
   ],
   "references": [
     {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
       "path": "../observability/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

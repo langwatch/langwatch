@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts",
+    "../../project/contract/tests/project.service.unit.test.ts",
+    "../../project/contract/src/project.service.ts",
+    "../../project/contract/src/index.ts"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ]
+}

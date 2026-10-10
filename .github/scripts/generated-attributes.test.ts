@@ -19,7 +19,6 @@ const GENERATOR_OUTPUTS: readonly { generator: string; globs: readonly string[] 
     generator: "pnpm generate:modules",
     globs: ["apps/*/src/process-modules.generated.ts", "apps/ui/src/browser-modules.generated.ts"],
   },
-  { generator: "pnpm sync:references", globs: ["tsconfig.build.json"] },
   {
     generator: "pnpm generate:readmes",
     globs: [

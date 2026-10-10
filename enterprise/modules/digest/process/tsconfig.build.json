@@ -22,5 +22,9 @@
     "**/testing.ts",
     "**/testing.tsx"
   ],
-  "references": []
+  "references": [
+    {
+      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
 }

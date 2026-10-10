@@ -24,16 +24,22 @@
   ],
   "references": [
     {
-      "path": "../config/tsconfig.build.json"
-    },
-    {
-      "path": "../observability/tsconfig.build.json"
+      "path": "../time/tsconfig.build.json"
     },
     {
       "path": "../task/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
     }
   ]
 }

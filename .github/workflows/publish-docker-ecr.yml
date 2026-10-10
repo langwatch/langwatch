@@ -193,7 +193,6 @@ jobs:
               - 'tools/seedgen/runner/package.json'
               - 'patches/**'
               - 'dev/scripts/**'
-              - 'dev/tsconfig.web-declarations.json'
               - 'vendor/**'
               - 'go.work'
               - 'go.work.sum'

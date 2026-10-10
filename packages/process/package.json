@@ -37,7 +37,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json tsconfig.type-tests.json",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

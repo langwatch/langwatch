@@ -2,16 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node"],
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "composite": false,
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
   "exclude": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     }
   ]
 }

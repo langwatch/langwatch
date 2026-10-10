@@ -18,7 +18,7 @@
     "dev": "vite --configLoader runner",
     "build": "NODE_ENV=production vite build --configLoader runner",
     "build:local": "NODE_ENV=production LANGWATCH_UI_LOCAL_BUILD=1 vite build --configLoader runner --outDir dist/client.local",
-    "typecheck": "tsc -b tsconfig.test.json",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

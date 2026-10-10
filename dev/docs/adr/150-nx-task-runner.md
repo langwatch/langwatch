@@ -386,3 +386,47 @@ packages export fixtures from it. Nx 23.2 has no task-level affected
 (`NX_LEGACY_AFFECTED` is ignored), but legacy affected already selects the readers of
 `{workspaceRoot}` inputs, so CI's global-input guard only adds the root tsconfigs and
 `dev/nx`, and now gates the plain lint step as well as the type-aware one.
+
+## Amendment, 2026-10-10: `nx sync` writes the project references
+
+**The Go reference sync is gone.** `tools/devscripts/syncreferences.go` (the
+`sync-references` subcommand), its golden tests, the architecture-enforcer
+`declaration-project-references` policy and the derive half of its
+`tsconfig-references.ts` are deleted (the workspace-member reader three other
+policies use is now `workspace/workspace-members.ts`). `pnpm sync:references` runs `nx sync`; the
+`@nx/js:typescript-sync` generator writes every reference between packages from
+the Nx project graph, `workspace:typecheck` names it in `syncGenerators` (so
+`pnpm typecheck` syncs first; `sync.applyChanges` is on), and CI runs
+`nx sync:check` where the policy ran. Only the sync is adopted: no
+`@nx/js/typescript` plugin, so no inferred per-project `typecheck` or `build`.
+
+**The layout is Nx's.** Every package's `tsconfig.json` is a composite
+container (`files: []`, `include: []`, `noEmit: false`) that keeps the compiler
+options its configs extend and references them: `tsconfig.build.json`, the
+declaration producer everywhere, and `tsconfig.test.json` (sources and tests,
+referencing only `./tsconfig.build.json`); a package with no build config has
+`tsconfig.app.json` instead. `runtimeTsConfigFileNames` is those two names, so
+each build or app config references its dependencies' build configs (every
+dependency kind, devDependencies included) and the root `tsconfig.json`
+references every container. A JavaScript-emitting build moved aside to
+`tsconfig.js.json` (`packages/mail`, `services/langyworker`); mail's declaration
+config took the name. The cyclic web group (`dev/tsconfig.web-declarations.json`)
+is dissolved into eleven ordinary producers; no member depends on another, and
+the `langwatch-declaration-source` export condition stays as a source locator.
+Mail's container references `./preview/tsconfig.json`, so the root's
+`langwatchExtraReferences` is gone. Cycle dropping went with the Go tool: it
+dropped no edge, TypeScript reports a cycle (TS6202) and §17 refuses peer cycles.
+`build:types` builds `modules/*/contract/tsconfig.build.json` by glob and the
+generated root `tsconfig.build.json` is deleted; `dev/nx/workspace-plugin.mjs`
+is keyed on `nx.json`. `dev/scripts/nx-sync-codemod.mjs` did the reshape and is
+idempotent, so a merge that brings old-shape packages can run it again.
+
+**TypeScript 6 for the generator only.** It calls `ts.sys`, `readConfigFile`
+and `parseJsonConfigFileContent`, which TypeScript 7's root export lacks; pnpm
+`packageExtensions` gives `@nx/js` its own `typescript@6.0.3`, and the root
+`tsc` stays 7.0.2.
+
+**Escape hatch.** A dependency whose reference would be wrong is opted out in
+the dependent's runtime config with `nx.sync.ignoredDependencies`:
+`modules/langy/browser` ignores `@langwatch/skills`, which it reads files from
+but which emits no declarations.

@@ -265,14 +265,6 @@ Feature: Feature package boundary lint
     Then it reports the exported declaration and fails
 
   @unit @architecture
-  Scenario: Declaration producers prepare their production dependencies
-    Given an adopted package imports another adopted workspace package
-    And only its no-emit config references that dependency's declaration producer
-    When architecture lint checks the declaration project graph
-    Then it reports a declaration-project-references finding on the producer
-    And adding a reachable producer reference resolves the finding without generated output
-
-  @unit @architecture
   Scenario: Feature services are classes
     Given a feature server service module
     When it exports a standalone service factory or a service class without static create

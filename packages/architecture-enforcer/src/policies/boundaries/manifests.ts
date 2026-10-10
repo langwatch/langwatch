@@ -66,7 +66,7 @@ function applyCatalogsLine(
 }
 
 /**
- * Hand-parsed, matching `workspaceGlobs` in `workspace/tsconfig-references.ts`:
+ * Hand-parsed, matching `workspaceGlobs` in `workspace/workspace-members.ts`:
  * the `catalog:`/`catalogs:` blocks are a flat two/four-space-indented map, so
  * reading them by hand keeps this policy free of a YAML dependency.
  */

@@ -15,6 +15,10 @@ import packageJson from "./package.json";
 // against the SDK's copy.
 const noExternal = [/^@langwatch\/(langy|handled-error)(\/|$)/, /^zod(\/|$)/];
 
+// tsconfig.json is a solution container (no files of its own), so the build reads the
+// package's check config, which carries the same compiler options (ADR-150, 2026-10-10).
+const tsconfig = "tsconfig.app.json";
+
 // `__CLI_VERSION__` is a bare identifier in src/cli/program.ts.
 const define = {
   __CLI_VERSION__: JSON.stringify(packageJson.version),
@@ -44,6 +48,7 @@ export default defineConfig([
     sourcemap: true,
     noExternal,
     define,
+    tsconfig,
   },
   {
     // `langwatch/agent` -- Node only, built as a SEPARATE config: it loads
@@ -66,6 +71,7 @@ export default defineConfig([
     sourcemap: true,
     noExternal,
     define,
+    tsconfig,
   },
   {
     // CLI entry -- only ever RUN as CJS, never imported as a library, so the
@@ -103,6 +109,7 @@ export default defineConfig([
     sourcemap: true,
     noExternal,
     define,
+    tsconfig,
     onSuccess: async () => {
       const { chmodSync, writeFileSync } = await import("node:fs");
       const stub = `#!/usr/bin/env node

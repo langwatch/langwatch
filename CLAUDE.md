@@ -115,7 +115,7 @@ remaining diagnostics exactly. Don't call a blocked check green.
 pnpm install                        # root only; one lockfile. Narrow: --filter "<pkg>..."
 pnpm start:prepare:files            # generated files (Prisma client, etc.); fixes "Cannot find module"
 pnpm generate:modules               # after editing modules/catalogue.json
-pnpm sync:references                # after adding/removing a workspace package
+pnpm sync:references                # nx sync: project references, after a dependency change
 pnpm test:affected                  # Nx: only packages this change reached, cached
 pnpm typecheck                      # one root tsc -b; incremental, rechecks only what changed
 pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran

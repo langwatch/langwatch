@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import type { ArchitectureViolation } from "../../types.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import { expandGlob, workspaceGlobs } from "../../workspace/tsconfig-references.ts";
+import { expandGlob, workspaceGlobs } from "../../workspace/workspace-members.ts";
 import { readWorkspaceCatalogs } from "../boundaries/manifests.ts";
 
 /**

@@ -29,7 +29,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

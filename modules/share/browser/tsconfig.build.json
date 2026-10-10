@@ -21,6 +21,9 @@
   "references": [
     {
       "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

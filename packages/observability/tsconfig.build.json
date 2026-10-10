@@ -36,6 +36,9 @@
 
   "references": [
     {
+      "path": "../../sdks/typescript"
+    },
+    {
       "path": "../time/tsconfig.build.json"
     }
   ]

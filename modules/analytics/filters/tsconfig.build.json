@@ -18,5 +18,10 @@
     "**/*.stories.*",
     "**/*.bench.*",
     "**/__bench__/**"
+  ],
+  "references": [
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
+    }
   ]
 }

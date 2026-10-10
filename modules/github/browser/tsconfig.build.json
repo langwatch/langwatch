@@ -21,10 +21,13 @@
   ],
   "references": [
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
-      "path": "../client/tsconfig.build.json"
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

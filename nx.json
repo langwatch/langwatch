@@ -85,7 +85,7 @@
         "outputs": [
           "{projectRoot}/dist",
           "!{projectRoot}/dist/typecheck",
-          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,app,preview}.tsbuildinfo"
         ]
       },
       {
@@ -118,6 +118,7 @@
           "!{projectRoot}/dist/test-setup.*",
           "!{projectRoot}/dist/package.json",
           "!{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "!{projectRoot}/dist/tsconfig.app.tsbuildinfo",
           "{projectRoot}/src/internal/generated"
         ]
       },
@@ -148,7 +149,7 @@
         "outputs": [
           "{projectRoot}/dist",
           "!{projectRoot}/dist/typecheck",
-          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,app,preview}.tsbuildinfo"
         ]
       },
       {
@@ -464,6 +465,14 @@
       "cache": true,
       "inputs": ["go", "^go", "{workspaceRoot}/packages/handled-error/src/**/*"],
       "outputs": ["{workspaceRoot}/packages/handled-error/src/codes.generated.ts"]
+    }
+  },
+  "sync": {
+    "applyChanges": true,
+    "generatorOptions": {
+      "@nx/js:typescript-sync": {
+        "runtimeTsConfigFileNames": ["tsconfig.build.json", "tsconfig.app.json"]
+      }
     }
   },
   "parallel": 2,

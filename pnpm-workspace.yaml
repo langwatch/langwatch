@@ -341,6 +341,11 @@ packageExtensions:
   '@google-cloud/dlp':
     dependencies:
       protobufjs: ^7.5.4
+  # @nx/js's typescript-sync generator needs the TypeScript 6 compiler API (ts.sys,
+  # readConfigFile), which TypeScript 7's root export lacks; the root `tsc` stays 7.
+  '@nx/js':
+    dependencies:
+      typescript: 6.0.3
 
 # Local fixes carried until upstream releases them (dev/docs/ARCHITECTURE.md, patched dependencies).
 patchedDependencies:

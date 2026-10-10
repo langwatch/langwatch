@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.js.json",
     "build:binary": "bun run scripts/build-binary.ts",
     "smoke": "bun run scripts/smoke.ts"
   },

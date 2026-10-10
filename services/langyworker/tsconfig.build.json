@@ -10,5 +10,10 @@
     "sourceMap": false
   },
   "include": ["src/**/*.ts", "package.json"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
 }

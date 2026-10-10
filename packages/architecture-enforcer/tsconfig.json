@@ -7,12 +7,15 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }
