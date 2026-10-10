@@ -178,11 +178,10 @@ function organizationGroup({
         : []),
       // How the organization signs in; one entry lit on the provider and connectors pages too.
       // Offered only to a reader who may see single sign-on; the page refuses the address as well.
+      // On every plan, never locked: only its single sign-on card needs Enterprise
+      // (Alex, 2026-10-11).
       ...(!isLiteMember && hasPermission("sso:view")
-        ? enterpriseEntry({
-            item: { label: "Authentication", href: "/settings/authentication", icon: LogIn },
-            enterprisePlan,
-          })
+        ? [{ label: "Authentication", href: "/settings/authentication", icon: LogIn }]
         : []),
       ...(!isLiteMember
         ? [{ label: "Usage & billing", href: "/settings/usage", icon: Gauge }]

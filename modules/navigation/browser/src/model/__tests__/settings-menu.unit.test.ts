@@ -57,6 +57,21 @@ describe("given a self-hosted install", () => {
       expect(hrefsIn({ isSaaS: true }).filter((href) => install.includes(href))).toEqual([]);
     });
 
+    /** @scenario "Authentication is offered unlocked on every plan" */
+    it("offers Authentication unlocked whatever the plan says", () => {
+      for (const enterprisePlan of ["pending", "locked", "included"] as const) {
+        const authentication = settingsMenu({
+          ...EVERYTHING_CLOSED,
+          enterprisePlan,
+          hasPermission: (p) => p === "sso:view",
+        })
+          .flatMap((group) => group.items)
+          .find((item) => item.href === "/settings/authentication");
+        expect(authentication).toBeDefined();
+        expect(authentication?.isLocked).toBeUndefined();
+      }
+    });
+
     it("hides them from a lite member", () => {
       const install = ["/settings/license", "/settings/connect", "/settings/checkup"];
       expect(hrefsIn({ isLiteMember: true }).filter((href) => install.includes(href))).toEqual([]);
@@ -126,9 +141,6 @@ describe("given an enterprise plan", () => {
       expect(
         hrefsIn({ enterprisePlan: "included", hasPermission: (p) => p === "sso:view" }),
       ).toContain("/settings/authentication");
-      expect(hrefsIn({ hasPermission: (p) => p === "sso:view" })).not.toContain(
-        "/settings/authentication",
-      );
     });
 
     it("marks none of them locked", () => {
@@ -162,7 +174,6 @@ describe("given a plan that lacks Enterprise", () => {
     it("offers the enterprise entries locked", () => {
       expect(lockedHrefsIn({ hasPermission: () => true })).toEqual([
         "/settings/audit-log",
-        "/settings/authentication",
         "/settings/roles",
       ]);
     });
@@ -170,10 +181,25 @@ describe("given a plan that lacks Enterprise", () => {
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
       expect(lockedHrefsIn({})).toEqual(["/settings/roles"]);
-      expect(lockedHrefsIn({ hasPermission: (p) => p === "sso:view" })).toEqual([
-        "/settings/authentication",
+      expect(lockedHrefsIn({ hasPermission: (p) => p === "auditLog:view" })).toEqual([
+        "/settings/audit-log",
         "/settings/roles",
       ]);
+    });
+
+    /** @scenario "Authentication is offered unlocked on every plan" */
+    it("offers Authentication unlocked whatever the plan says", () => {
+      for (const enterprisePlan of ["pending", "locked", "included"] as const) {
+        const authentication = settingsMenu({
+          ...EVERYTHING_CLOSED,
+          enterprisePlan,
+          hasPermission: (p) => p === "sso:view",
+        })
+          .flatMap((group) => group.items)
+          .find((item) => item.href === "/settings/authentication");
+        expect(authentication).toBeDefined();
+        expect(authentication?.isLocked).toBeUndefined();
+      }
     });
 
     it("hides them from a lite member", () => {

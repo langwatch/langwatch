@@ -258,16 +258,19 @@ describe("the settings shell in a new navigation mode", () => {
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */
+    /** @scenario "Authentication is offered unlocked on every plan" */
     it("shows the enterprise entries with a lock on a plan that lacks them", () => {
       renderSettingsSidebar({ isEnterprise: false });
 
-      for (const name of [/^Roles/, /^Audit log/, /^Authentication/]) {
+      for (const name of [/^Roles/, /^Audit log/]) {
         const link = screen.getByRole("link", { name });
         expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
       }
       expect(screen.queryByText("ENT")).not.toBeInTheDocument();
-      const directory = screen.getByRole("link", { name: "Directory" });
-      expect(within(directory).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
+      for (const name of [/^Directory/, /^Authentication/]) {
+        const link = screen.getByRole("link", { name });
+        expect(within(link).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
+      }
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */

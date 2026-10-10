@@ -81,10 +81,16 @@ Feature: Settings shell
   Scenario: A plan without Enterprise sees its entries locked
     Given my organization's plan has answered and lacks Enterprise
     When the settings sidebar renders
-    Then Audit log, Authentication and Roles are offered with a small lock
+    Then Audit log and Roles are offered with a small lock
     And the lock reads "Included in Enterprise"
     And an entry I lack the permission for stays hidden
     And opening a locked entry shows its page title and an Enterprise upsell, never the feature
+
+  @unit @integration
+  Scenario: Authentication is offered unlocked on every plan
+    Given I may see single sign-on and my plan lacks Enterprise
+    When the settings sidebar renders
+    Then Authentication is offered without a lock, whether or not the plan has answered
 
   @integration
   Scenario: Settings groups read in sentence case
