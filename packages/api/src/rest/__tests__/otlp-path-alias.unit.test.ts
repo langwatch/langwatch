@@ -35,7 +35,8 @@ describe("the OTLP path alias", () => {
   });
 
   describe("when an app declares only the canonical route", () => {
-    const app = withOtlpPathAliases(new Hono());
+    const base = new Hono();
+    const app = withOtlpPathAliases(base);
     app.post("/api/otel/v1/metrics", async (context) =>
       context.json({ body: await context.req.text() }),
     );

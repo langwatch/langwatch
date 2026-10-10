@@ -6,7 +6,6 @@
 import { PermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
-import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -18,6 +17,7 @@ import type { RestCaller, RestIdentity } from "../../hosting/api-door.ts";
 import { allRegisteredRoutes } from "../../route-registry.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { generateSpecs } from "./generate-specs.ts";
 
 /** The refusal a process gives for the webhook endpoints capability. */
 class NoWebhookEndpointsError extends HandledError {
