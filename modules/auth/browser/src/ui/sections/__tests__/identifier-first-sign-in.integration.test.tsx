@@ -284,7 +284,7 @@ describe("given the identifier-first sign-in screen", () => {
       routeMock.mockResolvedValue(soleConnection);
       renderScreen();
 
-      expect(await screen.findByRole("link", { name: /try sign in again/i })).toBeTruthy();
+      expect(await screen.findByRole("link", { name: /back to sign in/i })).toBeTruthy();
       expect(signInMock).not.toHaveBeenCalled();
     });
 

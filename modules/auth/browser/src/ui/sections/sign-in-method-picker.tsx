@@ -4,7 +4,6 @@ import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { MONO_FONT } from "../../model/front-door-theme.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
 import { methodsWorthOffering, rankMethodsForBrowser } from "../../model/method-ranking.ts";
 import { readPasskeyOnThisDevice } from "../../model/passkey-on-this-device.ts";
@@ -242,19 +241,12 @@ export function LastUsedBadge() {
   );
 }
 
-/** A thin "or" between the address step and the methods beside it, said the
- *  way the site says its small technical words: mono, spaced, quiet. */
+/** A thin "or" between the address step and the methods beside it, in the card's own type. */
 export function MethodDivider() {
   return (
     <HStack width="full" gap="10px" paddingY="6px">
       <Divider />
-      <Text
-        fontFamily={MONO_FONT}
-        fontSize="10px"
-        textTransform="uppercase"
-        letterSpacing="0.16em"
-        color="fg.muted"
-      >
+      <Text fontSize="12px" color="fg.subtle">
         or
       </Text>
       <Divider />

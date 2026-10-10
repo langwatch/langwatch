@@ -12,21 +12,15 @@ import { FullLogo } from "./full-logo.tsx";
 type DataAttributes = Record<`data-${string}`, string | boolean>;
 
 /** How wide the card stands from `sm` up: a message or form, a list-heavy step, a wide step. */
-const CARD_WIDTHS = { narrow: "408px", wide: "560px", full: "1200px" } as const;
+const CARD_WIDTHS = { narrow: "400px", wide: "560px", full: "1200px" } as const;
 
-/** The sign-in doors' glass: a translucent pane, a soft hairline and one lift. */
+/** The sign-in doors' card: a near-solid pane, a fine hairline and one soft lift. */
 const GLASS = {
-  bg: { base: "rgba(255, 255, 255, 0.3)", _dark: "rgba(10, 10, 12, 0.54)" },
-  border: { base: "rgba(20, 20, 23, 0.09)", _dark: "rgba(255, 255, 255, 0.1)" },
+  bg: { base: "rgba(255, 255, 255, 0.86)", _dark: "rgba(16, 16, 19, 0.82)" },
+  border: { base: "rgba(20, 20, 23, 0.08)", _dark: "rgba(255, 255, 255, 0.09)" },
   shadow: {
-    base: "inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5), 0 24px 48px -20px rgba(20, 20, 23, 0.28)",
-    _dark: "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.65)",
-  },
-  /** While anything on the card holds focus, the glass warms with the brand's light. */
-  focusShadow: {
-    base: "inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5), 0 24px 48px -20px rgba(20, 20, 23, 0.28), 0 0 56px -14px rgba(245, 107, 26, 0.28)",
-    _dark:
-      "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.65), 0 0 56px -14px rgba(255, 138, 61, 0.22)",
+    base: "0 1px 2px rgba(20, 20, 23, 0.04), 0 16px 40px -20px rgba(20, 20, 23, 0.18)",
+    _dark: "inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 24px 60px -24px rgba(0, 0, 0, 0.65)",
   },
 } as const;
 
@@ -108,14 +102,11 @@ export function BrandedCard({
         flex="1"
         width="full"
         bg={GLASS.bg}
-        backdropFilter="blur(26px) saturate(1.35)"
+        backdropFilter="blur(24px)"
         borderColor={GLASS.border}
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}
         boxShadow={GLASS.shadow}
-        transition="box-shadow 420ms ease"
-        _focusWithin={{ boxShadow: GLASS.focusShadow }}
-        _motionReduce={{ transition: "none" }}
         {...cardAttributes}
       >
         <Card.Header paddingTop="34px" paddingX="32px" paddingBottom={0}>

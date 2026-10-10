@@ -53,8 +53,9 @@ describe("<SignInError/>", () => {
     /** @scenario "Recovery works the same when the org's required method is not yet known" */
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
-      expect(screen.getByText(/provider didn't confirm the address/i)).toBeTruthy();
-      expect(screen.getByText(/method you used before/i)).toBeTruthy();
+      expect(screen.getByText(/already has an account/i)).toBeTruthy();
+      expect(screen.getByText(/sign in the way you did before/i)).toBeTruthy();
+      expect(screen.getByText(/single sign-on/i)).toBeTruthy();
     });
   });
 

@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
@@ -7,24 +7,17 @@ import { signIn, signOut, useSession } from "../../behavior/auth-client.tsx";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { explainErrorCode } from "../../model/error-presentation.ts";
 import { acceptInviteResultSchema } from "../../model/invite-messages.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
-import {
-  FRONT_DOOR_PRIMARY_STYLE,
-  FrontDoorPrimaryButton,
-} from "../elements/front-door-primary-button.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { InvitingOrganization } from "../elements/inviting-organization.tsx";
+import { FRONT_DOOR_LINK_STYLE } from "../elements/secondary-action-link.tsx";
 import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
-
-/** The landing's primary in a row rather than a column: the one definition, sized to its words. */
-const ROW_PRIMARY_STYLE = {
-  ...FRONT_DOOR_PRIMARY_STYLE,
-  width: "auto",
-  minHeight: "40px",
-} as const;
 
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */
 export function InviteLanding({ inviteCode }: { inviteCode: string }) {
@@ -45,7 +38,7 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
     return (
       <AuthCard title="Invitation">
         <HStack gap={3} justify="center" data-testid="invite-loading">
-          <Spinner size="sm" color="orange.500" />
+          <Spinner size="sm" color="frontDoor.detail" />
           <Text color="fg.muted">Looking up your invitation…</Text>
         </HStack>
       </AuthCard>
@@ -53,7 +46,12 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
   }
 
   return session ? (
-    <ConfirmAndJoin inviteCode={inviteCode} organizationName={landing.data.organizationName} />
+    <ConfirmAndJoin
+      inviteCode={inviteCode}
+      organizationName={landing.data.organizationName}
+      inviterName={landing.data.inviterName}
+      signedInAs={session.user.email ?? session.user.name ?? null}
+    />
   ) : (
     <SignedOutInvite
       inviteCode={inviteCode}
@@ -77,10 +75,12 @@ function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: stri
 
   return (
     <AuthCard
-      title="Invitation"
+      title="This invitation is no longer available"
       actions={<FrontDoorLinkButton href="/auth/signin" label="Go to sign in" />}
     >
-      <Text data-testid="invite-dead-end">This invitation is no longer available.</Text>
+      <Text color="fg.muted" data-testid="invite-dead-end">
+        Ask whoever invited you to send a new one.
+      </Text>
     </AuthCard>
   );
 }
@@ -92,15 +92,17 @@ function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: stri
  */
 function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: string }) {
   const ask = api.auth.requestFreshInvite.useMutation();
+  // Expiry is the state of the card, so its words are the heading rather than an alert on it.
+  const handled = readHandledError(error);
+  const copy = handled ? explainErrorCode(handled) : null;
 
   return (
-    <AuthCard title="Invitation">
+    <AuthCard title={copy?.title ?? "This invitation has expired"} intro={copy?.description}>
       <VStack width="full" align="stretch" gap={4}>
-        <HandledErrorAlert error={error} fallbackTitle="This invitation has expired" />
         {ask.isSuccess ? (
           <>
             <Text data-testid="invite-refresh-asked" color="fg.muted" textAlign="center">
-              We let the organization know. You will get a fresh invitation by email once somebody
+              We let the organization know. A fresh invitation will arrive by email once somebody
               there sends it.
             </Text>
             <FrontDoorLinkButton href="/auth/signin" label="Go to sign in" />
@@ -165,25 +167,17 @@ function SignedOutInvite({
   }
 
   return (
-    <AuthCard title={`Join ${organizationName}`}>
+    <AuthCard title="You've been invited">
       {/* At the top, like every other failure on these screens: an alert that
           opened part-way down the rail of methods would push the rest of it
           down the page and say its piece where nobody is looking. */}
-      <HandledErrorAlert
-        error={routing.error}
-        fallbackTitle="Could not start sign-in"
-        className="lw-front-door-alert"
+      <HandledErrorAlert error={routing.error} fallbackTitle="Could not start sign-in" />
+      <HandledErrorAlert error={passkeyError} fallbackTitle="Could not use a passkey" />
+      <InvitingOrganization
+        organizationName={organizationName}
+        inviterName={inviterName}
+        testId="invite-inviter"
       />
-      <HandledErrorAlert
-        error={passkeyError}
-        fallbackTitle="Could not use a passkey"
-        className="lw-front-door-alert"
-      />
-      <Text data-testid="invite-inviter">
-        {inviterName
-          ? `${inviterName} invited you to ${organizationName} on LangWatch.`
-          : `You have been invited to ${organizationName} on LangWatch.`}
-      </Text>
       {decision ? (
         <SignInMethodPicker
           methodSet={decision.methodSet}
@@ -211,16 +205,13 @@ function SignedOutInvite({
         // name — no picker, no retry. The sibling sign-in screen gives the
         // same failure a retry via its address form staying live; there's no
         // form here, so this button is its own retry control.
-        <HStack>
-          <Button
-            {...ROW_PRIMARY_STYLE}
-            data-testid="invite-routing-retry"
-            loading={routing.isDeciding}
-            onClick={() => void decide({ identifier: null })}
-          >
-            Try again
-          </Button>
-        </HStack>
+        <FrontDoorPrimaryButton
+          testId="invite-routing-retry"
+          isBusy={routing.isDeciding}
+          onClick={() => void decide({ identifier: null })}
+        >
+          Try again
+        </FrontDoorPrimaryButton>
       ) : null}
     </AuthCard>
   );
@@ -229,9 +220,14 @@ function SignedOutInvite({
 function ConfirmAndJoin({
   inviteCode,
   organizationName,
+  inviterName,
+  signedInAs,
 }: {
   inviteCode: string;
   organizationName: string;
+  inviterName: string | null;
+  /** The account a join would add: its address, or its name when it has none. */
+  signedInAs: string | null;
 }) {
   const accept = api.invite.acceptInvite.useMutation({
     onSuccess: (data) => {
@@ -259,62 +255,53 @@ function ConfirmAndJoin({
 
   return (
     <AuthCard
-      title={`You’re invited to join ${organizationName}`}
+      title="You've been invited"
       finePrint={
-        <HStack justify="center" gap={4} fontSize="13px">
-          <Link
-            href="https://docs.langwatch.ai/"
-            target="_blank"
-            rel="noreferrer"
-            style={{ textDecoration: "underline" }}
-          >
+        <Box asChild {...FRONT_DOOR_LINK_STYLE} color="fg.muted">
+          <Link href="https://docs.langwatch.ai/" target="_blank" rel="noreferrer">
             Read the docs
           </Link>
-          {!wrongAccount && (
-            <Button
-              variant="plain"
-              size="sm"
-              fontSize="13px"
-              textDecoration="underline"
-              textUnderlineOffset="3px"
-              onClick={signOutAndReturn}
-              data-testid="invite-sign-out"
-            >
-              Sign out
-            </Button>
-          )}
-        </HStack>
+        </Box>
       }
     >
-      <VStack width="full" align="stretch" gap={4}>
-        {wrongAccount ? null : (
-          <Text data-testid="invite-confirm" textAlign="center">
-            Join your team on LangWatch.
-          </Text>
-        )}
-        {accept.error ? (
-          <HandledErrorAlert error={accept.error} fallbackTitle="Couldn't accept the invitation" />
+      <InvitingOrganization
+        organizationName={organizationName}
+        inviterName={inviterName}
+        testId={wrongAccount ? undefined : "invite-confirm"}
+      />
+      {accept.error ? (
+        <HandledErrorAlert error={accept.error} fallbackTitle="Couldn't accept the invitation" />
+      ) : null}
+      {wrongAccount ? (
+        <FrontDoorPrimaryButton testId="invite-switch-account" onClick={signOutAndReturn}>
+          Sign out and use that account
+        </FrontDoorPrimaryButton>
+      ) : (
+        <FrontDoorPrimaryButton
+          isBusy={accept.isPending}
+          onClick={() => accept.mutate({ inviteCode })}
+        >
+          {`Join ${organizationName}`}
+        </FrontDoorPrimaryButton>
+      )}
+      <Text fontSize="13px" color="fg.muted" textAlign="center">
+        {signedInAs ? (
+          <>
+            Signed in as{" "}
+            <Text as="span" color="fg" fontWeight={500} overflowWrap="anywhere">
+              {signedInAs}
+            </Text>
+          </>
         ) : null}
-        <HStack justify="center">
-          {wrongAccount ? (
-            <Button
-              {...ROW_PRIMARY_STYLE}
-              data-testid="invite-switch-account"
-              onClick={signOutAndReturn}
-            >
-              Sign out and use that account
-            </Button>
-          ) : (
-            <Button
-              {...ROW_PRIMARY_STYLE}
-              loading={accept.isPending}
-              onClick={() => accept.mutate({ inviteCode })}
-            >
-              Let me in
-            </Button>
-          )}
-        </HStack>
-      </VStack>
+        {signedInAs && !wrongAccount ? " · " : null}
+        {wrongAccount ? null : (
+          <Box asChild {...FRONT_DOOR_LINK_STYLE} data-testid="invite-sign-out">
+            <button type="button" onClick={signOutAndReturn}>
+              Use another account
+            </button>
+          </Box>
+        )}
+      </Text>
     </AuthCard>
   );
 }

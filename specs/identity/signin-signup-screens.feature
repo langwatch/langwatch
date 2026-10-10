@@ -1044,7 +1044,9 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: A signed-in visitor confirms and joins
     Given I am already signed in with a verified identifier matching the invite
     When I open the invite link
-    Then I am asked to confirm joining, and confirming makes me a member
+    Then I see the organization, who invited me and which account I am signed in as
+    And I am asked to confirm joining, and confirming makes me a member
+    And I can switch to another account from the same card
 
   @integration
   Scenario: An expired invite offers to ask for a new one
