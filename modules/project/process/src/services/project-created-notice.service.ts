@@ -168,7 +168,12 @@ export class ProjectCreatedNoticeService {
 
   /** Throws: share revokes the project's links only from this fact, so a lost one must surface. */
   async traceSharingDisabled(
-    input: Readonly<{ projectId: string; organizationId: string; disabledByUserId: string }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      disabledByUserId: string;
+      revokeExistingLinks?: boolean | undefined;
+    }>,
   ): Promise<void> {
     await this.#connected().recordProjectTraceSharingDisabled.send({
       tenantId: input.projectId,

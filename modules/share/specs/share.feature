@@ -273,6 +273,33 @@ Feature: Share a trace behind a secret, scoped, expiring link
       And no new share links can be created
 
     @unit
+    Scenario: Turning sharing off and revoking the links removes them for good
+      Given a project with two trace share links
+      When an admin turns trace sharing off and chooses "Revoke 2 links"
+      Then share revokes every trace link of that project
+      And turning sharing back on brings none of them back
+
+    @unit
+    Scenario: Turning sharing off and keeping the links paused leaves them in place
+      Given a project with trace share links
+      When an admin turns trace sharing off and chooses "Keep links paused"
+      Then project records the choice on its trace sharing disabled fact
+      And share leaves every link in place, unresolvable until sharing is on again
+
+    @integration @unimplemented
+    Scenario: Turning sharing off with no links asks nothing
+      Given a project with no trace share links
+      When an admin turns trace sharing off
+      Then no revoke question is shown
+
+    @unit
+    Scenario: Turning sharing off in Ops goes through project's sharing door
+      Given an operator editing a project in Ops
+      When the operator turns trace sharing off
+      Then project switches it and records its fact, with the operator's revoke choice
+      And the generic admin write never carries the sharing field
+
+    @unit
     Scenario: project's trace sharing disabled fact revokes that project's trace links
       Given the share_trace_sharing_revocation pipeline over two projects with trace share links
       When project records trace sharing disabled for one of them

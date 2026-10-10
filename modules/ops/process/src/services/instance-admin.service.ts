@@ -8,6 +8,8 @@ import {
   type AdminOperationInput,
   type AdminOperationResult,
 } from "@langwatch/ops-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { InstanceAdminRepository } from "../repositories/instance-admin.repository.ts";
@@ -21,11 +23,17 @@ const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
 /** Auth's account doors: each writes through user, then ends the credentials it outdates. */
 export type InstanceAdminAccounts = Pick<AuthApi, "deactivateUser" | "changeUserEmail">;
+/** Project's one door for its sharing switch, so share hears the fact it revokes from. */
+export type InstanceAdminProjects = Pick<ProjectApi, "setTraceSharing">;
+export type InstanceAdminShares = Pick<ShareApi, "countTraceShares">;
 
 interface InstanceAdminServiceOptions {
   repository: InstanceAdminRepository;
   users: UserApi;
   accounts: InstanceAdminAccounts;
+  /** Absent only where no sharing switch is edited; a switch then refuses by name. */
+  projects?: InstanceAdminProjects | undefined;
+  shares?: InstanceAdminShares | undefined;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
@@ -47,6 +55,11 @@ const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
   connectionDecides: async () => false,
 };
 
+const NO_SHARING_DOOR: InstanceAdminProjects & InstanceAdminShares = {
+  setTraceSharing: () => Promise.reject(new Error("instance admin composed without project")),
+  countTraceShares: () => Promise.reject(new Error("instance admin composed without share")),
+};
+
 /** Ops-owned application service for the legacy react-admin wire surface. */
 type UserSideEffectAudit = { action: string; payload: Record<string, unknown> };
 
@@ -54,6 +67,8 @@ export class InstanceAdminService {
   private readonly repository: InstanceAdminRepository;
   private readonly users: UserApi;
   private readonly accounts: InstanceAdminAccounts;
+  private readonly projects: InstanceAdminProjects;
+  private readonly shares: InstanceAdminShares;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
 
@@ -61,12 +76,16 @@ export class InstanceAdminService {
     repository: InstanceAdminRepository;
     users: UserApi;
     accounts: InstanceAdminAccounts;
+    projects: InstanceAdminProjects;
+    shares: InstanceAdminShares;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
   }) {
     this.repository = deps.repository;
     this.users = deps.users;
     this.accounts = deps.accounts;
+    this.projects = deps.projects;
+    this.shares = deps.shares;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
   }
@@ -76,6 +95,8 @@ export class InstanceAdminService {
       repository: options.repository,
       users: options.users,
       accounts: options.accounts,
+      projects: options.projects ?? NO_SHARING_DOOR,
+      shares: options.shares ?? NO_SHARING_DOOR,
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
     });
@@ -110,7 +131,48 @@ export class InstanceAdminService {
     const normalized = await this.normalizeOrganizationDomain(parsed);
     await this.auditMutation(normalized);
 
+    if (normalized.resource === "project" && normalized.method === "update") {
+      return this.updateProject(normalized);
+    }
+    if (normalized.resource === "project" && normalized.method === "getOne") {
+      return this.projectWithTraceShareCount(normalized);
+    }
+
     return this.repository.execute(normalized);
+  }
+
+  /** The sharing switch goes through project's door; every other field stays a generic write. */
+  private async updateProject(input: AdminOperationInput): Promise<AdminOperationResult> {
+    const { traceSharingEnabled, revokeExistingLinks, ...data } = input.params.data ?? {};
+    const projectId = String(input.params.id ?? "");
+    if (typeof traceSharingEnabled === "boolean") {
+      await this.projects.setTraceSharing({
+        projectId,
+        enabled: traceSharingEnabled,
+        revokeExistingLinks: revokeExistingLinks !== false,
+        by: { id: input.actorId },
+      });
+    }
+    if (Object.keys(data).length > 0) {
+      return this.repository.execute({ ...input, params: { ...input.params, data } });
+    }
+
+    return this.repository.execute({ ...input, method: "getOne", params: { id: projectId } });
+  }
+
+  /** The edit drawer asks this before sharing is switched off, to offer revoking the links. */
+  private async projectWithTraceShareCount(
+    input: AdminOperationInput,
+  ): Promise<AdminOperationResult> {
+    const result = await this.repository.execute(input);
+    if (!("data" in result) || result.data === null || typeof result.data !== "object") {
+      return result;
+    }
+    const traceShareLinkCount = await this.shares.countTraceShares({
+      projectId: String(input.params.id ?? ""),
+    });
+
+    return { ...result, data: { ...result.data, traceShareLinkCount } };
   }
 
   /**
