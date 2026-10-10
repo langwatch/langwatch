@@ -99,6 +99,14 @@ func TestBrowserHoverDragAndSnapshotFlags(t *testing.T) {
 	if _, err := browserRequest("hover", inv); err != nil {
 		t.Error(err)
 	}
+	inv, _ = parse(browserSpec(), []string{"upload", "e1", "/etc/hosts", "--lane", "a"})
+	if _, err := browserRequest("upload", inv); err == nil || !strings.Contains(err.Error(), ".claude/tmp") {
+		t.Errorf("upload outside .claude/tmp: %v", err)
+	}
+	inv, _ = parse(browserSpec(), []string{"upload", "e1", "--lane", "a"})
+	if _, err := browserRequest("upload", inv); err == nil {
+		t.Error("upload without a file was accepted")
+	}
 	inv, _ = parse(browserSpec(), []string{"snapshot", "--grep", "Save", "--depth", "3", "--max-chars", "2000", "--lane", "a"})
 	req, err = browserRequest("snapshot", inv)
 	if err != nil || req["grep"] != "Save" || req["depth"] != 3 || req["maxChars"] != 2000 {

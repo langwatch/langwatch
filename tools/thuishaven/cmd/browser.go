@@ -28,7 +28,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -36,9 +36,9 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
-		args:    "<verb> [ref|selector|url|text|key|expression|file] [text]",
-		maxArgs: 3,
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
+		args:    "<verb> [ref|selector|url|text|key|expression|file] [text|file...]",
+		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--lane", takesValue: true, value: "<name>", summary: "the caller's own context; lanes never share one"},
 			{long: "--as", takesValue: true, value: "<admin|email>", summary: "sign the lane in as this login (haven auth); omit to stay signed out"},
@@ -135,7 +135,16 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 	if _, ok := browserVerbArgs[verb]; !ok {
 		return nil, errors.New(browserUsage)
 	}
-	if err := fillPositionals(verb, inv.args[1:], req); err != nil {
+	given := inv.args[1:]
+	if verb == "upload" {
+		files, err := uploadFiles(given)
+		if err != nil {
+			return nil, err
+		}
+		req["files"] = files
+		given = given[:1]
+	}
+	if err := fillPositionals(verb, given, req); err != nil {
 		return nil, err
 	}
 	if err := browserExtras(verb, inv, req); err != nil {
@@ -228,7 +237,7 @@ func browserExtras(verb string, inv invocation, req map[string]any) error {
 // browserVerbArgs names each verb's positionals, as playwright-cli spells them; "?" is optional.
 var browserVerbArgs = map[string][]string{
 	"open": {"url?"}, "goto": {"url"}, "snapshot": nil, "screenshot": nil, "close": nil,
-	"click": {"ref"}, "hover": {"ref"}, "drag": {"ref", "targetRef?"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
+	"click": {"ref"}, "hover": {"ref"}, "drag": {"ref", "targetRef?"}, "upload": {"ref"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
 	"eval": {"expression"}, "state-load": {"file"},
 	"record-start": nil, "record-stop": nil, "replay": {"file"},
 }
@@ -436,4 +445,42 @@ func (b browserDaemon) call(ctx context.Context, verb string, body map[string]an
 		return nil
 	}
 	return json.Unmarshal(reply, into)
+}
+
+// uploadFiles checks given[1:] are existing files under the repo's .claude/tmp/ and returns them absolute.
+func uploadFiles(given []string) ([]string, error) {
+	if len(given) < 2 {
+		return nil, errors.New("haven browser upload needs <ref> and at least one <file>")
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	root := cwd
+	for {
+		if _, err := os.Stat(filepath.Join(root, ".git")); err == nil {
+			break
+		}
+		if parent := filepath.Dir(root); parent != root {
+			root = parent
+			continue
+		}
+		return nil, errors.New("haven browser upload must run inside the repository")
+	}
+	allowed := filepath.Join(root, ".claude", "tmp") + string(filepath.Separator)
+	files := make([]string, 0, len(given)-1)
+	for _, raw := range given[1:] {
+		abs, err := filepath.Abs(raw)
+		if err != nil {
+			return nil, err
+		}
+		if !strings.HasPrefix(abs, allowed) {
+			return nil, fmt.Errorf("haven browser upload only reads files under %s (got %s)", allowed, abs)
+		}
+		if info, err := os.Stat(abs); err != nil || info.IsDir() {
+			return nil, fmt.Errorf("haven browser upload: %s is not an existing file", abs)
+		}
+		files = append(files, abs)
+	}
+	return files, nil
 }

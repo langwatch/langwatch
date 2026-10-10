@@ -374,6 +374,7 @@ type Request = {
   text?: string;
   key?: string;
   file?: string;
+  files?: string[];
   locator?: LocatorSpec;
   script?: Script;
   targetRef?: string;
@@ -413,6 +414,22 @@ const actions: Record<string, Act> = {
   },
   hover: async ({ page, body, timeout }) => {
     await targetOf({ page, body }).hover({ timeout });
+    return afterInput({ page, timeout });
+  },
+  upload: async ({ page, body, timeout }) => {
+    const target = targetOf({ page, body });
+    const files = body.files ?? [];
+    const isInput = await target.evaluate(
+      (el) => el instanceof HTMLInputElement && el.type === "file",
+      undefined,
+      { timeout },
+    );
+    if (isInput) await target.setInputFiles(files, { timeout });
+    else {
+      const chooser = page.waitForEvent("filechooser", { timeout });
+      await target.click({ timeout });
+      await (await chooser).setFiles(files);
+    }
     return afterInput({ page, timeout });
   },
   drag: async ({ page, body, timeout }) => {
