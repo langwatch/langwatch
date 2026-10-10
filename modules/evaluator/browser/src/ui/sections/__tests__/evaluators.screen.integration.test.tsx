@@ -233,10 +233,10 @@ describe("given an evaluator other things depend on", () => {
       await userEvent.click(await screen.findByText("Delete"));
 
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByText(/Workflows \(1\) - will be archived/)).toBeInTheDocument();
-      expect(
-        within(dialog).getByText(/Online Evaluations \(2\) - will be deleted/),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Workflows (1)").parentElement).toHaveTextContent("archived");
+      expect(within(dialog).getByText("Online Evaluations (2)").parentElement).toHaveTextContent(
+        "deleted",
+      );
       expect(within(dialog).getByText("Relevancy on production")).toBeInTheDocument();
     });
 

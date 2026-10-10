@@ -333,7 +333,7 @@ export function DeployPromptDialog({
 
       <DeleteConfirmationDialog
         title={`Delete tag "${tagToDelete?.name ?? ""}"?`}
-        description="SDK and API callers using this tag will no longer be able to resolve it to a prompt version. Type 'delete' below to confirm:"
+        description="SDK and API callers using this tag will no longer be able to resolve it to a prompt version."
         open={tagToDelete !== null}
         onClose={() => setTagToDelete(null)}
         onConfirm={() => {

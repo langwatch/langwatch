@@ -248,7 +248,7 @@ export function PublishedPromptActions({
 
       <DeleteConfirmationDialog
         title="Are you really sure?"
-        description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
+        description="There is no going back, and you will lose all versions of this prompt."
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={() => void handleDelete()}

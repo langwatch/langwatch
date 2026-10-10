@@ -1,7 +1,8 @@
+import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 import { RawMenu as Menu } from "@langwatch/design-system/menu";
-import { Field, IconButton, Input, Portal, Text } from "@langwatch/design-system/primitives";
+import { IconButton, Portal, Text } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
@@ -216,45 +217,21 @@ function RunNowConfirmation({
   targetId: string;
   project: string;
 }) {
-  const [typed, setTyped] = useState("");
-
-  // Clear on every close, not just on Cancel. A CONFIRMED run closes through
-  // the parent's success handler rather than through `onClose`, so resetting
-  // there only would leave the typed name sitting in the box: reopening the
-  // same row would find Confirm already enabled, and one click would send a
-  // second real report. Keying off `open` covers both exits.
-  useEffect(() => {
-    if (!open) setTyped("");
-  }, [open]);
-
-  const close = () => {
-    setTyped("");
-    onClose();
-  };
-
   return (
-    <ConfirmDialog
+    <DeleteConfirmationDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
       onConfirm={onConfirm}
+      closeOnConfirm={false}
       isLoading={busy}
-      confirmDisabled={typed.trim() !== project}
+      confirmationWord={project}
+      caseSensitive
+      trimConfirmation
+      confirmLabel="Confirm"
       title="Run this schedule now?"
       description={`This ${targetNoun({ targetType })} will run for ${project} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
     >
       <TargetIdentity targetId={targetId} />
-      <Field.Root marginTop={4}>
-        <Field.Label textStyle="xs">
-          Type <strong>{project}</strong> to confirm
-        </Field.Label>
-        <Input
-          size="sm"
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          placeholder={project}
-          autoComplete="off"
-        />
-      </Field.Root>
-    </ConfirmDialog>
+    </DeleteConfirmationDialog>
   );
 }
