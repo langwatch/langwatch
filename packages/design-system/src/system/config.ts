@@ -1325,23 +1325,27 @@ export const designSystemConfig = defineConfig({
             // lands it as far from the right edge as the icon is from the left.
             paddingInlineStart: "3.5",
             paddingInlineEnd: "3",
+            // The stack measures a card unscaled before it mounts, so cards behind keep its height.
+            "&:not([data-mounted])": { scale: "1" },
+            transitionProperty: "translate, scale, opacity, height",
             // Collapsed, the newest card and two behind it show; behind cards show no content.
             "&[data-overlap]": {
               opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
               transformOrigin: "top center",
+              translate: "0 calc(var(--y) - var(--toast-peek, 0) * var(--index) * 1px)",
               "&:not([data-first]) > *": { opacity: 0 },
             },
-            // The stack measures a card unscaled before it mounts, so cards behind keep its height.
-            "&:not([data-mounted])": { scale: "1" },
-            transitionProperty: "translate, scale, opacity, height",
             transitionDuration: "240ms",
             transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)",
-            "&[data-state=open]": { animation: "toast-in 180ms cubic-bezier(0.2, 0, 0, 1) both" },
+            "&[data-state=open]": {
+              animation: "toast-in 180ms cubic-bezier(0.2, 0, 0, 1) backwards",
+            },
             "&[data-state=closed]": { animation: "toast-fade 120ms ease-in both" },
             _motionReduce: {
               transition: "none",
               animation: "none",
-              "&[data-state=closed]": { animation: "toast-fade 120ms linear both" },
+              "&[data-state=open]": { animation: "none" },
+              "&[data-state=closed]": { animation: "none", opacity: 0 },
             },
             // A status toast wears the middle strength of the status mesh. Repeated per type to
             // outrank Chakra's own filled defaults.
