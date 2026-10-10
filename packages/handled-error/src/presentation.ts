@@ -1115,6 +1115,10 @@ const presentations = {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  prompt_tag_conflict: {
+    title: "That tag is already in use",
+    describe: () => "Pick a different name, or move the existing tag to the version you want.",
+  },
   prompt_not_a_copy: {
     // Refused on "sync from source". This prompt was written here rather than
     // copied from somewhere, so there is nothing to sync from and no retry to
