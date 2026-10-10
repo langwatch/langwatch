@@ -5,30 +5,38 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import NewExperimentWorkbench from "../new-workbench.screen.tsx";
 
-const { replaceMock, createMock, alertMock, routerState, datasetState, mutationState } = vi.hoisted(
-  () => ({
-    replaceMock: vi.fn(),
-    createMock: vi.fn(),
-    alertMock: vi.fn(),
-    routerState: { query: {} as Record<string, unknown> },
-    /** The mutation's own error state; a rerender reads it, as a state change would. */
-    mutationState: { error: undefined as unknown },
-    datasetState: {
-      data: undefined as
-        | {
-            name: string;
-            columnTypes: { name: string; type: string }[];
-            datasetRecords: { id: string; entry: unknown }[];
-          }
-        | undefined,
-    },
-  }),
-);
+const {
+  replaceMock,
+  createMock,
+  alertMock,
+  refetchMock,
+  routerState,
+  datasetState,
+  mutationState,
+} = vi.hoisted(() => ({
+  replaceMock: vi.fn(),
+  refetchMock: vi.fn(),
+  createMock: vi.fn(),
+  alertMock: vi.fn(),
+  routerState: { query: {} as Record<string, unknown> },
+  /** The mutation's own error state; a rerender reads it, as a state change would. */
+  mutationState: { error: undefined as unknown },
+  datasetState: {
+    error: undefined as unknown,
+    data: undefined as
+      | {
+          name: string;
+          columnTypes: { name: string; type: string }[];
+          datasetRecords: { id: string; entry: unknown }[];
+        }
+      | undefined,
+  },
+}));
 
 // A new router object each call, as the compat shim hands out.
 vi.mock("@langwatch/browser-host/use-router", () => ({
@@ -40,9 +48,22 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../elements/workflow/studio-host/errors.tsx", () => ({
-  HandledErrorAlert: ({ error, fallbackTitle }: { error: unknown; fallbackTitle: string }) => {
+  HandledErrorAlert: ({
+    error,
+    fallbackTitle,
+    onRetry,
+  }: {
+    error: unknown;
+    fallbackTitle: string;
+    onRetry?: () => void;
+  }) => {
     alertMock(error);
-    return <div role="alert">{fallbackTitle}</div>;
+    return (
+      <div role="alert">
+        {fallbackTitle}
+        {onRetry ? <button onClick={onRetry}>Try again</button> : null}
+      </div>
+    );
   },
 }));
 
@@ -69,7 +90,14 @@ vi.mock("../../../../behavior/experiment-api.ts", () => ({
 vi.mock("@langwatch/dataset-client", () => ({
   datasetClient: {
     datasetRecord: {
-      getAll: { useQuery: () => ({ data: datasetState.data }) },
+      getAll: {
+        useQuery: () => ({
+          data: datasetState.data,
+          isError: datasetState.error !== undefined,
+          error: datasetState.error,
+          refetch: refetchMock,
+        }),
+      },
     },
   },
 }));
@@ -89,6 +117,7 @@ describe("New experiment workbench address", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     routerState.query = {};
     datasetState.data = undefined;
+    datasetState.error = undefined;
     mutationState.error = undefined;
   });
 
@@ -148,6 +177,28 @@ describe("New experiment workbench address", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("when the linked dataset fails to load", () => {
+    /** @scenario A dataset link whose dataset cannot be loaded says so and offers to try again */
+    it("shows the failure with Try again and creates nothing", async () => {
+      routerState.query = { datasetId: "ds-1" };
+      const failure = Object.assign(new Error("missing"), {
+        data: { code: "INTERNAL_SERVER_ERROR" },
+      });
+      datasetState.error = failure;
+
+      renderRepeatedly();
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Couldn't load the dataset for this experiment",
+      );
+      expect(alertMock).toHaveBeenLastCalledWith(failure);
+      expect(createMock).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(refetchMock).toHaveBeenCalledTimes(1);
     });
   });
 
