@@ -55,11 +55,11 @@ export function AgentTestingPage() {
   const { casesCount, plansCount } = useTabCounts(project?.id ?? "");
   const openPlanTitle = useAgentTestingStore((state) => state.openPlanTitle);
 
-  const header = (title?: string) => (
+  const header = () => (
     <AgentTestingHeader
-      title={title}
       tab={routing.tab}
       onTabChange={routing.setTab}
+      tabHrefs={routing.tabHrefs}
       casesCount={casesCount}
       plansCount={plansCount}
       openPlan={routing.tab === "results" ? openPlanTitle : null}

@@ -25,7 +25,11 @@ vi.mock("../../../../model/scenario-host.ts", () => ({
 }));
 
 vi.mock("../../../../behavior/agent-testing/use-agent-testing-routing.ts", () => ({
-  useAgentTestingRouting: () => ({ tab: "cases", setTab: vi.fn() }),
+  useAgentTestingRouting: () => ({
+    tab: "cases",
+    setTab: vi.fn(),
+    tabHrefs: { cases: "/acme/agent-testing", results: "/acme/agent-testing/results" },
+  }),
 }));
 vi.mock("../../../../behavior/agent-testing/use-agent-testing-live-updates.ts", () => ({
   useAgentTestingLiveUpdates: () => ({ isSseConnected: false }),
@@ -44,8 +48,8 @@ vi.mock("../../agent-testing/use-agent-testing-page-flows.ts", () => ({
   useHydrateViewFromUrl: () => {},
 }));
 vi.mock("../../agent-testing/cases/test-cases-tab.tsx", () => ({
-  TestCasesTab: ({ header }: { header: (title: string) => ReactNode }) => (
-    <div data-testid="cases-tab">{header("Default")}</div>
+  TestCasesTab: ({ header }: { header: () => ReactNode }) => (
+    <div data-testid="cases-tab">{header()}</div>
   ),
 }));
 vi.mock("../../agent-testing/results/results-tab.tsx", () => ({
@@ -68,8 +72,8 @@ describe("the Agent Testing address with the release flag on", () => {
     it("shows the page with its header and its tabs", () => {
       renderWithDesignSystem(<AgentTestingRoute />);
 
-      expect(screen.getByRole("heading", { name: "Default" })).toBeInTheDocument();
-      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      expect(screen.getByRole("heading", { name: "Agent testing" })).toBeInTheDocument();
+      expect(screen.getAllByRole("link").map((tab) => tab.textContent)).toEqual([
         expect.stringContaining("Scenarios"),
         expect.stringContaining("Results"),
       ]);
