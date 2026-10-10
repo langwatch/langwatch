@@ -3931,10 +3931,12 @@ export class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
     tenantId,
     traceId,
     occurredAtMs,
+    widen = true,
   }: {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
+    widen?: boolean;
   }): Promise<TraceSummaryData | null> {
     const context = { aggregateId: traceId, tenantId: createTenantId(tenantId) };
     if (occurredAtMs === undefined) {
@@ -3942,16 +3944,17 @@ export class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
       return read.kind === "folded" ? read.state : null;
     }
 
-    // Anchored: each step is one bounded read, narrowest first; a miss at the widest is final.
-    for (const lookbackMs of TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS) {
-      const read = await this.#store.get(traceId, {
-        ...context,
-        readWindow: {
-          fromMs: occurredAtMs - lookbackMs,
-          toMs: occurredAtMs + TRACE_SUMMARY_LOOKUP_FORWARD_MS,
-        },
-      });
+    // Anchored: adjacent bounded slices, narrowest first; a miss at the widest is final.
+    const steps = widen
+      ? TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS
+      : TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS.slice(0, 1);
+    let toMs = occurredAtMs + TRACE_SUMMARY_LOOKUP_FORWARD_MS;
+    for (const lookbackMs of steps) {
+      const fromMs = occurredAtMs - lookbackMs;
+      const read = await this.#store.get(traceId, { ...context, readWindow: { fromMs, toMs } });
       if (read.kind === "folded") return read.state;
+      // Both bounds are inclusive, so the next slice ends one millisecond before this one.
+      toMs = fromMs - 1;
     }
 
     return null;

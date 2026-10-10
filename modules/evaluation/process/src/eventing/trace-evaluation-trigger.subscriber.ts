@@ -81,7 +81,7 @@ export function createTraceEvaluationTrigger(
   event: TraceEvaluationTriggerEvent;
 }) => Promise<void> {
   return async ({ tenantId, traceId, event }) => {
-    // Anchored on the event's own time: each retry of a not-yet-folded summary stays bounded.
+    // Anchored on the event's own time; a full miss reads 31 days once, so retries stay cheap.
     const foldState = await deps.findSummary({
       projectId: tenantId,
       traceId,

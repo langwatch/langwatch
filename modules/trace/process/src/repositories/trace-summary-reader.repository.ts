@@ -6,5 +6,6 @@ export abstract class TraceSummaryReaderRepository {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
+    widen?: boolean;
   }): Promise<TraceSummaryData | null>;
 }

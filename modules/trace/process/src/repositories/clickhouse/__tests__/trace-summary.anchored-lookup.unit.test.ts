@@ -121,6 +121,9 @@ describe("given a trace summary lookup anchored on its event's time", () => {
 
       expect(summary).not.toBeNull();
       expect(reads.map(({ sql, params }) => readBack(sql, params))).toEqual([3, 7, 21]);
+      expect(reads.slice(1).map(({ params }) => Number(params.toMs))).toEqual(
+        reads.slice(0, -1).map(({ params }) => Number(params.fromMs) - 1),
+      );
     });
   });
 
@@ -137,6 +140,11 @@ describe("given a trace summary lookup anchored on its event's time", () => {
 
       expect(summary).toBeNull();
       expect(reads.map(({ sql, params }) => readBack(sql, params))).toEqual([3, 7, 21, 30]);
+      const coveredMs = reads.reduce(
+        (sum, { params }) => sum + Number(params.toMs) - Number(params.fromMs) + 1,
+        0,
+      );
+      expect(coveredMs).toBe(31 * DAY_MS + 1);
       expect(reads.some(({ sql }) => isResolve(sql))).toBe(false);
     });
   });
@@ -179,6 +187,27 @@ describe("given a trace summary lookup anchored on its event's time", () => {
         );
       },
     );
+  });
+
+  describe("when the lookup asks not to widen", () => {
+    /** @scenario "A lookup that does not widen reads only the first slice" */
+    it("reads the first slice once and misses a trace 20 days back", async () => {
+      const { store, reads } = storeOver({ storedAtMs: NOW_MS - 20 * DAY_MS });
+
+      const summary = await FoldedTraceSummaryReader.create(store).findSummary({
+        tenantId: "tenant-1",
+        traceId: "t1",
+        occurredAtMs: NOW_MS,
+        widen: false,
+      });
+
+      expect(summary).toBeNull();
+      expect(reads).toHaveLength(1);
+      expect(reads[0]!.params).toMatchObject({
+        fromMs: NOW_MS - 3 * DAY_MS,
+        toMs: NOW_MS + DAY_MS,
+      });
+    });
   });
 
   describe("when the lookup carries no anchor", () => {

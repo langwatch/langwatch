@@ -196,7 +196,7 @@ function subscriber(options: {
   const isEnabled = vi.fn(async () => options.guardDisabled ?? false);
   const listMonitors = vi.fn(async (_projectId: string) => options.monitors ?? [monitor()]);
   const folded: { state: TraceSummaryData | null } = { state: null };
-  const lookups: { occurredAtMs?: number }[] = [];
+  const lookups: { occurredAtMs?: number; widen?: boolean }[] = [];
   const trigger = createTraceEvaluationTrigger({
     findSummary: async (input) => {
       lookups.push(input);
@@ -241,6 +241,31 @@ describe("createTraceEvaluationTrigger", () => {
         await run(built, event, foldState());
 
         expect(lookups).toEqual([expect.objectContaining({ occurredAtMs: event.occurredAt })]);
+      });
+    });
+
+    describe("when the live trace's summary is not folded yet", () => {
+      /** @scenario "The evaluation trigger's lookup is anchored on the span and widens" */
+      it("anchors on the span without narrowing the lookup, then throws so the job retries", async () => {
+        const { built, lookups } = subscriber({});
+        const event = spanEvent();
+        built.folded.state = null;
+
+        await expect(
+          built.trigger({
+            tenantId: "tenant-1",
+            traceId: "trace-1",
+            event: { type: event.type, occurredAt: event.occurredAt },
+          }),
+        ).rejects.toThrow(/no folded summary yet/);
+
+        expect(lookups).toEqual([
+          {
+            projectId: "tenant-1",
+            traceId: "trace-1",
+            occurredAtMs: event.occurredAt,
+          },
+        ]);
       });
     });
   });

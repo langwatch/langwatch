@@ -253,6 +253,7 @@ export class TraceService {
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
       occurredAtMs: parsed.occurredAtMs,
+      widen: parsed.widen,
     });
   }
 
