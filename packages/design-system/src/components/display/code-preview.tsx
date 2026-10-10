@@ -42,18 +42,28 @@ interface CodePreviewProps {
   lineNumbers?: boolean;
   /** Light chrome for a detail panel: small title, quiet border, 12px soft-wrapped body. */
   compact?: boolean;
+  /**
+   * Whether long lines wrap; defaults to `compact`. A wrapped line continues indented under
+   * its own start, so code keeps its shape. Off, the body scrolls sideways.
+   */
+  wrap?: boolean;
 }
 
 const COMPACT_BODY = {
-  "& pre": {
-    margin: 0,
-    padding: "8px 12px",
-    fontSize: "12px",
-    lineHeight: "18px",
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-  },
+  "& pre": { margin: 0, padding: "8px 12px", fontSize: "12px", lineHeight: "18px" },
 } as const;
+
+/** Soft wrap with a hanging indent: a continuation sits under its line, never at column 0. */
+const wrappedBody = ({ guttered }: { guttered: boolean }) =>
+  ({
+    "& pre": { whiteSpace: "pre-wrap", wordBreak: "break-word" },
+    "& .line": {
+      display: "inline-block",
+      width: "100%",
+      paddingInlineStart: guttered ? "calc(16px + 4ch)" : "4ch",
+      textIndent: "-4ch",
+    },
+  }) as const;
 
 /** The window's frame: a full title bar, or a detail panel's quiet 28px strip. */
 const WINDOW_CHROME = {
@@ -123,6 +133,29 @@ const GUTTERED = {
   "& .line[data-diff=hunk] span, & .line[data-diff=meta] span": { color: "fg.muted !important" },
 } as const;
 
+/** The body's styles: the window's own ground, as SnippetPreview's, not the Shiki theme's. */
+const bodyCss = ({
+  compact,
+  wrap,
+  guttered,
+}: {
+  compact: boolean;
+  wrap: boolean;
+  guttered: boolean;
+}) => ({
+  "& pre": {
+    margin: 0,
+    padding: "12px 16px",
+    whiteSpace: "pre",
+    overflowX: "auto",
+    tabSize: 4,
+    background: "transparent !important",
+  },
+  ...(compact ? COMPACT_BODY : {}),
+  ...(guttered ? GUTTERED : {}),
+  ...(wrap ? wrappedBody({ guttered }) : {}),
+});
+
 /** One house window for every code sample: title bar, copy button, Shiki body. */
 export function CodePreview({
   code,
@@ -132,6 +165,7 @@ export function CodePreview({
   diff = false,
   lineNumbers = false,
   compact = false,
+  wrap = compact,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const { copied, copy } = useCopyToClipboard();
@@ -184,26 +218,18 @@ export function CodePreview({
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </IconButton>
       </HStack>
-      <Box
-        overflow="auto"
-        maxHeight={maxHeight}
-        css={{
-          // The window's own ground, as SnippetPreview's, not the Shiki theme's lighter one.
-          "& pre": {
-            margin: 0,
-            padding: "12px 16px",
-            whiteSpace: "pre",
-            overflowX: "auto",
-            background: "transparent !important",
-          },
-          ...(compact ? COMPACT_BODY : {}),
-          ...(guttered ? GUTTERED : {}),
-        }}
-      >
+      <Box overflow="auto" maxHeight={maxHeight} css={bodyCss({ compact, wrap, guttered })}>
         {html ? (
           <Box display="contents" dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
-          <Box as="pre" margin={0} padding="12px 16px" whiteSpace="pre" overflowX="auto">
+          <Box
+            as="pre"
+            margin={0}
+            padding={compact ? "8px 12px" : "12px 16px"}
+            whiteSpace={wrap ? "pre-wrap" : "pre"}
+            overflowX="auto"
+            style={{ tabSize: 4 }}
+          >
             {code}
           </Box>
         )}

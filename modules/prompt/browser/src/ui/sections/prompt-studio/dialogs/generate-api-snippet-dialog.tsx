@@ -198,7 +198,7 @@ function formatTarget(target: Target) {
 
 /**
  * Map of snippet targets to Prism languages. Unsupported targets fall back to
- * the closest match, or bash. Not every target is supported by RenderCode.
+ * the closest match, or bash. Not every target is supported by CodePreview.
  */
 const SnippetTargetToLanguageMap: Record<Target, string> = {
   c_libcurl: "bash",

@@ -7,6 +7,7 @@ import type { WireOf } from "@langwatch/api/web";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
@@ -40,7 +41,6 @@ import { AgentWorkflowTargetEditorDrawer } from "./agent-workflow-target-editor-
 import { ConnectFromCodeDrawer } from "./connect-from-code-drawer.tsx";
 import { ConnectedAgentDrawer } from "./connected-agent-drawer.tsx";
 import { WorkflowSelectorDrawer } from "./workflow-selector-drawer.tsx";
-import { RenderCode } from "./workflow/code/render-code.tsx";
 import { EmojiPickerModal } from "./workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
 
 /** What a caller hands agent's HTTP or code editor: the agent to edit, and where a save goes. */
@@ -173,7 +173,13 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDraw
       {...(goBack ? { onGoBack: goBack } : {})}
       renderCodeEditor={(editor) => (
         <VStack align="stretch" gap={2} data-testid="agent-code-preview">
-          <RenderCode code={editor.code} language="python" />
+          <CodePreview
+            code={editor.code}
+            language="python"
+            filename="code.py"
+            lineNumbers
+            compact
+          />
           <Button size="xs" variant="outline" alignSelf="start" onClick={() => editor.onExpand()}>
             Edit code
           </Button>

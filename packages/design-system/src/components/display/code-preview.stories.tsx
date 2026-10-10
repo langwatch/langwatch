@@ -38,6 +38,15 @@ export const LineNumbers: Story = {
   },
 };
 
+const TABBED =
+  'class Code:\n\tdef __call__(self, input: str = None):\n\t\treturn {"output": {"accepted": True, "count": 2, "rows": [input]}}';
+
+/** Tabs read four wide; a long line wraps under its own indent, never back at column 0. */
+export const CompactWrapped: Story = {
+  args: { filename: "code.py", language: "python", compact: true, lineNumbers: true, code: TABBED },
+  decorators: [(Story) => <div style={{ maxWidth: 460 }}>{Story()}</div>],
+};
+
 const DIFF = `@@ -1,5 +1,6 @@
  import langwatch
  

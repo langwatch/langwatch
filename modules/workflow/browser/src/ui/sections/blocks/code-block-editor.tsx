@@ -1,10 +1,8 @@
-import { useColorMode } from "@langwatch/design-system/color-mode";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
-import { system } from "@langwatch/design-system/system";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";
 
-import { RenderCode } from "../code/render-code.tsx";
 import { CodeEditorModal } from "../optimization_studio/code/workflow-code-editor.transport.tsx";
 
 export interface CodeBlockField {
@@ -63,9 +61,6 @@ export function CodeBlockEditor({
   viewStateKey,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { colorMode } = useColorMode();
-  const previewBg = system.token.var("colors.bg.card");
-  const previewBorder = system.token.var("colors.border.card");
 
   const handleOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -119,21 +114,13 @@ export function CodeBlockEditor({
       </chakra.button>
 
       {/* Code preview */}
-      <RenderCode
+      <CodePreview
         code={code}
         language={language}
-        colorMode={colorMode}
-        style={{
-          width: "100%",
-          fontSize: "12px",
-          padding: "12px",
-          borderRadius: "8px",
-          backgroundColor: previewBg,
-          border: `1px solid ${previewBorder}`,
-          maxHeight: "200px",
-          overflowY: "hidden",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-        }}
+        filename={`code.${language === "python" ? "py" : language}`}
+        maxHeight="200px"
+        lineNumbers
+        compact
       />
 
       {/* Editor modal - only render internally when not using external modal */}
