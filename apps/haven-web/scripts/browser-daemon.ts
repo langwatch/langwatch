@@ -35,6 +35,7 @@ import {
   type Script,
   type Step,
 } from "./browser-record.ts";
+import { faultBody, routeRule, takeFault, type RouteRule } from "./browser-route.ts";
 import { filterSnapshot } from "./browser-snapshot.ts";
 import { parseTotp, redactSecrets, totpCode, wrongCode, type Totp } from "./mfa-totp.ts";
 
@@ -96,6 +97,8 @@ type Lane = {
   /** The CDP session with the lane's virtual authenticators (`browser mfa`); closing drops them. */
   webauthn?: CDPSession;
   authenticators: Map<string, { kind: string; userVerified: boolean }>;
+  /** `haven browser route`: requests answered with a fault, by URL glob. */
+  routes: Map<string, RouteRule>;
 };
 const lanes = new Map<string, Lane>();
 /** Lanes closed for idling, told once on their next command. */
@@ -295,6 +298,7 @@ async function laneFor({
     seen: [],
     inflight: 0,
     authenticators: new Map(),
+    routes: new Map(),
   };
   watchLane({ lane });
   lanes.set(name, lane);
@@ -420,6 +424,10 @@ type Request = {
   verified?: boolean;
   /** `haven browser mfa totp fill --wrong`: type a code no window accepts. */
   wrong?: boolean;
+  /** `haven browser route`: the URL glob, the status to answer and how many times. */
+  pattern?: string;
+  status?: number;
+  times?: number;
 };
 
 const MEDIA_TYPES: Record<string, string> = {
@@ -827,6 +835,46 @@ async function recordCommand({
   throw new Error(`unknown verb ${verb}`);
 }
 
+/** `haven browser route`: fault, list or lift the lane's routed requests (context routes). */
+async function routeCommand({ lane, verb, body }: { lane: Lane; verb: string; body: Request }) {
+  if (verb === "route-add") {
+    const rule = routeRule({ pattern: body.pattern ?? "", status: body.status, times: body.times });
+    if (lane.routes.has(rule.pattern)) await lane.context.unroute(rule.pattern);
+    lane.routes.set(rule.pattern, rule);
+    await lane.context.route(rule.pattern, async (route) => {
+      if (!takeFault({ rule })) return route.continue();
+      return route.fulfill({
+        status: rule.status,
+        contentType: "application/json",
+        body: faultBody({ rule }),
+      });
+    });
+    return { routed: rule.pattern, status: rule.status, times: rule.times ?? null };
+  }
+  if (verb === "route-off") {
+    const patterns = body.pattern ? [body.pattern] : [...lane.routes.keys()];
+    for (const pattern of patterns) {
+      if (!lane.routes.delete(pattern))
+        throw new Error(
+          `lane ${lane.name} routes nothing for ${pattern} (haven browser route list)`,
+        );
+      await lane.context.unroute(pattern);
+    }
+    return { lifted: patterns };
+  }
+  if (verb === "route-list") {
+    return {
+      routes: [...lane.routes.values()].map(({ pattern, status, times, hits }) => ({
+        pattern,
+        status,
+        times: times ?? null,
+        hits,
+      })),
+    };
+  }
+  throw new Error(`unknown verb ${verb}`);
+}
+
 /** `haven browser mfa`: virtual WebAuthn authenticators and TOTP codes on the lane's page. */
 async function mfaCommand({
   lane,
@@ -957,7 +1005,13 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
     return { closed: name };
   }
   const mfaVerb = verb.startsWith("mfa-");
-  if (!actions[verb] && !mfaVerb && !["record-start", "record-stop", "replay"].includes(verb))
+  const routeVerb = ["route-add", "route-off", "route-list"].includes(verb);
+  if (
+    !actions[verb] &&
+    !mfaVerb &&
+    !routeVerb &&
+    !["record-start", "record-stop", "replay"].includes(verb)
+  )
     throw new Error(`unknown verb ${verb}`);
   if (idled.delete(name) && verb !== "open" && !lanes.has(name))
     throw new Error(`lane ${name} was closed after idling; reopen with open`);
@@ -968,6 +1022,7 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
   if (verb === "record-start" || verb === "record-stop" || verb === "replay")
     return recordCommand({ lane, verb, body, timeout });
   if (mfaVerb) return mfaCommand({ lane, verb, body, timeout });
+  if (routeVerb) return routeCommand({ lane, verb, body });
   return withSlot({ run: () => perform({ lane, verb, body, timeout }) });
 }
 

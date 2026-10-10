@@ -28,7 +28,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|route|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -36,7 +36,7 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | route | close | status | stop",
 		args:    "<verb> [ref|selector|url|text|key|expression|file] [text|file...]",
 		maxArgs: -1,
 		flags: []flagSpec{
@@ -51,6 +51,8 @@ func browserSpec() commandSpec {
 			{long: "--depth", takesValue: true, value: "<n>", summary: "snapshot: only the first n levels of the tree"},
 			{long: "--max-chars", takesValue: true, value: "<n>", summary: "snapshot: cut after n characters with a truncated footer"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "how long a command may wait on the page (default 30s)"},
+			{long: "--status", takesValue: true, value: "<code>", summary: "route add: the HTTP status matching requests answer (default 503)"},
+			{long: "--times", takesValue: true, value: "<n>", summary: "route add: fault only the next n matches (default every match)"},
 			{long: "--json", summary: "machine-readable"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
 		},
@@ -80,6 +82,12 @@ func runBrowser(ctx context.Context, d deps, inv invocation) error {
 		}
 		if verb == "export" {
 			return exportScript(inv)
+		}
+	}
+	if verb == "route" {
+		var err error
+		if verb, inv, err = routeVerb(inv); err != nil {
+			return err
 		}
 	}
 	if strings.HasPrefix(verb, "mfa-") {
@@ -160,6 +168,9 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 		return nil, err
 	}
 	if err := mfaExtras(verb, inv, req); err != nil {
+		return nil, err
+	}
+	if err := routeExtras(verb, inv, req); err != nil {
 		return nil, err
 	}
 	if err := absolutise(req); err != nil {
@@ -260,6 +271,7 @@ var browserVerbArgs = map[string][]string{
 	"record-start": nil, "record-stop": nil, "replay": {"file"},
 	"mfa-add": nil, "mfa-list": nil, "mfa-remove": {"authenticatorId"}, "mfa-uv": {"authenticatorId", "verified"},
 	"mfa-totp-enroll": {"ref?"}, "mfa-totp-fill": {"ref"},
+	"route-add": {"pattern"}, "route-off": {"pattern?"}, "route-list": nil,
 }
 
 func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {
@@ -288,6 +300,8 @@ func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {
 		fmt.Printf("enrolled: %v digits every %vs (secret kept by the browser daemon)\n", reply["digits"], reply["period"])
 	case "mfa-totp-fill":
 		fmt.Println("filled")
+	case "route-add", "route-off", "route-list":
+		printRoute(verb, reply)
 	default:
 		fmt.Printf("%v  %v\n", reply["url"], reply["title"])
 	}
