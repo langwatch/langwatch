@@ -17,9 +17,9 @@ type Trend = "up" | "down" | "neutral";
 const TREND_COLOR: Record<Trend, string> = { up: "green.fg", down: "red.fg", neutral: "fg.muted" };
 
 const TREND_STROKE: Record<Trend, string> = {
-  up: "var(--chakra-colors-green-500)",
-  down: "var(--chakra-colors-red-500)",
-  neutral: "var(--chakra-colors-gray-400)",
+  up: "var(--chakra-colors-green-fg)",
+  down: "var(--chakra-colors-red-fg)",
+  neutral: "var(--chakra-colors-fg-subtle)",
 };
 
 function trendOf(delta: number | null): Trend {
