@@ -294,8 +294,8 @@ describe("the organization's own directory resource", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    // The leaver keeps the row and holds nothing; the reactivation below restores no grant.
-    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
+    // The leaver's membership here goes; the reactivation below restores nothing.
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
     expect(store.memberships.has(`${OTHER_ORGANIZATION}:user-1`)).toBe(true);
     expect(store.accounts.get("user-1")).toEqual(
       account({ id: "user-1", email: "shared@example.test" }),
@@ -311,7 +311,7 @@ describe("the organization's own directory resource", () => {
         },
       }),
     ).resolves.toMatchObject({ active: true });
-    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
     expect(users.findByEmail).not.toHaveBeenCalled();
   });
 
