@@ -116,12 +116,16 @@ describe("studioBackendPostEvent abort during an in-flight read", () => {
      * poll timer needed the fix.
      */
     it("does not raise an unhandled rejection when the poll's abort check rejects", async () => {
-      // A read that never resolves: only the abort race (the poll timer) can
-      // end the loop, so the test proves behavior purely through the timer's
-      // side effects, not the pre-read check.
+      // A read that never resolves on its own: only the abort race (the poll
+      // timer) can end the loop. `cancel` resolving lets the test prove
+      // `studioBackendPostEvent` actually settles, not just that the test's
+      // own timeout gave up on it — if the call never settled, its `finally`
+      // would never clear the poll's `setInterval`, leaking a timer that
+      // keeps firing (and logging) past this test (caught by review).
+      const cancel = vi.fn(async () => {});
       currentReader = {
         read: () => new Promise<ReadableStreamReadResult<Uint8Array>>(() => {}),
-        cancel: vi.fn(async () => {}),
+        cancel,
         releaseLock: vi.fn(),
       } as unknown as ReadableStreamDefaultReader<Uint8Array>;
 
@@ -133,35 +137,39 @@ describe("studioBackendPostEvent abort during an in-flight read", () => {
 
       let callCount = 0;
       const redisClosed = new Error("Connection is closed.");
-      // The pre-read check (call 1) passes; every poll tick after that
-      // (call 2+) rejects, as a closed Redis connection would on every call
-      // until the pod finishes shutting down.
+      // The pre-read check (call 1) passes. The next two poll ticks (calls 2
+      // and 3) reject, as a closed Redis connection would while a pod is
+      // shutting down. The connection then "recovers" (call 4 resolves
+      // true), ending the test deterministically instead of relying on a
+      // timeout — proving the rejecting ticks didn't wedge the poll or leave
+      // it unable to resolve once isAborted succeeds again.
       const isAborted = vi.fn(async () => {
         callCount++;
         if (callCount === 1) return false;
-        throw redisClosed;
+        if (callCount <= 3) throw redisClosed;
+        return true;
       });
       const onEvent = vi.fn();
 
       const { studioBackendPostEvent } = await import("../post-event");
       try {
-        // One real 1000ms poll tick, plus margin, is enough to exercise the
-        // timer callback at least once.
-        await Promise.race([
-          studioBackendPostEvent({
-            projectId: "p",
-            message: blockedCell,
-            onEvent,
-            isAborted,
-          }),
-          new Promise((resolve) => setTimeout(resolve, 1500)),
-        ]);
+        // studioBackendPostEvent is awaited directly (no race against a
+        // test-side timeout): it must settle on its own once isAborted
+        // resolves true, which also proves the poll's `setInterval` is
+        // cleared by the real `finally`, not abandoned.
+        await studioBackendPostEvent({
+          projectId: "p",
+          message: blockedCell,
+          onEvent,
+          isAborted,
+        });
       } finally {
         process.off("unhandledRejection", onUnhandledRejection);
       }
 
       expect(unhandled).toEqual([]);
-      expect(callCount).toBeGreaterThanOrEqual(2);
+      expect(callCount).toBeGreaterThanOrEqual(4);
+      expect(cancel).toHaveBeenCalledTimes(1);
     }, 10_000);
   });
 });
