@@ -29,7 +29,9 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetView[] }) {
                 label={{ label: target.status, tone: statusTone(target.status) }}
               />
             </Table.Cell>
-            <Table.Cell fontFamily="mono">{target.version ?? "None"}</Table.Cell>
+            <Table.Cell>
+              <InlineCode variant="neutral">{target.version ?? "None"}</InlineCode>
+            </Table.Cell>
             <Table.Cell>{target.lastError ?? ""}</Table.Cell>
           </Table.Row>
         ))}
@@ -54,7 +56,7 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
       {step.description && <Text textStyle="sm">{step.description}</Text>}
       <SummaryList>
         <SummaryListItem label="Step">
-          <InlineCode>{step.id}</InlineCode>
+          <InlineCode variant="neutral">{step.id}</InlineCode>
         </SummaryListItem>
         <SummaryListItem label="Kind">{step.kind}</SummaryListItem>
         <SummaryListItem label="Mode">{modeLabel(step.mode)}</SummaryListItem>

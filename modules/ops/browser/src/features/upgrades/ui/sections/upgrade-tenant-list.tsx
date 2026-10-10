@@ -1,4 +1,5 @@
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
@@ -149,7 +150,9 @@ function TenantRows({
               key={`${row.migrationName}:${row.tenantId}`}
               data-testid={`upgrade-tenant-${row.tenantId}`}
             >
-              <Table.Cell fontFamily="mono">{row.tenantId}</Table.Cell>
+              <Table.Cell>
+                <InlineCode variant="neutral">{row.tenantId}</InlineCode>
+              </Table.Cell>
               <Table.Cell>{titleOf(row.migrationName)}</Table.Cell>
               <Table.Cell>
                 <Badge colorPalette={known?.color ?? "gray"}>{known?.label ?? row.status}</Badge>

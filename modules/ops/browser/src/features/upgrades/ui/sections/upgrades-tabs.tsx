@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Table, Tabs, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
@@ -42,8 +43,12 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[
       <Table.Body>
         {targets.map((target) => (
           <Table.Row key={target.target} data-testid={`upgrade-dataplane-${target.target}`}>
-            <Table.Cell fontFamily="mono">{target.target}</Table.Cell>
-            <Table.Cell fontFamily="mono">{target.version ?? "None"}</Table.Cell>
+            <Table.Cell>
+              <InlineCode variant="neutral">{target.target}</InlineCode>
+            </Table.Cell>
+            <Table.Cell>
+              <InlineCode variant="neutral">{target.version ?? "None"}</InlineCode>
+            </Table.Cell>
             <Table.Cell textAlign="end">{target.outstanding}</Table.Cell>
             <Table.Cell maxWidth="420px">
               {target.lastError ? (

@@ -1,4 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -130,11 +131,13 @@ export default function OrganizationsView() {
             )}
             {list.data?.data.map((org) => (
               <Table.Row key={org.id}>
-                <Table.Cell fontSize="xs" color="fg.muted">
-                  {org.id}
+                <Table.Cell>
+                  <InlineCode variant="neutral">{org.id}</InlineCode>
                 </Table.Cell>
                 <Table.Cell>{org.name}</Table.Cell>
-                <Table.Cell>{org.slug}</Table.Cell>
+                <Table.Cell>
+                  {org.slug && <InlineCode variant="neutral">{org.slug}</InlineCode>}
+                </Table.Cell>
                 <Table.Cell>{org.pricingModel}</Table.Cell>
                 <Table.Cell>{org.currency}</Table.Cell>
                 <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>

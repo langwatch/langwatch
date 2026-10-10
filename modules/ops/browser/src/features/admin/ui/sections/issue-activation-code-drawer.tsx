@@ -116,7 +116,8 @@ export function IssueActivationCodeDrawer({
             </Button>
             {issued ? null : (
               <Button
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 disabled={!namesTheCustomer(draft)}
                 loading={commands.issue.isPending}
                 onClick={() => {

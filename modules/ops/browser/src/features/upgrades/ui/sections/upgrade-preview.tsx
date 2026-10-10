@@ -43,7 +43,9 @@ function PlannedReleases({ releases }: { releases: readonly PlannedRelease[] }) 
       <Table.Body>
         {releases.map((release) => (
           <Table.Row key={release.release ?? "unreleased"}>
-            <Table.Cell fontFamily="mono">{release.release ?? "Unreleased"}</Table.Cell>
+            <Table.Cell>
+              <InlineCode variant="neutral">{release.release ?? "Unreleased"}</InlineCode>
+            </Table.Cell>
             {STEP_GROUPS.map((group) => (
               <Table.Cell key={group}>
                 <Wrap gap={1}>

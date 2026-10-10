@@ -2,6 +2,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
@@ -989,7 +990,9 @@ function AttentionRow({ record }: { record: MigrationListing["attention"][number
   return (
     <>
       <Table.Row>
-        <Table.Cell fontFamily="mono">{record.tenantId}</Table.Cell>
+        <Table.Cell>
+          <InlineCode variant="neutral">{record.tenantId}</InlineCode>
+        </Table.Cell>
         <Table.Cell>
           <Badge colorPalette={STATUS_COLOR[record.status] ?? "gray"}>
             {STATUS_LABEL[record.status] ?? record.status}

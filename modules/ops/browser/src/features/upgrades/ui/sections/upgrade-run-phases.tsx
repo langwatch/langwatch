@@ -1,4 +1,5 @@
 import { CodePreview } from "@langwatch/design-system/code-preview";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Box, Card, Heading, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { ResourceRow } from "@langwatch/design-system/resource-row";
 
@@ -22,7 +23,7 @@ function StepRow({ step }: { step: UpgradeStepView }) {
   return (
     <Box data-testid="upgrade-run-step">
       <ResourceRow
-        name={step.id}
+        name={<InlineCode variant="neutral">{step.id}</InlineCode>}
         status={
           <UpgradeStatusBadge
             label={{ label: step.statusLabel, tone: statusTone(step.status) }}
@@ -42,9 +43,7 @@ function PhaseRow({ phase }: { phase: UpgradeRunPhaseView }) {
       <Text textStyle="sm" flex={1}>
         {phaseLabel(phase.name)}
       </Text>
-      <Text textStyle="xs" color="fg.muted" fontFamily="mono">
-        {phase.release ?? ""}
-      </Text>
+      {phase.release && <InlineCode variant="neutral">{phase.release}</InlineCode>}
       <UpgradeStatusBadge label={phaseOutcomeLabel(phase.outcome)} size="sm" />
       <Text textStyle="xs" color="fg.muted" minWidth="64px" textAlign="end">
         {formatDuration(phase.startedAt, phase.finishedAt)}
@@ -60,9 +59,7 @@ export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
     <Stack gap={5}>
       <HStack gap={3} wrap="wrap">
         <UpgradeStatusBadge label={runOutcomeLabel(run.outcome)} size="md" />
-        <Text textStyle="sm" fontFamily="mono">
-          {run.release ?? "Unreleased"}
-        </Text>
+        <InlineCode variant="neutral">{run.release ?? "Unreleased"}</InlineCode>
         <Text textStyle="sm" color="fg.muted">
           {run.kind} · {formatDuration(run.startedAt, run.finishedAt)}
         </Text>

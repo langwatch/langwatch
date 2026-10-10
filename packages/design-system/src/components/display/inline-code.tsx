@@ -81,6 +81,7 @@ export function InlineCode({
     title: children,
     "data-truncate": truncate,
     maxWidth: "full",
+    width: "fit-content",
     whiteSpace: "nowrap",
     fontFamily: "mono",
     fontVariantNumeric: "normal",

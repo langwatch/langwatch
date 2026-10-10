@@ -279,7 +279,8 @@ function SubmitButton({
   if (form.mode === "register") {
     return (
       <Button
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         disabled={form.licenseKey.trim() === "" || form.organizationId.trim() === ""}
         loading={commands.registerLegacy.isPending}
         onClick={() =>
@@ -305,7 +306,8 @@ function SubmitButton({
 
   return (
     <Button
-      colorPalette="blue"
+      colorPalette="orange"
+      variant="solid"
       disabled={
         !customerValid ||
         form.email.trim() === "" ||

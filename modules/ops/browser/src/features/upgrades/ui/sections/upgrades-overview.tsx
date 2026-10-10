@@ -146,10 +146,8 @@ function NeedsAttention({
                 justifyContent="start"
                 onClick={() => onOpenStep(step.id)}
               >
-                <Text as="span" fontFamily="mono">
-                  {step.id}
-                </Text>
-                : {step.lastError ? summariseError(step.lastError) : step.statusLabel}
+                <InlineCode variant="neutral">{step.id}</InlineCode>:{" "}
+                {step.lastError ? summariseError(step.lastError) : step.statusLabel}
               </Button>
             ))}
           </Stack>
@@ -240,9 +238,7 @@ function ReleasesTable({
             >
               <Table.Cell>
                 <HStack gap={2}>
-                  <Text fontFamily="mono" textStyle="sm" fontWeight="medium">
-                    {release.release ?? "Unreleased"}
-                  </Text>
+                  <InlineCode variant="neutral">{release.release ?? "Unreleased"}</InlineCode>
                   {release.installed && (
                     <Badge size="sm" colorPalette="green" variant="subtle">
                       Installed
@@ -345,7 +341,9 @@ function RunsTable({
             <Table.Cell>
               <UpgradeStatusBadge label={runOutcomeLabel(run.outcome)} />
             </Table.Cell>
-            <Table.Cell fontFamily="mono">{run.release ?? "Unreleased"}</Table.Cell>
+            <Table.Cell>
+              <InlineCode variant="neutral">{run.release ?? "Unreleased"}</InlineCode>
+            </Table.Cell>
             <Table.Cell textTransform="capitalize">{run.kind}</Table.Cell>
             <Table.Cell whiteSpace="nowrap">
               <FormattedDate value={run.startedAt} />
@@ -404,8 +402,8 @@ function PendingSteps({
             onClick={() => onOpenStep(step.id)}
             data-testid={`upgrade-${group}-step-${step.id}`}
           >
-            <Table.Cell fontFamily="mono" whiteSpace="nowrap" verticalAlign="top">
-              {step.id}
+            <Table.Cell verticalAlign="top">
+              <InlineCode variant="neutral">{step.id}</InlineCode>
             </Table.Cell>
             <Table.Cell verticalAlign="top">
               <UpgradeStepState step={step} />
@@ -498,9 +496,7 @@ function TenantSteps({
             <Table.Cell>
               <Stack gap={0}>
                 <Text textStyle="sm">{step.title}</Text>
-                <Text textStyle="xs" color="fg.muted" fontFamily="mono">
-                  {step.name}
-                </Text>
+                <InlineCode variant="neutral">{step.name}</InlineCode>
               </Stack>
             </Table.Cell>
             <Table.Cell textAlign="end">
