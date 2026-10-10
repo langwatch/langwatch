@@ -51,9 +51,6 @@ const keepForeverRowsSchema = z.array(
     })),
 );
 
-const KEEP_FOREVER_UNSCOPED_REASON =
-  "the event log's keep-forever rewrite spans every tenant on a target, so its mutation does too";
-
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
 function tenantFilterParams(projectId: string): Record<string, string> {
@@ -156,10 +153,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         ORDER BY create_time DESC
       `,
       params: tenantFilterParams(input.projectId),
-      unscoped: {
-        reason:
-          "system.mutations carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
-      },
+      // System.mutations carries no tenant column: the project is matched inside the recorded
+      // mutation command instead, which is what tenantFilterSql does.
+      SKIP_TENANT_CHECK: true,
     });
 
     return this.parseRows(rows);
@@ -175,10 +171,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         mutationId: input.mutationId,
         ...tenantFilterParams(input.projectId),
       },
-      unscoped: {
-        reason:
-          "KILL MUTATION reads system.mutations, which carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
-      },
+      // KILL MUTATION reads system.mutations, which carries no tenant column: the project is
+      // matched inside the recorded mutation command instead, which is what tenantFilterSql does.
+      SKIP_TENANT_CHECK: true,
     });
   }
 
@@ -210,7 +205,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         ORDER BY create_time DESC
       `,
       params: { tables: this.eventLogRetention.tables },
-      unscoped: { reason: KEEP_FOREVER_UNSCOPED_REASON },
+      // The event log's keep-forever rewrite spans every tenant on a target, so its mutation does
+      // too.
+      SKIP_TENANT_CHECK: true,
     });
     return keepForeverRowsSchema
       .parse(rows)
@@ -250,10 +247,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           AND is_done = 0
       `,
       params: { tables: input.tables, ...tenantFilterParams(input.projectId) },
-      unscoped: {
-        reason:
-          "system.mutations carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
-      },
+      // System.mutations carries no tenant column: the project is matched inside the recorded
+      // mutation command instead, which is what tenantFilterSql does.
+      SKIP_TENANT_CHECK: true,
     });
 
     return this.parseRows(rows, {

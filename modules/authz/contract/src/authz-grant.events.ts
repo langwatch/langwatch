@@ -142,6 +142,9 @@ export const grantAttachedPayloadSchema = z
     membershipStamp: z.string().min(1).optional(),
     /** Founder-only marker for a membership created in the same transaction. */
     membershipBootstrap: z.boolean().optional(),
+    /** Present when the writer asked to skip an identical live grant: the fold
+     *  drops this fact when one already landed, so a write inside the lag adds no row. */
+    onDuplicate: z.literal("skip").optional(),
   })
   .strict()
   .refine(grantShapeRefinement.check, {

@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
@@ -73,7 +73,7 @@ async function mountedKeyWrites() {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({
         listTraceDestinations: async (projectIds) =>
-          projectIds.map((id) => ({ id, teamId: "team_1", archivedAt: null })),
+          projectIds.map((id) => ({ id, teamId: "team_1", archivedAt: null, kind: "application" })),
       }),
       evaluators: createApiFixture({}),
       evaluations: createApiFixture({}),
@@ -84,6 +84,7 @@ async function mountedKeyWrites() {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {
@@ -132,13 +133,13 @@ async function mountedKeyWrites() {
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayRestCredential, () => ({ kind: "legacyProjectKey" as const })),
-      bindRestMiddleware(gatewayKeyCaller, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayRestCredential, () => ({ kind: "legacyProjectKey" as const })),
+      bindMiddlewareContext(gatewayKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),

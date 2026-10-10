@@ -19,10 +19,11 @@ import {
   type AgentOverview,
 } from "@langwatch/agent-contract";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { z } from "zod";
@@ -30,7 +31,7 @@ import { z } from "zod";
 import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
 
 /** The W3C trace context header a call carries, bound by the process from the request. */
-export const agentTraceparent = defineRestMiddleware("traceparent", z.string().nullable());
+export const agentTraceparent = defineMiddlewareContext("traceparent", z.string().nullable());
 
 function response(
   agent: AgentOverview,
@@ -84,7 +85,11 @@ function response(
 export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<AgentApi>;
+  router: () => RestTransportDeclaration<
+    AgentApi,
+    RestDoorCredential,
+    typeof projectRequestContext | typeof agentTraceparent
+  >;
 }> {
   const relayMaxBytes = relayPayloadCaps(relayMaxPayloadMb).envelopeBytes;
 
@@ -102,17 +107,17 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("project:view")
       .withOutput(agentListResponseSchema)
       .withDocs({ summary: "List agents with their current presence and owner" })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ app, input, scope }, facts) => {
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
         const page = await app.listWithPresence({
           ...input,
           projectId: scope.id,
-          viewerUserId: facts.viewerUserId,
+          viewerUserId: context.viewerUserId,
         });
 
         return {
           pagination: page.pagination,
-          data: page.data.map((agent) => response(agent, app, facts.projectSlug)),
+          data: page.data.map((agent) => response(agent, app, context.projectSlug)),
         };
       })
 
@@ -122,16 +127,16 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withOutput(agentResponseSchema)
       .withStatus(201)
       .withDocs({ summary: "Create an authored agent; connected agents register through the SDK" })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ app, input, scope }, facts) => {
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
         const created = await app.create({ ...input, projectId: scope.id });
         const agent = await app.getById({
           id: created.id,
           projectId: scope.id,
-          viewerUserId: facts.viewerUserId,
+          viewerUserId: context.viewerUserId,
         });
 
-        return response(agent, app, facts.projectSlug);
+        return response(agent, app, context.projectSlug);
       })
 
       .get("/:id", "getAgent")
@@ -139,15 +144,15 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("project:view")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Get an agent in the caller's project" })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ app, input, scope }, facts) => {
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
         const agent = await app.getById({
           ...input,
           projectId: scope.id,
-          viewerUserId: facts.viewerUserId,
+          viewerUserId: context.viewerUserId,
         });
 
-        return response(agent, app, facts.projectSlug);
+        return response(agent, app, context.projectSlug);
       })
 
       .patch("/:id", "updateAgent")
@@ -156,16 +161,16 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Update an authored agent" })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ app, input, scope }, facts) => {
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
         await app.update({ ...input, projectId: scope.id });
         const agent = await app.getById({
           id: input.id,
           projectId: scope.id,
-          viewerUserId: facts.viewerUserId,
+          viewerUserId: context.viewerUserId,
         });
 
-        return response(agent, app, facts.projectSlug);
+        return response(agent, app, context.projectSlug);
       })
 
       .put("/:id", "replaceAgent")
@@ -174,16 +179,16 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ app, input, scope }, facts) => {
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
         await app.update({ ...input, projectId: scope.id });
         const agent = await app.getById({
           id: input.id,
           projectId: scope.id,
-          viewerUserId: facts.viewerUserId,
+          viewerUserId: context.viewerUserId,
         });
 
-        return response(agent, app, facts.projectSlug);
+        return response(agent, app, context.projectSlug);
       })
 
       .delete("/:id", "archiveAgent")
@@ -208,11 +213,11 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         onExceeded: () =>
           new AgentPayloadTooLargeError({ what: "envelope", limitBytes: relayMaxBytes }),
       })
-      .withMiddleware(projectRestFacts, agentTraceparent)
-      .handle(({ app, input: { id, ...turn }, scope, signal }, facts, header) =>
+      .withMiddlewareContext(projectRequestContext, agentTraceparent)
+      .handle(({ app, input: { id, ...turn }, scope, signal }, context, header) =>
         app.call(
           { ...turn, id, projectId: scope.id },
-          { viewerUserId: facts.viewerUserId, traceparent: header, signal },
+          { viewerUserId: context.viewerUserId, traceparent: header, signal },
         ),
       )
 

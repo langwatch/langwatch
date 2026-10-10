@@ -31,6 +31,7 @@ import {
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
 import { automationDrawerAddress } from "../model/analytics-overlay-address.ts";
+import { isPersonalProject } from "../model/analytics-personal-project.ts";
 import { analyticsApi } from "./analytics-api.ts";
 
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
@@ -173,6 +174,11 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   );
   // Unknown until the project answers: no setup prompt flashes over a project with traces.
   const hasFirstMessage = firstMessage.data?.firstMessage ?? true;
+  const scopeGraph = analyticsApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: session.currentUser() !== null && scopeProjectId !== void 0 },
+  );
+  const isPersonal = isPersonalProject({ graph: scopeGraph.data ?? [], projectId: scopeProjectId });
 
   // Primitive dependencies only, so the host stays the SAME object across
   // renders that carry the same reading.
@@ -186,6 +192,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
                 slug: scopeProjectSlug ?? "",
                 name: scopeProjectName ?? "",
                 hasFirstMessage,
+                isPersonal,
                 ...(scopeProjectKind ? { kind: scopeProjectKind } : {}),
               }
             : void 0,
@@ -204,6 +211,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       scopeProjectName,
       scopeProjectKind,
       hasFirstMessage,
+      isPersonal,
       projectId,
       organizationId,
       scopeOrganizationName,

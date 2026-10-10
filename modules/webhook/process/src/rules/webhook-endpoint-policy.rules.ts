@@ -92,7 +92,9 @@ export function assertValidUrl(url: string, configuration: WebhookEndpointConfig
     url,
     allowInsecureLocal: configuration.allowInsecureLocalUrls,
   });
-  if (!verdict.admitted) throw new WebhookEndpointValidationError(`url refused: ${verdict.reason}`);
+  if (!verdict.admitted) {
+    throw new WebhookEndpointValidationError(`url refused: ${verdict.reason}`, verdict.blocked);
+  }
 }
 
 export function assertValidEvents(enabledEvents: string[]): void {

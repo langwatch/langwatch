@@ -5,7 +5,7 @@
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   ForbiddenError,
   MANAGEMENT_API_VERSION,
@@ -87,7 +87,7 @@ export interface ProjectManagementApi
 export const ProjectManagementApi = moduleApi<ProjectManagementApi>()("project");
 
 /** The member an organization credential acts for; null for a service key, which acts as nobody. */
-export const projectRestCaller = defineRestMiddleware(
+export const projectRestCaller = defineMiddlewareContext(
   "projectRestCaller",
   z.object({ userId: z.string().nullable(), apiKeyId: z.string() }),
 );
@@ -122,7 +122,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     description: "Get a project by ID. Requires project:view permission.",
     errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
   })
-  .withMiddleware(projectRestCaller)
+  .withMiddlewareContext(projectRestCaller)
   .handle(async ({ app, input, scope }, caller) => {
     const project = await projectInOrganization({
       app,
@@ -152,7 +152,8 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .withMiddleware(projectRestCaller)
+  .withMiddlewareContext(projectRestCaller)
+  .withAudit("management.project.update")
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
 
@@ -178,7 +179,8 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .withMiddleware(projectRestCaller)
+  .withMiddlewareContext(projectRestCaller)
+  .withAudit("management.project.archive-by-id")
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
     const project = await archiveProject({ app, id: input.id, organizationId: scope.id });

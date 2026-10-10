@@ -15,9 +15,9 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
-    "@types/pg": "^8.20.3",
+    "@types/pg": "catalog:",
     "ioredis": "catalog:",
-    "pg": "^8.22.0",
+    "pg": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
   }

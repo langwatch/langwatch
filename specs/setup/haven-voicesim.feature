@@ -49,7 +49,7 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
 
   Scenario: An agent clears the call log between runs
     Given voicesim has logged two calls
-    When the agent runs "haven voice clear", which sends DELETE /_sim/api/calls
+    When the agent runs "haven sim voice clear", which sends DELETE /_sim/api/calls
     Then voicesim answers 204 and /_sim/api/calls lists no calls
     And the next call's id keeps counting, so an id is never reused
 

@@ -42,6 +42,10 @@
   --sim-accent: var(--rust);
 }
 
+.sim-console[data-sim="lambda"] {
+  --sim-accent: var(--amber);
+}
+
 .sim-console .ds-topbar-mark {
   background: var(--sim-accent);
 }

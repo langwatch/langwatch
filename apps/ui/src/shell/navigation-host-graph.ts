@@ -32,6 +32,7 @@ export type NavigationGraphRead = readonly {
       id: string;
       name: string;
       slug: string;
+      kind?: string;
       presenceEnabled?: boolean;
       lastCodingAgentSessionAt?: string | null;
       lastCodingAgentPullRequestAt?: string | null;

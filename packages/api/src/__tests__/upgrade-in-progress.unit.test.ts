@@ -6,10 +6,11 @@ import type { PermissionDecision } from "@langwatch/authorization";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { Authorize } from "../access/access.ts";
+import { promoteStoreFailure, setLedgerCurrent } from "../errors.ts";
 import { SessionReader } from "../hosting/session-reader.ts";
 import { canonicalErrorResponse, withRetryAfter } from "../rest/response.ts";
 import { composeTrpcRouters } from "../trpc/compose.ts";
@@ -133,4 +134,25 @@ describe("a Postgres read the schema is not ready for", () => {
       expect(await response.text()).toContain('"message":"upgrade_in_progress"');
     });
   });
+});
+
+describe("a Postgres read the schema is not ready for once the gate admitted", () => {
+  afterEach(() => setLedgerCurrent({ current: false }));
+
+  /** @scenario "A missing table on a ledger that says current is not reported as upgrading" */
+  it.each(["P2021", "P2022", "42P01", "42703"])(
+    "answers %s as an unhandled 500 that names the table, never upgrade_in_progress",
+    async (code) => {
+      setLedgerCurrent({ current: true });
+      const response = await restAnswerFor(schemaBehind(code));
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
+      const promoted = promoteStoreFailure(schemaBehind(code));
+      expect(promoted).toBeInstanceOf(Error);
+      expect(promoted instanceof Error ? promoted.message : "").toBe(
+        "schema and ledger disagree: The table `public.NewThing` does not exist",
+      );
+    },
+  );
 });

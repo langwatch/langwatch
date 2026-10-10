@@ -1,12 +1,13 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ledgerTables } from "@langwatch/upgrade";
 
 import { type MovedTenantSteps, OpsMigrationRepository } from "../ops-migration.repository.ts";
 
-const TENANCY =
-  "-- @tenancy: a fleet-wide step over (migrationName, tenantId); the tenant is the key.\n";
-const ENROLMENT_TENANCY =
-  "-- @tenancy: a fleet-wide step over (organizationId, migrationName); the organization is the key.\n";
+// A fleet-wide step over (migrationName, tenantId); the tenant is the key.
+const TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
+// A fleet-wide step over (organizationId, migrationName); the organization is the key.
+const ENROLMENT_TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 /** Frozen SQL against the release that ships it: ops' state rows into the ledger schema's table. */
 export class PrismaOpsMigrationRepository extends OpsMigrationRepository {

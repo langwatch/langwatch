@@ -27,10 +27,16 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../licensing/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/module/tsconfig.build.json"

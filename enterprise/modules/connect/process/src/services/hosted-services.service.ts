@@ -4,15 +4,18 @@
  * is decided here is whether the key's license includes the service.
  */
 
-import type { HostedCapAnswer, HostedClassifyAnswer } from "@langwatch/enterprise-connect-contract";
+import type {
+  HostedBudgetWire,
+  HostedCaller,
+  HostedCapAnswer,
+  HostedClassifyAnswer,
+  HostedUsageAnswer,
+} from "@langwatch/enterprise-connect-contract";
 import {
   ConnectLicenseRequiredError,
   ConnectServiceNotEntitledError,
   type ConnectService,
   type ContractTerms,
-  type HostedBudgetWire,
-  type HostedCaller,
-  type HostedUsageAnswer,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
 import type {

@@ -961,6 +961,8 @@ model JoinRequest {
   resolvedById      String?
   /// user | invite-accepted, on a withdrawal.
   withdrawalCause   String?
+  /// The SSO connection a single sign-on arrival was admitted through; null otherwise.
+  connectionId      String?
   occurredAt        DateTime
   lastEventId       String
   acceptedAt        DateTime
@@ -3709,8 +3711,9 @@ model DataPrivacyPolicy {
   @@index([scopeType, scopeId])
 }
 
-// Data privacy's fold of where each project sits, from project's lifecycle facts (record §5;
-// Alex, 2026-10-06). Each column group keeps its newest fact; no relation to Project.
+/// @deprecated No reader or writer since privacy reads placement from Project and Team. Kept
+/// (Alex, 2026-10-10), @@ignore'd so no client reaches it; removed in a future release.
+/// Declared in packages/upgrade/releases/deprecations/deprecations.json.
 model DataPrivacyProjectScope {
   projectId            String    @id
   organizationId       String
@@ -3723,10 +3726,12 @@ model DataPrivacyProjectScope {
   updatedAt            DateTime  @default(now()) @updatedAt
 
   @@index([organizationId])
+  @@ignore
 }
 
-// Data retention's copy of where each project sits, a peer fold over project's lifecycle facts
-// (Alex, 2026-10-06, Q151 Q1); updatedAt is the newest fact's time. No relation to Project.
+/// @deprecated No reader or writer since retention reads placement from Project and Team. Kept
+/// (Alex, 2026-10-10), @@ignore'd so no client reaches it; removed in a future release.
+/// Declared in packages/upgrade/releases/deprecations/deprecations.json.
 model DataRetentionProjectScope {
   projectId      String    @id
   organizationId String
@@ -3737,6 +3742,7 @@ model DataRetentionProjectScope {
 
   @@index([organizationId])
   @@index([teamId])
+  @@ignore
 }
 
 // The Instant Evals judge's copy of each project's organization, folded from project's

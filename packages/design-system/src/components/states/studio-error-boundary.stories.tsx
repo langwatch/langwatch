@@ -14,7 +14,12 @@ function CrashingWithCode(): never {
 }
 
 const meta = {
-  title: "Patterns/Studio error boundary",
+  title: "Feedback/Studio error boundary",
+  parameters: {
+    usage: {
+      use: "Private to Studio drawer and Studio dialog: what a render-time crash inside them shows.",
+    },
+  },
   component: StudioIsolatedErrorBoundary,
   tags: ["autodocs"],
   args: { scope: "Node inspector" },

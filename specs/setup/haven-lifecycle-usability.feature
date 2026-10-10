@@ -1,5 +1,5 @@
 Feature: haven lifecycle usability
-  Day-to-day up/down/restart ergonomics: down never discards data, up on an
+  Day-to-day up/down/restart ergonomics: down keeps data unless --destroy, up on an
   already-running stack reconciles instead of refusing, one service can be
   bounced without tearing the stack down, and stale databases are reclaimed
   in the background instead of at teardown time. The full v2 surface is
@@ -9,17 +9,17 @@ Feature: haven lifecycle usability
     Given a worktree with a registered haven stack
 
   @unit
-  Scenario: Down keeps the databases, always
+  Scenario: Down keeps the databases unless it is told to destroy
     Given the stack's launcher is running
     When the developer runs "haven down"
     Then the launcher is stopped and the routes and registry entry are removed
     And the stack's ClickHouse and Postgres databases still exist
-    And no flag on down can drop them — fresh data is "haven db reset"
+    And only "haven down --destroy" drops them (see haven-cli-surface.feature) — fresh data in place is "haven db reset"
 
   @unit
-  Scenario: Down -f kills hard
+  Scenario: Down --force kills hard
     Given the stack's launcher is running
-    When the developer runs "haven down -f"
+    When the developer runs "haven down --force"
     Then the launcher's process group is SIGKILLed with no graceful wait
     And the databases still exist
 
@@ -38,7 +38,7 @@ Feature: haven lifecycle usability
     When the developer runs "haven up" in the same worktree
     Then a matching selection is a friendly no-op and the stack is left in place
     And a changed selection replaces the stack in place with the new one
-    And "haven up -f" restarts even a matching stack
+    And "haven up --force" restarts even a matching stack
     And there is never a refusal
 
   @unit
@@ -90,7 +90,7 @@ Feature: haven lifecycle usability
     Then arrow keys, tab, or a digit switch between "all" and each service's own log
     And the lines are coloured by service with warnings and errors highlighted
 
-  # Tab one of the attached view (haven up and haven play alike) is a live
+  # Tab one of the attached view (haven up and haven pr --throwaway alike) is a live
   # session dashboard, not a log stream: an ASCII harbour, the stack's status,
   # and per-service actions. The log groups follow it. Behaviour is in
   # app/session.go (the cheap live snapshot) and cmd/upviewer.go (the dashboard
@@ -160,14 +160,14 @@ Feature: haven lifecycle usability
   Scenario: A detached up logs the same as an attached one
     When the developer runs "haven up --detach"
     Then the stack starts in the background
-    And "haven logs -t" follows it exactly as it would an attached stack
+    And "haven logs -f" follows it exactly as it would an attached stack
     And the detach flag itself is never passed to the backgrounded child
     And "haven down" stops it
 
   # Bound by app/switch_test.go.
   @unit
   Scenario: Switching to a worktree by name
-    Given shell integration from "haven shell-init" is installed
+    Given shell integration from "haven self shell-init" is installed
     When the developer runs "haven switch" with a unique name prefix
     Then the shell changes directory to that worktree
     And a prefix matching several worktrees names them all rather than picking one

@@ -74,7 +74,7 @@ export function AssignDepartmentDialog({
       }}
       size="sm"
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Assign department</Dialog.Title>
         </Dialog.Header>

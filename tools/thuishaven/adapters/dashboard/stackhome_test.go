@@ -183,7 +183,7 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 		want := map[string]string{
 			"app": statusLive, "api": statusLive, "worker": statusStarting, "gateway": statusStarting,
 			"nlp": statusStarting, "langyagent": statusNotSelected, "idp": statusLive, "mail": statusStarting,
-			"design-system": statusNotSelected, "mail-room": statusNotSelected, "langevals": statusNotSelected, "storage": statusNotSelected, "voice": statusNotSelected, "llm": statusNotSelected, "analytics": statusNotSelected, "telemetry": statusNotSelected, "outbound": statusNotSelected, "payment": statusNotSelected, "observability": statusDown,
+			"design-system": statusNotSelected, "mail-room": statusNotSelected, "langevals": statusNotSelected, "storage": statusNotSelected, "voice": statusNotSelected, "llm": statusNotSelected, "analytics": statusNotSelected, "telemetry": statusNotSelected, "outbound": statusNotSelected, "payment": statusNotSelected, "lambda": statusNotSelected, "observability": statusDown,
 		}
 		got := map[string]string{}
 		var order []string
@@ -267,7 +267,8 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 func TestStackHomeJSONFieldNames(t *testing.T) {
 	f := newHomeFixture(t)
 	body := decode[map[string]any](t, f.get("feat-x.langwatch.localhost", "/api/stacks/feat-x"))
-	pinKeys(t, "stack home", body, "slug", "registered", "live", "hubUrl", "homeUrl", "facts", "surfaces", "errors", "credentials", "actions", "belowFloor")
+	pinKeys(t, "stack home", body, "slug", "registered", "live", "hubUrl", "homeUrl", "facts", "surfaces", "errors", "credentials", "actions", "belowFloor", "seed")
+	pinKeys(t, "seed", body["seed"], "canSeed", "sizes", "personas", "status", "log")
 	facts := body["facts"].(map[string]any)
 	pinKeys(t, "facts", facts, "branch", "worktreeDir", "layout", "baseline", "uptimeSeconds", "rssBytes", "heartbeatAt", "databases")
 	databases := facts["databases"].(map[string]any)

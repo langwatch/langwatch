@@ -1,11 +1,11 @@
 /**
  * The `/api/experiments` family on a runtime that stands in for the process:
- * one project door, the credential fact its create is attributed through, and
+ * one project door, the credential context its create is attributed through, and
  * the flat legacy envelope this family publishes.
  */
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   ForbiddenError,
   UnauthorizedError,
@@ -85,9 +85,9 @@ export function mountExperimentRest(
   const hono = runtime.mount(experimentRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(experimentRestCredential, (c) => {
-        const userId = callerOf(c.req.raw);
+    middlewareContext: [
+      bindMiddlewareContext(experimentRestCredential, (request) => {
+        const userId = callerOf(request);
 
         return userId === null
           ? { kind: "legacyProjectKey" as const }

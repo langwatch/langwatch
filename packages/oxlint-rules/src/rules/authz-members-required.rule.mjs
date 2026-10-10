@@ -1,7 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
 // Authorization fails closed (ARCHITECTURE.md §8): a question a port may leave unanswered is a
-// check the door may skip. Data members (declaration options, caller facts) are not questions.
+// check the door may skip. Data members (declaration options, caller context) are not questions.
 
 const GOVERNED = /^packages\/api\/src\/(?:access\/.+|hosting\/api-door)\.ts$/;
 
@@ -75,7 +75,7 @@ export const authzMembersRequiredRule = defineRule({
     optionalMember: {
       what: "`{{name}}` is an optional question on an exported authorization type.",
       why: "Authorization fails closed: a question a process may leave unanswered is a check the door may skip.",
-      fix: "Make `{{name}}` required (drop `?` and `| undefined`) and supply it at every call site.",
+      fix: "Make `{{name}}` required (drop `?` and `| undefined`) and supply it at every call site. Read the `api-transports` skill.",
     },
   },
   create(context) {

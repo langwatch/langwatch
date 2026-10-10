@@ -1,11 +1,6 @@
 /** The long-poll connect family answers main's relay bodies, byte for byte (ADR-129, §8). */
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
-import {
-  BearerIdentity,
-  bindRestCredential,
-  RestHost,
-  SessionKeyIdentity,
-} from "@langwatch/api/rest";
+import { BearerIdentity, bindRestCredential, RestHost } from "@langwatch/api/rest";
 import {
   type LangyApi,
   type LangyControlRegistered,
@@ -22,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   langyLocalControlConnectDatedRests,
   langyLocalControlConnectRest,
+  localControlSessionKeyDoor,
 } from "../langy-local-control-connect.rest.ts";
 
 const LIVE_KEY = "sk-lw-session-live";
@@ -95,19 +91,16 @@ function family(router = langyLocalControlConnectRest, mount = "") {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => {} },
   });
-  const door = SessionKeyIdentity.create({
-    instanceTokenHeader: INSTANCE_TOKEN_HEADER,
-    verify: (presented) => app.verifyLocalControlSessionKey(presented),
-  });
   host.mount(router.router(), () => app, {
-    facts: [bindRestCredential("session_key", () => door)],
+    middlewareBindings: [
+      bindRestCredential("session_key", () => localControlSessionKeyDoor.open(app)),
+    ],
   });
   const request = (path: string, init: RequestInit = {}) =>
     host.app.request(`http://api.test/api/v1/langy/control${mount}/connect${path}`, init);

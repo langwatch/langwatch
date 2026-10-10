@@ -16,6 +16,9 @@ type Checkpoint struct {
 	Acked    []int64        `json:"acked,omitempty"`
 	Refs     Refs           `json:"refs"`
 	Counters map[string]int `json:"counters"`
+	// Existing are the project refs this run found already made: their telemetry was sent by the
+	// run that made them, so this one sends none.
+	Existing []string `json:"existing,omitempty"`
 }
 
 // NewCheckpoint starts an empty checkpoint for a run; known holds refs bound before the run

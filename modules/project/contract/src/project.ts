@@ -129,6 +129,17 @@ export const updateProjectInputSchema = z
   .strict();
 export type UpdateProjectInput = z.infer<typeof updateProjectInputSchema>;
 
+export const setTraceSharingInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    enabled: z.boolean(),
+    /** Only read when switching off: false keeps the links paused until sharing returns. */
+    revokeExistingLinks: z.boolean(),
+    by: z.object({ id: z.string().min(1) }),
+  })
+  .strict();
+export type SetTraceSharingInput = z.infer<typeof setTraceSharingInputSchema>;
+
 export const createProjectInputSchema = z
   .object({
     id: z.string().min(1),

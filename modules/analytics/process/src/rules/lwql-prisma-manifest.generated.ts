@@ -289,6 +289,7 @@ export interface LwqlPrismaRows {
     readonly resolvedByType: "String?";
     readonly resolvedById: "String?";
     readonly withdrawalCause: "String?";
+    readonly connectionId: "String?";
     readonly occurredAt: "DateTime";
     readonly lastEventId: "String";
     readonly acceptedAt: "DateTime";
@@ -1317,25 +1318,6 @@ export interface LwqlPrismaRows {
     readonly personalOnly: "Boolean";
     readonly config: "Json";
     readonly createdAt: "DateTime";
-    readonly updatedAt: "DateTime";
-  };
-  readonly DataPrivacyProjectScope: {
-    readonly projectId: "String";
-    readonly organizationId: "String";
-    readonly teamId: "String?";
-    readonly isPersonal: "Boolean?";
-    readonly departmentId: "String?";
-    readonly teamRecordedAt: "DateTime?";
-    readonly departmentRecordedAt: "DateTime?";
-    readonly archivedAt: "DateTime?";
-    readonly updatedAt: "DateTime";
-  };
-  readonly DataRetentionProjectScope: {
-    readonly projectId: "String";
-    readonly organizationId: "String";
-    readonly teamId: "String?";
-    readonly teamRecordedAt: "DateTime?";
-    readonly archivedAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
   readonly InstantEvalJudgeProject: {

@@ -81,6 +81,14 @@
       }
     },
     "redisKeysByPrefix": { "type": "object", "additionalProperties": { "type": "integer" } },
+    "redisTopPrefixes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["prefix", "keys", "bytes"],
+        "properties": { "prefix": { "type": "string" }, "keys": { "type": "integer" }, "bytes": { "type": "integer" } }
+      }
+    },
     "objectCount": { "type": "integer" },
     "expect": {
       "type": "object",

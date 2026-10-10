@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import {
   type Trace,
   TraceViewerService,
@@ -23,6 +25,8 @@ import type { TraceViewerProtectionService } from "./trace-viewer-protection.ser
 export interface TraceLegacyRead {
   /** One trace with its spans, or undefined when the project holds no such trace. */
   findById(params: {
+    /** The own-only proof the store read goes through. */
+    authorization: Authorization;
     projectId: string;
     traceId: string;
     protections: unknown;
@@ -33,13 +37,17 @@ export interface TraceLegacyRead {
   getAllTracesForProject(
     input: TraceLegacyListInput,
     protections: unknown,
-    options?: {
+    options: {
       downloadMode?: boolean;
       includeSpans?: boolean;
       resolveBlobs?: boolean;
       scrollId?: string | null;
       /** The v1 REST search's compiled query-language filter, ANDed into the read. */
       filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
+      authorization?: Authorization;
+      /** The own-only proof the span, evaluation and event reads go through. */
+      ownRead: Authorization;
     },
   ): Promise<TracesForProjectResult>;
 
@@ -55,6 +63,8 @@ export interface TraceLegacyRead {
    * storage included.
    */
   getTracesWithSpans(params: {
+    /** The own-only proof the store read goes through. */
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
     protections: unknown;
@@ -64,6 +74,8 @@ export interface TraceLegacyRead {
 
   /** Every trace in one conversation. */
   getTracesByThreadId(params: {
+    /** The own-only proof the store read goes through. */
+    authorization: Authorization;
     projectId: string;
     threadId: string;
     protections: unknown;
@@ -72,6 +84,8 @@ export interface TraceLegacyRead {
 
   /** Every trace in each of several conversations. */
   getTracesWithSpansByThreadIds(params: {
+    /** The own-only proof the store read goes through. */
+    authorization: Authorization;
     projectId: string;
     threadIds: string[];
     protections: unknown;
@@ -109,6 +123,8 @@ export interface TraceLegacyRead {
 type TraceViewerServiceOptions = Readonly<{
   read: TraceLegacyRead;
   protections: Pick<TraceViewerProtectionService, "resolve">;
+  /** Mints the own-only proof the viewer's store read goes through. */
+  authorize: FoldReadAuthorizer;
 }>;
 
 /**
@@ -133,6 +149,10 @@ export class TraceViewerReadService extends TraceViewerService {
     });
 
     return this.options.read.getTracesWithSpans({
+      authorization: await this.options.authorize({
+        projectId: input.projectId,
+        purpose: { kind: "operator", entry: "TraceViewerReadService.readForViewer" },
+      }),
       projectId: input.projectId,
       traceIds: [...input.traceIds],
       protections,

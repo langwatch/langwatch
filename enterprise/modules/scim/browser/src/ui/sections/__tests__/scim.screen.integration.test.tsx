@@ -549,7 +549,7 @@ describe("given a reader who may see single sign-on but not manage it", () => {
     expect(await screen.findByText("Your directory added a person")).toBeTruthy();
     expect(screen.queryByTestId("scim-generate-open")).toBeNull();
     expect(screen.queryByTestId("scim-token-revoke")).toBeNull();
-    expect(screen.queryByText("Access Restricted")).toBeNull();
+    expect(screen.queryByText(/You need access to/)).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -568,7 +568,7 @@ describe("given a reader without sso:view", () => {
   it("says which permission the page needs and shows none of it", () => {
     renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["sso:view"] }));
 
-    expect(screen.getByText(/required permission: sso:view/i)).toBeTruthy();
+    expect(screen.getByText("sso:view")).toBeTruthy();
     expect(screen.queryByText("Provisioning tokens")).toBeNull();
   });
 });

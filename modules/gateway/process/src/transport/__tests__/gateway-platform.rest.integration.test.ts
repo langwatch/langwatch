@@ -6,7 +6,7 @@
 
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   type IdempotentRunner,
   type RestPermissionReach,
@@ -62,8 +62,8 @@ const callerOf: Pick<GatewayApi, "actorForCredential" | "getVirtualKeyCaller"> =
   }),
 };
 
-function credentialFact(credential: GatewayRequestCredential = scopedKey) {
-  return bindRestMiddleware(gatewayRestCredential, () => credential);
+function credentialContext(credential: GatewayRequestCredential = scopedKey) {
+  return bindMiddlewareContext(gatewayRestCredential, () => credential);
 }
 
 const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
@@ -142,9 +142,9 @@ function fakeKeyDoor({
 }
 
 /**
- * The family behind both of its doors: project-door routes see the caller's
- * project, key-door routes (virtual keys and the organization-owned rows) the
- * organization, and each fact the declaration names is bound as the process binds it.
+ * The family behind both of its doors: project-door routes see the caller's project,
+ * key-door routes (virtual keys, organization-owned rows) the organization, and each
+ * middleware context the declaration names is bound as the module provides it.
  */
 function mountFamily({
   app,
@@ -177,10 +177,10 @@ function mountFamily({
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayKeyCaller, () => keyCaller),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => virtualKeyCaller),
-      credentialFact(credential),
+    middlewareContext: [
+      bindMiddlewareContext(gatewayKeyCaller, () => keyCaller),
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => virtualKeyCaller),
+      credentialContext(credential),
     ],
   });
 }
@@ -491,7 +491,7 @@ const budgetBody = {
   limit_usd: "25.50",
 };
 
-/** Mounts the family as the doors hand a caller over: the key caller and the credential fact. */
+/** Mounts the family as the doors hand a caller over: the key caller and the credential context. */
 function mountAs({
   app,
   credential,

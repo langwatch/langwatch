@@ -42,6 +42,8 @@ function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
     targetId: "vk_abcdefghijklmnopqrstuvwxyz",
     before: null,
     after: { rateLimit: "500/m" },
+    actorUserId: null,
+    actorUser: null,
     ...overrides,
   };
 }

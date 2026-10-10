@@ -27,6 +27,10 @@ type Actions struct {
 	// ResetDatabases runs `haven db reset --yes` for it. Both return once spawned.
 	StartService   func(slug, service string) error
 	ResetDatabases func(slug string) error
+	// Seed runs `haven db seed --size <size> --persona <persona>` for a stack and
+	// returns once spawned; SeedReport is its status line and log tail.
+	Seed       func(slug, size, persona string) error
+	SeedReport func(slug string) (string, []string)
 	// StartKeeper starts a provisioned stack's keeper for the `haven up` that
 	// asks, and returns once the keeper holds the stack's record.
 	StartKeeper func(ctx context.Context, slug string) error
@@ -143,7 +147,7 @@ func (s *Server) handleDown(w http.ResponseWriter, r *http.Request) {
 	writeActionResult(w, "stopped "+slug, s.config.Actions.Down(r.Context(), slug))
 }
 
-// handleDestroy stops a stack and drops its databases: `haven destroy <slug>`.
+// handleDestroy stops a stack and drops its databases: `haven down --destroy --stack <slug>`.
 // The body must repeat the slug, the same typed confirmation the hub asks for,
 // so a stray POST at the route cannot take data away.
 func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +225,33 @@ func (s *Server) handleResetDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeActionResult(w, "resetting "+slug+"'s databases: migrating and seeding them fresh", s.config.Actions.ResetDatabases(slug))
+}
+
+// handleSeed is the seed console's start: `haven db seed` at the chosen size and
+// persona. seedgen validates both before anything is spawned.
+func (s *Server) handleSeed(w http.ResponseWriter, r *http.Request) {
+	if !guardAction(w, r) {
+		return
+	}
+	if s.config.Actions.Seed == nil {
+		http.Error(w, "this haven cannot seed a stack", http.StatusNotImplemented)
+		return
+	}
+	slug := r.PathValue("slug")
+	if !s.knownLogStack(slug) {
+		http.Error(w, "unknown stack", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Size    string `json:"size"`
+		Persona string `json:"persona"`
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxActionBody))
+	if err != nil || json.Unmarshal(body, &req) != nil || req.Size == "" || req.Persona == "" {
+		http.Error(w, "send a size and a persona", http.StatusBadRequest)
+		return
+	}
+	writeActionResult(w, "seeding "+slug+" at the "+req.Size+" size", s.config.Actions.Seed(slug, req.Size, req.Persona))
 }
 
 // handleStartKeeper is the hand-over `haven up` asks for (ruling D-S4c-1). The

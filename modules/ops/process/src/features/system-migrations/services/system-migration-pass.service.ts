@@ -10,6 +10,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { type TenantMigrationStep, tenantAxisSchema } from "@langwatch/upgrade/step";
 import type {
+  TenantStepBucket,
   TenantStepSettleService,
   TenantStepSettleState,
 } from "@langwatch/upgrade/step/tenant-state";
@@ -92,6 +93,8 @@ export class SystemMigrationPassService {
   }
 
   readonly #cohorts: SystemMigrationPassCohortService;
+  /** Declared tenant steps this process's last pass left pending; each wakes another pass. */
+  #pendingDeclaredSteps: readonly string[] = [];
 
   private constructor(private readonly options: SystemMigrationPassOptions) {
     this.#cohorts = SystemMigrationPassCohortService.create({
@@ -153,7 +156,7 @@ export class SystemMigrationPassService {
       user: userTenants,
     };
     let merged = summary;
-    const driven: string[] = [];
+    const driven: TenantStepBucket[] = [];
     for (const axis of tenantAxisSchema.options) {
       const steps = declared.steps().filter((step) => step.tenants === axis);
       const migrations = this.released({
@@ -161,7 +164,6 @@ export class SystemMigrationPassService {
         isSaaS,
       });
       if (migrations.length === 0) continue;
-      driven.push(...migrations.map((migration) => migration.name));
       const cohort = await this.#cohorts.declared({ axis, isSaaS, migrations });
       for (const bucket of groupByTenantSource({ migrations, everyTenant: sources[axis] })) {
         const runner = new SystemMigrationRunnerService({
@@ -173,9 +175,10 @@ export class SystemMigrationPassService {
           migrations: bucket.migrations,
         });
         merged = mergeSummaries(merged, await runner.runPass({ signal }));
+        driven.push({ ids: bucket.migrations.map((migration) => migration.name), runner });
       }
     }
-    await declared.settle.settle({ ids: driven });
+    this.#pendingDeclaredSteps = await declared.settle.settle({ buckets: driven });
     return merged;
   }
 
@@ -260,6 +263,7 @@ export class SystemMigrationPassService {
   private async hasDeclaredStepAwaitingPass({ isSaaS }: { isSaaS: boolean }): Promise<boolean> {
     const declared = this.options.declared;
     if (!declared) return false;
+    if (this.#pendingDeclaredSteps.length > 0) return true;
     const steps = this.released({
       migrations: declared.steps().map((step) => ({ ...step, name: step.id })),
       isSaaS,

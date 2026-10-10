@@ -19,6 +19,7 @@ import { useDebounce } from "use-debounce";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { ruleVerdict } from "../../model/regex-rule.ts";
 import { exactModelMatchRegex, isSafeRegex } from "../../model/safe-regex.ts";
 import {
   LLMModelCostMatchingSpans,
@@ -116,6 +117,12 @@ function reportCostFailure({
   });
 }
 
+function drawerTitle({ id, cloneModel }: { id?: string; cloneModel?: string }) {
+  if (id) return "Edit LLM Model Cost";
+  if (cloneModel) return `Override cost for ${cloneModel}`;
+  return "Add LLM Model Cost";
+}
+
 export function LLMModelCostDrawer({
   id,
   cloneModel,
@@ -144,7 +151,7 @@ export function LLMModelCostDrawer({
     <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading>{id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}</Heading>
+          <Heading>{drawerTitle({ id, cloneModel })}</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -231,6 +238,10 @@ function LLMModelCostForm({
     cacheCreationCostPerToken: finiteOrUndefined(debouncedValues.cacheCreationCostPerToken),
     cacheCreation1hCostPerToken: finiteOrUndefined(debouncedValues.cacheCreation1hCostPerToken),
   };
+
+  const [sample, setSample] = useState("");
+  const liveRegex = liveValues.regex ?? "";
+  const verdict = ruleVerdict({ regex: liveRegex, model: sample });
 
   const savedVerb = id ? "updated" : "created";
 
@@ -325,6 +336,27 @@ function LLMModelCostForm({
             />
           </InputGroup>
           <Field.ErrorText>{errors.regex?.message}</Field.ErrorText>
+        </HorizontalFormControl>
+        <HorizontalFormControl
+          label="Try it"
+          helper="Type a model string to see whether this rule matches it"
+          invalid={!!liveRegex && verdict === "invalid"}
+        >
+          <Input
+            aria-label="Sample model string"
+            fontFamily="mono"
+            placeholder="openai/gpt-5.5"
+            value={sample}
+            onChange={(event) => setSample(event.target.value)}
+          />
+          {!!liveRegex && verdict === "invalid" && (
+            <Field.ErrorText>Please enter a valid regular expression</Field.ErrorText>
+          )}
+          {!!liveRegex && !!sample && verdict !== "invalid" && (
+            <Text as="output" fontSize="sm" color={verdict === "match" ? "green.fg" : "fg.muted"}>
+              {verdict === "match" ? "Match" : "No match"}
+            </Text>
+          )}
         </HorizontalFormControl>
         <LLMModelCostMatchingSpans
           input={previewInput}

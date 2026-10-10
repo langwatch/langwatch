@@ -7,7 +7,8 @@ import {
   badRequestSchema,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -112,7 +113,11 @@ function firePageWire(page: TriggerFirePage): AutomationRestFirePage {
 export function createAutomationRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<AutomationApi>;
+  router: () => RestTransportDeclaration<
+    AutomationApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
 }> {
   return (
     defineRestRouter(AutomationApi)
@@ -127,7 +132,7 @@ export function createAutomationRest(): Readonly<{
         description:
           "List the project's automations, newest first. Paused automations are included.",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, scope }, project) => {
         logger.info({ projectId: scope.id }, "Listing triggers");
         const triggers = await app.listAutomations({ projectId: scope.id });
@@ -141,7 +146,7 @@ export function createAutomationRest(): Readonly<{
       .withPermission("triggers:view")
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({ tags: ["Triggers"], description: "Get a trigger by its ID" })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => {
         logger.info({ projectId: scope.id, triggerId: input.triggerId }, "Getting trigger");
         const trigger = await app.getPublicTrigger({
@@ -191,7 +196,7 @@ export function createAutomationRest(): Readonly<{
           "`report` for a scheduled report, or conditions for a trace automation. The delivery " +
           "channel is fixed at creation.",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope, actor }, project) => {
         logger.info({ projectId: scope.id }, "Creating trigger");
         const trigger = await app.createPublicTrigger({
@@ -215,7 +220,7 @@ export function createAutomationRest(): Readonly<{
           "except `actionParams`, which replaces the delivery configuration as a whole. The " +
           "delivery channel and an alert's graph cannot be changed.",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope, actor }, project) => {
         const { triggerId, ...body } = input;
         logger.info({ projectId: scope.id, triggerId }, "Updating trigger");
@@ -243,7 +248,7 @@ export function createAutomationRest(): Readonly<{
         description:
           "Resume a paused automation. A report goes back on its schedule; the pause record is cleared.",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => ({
         status: 200 as const,
         body: automationWire({
@@ -266,7 +271,7 @@ export function createAutomationRest(): Readonly<{
         tags: ["Triggers"],
         description: "Pause an automation. A report stops claiming its schedule.",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => ({
         status: 200 as const,
         body: automationWire({

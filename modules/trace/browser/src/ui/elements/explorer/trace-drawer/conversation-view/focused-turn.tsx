@@ -54,7 +54,9 @@ export function useFocusedTurnBlink(focusTraceId: string | undefined): boolean {
  * rather than against its edges. Taken straight back out as margin: a turn put
  * under review must not push the turns around it out of place.
  */
-const TINT_BLEED_PX = 6;
+const TINT_BLEED_X_PX = 12;
+/** Vertically the bleed stops at the thread's own gap, so it never tints the next turn. */
+const TINT_BLEED_Y_PX = 8;
 
 /**
  * The turn under review, told apart from the rest of the thread.
@@ -74,8 +76,8 @@ export function FocusedTurnFrame({
       data-focused-turn="true"
       bg={TINT_RESTING}
       borderRadius="lg"
-      padding={`${TINT_BLEED_PX}px`}
-      margin={`-${TINT_BLEED_PX}px`}
+      padding={`${TINT_BLEED_Y_PX}px ${TINT_BLEED_X_PX}px`}
+      margin={`-${TINT_BLEED_Y_PX}px -${TINT_BLEED_X_PX}px`}
       animation={isBlinking ? `tracesFocusedTurnBlink ${BLINK_MS}ms ease-in-out` : undefined}
     >
       <style>{BLINK_KEYFRAMES}</style>

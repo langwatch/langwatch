@@ -1,10 +1,9 @@
+import { CONTRACT_BUDGET_EXTERNAL_ID } from "@langwatch/enterprise-connect-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { z } from "zod";
 
 import type { ContractBudget, ContractBudgetStore } from "./contract-budget.service.ts";
 
-/** Addresses the contract budget within its organization. */
-export const CONTRACT_BUDGET_EXTERNAL_ID = "connect-contract";
 const CAP_SET_BY = "connect_cap_set_by";
 const CENTS = 100;
 

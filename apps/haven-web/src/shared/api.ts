@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import {
   actionAnswerSchema,
+  cliReadSchema,
   notFoundSchema,
   revealedKeySchema,
   stackHomeSchema,
@@ -114,9 +115,45 @@ export const startServicePath = ({ slug, service }: { slug: string; service: str
 export const resetDatabasesPath = ({ slug }: { slug: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/reset-databases`;
 
+export const seedPath = ({ slug }: { slug: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/seed`;
+
 export const LIMITS_PATH = "/api/limits";
 
 export const limitPath = ({ name }: { name: string }) =>
   `${LIMITS_PATH}/${encodeURIComponent(name)}`;
 
 export const START_PATH = "/api/worktrees/start";
+
+/** One `haven <name> --json` read for a stack, as the daemon answers it. */
+export const getCliRead = async <Rows>({
+  slug,
+  name,
+  rows,
+  signal,
+}: {
+  slug: string;
+  name: string;
+  rows: z.ZodType<Rows>;
+  signal?: AbortSignal;
+}): Promise<Rows> => {
+  const answer = await getJson({
+    path: `/api/stacks/${encodeURIComponent(slug)}/cli/${encodeURIComponent(name)}`,
+    schema: cliReadSchema({ rows }),
+    signal,
+  });
+  return answer.rows;
+};
+
+export const resolveFeedbackPath = ({ slug, id }: { slug: string; id: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/feedback/${encodeURIComponent(id)}/resolve`;
+
+export const browserLanePath = ({
+  slug,
+  lane,
+  view,
+}: {
+  slug: string;
+  lane: string;
+  view: "snapshot" | "screenshot";
+}) => `/api/stacks/${encodeURIComponent(slug)}/browser/${encodeURIComponent(lane)}/${view}`;

@@ -313,7 +313,7 @@ func captureStderr(t *testing.T, body func()) string {
 }
 
 // captureStdout runs body with os.Stdout swapped for a pipe and returns what
-// was written - `haven slot explain` prints its answer there, the same place a
+// was written - `haven machine slot explain` prints its answer there, the same place a
 // person reads it.
 func captureStdout(t *testing.T, body func()) string {
 	t.Helper()
@@ -339,7 +339,7 @@ func TestSlotExplainPrintsTheUnitTestWidthAndItsSource(t *testing.T) {
 	t.Run("given HAVEN_TEST_WORKERS is set, the way HAVEN_TYPECHECK_SLOTS is", func(t *testing.T) {
 		t.Setenv("HAVEN_TEST_WORKERS", "6")
 
-		t.Run("when haven slot explain runs", func(t *testing.T) {
+		t.Run("when haven machine slot explain runs", func(t *testing.T) {
 			out := captureStdout(t, func() {
 				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
 					t.Fatal(err)
@@ -357,7 +357,7 @@ func TestSlotExplainPrintsTheUnitTestWidthAndItsSource(t *testing.T) {
 	t.Run("given HAVEN_TEST_WORKERS is unset", func(t *testing.T) {
 		t.Setenv("HAVEN_TEST_WORKERS", "")
 
-		t.Run("when haven slot explain runs", func(t *testing.T) {
+		t.Run("when haven machine slot explain runs", func(t *testing.T) {
 			out := captureStdout(t, func() {
 				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
 					t.Fatal(err)
@@ -373,7 +373,7 @@ func TestSlotExplainPrintsTheUnitTestWidthAndItsSource(t *testing.T) {
 	})
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestExplainWaitersPrintsClassAgeAndEffectivePriority(t *testing.T) {
 	store := fileregistry.New(t.TempDir())
 
@@ -535,7 +535,7 @@ func TestSlotHeartbeatRepeatsPositionAndNamesHolders(t *testing.T) {
 // always answers with a fixed, caller-supplied list of other waiters - what
 // lets shouldYieldToHigherPriority be tested as the pure decision it is,
 // without racing two goroutines that share this test's own pid (a real
-// `haven slot run` is always a separate OS process, so the production code
+// `haven machine slot run` is always a separate OS process, so the production code
 // keys a claim by pid; two slotJobs in one test process would collide on
 // that same key, which is a test artifact this fake sidesteps entirely).
 type fakeWaiterRegistry struct{ snapshots []fileregistry.WaiterSnapshot }
@@ -568,7 +568,7 @@ func TestSlotJobYieldsToAHigherPriorityWaiter(t *testing.T) {
 	}
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestSlotJobDoesNotYieldToALowerPriorityWaiter(t *testing.T) {
 	job := &slotJob{
 		caller:   domain.Interactive,
@@ -590,7 +590,7 @@ func TestSlotJobNeverYieldsWithNoRegistryWired(t *testing.T) {
 	}
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestSlotJobExcludesItsOwnRegistrationFromOthers(t *testing.T) {
 	job := &slotJob{
 		caller:   domain.Interactive,
@@ -663,8 +663,8 @@ func TestHeldByQueueAncestor(t *testing.T) {
 func TestIsQueueCommand(t *testing.T) {
 	accepted := []string{
 		"node /repo/dev/scripts/check-queue.mjs pnpm typecheck",
-		"haven slot run --label typecheck -- pnpm typecheck",
-		"/Users/someone/go/bin/haven typecheck",
+		"haven machine slot run --label typecheck -- pnpm typecheck",
+		"/Users/someone/go/bin/haven machine typecheck",
 		"/var/folders/T/go-build/b001/haven.test -test.run TestX",
 	}
 	for _, command := range accepted {

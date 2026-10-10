@@ -1,17 +1,21 @@
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /**
  * @vitest-environment node
  * Real Postgres: routingMode's implicit null-fallback made explicit; NONE is the new default.
  * Spec: specs/ai-gateway/fallback.feature
  */
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+
+// Replaying the shipped backfill, narrowed to this test's synthetic rows.
+const REPLAY = skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql;
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
@@ -192,7 +196,7 @@ describe.skipIf(!databaseUrl)(
             // VirtualKey in the shared test database until the rollback,
             // blocking any concurrently running suite.
             await tx.$executeRawUnsafe(
-              `-- @tenancy: replaying the shipped backfill, narrowed to this test's synthetic rows\n${statement} AND "id" IN ('${legacyNullPolicyId}', '${legacyPolicyId}')`,
+              `${REPLAY}\n${statement} AND "id" IN ('${legacyNullPolicyId}', '${legacyPolicyId}')`,
             );
           }
 

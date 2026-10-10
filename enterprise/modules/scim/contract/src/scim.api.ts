@@ -25,6 +25,8 @@ import type {
   ConnectionReconciliation,
   OrganizationReconciliation,
   ScimDirectoryActivityEntry,
+  ScimDirectoryMember,
+  ScimDirectoryMembersInput,
   ScimReconciliationScope,
 } from "./scim-reconciliation.ts";
 import type { ScimConnectionRequestsInput, ScimRequestEntry } from "./scim-request-log.ts";
@@ -137,7 +139,8 @@ export interface ScimApi {
    * connection can no longer write through single sign-on.
    */
   authenticateDirectory(input: {
-    authorization: string | null;
+    /** The bearer the framework pulled off the request, null when none was presented. */
+    bearer: string | null;
     /** What the provider asked for, so an attributable refusal can be filed
      *  against the connection it was meant for (ADR-126). A door that does
      *  not supply them refuses exactly as before and records nothing. */
@@ -178,6 +181,10 @@ export interface ScimApi {
   /** What one connection's directory did, newest first, in words (ADR-126).
    *  Scanned in this organization's tenant, so another's connection reads empty. */
   findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]>;
+
+  /** Which of these members this organization's directories created (port of main's
+   *  `directoryProvisioned`); built from the organization's own connections. */
+  findDirectoryMembers(input: ScimDirectoryMembersInput): Promise<ScimDirectoryMember[]>;
 
   // ── The platform operator's oversight (ADR-122) ─────────────────────────
   // Staff-list gated: anyone else is answered as if the surface did not exist.

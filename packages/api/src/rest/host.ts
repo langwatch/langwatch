@@ -1,8 +1,8 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
 import type { Authorize, Entitlements } from "../access/access.ts";
-import { SurfaceUnconfiguredError } from "../errors.ts";
 /**
  * Where every declared REST family mounts. Thin on purpose: it states which
  * credential answers which family and hands one application to the hosting.
@@ -21,17 +21,17 @@ import {
   routeScopesOf,
   type MountableRestApp,
 } from "./addressing.ts";
-import { CliTokenIdentity } from "./cli-token-identity.ts";
 import type {
   RestDoorCredential,
   RestSharedPath,
   RestTransportDeclaration,
 } from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
+import { withOtlpPathAliases } from "./otlp-path-alias.ts";
 import {
   isRestCredentialBinding,
   type RestDoor,
-  type RestTransportMiddlewareBinding,
+  type MiddlewareContextBinding,
 } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
@@ -44,18 +44,33 @@ const restDeprecationLog: RestDeprecationLog = {
 };
 import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
 import { assertEveryRouteDeclared } from "./security.ts";
-import { SessionKeyIdentity } from "./session-key-identity.ts";
 
-/** Every credential kind a family may name, except the three a module binds for itself. */
+/** Every credential kind a family may name, except the ones a module binds for itself. */
 export type RestIdentities = Readonly<
-  Record<Exclude<RestDoorCredential, "internal_secret" | "session_key" | "cli_token">, RestIdentity>
+  Record<
+    Exclude<
+      RestDoorCredential,
+      | "internal_secret"
+      | "scim_token"
+      | "session_key"
+      | "cli_token"
+      | "otlp_ingest"
+      | "licence_token"
+    >,
+    RestIdentity
+  >
 >;
 
 /**
  * Which bearer guards one internal family, by the family's own namespace. Absent, a family
- * naming `internal_secret` without binding its own door refuses every call.
+ * naming `internal_secret` without binding its own door refuses the boot.
  */
 export type RestFamilyBearers = (namespace: string) => RestIdentity;
+
+/** An upgrade in progress is an expected 503, so it warns; every other 5xx stays an error. */
+function restFailureLevel(error: unknown): "warn" | "error" {
+  return HandledError.isHandled(error) && error.code === "upgrade_in_progress" ? "warn" : "error";
+}
 
 export class RestHost implements FeatureRestHost<MountableRestApp> {
   static create(options: {
@@ -75,8 +90,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
      * answering uncounted.
      */
     rateLimiter?: RateLimiter | undefined;
-    /** What the process answers on behalf of a module, on every family at once. */
-    facts?: readonly RestTransportMiddlewareBinding[] | undefined;
+    /** Middleware context answered on every family at once: only the document build refuses it. */
+    middlewareContext?: readonly MiddlewareContextBinding[] | undefined;
     /** The plans a route declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
     /** The SAME decisions tRPC authorizes through: lineage, kind reads and route proofs. */
@@ -89,7 +104,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    * Each family carries its own absolute paths, so this is a route table
    * rather than a prefix scheme.
    */
-  readonly app = new Hono();
+  readonly app = withOtlpPathAliases(new Hono());
 
   /** Which module claims each prefixed namespace mounted so far. */
   private readonly claims = new Map<string, string>();
@@ -112,9 +127,14 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   ): MountableRestApp {
     const declaration = transport as RestTransportDeclaration<unknown>;
     this.claimNamespace(declaration);
-    const identities = this.identitiesFor(declaration);
+    const identities: Partial<Record<RestDoorCredential, RestDoor>> = {
+      ...this.options.identities,
+      ...(this.options.bearers
+        ? { internal_secret: this.options.bearers(declaration.namespace) }
+        : {}),
+    };
     const { authz } = this.options;
-    const bindings = options?.facts ?? [];
+    const bindings = options?.middlewareBindings ?? [];
     const credentials = new Set<RestDoorCredential>();
 
     for (const binding of bindings) {
@@ -128,10 +148,12 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       identities[binding.credential] = binding.resolveIdentity();
     }
 
+    assertDoorsBound({ declaration, identities });
+
     const family: MountableRestApp = createRestRuntime({
       identity: everyRoutePublic(declaration)
         ? publicIdentity()
-        : identities[declaration.credential as RestDoorCredential],
+        : (identities[declaration.credential] ?? publicIdentity()),
       doors: identities,
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
@@ -143,19 +165,21 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       app,
       onError: (error, context) => {
         const response = canonicalErrorResponse(error, context);
-        if (response.status >= 500) {
-          restErrorLogger.error(
+        // A client that went away mid-request aborts its own read: no answer reaches it, no fault.
+        const clientGone = context.req.raw.signal.aborted;
+        if (response.status >= 500 && !clientGone) {
+          restErrorLogger[restFailureLevel(error)](
             { error, method: context.req.method, path: context.req.path },
             "REST request failed",
           );
         }
         return response;
       },
-      facts: [
-        ...(this.options.facts ?? []),
+      middlewareContext: [
+        ...(this.options.middlewareContext ?? []),
         ...(bindings.filter(
           (binding) => !isRestCredentialBinding(binding),
-        ) as readonly RestTransportMiddlewareBinding[]),
+        ) as readonly MiddlewareContextBinding[]),
       ],
     });
 
@@ -207,19 +231,6 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     }
     this.prefixes.push(...claims);
     this.claims.set(declaration.namespace, serving);
-  }
-
-  private identitiesFor(
-    declaration: RestTransportDeclaration<unknown>,
-  ): Record<RestDoorCredential, RestDoor> {
-    return {
-      ...this.options.identities,
-      internal_secret:
-        this.options.bearers?.(declaration.namespace) ??
-        unboundInternalSecret(declaration.namespace),
-      session_key: SessionKeyIdentity.unbound(declaration.namespace),
-      cli_token: CliTokenIdentity.unbound(declaration.namespace),
-    };
   }
 }
 
@@ -277,12 +288,31 @@ function assertSharedPathAdmitted({
   }
 }
 
-function unboundInternalSecret(namespace: string): RestIdentity {
-  const refuse = (): never => {
-    throw new SurfaceUnconfiguredError(`${namespace} internal secret`);
-  };
+/**
+ * Every door a non-public route answers behind is bound before the family serves (Alex
+ * 2026-10-10 TYPED-DOORS): an unbound one refuses the boot by name, never a request.
+ */
+function assertDoorsBound({
+  declaration,
+  identities,
+}: {
+  declaration: RestTransportDeclaration<unknown>;
+  identities: Partial<Record<RestDoorCredential, RestDoor>>;
+}): void {
+  const unbound = new Set(
+    declaration.routes
+      .filter((route) => route.access?.kind !== "public")
+      .map((route) => route.credential ?? declaration.credential)
+      .filter((credential) => identities[credential] === void 0),
+  );
 
-  return { authenticate: refuse, identify: refuse };
+  if (unbound.size === 0) return;
+
+  throw new Error(
+    `REST ${declaration.namespace} of ${declaration.api.name} answers behind ` +
+      `${[...unbound].map((credential) => `"${credential}"`).join(", ")}, which nothing binds; ` +
+      "bind it with the module's .withDoors({ ... }) or supply it from the host",
+  );
 }
 
 /**

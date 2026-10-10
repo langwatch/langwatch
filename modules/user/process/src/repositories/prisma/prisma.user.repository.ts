@@ -1,7 +1,12 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import {
+  isUniqueConstraintError,
+  PrismaRepository,
+  skipTenantCheck,
+} from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
+  EmailAlreadyRegisteredError,
   userAccountInfoSchema,
   userFullProfileSchema,
   userProfileSchema,
@@ -140,7 +145,10 @@ export class PrismaUserRepository
   /** One clock for every server, so user's facts order however the servers' clocks drift. */
   async readClock(): Promise<Instant> {
     const [row] = await this.#database.$queryRaw<{ now: Date }[]>`
-      -- @tenancy: reads the database clock; no table is touched.
+      ${skipTenantCheck({
+        // Reads the database clock; no table is touched.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT now() AS "now"
     `;
     if (!row) throw new Error("The database answered no clock reading");
@@ -246,14 +254,20 @@ export class PrismaUserRepository
     return rows.map((row) => userProfileSchema.parse(row));
   }
 
+  /** A racing mint of the same address loses on the store's unique email and reads as taken. */
   async create(input: CreateUserInput): Promise<UserProfile> {
-    return this.transaction(async (transaction) => {
-      const user = userProfileSchema.parse(
-        await transaction.user.create({ data: input, select: userProfileSelect }),
-      );
-      await this.#appendMintFacts({ transaction, userId: user.id, createdAt: user.createdAt });
-      return user;
-    });
+    try {
+      return await this.transaction(async (transaction) => {
+        const user = userProfileSchema.parse(
+          await transaction.user.create({ data: input, select: userProfileSelect }),
+        );
+        await this.#appendMintFacts({ transaction, userId: user.id, createdAt: user.createdAt });
+        return user;
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) throw new EmailAlreadyRegisteredError();
+      throw error;
+    }
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {

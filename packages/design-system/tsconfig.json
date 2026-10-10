@@ -17,8 +17,6 @@
     ".storybook/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "stories/**/*.ts",
-    "stories/**/*.tsx",
     "tests/**/*.ts",
     "tests/**/*.tsx"
   ],

@@ -25,6 +25,7 @@ import {
 
 import { UiNavigation, UiRoute, type UiRouteReadingValues } from "./capabilities.ts";
 import { importChunkAgain } from "./chunk-refetch.ts";
+import { readUiStorage } from "./storage.ts";
 
 /**
  * A failure that never reached the server — not a refusal, not a bug. A
@@ -241,7 +242,7 @@ async function reloadIfDeployRemoved(err: unknown): Promise<boolean> {
       cache: "no-store",
       signal: AbortSignal.timeout(DEPLOY_PROBE_TIMEOUT_MS),
     });
-    return probe.status === 404 && forceReloadOnce();
+    return probe.status === 404 && reloadWhenIdle();
   } catch {
     return false;
   }
@@ -330,6 +331,53 @@ export async function warmChunk(load: () => Promise<unknown>): Promise<boolean> 
   }
 }
 
+/** A reload waits until nobody has touched the page this long; `haven-reload-idle-ms` overrides. */
+export const RELOAD_IDLE_MS = 60_000;
+export const RELOAD_IDLE_KEY = "haven-reload-idle-ms";
+const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+
+let lastInputAt = Number.NEGATIVE_INFINITY;
+let isTrackingInput = false;
+let idleReload: ReturnType<typeof setTimeout> | undefined;
+
+function trackInput(): void {
+  if (isTrackingInput) return;
+  isTrackingInput = true;
+  for (const type of INPUT_EVENTS) {
+    window.addEventListener(type, () => (lastInputAt = nowInstant().epochMilliseconds), {
+      capture: true,
+      passive: true,
+    });
+  }
+}
+
+/** A page a `haven up --ui=watch` stack served: its api port marks the head. */
+function isWatchModePage(): boolean {
+  return document.querySelector('meta[name="haven-ui-watch"]') !== null;
+}
+
+function reloadIdleMs(): number {
+  const override = Number(readUiStorage(RELOAD_IDLE_KEY));
+  return Number.isFinite(override) && override > 0 ? override : RELOAD_IDLE_MS;
+}
+
+/**
+ * Reloads now, except on a watch-mode page someone is using (recent input, not
+ * hidden): that one reloads once they stop. True when it reloaded now.
+ */
+export function reloadWhenIdle(): boolean {
+  if (typeof window === "undefined") return false;
+  trackInput();
+  const remainingMs = lastInputAt + reloadIdleMs() - nowInstant().epochMilliseconds;
+  if (!isWatchModePage() || document.hidden || remainingMs <= 0) return forceReloadOnce();
+  if (idleReload) clearTimeout(idleReload);
+  idleReload = setTimeout(() => {
+    idleReload = void 0;
+    reloadWhenIdle();
+  }, remainingMs);
+  return false;
+}
+
 /**
  * Vite reports a failed chunk here before it rejects. Never `preventDefault`: Vite then
  * RESOLVES the import with `undefined`, and the loader reads `.default` of nothing. A failure
@@ -337,6 +385,7 @@ export async function warmChunk(load: () => Promise<unknown>): Promise<boolean> 
  */
 export function registerChunkReloadListener(): void {
   if (typeof window === "undefined") return;
+  trackInput();
   window.addEventListener("vite:preloadError", (event) => {
     const payload = "payload" in event ? event.payload : void 0;
     // The loader's own catch runs in a microtask after this event, so look after it.
@@ -345,6 +394,33 @@ export function registerChunkReloadListener(): void {
       if (!owned) void reloadIfDeployRemoved(payload);
     }, 0);
   });
+}
+
+const ENTRY_SCRIPT = /<script\b[^>]*\bsrc="([^"]*\/assets\/[^"]+\.js)"/;
+
+/**
+ * A rebuild swapped in under an open page of a `haven up --ui=watch` stack: polls
+ * the served index for a new entry chunk, then reloads once the reader is idle.
+ * Any other page (production, built, a Vite server) does nothing.
+ */
+export function reloadOnBundleSwap({ pollMs = 5_000 }: { pollMs?: number } = {}): void {
+  if (typeof window === "undefined") return;
+  const entry = document
+    .querySelector('script[type="module"][src*="/assets/"]')
+    ?.getAttribute("src");
+  if (!entry || !isWatchModePage()) return;
+  trackInput();
+  const poll = setInterval(() => {
+    void fetch("/", { cache: "no-store" })
+      .then((answer) => (answer.ok ? answer.text() : ""))
+      .then((html) => {
+        const served = ENTRY_SCRIPT.exec(html)?.[1];
+        if (!served || served === entry) return;
+        clearInterval(poll);
+        reloadWhenIdle();
+      })
+      .catch(() => void 0);
+  }, pollMs);
 }
 
 /**

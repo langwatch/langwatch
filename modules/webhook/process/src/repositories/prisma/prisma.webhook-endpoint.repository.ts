@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 // SPDX-License-Identifier: Apache-2.0
 
 import { createLogger } from "@langwatch/observability";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   Prisma,
   type PrismaClient,
@@ -588,7 +589,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       FROM "WebhookEndpoint"
       WHERE "status" = 'ACTIVE'::"WebhookEndpointStatus"
         AND "archivedAt" IS NULL
-      -- @tenancy: webhook delivery sweep entry point (system-owned worker)
+      ${skipTenantCheck({
+        // Webhook delivery sweep entry point (system-owned worker)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return rows.map((r) => r.organizationId);
   }

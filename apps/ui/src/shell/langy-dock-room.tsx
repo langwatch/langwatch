@@ -4,6 +4,7 @@
  * content card, and the content row keeps the dock's room while it is open.
  */
 
+import { setDrawerEndInset } from "@langwatch/design-system/drawer";
 import { LANGY_SHELL_DOCK_INSET } from "@langwatch/langy-contract";
 import { useLayoutEffect, type ReactNode } from "react";
 
@@ -17,6 +18,12 @@ function LangyDockRoom({ render }: { render: (inset: number) => ReactNode }) {
     claimDockShell();
     return releaseDockShell;
   }, [claimDockShell, releaseDockShell]);
+  const dockedOpen = useLangyStore((store) => store.isOpen && store.panelMode === "sidebar");
+  // A drawer opens beside the docked panel, as on main: panel inset plus the drawer's own margin.
+  useLayoutEffect(() => {
+    setDrawerEndInset(dockedOpen ? LANGY_SHELL_DOCK_INSET + 8 : 0);
+    return () => setDrawerEndInset(0);
+  }, [dockedOpen]);
   return render(dockShifted ? LANGY_SHELL_DOCK_INSET : 0);
 }
 

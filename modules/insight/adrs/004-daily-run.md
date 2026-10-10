@@ -83,9 +83,10 @@ no push notification.
 
 - The module gains five peers: `LangyApi`, `DashboardApi`, `AuthzApi`, `UserApi` and
   `AnalyticsApi` (the validation door for a finding's query).
-- A run on an Only me board passes the gate for its author, but Langy's command line reads
-  boards over REST, which passes no viewer. Until that door reads a member's own key as
-  the member, Langy opens no widget of such a board and the run finds nothing.
+- A run on an Only me board passes the gate for its author, and Langy's command line
+  reads the board over REST as the author too. The run's key is a Langy session key the
+  author owns, and the dashboard doors read a key a person owns as that person
+  (dashboards-v2.feature AC196). It is not a key no person owns, which has no viewer.
 - `InsightDailyScheduleProjection` is created with the schedule's columns (`state`,
   `hour`, `timezone`, `maxInsights`) and `lastRunRenewed`, which nothing writes yet,
   so the next slices add no column to a projection table.

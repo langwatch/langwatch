@@ -92,3 +92,42 @@ Feature: A system state is captured to a snapshot and restored from it unchanged
     When the S3 server answers 403 with a body that echoes the request signature
     Then the error names the bucket, the key and the status code
     And the error contains neither the access key, the secret key nor the signature
+
+  @unit
+  Scenario: A cell runs built code on both sides and never spawns a dev command
+    When a cell plans how to build and start the release it upgrades from and the release it upgrades to
+    Then the old release builds once and runs platform/app runtime:app and runtime:workers
+    And the new release builds as the release image does and runs apps/api and apps/worker start
+    And every process gets NODE_ENV=production
+    And no argv holds tsx, vite dev, a watch flag or a script ending in :dev
+
+  @unit
+  Scenario: A build is skipped when its stamp records the same commit and the output exists
+    Given a checkout whose build stamp records its HEAD commit and whose build output exists
+    When the cell asks for a build
+    Then the build command does not run
+    When the stamp records another commit or the output is missing
+    Then the build command runs and the stamp records HEAD
+
+  @e2e @unimplemented
+  Scenario: produce writes a snapshot and its cache entry
+    When "upgradelab produce -deployment cloud -tier S" runs on a quiet host
+    Then main is built, booted, seeded and driven with traffic, and its worker paused so jobs queue
+    And the snapshot directory and the seed context land under the cache key for main's commit, deployment, tier, shape, seed and recipe
+    And the cell's stores are dropped afterwards
+
+  @unit
+  Scenario: produce skips a cached key unless forced
+    Given a cache entry for the key produce would write
+    When produce runs without -force
+    Then it reports the cached snapshot and starts nothing
+    When produce runs with -force
+    Then it replaces the entry
+
+  @e2e @unimplemented
+  Scenario: Two cells from one snapshot start from the same fingerprint
+    Given a snapshot produced once for cloud S
+    When two cells run with -from-snapshot on that snapshot
+    Then each restores it into fresh upgradelab_<cell> stores instead of seeding
+    And both write the same restored fingerprint before main boots
+    And the jobs queued at the snapshot's cut are in Redis again

@@ -6,13 +6,13 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).withTransportFacts(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withMigrations(…).withTasks(…)`, `src/organization.module.ts:32`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareBindings(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withMigrations(…).withTasks(…)`, `src/organization.module.ts:32`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:239`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:240`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -774,6 +774,22 @@ listPendingInvitations(input: Readonly<{ organizationId: string }>): Promise<Org
 acceptInvitation(input: Readonly<{ inviteCode: string }>, by: OrganizationCaller): Promise<OrganizationInviteAccepted>;
 ```
 
+#### `getInviteLanding`
+
+The invitation behind a code, for whoever holds it. Missing and revoked both throw `InviteNotFoundError`, so a guessed code learns nothing; expired throws `InviteExpiredError`.
+
+```typescript
+getInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
+```
+
+#### `requestFreshInvite`
+
+Tells an expired invitation's admins somebody is waiting; mints nothing (D11).
+
+```typescript
+requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void>;
+```
+
 #### `applyPendingInvite`
 
 Applies the PENDING invitation this address already holds here, for a caller that never saw an invitation code. Its role and team assignments replace a default membership entirely.
@@ -1029,7 +1045,7 @@ interface Response {
 
 Get a group with members and bindings
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:117`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:118`.
 
 Answers at `/api/groups/:groupId`, `/api/v1/groups/:groupId`; also, undocumented, `/api/groups/2026-08-07/:groupId`, `/api/v1/groups/2026-08-07/:groupId`, `/api/groups/latest/:groupId`, `/api/v1/groups/latest/:groupId`.
 
@@ -1045,7 +1061,7 @@ type Response = z.infer<typeof organizationGroupRestDetailsSchema>; // ../contra
 
 Rename a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:137`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:138`.
 
 Answers at `/api/groups/:groupId`, `/api/v1/groups/:groupId`; also, undocumented, `/api/groups/2026-08-07/:groupId`, `/api/v1/groups/2026-08-07/:groupId`, `/api/groups/latest/:groupId`, `/api/v1/groups/latest/:groupId`.
 
@@ -1067,7 +1083,7 @@ interface Response {
 
 Delete a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:154`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:156`.
 
 Answers at `/api/groups/:groupId`, `/api/v1/groups/:groupId`; also, undocumented, `/api/groups/2026-08-07/:groupId`, `/api/v1/groups/2026-08-07/:groupId`, `/api/groups/latest/:groupId`, `/api/v1/groups/latest/:groupId`.
 
@@ -1083,7 +1099,7 @@ interface Response {
 
 List members of a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:170`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:173`.
 
 Answers at `/api/groups/:groupId/members`, `/api/v1/groups/:groupId/members`; also, undocumented, `/api/groups/2026-08-07/:groupId/members`, `/api/v1/groups/2026-08-07/:groupId/members`, `/api/groups/latest/:groupId/members`, `/api/v1/groups/latest/:groupId/members`.
 
@@ -1103,7 +1119,7 @@ interface Response {
 
 Add a member to a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:182`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:185`.
 
 Answers at `/api/groups/:groupId/members`, `/api/v1/groups/:groupId/members`; also, undocumented, `/api/groups/2026-08-07/:groupId/members`, `/api/v1/groups/2026-08-07/:groupId/members`, `/api/groups/latest/:groupId/members`, `/api/v1/groups/latest/:groupId/members`.
 
@@ -1120,7 +1136,7 @@ type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/sr
 
 Remove a member from a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:200`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:204`.
 
 Answers at `/api/groups/:groupId/members/:userId`, `/api/v1/groups/:groupId/members/:userId`; also, undocumented, `/api/groups/2026-08-07/:groupId/members/:userId`, `/api/v1/groups/2026-08-07/:groupId/members/:userId`, `/api/groups/latest/:groupId/members/:userId`, `/api/v1/groups/latest/:groupId/members/:userId`.
 
@@ -1137,7 +1153,7 @@ type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/sr
 
 List role bindings for a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:216`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:221`.
 
 Answers at `/api/groups/:groupId/bindings`, `/api/v1/groups/:groupId/bindings`; also, undocumented, `/api/groups/2026-08-07/:groupId/bindings`, `/api/v1/groups/2026-08-07/:groupId/bindings`, `/api/groups/latest/:groupId/bindings`, `/api/v1/groups/latest/:groupId/bindings`.
 
@@ -1160,7 +1176,7 @@ interface Response {
 
 Add a role binding to a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:231`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:236`.
 
 Answers at `/api/groups/:groupId/bindings`, `/api/v1/groups/:groupId/bindings`; also, undocumented, `/api/groups/2026-08-07/:groupId/bindings`, `/api/v1/groups/2026-08-07/:groupId/bindings`, `/api/groups/latest/:groupId/bindings`, `/api/v1/groups/latest/:groupId/bindings`.
 
@@ -1186,7 +1202,7 @@ interface Response {
 
 Remove a role binding from a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:255`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:261`.
 
 Answers at `/api/groups/:groupId/bindings/:bindingId`, `/api/v1/groups/:groupId/bindings/:bindingId`; also, undocumented, `/api/groups/2026-08-07/:groupId/bindings/:bindingId`, `/api/v1/groups/2026-08-07/:groupId/bindings/:bindingId`, `/api/groups/latest/:groupId/bindings/:bindingId`, `/api/v1/groups/latest/:groupId/bindings/:bindingId`.
 
@@ -1249,7 +1265,7 @@ type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../
 
 List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true.
 
-Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:196`.
+Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:197`.
 
 Answers at `/api/organization/members`, `/api/v1/organization/members`; also, undocumented, `/api/organization/2026-08-07/members`, `/api/v1/organization/2026-08-07/members`, `/api/organization/latest/members`, `/api/v1/organization/latest/members`.
 
@@ -1267,7 +1283,7 @@ type Response = z.infer<typeof organizationManagementRestMemberListSchema>; // .
 
 Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages.
 
-Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:217`.
+Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:218`.
 
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
@@ -1283,7 +1299,7 @@ type Response = z.infer<typeof organizationManagementRestMemberWithTeamsSchema>;
 
 The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:239`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:240`.
 
 Answers at `/api/organization/members/:userId/access`, `/api/v1/organization/members/:userId/access`; also, undocumented, `/api/organization/2026-08-07/members/:userId/access`, `/api/v1/organization/2026-08-07/members/:userId/access`, `/api/organization/latest/members/:userId/access`, `/api/v1/organization/latest/members/:userId/access`.
 
@@ -1296,7 +1312,7 @@ type Response = z.infer<typeof organizationManagementRestAccessBreakdownSchema>;
 
 Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:263`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:264`.
 
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
@@ -1314,7 +1330,7 @@ type Response = z.infer<typeof organizationManagementRestUpdatedMemberSchema>; /
 
 Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:289`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:291`.
 
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
@@ -1330,7 +1346,7 @@ interface Response {
 
 List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:305`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:308`.
 
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
@@ -1342,7 +1358,7 @@ type Response = z.infer<typeof organizationManagementRestInviteListSchema>; // .
 
 Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:320`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:323`.
 
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
@@ -1366,7 +1382,7 @@ type Response = z.infer<typeof organizationManagementRestCreatedInvitesSchema>; 
 
 Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:364`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:368`.
 
 Answers at `/api/organization/invites/:inviteId`, `/api/v1/organization/invites/:inviteId`; also, undocumented, `/api/organization/2026-08-07/invites/:inviteId`, `/api/v1/organization/2026-08-07/invites/:inviteId`, `/api/organization/latest/invites/:inviteId`, `/api/v1/organization/latest/invites/:inviteId`.
 
@@ -1487,7 +1503,7 @@ interface Response {
 
 Get a team by its id
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:150`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:151`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1503,7 +1519,7 @@ type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/f
 
 Update a team by its id
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:168`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:169`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1520,7 +1536,7 @@ type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/f
 
 Archive a team (soft-delete)
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:188`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:190`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1538,7 +1554,7 @@ interface Response {
 
 List members of a team
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:210`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:213`.
 
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
@@ -1559,7 +1575,7 @@ interface Response {
 
 Add a member to a team
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:237`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:240`.
 
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
@@ -1580,7 +1596,7 @@ interface Response {
 
 Remove a member from a team
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:268`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:272`.
 
 Answers at `/api/teams/:teamId/members/:userId`, `/api/v1/teams/:teamId/members/:userId`; also, undocumented, `/api/teams/2026-08-07/:teamId/members/:userId`, `/api/v1/teams/2026-08-07/:teamId/members/:userId`, `/api/teams/latest/:teamId/members/:userId`, `/api/v1/teams/latest/:teamId/members/:userId`.
 
@@ -1597,7 +1613,7 @@ type Response = z.infer<typeof organizationTeamRestSuccessSchema>; // ../contrac
 
 List projects in a team
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:291`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:296`.
 
 Answers at `/api/teams/:teamId/projects`, `/api/v1/teams/:teamId/projects`; also, undocumented, `/api/teams/2026-08-07/:teamId/projects`, `/api/v1/teams/2026-08-07/:teamId/projects`, `/api/teams/latest/:teamId/projects`, `/api/v1/teams/latest/:teamId/projects`.
 
@@ -1755,7 +1771,7 @@ type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/g
 
 ### `invite`
 
-Contract `../contract/src/invite.trpc.ts:23`, router `src/transport/invite.trpc.ts:14`.
+Contract `../contract/src/invite.trpc.ts:27`, router `src/transport/invite.trpc.ts:14`.
 
 | Procedure                              | Kind     | Gate                                                                                                                                  | Input                                     | Output                                          |
 | -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
@@ -1826,17 +1842,17 @@ interface Output {
 }
 
 // invite.myPendingInvitation
-// Input: inline, ../contract/src/invite.trpc.ts:48
+// Input: inline, ../contract/src/invite.trpc.ts:57
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:91
+// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:105
 interface Output {
   inviteCode: string | null;
 }
 
 // invite.pendingForMe
-// Input: inline, ../contract/src/invite.trpc.ts:53
+// Input: inline, ../contract/src/invite.trpc.ts:62
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:99
+// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:113
 type Output = {
   inviteCode: string;
   organizationName: string;
@@ -1891,7 +1907,7 @@ type Input = z.infer<typeof limitScopeSchema>; // ../contract/src/license-enforc
 
 ### `organization`
 
-Contract `../contract/src/organization.trpc.ts:60`, router `src/transport/organization.trpc.ts:80`.
+Contract `../contract/src/organization.trpc.ts:78`, router `src/transport/organization.trpc.ts:80`.
 
 | Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                |
 | ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------- |
@@ -1912,7 +1928,7 @@ Contract `../contract/src/organization.trpc.ts:60`, router `src/transport/organi
 
 ```typescript
 // organization.createAndAssign
-type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:43
+type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:48
 // Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:9
 interface Output {
   success: true;
@@ -1952,7 +1968,7 @@ type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/org
 interface Input {
   isDemo?: boolean;
 }
-// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:58
+// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:63
 type Output = unknown[];
 
 // organization.getScopeGraph
@@ -1982,11 +1998,11 @@ interface Input {
   organizationId: string;
   includeDeactivated?: boolean;
 }
-type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:165
+type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:179
 
 // organization.getDirectoryCounts
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:190
+// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:204
 interface Output {
   members: number;
   openInvites: number;
@@ -1997,11 +2013,11 @@ interface Output {
 
 // organization.getMemberById
 type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:12
-type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:142
+type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:156
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:269
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:289
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
@@ -2019,7 +2035,7 @@ type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/org
 
 // organization.getAllOrganizationMembers
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:139
+// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:153
 type Output = {
   id: string;
   name: string | null;
@@ -2040,7 +2056,7 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:202
+// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:216
 interface Output {
   success: true;
   teamsLeftWithoutAdmin: {
@@ -2063,7 +2079,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:241
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:260
 ```
 
 ### `personalWorkspaceFeatures`
@@ -2257,7 +2273,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:298`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:299`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

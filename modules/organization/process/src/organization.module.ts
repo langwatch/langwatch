@@ -1,4 +1,4 @@
-import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
+import { organizationCredentialOfRequest } from "@langwatch/api/rest";
 import type { OrganizationApi, OrganizationServerConfig } from "@langwatch/organization-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -15,10 +15,7 @@ import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
 import { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
-import {
-  organizationKeyFacts,
-  organizationManagementRest,
-} from "./transport/organization-management.rest.ts";
+import { organizationManagementRest } from "./transport/organization-management.rest.ts";
 import { organizationTrpcTransport } from "./transport/organization.trpc.ts";
 import { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
@@ -45,12 +42,12 @@ export const organizationProcessModule: PublishedProcessModule<
     groupsRest,
     teamsRest,
   )
-  .withTransportFacts(() => [
+  .provideMiddlewareContext({
     // Escalation is bounded by the key itself, never by its owner's wider standing.
-    bindRestMiddleware(organizationKeyFacts, (context) => ({
-      apiKeyId: organizationCredentialOfRequest(context.req.raw).apiKeyId,
-    })),
-  ])
+    organizationKeyContext: (request) => ({
+      apiKeyId: organizationCredentialOfRequest(request).apiKeyId,
+    }),
+  })
   .withEventing(seatLimitEventing)
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)

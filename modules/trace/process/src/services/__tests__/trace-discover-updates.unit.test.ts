@@ -7,6 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListService } from "../../features/read/services/trace-list-read.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
@@ -42,7 +43,7 @@ describe("the discover refresh push", () => {
       });
 
       const first = await service.getDiscover({
-        tenantId: TENANT,
+        authorization: ownProof({ projectId: TENANT }),
         timeRange: { from: 1_700_000_000_000, to: 1_700_086_400_000 },
       });
 

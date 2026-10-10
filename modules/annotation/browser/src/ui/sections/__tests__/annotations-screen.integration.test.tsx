@@ -508,7 +508,7 @@ describe("given the queue editor", () => {
     it("writes the address rather than mounting a drawer itself", () => {
       const { host } = renderWithAnnotationHost(<AnnotationsScreen view="inbox" />);
 
-      screen.getByRole("button", { name: "Create annotation queue" }).click();
+      screen.getByRole("button", { name: "New Queue" }).click();
 
       expect(host.lastQuery).toMatchObject({ "queue-editor": "new" });
     });
@@ -523,9 +523,7 @@ describe("given the queue editor", () => {
         isLiteMember: true,
       });
 
-      expect(
-        screen.queryByRole("button", { name: "Create annotation queue" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "New Queue" })).not.toBeInTheDocument();
 
       expect(
         screen.queryByRole("button", { name: "Actions for queue Support reviews" }),

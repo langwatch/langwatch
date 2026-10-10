@@ -75,6 +75,7 @@ async function gatewayAppStub({ virtualKeyId = "vk_1" }: { virtualKeyId?: string
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
+      licensing: peer("licensing"),
     },
     repositories,
     config: {

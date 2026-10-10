@@ -40,6 +40,12 @@ function connectedFacts() {
       recordManagedKeyInvalidated: createApiFixture<Senders["recordManagedKeyInvalidated"]>({
         send: async (payload) => void sent.push(payload),
       }),
+      recordManagedKeyLicenseSet: createApiFixture<Senders["recordManagedKeyLicenseSet"]>({
+        send: async (payload) => void sent.push(payload),
+      }),
+      recordManagedKeyServicesSet: createApiFixture<Senders["recordManagedKeyServicesSet"]>({
+        send: async (payload) => void sent.push(payload),
+      }),
       recordContractTermsChanged: createApiFixture<Senders["recordContractTermsChanged"]>({
         send: async (payload) => void sent.push(payload),
       }),
@@ -144,6 +150,56 @@ describe("licensing's Connect facts", () => {
           occurredAt: expect.any(Number),
           organizationId: ORGANIZATION,
           virtualKeyId: "vk-new",
+        },
+      ]);
+    });
+  });
+
+  describe("when licensing records the licence a managed key serves", () => {
+    /** @scenario "Licensing records a managed key's licence as a fact gateway applies" */
+    it("records the key, its token's registry hash, the bound install and the term's end", async () => {
+      const { facts, sent } = connectedFacts();
+
+      await facts.managedKeyLicenseSet({
+        virtualKeyId: "vk-1",
+        organizationId: ORGANIZATION,
+        tokenHash: "hash-1",
+        instanceId: null,
+        expiresAt: Temporal.Instant.fromEpochMilliseconds(SYNCED_AT),
+      });
+
+      expect(sent).toEqual([
+        {
+          tenantId: ORGANIZATION,
+          occurredAt: expect.any(Number),
+          organizationId: ORGANIZATION,
+          virtualKeyId: "vk-1",
+          tokenHash: "hash-1",
+          instanceId: null,
+          expiresAt: SYNCED_AT,
+        },
+      ]);
+    });
+  });
+
+  describe("when licensing records the services a managed key may serve", () => {
+    /** @scenario "Licensing records a managed key's services as a fact gateway applies" */
+    it("records the key and the whole service list", async () => {
+      const { facts, sent } = connectedFacts();
+
+      await facts.managedKeyServicesSet({
+        virtualKeyId: "vk-1",
+        organizationId: ORGANIZATION,
+        services: ["llm", "langy"],
+      });
+
+      expect(sent).toEqual([
+        {
+          tenantId: ORGANIZATION,
+          occurredAt: expect.any(Number),
+          organizationId: ORGANIZATION,
+          virtualKeyId: "vk-1",
+          services: ["llm", "langy"],
         },
       ]);
     });

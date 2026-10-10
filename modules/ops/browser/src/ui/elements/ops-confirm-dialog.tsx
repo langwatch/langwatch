@@ -37,7 +37,7 @@ export function ConfirmDialog({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>

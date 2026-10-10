@@ -39,7 +39,7 @@ export function DeleteDatasetDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(details) => !details.open && onClose()}>
-      <Dialog.Content bg="bg" maxWidth="480px">
+      <Dialog.Content maxWidth="480px">
         <Dialog.Header>
           <Dialog.Title>Are you really sure?</Dialog.Title>
           <Dialog.CloseTrigger />
@@ -64,7 +64,7 @@ export function DeleteDatasetDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button

@@ -12,7 +12,7 @@ import {
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
-import { boundedSubquery } from "../repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
+import { boundedSubquery } from "./trace-query-subquery.rules.ts";
 import {
   extractNumericValue,
   extractStringValue,

@@ -41,7 +41,7 @@ export class TraceIndexMaterialisationService {
   }): Promise<UpdatedAtIndexProgress> {
     let started = false;
     let progress: UpdatedAtIndexProgress = { mutationId: null, partsToDo: 0 };
-    for (let aborted = false; !aborted;) {
+    while (!signal.aborted) {
       const [latest] = await this.mutations.findUpdatedAtIndexMutations();
       if (!latest) {
         // Started and still unrecorded: the table has no such index, so nothing is left to build.
@@ -56,7 +56,6 @@ export class TraceIndexMaterialisationService {
       if (dryRun) return progress;
       await onPoll(progress);
       await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
-      aborted = signal.aborted;
     }
     return progress;
   }

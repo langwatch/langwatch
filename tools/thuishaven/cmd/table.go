@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The CLI constitution (ADR-064): one name per command (no aliases, ever), one
@@ -27,6 +29,7 @@ type flagSpec struct {
 	isSwitch   bool   // bare means on; "--flag=false" turns it off (a default-on switch)
 	value      string // help placeholder for the value, e.g. "<dur>"
 	summary    string
+	hidden     bool // internal (pr's --launch): accepted, absent from help
 }
 
 // commandSpec is one entry of the CLI surface.
@@ -42,6 +45,26 @@ type commandSpec struct {
 	minusArgs bool
 	hidden    bool // internal (daemon): dispatchable, absent from help
 	run       func(ctx context.Context, d deps, inv invocation) error
+	// subs makes this a group (`haven sim mail list`): a first argument naming
+	// a sub runs it, anything else runs this spec's own run, if it has one.
+	subs []commandSpec
+	// rewrite turns the public argv into the one run parses, refusing a
+	// retired spelling first (the simulators' verbs, logs -t).
+	rewrite func(rest []string) ([]string, error)
+	// fields marks a read whose --json output is an object of selectable
+	// fields: bare --json lists them, --json a,b selects them.
+	fields bool
+	// stream marks a command whose --json output is NDJSON, never enveloped.
+	stream bool
+	path   string // the full spelling, "sim mail"; set by buildTable
+}
+
+// display is how messages name the command: its full spelling.
+func (spec commandSpec) display() string {
+	if spec.path != "" {
+		return spec.path
+	}
+	return spec.name
 }
 
 // invocation is a parsed command line: declared flags and positionals. raw is
@@ -78,10 +101,10 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 	}
 	addPositional := func(a string) error {
 		if spec.maxArgs == 0 {
-			return fmt.Errorf("haven %s takes no arguments (got %q)%s", spec.name, a, flagHint(spec))
+			return fmt.Errorf("haven %s takes no arguments (got %q)%s", spec.display(), a, flagHint(spec))
 		}
 		if spec.maxArgs > 0 && len(inv.args) >= spec.maxArgs {
-			return fmt.Errorf("haven %s takes at most %d argument(s) (got extra %q)", spec.name, spec.maxArgs, a)
+			return fmt.Errorf("haven %s takes at most %d argument(s) (got extra %q)", spec.display(), spec.maxArgs, a)
 		}
 		inv.args = append(inv.args, a)
 		return nil
@@ -103,15 +126,15 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 			name, embedded, hasEmbedded := strings.Cut(a, "=")
 			f := findLong(name)
 			if f == nil {
-				return inv, fmt.Errorf("haven %s: unknown flag %q%s", spec.name, name, flagHint(spec))
+				return inv, fmt.Errorf("haven %s: unknown flag %q%s", spec.display(), name, flagHint(spec))
 			}
 			if hasEmbedded {
 				if !f.takesValue && !f.isSwitch {
-					return inv, fmt.Errorf("haven %s: %s takes no value", spec.name, f.long)
+					return inv, fmt.Errorf("haven %s: %s takes no value", spec.display(), f.long)
 				}
 				if f.isSwitch {
 					if _, err := strconv.ParseBool(embedded); err != nil {
-						return inv, fmt.Errorf("haven %s: %s=%s is not true or false", spec.name, f.long, embedded)
+						return inv, fmt.Errorf("haven %s: %s=%s is not true or false", spec.display(), f.long, embedded)
 					}
 				}
 				inv.flags[f.long] = embedded
@@ -119,7 +142,7 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 			}
 			if f.takesValue {
 				if i+1 >= len(rest) {
-					return inv, fmt.Errorf("haven %s: %s needs a value %s", spec.name, f.long, f.value)
+					return inv, fmt.Errorf("haven %s: %s needs a value %s", spec.display(), f.long, f.value)
 				}
 				i++
 				inv.flags[f.long] = rest[i]
@@ -130,7 +153,7 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 			if f := findShort(a); f != nil {
 				if f.takesValue {
 					if i+1 >= len(rest) {
-						return inv, fmt.Errorf("haven %s: %s needs a value %s", spec.name, f.long, f.value)
+						return inv, fmt.Errorf("haven %s: %s needs a value %s", spec.display(), f.long, f.value)
 					}
 					i++
 					inv.flags[f.long] = rest[i]
@@ -145,7 +168,7 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 				}
 				continue
 			}
-			return inv, fmt.Errorf("haven %s: unknown flag %q%s", spec.name, a, flagHint(spec))
+			return inv, fmt.Errorf("haven %s: unknown flag %q%s", spec.display(), a, flagHint(spec))
 		default:
 			if err := addPositional(a); err != nil {
 				return inv, err
@@ -170,37 +193,10 @@ func flagHint(spec commandSpec) string {
 	return " — flags: " + strings.Join(names, ", ")
 }
 
-// removed maps every retired spelling to what replaced it. A removed spelling
-// fails with a one-line pointer; it never keeps working silently (ADR-064:
-// clean break, no compatibility layer).
-var removed = map[string]string{
-	"ls":            "haven status",
-	"list":          "haven status",
-	"doctor":        "haven status",
-	"watch":         "haven status (or bare `haven` for the live hub)",
-	"hub":           "haven (bare)",
-	"ps":            "haven",
-	"active":        "haven",
-	"rs":            "haven restart",
-	"sw":            "haven switch",
-	"cd":            "haven switch",
-	"ch":            "haven db url clickhouse (the server is managed automatically)",
-	"clickhouse":    "haven db url clickhouse (the server is managed automatically)",
-	"pg":            "haven db url postgres (the server is managed automatically)",
-	"postgres":      "haven db url postgres (the server is managed automatically)",
-	"obs":           "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
-	"observability": "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
-	"tc":            "haven typecheck",
-	"oc":            "haven clean",
-	"cleanup":       "haven clean",
-	"prune":         "haven clean",
-	"moron":         "haven git",
-}
-
 // table is the whole CLI surface, in help order. The viewer's own tabs are
 // appended to it: every tab of the up viewer is a command too, so a stack is
 // as readable from a pipe as it is from a keyboard.
-var table = append(baseTable, tabSpecs()...)
+var table = buildTable()
 
 // baseTable is the surface that is not derived from the viewer's tabs.
 var baseTable = []commandSpec{
@@ -212,11 +208,23 @@ var baseTable = []commandSpec{
 		run:     runBundledSimulator,
 	},
 	{
+		name:    "static",
+		args:    "<lane> <dir> <port>",
+		maxArgs: 3,
+		hidden:  true,
+		run:     runStatic,
+	},
+	{
 		name:    "go-watch",
 		args:    "<binary> <service>…",
 		maxArgs: -1,
 		hidden:  true,
 		run:     runGoWatch,
+	},
+	{
+		name:   "ui-watch",
+		hidden: true,
+		run:    runUIWatch,
 	},
 	{
 		name:    "keep",
@@ -232,16 +240,21 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change (the default). --watch=false holds the stack: no Go rebuilds, no Node reloads, sticks; `haven reload` applies changes"},
+			{long: "--watch", short: "-w", summary: "rebuild and reload on a change: one-shot UI builds (open pages reload once idle), Node reload, Go rebuild. Without it nothing reloads; `haven reload` applies changes. Not sticky"},
+			{long: "--hmr", summary: "as --watch, but the UI runs Vite bundledDev with HMR. Not sticky"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
-			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
+			{long: "--force", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
+			{long: "--no-mail", summary: "the app sees no mail provider, even one .env names (HAVEN_NO_MAIL=1 does too); not sticky"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if inv.has("--no-seed") {
 				disableAutoSeed()
+			}
+			if inv.has("--no-mail") {
+				_ = os.Setenv(domain.NoMailKnob, "1")
 			}
 			if err := rejectRemovedSelectionEnv(); err != nil {
 				return err
@@ -249,7 +262,7 @@ var baseTable = []commandSpec{
 			if err := checkOneProcessEnv(os.Stderr); err != nil {
 				return err
 			}
-			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
+			sel, err := d.orch.ResolveSelection(d.worktree, upDeltas(d, inv.args))
 			if err != nil {
 				return err
 			}
@@ -260,13 +273,13 @@ var baseTable = []commandSpec{
 			if err := applyDeploymentMode(&d.opts, mode, d.worktree); err != nil {
 				return err
 			}
-			if inv.has("--watch") {
-				d.opts.ShouldGoWatch = inv.value("--watch") != "false" && inv.value("--watch") != "0"
-				if sel, err = d.orch.ResolveHold(d.worktree, sel, !d.opts.ShouldGoWatch); err != nil {
-					return err
-				}
+			switch {
+			case inv.has("--watch"):
+				sel.Refresh = domain.RefreshWatch
+			case inv.has("--hmr"):
+				sel.Refresh = domain.RefreshHMR
 			}
-			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.Held
+			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.IsStill()
 			d.opts.Selection = sel
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")
@@ -292,12 +305,17 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "down",
-		summary: "stop this worktree's stack; data is always kept",
+		summary: "stop this stack and keep its data; --destroy drops its databases too",
 		flags: []flagSpec{
 			{long: "--all", summary: "stop every stack, the shared servers, the daemon, and the proxy"},
-			{long: "--force", short: "-f", summary: "kill hard — no graceful shutdown"},
+			{long: "--force", summary: "kill hard — no graceful shutdown"},
+			{long: "--destroy", summary: "also DROP this stack's databases: a terminal types the slug, an agent passes --yes"},
+			{long: "--yes", summary: "confirm --destroy without prompting (required in agent mode)"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if inv.has("--destroy") {
+				return runDownDestroy(ctx, d, inv)
+			}
 			if inv.has("--all") {
 				return d.orch.DownAll(ctx)
 			}
@@ -306,16 +324,6 @@ var baseTable = []commandSpec{
 			}
 			return d.orch.Down(ctx, d.params, inv.has("--force"))
 		},
-	},
-	{
-		name:    "destroy",
-		summary: "stop a stack by slug and DROP its databases - the data goes with it",
-		args:    "<slug>",
-		maxArgs: 1,
-		flags: []flagSpec{
-			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode)"},
-		},
-		run: runDestroy,
 	},
 	{
 		name:    "restart",
@@ -335,8 +343,8 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "reload",
-		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready",
-		args:    "[app|api|worker]",
+		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready; ui rebuilds a built-UI stack's bundle and swaps it in",
+		args:    "[app|api|worker|ui]",
 		maxArgs: 1,
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			name := "app"
@@ -366,10 +374,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "mail",
-		summary: "read this worktree's caught email: address | inbox | list | get <id> | links <id> | wait | delete <id> | clear",
-		args:    "<address|inbox|list|get|links|wait|delete|clear> [id]",
+		summary: "read this worktree's caught email: address | inbox | list | get <id> | links <id> | wait | delete <id> | clear | set --error <status>",
+		args:    "<address|inbox|list|get|links|wait|delete|clear|set> [id]",
 		maxArgs: 2,
 		flags: []flagSpec{
+			simErrorFlag,
 			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
 			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
@@ -394,10 +403,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "analytics",
-		summary: "analyticssim's caught PostHog and Customer.io calls: status | records | clear | wait",
-		args:    "<status|records|clear|wait>",
+		summary: "analyticssim's caught PostHog and Customer.io calls: status | records | clear | wait | set --error <status>",
+		args:    "<status|records|clear|wait|set>",
 		maxArgs: 1,
 		flags: simFlags(
+			simErrorFlag,
 			flagSpec{long: "--provider", takesValue: true, value: "<name>", summary: "records/wait: posthog or customerio"},
 			flagSpec{long: "--kind", takesValue: true, value: "<kind>", summary: "records/wait: only this kind of record"},
 			flagSpec{long: "--event", takesValue: true, value: "<name>", summary: "records/wait: only this event name"},
@@ -429,10 +439,20 @@ var baseTable = []commandSpec{
 		run: runOutbound,
 	},
 	{
+		name:    "lambda",
+		summary: "lambdasim's NLP Lambda invocations: info | calls | call <id> | clear | set --error <kind>",
+		args:    "<info|calls|call|clear|set> [id]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--error", takesValue: true, value: "<kind>", summary: "set: force throttled, not-found, function-error or service on every invoke (none turns it off)"},
+		),
+		run: runLambda,
+	},
+	{
 		name:    "payment",
-		summary: "paymentsim, the Stripe stand-in: status | events | usage | advance | fail | deliver | hold | release | reset",
-		args:    "<status|events|usage|advance|fail|deliver|hold|release|reset>",
-		maxArgs: 1,
+		summary: "paymentsim, the Stripe stand-in: status | customers | subscriptions | checkouts | invoices | events | usage | complete | retry | advance | fail | clear-failures | deliver | hold | release | reset",
+		args:    "<status|customers|subscriptions|checkouts|invoices|events|usage|complete|retry|advance|fail|clear-failures|deliver|hold|release|reset> [id]",
+		maxArgs: 2,
 		flags: simFlags(
 			flagSpec{long: "--type", takesValue: true, value: "<event type>", summary: "events: only this type"},
 			flagSpec{long: "--customer", takesValue: true, value: "<id>", summary: "usage/fail: the customer"},
@@ -467,21 +487,16 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "storage",
-		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests",
-		args:    "<buckets|objects|object|presign|delete|clear|seed|requests> [bucket] [key]",
+		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests | set --error <status>",
+		args:    "<buckets|objects|object|presign|delete|clear|seed|requests|set> [bucket] [key]",
 		maxArgs: 3,
 		flags: simFlags(
+			simErrorFlag,
 			flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"},
 			flagSpec{long: "--put", summary: "presign: a PUT URL instead of a GET"},
 			flagSpec{long: "--expires", takesValue: true, value: "<seconds>", summary: "presign: lifetime, 1..604800 (default 3600)"},
 		),
 		run: runStorage,
-	},
-	{
-		name:    "sims",
-		summary: "every simulator: running here or not, its console, the +name to start it, its verbs and skill",
-		flags:   simFlags(),
-		run:     runSims,
 	},
 	{
 		name:    "voice",
@@ -497,26 +512,31 @@ var baseTable = []commandSpec{
 		args:    "[service…]",
 		maxArgs: -1,
 		flags: []flagSpec{
-			{long: "--tail", short: "-t", summary: "stream live"},
+			{long: "--follow", short: "-f", summary: "stream live"},
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
 			{long: "--loki", summary: "read the full stream from the stack's Loki (info/debug the consoles mute)"},
 			{long: "--grep", takesValue: true, value: "<text>", summary: "only lines containing text"},
 			{long: "--trace", takesValue: true, value: "<trace-id>", summary: "Loki lines for one trace (implies --loki)"},
-			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
 			{long: "--raw", summary: "the child's own bytes, unrendered"},
-			{long: "--json", summary: "one JSON object per line, lane stamped on"},
+			{long: "--json", summary: "NDJSON: one typed event per line, lane stamped on"},
 		},
-		run: runLogsCmd,
+		stream:  true,
+		rewrite: retireLogsTail,
+		run:     runLogsCmd,
 	},
 	querySpec(),
 	seedSpec(),
+	apiSpec(),
+	gatewaySpec(),
 	telemetrySpec(),
 	authSpec(),
 	browserSpec(),
+	mfaSpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",
+		fields:  true,
 		flags: []flagSpec{
 			{long: "--json", summary: "machine-readable"},
 			{long: "--reveal", summary: "print this worktree's overlay secrets instead of masking them"},
@@ -549,10 +569,14 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "pr",
-		summary: "try a GitHub PR locally: worktree, install, stack up on a hostname",
+		summary: "a GitHub PR locally: a lasting worktree + stack; --throwaway gives a sandbox that quitting DESTROYS",
 		args:    "<ref>",
 		maxArgs: 1,
 		flags: []flagSpec{
+			{long: "--throwaway", summary: "own checkout + databases; quitting DESTROYS everything it created"},
+			{long: "--allow-untrusted", summary: "--throwaway: proceed although not every PR author has write access (the only way in agent mode)"},
+			{long: "--seed", takesValue: true, value: "<preset>", summary: "--throwaway: seed the sandbox's database: " + strings.Join(app.SeedPresetNames(), ", ")},
+			{long: "--launch", hidden: true, summary: "internal: the sandbox's backgrounded launcher"},
 			{long: "--dry-run", summary: "resolve + print the plan, create nothing"},
 			{long: "--no-install", summary: "skip dependency install"},
 			{long: "--allow-closed", summary: "allow a non-open PR"},
@@ -560,6 +584,15 @@ var baseTable = []commandSpec{
 			{long: "--discard-local-changes", summary: "overwrite local edits instead of stashing"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			switch {
+			case inv.has("--launch"):
+				return runPlayLaunchCmd(ctx, d, inv)
+			case inv.has("--throwaway"):
+				return runPlay(ctx, d, inv)
+			}
+			if inv.has("--allow-untrusted") || inv.has("--seed") {
+				return usageErr("--allow-untrusted and --seed belong to haven pr --throwaway")
+			}
 			ref := ""
 			if len(inv.args) > 0 {
 				ref = inv.args[0]
@@ -577,40 +610,8 @@ var baseTable = []commandSpec{
 		},
 	},
 	{
-		name:    "play",
-		summary: "run a PR in a throwaway sandbox: own checkout + databases; quitting DESTROYS everything it created",
-		args:    "[pr]",
-		maxArgs: 1,
-		flags: []flagSpec{
-			{long: "--allow-untrusted", summary: "proceed although not every PR author has write access (the only way in agent mode)"},
-			{long: "--seed", takesValue: true, value: "<preset>", summary: "seed the sandbox's database: " + strings.Join(app.SeedPresetNames(), ", ")},
-		},
-		run: runPlay,
-	},
-	{
-		// The backgrounded sandbox launcher `haven play` spawns in the play
-		// checkout - internal, like daemon: dispatchable, absent from help. The
-		// preset travels as a positional because the launcher is a separate
-		// process: anything the parent parsed and did not pass on is lost.
-		name:    "play-launch",
-		args:    "<number> [preset]",
-		maxArgs: 2,
-		hidden:  true,
-		run:     runPlayLaunchCmd,
-	},
-	{
-		name:    "git",
-		summary: "embedded git TUI for a worktree (slug, name, or path)",
-		args:    "[target]",
-		maxArgs: 1,
-		flags: []flagSpec{
-			{long: "--json", summary: "machine-readable per-worktree overview"},
-		},
-		run: runGitUI,
-	},
-	{
 		name:    "switch",
-		summary: "print a worktree's dir by name (a real cd with haven shell-init)",
+		summary: "cd to a worktree by name (the shell function comes from haven self setup)",
 		args:    "[name]",
 		maxArgs: 1,
 		flags: []flagSpec{
@@ -623,20 +624,6 @@ var baseTable = []commandSpec{
 		summary: "emit the shell function + completion for haven switch",
 		run: func(_ context.Context, _ deps, _ invocation) error {
 			fmt.Print(shellInitScript)
-			return nil
-		},
-	},
-	{
-		name:    "hmr",
-		summary: "retired no-op: reloads are debounced, there is no hold (ADR-168)",
-		args:    "[on|off|status]",
-		maxArgs: 1,
-		// Kept so agent hooks still calling `haven hmr on --ttl <dur>` exit 0.
-		flags: []flagSpec{
-			{long: "--ttl", takesValue: true, value: "<dur>", summary: "ignored"},
-		},
-		run: func(_ context.Context, _ deps, _ invocation) error {
-			fmt.Println("haven hmr is retired: reloads are debounced and nothing holds them; remove the call")
 			return nil
 		},
 	},
@@ -694,7 +681,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "gate",
-		summary: "answer a coding-agent PreToolUse hook on stdin (opt in with `haven setup`)",
+		summary: "answer a coding-agent PreToolUse hook on stdin (opt in with `haven self setup`)",
 		flags: []flagSpec{
 			{long: "--client", takesValue: true, value: "<client>", summary: "hook output protocol: claude (default) or codex"},
 		},
@@ -751,36 +738,89 @@ var baseTable = []commandSpec{
 	},
 }
 
-// tableByName is the dispatch index over table.
+// tableByName indexes every command by its full spelling: "up", "sim",
+// "sim mail", "machine typecheck".
 var tableByName = func() map[string]commandSpec {
-	m := make(map[string]commandSpec, len(table))
-	for _, spec := range table {
-		if _, dup := m[spec.name]; dup {
-			panic("duplicate haven command " + spec.name)
+	m := map[string]commandSpec{}
+	var index func(specs []commandSpec)
+	index = func(specs []commandSpec) {
+		for _, spec := range specs {
+			if _, dup := m[spec.display()]; dup {
+				panic("duplicate haven command " + spec.display())
+			}
+			m[spec.display()] = spec
+			index(spec.subs)
 		}
-		m[spec.name] = spec
 	}
+	index(table)
 	return m
 }()
 
 func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
-	if hint, gone := removed[sub]; gone {
-		return fmt.Errorf("haven %s was removed — use %s", sub, hint)
+	if now, ok := retired[sub]; ok {
+		if now == nil {
+			return retiredError(append([]string{sub}, rest...), nil)
+		}
+		return retiredError(append([]string{sub}, rest...), now(rest))
 	}
 	spec, ok := tableByName[sub]
 	if !ok {
-		msg := fmt.Sprintf("haven: unknown command %q", sub)
+		msg := fmt.Sprintf("unknown command %q", sub)
 		if close := closestCommands(sub); len(close) > 0 {
 			msg += " — did you mean: " + strings.Join(close, ", ")
 		}
-		fmt.Fprintf(os.Stderr, "%s\nRun `haven help` for the full reference.\n", msg)
-		return fmt.Errorf("unknown command %q", sub)
+		return usageErr("%s\nRun `haven help` for the full reference.", msg)
 	}
-	inv, err := parse(spec, rest)
+	return d.run(ctx, spec, rest)
+}
+
+// run walks into a group's sub, rewrites a public argv to the one the command
+// parses, and runs it, enveloping its --json output.
+func (d deps) run(ctx context.Context, spec commandSpec, rest []string) error {
+	if len(spec.subs) > 0 && len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+		for _, sub := range spec.subs {
+			if sub.name == rest[0] {
+				return d.run(ctx, sub, rest[1:])
+			}
+		}
+		if spec.run == nil {
+			return usageErr("haven %s: unknown subcommand %q; one of: %s", spec.display(), rest[0], strings.Join(subNames(spec), ", "))
+		}
+	}
+	if spec.run == nil {
+		return usageErr("haven %s needs a subcommand: %s", spec.display(), strings.Join(subNames(spec), ", "))
+	}
+	if spec.rewrite != nil {
+		var err error
+		if rest, err = spec.rewrite(rest); err != nil {
+			return err
+		}
+	}
+	rest, sel, err := takeJSONSelection(spec, rest)
 	if err != nil {
 		return err
 	}
-	return spec.run(ctx, d, inv)
+	inv, err := parse(spec, rest)
+	if err != nil {
+		return exitError{code: exitUsage, err: err}
+	}
+	if d.target != "" {
+		inv.flags["--stack"] = d.target
+	}
+	if !inv.has("--json") || spec.stream {
+		return spec.run(ctx, d, inv)
+	}
+	return d.envelope(spec, sel, func() error { return spec.run(ctx, d, inv) })
+}
+
+func subNames(spec commandSpec) []string {
+	var names []string
+	for _, sub := range spec.subs {
+		if !sub.hidden {
+			names = append(names, sub.name)
+		}
+	}
+	return names
 }
 
 // closestCommands suggests near-misses for an unknown command: prefix matches
@@ -795,7 +835,18 @@ func closestCommands(input string) []string {
 			out = append(out, spec.name)
 		}
 	}
+	if len(out) == 0 {
+		for _, spec := range table {
+			for _, sub := range spec.subs {
+				if !sub.hidden && (sub.name == input || editDistanceAtMost(sub.name, input, 1)) {
+					out = append(out, sub.display())
+				}
+			}
+		}
+	}
 	sort.Strings(out)
+	isPrefix := func(name string) bool { return strings.HasPrefix(name, input) || strings.HasPrefix(input, name) }
+	sort.SliceStable(out, func(i, j int) bool { return isPrefix(out[i]) && !isPrefix(out[j]) })
 	if len(out) > 3 {
 		out = out[:3]
 	}
@@ -827,48 +878,69 @@ func editDistanceAtMost(a, b string, max int) bool {
 	return prev[len(b)] <= max
 }
 
-// commandsHelp renders the COMMANDS section of help from the table, so a
-// command cannot exist without being documented.
-// It lists names and one-line summaries only. Flags live in `haven help
-// <command>`, because the top-level help is what you read when you have
-// forgotten a command's NAME — a wall of every flag on every command buries
-// exactly the line you came for.
+// dailyCommands are the top-level verbs help lists first; everything else
+// visible is a group or a tool.
+var dailyCommands = []string{"up", "down", "restart", "reload", "status", "logs", "errors", "env", "browser", "pr", "switch", "wait", "defaults"}
+
+// commandsHelp renders help's command sections from the table, so a command
+// cannot exist without being documented: the daily verbs, then each group
+// with its subcommands. Flags live in `haven help <command>`.
 func commandsHelp() string {
-	var b strings.Builder
+	var daily, groups strings.Builder
 	for _, spec := range table {
 		if spec.hidden {
 			continue
 		}
 		left := spec.name
-		if spec.args != "" {
+		switch {
+		case len(spec.subs) > 0 && spec.run == nil:
+			left += " " + strings.Join(subNames(spec), "|")
+		case spec.args != "":
 			left += " " + spec.args
 		}
-		b.WriteString(fmt.Sprintf("    %-16s %s\n", left, spec.summary))
+		section := &groups
+		if slices.Contains(dailyCommands, spec.name) {
+			section = &daily
+		}
+		fmt.Fprintf(section, "    %-16s %s\n", left, spec.summary)
 	}
-	return b.String()
+	return "DAILY\n" + daily.String() + "\nGROUPS\n" + groups.String()
 }
 
 // commandHelp renders one command in full: what it is for, how it is called,
-// and every flag it takes.
+// and every flag it takes. A group lists its subcommands.
 func commandHelp(name string) (string, bool) {
-	for _, spec := range table {
-		if spec.name == name && !spec.hidden {
-			return renderCommandHelp(spec), true
-		}
+	spec, ok := tableByName[name]
+	if !ok || spec.hidden {
+		return "", false
 	}
-	return "", false
+	return renderCommandHelp(spec), true
 }
 
 func renderCommandHelp(spec commandSpec) string {
 	var b strings.Builder
-	usage := "    haven " + spec.name
+	usage := "    haven " + spec.display()
 	if spec.args != "" {
 		usage += " " + spec.args
 	}
 	fmt.Fprintf(&b, "%s\n\n%s\n", spec.summary, usage)
-	if len(spec.flags) > 0 {
+	if names := subNames(spec); len(names) > 0 {
+		b.WriteString("\nSUBCOMMANDS\n")
+		for _, sub := range spec.subs {
+			if !sub.hidden {
+				fmt.Fprintf(&b, "    %-16s %s\n", sub.name, sub.summary)
+			}
+		}
+	}
+	var flags []flagSpec
+	for _, f := range spec.flags {
+		if !f.hidden {
+			flags = append(flags, f)
+		}
+	}
+	if len(flags) > 0 {
 		b.WriteString("\nFLAGS\n")
-		for _, f := range spec.flags {
+		for _, f := range flags {
 			fmt.Fprintf(&b, "    %-22s %s\n", helpFlagLabel(f), f.summary)
 		}
 	}
@@ -886,7 +958,7 @@ func helpFlagLabel(f flagSpec) string {
 	return label
 }
 
-// commandNames lists every visible command, for the "unknown topic" pointer.
+// commandNames lists every visible top-level command, for the "unknown topic" pointer.
 func commandNames() []string {
 	var names []string
 	for _, spec := range table {

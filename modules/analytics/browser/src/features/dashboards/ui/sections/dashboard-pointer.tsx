@@ -10,7 +10,7 @@ import { Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
 
 import { analyticsApi } from "../../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import {
   keptDashboardPointer,

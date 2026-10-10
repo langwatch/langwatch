@@ -392,7 +392,7 @@ describe("TenantGuard", () => {
     });
   });
 
-  describe("given a statement declared unscoped", () => {
+  describe("given a statement that sets SKIP_TENANT_CHECK", () => {
     describe("when it is executed", () => {
       it("allows it", async () => {
         const next = vi.fn(passthrough);
@@ -402,7 +402,8 @@ describe("TenantGuard", () => {
           request({
             sql: "SELECT count() FROM system.parts",
             params: {},
-            unscoped: { reason: "operational part-count check" },
+            // An operational part-count check reads system tables, which no tenant owns.
+            SKIP_TENANT_CHECK: true,
           }),
         );
 
@@ -415,12 +416,17 @@ describe("TenantGuard", () => {
         const unscoped = request({
           sql: "SELECT count() FROM system.parts",
           params: {},
-          unscoped: { reason: "operational part-count check" },
+          // An operational part-count check reads system tables, which no tenant owns.
+          SKIP_TENANT_CHECK: true,
         });
 
         await execute(unscoped);
 
-        expect(onUnscoped).toHaveBeenCalledWith(unscoped);
+        expect(onUnscoped).toHaveBeenCalledWith({
+          operation: "statement",
+          table: "system.parts",
+          tenantId: unscoped.tenantId,
+        });
       });
     });
 
@@ -428,7 +434,7 @@ describe("TenantGuard", () => {
       it("still allows the statement the guard just approved", async () => {
         // `onUnscoped` is host code — an audit log, a counter — and it runs on
         // the branch where the guard has already decided to allow. Unguarded,
-        // a broken audit sink turns every declared-unscoped statement into a
+        // a broken audit sink turns every skipped statement into a
         // refusal, which is a reporting hook deciding policy.
         const next = vi.fn(passthrough);
         const execute = guardedBy(next, {
@@ -441,7 +447,8 @@ describe("TenantGuard", () => {
           request({
             sql: "SELECT count() FROM system.parts",
             params: {},
-            unscoped: { reason: "operational part-count check" },
+            // An operational part-count check reads system tables, which no tenant owns.
+            SKIP_TENANT_CHECK: true,
           }),
         );
 

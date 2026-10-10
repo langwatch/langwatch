@@ -144,5 +144,5 @@ func PlanHavenPath(f HavenPathFacts) HavenPathState {
 // not decoration — this is someone else's shell config, and an unattributed
 // line in it is the kind of thing people delete with no idea what breaks.
 func HavenPathRCBlock(line string) string {
-	return "\n# added by `haven install` (langwatch)\n" + line + "\n"
+	return "\n# added by `haven self install` (langwatch)\n" + line + "\n"
 }

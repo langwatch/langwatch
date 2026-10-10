@@ -8,6 +8,7 @@
 export const FLOOR_AND_LOCK_RULES: ReadonlySet<string> = new Set([
   "new-foreign-key",
   "retirement-note-above-floor",
+  "contract-without-archive-note",
   "set-not-null-on-populated-column",
   "enum-recreated",
   "unique-or-validated-constraint-on-existing-table",
@@ -47,6 +48,13 @@ const RETIREMENT_FIX =
   "`-- contract: retired in <release>` above the statement, naming the release that stopped " +
   "using it; if it has not, ship that code first — a rollback to the previous image must " +
   "still find its schema.";
+
+const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?:none[ \t]*\(.+\)|(?!none\b)\S+)/im;
+
+const ARCHIVE_FIX =
+  "add `-- archive: <table>` naming each table the contract archives (archive-or-fail copies " +
+  "it into _retired_<table>_<release> before the drop), or `-- archive: none (<reason>)` " +
+  "when the dropped data has no value, for example an empty or derived column.";
 
 const RENAME_FIX =
   "never rename in place: add the new name, backfill it, write both (or read both), switch " +
@@ -159,7 +167,18 @@ function dropFindings({
   floor: string;
 }): Finding[] {
   const pattern = /\bDROP\s+(COLUMN|TABLE|TYPE)\s+(?:IF\s+EXISTS\s+)?"?([\w.]+)"?/gi;
-  return [...live.matchAll(pattern)].flatMap((match): Finding[] => {
+  const first = [...live.matchAll(pattern)].find((match) => match[1]!.toUpperCase() !== "TYPE");
+  const unarchived: Finding[] =
+    first && !ARCHIVE_NOTE.test(sql)
+      ? [
+          {
+            rule: "contract-without-archive-note",
+            problem: `drops ${first[1]!.toLowerCase()} ${first[2]} with no archive note`,
+            fix: ARCHIVE_FIX,
+          },
+        ]
+      : [];
+  const retirements = [...live.matchAll(pattern)].flatMap((match): Finding[] => {
     const what = `${match[1]!.toLowerCase()} ${match[2]}`;
     if (!retiredBefore(sql, match.index)) {
       return [
@@ -188,6 +207,7 @@ function dropFindings({
       },
     ];
   });
+  return [...retirements, ...unarchived];
 }
 
 function notNullFindings(live: string): Finding[] {

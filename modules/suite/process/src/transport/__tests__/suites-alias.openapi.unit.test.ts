@@ -36,10 +36,10 @@ const closed: RestIdentity = {
 
 async function generate(): Promise<Document> {
   const family = createSuitesAliasRest().router() as RestTransportDeclaration<unknown>;
-  const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
   for (const route of family.routes) {
-    for (const fact of route.middleware ?? []) {
-      facts.set(fact.name, { middleware: fact, resolve: refuse });
+    for (const declared of route.middleware ?? []) {
+      contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
     }
   }
 
@@ -49,7 +49,6 @@ async function generate(): Promise<Document> {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -57,7 +56,7 @@ async function generate(): Promise<Document> {
     audit: { record: async () => {} },
     idempotency: refuse,
     rateLimiter: { check: refuse },
-    facts: [...facts.values()] as never,
+    middlewareContext: [...contexts.values()] as never,
     entitlements: { holds: refuse },
   });
   rest.mount(family, refuse);

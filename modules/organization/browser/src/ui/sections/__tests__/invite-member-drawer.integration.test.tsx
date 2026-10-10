@@ -99,4 +99,17 @@ describe("the invite drawer", () => {
       await waitFor(() => expect(calls.invalidated).toContain("licenseEnforcement.checkLimit"));
     });
   });
+
+  describe("given it opens from the inline invite box with the first letter typed", () => {
+    it("focuses the email field, so the rest of the address lands there", async () => {
+      const host = new FakeOrganizationHost({ grants: new Set(["organization:manage"]) });
+      renderWithOrganizationHost(<InviteMemberDrawer open={true} initialEmail="t" />, host);
+      const field = screen.getByPlaceholderText("alice@example.com, bob@example.com");
+
+      await waitFor(() => expect(field).toHaveFocus());
+      await userEvent.keyboard("om@acme.com");
+
+      expect(field).toHaveValue("tom@acme.com");
+    });
+  });
 });

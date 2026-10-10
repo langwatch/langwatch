@@ -15,6 +15,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
@@ -30,6 +31,7 @@ import {
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -120,7 +122,7 @@ function explorerFilter({ query }: { query: string }): TraceFilterWhere {
 
 function listWith({ tenantId, filterWhere }: { tenantId: string; filterWhere: TraceFilterWhere }) {
   return repo.listAll({
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange,
     sort: { column: "OccurredAt", direction: "desc" },
     limit: 50,
@@ -139,7 +141,7 @@ async function categoricalCounts({
   filterWhere?: TraceFilterWhere;
 }): Promise<Record<string, number>> {
   const batch = await repo.findBatchedFacets({
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange,
     table: "trace_summaries",
     timeColumn: "OccurredAt",
@@ -156,7 +158,7 @@ async function categoricalCounts({
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = TraceListClickHouseRepository.create(async () => ch);
+  repo = TraceListClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
 }, 120_000);
 
 describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the trace list", () => {
@@ -220,7 +222,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     /** @scenario "The list leaves out Langy's turns by default" */
     it("counts only the customer trace as new", async () => {
       const count = await repo.findCount({
-        tenantId,
+        authorization: ownProof({ projectId: tenantId }),
         timeRange,
         since: base - 1,
         filterWhere: explorerFilter({ query: "" }),
@@ -384,7 +386,7 @@ async function sidebarCounts({
     topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange,
     filterFor: createFacetFilterResolver({
       queryText: query,

@@ -146,7 +146,7 @@ func TestIdPSignInPrintsOnlyTheNamedUser(t *testing.T) {
 	}
 }
 
-// @scenario "haven idp verification sets and clears the well-known verification file"
+// @scenario "haven sim idp verification sets and clears the well-known verification file"
 func TestIdPVerificationSetsAndClearsTheWellKnownToken(t *testing.T) {
 	api, seen := recordIdP(t)
 	if err := runIdPStub(t, api, simInv("verification", "set", "acme1.test", "tok-1")); err != nil {

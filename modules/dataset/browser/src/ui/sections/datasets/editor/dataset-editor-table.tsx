@@ -50,6 +50,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useDebounce } from "use-debounce";
 import { useStore } from "zustand";
@@ -156,7 +157,11 @@ function EditorTableHeading({
   title?: React.ReactNode;
 }) {
   if (title === undefined && datasetName) {
-    return <PageLayout.Heading data-testid="dataset-title">{datasetName}</PageLayout.Heading>;
+    return (
+      <PageLayout.Heading data-testid="dataset-title" title={datasetName} truncate minWidth={0}>
+        {datasetName}
+      </PageLayout.Heading>
+    );
   }
   if (typeof title === "string") return <Heading size="md">{title}</Heading>;
 
@@ -712,6 +717,7 @@ export function DatasetEditorTable({
   onColumnsChanged,
   editorPortalRef,
   headerActions,
+  headerSlot,
   readEnabled = true,
 }: {
   datasetId?: string;
@@ -731,6 +737,9 @@ export function DatasetEditorTable({
   floatingSelectionBar?: boolean;
   /** Page-specific actions rendered at the end of the chrome button row. */
   headerActions?: ReactNode;
+  /** Page mode: the page header element that receives the heading, counts, save state and
+   *  buttons; the search row stays above the grid. Omitted, the toolbar stays in the content. */
+  headerSlot?: HTMLElement | null;
   /** Disable editing the dataset definition (columns) in the database. */
   canEditDatasetRecord?: boolean;
   bottomSpace?: string;
@@ -1060,6 +1069,7 @@ export function DatasetEditorTable({
         canEditDatasetRecord={canEditDatasetRecord}
         onEditColumns={() => editColumnsDrawer.onOpen()}
         headerActions={headerActions}
+        headerSlot={headerSlot}
       />
 
       <Box
@@ -1400,6 +1410,7 @@ function EditorToolbar({
   canEditDatasetRecord,
   onEditColumns,
   headerActions,
+  headerSlot,
 }: {
   datasetName: ComponentProps<typeof EditorTableHeading>["datasetName"];
   title: ReactNode;
@@ -1423,11 +1434,12 @@ function EditorToolbar({
   canEditDatasetRecord: boolean;
   onEditColumns: () => void;
   headerActions: ReactNode;
+  headerSlot?: HTMLElement | null;
 }) {
-  return (
-    <HStack gap={3} align="center" width="full">
-      <EditorTableHeading datasetName={datasetName} title={title} />
-      <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
+  const heading = <EditorTableHeading datasetName={datasetName} title={title} />;
+  const counts = (
+    <>
+      <Text fontSize="13px" flexShrink={0} color="fg.muted" data-testid="dataset-row-count">
         {/* With no match count to report (see `isMatchCountKnown`), the count
           on hand describes unsearched rows, so reporting it as the result
           of the search would be false. Report the dataset's own size
@@ -1440,7 +1452,10 @@ function EditorToolbar({
         })}
       </Text>
       {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
-      <Spacer />
+    </>
+  );
+  const searchBox = (
+    <>
       {/* Saved datasets only — see the `activeSearch` note above. Placed
         outside the `!hideButtons` group on purpose: that group is the
         dataset-management toolbar, and search is a way of reading the grid,
@@ -1465,6 +1480,10 @@ function EditorToolbar({
           />
         </Box>
       )}
+    </>
+  );
+  const deleteSelected = (
+    <>
       {!floatingSelectionBar && selectedRowCount > 0 && (
         <Button
           size="sm"
@@ -1476,6 +1495,10 @@ function EditorToolbar({
           <X size={14} /> Delete {selectedRowCount} {selectedRowCount === 1 ? "row" : "rows"}
         </Button>
       )}
+    </>
+  );
+  const actions = (
+    <>
       {!hideButtons && (
         <>
           <Button
@@ -1500,6 +1523,38 @@ function EditorToolbar({
         </>
       )}
       {headerActions}
+    </>
+  );
+
+  if (headerSlot) {
+    return (
+      <>
+        {createPortal(
+          <>
+            {heading}
+            {counts}
+            <Spacer />
+            {actions}
+          </>,
+          headerSlot,
+        )}
+        <HStack gap={3} align="center" width="full">
+          {searchBox}
+          <Spacer />
+          {deleteSelected}
+        </HStack>
+      </>
+    );
+  }
+
+  return (
+    <HStack gap={3} align="center" width="full">
+      {heading}
+      {counts}
+      <Spacer />
+      {searchBox}
+      {deleteSelected}
+      {actions}
     </HStack>
   );
 }

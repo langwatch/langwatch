@@ -3,6 +3,7 @@ import {
   ClickHouseQueryClient,
   type QueryDriver,
   type QueryRequest,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
@@ -29,7 +30,9 @@ class RecordingDriver implements QueryDriver {
 }
 
 function repositoryOver(driver: RecordingDriver) {
-  return ClickHouseTraceAttributedRollupRepository.create(new ClickHouseQueryClient({ driver }));
+  return ClickHouseTraceAttributedRollupRepository.create(
+    new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }),
+  );
 }
 
 describe("ClickHouseTraceAttributedRollupRepository guards", () => {

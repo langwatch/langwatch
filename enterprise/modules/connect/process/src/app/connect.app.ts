@@ -3,14 +3,12 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import {
   ConnectApi,
   type ConnectApi as ConnectApiContract,
+  type HostedCaller,
   type HostedCapAnswer,
   type HostedClassifyAnswer,
-} from "@langwatch/enterprise-connect-contract";
-import {
-  LicensingApi,
-  type HostedCaller,
   type HostedUsageAnswer,
-} from "@langwatch/enterprise-licensing-contract";
+} from "@langwatch/enterprise-connect-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";

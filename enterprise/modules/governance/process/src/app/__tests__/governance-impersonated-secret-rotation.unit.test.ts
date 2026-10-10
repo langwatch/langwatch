@@ -4,6 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -49,6 +50,7 @@ function buildApp() {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

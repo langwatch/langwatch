@@ -53,4 +53,9 @@ export {
 } from "./run-script.ts";
 export { bootNodeExecutable, installBootGuard } from "./boot-guard.ts";
 export { createWarnThrottle, type WarnThrottle } from "./warn-throttle.ts";
-export { canonicalOtlpPath } from "./request/otlp-path.ts";
+export {
+  canonicalOtlpPath,
+  OTLP_CORRECTED_PATH_HEADER,
+  readCorrectedPath,
+  stampCorrectedPath,
+} from "./request/otlp-path.ts";

@@ -15,7 +15,7 @@ import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = { id: "project-123", teamId: "team-1", organizationId: "organization-1" };
 
@@ -74,11 +74,14 @@ function ingestionSourceDeployment({
   );
   apis.ready();
   const family = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
+    },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },
   }).mount(otlpIngestRest.router(), {
     app: () => apis.reference(TraceApi),
-    credential: "public",
+    credential: "otlp_ingest",
     onError: renderRefusal,
   });
   const post = (body: string) =>

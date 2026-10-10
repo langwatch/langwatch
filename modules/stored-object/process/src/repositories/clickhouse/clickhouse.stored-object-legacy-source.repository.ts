@@ -5,14 +5,10 @@ import {
   type LegacyStoredObjectRow,
   StoredObjectLegacySourceRepository,
 } from "../stored-object-legacy-source.repository.ts";
-import {
-  LEGACY_INDEX_UNSCOPED,
-  type StoredObjectsClickHouse,
-} from "./stored-objects.repository.ts";
+import { type StoredObjectsClickHouse } from "./stored-objects.repository.ts";
 
 const legacyRowSchema = z.object({
   id: z.string(),
-  project_id: z.string(),
   purpose: z.string(),
   owner_kind: z.string(),
   owner_id: z.string(),
@@ -21,7 +17,7 @@ const legacyRowSchema = z.object({
   sha256: z.string(),
   storage_uri: z.string(),
   created_at: z.string(),
-  inserted_at: z.string(),
+  last_inserted_at: z.string(),
 });
 
 /** Pages one project's legacy index by id, each id at its latest version. */
@@ -45,10 +41,10 @@ export class ClickHouseStoredObjectLegacySourceRepository extends StoredObjectLe
   }): Promise<readonly LegacyStoredObjectRow[]> {
     const client = await this.clickhouse.resolveClient(projectId);
     const result = await client.query({
+      // An alias named after a column shadows it in WHERE and inside argMax (ILLEGAL_AGGREGATION).
       query: `
         SELECT
           id,
-          any(project_id)                  AS project_id,
           argMax(purpose, inserted_at)     AS purpose,
           argMax(owner_kind, inserted_at)  AS owner_kind,
           argMax(owner_id, inserted_at)    AS owner_id,
@@ -57,7 +53,7 @@ export class ClickHouseStoredObjectLegacySourceRepository extends StoredObjectLe
           argMax(sha256, inserted_at)      AS sha256,
           argMax(storage_uri, inserted_at) AS storage_uri,
           argMax(created_at, inserted_at)  AS created_at,
-          max(inserted_at)                 AS inserted_at
+          max(inserted_at)                 AS last_inserted_at
         FROM stored_objects
         WHERE project_id = {projectId:String}
           AND id > {afterId:String}
@@ -67,14 +63,16 @@ export class ClickHouseStoredObjectLegacySourceRepository extends StoredObjectLe
       `,
       query_params: { projectId, afterId: afterId ?? "", limit },
       format: "JSONEachRow",
-      unscoped: LEGACY_INDEX_UNSCOPED,
+      // Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the
+      // statement is filtered by project_id.
+      SKIP_TENANT_CHECK: true,
     });
     const rows = await result.json<unknown>();
     return rows.map((raw) => {
       const row = legacyRowSchema.parse(raw);
       return {
         id: row.id,
-        projectId: row.project_id,
+        projectId,
         purpose: row.purpose,
         ownerKind: row.owner_kind,
         ownerId: row.owner_id,
@@ -83,7 +81,7 @@ export class ClickHouseStoredObjectLegacySourceRepository extends StoredObjectLe
         sha256: row.sha256,
         storageUri: row.storage_uri,
         createdAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(row.created_at)),
-        insertedAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(row.inserted_at)),
+        insertedAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(row.last_inserted_at)),
       };
     });
   }

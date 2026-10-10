@@ -5,7 +5,11 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
  * `POST /api/workflows/:workflowId/run` over the real app and the runtime a process mounts
  * it on: the run's typed refusals keep their statuses, and an untyped failure stays opaque.
  */
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -59,7 +63,7 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
       app: () => app,
       credential: "project",
       onError: canonicalErrorResponse,
-      facts: [bindRestMiddleware(workflowRunCallerKey, () => null)],
+      middlewareContext: [bindMiddlewareContext(workflowRunCallerKey, () => null)],
     })
     .request("/api/workflows/workflow_1/run", {
       method: "POST",

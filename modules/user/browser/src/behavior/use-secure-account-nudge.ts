@@ -15,6 +15,17 @@ export function useSecureAccountNudge() {
   const host = usePersonalWorkspaceHost();
   const utils = api.useUtils();
   const nudge = api.user.secureAccountNudge.useQuery({});
+  // Identity answers whether the organization's single sign-on governs sign-in; asked only
+  // when a passkey is on offer, and the offer waits for it so it never flickers.
+  const governance = api.identity.mySignInGovernance.useQuery(
+    {},
+    { enabled: nudge.data?.passkey === true },
+  );
+  const ssoGoverned = governance.data?.governedBySso === true;
+  const offer =
+    nudge.data?.passkey && governance.isPending
+      ? undefined
+      : withoutGovernedPasskey(nudge.data, ssoGoverned);
   // Settled on the mutation, not the call: writing the answer into the cached
   // offer unmounts this dialog, and a callback handed to `mutate` goes with it.
   const dismiss = api.user.dismissSecureAccountNudge.useMutation({
@@ -66,11 +77,21 @@ export function useSecureAccountNudge() {
   };
 
   return {
-    offer: nudge.data,
+    offer,
+    ssoGoverned,
     isAnswered,
     isCreating,
     later,
     setUpTwoStep,
     createPasskey,
   };
+}
+
+/** A governed account is offered no passkey, and nothing at all when that was the whole offer. */
+function withoutGovernedPasskey<T extends { offer: boolean; passkey: boolean; twoStep: boolean }>(
+  offer: T | undefined,
+  governed: boolean,
+): T | undefined {
+  if (!offer || !governed) return offer;
+  return { ...offer, passkey: false, offer: offer.offer && offer.twoStep };
 }

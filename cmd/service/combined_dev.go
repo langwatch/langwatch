@@ -7,6 +7,7 @@ import (
 
 	analyticssim "github.com/langwatch/langwatch/services/analyticssim/cmd"
 	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
+	lambdasim "github.com/langwatch/langwatch/services/lambdasim/cmd"
 	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
 	mailsim "github.com/langwatch/langwatch/services/mailsim/cmd"
 	outboundsim "github.com/langwatch/langwatch/services/outboundsim/cmd"
@@ -46,6 +47,7 @@ var simulators = []simulator{
 	ownAddr("telemetrysim", "TELEMETRYSIM_ADDR", telemetrysim.Root),
 	ownAddr("outboundsim", "OUTBOUNDSIM_ADDR", outboundsim.Root),
 	ownAddr("paymentsim", "PAYMENTSIM_ADDR", paymentsim.Root),
+	ownAddr("lambdasim", "LAMBDASIM_ADDR", lambdasim.Root),
 }
 
 // ownAddr is a simulator whose own configuration reads addrEnv, so the combined

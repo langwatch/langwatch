@@ -63,7 +63,7 @@ func TestUpRegistersTheGateHookAutomatically(t *testing.T) {
 		t.Run("when the developer runs haven up", func(t *testing.T) {
 			o.EnsureGateHookForUp(worktree)
 
-			t.Run("the gate is registered in that worktree's Claude settings, the same way haven setup gate-hook would", func(t *testing.T) {
+			t.Run("the gate is registered in that worktree's Claude settings, the same way haven self setup gate-hook would", func(t *testing.T) {
 				if len(claude.roots) != 1 || claude.roots[0] != worktree || !strings.HasSuffix(claude.commands[0], " gate") {
 					t.Fatalf("expected a registration in the started worktree, got roots=%+v commands=%+v", claude.roots, claude.commands)
 				}
@@ -71,7 +71,7 @@ func TestUpRegistersTheGateHookAutomatically(t *testing.T) {
 					t.Fatal(err)
 				}
 				if claude.commands[0] != claude.commands[1] {
-					t.Fatalf("haven up and haven setup gate-hook must write the identical command: %+v", claude.commands)
+					t.Fatalf("haven up and haven self setup gate-hook must write the identical command: %+v", claude.commands)
 				}
 			})
 
@@ -89,12 +89,12 @@ func TestUpRegistersTheGateHookAutomatically(t *testing.T) {
 		})
 	})
 
-	t.Run("given a worktree opted out with haven setup gate-hook --off", func(t *testing.T) {
+	t.Run("given a worktree opted out with haven self setup gate-hook --off", func(t *testing.T) {
 		claude := &hookSettingsRecorder{offResult: true}
 		worktree := t.TempDir()
 		o := New(Deps{Cfg: Config{RepoRoot: worktree}, Claude: claude})
 
-		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+		t.Run("when haven self setup gate-hook --off runs", func(t *testing.T) {
 			turnedOff, err := o.OptOutFeature("gate-hook")
 
 			t.Run("it removes the registration through the same writer haven up uses", func(t *testing.T) {

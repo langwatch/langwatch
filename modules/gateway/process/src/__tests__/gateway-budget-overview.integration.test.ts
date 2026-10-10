@@ -66,6 +66,7 @@ function createSuiteProjects(): ProjectApi {
             teamId: true,
             isPersonal: true,
             ownerUserId: true,
+            kind: true,
             team: { select: { organizationId: true } },
           },
         });

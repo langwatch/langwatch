@@ -1,4 +1,5 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -10,7 +11,6 @@ import { useMemo, useState } from "react";
 import { buildMcpJson, findLangwatchEnvLines } from "../../model/shared/build-mcp-config.ts";
 import { TabButton } from "../elements/shared/tab-button.tsx";
 import { useActiveProject } from "./active-project-context.tsx";
-import { CodePreview } from "./observability/code-preview.tsx";
 import { ProjectTokenBanner } from "./observability/project-token-banner.tsx";
 
 const MotionVStack = motion.create(VStack);
@@ -223,7 +223,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
 
         {minting ? <ProjectTokenBanner minting={minting} /> : null}
 
-        <CodePreview
+        <SnippetPreview
           code={configJson}
           filename="mcp.json"
           codeLanguage="json"

@@ -157,9 +157,6 @@ export class ScimMembershipAccessService {
       revokedGrantIds: visibleGrants.map((row) => row.id),
       actor: ScimMembershipAccessService.ACTOR,
     });
-    // A leaver stays a member holding nothing; only a deletion takes the row.
-    if (op === "delete_user") {
-      await this.members.deleteMember({ organizationId, userId }, null);
-    }
+    await this.members.deleteMember({ organizationId, userId }, null);
   }
 }

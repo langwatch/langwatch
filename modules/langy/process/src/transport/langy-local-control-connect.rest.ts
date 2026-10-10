@@ -5,8 +5,10 @@
  */
 
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
+  defineRestDoor,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
@@ -37,6 +39,24 @@ import {
 } from "./langy-local-control.rest.ts";
 
 const JSON_MEDIA_TYPE = "application/json";
+
+/** Register's door: the framework parsed the minted key, the session core says who holds it. */
+export const localControlSessionKeyDoor = defineRestDoor("session_key", {
+  needs: LangyApi,
+  identify: async ({ sessionKey, request }, langy) => {
+    if (sessionKey === null) throw new ProjectMissingCredentialsError();
+    const holder = await langy.verifyLocalControlSessionKey({
+      ...sessionKey,
+      instanceToken: request.headers.get(INSTANCE_TOKEN_HEADER),
+    });
+
+    return {
+      actor: holder.actor,
+      scope: { tier: "project", id: holder.projectId },
+      session: holder,
+    };
+  },
+});
 
 const BECAUSE = "The local folder reads its answers and refusals as relay frames.";
 

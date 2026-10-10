@@ -21,6 +21,8 @@ export const seedAckSchema = z
     id: z.string().min(1),
     ok: z.literal(true),
     refs: z.record(z.string(), z.string()).optional(),
+    /** The action found what it names instead of creating it: a re-run. */
+    existing: z.literal(true).optional(),
   })
   .strict();
 export type SeedAck = z.infer<typeof seedAckSchema>;

@@ -20,6 +20,7 @@ const CONSOLES: { label: string; service: string | null; group?: string }[] = [
   { label: "Outbound", service: "outbound", group: "Sims" },
   { label: "Payment", service: "payment", group: "Sims" },
   { label: "Telemetry", service: "telemetry", group: "Sims" },
+  { label: "Lambda", service: "lambda", group: "Sims" },
   { label: "Design system", service: "design-system", group: "Tools" },
   { label: "Mail room", service: "mail-room", group: "Tools" },
 ];

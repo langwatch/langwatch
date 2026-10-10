@@ -23,6 +23,7 @@ import {
   MemberNotFoundError,
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
+  auditImpersonationMetadataSchema,
 } from "@langwatch/organization-contract";
 import type {
   FullyLoadedOrganization,
@@ -2191,7 +2192,19 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // userId is nullable post-consolidation (system-actor writes) — filter
     // null out before passing to the Prisma `IN` predicate, which rejects
     // null array members at runtime.
-    const userIds = [...new Set(rows.map((r) => r.userId).filter((id): id is string => !!id))];
+    const actorIds = new Map(
+      rows.map((row) => [
+        row.id,
+        row.actorUserId ??
+          auditImpersonationMetadataSchema.safeParse(row.metadata).data?.impersonatorId ??
+          null,
+      ]),
+    );
+    const userIds = [
+      ...new Set(
+        [...rows.map((r) => r.userId), ...actorIds.values()].filter((id): id is string => !!id),
+      ),
+    ];
     const projectIds = [
       ...new Set(rows.map((r) => r.projectId).filter((id): id is string => !!id)),
     ];
@@ -2235,6 +2248,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         targetId: log.targetId,
         before: log.before,
         after: log.after,
+        actorUserId: actorIds.get(log.id) ?? null,
+        actorUser: userMap.get(actorIds.get(log.id) ?? "") ?? null,
       };
     });
 

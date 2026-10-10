@@ -1,4 +1,4 @@
-import type { TransportPeers, BoundTransportFacts } from "@langwatch/api";
+import type { TransportPeers, BoundMiddlewareBindings } from "@langwatch/api";
 /**
  * What a process's doors are built from, once every module is installed:
  * a FACTORY, since a door can't be built before boot (route credentials
@@ -20,10 +20,10 @@ export class MissingTransportPeerError extends Error {
 /** The peers a booting application hands its door factory. */
 export function transportPeersOf(
   resolve: (token: TokenIdentity) => unknown,
-  facts: readonly BoundTransportFacts[] = [],
+  middlewareBindings: readonly BoundMiddlewareBindings[] = [],
 ): TransportPeers {
   return {
-    facts,
+    middlewareBindings,
     app: <Instance>(token: DependencyToken<Instance>): Instance => {
       const instance = resolve(token as TokenIdentity);
       if (instance === void 0)

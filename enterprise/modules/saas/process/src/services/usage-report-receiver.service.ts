@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { PLATFORM_TENANT_ID } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   UsageReportRateLimitedError,
@@ -6,11 +7,12 @@ import {
   type SaasServerConfig,
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import { countUnknownUsageFields, usageReportBodySchema } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { ProductAnalyticsChannel } from "../channels/product-analytics.channel.ts";
+import type { SaasUsageReportPipeline } from "../eventing/saas-usage-report.pipeline.ts";
 import type { SaasRateLimitRepository } from "../repositories/saas-rate-limit.repository.ts";
 import {
   senderAddressesOf,
@@ -24,6 +26,12 @@ import {
 import type { LangWatchCloudService } from "./langwatch-cloud.service.ts";
 
 type UsageReportRecorder = Pick<LicensingApi, "recordUsageReport">;
+type UsageReportFacts = Readonly<{
+  recordUsageReportReceived: Pick<
+    EventingCommands<SaasUsageReportPipeline>["recordUsageReportReceived"],
+    "send"
+  >;
+}>;
 type ReleaseConfig = Pick<
   SaasServerConfig,
   "latestRelease" | "latestReleaseCommit" | "releaseFloor"
@@ -31,29 +39,27 @@ type ReleaseConfig = Pick<
 
 /**
  * The anonymous daily report a self-hosted install posts. It lands in the
- * install registry and in product analytics; neither failing refuses it, since
- * a refused report takes the install out of view. @see ../../../specs/usage-report-receiver.feature
+ * install registry and as a `usage_report_received` fact nurturing sends to product
+ * analytics; neither failing refuses it, since a refused report takes the install out of view. @see ../../../specs/usage-report-receiver.feature
  */
 export class UsageReportReceiverService {
   readonly #cloud: LangWatchCloudService;
   readonly #rateLimits: SaasRateLimitRepository;
   readonly #registry: UsageReportRecorder;
-  readonly #analytics: ProductAnalyticsChannel;
   readonly #logger: Logger;
   readonly #receipt: UsageReportReceipt;
+  #facts: UsageReportFacts | undefined;
 
   private constructor(parts: {
     cloud: LangWatchCloudService;
     rateLimits: SaasRateLimitRepository;
     registry: UsageReportRecorder;
-    analytics: ProductAnalyticsChannel;
     logger: Logger;
     release: ReleaseConfig;
   }) {
     this.#cloud = parts.cloud;
     this.#rateLimits = parts.rateLimits;
     this.#registry = parts.registry;
-    this.#analytics = parts.analytics;
     this.#logger = parts.logger;
     this.#receipt = receiptOf(parts.release);
   }
@@ -62,7 +68,6 @@ export class UsageReportReceiverService {
     cloud: LangWatchCloudService;
     rateLimits: SaasRateLimitRepository;
     registry: UsageReportRecorder;
-    analytics: ProductAnalyticsChannel;
     logger: Logger;
     release: ReleaseConfig;
   }): UsageReportReceiverService {
@@ -86,13 +91,35 @@ export class UsageReportReceiverService {
     await this.#admit(usageReportInstanceKey(instanceId), USAGE_REPORT_PER_INSTANCE_LIMIT);
 
     await this.#record({ instanceId, properties, unknownFields });
-    this.#analytics.capture({
-      distinctId: instanceId,
-      event,
-      properties: { ...properties, unknown_fields: unknownFields },
-    });
+    await this.#recordFact({ instanceId, event, properties, unknownFields });
 
     return this.#receipt;
+  }
+
+  /** Binds the saas_usage_report pipeline's sender. */
+  connect(facts: UsageReportFacts): void {
+    this.#facts = facts;
+  }
+
+  async #recordFact(data: {
+    instanceId: string;
+    event: string;
+    properties: Record<string, unknown>;
+    unknownFields: number;
+  }): Promise<void> {
+    try {
+      if (!this.#facts) throw new Error("saas_usage_report senders are not connected yet");
+      await this.#facts.recordUsageReportReceived.send({
+        ...data,
+        tenantId: PLATFORM_TENANT_ID,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      this.#logger.error(
+        { error, instanceId: data.instanceId },
+        "a usage report was accepted but its fact was not recorded",
+      );
+    }
   }
 
   async #admit(key: string, limit: { requests: number; seconds: number }): Promise<void> {

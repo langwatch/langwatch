@@ -1,10 +1,10 @@
 /**
  * `/api/experiments` - the list, one row, and the create that starts a
  * workbench, over a standard project key. The create's attributed credential
- * is a bound fact, not a reach into the framework's context.
+ * is middleware context, not a reach into the framework's context.
  */
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -31,7 +31,7 @@ const EXPERIMENT_TAGS = ["Experiments"] as const;
  * rule reads: a scoped key acts as the member it was minted for, a legacy
  * project key acts as nobody, and an agent's session key says so.
  */
-export const experimentRestCredential = defineRestMiddleware(
+export const experimentRestCredential = defineMiddlewareContext(
   "experimentRestCredential",
   z.discriminatedUnion("kind", [
     z.object({
@@ -152,7 +152,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
       },
     ],
   })
-  .withMiddleware(experimentRestCredential)
+  .withMiddlewareContext(experimentRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     // A caller that sends no setup still gets a workbench they can open. The
     // default and the attribution are both the application's: they are

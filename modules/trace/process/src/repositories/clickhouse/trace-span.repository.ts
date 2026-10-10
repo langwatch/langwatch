@@ -1,12 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
 import { type AuthorizedClickHouse, tenantScope } from "@langwatch/clickhouse-client";
-import { EventUtils } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import {
   evaluationTraceEventSchema,
   evaluationTraceSpanSchema,
   type EvaluationTraceEvent,
-  type EvaluationTraceReadInput,
   type EvaluationTraceSpan,
   type SpanTreeCursor,
 } from "@langwatch/trace-contract";
@@ -18,7 +16,6 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
-import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
@@ -94,17 +91,6 @@ const summarySelect = `
   StatusCode
 `;
 
-const dedupInTuple = (extraInnerWhere: string): string => `
-  (TenantId, TraceId, SpanId, UpdatedAt) IN (
-    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-    FROM ${STORED_SPANS_TABLE}
-    WHERE TenantId = {tenantId:String}
-      AND TraceId = {traceId:String}
-      ${extraInnerWhere}
-    GROUP BY TenantId, TraceId, SpanId
-  )
-`;
-
 /** The dedup election under the proof's fence; the tree reads never name a tenant (ADR-177). */
 const fencedDedupInTuple = (extraInnerWhere: string): string => `
   (TenantId, TraceId, SpanId, UpdatedAt) IN (
@@ -149,26 +135,20 @@ const occurredAtRowsSchema = z.array(occurredAtRowSchema);
 
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
 export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository {
-  private constructor(
-    private readonly resolveClient: TraceClickHouseResolver,
-    private readonly clickhouse: AuthorizedClickHouse,
-  ) {
+  private constructor(private readonly clickhouse: AuthorizedClickHouse) {
     super();
   }
 
-  static create(options: {
-    resolveClient: TraceClickHouseResolver;
-    clickhouse: AuthorizedClickHouse;
-  }): ClickHouseTraceSpanRepository {
-    return new ClickHouseTraceSpanRepository(options.resolveClient, options.clickhouse);
+  static create(options: { clickhouse: AuthorizedClickHouse }): ClickHouseTraceSpanRepository {
+    return new ClickHouseTraceSpanRepository(options.clickhouse);
   }
 
-  async findEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]> {
-    EventUtils.validateTenantId(
-      { tenantId: input.tenantId },
-      "ClickHouseTraceSpanRepository.findEvaluationSpans",
-    );
-    const client = await this.resolveClient(input.tenantId);
+  async findEvaluationSpans(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<EvaluationTraceSpan[]> {
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
     const window =
       input.occurredAtMs === void 0
         ? ""
@@ -180,15 +160,14 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
           coalesce(nullIf(SpanAttributes['gen_ai.response.model'], ''), SpanAttributes['gen_ai.request.model']) AS Model,
           SpanAttributes['langwatch.rag.contexts'] AS Contexts
         FROM ${STORED_SPANS_TABLE}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND TraceId = {traceId:String}
           ${window}
-          AND ${dedupInTuple(window)}
+          AND ${fencedDedupInTuple(window)}
         ORDER BY StartTime ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
       query_params: {
-        tenantId: input.tenantId,
         traceId: input.traceId,
         ...(input.occurredAtMs === void 0
           ? {}
@@ -202,7 +181,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     const rows = evaluationSpanRowsSchema.parse(await result.json());
     if (rows.length === 0 && input.occurredAtMs !== void 0) {
       return this.findEvaluationSpans({
-        tenantId: input.tenantId,
+        authorization: input.authorization,
         traceId: input.traceId,
       });
     }
@@ -211,12 +190,12 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     );
   }
 
-  async findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]> {
-    EventUtils.validateTenantId(
-      { tenantId: input.tenantId },
-      "ClickHouseTraceSpanRepository.findEvaluationEvents",
-    );
-    const client = await this.resolveClient(input.tenantId);
+  async findEvaluationEvents(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<EvaluationTraceEvent[]> {
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
     const window =
       input.occurredAtMs === void 0
         ? ""
@@ -230,10 +209,10 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
             \`Events.Name\` AS Events_Name,
             \`Events.Attributes\` AS Events_Attributes
           FROM ${STORED_SPANS_TABLE}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("StartTime")}
             AND TraceId = {traceId:String}
             ${window}
-            AND ${dedupInTuple(window)}
+            AND ${fencedDedupInTuple(window)}
         )
         ARRAY JOIN
           Events_Timestamp AS event_timestamp,
@@ -243,7 +222,6 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         ORDER BY event_timestamp DESC
       `,
       query_params: {
-        tenantId: input.tenantId,
         traceId: input.traceId,
         ...(input.occurredAtMs === void 0
           ? {}
@@ -257,7 +235,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     const rows = evaluationEventRowsSchema.parse(await result.json());
     if (rows.length === 0 && input.occurredAtMs !== void 0) {
       return this.findEvaluationEvents({
-        tenantId: input.tenantId,
+        authorization: input.authorization,
         traceId: input.traceId,
       });
     }
@@ -266,13 +244,10 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     );
   }
 
-  async findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
-    EventUtils.validateTenantId(
-      { tenantId: input.tenantId },
-      "ClickHouseTraceSpanRepository.findIngestLag",
-    );
-
-    const client = await this.resolveClient(input.tenantId);
+  async findIngestLag(input: {
+    authorization: Authorization;
+  }): Promise<TraceIngestLagSample | null> {
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
     const result = await client.query({
       query: `
         SELECT
@@ -283,13 +258,12 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
             TraceId,
             dateDiff('millisecond', max(EndTime), max(CreatedAt)) AS SpanLagMs
           FROM stored_spans
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("StartTime")}
             AND StartTime >= now() - INTERVAL 7 DAY
           GROUP BY TraceId
         )
         WHERE SpanLagMs >= 0
       `,
-      query_params: { tenantId: input.tenantId },
       format: "JSONEachRow",
     });
     const rows = ingestLagRowsSchema.parse(await result.json());

@@ -1,4 +1,5 @@
 import type { ServingRosterEntry } from "@langwatch/upgrade";
+import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
   ListRunsInput,
   ListStepsFilter,
@@ -19,6 +20,8 @@ import type {
  */
 export interface UpgradeLedgerRepository {
   findStatus(): Promise<UpgradeStatus>;
+  /** The deprecation register this image ships (ruling D8). */
+  findDeprecations(): Deprecation[];
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage>;
   findReleases(): Promise<UpgradeReleasePage>;
   findRuns(input?: ListRunsInput): Promise<UpgradeRunPage>;

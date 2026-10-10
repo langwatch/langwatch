@@ -5,7 +5,7 @@
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -18,7 +18,7 @@ import {
   OnboardingApi,
 } from "@langwatch/onboarding-contract";
 
-export const onboardingRestCredential = defineRestMiddleware(
+export const onboardingRestCredential = defineMiddlewareContext(
   "onboardingRestCredential",
   onboardingRestCredentialSchema,
 );
@@ -30,7 +30,7 @@ export const onboardingRest = defineRestRouter(OnboardingApi)
   .get("/guided", "getApiOnboardingGuided")
   .withPermission("project:view")
   .withOutput(guidedStateWithVariantOutputSchema)
-  .withMiddleware(onboardingRestCredential)
+  .withMiddlewareContext(onboardingRestCredential)
   .withDocs({
     hide: true,
     tags: ["Onboarding"],
@@ -44,7 +44,7 @@ export const onboardingRest = defineRestRouter(OnboardingApi)
   .withInput(guidedPathCompleteRestInputSchema)
   .withPermission("project:view")
   .withOutput(guidedStateOutputSchema)
-  .withMiddleware(onboardingRestCredential)
+  .withMiddlewareContext(onboardingRestCredential)
   .withDocs({
     hide: true,
     tags: ["Onboarding"],

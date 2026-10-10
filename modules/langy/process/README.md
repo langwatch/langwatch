@@ -6,7 +6,7 @@ The server half of [langy](../README.md). Langy, the in-product assistant: conve
 
 ## Installation
 
-`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).withTransportFacts(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:28`.
+`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).provideMiddlewareBindings(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:28`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1361,7 +1361,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:286`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:285`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

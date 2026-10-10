@@ -1,6 +1,6 @@
 ---
 name: outboundsim
-description: "Catch and inspect the stack's outbound Slack, webhook and SQS sends with outboundsim, haven's stand-in for those destinations, and inject receiver faults. Use when someone says 'did the Slack alert fire', 'webhook delivery', 'check the signature', 'retry a failing receiver', 'SQS message', 'outboundsim', 'haven outbound', or needs to assert on an outbound message in a test."
+description: "Catch and inspect the stack's outbound Slack, webhook and SQS sends with outboundsim, haven's stand-in for those destinations, and inject receiver faults. Use when someone says 'haven outbound', 'did the Slack alert fire', 'webhook delivery', 'check the signature', 'retry a failing receiver', 'SQS message', 'outboundsim', 'haven sim outbound', 'haven up +outbound', or needs to assert on an outbound message in a test."
 user-invocable: true
 ---
 
@@ -19,24 +19,24 @@ it. Code: `services/outboundsim`, console `apps/outboundsim-web`.
   `SLACK_API_BASE=<base>/api` and `SLACK_WEBHOOK_BASE=<base>` (so a bot token check,
   `chat.postMessage` and a `https://hooks.slack.com/...` test fire land here, not at Slack) and
   `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1`, each only when `.env` leaves it unset. A webhook
-  destination you create in the app points at `<base>/hooks/<name>`; `haven outbound urls`
+  destination you create in the app points at `<base>/hooks/<name>`; `haven sim outbound urls`
   prints every URL to paste.
 
 ## Drive it from a terminal
 
 ```
-haven outbound status | urls
-haven outbound records [--channel slack-webhook|slack-api|webhook|sqs] [--target] [--json]
-haven outbound deliveries                # webhook retries grouped by event id
-haven outbound wait --channel webhook [--target] [--count 1] [--timeout 30s]
-haven outbound fault add --channel webhook --status 503 [--retry-after 5] [--times 2]
-haven outbound fault add --channel webhook --latency 20000 | --drop   # ms
-haven outbound fault list | clear [id]
-haven outbound receiver set <name> --secret <s>   # verify LangWatch delivery signatures
-haven outbound clear
+haven sim outbound status | urls
+haven sim outbound list [--channel slack-webhook|slack-api|webhook|sqs] [--target] [--json]
+haven sim outbound deliveries                # webhook retries grouped by event id
+haven sim outbound wait --channel webhook [--target] [--count 1] [--timeout 30s]
+haven sim outbound fault add --channel webhook --status 503 [--retry-after 5] [--times 2]
+haven sim outbound fault add --channel webhook --latency 20000 | --drop   # ms
+haven sim outbound fault list | clear [id]
+haven sim outbound receiver set <name> --secret <s>   # verify LangWatch delivery signatures
+haven sim outbound clear
 ```
 
-`wait` is how a test or agent asserts a send happened; it exits non-zero on timeout.
+`wait` is how a test or agent asserts a send happened; it exits 66 on timeout.
 
 ## HTTP
 

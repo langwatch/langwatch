@@ -1,7 +1,8 @@
 /** Top bar: org/product scope (left), account controls (right). Impersonation banner from host. */
 
+import { AppTopBar } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { Settings as SettingsIcon } from "lucide-react";
 
 import { InsightsBell } from "../../behavior/lent-insights.tsx";
@@ -40,57 +41,44 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
   const clusterWidth = state.isCompactSidebar ? undefined : state.menuWidth;
 
   return (
-    <HStack
-      position="relative"
-      width="full"
-      height={`${APP_HEADER_HEIGHT}px`}
-      paddingLeft={shouldShowProductCluster ? 0 : 4}
-      paddingRight={4}
-      paddingY={3}
-      background="bg.page"
-      justifyContent="space-between"
-      gap={4}
-      overflow="hidden"
-    >
-      {(user?.impersonator || showDevelopmentIndicator) && (
-        <Box
-          position="absolute"
-          top={-5}
-          right="-100px"
-          bottom={0}
-          w="400px"
-          background={user?.impersonator ? "blue.300" : "orange.300"}
-          filter="blur(40px)"
-          pointerEvents="none"
-        ></Box>
-      )}
-
-      <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
-        {shouldShowProductCluster && (
+    <AppTopBar
+      height={APP_HEADER_HEIGHT}
+      glow={topBarGlow({ impersonating: Boolean(user?.impersonator), showDevelopmentIndicator })}
+      flushLeft={shouldShowProductCluster}
+      leading={
+        shouldShowProductCluster ? (
           <ProductCluster activeProductId={activeProductId} width={clusterWidth} />
-        )}
-        <HStack
-          gap={3}
-          alignItems="center"
-          minWidth={0}
-          // The cluster ends at the sidebar edge, so this inset is the
-          // gap the organization control keeps from the content column.
-          paddingLeft={shouldShowProductCluster ? "22px" : 0}
-        >
+        ) : undefined
+      }
+      controls={
+        <>
           <OrganizationSelect activeProductId={activeProductId} />
           <ProductScopeControl activeProductId={activeProductId} />
-        </HStack>
-      </HStack>
-
-      <HStack gap={2} justifyContent="flex-end" overflow="hidden" flexShrink={0}>
-        {showDevelopmentIndicator && <DevBadge label={host.deployment().devIndicatorLabel} />}
-        {accountMenu?.headerBanner}
-        <InsightsBell />
-        {host.commandBar()?.trigger}
-        <AppHeaderUserMenu />
-      </HStack>
-    </HStack>
+        </>
+      }
+      trailing={
+        <>
+          {showDevelopmentIndicator && <DevBadge label={host.deployment().devIndicatorLabel} />}
+          {accountMenu?.headerBanner}
+          <InsightsBell />
+          {host.commandBar()?.trigger}
+          <AppHeaderUserMenu />
+        </>
+      }
+    />
   );
+}
+
+/** An operator viewing as someone outranks a development build. */
+function topBarGlow({
+  impersonating,
+  showDevelopmentIndicator,
+}: {
+  impersonating: boolean;
+  showDevelopmentIndicator: boolean;
+}): "impersonating" | "development" | undefined {
+  if (impersonating) return "impersonating";
+  return showDevelopmentIndicator ? "development" : undefined;
 }
 
 function ProductCluster({

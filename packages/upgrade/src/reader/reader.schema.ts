@@ -25,6 +25,7 @@ export const installationReasonSchema = z.enum([
   "image-below-ledger-floor",
   "failed-step",
   "failed-target",
+  "failed-run",
   "run-in-progress",
   "no-upgrade-recorded",
   "image-newer",

@@ -38,6 +38,14 @@ function isDeclaredScopeHeader(node) {
   return call?.type === "CallExpression" && nameOf(call.callee) === "withPermission";
 }
 
+// `"authorization" in input` tests a field (an authz proof), unless the object tested is `headers`.
+function isFieldTest(node) {
+  const test = node.parent;
+  if (test?.type !== "BinaryExpression" || test.operator !== "in" || test.left !== node) return false;
+
+  return nameOf(test.right) !== "headers";
+}
+
 function nameOf(node) {
   if (node?.type === "Identifier") return node.name;
 
@@ -66,7 +74,7 @@ export const authHeaderReadRule = defineRule({
     return {
       Literal(node) {
         if (typeof node.value !== "string" || node.parent?.type === "TSLiteralType") return;
-        if (isDeclaredScopeHeader(node)) return;
+        if (isDeclaredScopeHeader(node) || isFieldTest(node)) return;
         check(node, node.value);
       },
       TemplateLiteral(node) {

@@ -3,10 +3,10 @@
  * which owns the runner, at agent's published path (ARCHITECTURE.md §8, R10).
  */
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 import {
   agentTestRestParamsSchema,
@@ -17,7 +17,7 @@ import {
 import { z } from "zod";
 
 /** The API key a test run was started with, so the run's key holds no more; null if none. */
-export const agentTestCallerKey = defineRestMiddleware(
+export const agentTestCallerKey = defineMiddlewareContext(
   "agentTestCallerKey",
   z.string().min(1).nullable(),
 );
@@ -38,16 +38,16 @@ export const scenarioAgentTestRest = defineRestRouter(ScenarioApi)
   .withPermission("scenarios:create")
   .withOutput(agentTestRunResponseSchema)
   .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
-  .withMiddleware(projectRestFacts, agentTestCallerKey)
-  .handle(({ app, input, scope }, facts, callerKey) =>
+  .withMiddlewareContext(projectRequestContext, agentTestCallerKey)
+  .handle(({ app, input, scope }, context, callerKey) =>
     app.testAgentRun({
       projectId: scope.id,
       agentId: input.id,
       actor:
-        facts.viewerUserId === null
+        context.viewerUserId === null
           ? undefined
           : {
-              id: facts.viewerUserId,
+              id: context.viewerUserId,
               label: "user",
               ...(callerKey ? { apiKeyId: callerKey } : {}),
             },

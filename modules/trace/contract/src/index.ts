@@ -67,7 +67,6 @@ export {
   type ScenarioRoleMetricsInput,
 } from "./trace.api.ts";
 export * from "./trace-record.ts";
-export { listedTraceKey } from "./listed-trace-key.ts";
 export * from "./trace.errors.ts";
 export * from "./features/ingest/otlp-ingest.rest.ts";
 export * from "./traces.trpc.ts";

@@ -6,13 +6,13 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withTransportFacts(…).withEventing(projectLifecycleEventing).withMigrations(…).withTasks(…)`, `src/project.module.ts:17`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareBindings(…).withEventing(projectLifecycleEventing).withMigrations(…).withTasks(…)`, `src/project.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:93`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:94`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -160,6 +160,14 @@ Stored-object credentials (`s3Endpoint`, `s3AccessKeyId`, `s3SecretAccessKey`) a
 
 ```typescript
 updateSettings(input: Readonly<UpdateProjectInput & { projectId: string }>, by: Readonly<{ id: string }>): Promise<Project>;
+```
+
+#### `setTraceSharing`
+
+Switches trace sharing; switching it off records the fact share revokes links from.
+
+```typescript
+setTraceSharing(input: SetTraceSharingInput): Promise<void>;
 ```
 
 #### `archive`
@@ -409,7 +417,7 @@ Permission `project:view`. Declared at `src/transport/project.rest.ts:116`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-// Params: projectRestParamsSchema, ../contract/src/project.ts:292
+// Params: projectRestParamsSchema, ../contract/src/project.ts:303
 interface Params {
   id: string;
 }
@@ -436,8 +444,8 @@ Permission `project:update`. Declared at `src/transport/project.rest.ts:140`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
-// Body: projectRestUpdateSchema, ../contract/src/project.ts:282
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
+// Body: projectRestUpdateSchema, ../contract/src/project.ts:293
 interface Body {
   name?: string;
   language?: string;
@@ -452,12 +460,12 @@ type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/proj
 
 Archive a project
 
-Permission `project:delete`. Declared at `src/transport/project.rest.ts:167`.
+Permission `project:delete`. Declared at `src/transport/project.rest.ts:168`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
 // Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:77
 interface Response {
   id: string;
@@ -470,12 +478,12 @@ interface Response {
 
 Get the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:191`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:193`.
 
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
 // Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:35
 interface Response {
   apiKey: string;
@@ -486,13 +494,13 @@ interface Response {
 
 Regenerate the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:210`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:212`.
 
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
-// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:295
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:303
+// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:306
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:35
 ```
@@ -556,7 +564,7 @@ interface Output {
 }
 
 // project.archiveById
-// Input: projectArchiveByIdInputSchema, ../contract/src/project-trpc.schemas.ts:62
+// Input: projectArchiveByIdInputSchema, ../contract/src/project-trpc.schemas.ts:64
 interface Input {
   projectId: string;
   projectToArchiveId: string;
@@ -568,7 +576,7 @@ interface Output {
 }
 
 // project.updateAggregateRule
-type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:69
+type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:71
 // Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:87
 interface Output {
   success: true;
@@ -582,7 +590,7 @@ interface Output {
 }
 
 // project.aggregateMemberCandidates
-// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:76
+// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:78
 interface Input {
   organizationId: string;
 }

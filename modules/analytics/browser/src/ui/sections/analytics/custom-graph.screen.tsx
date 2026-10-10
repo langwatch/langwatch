@@ -442,7 +442,7 @@ function AnalyticsCustomGraphContent({
         onOpenChange={({ open }) => jsonModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Graph JSON</Dialog.Title>
             <Dialog.CloseTrigger />
@@ -457,7 +457,7 @@ function AnalyticsCustomGraphContent({
         onOpenChange={({ open }) => apiModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>JSON API</Dialog.Title>
             <Dialog.CloseTrigger />

@@ -7,6 +7,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { setLedgerCurrent } from "@langwatch/api";
+
 import type { ServerRole } from "../feature-installer.ts";
 import { UPGRADE_CONSOLE_TOKEN_TTL_MS, type UpgradeConsole } from "../lifecycle/liveness-thread.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
@@ -186,6 +188,7 @@ export function upgradeGateComponent({
       }
       const serving = () => {
         admitted = true;
+        setLedgerCurrent({ current: true });
         const elapsedMs = Math.round(performance.now() - startedAt);
         logger.info(
           {
@@ -229,6 +232,7 @@ export function upgradeGateComponent({
     stop: async () => {
       upgrading?.stop.abort();
       await upgrading?.asking;
+      setLedgerCurrent({ current: false });
       if (admitted) await gate.release();
     },
   };

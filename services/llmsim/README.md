@@ -44,8 +44,11 @@ an OpenAI provider with a base URL into chat completions before it leaves.
   resolved. `json_object` gets `{"answer": "..."}`.
 - **Tools**: a forced tool (`tool_choice` required, a named function, or
   Anthropic `any`/`tool`) is always called; otherwise, when tools are offered
-  and the last message is not a tool result, half of all prompts call the first
-  tool. Arguments are drawn from the tool's JSON schema.
+  and the last message is not a tool result, half of all prompts call a tool.
+  **Tools mode** (model name containing `tools`, e.g. `markov-tools`, or
+  `X-Llmsim-Tools: auto`) makes every such prompt call one; after a tool result
+  it answers text. The tool is the one the last user message names (longest
+  match), else a seeded pick. Arguments are drawn from the tool's JSON schema.
 - **Langy mode** (model name containing `langy-echo`, or `X-Llmsim-Mode:
 langy`): no Markov text; llmsim does what the last user message says.
   - A plain message is echoed back verbatim, streaming included.

@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { getRequestListener } from "@hono/node-server";
 import { Hono } from "hono";
 
+import { canonicalOtlpRequest } from "../rest/otlp-path-alias.ts";
+
 export type HttpHandler = (request: Request) => Response | Promise<Response>;
 export type NodeHandler = (
   request: IncomingMessage,
@@ -75,7 +77,9 @@ export class HttpMux {
     return this;
   }
 
-  fetch = async (request: Request, socketAddress?: string): Promise<Response> => {
+  fetch = async (received: Request, socketAddress?: string): Promise<Response> => {
+    // Root-level exporter paths (`/v1/traces`) reach the API only once rewritten, as on main.
+    const request = canonicalOtlpRequest(received);
     const router = this.#compile();
     const exchange: HttpExchange = { request, socketAddress, headers: new Headers() };
     let failure: unknown;

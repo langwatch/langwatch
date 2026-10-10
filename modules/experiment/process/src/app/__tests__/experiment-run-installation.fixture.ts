@@ -11,6 +11,7 @@ import {
   type InsertRequest,
   type QueryDriver,
   type QueryResult,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -339,7 +340,10 @@ function boot({
   // The live tier: two processes share a run only through the stores both hold.
   const clients: Record<string, unknown> = {
     prisma: database.client,
-    clickhouse: new ClickHouseQueryClient({ driver: new EmptyDriver() }),
+    clickhouse: new ClickHouseQueryClient({
+      tenantGuard: new TenantGuard(),
+      driver: new EmptyDriver(),
+    }),
     redis: memoryRedisDouble({ store: redis }),
   };
   const stores: StoresMemberSource = {

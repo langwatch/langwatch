@@ -2,6 +2,7 @@ import "../../model/ambient.d.ts";
 import { BrandedCard } from "@langwatch/design-system/branded-card";
 
 import "./auth-front-door.css";
+import { VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /** The branded card for every auth screen; its hooks let the door animate the card. */
@@ -10,6 +11,7 @@ export function AuthCard({
   intro,
   finePrint,
   solid = false,
+  actions,
   children,
 }: {
   title: string;
@@ -21,7 +23,9 @@ export function AuthCard({
   /** A near-solid floor instead of the glass, for a card that is one sentence with nothing
    *  to operate: the glass that flatters a column of fields washes a lone sentence out. */
   solid?: boolean;
-  children: ReactNode;
+  /** The ways out of the card: FrontDoorLinkButtons, stacked full width under the body. */
+  actions?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <BrandedCard
@@ -36,6 +40,11 @@ export function AuthCard({
       bodyAttributes={{ "data-auth-card-body": true }}
     >
       {children}
+      {actions ? (
+        <VStack width="full" align="stretch" gap={3}>
+          {actions}
+        </VStack>
+      ) : null}
     </BrandedCard>
   );
 }

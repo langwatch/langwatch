@@ -220,11 +220,11 @@ export class GatewayInternalDoorService {
       await new Promise((resolve) => setTimeout(resolve, CHANGES_POLL_MS));
     }
 
-    const current = await this.protocol.currentRevision(orgId);
+    // Echo `since`, never the newest revision: one committed after the last read is unseen.
     return {
       status: 204 as const,
       body: void 0,
-      headers: { "X-LangWatch-Revision": current.toString() },
+      headers: { "X-LangWatch-Revision": since.toString() },
     };
   }
 

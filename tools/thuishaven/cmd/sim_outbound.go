@@ -12,7 +12,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const outboundUsage = "usage: haven outbound <status|records|deliveries|clear|wait --channel <name>|fault add|list|clear|receiver set <name> --secret <s>|urls> [--json]"
+const outboundUsage = "usage: haven sim outbound <status|list|deliveries|clear|wait --channel <name>|fault add|list|clear|receiver set <name> --secret <s>|urls> [--json]"
 
 // outboundPollEvery is how often `wait` re-reads the records.
 const outboundPollEvery = 250 * time.Millisecond
@@ -40,14 +40,14 @@ type outboundFault struct {
 	Times      int    `json:"times,omitempty"`
 }
 
-// outboundCLI is one `haven outbound` call: the sim, the words and the output mode.
+// outboundCLI is one `haven sim outbound` call: the sim, the words and the output mode.
 type outboundCLI struct {
 	api    sources.SimAPI
 	inv    invocation
 	asJSON bool
 }
 
-// runOutbound is `haven outbound <status|records|deliveries|clear|wait|fault|receiver|urls>`.
+// runOutbound is `haven sim outbound <status|list|deliveries|clear|wait|fault|receiver|urls>`.
 func runOutbound(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(outboundUsage)
@@ -81,7 +81,7 @@ func outboundCommand(ctx context.Context, c outboundCLI) error {
 	case "receiver":
 		return outboundReceiver(c)
 	}
-	return fmt.Errorf("unknown `haven outbound` subcommand %q; %s", c.inv.args[0], outboundUsage)
+	return fmt.Errorf("unknown `haven sim outbound` subcommand %q; %s", c.inv.args[0], outboundUsage)
 }
 
 // outboundFilter maps the flags onto the sim's query.
@@ -114,7 +114,7 @@ type outboundWaitPlan struct {
 
 func outboundWaitFor(inv invocation) (outboundWaitPlan, error) {
 	if !inv.has("--channel") {
-		return outboundWaitPlan{}, errors.New("usage: haven outbound wait --channel <name> [--target] [--count] [--timeout 30s]")
+		return outboundWaitPlan{}, errors.New("usage: haven sim outbound wait --channel <name> [--target] [--count] [--timeout 30s]")
 	}
 	timeout := mailWaitDefaultTimeout
 	if raw := inv.value("--timeout"); raw != "" {
@@ -202,7 +202,7 @@ func outboundFaultCommand(c outboundCLI) error {
 	case "clear":
 		return outboundFaultClear(c)
 	}
-	return errors.New("usage: haven outbound fault <add --channel <name> [--target <glob>] [--status <code>] [--body] [--retry-after] [--latency] [--drop] [--times]|list|clear [id]>")
+	return errors.New("usage: haven sim outbound fault <add --channel <name> [--target <glob>] [--status <code>] [--body] [--retry-after] [--latency] [--drop] [--times]|list|clear [id]>")
 }
 
 func outboundFaultFrom(inv invocation) (outboundFault, error) {
@@ -254,7 +254,7 @@ func outboundFaultClear(c outboundCLI) error {
 func outboundReceiver(c outboundCLI) error {
 	name, secret := outboundArg(c.inv, 2), c.inv.value("--secret")
 	if outboundArg(c.inv, 1) != "set" || name == "" || secret == "" {
-		return errors.New("usage: haven outbound receiver set <name> --secret <secret>")
+		return errors.New("usage: haven sim outbound receiver set <name> --secret <secret>")
 	}
 	if err := c.api.Put("/_sim/api/receivers/"+url.PathEscape(name), map[string]string{"secret": secret}, nil); err != nil {
 		return err

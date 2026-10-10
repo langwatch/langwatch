@@ -1,7 +1,7 @@
 import {
-  bindRestMiddleware,
   principalOfCredential,
   projectCredentialOfRequest,
+  projectRequestContextOf,
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -18,7 +18,7 @@ import { WorkflowHttpCredentialsBackfillService } from "#services/workflow-http-
 import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.service";
 import { workflowExecuteSyncRest } from "#transport/workflow-execute-sync.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
-import { workflowRunCallerKey, workflowRunRest } from "#transport/workflow-run.rest";
+import { workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest } from "#transport/workflow-studio.rest";
 import { createWorkflowRest } from "#transport/workflow.rest";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
@@ -84,9 +84,10 @@ export const workflowProcessModule: PublishedProcessModule<
       },
     }),
   ])
-  .withTransportFacts(() => [
-    bindRestMiddleware(workflowRunCallerKey, (context) => {
-      const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
+  .provideMiddlewareContext({
+    projectRequestContext: projectRequestContextOf,
+    workflowRunCallerKey: (request) => {
+      const principal = principalOfCredential(projectCredentialOfRequest(request));
       return principal?.type === "apiKey" ? principal.id : null;
-    }),
-  ]);
+    },
+  });

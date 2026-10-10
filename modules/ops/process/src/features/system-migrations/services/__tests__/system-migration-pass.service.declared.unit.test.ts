@@ -7,6 +7,7 @@ import {
 } from "@langwatch/upgrade/step/tenant-state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MemorySystemMigrationStateRepository } from "../../../../repositories/memory/memory.system-migration-state.repository.ts";
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
 import { RedisMigrationLeaseRepository } from "../../../../repositories/redis/redis.migration-lease.repository.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
@@ -39,6 +40,7 @@ function declaredPass({ held }: { held: Set<string> }) {
   const passes = SystemMigrationPassService.create({
     repositories: {
       ...PostgresOpsRepositories.create({ prisma: prismaDouble({}) }),
+      migrationState: MemorySystemMigrationStateRepository.create(),
       migrationLease: RedisMigrationLeaseRepository.create({ redis: null }),
       organizationTenants: { ...everyOrganization, pendingFor: () => everyOrganization },
     },
@@ -52,7 +54,14 @@ function declaredPass({ held }: { held: Set<string> }) {
       settle: TenantStepSettleService.create({ state, ledger }),
     },
   });
-  return { passes, ledger };
+  return { passes, ledger, state };
+}
+
+/** Redis reachable: every claim is granted. Without this the lease has no Redis at all. */
+function redisAnswers(): void {
+  vi.spyOn(RedisMigrationLeaseRepository.prototype, "acquire").mockResolvedValue(true);
+  vi.spyOn(RedisMigrationLeaseRepository.prototype, "renew").mockResolvedValue(true);
+  vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
 }
 
 describe("SystemMigrationPassService's declared tenant steps", () => {
@@ -61,9 +70,7 @@ describe("SystemMigrationPassService's declared tenant steps", () => {
   describe("given a pass holds one of a declared tenant step's tenants", () => {
     /** @scenario "A migration pass settles the declared tenant steps it drove" */
     it("leaves the step's ledger row pending, and settles it once no tenant is held", async () => {
-      vi.spyOn(RedisMigrationLeaseRepository.prototype, "acquire").mockResolvedValue(true);
-      vi.spyOn(RedisMigrationLeaseRepository.prototype, "renew").mockResolvedValue(true);
-      vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
+      redisAnswers();
       const held = new Set(["org-2"]);
       const { passes, ledger } = declaredPass({ held });
 
@@ -73,6 +80,28 @@ describe("SystemMigrationPassService's declared tenant steps", () => {
       held.clear();
       await passes.runPass({});
       expect(ledger.isSettled({ id: STEP })).toBe(true);
+    });
+  });
+
+  describe("given one tenant finished earlier and Redis is now down", () => {
+    /** @scenario "A pending tenant step keeps waking passes until it settles" */
+    it("leaves the step pending, keeps asking for passes, and settles once Redis is back", async () => {
+      const { passes, ledger, state } = declaredPass({ held: new Set() });
+      await state.upsertRecord({
+        migrationName: STEP,
+        tenantId: "org-1",
+        status: "finalized",
+        report: null,
+      });
+
+      await passes.runPass({});
+      expect(ledger.isSettled({ id: STEP })).toBe(false);
+      expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
+
+      redisAnswers();
+      await passes.runPass({});
+      expect(ledger.isSettled({ id: STEP })).toBe(true);
+      expect(await passes.hasTenantAwaitingRedrive()).toBe(false);
     });
   });
 });

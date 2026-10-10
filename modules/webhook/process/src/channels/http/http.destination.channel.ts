@@ -25,7 +25,7 @@ const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
 const RESPONSE_HEADER_VALUE_CHARS = 200;
 const RESPONSE_HEADER_MAX_COUNT = 32;
 
-export interface HttpDestinationRequest {
+interface HttpDestinationRequest {
   url: string;
   method?: "POST" | "PUT" | "PATCH";
   /** Static headers. Content-Type et al. are the caller's to set. */

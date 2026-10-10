@@ -24,6 +24,7 @@ export function ApplyToExistingConfirmDialog({
       }}
     >
       <Dialog.Content>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Apply retention to existing data?</Dialog.Title>
         </Dialog.Header>

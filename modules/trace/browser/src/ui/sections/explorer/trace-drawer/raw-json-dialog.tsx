@@ -96,7 +96,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
       size="xl"
       placement="center"
     >
-      <Dialog.Content bg="bg" maxHeight="85vh" display="flex" flexDirection="column">
+      <Dialog.Content maxHeight="85vh" display="flex" flexDirection="column">
         <Dialog.Header borderBottomWidth="1px" borderColor="border">
           <VStack align="stretch" gap={2}>
             <HStack gap={3} align="center">

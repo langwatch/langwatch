@@ -3,7 +3,7 @@ import type { AuthzAggregateReadEventData } from "@langwatch/authz-contract";
 
 import type { GovernanceModule } from "../app/governance.app.ts";
 
-export type AggregateReadViews = Pick<GovernanceModule, "governanceAuditWorkspaceView">;
+type AggregateReadViews = Pick<GovernanceModule, "governanceAuditWorkspaceView">;
 
 type AggregateReadFact = Pick<
   AuthzAggregateReadEventData,

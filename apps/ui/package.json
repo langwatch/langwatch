@@ -17,6 +17,7 @@
     "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev": "vite --configLoader runner",
     "build": "NODE_ENV=production vite build --configLoader runner",
+    "build:local": "NODE_ENV=production LANGWATCH_UI_LOCAL_BUILD=1 vite build --configLoader runner --outDir dist/client.local",
     "typecheck": "tsc -b tsconfig.test.json",
     "test": "vitest run"
   },
@@ -103,7 +104,7 @@
     "@trpc/server": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
-    "nprogress": "^0.2.0",
+    "nprogress": "catalog:",
     "posthog-js": "catalog:",
     "react": "catalog:",
     "react-contextual-analytics": "catalog:",
@@ -132,7 +133,7 @@
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/bcrypt": "catalog:",
-    "@types/nprogress": "^0.2.3",
+    "@types/nprogress": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
@@ -141,11 +142,26 @@
     "dotenv": "catalog:",
     "jsdom": "catalog:",
     "modern-screenshot": "^4.7.0",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "oxc-transform-react": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "build:local": {
+        "cache": true,
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild"
+        ],
+        "outputs": [
+          "{projectRoot}/dist/client.local"
+        ]
+      }
+    }
   }
 }

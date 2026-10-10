@@ -23,6 +23,7 @@ import {
   opsMigrationOverviewSchema,
   opsMigrationTargetedRunResultSchema,
   opsMigrationTenantInputSchema,
+  opsMigrationTenantRowSchema,
   opsRollBackSystemMigrationTenantInputSchema,
   opsRunSystemMigrationForOrganizationInputSchema,
   opsSearchMigrationOrganizationsInputSchema,
@@ -58,6 +59,18 @@ export const opsUpgradeLeaseSchema = z.object({
 });
 export type OpsUpgradeLease = z.infer<typeof opsUpgradeLeaseSchema>;
 
+/** Something this image still ships but retires; a null release is unreleased, or not yet named. */
+export const opsUpgradeDeprecationSchema = z.object({
+  id: z.string(),
+  what: z.string(),
+  kind: z.string(),
+  deprecatedIn: z.string().nullable(),
+  removedIn: z.string().nullable(),
+  successor: z.string().nullable(),
+  notice: z.string(),
+});
+export type OpsUpgradeDeprecation = z.infer<typeof opsUpgradeDeprecationSchema>;
+
 /** Where the installation stands; `state`, `tone` and `reason` are the reader's words, raw. */
 export const opsUpgradeStatusSchema = z.object({
   state: z.string(),
@@ -75,6 +88,8 @@ export const opsUpgradeStatusSchema = z.object({
   counts: countsSchema,
   failedStepIds: z.array(z.string()),
   failedTargets: z.number().int(),
+  /** The image's deprecation register (ruling D8), shown under "Deprecated". */
+  deprecations: z.array(opsUpgradeDeprecationSchema),
 });
 export type OpsUpgradeStatus = z.infer<typeof opsUpgradeStatusSchema>;
 
@@ -181,6 +196,17 @@ export const opsUpgradeListRunsInputSchema = z.object({
   limit: z.number().int().positive().optional(),
 });
 export type OpsUpgradeListRunsInput = z.infer<typeof opsUpgradeListRunsInputSchema>;
+
+/** Tenant rows of one step (`step` = migration name) or all, in one state or all, newest first. */
+export const opsUpgradeListTenantsInputSchema = z.object({
+  step: z.string().min(1).max(200).optional(),
+  state: opsMigrationTenantRowSchema.shape.status.optional(),
+  cursor: z.string().nullable().optional(),
+  limit: z.number().int().positive().max(200).optional(),
+});
+export type OpsUpgradeListTenantsInput = z.infer<typeof opsUpgradeListTenantsInputSchema>;
+export const opsUpgradeTenantPageSchema = opsUpgradePageSchema(opsMigrationTenantRowSchema);
+export type OpsUpgradeTenantPage = z.infer<typeof opsUpgradeTenantPageSchema>;
 
 /** One step or run, by the id the ledger records it under. */
 export const opsUpgradeIdInputSchema = z.object({ id: z.string().min(1) });
@@ -297,6 +323,11 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .withInput(z.void())
   .withOutput(opsMigrationOverviewSchema.array())
 
+  /** Every tenant's state per tenant step, filterable by step and state, one page at a time. */
+  .query("listTenants")
+  .withInput(opsUpgradeListTenantsInputSchema)
+  .withOutput(opsUpgradeTenantPageSchema)
+
   /**
    * Which organizations are enrolled for which migrations, with the names an
    * operator recognizes. Carries `isSaaS`, so the page can say honestly that a
@@ -352,10 +383,10 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   /**
    * Kick a pass now instead of waiting for the next worker boot.
    * Fire-and-forget: per-organization claims already keep two passes off the
-   * same organization.
+   * same organization. `{}` input: a void mutation sends no body over the unbatched link.
    */
   .mutation("runSystemMigrationPass")
-  .withInput(z.void())
+  .withInput(z.object({}))
   .withOutput(opsMigrationPassStartedSchema)
 
   .mutation("assertSystemMigrationLegacyWritersDrained")

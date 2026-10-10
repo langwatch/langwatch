@@ -19,7 +19,9 @@ import {
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
 import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
+import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
@@ -35,17 +37,6 @@ const LWQL_SELF_PROVISION_TXN_TIMEOUT_MS = 300_000;
 const LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS = 30_000;
 
 const logger = createLogger("langwatch:task:lwql-provision");
-
-/**
- * Exactly the Postgres operations this task performs.
- */
-export type LwqlProvisioningDatabase = {
-  $executeRawUnsafe: (statement: string) => Promise<number>;
-  $transaction: <T>(
-    fn: (tx: { $executeRawUnsafe: (statement: string) => Promise<number> }) => Promise<T>,
-    options: { timeout: number; maxWait: number },
-  ) => Promise<T>;
-};
 
 /** The one project read the key-map backfill makes (PO-1). */
 type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
@@ -84,9 +75,7 @@ async function runPostgresStatements({
   database: LwqlProvisioningDatabase;
   statements: string[];
 }): Promise<void> {
-  for (const statement of statements) {
-    await database.$executeRawUnsafe(lwqlProvisioning.withTenancyOptOut(statement));
-  }
+  await PrismaLangWatchQLPostgresRepository.create(database).runStatements(statements);
 }
 
 /** Tenants read per round of the backfill: each read is one tenant-scoped query. */
@@ -222,18 +211,12 @@ async function withSelfProvisionLock<T>({
   fn: () => Promise<T>;
 }): Promise<T> {
   assertPoolFitsSelfProvisionLock(connectionLimit);
-  return database.$transaction(
-    async (tx) => {
-      await tx.$executeRawUnsafe(
-        `-- @tenancy: global self-provision boot lock, no tenant scope\nSELECT pg_advisory_xact_lock(hashtextextended('${LWQL_SELF_PROVISION_LOCK_KEY}', 0))`,
-      );
-      await tx.$executeRawUnsafe(
-        "-- @tenancy: global self-provision boot lock session setting, no tenant scope\nSET LOCAL idle_in_transaction_session_timeout = 0",
-      );
-      return fn();
-    },
-    { timeout: LWQL_SELF_PROVISION_TXN_TIMEOUT_MS, maxWait: LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS },
-  );
+  return PrismaLangWatchQLPostgresRepository.create(database).withAdvisoryLock({
+    key: LWQL_SELF_PROVISION_LOCK_KEY,
+    timeoutMs: LWQL_SELF_PROVISION_TXN_TIMEOUT_MS,
+    maxWaitMs: LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS,
+    fn,
+  });
 }
 
 /** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */

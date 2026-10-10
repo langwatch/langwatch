@@ -177,7 +177,6 @@ export function SignUpCredentialForm({
         <HandledErrorAlert
           error={passkeyError}
           fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok
-          className="lw-front-door-alert"
         />
         {/* The address this is for, and the way back to change it. It is the
             last chance to notice a typo before it becomes an account. */}

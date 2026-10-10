@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).withTransportFacts(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing)`, `src/authz.module.ts:29`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareBindings(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing)`, `src/authz.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -644,7 +644,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Get a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:84`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:85`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -660,7 +660,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Change a grant's role
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:100`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:101`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -677,7 +677,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Revoke a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:122`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:124`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -750,7 +750,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:151`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:152`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 
@@ -771,7 +771,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:175`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:177`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 

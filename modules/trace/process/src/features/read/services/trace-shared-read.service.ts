@@ -238,17 +238,25 @@ function hashViewer({
     .slice(0, 32);
 }
 
+/** Stamped by the ingestion receiver; an internal key id the share page never renders. */
+const API_KEY_ID_ATTRIBUTE = "langwatch.api_key.id";
+
+function sharedResourceAttrs(attrs: Record<string, string>): Record<string, string> {
+  const { [API_KEY_ID_ATTRIBUTE]: _apiKeyId, ...rest } = withoutHiddenResourceAttrs(attrs);
+  return rest;
+}
+
 function resourceInfoOf(rows: SpanResourceInfo[]): TraceResourceInfoDto {
   const root = rows.find((row) => row.parentSpanId == null) ?? rows[0] ?? null;
 
   return {
     rootSpanId: root?.spanId ?? null,
-    resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+    resourceAttributes: sharedResourceAttrs(root?.resourceAttributes ?? {}),
     scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
     spans: rows.map((row) => ({
       spanId: row.spanId,
       parentSpanId: row.parentSpanId,
-      resourceAttributes: withoutHiddenResourceAttrs(row.resourceAttributes),
+      resourceAttributes: sharedResourceAttrs(row.resourceAttributes),
       scope: { name: row.scopeName ?? "", version: row.scopeVersion },
     })),
   };

@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:30`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withMigrations(…).provideMiddlewareBindings(…)`, `src/workflow.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

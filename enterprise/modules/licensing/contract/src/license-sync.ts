@@ -27,20 +27,33 @@ export const licenseSyncBodySchema = z
 
 export type LicenseSyncBody = z.infer<typeof licenseSyncBodySchema>;
 
-/** The two headers every call to the connect host presents its credential in. */
-export const connectHostHeadersSchema = z.object({
-  authorization: z.string().optional(),
-  "x-langwatch-instance": z.string().optional(),
-});
-
 /** An activation carries its code in the bearer header, so its body names nothing. */
 export const connectActivationRequestSchema = z.object({});
 
-/** A credential as presented: the raw bearer header and the instance id, both unchecked. */
+/** A credential as presented: the bearer the framework read and the instance id, both unchecked. */
 export interface ConnectPresentedCredential {
-  authorization: string | undefined;
+  bearer: string | null;
   instanceId: string | undefined;
 }
+
+/** Who the `licence_token` door says presented a licence token (W02-DOOR-SHAPE). */
+export const connectLicenceCallerSchema = z.object({
+  licenseRowId: z.string(),
+  organizationId: z.string(),
+  instanceId: z.string(),
+  virtualKeyId: z.string(),
+});
+
+export type ConnectLicenceCaller = z.infer<typeof connectLicenceCallerSchema>;
+
+/** An activation code the door found redeemable, not yet claimed (W02-ACTIVATE-DOOR). */
+export const connectActivationCallerSchema = z.object({
+  activationCodeId: z.string(),
+  organizationId: z.string(),
+  instanceId: z.string(),
+});
+
+export type ConnectActivationCaller = z.infer<typeof connectActivationCallerSchema>;
 
 /** Every refusal of a credential resolution, with the status the host answers. */
 export const CONNECT_CREDENTIAL_REFUSALS = {

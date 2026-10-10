@@ -1,15 +1,18 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, Input, Spinner } from "@langwatch/design-system/primitives";
+import {
+  SectionNavigationAddRow,
+  SectionNavigationItem,
+} from "@langwatch/design-system/section-navigation-frame";
 import { toaster } from "@langwatch/design-system/toaster";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Edit2, MoreVertical, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { useDashboards } from "../../behavior/use-dashboards.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { DashboardNameDialog } from "./dashboard-name-dialog.tsx";
 
 interface CustomDashboardsSectionProps {
@@ -117,7 +120,7 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
 
   if (dashboardsQuery.isLoading) {
     return (
-      <Box paddingX={6} paddingY={2}>
+      <Box paddingX={2} paddingY={1}>
         <Spinner size="sm" />
       </Box>
     );
@@ -177,15 +180,10 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
         const isEditing = editingDashboardId === dashboard.id;
         const canMoveUp = index > 0;
         const canMoveDown = index < dashboards.length - 1;
+        const href = `/${projectSlug}/analytics/reports?dashboard=${dashboard.id}`;
 
         return (
-          <Box
-            key={dashboard.id}
-            position="relative"
-            width="full"
-            borderRadius="lg"
-            _hover={{ background: "bg.muted", "& .menu-btn": { opacity: 1 } }}
-          >
+          <Box key={dashboard.id}>
             {isEditing ? (
               <DashboardNameInput
                 inputRef={inputRef}
@@ -198,38 +196,38 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
                 }}
               />
             ) : (
-              <>
-                <MenuLink
-                  href={`/${projectSlug}/analytics/reports?dashboard=${dashboard.id}`}
-                  isSelected={isSelected}
-                >
-                  {dashboard.name}
-                </MenuLink>
-                <DashboardRowMenu
-                  name={dashboard.name}
-                  canMoveUp={canMoveUp}
-                  canMoveDown={canMoveDown}
-                  canDelete={dashboards.length > 1}
-                  onRename={() => handleStartRename(dashboard.id, dashboard.name)}
-                  onMove={(direction) => handleMoveDashboard(dashboard.id, direction)}
-                  onDelete={(e) => handleDeleteDashboard(e, dashboard.id)}
-                />
-              </>
+              <SectionNavigationItem
+                link={{
+                  label: dashboard.name,
+                  href,
+                  actions: (
+                    <DashboardRowMenu
+                      name={dashboard.name}
+                      canMoveUp={canMoveUp}
+                      canMoveDown={canMoveDown}
+                      canDelete={dashboards.length > 1}
+                      onRename={() => handleStartRename(dashboard.id, dashboard.name)}
+                      onMove={(direction) => handleMoveDashboard(dashboard.id, direction)}
+                      onDelete={(e) => handleDeleteDashboard(e, dashboard.id)}
+                    />
+                  ),
+                }}
+                activeHref={isSelected ? href : ""}
+                onNavigate={(to) => host.navigate(to)}
+              />
             )}
           </Box>
         );
       })}
       {/* An aggregate (ADR-177) keeps no dashboards of its own. */}
       {acceptsWrites && (
-        <Button
-          size="sm"
-          width="full"
-          variant="ghost"
-          data-testid="analytics-dashboard-add"
-          onClick={handleCreateDashboard}
-        >
-          <Plus size={14} /> Add Dashboard
-        </Button>
+        <SectionNavigationAddRow
+          add={{
+            label: "Add Dashboard",
+            onClick: handleCreateDashboard,
+            testId: "analytics-dashboard-add",
+          }}
+        />
       )}
     </>
   );
@@ -275,24 +273,17 @@ function DashboardRowMenu({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Box
-          as="button"
-          className="menu-btn"
+        <Button
+          size="xs"
+          variant="ghost"
           aria-label={`Actions for dashboard ${name}`}
           data-testid={`analytics-dashboard-menu-${name}`}
-          position="absolute"
-          right={1}
-          top="50%"
-          transform="translateY(-50%)"
-          opacity={0}
-          transition="opacity 0.2s"
-          padding={1}
-          cursor="pointer"
-          color="fg.muted"
-          _hover={{ color: "fg.default" }}
+          minWidth={0}
+          height="20px"
+          paddingX={1}
         >
           <MoreVertical size={14} />
-        </Box>
+        </Button>
       </Menu.Trigger>
       <Menu.Content>
         <Menu.Item value="rename" data-testid="analytics-dashboard-rename" onClick={onRename}>
@@ -356,9 +347,7 @@ function DashboardNameInput({
         if (e.key === "Enter") onCommit();
         if (e.key === "Escape") onCancel();
       }}
-      marginLeft={4}
-      marginRight={2}
-      marginY={1}
+      marginY={0.5}
       fontSize="14px"
     />
   );

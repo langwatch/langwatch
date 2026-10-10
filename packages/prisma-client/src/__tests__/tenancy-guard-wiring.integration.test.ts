@@ -5,6 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -96,7 +97,10 @@ describe.skipIf(!databaseUrl)("the tenancy guard chain on a composed client", ()
     /** @scenario "Raw SQL with the sanctioned tenancy marker runs" */
     it("reaches the database and returns rows", async () => {
       const rows = await prisma.$queryRaw<{ probe: number }[]>`
-        -- @tenancy: guard-wiring test probe (no tenant data touched)
+        ${skipTenantCheck({
+          // Guard-wiring test probe (no tenant data touched)
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT 1 AS probe
       `;
       expect(rows).toHaveLength(1);

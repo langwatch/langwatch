@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -143,15 +144,16 @@ func (s Stack) OverlayEnv() []string {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
 	}
-	// The ui lane holds each developer tool's port and starts the tool on the first
-	// visit (apps/ui/vite/dormant-dev-tool.ts). Naming haven's ports here puts that
-	// listener behind design-system.<slug> and mail-room.<slug>.
-	if sb := s.svc(DesignSystemService); sb.Port != 0 {
-		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
+	// Haven serves the built Storybook itself (the design-system lane), so the ui
+	// lane only frames it at /design-system and never starts `storybook dev`.
+	if sb := s.svc(DesignSystemService); sb.Port != 0 && sb.URL != "" {
+		env = append(env, "LANGWATCH_STORYBOOK_URL="+sb.URL)
+	} else {
+		env = append(env, "LANGWATCH_SKIP_STORYBOOK=1")
 	}
-	if mr := s.svc(MailRoomService); mr.Port != 0 {
-		env = append(env, fmt.Sprintf("LANGWATCH_MAIL_PREVIEW_PORT=%d", mr.Port))
-	}
+	// Haven serves the mail studio rendered at build time (the mail-room lane), so
+	// the ui lane never starts its dev server, whatever the UI mode.
+	env = append(env, "LANGWATCH_SKIP_MAIL_PREVIEW=1")
 	// The evaluator service, when this stack runs one (or falls back to a
 	// baseline's). Without it the app keeps .env's value, where nothing listens.
 	if lev := s.svc(LangevalsService); lev.Port != 0 {
@@ -310,6 +312,8 @@ func (s Stack) observabilityEnv() []string {
 		// forward to. The frontend half of a trace is exactly what a developer
 		// debugging their own worktree wants, so it is on whenever the stack is.
 		"RUM_ENABLED=true",
+		// Named explicitly so the rum module does not fall back to the deprecated OTEL endpoint and warn.
+		"RUM_COLLECTOR_ENDPOINT=" + otlp,
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// The proxied hostname when the portless proxy carries the route (stable,
@@ -389,6 +393,20 @@ func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
 		fmt.Sprintf("SMTP_PORT=%d", smtpPort),
 		"SMTP_SECURE=false",
 	}
+}
+
+// NoMailKnob is the per-run variable `haven up --no-mail` sets.
+const NoMailKnob = "HAVEN_NO_MAIL"
+
+// NoMailEnv blanks every mail setting for `haven up --no-mail`: an empty
+// variable beats the root .env under node --env-file, so the app sees no
+// provider. A key only 1Password holds is out of its reach.
+func NoMailEnv() []string {
+	env := []string{"SENDGRID_API_KEY=", "RESEND_API_KEY="}
+	for _, key := range MailProviderEnvVars {
+		env = append(env, key+"=")
+	}
+	return env
 }
 
 // StorageProviderEnvVars are the env keys that mean a developer chose where
@@ -515,11 +533,23 @@ func PaymentProviderEnv(resolved map[string]string, endpoint string) []string {
 	return []string{"STRIPE_API_BASE=" + endpoint, "STRIPE_SECRET_KEY=" + PaymentSimSecretKey, "STRIPE_WEBHOOK_SECRET=" + PaymentSimWebhookSecret}
 }
 
+// RefuseLiveStripe refuses a dev stack a live Stripe key: it names the variable,
+// never the value. Webhook secrets (whsec_) carry no live/test mark, so the key decides.
+func RefuseLiveStripe(resolved map[string]string) error {
+	key := resolved["STRIPE_SECRET_KEY"]
+	if strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_") {
+		return errors.New("haven refuses a live Stripe key in STRIPE_SECRET_KEY: use a test key (sk_test_) or remove it to get paymentsim")
+	}
+	return nil
+}
+
 // StripeNotice is the line `haven up` prints: which Stripe billing talks to.
 func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
 	switch {
+	case resolved["STRIPE_API_BASE"] != "":
+		return "Stripe: custom base " + resolved["STRIPE_API_BASE"]
 	case HasOwnStripe(resolved):
-		return "Stripe: your key from .env"
+		return "Stripe: your test key from .env"
 	case isPaymentSimOn:
 		return "Stripe: paymentsim"
 	}
@@ -560,6 +590,9 @@ func LLMProviderEnv(resolved map[string]string, port int) []string {
 		env = append(env, p.url+"="+p.value)
 		if resolved[p.key] == "" {
 			env = append(env, p.key+"=llmsim")
+		}
+		if p.url == "OPENAI_BASE_URL" {
+			env = append(env, "HAVEN_SEED_LLMSIM_MODELS=1") // the seed adds error-429/500 models
 		}
 	}
 	return env

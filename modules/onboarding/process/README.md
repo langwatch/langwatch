@@ -6,7 +6,7 @@ The server half of [onboarding](../README.md). Onboarding: the guided paths a ne
 
 ## Installation
 
-`defineProcessModule("onboarding").withApi(OnboardingModule).withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest).withEventing(guidedOnboardingLifecycleEventing).withTransportFacts(…)`, `src/onboarding.module.ts:12`.
+`defineProcessModule("onboarding").withApi(OnboardingModule).withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest).withEventing(guidedOnboardingLifecycleEventing).provideMiddlewareBindings(…)`, `src/onboarding.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

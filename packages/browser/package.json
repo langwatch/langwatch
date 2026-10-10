@@ -167,7 +167,7 @@
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "lucide-react": "catalog:",
-    "nprogress": "^0.2.0",
+    "nprogress": "catalog:",
     "posthog-js": "catalog:",
     "react-error-boundary": "catalog:",
     "zod": "catalog:"
@@ -180,7 +180,7 @@
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
-    "@types/nprogress": "^0.2.3",
+    "@types/nprogress": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "jsdom": "catalog:",

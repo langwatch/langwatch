@@ -50,7 +50,8 @@ folder into a release manifest (`packages/upgrade/releases/<release>.json`); you
    has none of these: edit it before you commit. Never move the marker back.
 7. **Nothing is dropped while a release at or above the floor uses it**, and the statement carries
    `-- contract: retired in <release>` with `<release>` at or below the floor. A later release is
-   refused (`retirement-note-above-floor`) with the first release it may ship in.
+   refused (`retirement-note-above-floor`) with the first release it may ship in. It also carries
+   `-- archive: <table>` or `-- archive: none (<reason>)`, else `contract-without-archive-note` fails.
 8. **Nothing is renamed or retyped in place.**
 9. **No new foreign key and no new `@relation`** (Alex, 2026-10-06; existing ones stay).
 
@@ -150,6 +151,7 @@ since A` in `schema.prisma`, no migration. Once the floor is at or above A, drop
 
 ```sql
 -- contract: retired in 3.20.1
+-- archive: none (derived column, nothing to keep)
 ALTER TABLE "Project" DROP COLUMN IF EXISTS "legacyKey";
 ```
 

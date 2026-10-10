@@ -8,22 +8,40 @@ const { url, email, password, out, signIn } = JSON.parse(process.argv[2]);
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds the page.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.fulfill({ contentType: "text/css", body: "" }));
   if (signIn) {
-    await page.goto(`${url}/auth/signin?callbackUrl=%2Fops%2Fupgrades`, { timeout: 30_000 });
+    await page.goto(`${url}/auth/signin?callbackUrl=%2Fops%2Fupgrades`, { timeout: 30_000, waitUntil: "domcontentloaded" });
     // Identifier first: the email, Continue, then the password appears.
-    await page.locator('input[type="email"], input[name="email"]:not([type="hidden"])').first().fill(email);
+    await page
+      .locator('input[type="email"], input[name="email"]:not([type="hidden"])')
+      .first()
+      .fill(email);
     const passwordField = page.locator('input[type="password"]').first();
-    if (!(await passwordField.isVisible())) await page.locator('button[type="submit"]').first().click();
+    if (!(await passwordField.isVisible()))
+      await page.locator('button[type="submit"]').first().click();
     await passwordField.fill(password, { timeout: 30_000 });
     await page.locator('button[type="submit"]').first().click();
     await page.waitForURL(/\/ops\/upgrades/, { timeout: 30_000 }).catch(() => undefined);
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
     // The passkey nudge covers the page after a password sign-in.
-    await page.getByRole("button", { name: "Not now" }).click({ timeout: 5_000 }).catch(() => undefined);
-    const states = /Up to date|Finishing in background|Behind|Never upgraded|Upgrading|Rolled back|Needs attention|Unsupported|Forbidden|not allowed/;
-    await page.getByText(states).first().waitFor({ timeout: 30_000 }).catch(() => undefined);
+    await page
+      .getByRole("button", { name: "Not now" })
+      .click({ timeout: 5_000 })
+      .catch(() => undefined);
+    const states =
+      /Up to date|Finishing in background|Behind|Never upgraded|Upgrading|Rolled back|Needs attention|Unsupported|Forbidden|not allowed/;
+    await page
+      .getByText(states)
+      .first()
+      .waitFor({ timeout: 30_000 })
+      .catch(() => undefined);
   } else {
-    await page.goto(url, { timeout: 30_000 });
+    await page.goto(url, { timeout: 30_000, waitUntil: "domcontentloaded" });
+    // `load` fires before the SPA's async boot paints #root: wait for text, or the shot is blank.
+    await page
+      .waitForFunction(() => document.body.innerText.trim() !== "", null, { timeout: 30_000 })
+      .catch(() => undefined);
   }
   await page.screenshot({ path: out, fullPage: true });
   const text = await page.innerText("body").catch(() => "");

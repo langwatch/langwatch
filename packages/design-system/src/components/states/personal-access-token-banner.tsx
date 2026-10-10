@@ -1,7 +1,8 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@chakra-ui/react";
 import { KeyIcon } from "lucide-react";
 
 import { CopyButton } from "../display/copy-button.tsx";
+import { Banner, BannerAction } from "./banner.tsx";
 
 /** What a snippet shows until a personal access token has been created. */
 export const API_KEY_PLACEHOLDER = "<YOUR_LANGWATCH_API_KEY>";
@@ -29,55 +30,33 @@ export function PersonalAccessTokenBanner({
   createLabel,
 }: PersonalAccessTokenBannerProps) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="orange.muted"
-      borderRadius="lg"
-      bg="orange.subtle"
-      paddingX={4}
-      paddingY={3}
-    >
-      <HStack justify="space-between" align="center" gap={3}>
-        <HStack gap={2} flex={1} minWidth={0}>
-          <KeyIcon size={16} aria-hidden="true" />
-          {token ? (
-            <>
-              <Text fontSize="sm">
-                <Text as="span" fontWeight="semibold">
-                  Copy this token now.
-                </Text>{" "}
-                <Text as="span" color="fg.muted">
-                  It won&apos;t be shown again.
-                </Text>
-              </Text>
-              <CopyButton
-                value={token}
-                label="Personal access token"
-                aria-label="Copy personal access token"
-              />
-            </>
-          ) : (
-            <Text fontSize="sm" color="fg.muted">
-              Create a personal access token to fill the snippets below.
-            </Text>
-          )}
-        </HStack>
-        <Button
-          size="sm"
-          variant={token ? "ghost" : "solid"}
-          colorPalette="orange"
-          loading={isCreating}
-          onClick={onCreate}
-          flexShrink={0}
-        >
+    <Banner
+      status={token ? "warning" : "info"}
+      icon={<KeyIcon size={16} aria-hidden="true" />}
+      title={token ? "Copy this token now." : undefined}
+      action={
+        <BannerAction loading={isCreating} onClick={onCreate}>
           {token ? "Create another" : (createLabel ?? "Create a personal access token")}
-        </Button>
-      </HStack>
+        </BannerAction>
+      }
+    >
+      {token ? (
+        <HStack as="span" gap={2}>
+          <span>It won&apos;t be shown again.</span>
+          <CopyButton
+            value={token}
+            label="Personal access token"
+            aria-label="Copy personal access token"
+          />
+        </HStack>
+      ) : (
+        "Create a personal access token to fill the snippets below."
+      )}
       {scopeNote ? (
-        <Text fontSize="xs" color="fg.muted" marginTop={2}>
+        <Text as="span" display="block" fontSize="xs" marginTop={1}>
           {scopeNote}
         </Text>
       ) : null}
-    </Box>
+    </Banner>
   );
 }

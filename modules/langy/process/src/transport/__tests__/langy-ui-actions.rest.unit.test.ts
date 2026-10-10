@@ -25,6 +25,7 @@ const PROJECT = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 const LISTED: LangyUiActionsListed = {
   dark: false,

@@ -261,6 +261,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
   async findOldestPendingInviteForAddress(input: { address: string }): Promise<{
     inviteCode: string;
     organizationName: string;
+    inviterName: string | null;
     role: OrganizationUserRole;
   } | null> {
     const now = nowInstant();
@@ -276,6 +277,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     return {
       inviteCode: invite.inviteCode,
       organizationName: this.memory.organizations.get(invite.organizationId)?.name ?? "",
+      inviterName: (invite.requestedBy && this.memory.users.get(invite.requestedBy)?.name) || null,
       role: invite.role,
     };
   }

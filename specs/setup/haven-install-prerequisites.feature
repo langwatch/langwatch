@@ -1,12 +1,12 @@
 @unit
-Feature: haven install checks the machine's prerequisites
+Feature: haven self install checks the machine's prerequisites
   `make haven install` used to do two things: go install the binary and offer
   to put the Go bin dir on PATH. It said nothing about whether the machine had
   the tools haven then drives — portless, a Node toolchain, the brew formulae
   behind the managed Postgres and Redis, a container runtime. Every one of
   those was discovered later, as a failed `haven up`, one at a time.
 
-  `haven install` is that check: it probes each prerequisite, shows what is
+  `haven self install` is that check: it probes each prerequisite, shows what is
   missing, and offers to install it. Nothing is installed without being
   chosen, and anything declined with "never" is remembered machine-wide so the
   same question is not asked on every checkout.
@@ -20,42 +20,42 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: A required prerequisite that is missing fails the check
       Given portless is not installed
-      When the developer runs "haven install --list"
+      When the developer runs "haven self install --list"
       Then portless is reported missing and marked required
       And the report names the command that would install it
 
     Scenario: An optional prerequisite that is missing is reported, not demanded
       Given the ClickHouse client is not installed
       And every required prerequisite is present
-      When the developer runs "haven install --list"
+      When the developer runs "haven self install --list"
       Then the ClickHouse client is reported missing and marked optional
       And the machine is still reported ready
 
     Scenario: A tool only the agent instructions suggest is offered, never assumed
       Given rtk is not installed
       And every required prerequisite is present
-      When the developer runs "haven install --list"
+      When the developer runs "haven self install --list"
       Then rtk is reported missing and marked optional
       And the machine is still reported ready
 
     Scenario: Bun is offered so a fresh machine can run Langy
       Given bun is not installed
       And every required prerequisite is present
-      When the developer runs "haven install --list"
+      When the developer runs "haven self install --list"
       Then bun is reported missing and marked recommended
       And the report names "brew install bun"
-      And "haven install --yes" installs it
+      And "haven self install --yes" installs it
 
     Scenario: A Langy that cannot build for want of bun says how to fix it
       Given bun is not installed
       When the developer runs "haven up +langy"
       Then the langy-worker build is not attempted
-      And the line says "bun is missing: run `haven install`"
+      And the line says "bun is missing: run `haven self install`"
       And the rest of the stack comes up without Langy
 
     Scenario: Everything present reports ready and installs nothing
       Given every prerequisite is present
-      When the developer runs "haven install"
+      When the developer runs "haven self install"
       Then it reports the machine is ready
       And no installer is run
 
@@ -95,13 +95,13 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: A skipped prerequisite is still installed when named
       Given the ClickHouse client is recorded as skipped
-      When the developer runs "haven install clickhouse-client"
+      When the developer runs "haven self install clickhouse-client"
       Then it is installed
       And it is no longer recorded as skipped
 
     Scenario: The skips can be cleared
       Given two prerequisites are recorded as skipped
-      When the developer runs "haven install --reset-skips"
+      When the developer runs "haven self install --reset-skips"
       Then nothing is recorded as skipped any more
       And the next run offers both again
 
@@ -109,14 +109,14 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: The report-only flag refuses to be given something to install
       Given the ClickHouse client is missing
-      When the developer runs "haven install --list clickhouse-client"
+      When the developer runs "haven self install --list clickhouse-client"
       Then it fails saying the two cannot be combined
       And nothing is installed
 
     Scenario: A machine with nothing to do still says so
       Given every prerequisite is present
       And the developer is at a terminal
-      When the developer runs "haven install"
+      When the developer runs "haven self install"
       Then the full report is printed with the ready verdict
       And no picker is shown
 
@@ -147,7 +147,7 @@ Feature: haven install checks the machine's prerequisites
       # a v1.64.8 binary satisfied nothing and refused the repo's v2 config,
       # so the report has to say so rather than reading as installed
 
-    Scenario: A small macOS accept queue is reported and haven install sets it
+    Scenario: A small macOS accept queue is reported and haven self install sets it
       Given the machine is macOS and kern.ipc.somaxconn is 128
       When the prerequisites are planned
       Then the accept queue is reported missing
@@ -174,20 +174,20 @@ Feature: haven install checks the machine's prerequisites
     Scenario: Agent mode reports instead of prompting
       Given haven is running in agent mode
       And prerequisites are missing
-      When the developer runs "haven install"
+      When the developer runs "haven self install"
       Then the missing prerequisites are printed with the commands that fix them
       And no picker is shown and nothing is installed
 
     Scenario: A non-interactive run with --yes installs what is needed
       Given stdin is a pipe
       And node and portless are missing
-      When the developer runs "haven install --yes"
+      When the developer runs "haven self install --yes"
       Then node and portless are installed
       And optional prerequisites are left alone
 
     Scenario: A prerequisite haven cannot install itself is explained, not attempted
       Given brew is missing
-      When the developer runs "haven install --yes"
+      When the developer runs "haven self install --yes"
       Then brew is reported as install-it-yourself with its official command
       And no installer is run for it
       And the run stops there rather than failing on the formulae below it
@@ -236,25 +236,25 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: macOS install fetches the native tier and colima stays optional
       Given a Mac with Homebrew and no observability tools or pinned binaries
-      When the developer runs "haven install --yes"
+      When the developer runs "haven self install --yes"
       Then grafana, prometheus and loki are installed through Homebrew
       And the pinned ClickHouse, Tempo and Alloy releases are downloaded and their sha256 verified
       And the container runtime is reported optional, never required
 
     Scenario: A second install run fetches nothing
       Given the pinned ClickHouse, Tempo and Alloy binaries are already on disk
-      When the developer runs "haven install" again
+      When the developer runs "haven self install" again
       Then nothing is downloaded and the row reads as installed with every version
 
     Scenario: Haven fetches a pinned, checksummed Alloy instead of building it
       Given a Mac whose Command Line Tools are too old to build Alloy from source
-      When the developer runs "haven install"
+      When the developer runs "haven self install"
       Then haven downloads the pinned Alloy darwin zip for its architecture into its home
       And unpacks the alloy binary only when the zip matches its pinned sha256
 
     Scenario: Linux install keeps today's catalogue
       Given a Linux machine
-      When the developer runs "haven install"
+      When the developer runs "haven self install"
       Then the observability tools and the pinned binaries are reported not applicable
 
     Scenario: Two concurrent installs of a pinned binary download it once

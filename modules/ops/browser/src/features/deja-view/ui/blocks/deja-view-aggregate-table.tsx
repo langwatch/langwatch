@@ -1,4 +1,5 @@
-import { Badge, Card, Table, Text } from "@langwatch/design-system/primitives";
+import { InlineCode } from "@langwatch/design-system/inline-code";
+import { Card, Table, Text } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 
 import { formatTimestamp } from "../../model/deja-view-fragment.ts";
@@ -39,9 +40,7 @@ export function AggregateTable({
                   </Text>
                 </Table.Cell>
                 <Table.Cell>
-                  <Badge size="sm" variant="subtle">
-                    {agg.aggregateType}
-                  </Badge>
+                  <InlineCode>{agg.aggregateType}</InlineCode>
                 </Table.Cell>
                 <Table.Cell>
                   <Text textStyle="xs" fontFamily="mono" color="fg.muted">

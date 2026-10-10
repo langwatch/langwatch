@@ -102,7 +102,7 @@ Feature: Collaborative presence
     When presence reads the project's settings
     Then the project is unknown
 
-  # The presenter is the existing session-person fact the door binds, with image (rulings
+  # The presenter is the existing session-person context the door binds, with image (rulings
   # 2026-10-05, "Presence presenter"); presence keeps no user peer.
   @unit
   Scenario: The presenter's name and image come from the signed-in session

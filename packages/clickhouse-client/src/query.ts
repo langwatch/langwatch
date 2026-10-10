@@ -36,11 +36,11 @@ export interface QueryRequest {
   /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
-   * Declares a statement with no tenant predicate (DDL, `system.*`, a
-   * migration, a cross-tenant sweep). A written reason, not a boolean: it's
-   * recorded on the span so an audit can list every unscoped statement and why.
+   * Skips the tenant predicate check (DDL, `system.*`, a cross-tenant sweep). `tenantId` still
+   * routes the statement; every skip is counted and logged. A comment directly above the flag
+   * gives the reason (`langwatch/skip-tenant-check-reason`).
    */
-  unscoped?: { reason: string } | undefined;
+  SKIP_TENANT_CHECK?: true | undefined;
 }
 
 /**
@@ -65,6 +65,8 @@ export interface InsertRequest {
    * copying every row.
    */
   rows: readonly Readonly<Record<string, unknown>>[];
+  /** Skips the one-tenant batch check; counted and logged like a statement's skip. */
+  SKIP_TENANT_CHECK?: true | undefined;
   /** Per-insert ClickHouse settings, e.g. `async_insert`. */
   settings?: Record<string, string | number> | undefined;
   /** Cooperative cancellation. Policies should stop retrying when aborted. */

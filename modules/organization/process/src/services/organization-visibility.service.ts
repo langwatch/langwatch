@@ -201,8 +201,8 @@ export class OrganizationVisibilityService {
     organization.elasticsearchNodeUrl = null;
     organization.elasticsearchApiKey = null;
     organization.useCustomElasticsearch = false;
-    // The uploaded licence key is shown once at upload and never read back.
-    organization.license = null;
+    // Licensing owns the licence key now; a row that still carries it never ships it.
+    Reflect.deleteProperty(organization, "license");
   }
 
   /**

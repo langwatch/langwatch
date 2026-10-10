@@ -132,7 +132,7 @@ Hostname routing is the alternative, and it is opt-in.
 ```bash
 make haven up          # start this worktree's stack
 make haven status      # every stack, service health, shared servers
-haven logs backend -t  # tail one lane from any terminal
+haven logs backend -f  # tail one lane from any terminal
 ```
 
 haven gives every worktree's services a stable hostname through the portless
@@ -175,12 +175,12 @@ package: each application and each feature package owns its own
 
 All of those go through a machine-wide queue, and it is worth knowing why. One
 typecheck holds a 2.3 to 3.5 GiB working set and uses every core, which is fine
-once and ruinous four times over. haven's machine-wide slot (`haven slot`,
+once and ruinous four times over. haven's machine-wide slot (`haven machine slot`,
 `tools/thuishaven/README.md`) counts the runs live across every worktree,
 terminal and agent on the machine, and a run past the limit waits its turn
 instead of piling on. With a slot free it prints nothing. Queued, it says so on
 stderr, which is the thing that tells you a slow run was waiting rather than
-hung. `haven slot explain` shows the limit and who holds a slot.
+hung. `haven machine slot explain` shows the limit and who holds a slot.
 Never set `CHECK_SLOTS` yourself.
 
 ## How work starts here

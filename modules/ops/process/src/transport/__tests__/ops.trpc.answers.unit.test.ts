@@ -4,7 +4,11 @@
  * Every operator page reads its fields off these shapes, so a changed one
  * is a blank card rather than an error.
  */
-import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  bindTrpcMiddlewareContext,
+  createTrpcRuntime,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -16,11 +20,10 @@ import {
   OPS_STAFF_ADDRESS,
   platformOperatorAuthz,
 } from "../../app/__tests__/ops.fixture.ts";
-import type { OpsCapability } from "../../app/ops.app.ts";
-import type { OpsReplayRunner } from "../../app/ops.app.ts";
+import type { OpsCapability, OpsReplayRunner } from "../../app/ops.app.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
-import { opsOperatorFact } from "../ops-operator.trpc.ts";
+import { opsOperatorContext } from "../ops-operator.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
 import { opsUpgradeTrpcTransport } from "../ops-upgrade.trpc.ts";
 import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
@@ -45,7 +48,9 @@ function mount<Contract extends TrpcContract>(
     procedure: trpc.procedure,
     members: opsTrpcMembers({ holders }),
   }).mount(declaration, () => app, {
-    facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsTrpcTestContext) => ctx.operator)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(opsOperatorContext, (ctx: OpsTrpcTestContext) => ctx.operator),
+    ],
   });
 
   return {
@@ -138,6 +143,15 @@ describe("the ops surface's declared answers", () => {
   });
 
   describe("given a write that acknowledges", () => {
+    /** @scenario An operator's "Run a pass now" is accepted with an empty input */
+    it("starts a pass from an empty input, the body the unbatched link can send", async () => {
+      const upgrade = mount(opsUpgradeTrpcTransport);
+
+      await expect(upgrade.operator.runSystemMigrationPass({})).resolves.toEqual({
+        started: true,
+      });
+    });
+
     it("answers each acknowledgement's declared shape", async () => {
       const queues = mount(opsQueueTrpcTransport, {
         unblockQueueGroup: async () => ({ wasBlocked: true }),
@@ -151,7 +165,6 @@ describe("the ops surface's declared answers", () => {
       await expect(
         eventLog.operator.dismissAnomaly({ tenantId: "project_a", kind: "rate_breaker" }),
       ).resolves.toEqual({ dismissed: true });
-      await expect(upgrade.operator.runSystemMigrationPass()).resolves.toEqual({ started: true });
       await expect(
         upgrade.operator.enrollMigrationTenant({
           organizationId: "org_acme",

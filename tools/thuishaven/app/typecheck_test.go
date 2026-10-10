@@ -34,7 +34,7 @@ func (f *fakeSemaphore) Acquire(_ context.Context, name string, slots int) (func
 	return func() { f.released++ }, 1, nil
 }
 
-// @scenario "haven typecheck is not gated twice"
+// @scenario "haven machine typecheck is not gated twice"
 func TestTypecheckDisablesTheScriptsOwnQueue(t *testing.T) {
 	sup := &fakeSupervisor{}
 	sem := &fakeSemaphore{}
@@ -61,7 +61,7 @@ func TestTypecheckDisablesTheScriptsOwnQueue(t *testing.T) {
 	}
 }
 
-// @scenario "haven typecheck and delegated checks share one counter"
+// @scenario "haven machine typecheck and delegated checks share one counter"
 func TestTypecheckCountsAgainstTheSharedChecksSemaphore(t *testing.T) {
 	sem := &fakeSemaphore{}
 	orch := &Orchestrator{

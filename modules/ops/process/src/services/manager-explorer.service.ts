@@ -1,4 +1,4 @@
-import type { ProcessRef, ProcessStore } from "@langwatch/eventing";
+import { HANDOFF_PROCESS_NAME, type ProcessRef, type ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type {
   AggregateProcessManager,
@@ -95,7 +95,11 @@ export class ManagerExplorerService {
       if (!registryNames.has(c.processName)) {
         rows.push({
           ...c,
-          pipelineName: "(not registered)",
+          // The hand-off outbox is hosted by eventing itself, not by a pipeline's process managers.
+          pipelineName:
+            c.processName === HANDOFF_PROCESS_NAME
+              ? "(eventing hand-off outbox)"
+              : "(not registered)",
           scheduled: false,
         });
       }

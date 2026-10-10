@@ -98,3 +98,14 @@ describe("given the auth module, which binds the door", () => {
     });
   });
 });
+
+describe("given an app that asks whether an input carries an authorization proof", () => {
+  describe("when the header name only tests a field with `in`", () => {
+    /** @scenario "A field test with `in` is not a header read" */
+    it("reports nothing, but still reports the same test against headers", () => {
+      const file = "modules/agent/process/src/app/agent.app.ts";
+      expect(report('if ("authorization" in input) proceed();', file)).toEqual([]);
+      expect(report('if ("authorization" in headers) proceed();', file)).toHaveLength(1);
+    });
+  });
+});

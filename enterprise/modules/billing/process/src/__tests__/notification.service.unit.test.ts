@@ -24,8 +24,8 @@ vi.mock("@langwatch/observability", () => ({
 
 import { Temporal } from "@langwatch/time";
 
-import { HttpHubspotFormChannel } from "../channels/http/http.hubspot-form.channel.ts";
-import { MemoryUsageLimitEmailChannel } from "../channels/memory/memory.usage-limit-email.channel.ts";
+import { HttpHubspotFormChannel } from "../channels/http/http.billing.channels.ts";
+import { MemoryUsageLimitEmailChannel } from "../channels/memory/memory.billing.channels.ts";
 import { SlackBillingAlertChannel } from "../channels/slack/slack.billing-alert.channel.ts";
 import { UsageLimitEmailChannel, type UsageLimitEmailData } from "../index.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";

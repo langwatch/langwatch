@@ -4,7 +4,11 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
  * MODULE-declared transports — sibling of the collector composition test.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  canonicalErrorResponse,
+  createRestRuntime,
+  withOtlpPathAliases,
+} from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -29,7 +33,7 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const doorLog = vi.hoisted(() => ({
   loggerName: "langwatch:otel:v1:traces",
@@ -58,6 +62,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 const TOKEN = "sk-lw-a-project-key";
 const API_KEY_ID = "api-key-1";
@@ -205,6 +210,9 @@ function deployment(
   apis.ready();
 
   const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
+    },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -222,13 +230,14 @@ function deployment(
 
   const mounted = servesOtlp
     ? [
-        runtime.mount(otlpIngestRest.router(), {
-          app: () => apis.reference(TraceApi),
-          // The receiver binds NO transport fact: it is declared public and
-          // resolves the project credential inside its handler.
-          credential: "public",
-          onError: canonicalErrorResponse,
-        }),
+        // The host rewrites a misconfigured exporter path before routing, as RestHost does.
+        withOtlpPathAliases(
+          runtime.mount(otlpIngestRest.router(), {
+            app: () => apis.reference(TraceApi),
+            credential: "otlp_ingest",
+            onError: canonicalErrorResponse,
+          }),
+        ),
       ]
     : [];
 
@@ -396,6 +405,21 @@ describe("given the trace module as a process composes it", () => {
         message:
           "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
       });
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when an exporter posts to a path the receiver does not recognise", () => {
+    /** @scenario "The trace door answers an unknown exporter path as not found before it asks for the key" */
+    it("answers 404 with or without a key and records nothing", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const anonymous = await post("/not-an-exporter/v1/traces", otlpTraceBody(), {
+        "X-Auth-Token": "",
+      });
+      const keyed = await post("/not-an-exporter/v1/traces", otlpTraceBody());
+
+      expect([anonymous.status, keyed.status]).toEqual([404, 404]);
       expect(recordedSpans).toHaveLength(0);
     });
   });

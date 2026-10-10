@@ -2,7 +2,7 @@
  * @vitest-environment node
  * Verifies error handling consistency for GET /api/trace/:id (F4 of e2e-walk).
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
@@ -48,7 +48,7 @@ function buildApi(findTrace: () => Promise<never>) {
 
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
+    middlewareContext: [bindMiddlewareContext(tracesRestCredential, () => ({ principal: null }))],
     // The boundary the process installs, restated: a handled refusal answers
     // with its code, and anything else degrades to the generic unknown.
     onError: (error, context) => {

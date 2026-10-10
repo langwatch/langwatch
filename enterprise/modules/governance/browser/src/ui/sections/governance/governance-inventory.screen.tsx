@@ -58,6 +58,7 @@ import { IngestionSourcesTable } from "../../../features/ingestion-sources/inges
 import {
   gatedSourceTypeOptions,
   isOttlEnabledSourceType,
+  needsIngestSecret,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
   routesConversations,
   SOURCE_TYPE_LABEL,
@@ -1181,6 +1182,7 @@ function InventoryPage() {
             setComposer={page.setComposer}
             invalidFieldKeys={page.invalidFieldKeys}
             isPending={mutations.create.isPending}
+            refusal={mutations.create.error}
             onSubmit={page.onSubmit}
             onClose={page.closeComposer}
           />
@@ -1415,6 +1417,7 @@ export function SourceComposerDrawer({
   setComposer,
   invalidFieldKeys,
   isPending,
+  refusal,
   onSubmit,
   onClose,
 }: {
@@ -1426,6 +1429,8 @@ export function SourceComposerDrawer({
   /** Required fields a refused save found empty, marked on the form itself. */
   invalidFieldKeys: readonly string[];
   isPending: boolean;
+  /** The save's failure; a parser refusal is drawn onto the statements it names. */
+  refusal?: unknown;
   onSubmit: () => void;
   onClose: () => void;
 }) {
@@ -1511,6 +1516,7 @@ export function SourceComposerDrawer({
               statements={composer.ottlStatements}
               onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
               enabled={isOttlEnabledSourceType(composer.sourceType)}
+              refusal={refusal}
             />
           </VStack>
         </Drawer.Body>
@@ -1849,6 +1855,7 @@ export function SourceEditDrawer({
   onClose,
   onSubmit,
   isPending,
+  refusal,
 }: {
   organizationId: string;
   /**
@@ -1861,6 +1868,8 @@ export function SourceEditDrawer({
   onClose: () => void;
   onSubmit: (input: EditSubmission) => void;
   isPending: boolean;
+  /** The save's failure; a parser refusal is drawn onto the statements it names. */
+  refusal?: unknown;
 }) {
   const isOpen = !!source;
   const form = useSourceEditForm(source);
@@ -1957,6 +1966,7 @@ export function SourceEditDrawer({
             hasPulled={hasPulled}
             organizationId={organizationId}
             destinationCtx={destinationCtx}
+            refusal={refusal}
           />
         </Drawer.Body>
         <Drawer.Footer>
@@ -1999,6 +2009,7 @@ function SourceEditBody({
   hasPulled,
   organizationId,
   destinationCtx,
+  refusal,
 }: {
   form: ReturnType<typeof useSourceEditForm>;
   source: Source;
@@ -2006,11 +2017,14 @@ function SourceEditBody({
   hasPulled: boolean;
   organizationId: string;
   destinationCtx: DestinationContext;
+  refusal?: unknown;
 }) {
   // Derived here rather than passed in: `isEditablePullSource` is a type guard,
   // and narrowing `sourceType` is what lets the pull fields below take it as a
   // `SourceType` instead of re-asserting one.
   const isPullMode = isEditablePullSource(sourceType);
+  // The row menu offers Rotate secret only for these (needsIngestSecret).
+  const hasRotatableSecret = !!sourceType && needsIngestSecret({ sourceType });
   // Read here rather than left to the field's own early return, because the
   // Advanced group has to know whether it holds anything before it offers
   // itself — a disclosure that opens onto an empty box is worse than none.
@@ -2066,12 +2080,13 @@ function SourceEditBody({
         statements={form.statements}
         onChange={form.setStatements}
         enabled={isOttlEnabledSourceType(source.sourceType)}
+        refusal={refusal}
       />
 
       <Text fontSize="xs" color="fg.muted">
-        {isPullMode
-          ? "Source type is immutable after create: archive and recreate to change it."
-          : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
+        {hasRotatableSecret
+          ? "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."
+          : "Source type is immutable after create: archive and recreate to change it."}
       </Text>
     </VStack>
   );

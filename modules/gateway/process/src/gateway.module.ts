@@ -1,6 +1,5 @@
 import {
   bindRestCredential,
-  bindRestMiddleware,
   keyCredentialOfRequest,
   keyDoorPrincipalOfRequest,
   projectCredentialOfRequest,
@@ -29,17 +28,12 @@ import { gatewayRepositories } from "./repositories/gateway-repositories.registr
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
-import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
+import { elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
-import {
-  gatewayKeyCaller,
-  gatewayVirtualKeyCaller,
-  gatewayPlatformRest,
-  gatewayRestCredential,
-} from "./transport/gateway-platform.rest.ts";
+import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
@@ -75,46 +69,40 @@ export const gatewayProcessModule: PublishedProcessModule<
   .withTasks(({ repositories }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
   ])
-  .withTransportFacts(({ app }) => {
-    if (!(app instanceof GatewayModule)) {
-      throw new TypeError("Gateway transport requires its constructed application");
-    }
-
-    return [
-      // The gateway control plane is signed rather than bearer-authenticated.
-      // It owns the same declared secret as the data-plane client.
-      bindRestCredential("internal_secret", () => app.internalDoor()),
-      // Organization-owned rows take any API key; the key door asked the route's permission.
-      bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),
-      // A virtual key route also serves a project-bound access token, as its person.
-      bindRestMiddleware(gatewayVirtualKeyCaller, (context) =>
-        keyDoorPrincipalOfRequest(context.req.raw),
-      ),
-      // The callback arrives publicly and the application verifies the raw bytes
-      // against the provider row's own stored secret, so the header is all the
-      // transport carries.
-      bindRestMiddleware(gatewayRestCredential, (context): GatewayRequestCredential => {
-        const credential = projectCredentialOfRequest(context.req.raw);
-        if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
-        if (credential.type === "cliAccessToken") {
-          return {
-            kind: "user",
-            userId: credential.userId,
-            organizationId: credential.organizationId,
-          };
-        }
-
+  .provideMiddlewareBindings(({ app }) => [
+    // The gateway control plane is signed rather than bearer-authenticated.
+    // It owns the same declared secret as the data-plane client.
+    bindRestCredential("internal_secret", () => app.internalDoor()),
+  ])
+  .provideMiddlewareContext({
+    // Organization-owned rows take any API key; the key door asked the route's permission.
+    gatewayKeyCaller: (request) => keyCredentialOfRequest(request),
+    // A virtual key route also serves a project-bound access token, as its person.
+    gatewayVirtualKeyCaller: (request) => keyDoorPrincipalOfRequest(request),
+    // The callback arrives publicly and the application verifies the raw bytes
+    // against the provider row's own stored secret, so the header is all the
+    // transport carries.
+    gatewayRestCredential: (request): GatewayRequestCredential => {
+      const credential = projectCredentialOfRequest(request);
+      if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+      if (credential.type === "cliAccessToken") {
         return {
-          kind: "apiKey",
-          apiKeyId: credential.apiKeyId,
+          kind: "user",
           userId: credential.userId,
           organizationId: credential.organizationId,
         };
-      }),
-      bindRestMiddleware(elevenLabsSignature, (context) => ({
-        signature: context.req.header("elevenlabs-signature"),
-      })),
-    ];
+      }
+
+      return {
+        kind: "apiKey",
+        apiKeyId: credential.apiKeyId,
+        userId: credential.userId,
+        organizationId: credential.organizationId,
+      };
+    },
+    elevenLabsSignature: (request) => ({
+      signature: request.headers.get("elevenlabs-signature") ?? undefined,
+    }),
   });
 
 /**

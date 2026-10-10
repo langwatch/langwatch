@@ -84,7 +84,7 @@ eventing, so a contract keys a map by an event table without naming it (Alex, 20
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and
-  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineRestMiddleware`). Zod-only,
+  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineMiddlewareContext`). Zod-only,
   framework-free, browser-safe, near-zero weight. Every contract depends on
   it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
   here — it lives in the runtime that consumes it, so nothing backend-shaped
@@ -328,7 +328,8 @@ document, is the authority on filenames):
 - `transport/` — declarations only (§8).
 - `rules/` — pure functions and constants; no clock, no I/O. Value types (data
   bags and the pure functions over them) live here too, not as `*Service`
-  classes and not in a new slot (Alex, 2026-09-28).
+  classes and not in a new slot (Alex, 2026-09-28). Building SQL text with no I/O is a pure
+  decision and may live in `rules/` (Alex 2026-10-10 TRACE-QUERY-SQL).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
   The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
@@ -627,7 +628,7 @@ Framework classes implement hosting. **The container** (`server.container(role)`
 modules, opens the stores and boots. Nothing more (Alex, 2026-10-01): it holds no members, answers
 no supply and takes no `.provide` or `withMember`. Authentication policy stays in the API runtime. auth
 binds the one API door (sessions, key credentials, plan gate, audit sinks) from
-the peers it already holds, in its own transport facts; the process opens it
+the peers it already holds, in its own middleware bindings; the process opens it
 before its hosts and builds both over it. A process with no door, or two,
 refuses boot by name, and `@langwatch/process` names no module contract but ops (its
 admin edge). This keeps transport machinery out of `main.ts` without making
@@ -1427,10 +1428,21 @@ ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY O
 `OPTIMIZE ... FINAL` and `POPULATE`; the note excuses only a mutation, never the last three. Migrations
 in the newest `langwatch@v*` tag, read from git, are history and never rewritten; a clone without the
 tags fails the guards rather than passing (Alex, 2026-10-09).
+**No stuck states** (Alex, 2026-10-10, STUCK-STATES; `specs/upgrade/upgrade-stuck-states-*.feature`):
+- Once the gate admits (the ledger is current), a schema-not-ready error is a 500 that logs "schema and
+  ledger disagree", never `upgrade_in_progress`. That 503 is only for an api the gate has not admitted.
+- A tenant step settles done only when every eligible tenant holds a finished row. A pass that claimed
+  nothing, Redis down included, leaves it pending.
+- A background step run has a 15-minute deadline. When it passes, the run aborts and keeps its
+  checkpoint, the step goes back to pending, and the sweep moves on; Ops shows the expiry.
+- A failed upgrade run with no failed step row backs off exponentially from 10 s to 5 minutes, and its
+  log says it is retrying and why.
+- Legacy `pnpm task` runs and `upgrade` never overlap. Both take the one timed upgrade lease, and each
+  refuses while the other holds it. Legacy tasks are to fold into upgrade steps, in a later drive.
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
-`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
-lock, before serve, and the access-config render runs from env alone in its Helm job (Alex,
+`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
+lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
 2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
 touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
 migration main has released keeps main's bytes even when it touches two owners: installs hold its
@@ -1463,7 +1475,7 @@ accepts a tenant step and the background runner skips it; its ledger row is `don
 tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
 2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
-raw SQL marked `-- @tenancy: <reason>`, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1). Stored-object's ClickHouse import is a `project` tenant step with
+raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
@@ -1490,6 +1502,9 @@ host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
 A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
 destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
 after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
+An image is the newest stamped release (`packages/upgrade/releases/`) only when it ships no step
+beyond the stamped ones; otherwise it names itself "unreleased", and its unstamped steps show under
+the Unreleased row (Alex, 2026-10-10, IMAGE-IDENTITY).
 
 **A contract step never drops unarchived data** (Alex, 2026-10-09, ARCHIVE-OR-FAIL). Archive-or-fail
 lives in `packages/upgrade`: a contract's SQL names each table it retires with `-- archive: <table>`
@@ -1497,7 +1512,7 @@ beside its `-- contract: retired in <release>` note, and before any schema apply
 such table still ahead into `_retired_<table>_<release>` and checks the copy holds the source's rows,
 or marks the contract step failed and applies nothing. A re-run copies only a stale archive; `upgrade
 plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
-asks fails. A contract with no archive note behaves as before.
+asks fails. Every Postgres contract carries `-- archive: <table>` or `-- archive: none (<reason>)`; the migration-safety guard refuses one without (`contract-without-archive-note`).
 
 **An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
 named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
@@ -1602,13 +1617,14 @@ declaration of the env family in its own config.
 **Routing is folded into the `clickhouse` member** (Alex, 2026-09-28): the member routes every
 statement by its tenant's organization itself, so a module hands the member its statement and
 never writes a routed-client adapter (ops' replay and event-explorer adapters are deleted). A
-statement spanning every tenant names none (`tenantId: ""`) with a written `unscoped` reason, and
+statement spanning every tenant names none (`tenantId: ""`) and sets `SKIP_TENANT_CHECK: true` under a comment giving the reason
+(Alex, 2026-10-10: the guard is required, every skip is counted and logged, `langwatch/skip-tenant-check-reason` refuses a flag without a real reason), and
 the member reads it on the shared server, where main's `"default"` fallback read. A read across one
 organization's projects (a gateway budget's ledger) declares its **tenant set** (`tenantIds`) instead:
 the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
 `tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
 the tenant directory it already routes by and refuses a set spanning organizations. One statement,
-answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). The list may
+answered on that organization's server, never a skipped tenant check (Alex, 2026-09-29). The list may
 also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
 bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
 subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
@@ -1634,6 +1650,7 @@ tables, and declares its own LWQL catalogue entries for the event-table views, w
 composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's offloaded fields) is
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
+2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -1794,8 +1811,22 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's
-  credential facts), then the body is parsed and validated, then any authorisation that reads the parsed input.
-  A fact that reads the input is declared `source: "input"` and resolves after the validators (Alex, 2026-09-30).
+  middleware context read off the credential), then the body is parsed and validated, then any authorisation that
+  reads the parsed input. Context that reads the input is declared `source: "input"` and resolves after the
+  validators, handed the validated input (Alex, 2026-09-30).
+- **What a route needs beyond its input is middleware context, supplied by its own module** (Alex, 2026-10-10).
+  `defineMiddlewareContext(name, schema)` declares it, the route names it with `.withMiddlewareContext(x)`, and the
+  module installer supplies every name its routes ask for with `.provideMiddlewareContext({ name: (request,
+  { app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
+  routes need context it never provides does not publish, and the mount still refuses an unprovided name. No
+  process supplies a module's context; a value several modules need is a shared helper (`projectRequestContextOf`
+  in `@langwatch/api/rest`). `.withHeaders(...)` values bind themselves.
+- **tRPC and hand-bound values speak the same vocabulary** (Alex, 2026-10-10). A procedure names a declared
+  context with `.withMiddlewareContext(x)`; its mount binds it with `bindTrpcMiddlewareContext` or
+  `bindTrpcHeader`, and the host binds `browserSessionContext` and `callerAddressContext`. Bindings a module
+  writes by hand (tRPC, websocket, the API door) go in `.provideMiddlewareBindings(() => [...])`; a REST context
+  bound there counts as provided and a mistyped value does not compile. A REST route that needs the browser
+  session reads the door's (`browserSessionContext`, supplied by `browserSessionOfRequest`), never re-verifies it.
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - REST authenticates with API keys only and tRPC with the session (Alex, 2026-09-30); `/api/files` and
@@ -1808,7 +1839,11 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - No key, token or secret is minted while the actor carries an impersonator (Alex, 2026-10-01). An endpoint that mints
   declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
   guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
-  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`.
+  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`, `otlp_ingest` (an OTLP exporter's
+  key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a
+  connect-host bearer, bound by licensing: a licence token on sync, an activation code looked up unclaimed on
+  activate, which `redeemActivationCode` claims; Alex 2026-10-10 W02-ACTIVATE-DOOR).
+- A module-bound door is `defineRestDoor(credential, { needs, identify })` typed by `DoorContract`; the framework hands it `{ bearer, request }`, a module binds `.withDoors({...})` keyed exactly by its routes' module-bound credentials, and a route naming a credential nobody bound refuses the boot (Alex 2026-10-10 TYPED-DOORS, W02-DOOR-BEARER).
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
@@ -1837,6 +1872,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - `publicRoute`/raw results only for genuinely non-JSON protocols
   (OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
+- `optionalCredential({ reason, refused: "anonymous" })` answers a credential the door refuses as none: the
+  door's `identify` runs, a refusal hands no actor and no scope, and any other failure is logged and answered
+  as anonymous too (the bug-report intake, Alex 2026-10-10 W02-BUG-INTAKE, W02-INTAKE-OUTAGE).
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
   shape is still asked for (Alex, 2026-09-24). `ScenarioApi.launchRun` is such a port, one-to-one with
@@ -1866,8 +1904,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
 close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
-- The API door is bound once, by auth, with `bindApiDoor` in its `withTransportFacts`; the container
-  hands installed facts to the surface factory, which opens it ahead of REST and tRPC. None or two
+- The API door is bound once, by auth, with `bindApiDoor` in its `provideMiddlewareBindings`; the container
+  hands installed bindings to the surface factory, which opens it ahead of REST and tRPC. None or two
   binders refuse boot by name (`MissingApiDoorError`, `DuplicateApiDoorError`) (Alex, 2026-10-01).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
@@ -2007,7 +2045,7 @@ acyclic; event causation may loop (a request and its completion) and idempotency
 seat-raised event and sends its own invoicing command; `LicensingApi.findSeatChanges` and the minute
 poll go (Alex, 2026-09-29).
 A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
-with a pending answer, never a reverse read; identity's history and proposals are read through the
+with a pending answer, never a reverse read; identity's history and proposals and SCIM's sync activity are read through the
 eventing member's surface (Alex, 2026-09-29).
 Enterprise `nurturing` shows the subscriber rule (Alex, 2026-09-29): nurturing's own subscribers listen to
 each owner's events, which carry ids and the non-personal, point-in-time facts; no owner knows nurturing and
@@ -2833,9 +2871,10 @@ billing, so connect syncs on licensing's `contract_terms_changed` and resets on 
 `connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
 billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
 spend share. `connect.errors.ts` stays in licensing-contract.
-The connect upstream reaches gateway as a licensing fact carrying the organization, base URL, instance id and
-the licence token's fingerprint, never the token; gateway reads the token from licensing's row through a declared
-read-only share (Alex, 2026-10-09, C3b D2; the C3-KEY-HASH shape).
+The connect upstream reaches gateway as licensing's `connect_upstream_set` / `connect_upstream_cleared` facts
+naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceId }` from
+`LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
+instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
@@ -3077,6 +3116,18 @@ the rest `@langwatch/process`), `@langwatch/process-server`, `@langwatch/ui-kern
 `@langwatch/installed-server-modules` and `@langwatch/installed-web-modules`, `packages/audit-log-null`,
 `defineServerModule` / `defineWebModule`, `serverModules` / `webModules`, `<id>Server`,
 `openProcessStores`, `<f>.server.ts` stems, `<X>App` module classes and `.withApp(...)`.
+· REST middleware facts (Alex, 2026-10-10; §8): `defineRestMiddleware` and `RestTransportMiddleware` (now
+`defineMiddlewareContext` and `MiddlewareContext`), `.withMiddleware(...)` on a REST route (now
+`.withMiddlewareContext(...)`), `bindRestMiddleware`, `bindRestHeader` and `RestTransportMiddlewareBinding` in a
+module (now keys of `.provideMiddlewareContext({ ... })`), `projectRestFacts` (now `projectRequestContext`), and
+a REST context value bound in `withTransportFacts` or by the process.
+· "Facts" for transport values (Alex, 2026-10-10; §8): `defineTrpcFact` and `TrpcFact` (now
+`defineMiddlewareContext` and `MiddlewareContext`), `.withFacts(...)` (now `.withMiddlewareContext(...)`),
+`bindTrpcFact` and `TrpcFactBinding` (now `bindTrpcMiddlewareContext`, `TrpcMiddlewareContextBinding`),
+`withTransportFacts`, `TransportFactBinding` and `BoundTransportFacts` (now `provideMiddlewareBindings`,
+`MiddlewareBinding`, `BoundMiddlewareBindings`), a host or runtime mount's `{ facts }` (now `middlewareBindings`, or
+`middlewareContext` on a tRPC mount), a websocket protocol's `facts:` (now `middlewareContext:`), `<x>Fact`
+constants (now `<x>Context`), and ops' `adminAuthSession` (the door's `browserSessionContext`).
 
 ---
 

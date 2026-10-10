@@ -12,6 +12,7 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -86,16 +87,13 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         blobStore: BlobStoreRedisRepository.create(redis),
         anomalyState: RedisAnomalyStateRepository.create(redis),
       },
-      accounts: {
-        deactivateUser: () => Promise.reject(new Error("unreached")),
-        changeUserEmail: () => Promise.reject(new Error("unreached")),
-      },
       authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
       sessions: createApiFixture<AuthApi>(),
       accounts: createApiFixture<AuthApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
-      users: {} as UserApi,
+      users: createApiFixture<UserApi>(),
+      shares: createApiFixture<ShareApi>(),
       scheduler: {
         schedules,
         projects,

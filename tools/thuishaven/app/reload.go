@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The host's lines that end a reload: a reload finished in place, or a
@@ -16,7 +19,7 @@ var doneLines = []string{`"msg":"backend reload finished"`, `"msg":"backend read
 
 const reloadTimeout = 3 * time.Minute
 
-var reloadLanes = []string{"app", "api", "worker"}
+var reloadLanes = []string{"app", "api", "worker", "ui"}
 
 // Reload asks the Node host (api, worker and, in one process, the UI) to
 // reload its backend in place (SIGUSR2): the UI and its sessions stay up. It
@@ -32,6 +35,9 @@ func (o *Orchestrator) Reload(ctx context.Context, p UpParams, name string) erro
 	st, ok := o.stackBySlug(slug)
 	if !ok {
 		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
+	}
+	if name == "ui" {
+		return o.reloadUI(ctx, st)
 	}
 	if len(restartTargets(st, APILane)) == 0 {
 		return fmt.Errorf("this stack has no Node host to reload")
@@ -59,6 +65,21 @@ func (o *Orchestrator) Reload(ctx context.Context, p UpParams, name string) erro
 		return err
 	}
 	fmt.Printf("  %s ready again\n", name)
+	return nil
+}
+
+// reloadUI rebuilds a built-UI stack's bundle and swaps it in; it returns once
+// the swap is done, so the next page load is the new build.
+func (o *Orchestrator) reloadUI(ctx context.Context, st domain.Stack) error {
+	if st.Refresh == domain.RefreshHMR {
+		return fmt.Errorf("stack %q serves the UI from Vite with HMR, which reloads itself — `haven up` or `haven up --watch` serves a build", st.Slug)
+	}
+	cmd := exec.CommandContext(ctx, "sh", "-c", UIBuildShell)
+	cmd.Dir, cmd.Stdout, cmd.Stderr = st.WorktreeDir, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("building apps/ui: %w", err)
+	}
+	fmt.Println("  ui bundle swapped in — reload the page")
 	return nil
 }
 

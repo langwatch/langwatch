@@ -4,7 +4,7 @@
  * call the app doesn't serve fails here as it does in production.
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   canonicalErrorResponse,
   ForbiddenError,
@@ -85,6 +85,7 @@ export function mountProjectRestApplication(
   };
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
@@ -104,8 +105,8 @@ export function mountProjectRestApplication(
 
   const hono = runtime.mount(projectRest.router(), {
     app: () => apis.reference(ProjectManagementApi),
-    facts: [
-      bindRestMiddleware(projectRestCaller, () => ({ userId: USER_ID, apiKeyId: API_KEY_ID })),
+    middlewareContext: [
+      bindMiddlewareContext(projectRestCaller, () => ({ userId: USER_ID, apiKeyId: API_KEY_ID })),
     ],
     onError: canonicalErrorResponse,
   });

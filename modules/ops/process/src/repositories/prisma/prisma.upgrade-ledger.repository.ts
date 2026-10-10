@@ -1,11 +1,12 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   imageSteps,
   type ServingRosterEntry,
   UpgradeLedgerRepository as ServingLedger,
 } from "@langwatch/upgrade";
-import { readImageCodeSteps } from "@langwatch/upgrade/gate";
-import { loadReleases } from "@langwatch/upgrade/manifest";
+import { imageRelease, readImageCodeSteps, servingImageTree } from "@langwatch/upgrade/gate";
+import { type Deprecation, loadDeprecations, loadReleases } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
   type ListRunsInput,
@@ -25,9 +26,8 @@ import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
 
 import type { UpgradeLedgerRepository } from "../upgrade-ledger.repository.ts";
 
-/** Marks the reader's SQL for the tenancy guard: the ledger is the install's, no tenant's. */
-const LEDGER_TENANCY =
-  "-- @tenancy: the upgrade ledger describes the installation, not a tenant.\n";
+// The upgrade ledger describes the installation, not a tenant.
+const LEDGER_TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 /** The image's code steps that wait until no serving process lacks them (WAITINGON-LOOKUP). */
 function waitingCodeSteps(): ReadonlySet<string> {
@@ -60,7 +60,7 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   }): PrismaUpgradeLedgerRepository {
     const releases = loadReleases();
     const { manifests, floor } = releases;
-    const release = manifests.at(-1)?.release;
+    const release = imageRelease({ manifests, tree: servingImageTree() }) ?? undefined;
     const shipped = imageSteps({ release: release ?? "0.0.0" });
     const postgres = {
       query: async <Row extends object>(text: string, values: unknown[] = []) => ({
@@ -85,6 +85,10 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   findStatus(): Promise<UpgradeStatus> {
     return this.reader.status();
+  }
+
+  findDeprecations(): Deprecation[] {
+    return loadDeprecations();
   }
 
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage> {

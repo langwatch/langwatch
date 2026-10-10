@@ -14,6 +14,7 @@ import {
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
+import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
@@ -62,6 +63,8 @@ function takeClock(): void {
 
 let ch: ClickHouseClient;
 let repo: SpanStorageClickHouseRepository;
+/** The span tree pages through its own repository on this branch. */
+let spanTree: ClickHouseTraceSpanRepository;
 
 function spanRow({
   tenantId,
@@ -139,6 +142,7 @@ beforeAll(async () => {
     resolveClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
   });
+  spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
 
   await insert([
     spanRow({
@@ -207,14 +211,14 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository through 
       it("returns the spans of the aggregate and its members and none of the outsider's", async () => {
         const authorization = aggregateReadsAandB();
 
-        const spans = await repo.getSpansByTraceId({
+        const spans = await repo.findSpansByTraceId({
           authorization,
           traceId: SHARED_TRACE,
           occurredAtMs: TODAY,
         });
         expect(spans.map((span) => span.span_id).toSorted()).toEqual(["a-1", "agg-1", "b-in"]);
 
-        const page = await repo.findSpanSummariesPage({
+        const page = await spanTree.listSummaryPage({
           authorization,
           traceId: SHARED_TRACE,
           limit: 50,
@@ -223,14 +227,14 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository through 
         expect(page.rows.map((row) => row.spanId).toSorted()).toEqual(["a-1", "agg-1", "b-in"]);
         expect(page.hasMore).toBe(false);
 
-        const summary = await repo.getSpanSummaryByTraceId({
+        const summary = await repo.findSpanSummaryByTraceId({
           authorization,
           traceId: SHARED_TRACE,
           occurredAtMs: TODAY,
         });
         expect(summary.map((row) => row.spanId).toSorted()).toEqual(["a-1", "agg-1", "b-in"]);
 
-        const rollups = await repo.getTraceEventRollupsByTraceIds({
+        const rollups = await repo.findTraceEventRollupsByTraceIds({
           authorization,
           traceIds: [SHARED_TRACE],
           timeRange: WINDOW,
@@ -261,7 +265,7 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository through 
     describe("when the aggregate reads the page's event rollups", () => {
       /** @scenario "Two members with the same trace id each list their own events" */
       it("keeps each project's events on its own row", async () => {
-        const rollups = await repo.getTraceEventRollupsByTraceIds({
+        const rollups = await repo.findTraceEventRollupsByTraceIds({
           authorization: aggregateReadsAandB(),
           traceIds: [SHARED_TRACE],
           timeRange: WINDOW,
@@ -301,14 +305,14 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository through 
           now: NOW,
         });
 
-        const spans = await repo.getSpansByTraceId({
+        const spans = await repo.findSpansByTraceId({
           authorization,
           traceId: A_TRACE,
           occurredAtMs: TODAY,
         });
         expect(spans.map((span) => span.span_id)).toEqual(["a-today"]);
 
-        const page = await repo.findSpanSummariesPage({
+        const page = await spanTree.listSummaryPage({
           authorization,
           traceId: A_TRACE,
           limit: 50,
@@ -327,7 +331,7 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository through 
 
         // No hint: the read resolves the trace's time through
         // `trace_summaries` first, so that statement carries the fence too.
-        const viaProof = await repo.getSpansByTraceId({
+        const viaProof = await repo.findSpansByTraceId({
           authorization,
           traceId: PLAIN_TRACE,
         });

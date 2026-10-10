@@ -89,7 +89,7 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
   );
 }
 
-/** Narrowed to the constructed app, as the licensing transport facts do, not the contract. */
+/** Narrowed to the constructed app, as licensing's middleware bindings do, not the contract. */
 export const lwqlReconvergenceEventing = defineEventingModule({
   pipeline: LWQL_RECONVERGENCE_PIPELINE_NAME,
   build: ({ app }: EventingSetup<AnalyticsRepositories, AnalyticsApi>) => {

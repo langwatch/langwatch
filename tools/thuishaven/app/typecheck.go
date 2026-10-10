@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// TypecheckRun is one `haven typecheck`. ExtraArgs are forwarded to the
+// TypecheckRun is one `haven machine typecheck`. ExtraArgs are forwarded to the
 // underlying command. MaxRSSOverrideMB <= 0 keeps domain.DefaultTypecheckReapLimits'
 // RSS ceiling (env parsing is composition-root-only, so this comes in as a
 // resolved value, same as SlotsOverride).
@@ -69,7 +69,7 @@ func (o *Orchestrator) Typecheck(ctx context.Context, r TypecheckRun) error {
 	return o.sup.RunOnceBounded(ctx, "typecheck", r.RepoDir, shell, env, ReapLimits(rl))
 }
 
-// holdTypecheckSlots waits for one "checks" slot, the counter `haven slot run`
+// holdTypecheckSlots waits for one "checks" slot, the counter `haven machine slot run`
 // shares (ADR-064, ADR-095), and for an affected run takes every other slot
 // free right now too. slots == 0 is the gate turned off.
 func (o *Orchestrator) holdTypecheckSlots(ctx context.Context, slots int, affected bool) (release func(), slot, parallel int, err error) {

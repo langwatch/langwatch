@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Switch } from "./switch.tsx";
 
 const meta = {
-  title: "Primitives/Switch",
+  title: "Inputs and forms/Switch",
+  parameters: {
+    usage: {
+      use: "A setting that takes effect the moment it is flipped.",
+      avoid: "A choice saved later with the rest of a form: use Checkbox.",
+    },
+  },
   component: Switch,
   tags: ["autodocs"],
   args: { children: "Capture inputs and outputs" },

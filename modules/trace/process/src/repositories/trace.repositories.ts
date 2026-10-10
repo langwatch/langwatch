@@ -4,6 +4,7 @@ import type { TraceEditOverlayRepository } from "../features/edit-overlay/reposi
 import type { TraceExportSlotRepository } from "../features/export/repositories/trace-export-slot.repository.ts";
 import type { TraceIngestSourceBillingRepository } from "../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
 import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
+import type { TraceLegacyReadRepository } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import type { TraceClusteringSampleRepository } from "../features/topic/repositories/trace-clustering-sample.repository.ts";
 import type { TraceTopicNamesReadRepository } from "../features/topic/repositories/trace-topic-names.repository.ts";
 import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-client.repository.ts";
@@ -62,6 +63,8 @@ export interface TraceRepositories {
   /** Annotation's rows and score names, read through its shared tables for the legacy read. */
   readonly annotations: TraceAnnotationsReadRepository;
   readonly annotationScores: TraceAnnotationScoresReadRepository;
+  /** The legacy trace read's store; the composition root lays its policies over it. */
+  readonly legacyRead: TraceLegacyReadRepository;
   readonly list: TraceListRepository;
   readonly sessionGroups: SessionGroupsRepository;
   /** Claim-check reads for fields the fold offloaded out of the summary. */

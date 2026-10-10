@@ -313,6 +313,14 @@ Feature: The insights inbox
       When a member asks for their insights
       Then the request is refused with insights_not_enabled
 
+    # An aggregate project is read only (ADR-177 decision 8); the daily run skips one too.
+    @integration
+    Scenario: An aggregate project takes no insight write
+      Given an aggregate project and an organisation admin on it
+      When they file an insight, mark one seen, mark one done and keep one
+      Then each is refused with aggregate_project_is_read_only before the module is asked
+      And they can still ask for their insights
+
     @integration
     Scenario: Acting on an unknown insight is refused
       Given no insight with the id in the project

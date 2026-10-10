@@ -1,3 +1,4 @@
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import {
@@ -24,7 +25,7 @@ type SampleAgentsSetup = FeatureSetup<
 /** The demo agents behind the sample project; each run lands as traces in the caller's project. */
 export class SampleAgentsModule implements SampleAgentsApiContract {
   static readonly contract = SampleAgentsApi;
-  static readonly dependencies = {};
+  static readonly dependencies = { apiKeys: ApiKeyApi };
   static readonly config = sampleAgentsConfig;
   /** The platform's own OpenAI key pays for the demo conversations, as it did on main. */
   static readonly secrets = { openAi: openAiApiKey } as const;
@@ -35,11 +36,12 @@ export class SampleAgentsModule implements SampleAgentsApiContract {
     this.#hotelBot = hotelBot;
   }
 
-  static async create({ channels }: SampleAgentsSetup): Promise<SampleAgentsModule> {
+  static async create({ channels, dependencies }: SampleAgentsSetup): Promise<SampleAgentsModule> {
     return new SampleAgentsModule(
       HotelBotService.create({
         chat: channels.chat,
         collector: channels.collector,
+        apiKeys: dependencies.apiKeys,
         logger: createLogger("langwatch:sample-agents"),
         random: Math.random,
         nowMs: () => nowInstant().epochMilliseconds,

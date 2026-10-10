@@ -1,6 +1,6 @@
 ---
 name: paymentsim
-description: "Run billing against paymentsim, haven's Stripe stand-in: checkout, subscriptions, invoices, signed webhooks, the test clock, payment failures and exact metered-usage totals. Use when someone says 'test billing locally', 'fake Stripe', 'stripe webhook locally', 'advance the billing clock', 'fail a payment', 'replay a Stripe event', 'duplicate webhook', 'usage metering totals', 'paymentsim', 'haven payment', or needs to assert on a Stripe call in a test."
+description: "Run billing against paymentsim, haven's Stripe stand-in: checkout, subscriptions, invoices, signed webhooks, the test clock, payment failures and exact metered-usage totals. Use when someone says 'haven payment', 'test billing locally', 'fake Stripe', 'stripe webhook locally', 'advance the billing clock', 'fail a payment', 'replay a Stripe event', 'duplicate webhook', 'usage metering totals', 'paymentsim', 'haven sim payment', or needs to assert on a Stripe call in a test."
 user-invocable: true
 ---
 
@@ -35,22 +35,22 @@ billing credit_grants create. Anything else answers Stripe's 404 "Unrecognized r
 Events fired: `checkout.session.completed`, `customer.subscription.created|updated|deleted`,
 `invoice.finalized|paid|payment_succeeded|payment_failed`.
 
-## Control API (`/_sim/api`) and `haven payment`
+## Control API (`/_sim/api`) and `haven sim payment`
 
-| Need                         | Call                                                     | CLI                                   |
-| ---------------------------- | -------------------------------------------------------- | ------------------------------------- |
-| state                        | `GET status`                                             | `haven payment status`                |
-| seed catalog file            | `POST catalog?mode=test` (stripe-catalog.json body)      |                                       |
-| seed a (tiered) price/meter  | `POST prices` / `POST meters` (JSON)                     |                                       |
-| finish a checkout            | `POST checkout/{id}/complete`, or open the session `url` |                                       |
-| advance the test clock       | `POST clock/advance {"seconds"}` or `{"to"}`             | `haven payment advance --seconds N`   |
-| decline the next charges     | `POST payment-failures {"customer","times"}`             | `haven payment fail --customer cus_…` |
-| retry an open invoice        | `POST invoices/{id}/retry`                               |                                       |
-| list events + attempts       | `GET events?type=`                                       | `haven payment events`                |
-| deliver ids in this order    | `POST events/deliver {"ids","signingSecret"}`            | `haven payment deliver --ids a,b`     |
-| queue without delivering     | `POST webhooks/hold {"held":true}`                       | `haven payment hold` / `release`      |
-| exact metered totals         | `GET usage?customer=&event_name=&from=&to=`              | `haven payment usage --customer …`    |
-| forget everything but catalog| `DELETE state`                                           | `haven payment reset`                 |
+| Need                          | Call                                                     | CLI                                        |
+| ----------------------------- | -------------------------------------------------------- | ------------------------------------------ |
+| state                         | `GET status`                                             | `haven sim payment status`                 |
+| seed catalog file             | `POST catalog?mode=test` (stripe-catalog.json body)      |                                            |
+| seed a (tiered) price/meter   | `POST prices` / `POST meters` (JSON)                     |                                            |
+| finish a checkout             | `POST checkout/{id}/complete`, or open the session `url` |                                            |
+| advance the test clock        | `POST clock/advance {"seconds"}` or `{"to"}`             | `haven sim payment advance --seconds N`    |
+| decline the next charges      | `POST payment-failures {"customer","times"}`             | `haven sim payment fault --customer cus_…` |
+| retry an open invoice         | `POST invoices/{id}/retry`                               |                                            |
+| list events + attempts        | `GET events?type=`                                       | `haven sim payment list`                   |
+| deliver ids in this order     | `POST events/deliver {"ids","signingSecret"}`            | `haven sim payment deliver --ids a,b`      |
+| queue without delivering      | `POST webhooks/hold {"held":true}`                       | `haven sim payment hold` / `release`       |
+| exact metered totals          | `GET usage?customer=&event_name=&from=&to=`              | `haven sim payment usage --customer …`     |
+| forget everything but catalog | `DELETE state`                                           | `haven sim payment clear`                  |
 
 Duplicate = the same id twice in `deliver`; out of order = ids reversed; bad signature =
 `signingSecret` other than the configured one. The signature timestamp is the wall clock,

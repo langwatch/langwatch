@@ -5,7 +5,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
-/** Describing the routes needs no credential, so every door refuses and every fact throws. */
+/** Describing routes needs no credential: every door refuses, every middleware context throws. */
 export async function bootDescribedRest() {
   const refuse = () => {
     throw new Error("the test describes routes and answers no request");
@@ -17,7 +17,7 @@ export async function bootDescribedRest() {
     authorize: refuse,
     authorizePlatform: refuse,
   };
-  const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
 
   for (const module of processModules) {
     for (const transport of module.transports ?? []) {
@@ -28,8 +28,8 @@ export async function bootDescribedRest() {
       };
 
       for (const route of declaration.routes) {
-        for (const fact of route.middleware ?? []) {
-          facts.set(fact.name, { middleware: fact, resolve: refuse });
+        for (const declared of route.middleware ?? []) {
+          contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
         }
       }
     }
@@ -44,7 +44,6 @@ export async function bootDescribedRest() {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },
@@ -52,7 +51,7 @@ export async function bootDescribedRest() {
         audit: { record: async () => {} },
         idempotency: refuse,
         rateLimiter: { check: refuse },
-        facts: [...facts.values()] as never,
+        middlewareContext: [...contexts.values()] as never,
         entitlements: { holds: refuse },
       });
       const mountNothing = { mount: () => {} };

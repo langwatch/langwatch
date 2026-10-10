@@ -8,7 +8,7 @@ import { isHiddenForSession } from "./orb-prefs";
 import { attachPageBuffer } from "./page-buffer";
 import { orbShell, whenAppPainted } from "./reveal";
 
-/** The orb pushes the page buffer to haven at most this often, for `haven page`. */
+/** The orb pushes the page buffer to haven at most this often, for `haven orb console|network`. */
 const PUSH_EVERY_MS = 2_000;
 
 const pushEvery = ({ host, buffer, send, endpoint }: Orb) => {

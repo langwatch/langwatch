@@ -17,14 +17,14 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// runPlay is `haven play [pr]`: run a PR in a throwaway sandbox with its own
+// runPlay is `haven pr <n> --throwaway`: run a PR in a throwaway sandbox with its own
 // checkout, its own databases, and its own hostname - and destroy all of it
 // when the user quits. The opposite contract to `haven up`, where quitting
 // detaches. The flow: resolve the PR (picker when no argument), pass the
 // trust gate, disclose the destruction contract, check out, record the
 // sandbox, launch, attach the log view, tear down. Teardown is deferred so
 // SIGINT/SIGTERM (the root signal context) and panics still run it; a hard
-// kill leaves the record behind for `haven clean` to finish the job.
+// kill leaves the record behind for `haven machine clean` to finish the job.
 func runPlay(ctx context.Context, d deps, inv invocation) error {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return fmt.Errorf("the GitHub CLI `gh` is required - install it (https://cli.github.com) and run `gh auth login`")
@@ -41,7 +41,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	}
 	if ref == "" {
 		if d.isAgent || !stdoutIsTTY() {
-			return fmt.Errorf("haven play needs a PR in agent mode: pass a number or URL (the picker needs a terminal)")
+			return fmt.Errorf("haven pr --throwaway needs a PR in agent mode: pass a number or URL (the picker needs a terminal)")
 		}
 		number, picked, err := pickOpenPR(ctx, d.worktree)
 		if err != nil {
@@ -91,7 +91,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 
 	checkout := app.PlayCheckoutDir(havenHome(), pr.Number)
 	// Record the sandbox BEFORE creating anything, so a death at any later
-	// point leaves it discoverable and reapable by `haven clean`.
+	// point leaves it discoverable and reapable by `haven machine clean`.
 	rec := app.PlayRecord{
 		Number:    pr.Number,
 		Slug:      app.PlaySlug(pr.Number),
@@ -141,7 +141,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 		return err
 	}
 	// The launcher child now owns the sandbox's processes: point the record at
-	// it so `haven clean` can stop the right process group after a hard death
+	// it so `haven machine clean` can stop the right process group after a hard death
 	// of this parent.
 	rec.PID = child.pid
 	if err := app.WritePlayRecord(havenHome(), rec); err != nil {
@@ -179,7 +179,7 @@ func confirmUntrustedPlayVia(r io.Reader, w io.Writer, untrusted []string, numbe
 	for _, name := range untrusted {
 		fmt.Fprintf(w, "    %s\n", name)
 	}
-	fmt.Fprintln(w, "  haven play will run their code on this machine (install, migrations, services).")
+	fmt.Fprintln(w, "  haven pr --throwaway will run their code on this machine (install, migrations, services).")
 	fmt.Fprint(w, "  Run it anyway? [y/N] ")
 	line, err := in.ReadString('\n')
 	if err != nil && line == "" {
@@ -205,7 +205,7 @@ type playChild struct {
 	pid int
 }
 
-// startPlayLaunch backgrounds the hidden `haven play-launch <n> [preset]` in
+// startPlayLaunch backgrounds the hidden `haven pr --launch <n> [preset]` in
 // the play checkout, streaming its combined output to the slug's log file - the
 // same launcher shape as `haven up`'s detached mode, so the attached viewer and
 // `haven logs` read it identically. It takes the sandbox record rather than its
@@ -219,7 +219,7 @@ func startPlayLaunch(rec app.PlayRecord, preset string) (playChild, error) {
 	// haven's own source comes from the trusted checkout, never from the
 	// sandbox's: that is the PR's tree, and it contains a cmd/haven of its own.
 	root := trustedRepoRoot()
-	argv := append(selfArgv(root, "play-launch"), playLaunchArgs(rec.Number, preset)...)
+	argv := append(selfArgv(root, "pr"), playLaunchArgs(rec.Number, preset)...)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = rec.Checkout
 	cmd.Env = childEnvWithTrustedRoot(root)
@@ -245,34 +245,31 @@ func startPlayLaunch(rec app.PlayRecord, preset string) (playChild, error) {
 
 // playLaunchArgs is the launcher's argument list. An empty preset is left off
 // entirely rather than passed as "", so the launcher's own parse sees exactly
-// what `haven play` was given.
+// what `haven pr --throwaway` was given.
 func playLaunchArgs(number int, preset string) []string {
-	argv := []string{strconv.Itoa(number)}
+	argv := []string{strconv.Itoa(number), "--throwaway", "--launch"}
 	if preset != "" {
-		argv = append(argv, preset)
+		argv = append(argv, "--seed", preset)
 	}
 	return argv
 }
 
-// runPlayLaunchCmd is the hidden `haven play-launch <n> [preset]`: the
-// sandbox's backgrounded launcher process, spawned by `haven play` with cwd set
+// runPlayLaunchCmd is the hidden `haven pr --launch <n> [preset]`: the
+// sandbox's backgrounded launcher process, spawned by `haven pr --throwaway` with cwd set
 // to the play checkout. Internal - it is dispatchable but absent from help,
 // like `daemon`.
 func runPlayLaunchCmd(ctx context.Context, d deps, inv invocation) error {
 	// The parser enforces a maximum number of positionals, never a minimum, and
-	// this command is dispatchable by hand — so a bare `haven play-launch` would
+	// this command is dispatchable by hand — so a bare `haven pr --launch` would
 	// index into an empty slice.
 	if len(inv.args) == 0 {
-		return fmt.Errorf("haven play-launch: a PR number is required")
+		return fmt.Errorf("haven pr --launch: a PR number is required")
 	}
 	number, err := strconv.Atoi(inv.args[0])
 	if err != nil || number <= 0 {
-		return fmt.Errorf("haven play-launch: %q is not a PR number", inv.args[0])
+		return fmt.Errorf("haven pr --launch: %q is not a PR number", inv.args[0])
 	}
-	preset := ""
-	if len(inv.args) > 1 {
-		preset = inv.args[1]
-	}
+	preset := inv.value("--seed")
 	return d.orch.PlayLaunch(ctx, app.PlaySandbox{
 		Number: number, Checkout: d.worktree, Preset: preset,
 	})

@@ -7,6 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ResolveOriginCommandData, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { DEFERRED_ORIGIN_SUBSCRIBER_NAME } from "../deferred-origin.subscriber.ts";
@@ -31,6 +32,7 @@ function compose({ reads }: { reads: TraceSummaryData[] }) {
   for (const read of reads) findSummary.mockResolvedValueOnce(read);
   const pipeline = TraceProcessingRuntimeAdapter.create({
     role: "worker",
+    authorizeFoldRead: ownProofAuthorizer,
     tokenizer: createApiFixture<Input["tokenizer"]>(),
     peers: createApiFixture<Input["peers"]>(),
     repositories: MemoryTraceRepositories.create(),

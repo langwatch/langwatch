@@ -6,6 +6,7 @@ import {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
 } from "../managed-client.ts";
+import { TenantGuard } from "../tenantGuard.ts";
 
 class SilentTelemetry extends ClickHouseManagedClientTelemetry {
   registerLimiter(): void {}
@@ -32,13 +33,15 @@ describe("a statement bound driving a client", () => {
         });
         const execute = vi.fn(async () => ({ rows: [1] }));
         const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
           driver: { execute } as never,
           limiter,
         });
 
         const result = await client.query({
           tenantId: "project_1",
-          sql: "SELECT 1",
+          sql: "SELECT 1 WHERE TenantId = {tenantId:String}",
+          params: { tenantId: "project_1" },
         });
 
         expect(result.rows).toEqual([1]);

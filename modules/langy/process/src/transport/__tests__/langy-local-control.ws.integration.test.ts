@@ -6,10 +6,9 @@
 
 import { createServer, type Server } from "node:http";
 
-import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import { WebSocketHost } from "@langwatch/api";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import { bindRestCredential, SessionKeyIdentity } from "@langwatch/api/rest";
+import { bindRestCredential } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
   LangyTurnInProgressError,
@@ -36,6 +35,7 @@ import { LangyLocalControlRuntimeService } from "../../features/local-control/se
 import { LocalControlSessionCoreService } from "../../features/local-control/services/langy-local-session.service.ts";
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { localControlSessionKeyDoor } from "../langy-local-control-connect.rest.ts";
 import {
   CONTROL_CONNECT_PATH,
   createLangyLocalControlWebSocketProtocol,
@@ -135,6 +135,7 @@ const apiKeys = createApiFixture<ApiKeyApi>({
         organizationId,
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       },
     };
   },
@@ -264,10 +265,11 @@ async function startPod(): Promise<Pod> {
     holdMs: 300,
     pollIntervalMs: 25,
   });
-  const sessionKeyDoor = SessionKeyIdentity.create({
-    instanceTokenHeader: INSTANCE_TOKEN_HEADER,
-    verify: (presented) => longPoll.verifySessionKey(presented),
-  });
+  const sessionKeyDoor = localControlSessionKeyDoor.open(
+    createApiFixture<LangyApi>({
+      verifyLocalControlSessionKey: (presented) => longPoll.verifySessionKey(presented),
+    }),
+  );
   const sockets = WebSocketHost.create();
   sockets.mount(
     createLangyLocalControlWebSocketProtocol(),
@@ -275,7 +277,7 @@ async function startPod(): Promise<Pod> {
       createApiFixture<LangyApi>({
         acceptLocalControlConnection: (connection, opened) => gateway.accept(connection, opened),
       }),
-    { facts: [bindRestCredential("session_key", () => sessionKeyDoor)] },
+    { middlewareBindings: [bindRestCredential("session_key", () => sessionKeyDoor)] },
   );
   server.on("upgrade", (request, socket, head) => sockets.upgrade(request, socket, head));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

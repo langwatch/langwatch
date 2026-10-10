@@ -1,10 +1,12 @@
+import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
+
 import type { LicensingRepositories } from "../licensing.repositories.ts";
+import type { MemberSeatRepository } from "../member-seat.repository.ts";
 import { MemoryActivationCodeRepository } from "./memory.activation-code.repository.ts";
 import { MemoryConnectOrganizationRepository } from "./memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "./memory.instance-identity.repository.ts";
 import { MemoryIssuedLicenseRepository } from "./memory.issued-license.repository.ts";
 import { MemoryLicensingRateLimitRepository } from "./memory.licensing-rate-limit.repository.ts";
-import { MemoryMemberSeatRepository } from "./memory.member-seat.repository.ts";
 import { MemoryOrganizationLicenseRepository } from "./memory.organization-license.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "./memory.self-hosted-instance.repository.ts";
 
@@ -23,5 +25,18 @@ export class MemoryLicensingRepositories {
       rateLimits: MemoryLicensingRateLimitRepository.create(),
       memberSeats: MemoryMemberSeatRepository.create(),
     };
+  }
+}
+
+/** No organization holds seats in memory; seat counts come from the live tables. */
+class MemoryMemberSeatRepository implements MemberSeatRepository {
+  static create(): MemoryMemberSeatRepository {
+    return new MemoryMemberSeatRepository();
+  }
+
+  private constructor() {}
+
+  async countMemberSeats(): Promise<OrganizationMemberSeats> {
+    return { fullMembers: 0, liteMembers: 0, developers: 0 };
   }
 }

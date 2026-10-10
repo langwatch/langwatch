@@ -1,4 +1,8 @@
-import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
+import {
+  ApiKeyNotFoundError,
+  LANGY_SESSION_API_KEY_NAME,
+  type ApiKeyApi,
+} from "@langwatch/api-key-contract";
 import { ALL_PERMISSIONS } from "@langwatch/authorization";
 import {
   type AuthzApi,
@@ -382,6 +386,38 @@ describe("LangySessionKeyService", () => {
 
       expect(LANGY_UNATTENDED_PERMISSIONS).toContain("cost:view");
       expect(granted).toEqual([["traces:view"]]);
+    });
+
+    /** @scenario "An unattended key is owned by the person it is minted for" */
+    it("names the person as the key's owner and creator, under the Langy session name", async () => {
+      const created: Parameters<ApiKeyApi["create"]>[0][] = [];
+      const apiKeys: ApiKeyApi = Object.create(null);
+      apiKeys.create = async (input) => {
+        created.push(input);
+        return { token: "session-token", apiKey: Object.assign(Object.create(null), { id: "k" }) };
+      };
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
+      authz.effectivePermissions = async () => ["analytics:view"];
+
+      await createService({
+        repository: new SessionKeyRepository(),
+        apiKeys,
+        authz,
+        metrics: new SessionKeyMetrics(),
+      }).mint({
+        session: { user: { id: "user-1" } },
+        projectId: "project-1",
+        organizationId: "organization-1",
+        ceiling: "unattended",
+      });
+
+      expect(created).toHaveLength(1);
+      expect(created[0]).toMatchObject({
+        name: LANGY_SESSION_API_KEY_NAME,
+        userId: "user-1",
+        createdByUserId: "user-1",
+        permissions: ["analytics:view"],
+      });
     });
 
     /** @scenario "An unattended key holds only what reading a board needs" */

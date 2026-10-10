@@ -32,8 +32,17 @@ export interface BoardQueryContext extends BoardPeriod {
   readonly excludeOrigins: readonly string[];
 }
 
-/** Dashboards show the member's agent, not Langy's turns in their project (ADR-061). */
-export const DEFAULT_BOARD_EXCLUDED_ORIGINS: readonly string[] = [LANGY_TRACE_ORIGIN];
+/**
+ * The origins a board leaves out by default: Langy's turns, since a board shows the member's
+ * agent (ADR-061); none in a personal project, where Langy's conversations are the data.
+ */
+export function defaultBoardExcludedOrigins({
+  isPersonalProject,
+}: {
+  isPersonalProject: boolean;
+}): readonly string[] {
+  return isPersonalProject ? [] : [LANGY_TRACE_ORIGIN];
+}
 
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";

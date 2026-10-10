@@ -71,7 +71,8 @@ describe("given a process that built its ClickHouse member", () => {
         await member.value.query({
           tenantId: "project-1",
           sql: "SELECT 1",
-          unscoped: { reason: "a probe with no tenant table" },
+          // A probe statement that reads no tenant table.
+          SKIP_TENANT_CHECK: true,
         });
       } finally {
         await member.close?.();

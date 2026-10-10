@@ -297,7 +297,7 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
       </Tooltip>
 
       <Dialog.Root open={isDialogOpen} onOpenChange={({ open }) => setIsDialogOpen(open)}>
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Create Experiment</Dialog.Title>
           </Dialog.Header>
@@ -309,11 +309,11 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
-            <Button variant="ghost" onClick={() => setIsDialogOpen(false)} disabled={isCreating}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isCreating}>
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={handleCreate}
               disabled={isCreating || isLoadingSavedPrompts}
             >

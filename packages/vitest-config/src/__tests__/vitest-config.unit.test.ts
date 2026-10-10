@@ -111,6 +111,7 @@ describe("moduleVitestTestOptions", () => {
 describe("defineModuleVitestConfig", () => {
   it("wraps the options in a vitest config object", () => {
     expect(defineModuleVitestConfig({ kind: "node" })).toEqual({
+      plugins: [],
       test: moduleVitestTestOptions({ kind: "node" }),
     });
   });

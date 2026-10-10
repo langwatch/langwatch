@@ -13,12 +13,12 @@ import {
   type ConnectServiceState,
   type ConnectStatus,
   type ConnectSyncView,
+  type ConnectUpstream,
   ConnectDisabledError,
   ConnectLicenseRequiredError,
   ConnectServiceNotEntitledError,
   DEFAULT_LICENSE_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-contract";
-import type { GatewayConnectUpstream } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
@@ -59,7 +59,10 @@ interface ConnectDeployment {
 interface ConnectInstallServiceDependencies {
   readonly organizations: ConnectOrganizationRepository;
   /** Where a switch is recorded; organization writes it to its own row (ORG-CONNECT-WRITES). */
-  readonly facts: Pick<LicensingCustomerFactsService, "connectServiceSwitched">;
+  readonly facts: Pick<
+    LicensingCustomerFactsService,
+    "connectServiceSwitched" | "connectUpstreamSet" | "connectUpstreamCleared"
+  >;
   readonly identity: InstanceIdentityService;
   readonly cryptography: LicenseCryptography;
   readonly deployment: ConnectDeployment;
@@ -69,8 +72,6 @@ interface ConnectInstallServiceDependencies {
   readonly instanceLicenseKey: () => string | undefined;
   /** The key licenses are verified against, where the deployment names one. */
   readonly publicKey?: string;
-  /** The install gateway's hosted provider slot, where one is composed. */
-  readonly upstream?: ConnectUpstreamSlot;
   /** Where a failed usage read is recorded; absent, it is not. */
   readonly logger?: LicenseLogger;
 }
@@ -100,6 +101,13 @@ export class ConnectInstallService {
     if (!token) return [];
 
     return [{ token, instanceId: await this.deps.identity.getInstanceId() }];
+  }
+
+  /** Where this organization's gateway reaches hosted models; empty where no credential is held. */
+  async findUpstream(organizationId: string): Promise<ConnectUpstream[]> {
+    const [credential] = await this.findCredential(organizationId);
+    if (!credential) return [];
+    return [{ ...credential, baseUrl: this.deps.deployment.gatewayEndpoint }];
   }
 
   /** The hosted services this organization's license names. */
@@ -332,11 +340,10 @@ export class ConnectInstallService {
   }
 
   /**
-   * Writes the gateway's hosted provider slot while Connect is on, managed models
-   * are entitled and switched on, and a license yields a token; clears it otherwise.
+   * Records that the gateway's hosted provider slot is set while Connect is on, managed models
+   * are entitled and switched on, and a license yields a token; that it is cleared otherwise.
    */
   async publishUpstream(organizationId: string): Promise<void> {
-    if (!this.deps.upstream) return;
     const enabled = await this.isServiceEnabled({ organizationId, service: MANAGED_MODELS });
     await this.publishUpstreamWith({ organizationId, enabled });
   }
@@ -348,19 +355,9 @@ export class ConnectInstallService {
     organizationId: string;
     enabled: boolean;
   }): Promise<void> {
-    const { upstream } = this.deps;
-    if (!upstream) return;
     const [credential] = await this.findCredential(organizationId);
-    if (!credential || !enabled) {
-      await upstream.clear({ organizationId });
-      return;
-    }
-    await upstream.set({
-      organizationId,
-      baseUrl: this.deps.deployment.gatewayEndpoint,
-      token: credential.token,
-      instanceId: credential.instanceId,
-    });
+    if (credential && enabled) await this.deps.facts.connectUpstreamSet({ organizationId });
+    else await this.deps.facts.connectUpstreamCleared({ organizationId });
   }
 
   /** The credential a change needs, or the reason it cannot be made. */
@@ -414,14 +411,4 @@ function syncOf(organization: ConnectOrganizationRecord | null): ConnectSyncView
     lastSyncAt: organization?.lastSyncAt?.toString() ?? null,
     lastError: organization?.lastSyncError ? { code: organization.lastSyncError } : null,
   };
-}
-
-/**
- * The hosted provider slot the install's own gateway adds for one organization,
- * which the gateway owns. Licensing sets it only while managed models may be
- * reached, and clears it on every other change of license, service or Connect.
- */
-export interface ConnectUpstreamSlot {
-  set(params: GatewayConnectUpstream): Promise<void>;
-  clear(params: { organizationId: string }): Promise<void>;
 }

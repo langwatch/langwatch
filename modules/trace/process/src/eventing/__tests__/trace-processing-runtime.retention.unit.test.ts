@@ -7,6 +7,7 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import {
@@ -27,6 +28,7 @@ describe("TraceProcessingRuntimeAdapter", () => {
       });
       const pipeline = TraceProcessingRuntimeAdapter.create({
         role: "worker",
+        authorizeFoldRead: ownProofAuthorizer,
         tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
         peers,
         repositories: MemoryTraceRepositories.create(),

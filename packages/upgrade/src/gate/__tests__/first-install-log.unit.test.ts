@@ -34,6 +34,7 @@ describe("admitAfterFirstInstall", () => {
           /^first install: .*this worker runs `pnpm task upgrade` before it takes jobs/,
         ),
         "upgrade ran",
+        expect.stringMatching(/finished: the installation is current/),
       ]);
       expect(said[0]?.fields).toMatchObject({ phase: "first-install", next: expect.any(String) });
     });
@@ -64,6 +65,41 @@ describe("admitAfterFirstInstall", () => {
         next: expect.stringMatching(/^nothing to do/),
       });
       expect(said[1]?.message).toBe("upgrade ran");
+    });
+  });
+
+  describe("given a worker that ran the upgrade because it was behind", () => {
+    /** @scenario "A worker that said it was behind says when the installation is current" */
+    it("says the installation is current and it takes jobs, after the upgrade's lines", async () => {
+      const said: string[] = [];
+      const answers: ServingVerdict[] = [
+        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+        { admitted: true, outcome: "current" },
+      ];
+      await admitAfterFirstInstall({
+        gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
+        firstInstall: async () => {
+          said.push("upgrade ran");
+          return { exitCode: 0, logTail: [] };
+        },
+        warn: (message) => void said.push(message),
+      });
+
+      expect(said.slice(1)).toEqual([
+        "upgrade ran",
+        "`pnpm task upgrade` finished: the installation is current, so this worker takes jobs",
+      ]);
+    });
+
+    it("says nothing when the installation was current from the start", async () => {
+      const said: string[] = [];
+      await admitAfterFirstInstall({
+        gate: { admit: async () => ({ admitted: true, outcome: "current" }) },
+        firstInstall: async () => ({ exitCode: 0, logTail: [] }),
+        warn: (message) => void said.push(message),
+      });
+
+      expect(said).toEqual([]);
     });
   });
 
@@ -138,7 +174,10 @@ describe("admitAfterFirstInstall", () => {
       expect(verdict).toEqual(current);
       expect(runs).toBe(0);
       expect(waits).toEqual([10_000, 10_000]);
-      expect(said).toEqual([expect.stringMatching(/held by worker-2 on pod-b/)]);
+      expect(said).toEqual([
+        expect.stringMatching(/held by worker-2 on pod-b/),
+        expect.stringMatching(/finished: the installation is current/),
+      ]);
     });
   });
 
@@ -182,6 +221,50 @@ describe("admitAfterFirstInstall", () => {
       expect(verdict).toEqual(current);
       expect(runs).toBe(1);
       expect(waitedForRetry).toBe(3);
+    });
+  });
+
+  describe("given runs that fail with no failed step row", () => {
+    /** @scenario "A failed run with no failed step retries on a backoff, saying why" */
+    it("retries on a doubling wait, saying it retries and the run's last line, never a Retry", async () => {
+      const said: string[] = [];
+      const waits: number[] = [];
+      const exits = [1, 1, 1, 0];
+      const answers = [behind(), behind(), behind(), behind(), current];
+      const verdict = await admitAfterFirstInstall({
+        gate: { admit: async () => answers.shift() ?? current },
+        firstInstall: async () => ({
+          exitCode: exits.shift() ?? 0,
+          logTail: ["preflight refused: a failed Prisma migration"],
+        }),
+        warn: (message) => void said.push(message),
+        wait: async (ms) => void waits.push(ms),
+      });
+
+      expect(verdict).toEqual(current);
+      expect(waits).toEqual([10_000, 20_000, 40_000]);
+      const retries = said.filter((line) => line.includes("retries it in"));
+      expect(retries).toHaveLength(3);
+      expect(retries[0]).toContain("preflight refused: a failed Prisma migration");
+      expect(said.filter((line) => line.includes("waits for a Retry"))).toEqual([]);
+    });
+
+    /** @scenario "A failed run with no failed step retries on a backoff, saying why" */
+    it("never waits longer than five minutes between tries", async () => {
+      const waits: number[] = [];
+      let runs = 0;
+      await admitAfterFirstInstall({
+        gate: { admit: async () => (runs < 8 ? behind() : current) },
+        firstInstall: async () => {
+          runs += 1;
+          return { exitCode: 1, logTail: [] };
+        },
+        warn: () => undefined,
+        wait: async (ms) => void waits.push(ms),
+      });
+
+      expect(Math.max(...waits)).toBe(300_000);
+      expect(waits.at(-1)).toBe(300_000);
     });
   });
 });

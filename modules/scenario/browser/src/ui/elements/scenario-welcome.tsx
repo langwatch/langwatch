@@ -95,7 +95,7 @@ export function ScenarioWelcomeModal({
       placement="center"
       size="lg"
     >
-      <Dialog.Content bg="bg" maxWidth="640px">
+      <Dialog.Content maxWidth="640px">
         <Dialog.CloseTrigger />
         <Dialog.Body py={8} px={8}>
           <ScenarioWelcomeContent onProceed={onProceed} />

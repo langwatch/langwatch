@@ -24,9 +24,9 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// `haven slot` is the check queue (specs/setup/check-slots.feature) as a haven
+// `haven machine slot` is the check queue (specs/setup/check-slots.feature) as a haven
 // command: `slot run -- <cmd> [args…]` takes a machine-wide slot from the same
-// flock semaphore `haven typecheck` uses, runs the command with stdio passed
+// flock semaphore `haven machine typecheck` uses, runs the command with stdio passed
 // straight through, and releases. dev/scripts/check-queue.mjs delegates here
 // whenever the haven binary is installed, so on a haven machine the queue's
 // decisions are this Go code, not the JS fallback.
@@ -36,7 +36,7 @@ import (
 // through untouched. It speaks on stderr only when the run has to wait.
 
 // checkSlotName is the one semaphore every whole-repo check counts against —
-// `haven slot run` and `haven typecheck` alike, because they compete for the
+// `haven machine slot run` and `haven machine typecheck` alike, because they compete for the
 // same cores.
 const checkSlotName = "checks"
 
@@ -49,7 +49,7 @@ const (
 
 func runSlot(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.raw) == 0 {
-		return errors.New("usage: haven slot run [--label <name>] [--timeout <duration>] -- <command> [args…] | haven slot explain")
+		return errors.New("usage: haven machine slot run [--label <name>] [--timeout <duration>] -- <command> [args…] | haven machine slot explain")
 	}
 	switch inv.raw[0] {
 	case "explain":
@@ -125,7 +125,7 @@ func resolvePriorityState(store *fileregistry.Store) (agentID string, caller dom
 
 // explainWaiters prints who is currently queued for the shared slot: each
 // waiter's class, how long it has waited, and its effective priority right
-// now - the ordering `haven slot run` is actually scheduling by.
+// now - the ordering `haven machine slot run` is actually scheduling by.
 func explainWaiters(store *fileregistry.Store) {
 	waiters := store.WaiterSnapshots(checkSlotName)
 	if len(waiters) == 0 {
@@ -140,7 +140,7 @@ func explainWaiters(store *fileregistry.Store) {
 	}
 }
 
-// callerLabel is the human name for a CallerKind, for `haven slot explain`'s
+// callerLabel is the human name for a CallerKind, for `haven machine slot explain`'s
 // waiter lines.
 func callerLabel(c domain.CallerKind) string {
 	switch c {
@@ -318,7 +318,7 @@ func parseSlotRun(raw []string) (label string, limit time.Duration, argv []strin
 		rest = rest[1:]
 	}
 	if len(rest) == 0 {
-		return "", 0, nil, errors.New("usage: haven slot run [--label <name>] [--timeout <duration>] -- <command> [args…]")
+		return "", 0, nil, errors.New("usage: haven machine slot run [--label <name>] [--timeout <duration>] -- <command> [args…]")
 	}
 	if label == "" {
 		label = rest[0]

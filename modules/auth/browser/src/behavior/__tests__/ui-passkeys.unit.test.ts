@@ -6,6 +6,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PASSKEY_ON_THIS_DEVICE_STORAGE_KEY } from "../../model/passkey-on-this-device.ts";
 import {
   linkUiSignInMethod,
   listUiPasskeys,
@@ -68,6 +69,18 @@ describe("given a ceremony result", () => {
       });
       expect(readPasskeyOutcome({ error: {} })).toEqual({ ok: false, cancelled: false });
     });
+  });
+});
+
+describe("given a passkey registered in this browser", () => {
+  /** @scenario "A passkey that works here is remembered without naming anybody" */
+  it("remembers that this browser has a passkey, and a refusal does not", async () => {
+    window.localStorage.clear();
+    await registerUiPasskey(client({ error: { status: 400 } }));
+    expect(window.localStorage.getItem(PASSKEY_ON_THIS_DEVICE_STORAGE_KEY)).toBeNull();
+
+    await registerUiPasskey(client({ data: { id: "passkey_1" } }));
+    expect(window.localStorage.getItem(PASSKEY_ON_THIS_DEVICE_STORAGE_KEY)).toBe("1");
   });
 });
 

@@ -1,4 +1,3 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { BugReportRateLimitedError, type SubmitBugReport } from "@langwatch/ops-contract";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
@@ -44,16 +43,13 @@ export class BugReportIntakeService {
   async submit({
     input,
     callerKey,
-    apiToken,
-    projectIdHint,
-    apiKeys,
+    linkedProjectId,
   }: {
     input: SubmitBugReport;
     /** Rate-limit bucket for the caller (nearest-hop IP; self-asserted). */
     callerKey: string;
-    apiToken?: string;
-    projectIdHint?: string | null;
-    apiKeys: ApiKeyApi;
+    /** The project the door verified the reporter's key for; null files the report unlinked. */
+    linkedProjectId: string | null;
   }): Promise<{ id: string }> {
     const limit = await this.deps.rateLimiter.consume({
       key: `bug-report:${callerKey}`,
@@ -63,12 +59,6 @@ export class BugReportIntakeService {
     if (!limit.allowed) {
       throw new BugReportRateLimitedError();
     }
-
-    const linkedProjectId = await findLinkedProjectId({
-      apiToken,
-      projectIdHint,
-      apiKeys,
-    });
 
     // Defense in depth: the CLI and MCP redact locally, but the endpoint is
     // public, so a direct POST could carry raw secrets into this cross-tenant,
@@ -135,36 +125,4 @@ function redactSubmission(input: SubmitBugReport): {
         )
       : undefined,
   };
-}
-
-/**
- * Best-effort project linkage from an optional API key. Any failure (invalid,
- * expired, malformed) resolves to "not linked" rather than an error: linkage
- * is a nicety, intake is the point.
- */
-async function findLinkedProjectId({
-  apiToken,
-  projectIdHint,
-  apiKeys,
-}: {
-  apiToken?: string | undefined;
-  projectIdHint?: string | null;
-  apiKeys: ApiKeyApi;
-}): Promise<string | null> {
-  if (!apiToken) {
-    return null;
-  }
-
-  try {
-    const resolved = await apiKeys.findResolvedToken({
-      token: apiToken,
-      projectId: projectIdHint ?? null,
-    });
-
-    return resolved?.project.id ?? null;
-  } catch (error) {
-    logger.warn({ error }, "bug report project linkage failed, storing unlinked");
-
-    return null;
-  }
 }

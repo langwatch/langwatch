@@ -114,6 +114,7 @@ export const organizationPendingInvitationsForCallerSchema = z.array(
   z.object({
     inviteCode: z.string().min(1),
     organizationName: z.string(),
+    inviterName: z.string().nullable(),
     role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
   }),
 );
@@ -248,6 +249,11 @@ const organizationAuditLogEntrySchema = z
     targetId: z.string().nullable(),
     before: z.unknown(),
     after: z.unknown(),
+    actorUserId: z.string().nullable(),
+    actorUser: z
+      .object({ id: z.string().min(1), name: z.string().nullable(), email: z.string().nullable() })
+      .strict()
+      .nullable(),
   })
   .strict();
 
@@ -272,6 +278,7 @@ export type OrganizationPendingInviteApplied =
 /** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */
 export const organizationMemberProvenanceSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("directory"), providerId: z.string().nullable() }),
+  z.object({ source: z.literal("sso"), connectionId: z.string() }),
   z.object({ source: z.literal("domain"), domain: z.string(), automatic: z.boolean() }),
   z.object({ source: z.literal("invited") }),
   z.object({ source: z.literal("unknown") }),

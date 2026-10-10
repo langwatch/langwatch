@@ -18,7 +18,7 @@ type StoredObjectsClickHouseClient = Readonly<{
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
 }>;
 
@@ -46,22 +46,13 @@ export class RoutedStoredObjectsClickHouse implements StoredObjectsClickHouse {
           tenantId: projectId,
           sql: input.query,
           params: input.query_params,
-          unscoped: input.unscoped,
+          SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
         });
         return { json: async <Result>() => result.rows as Result[] };
       },
     };
   }
 }
-
-/**
- * The table is the read-only legacy index (ADR-158) and has no TenantId column: every
- * statement here is scoped by project_id, which the tenant guard's text check cannot see.
- */
-export const LEGACY_INDEX_UNSCOPED = {
-  reason:
-    "Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the statement is filtered by project_id.",
-} as const;
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 
@@ -136,7 +127,9 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
           `,
           query_params: { projectId, id },
           format: "JSONEachRow",
-          unscoped: LEGACY_INDEX_UNSCOPED,
+          // Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the
+          // statement is filtered by project_id.
+          SKIP_TENANT_CHECK: true,
         });
 
         const rows = await result.json<Record<string, unknown>>();

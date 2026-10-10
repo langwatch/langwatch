@@ -11,7 +11,7 @@ The hosted end of LangWatch Connect on LangWatch Cloud: the three `/api/internal
 | Classification | enterprise (`modules/catalogue.json`)                                                                |
 | Subjects       | connect-hosted                                                                                       |
 | Halves         | [contract](contract) · [process](process/README.md)                                                  |
-| Api token      | `ConnectApi` = `moduleApi<ConnectApi>()("connect")`, `contract/src/connect.api.ts:25` (3 operations) |
+| Api token      | `ConnectApi` = `moduleApi<ConnectApi>()("connect")`, `contract/src/connect.api.ts:29` (3 operations) |
 | Installed by   | api, worker, tasks (process)                                                                         |
 
 ## What connect owns

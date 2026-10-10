@@ -5,11 +5,11 @@
  * Spec: specs/automations/unsubscribe-landing.feature
  */
 
-import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
 import UnsubscribeScreen from "../unsubscribe-screen.tsx";
 
 const { state } = vi.hoisted(() => ({
@@ -48,7 +48,9 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
 }));
 
 function renderScreen(token: string) {
-  return renderWithDesignSystem(<UnsubscribeScreen token={token} />);
+  return renderWithAutomationHost(<UnsubscribeScreen />, {
+    host: FakeAutomationHost.create({ query: { token } }),
+  });
 }
 
 beforeEach(() => {

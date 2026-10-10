@@ -410,7 +410,10 @@ export interface GovernanceRestApi {
     actor: string;
   }): Promise<GovernanceActorWorkspace | null>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
-  departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments>;
+  departmentAssignments(input: {
+    organizationId: string;
+    callerUserId: string | null;
+  }): Promise<DepartmentAssignments>;
   departmentCreate(input: { organizationId: string; name: string }): Promise<Department>;
   departmentRename(input: {
     id: string;

@@ -1,30 +1,18 @@
-import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
-import {
-  bindRestMiddleware,
-  credentialPrincipalOfToken,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
+import { credentialPrincipalOfToken, projectCredentialOfRequest } from "@langwatch/api/rest";
 import type { DashboardApi, DashboardServerConfig } from "@langwatch/dashboard-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
 import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
-import {
-  dashboardWidgetCallerSource,
-  dashboardWidgetRest,
-  dashboardWidgetUrl,
-} from "./transport/dashboard-widget.rest.ts";
+import { dashboardWidgetRest } from "./transport/dashboard-widget.rest.ts";
 import { dashboardWidgetTrpcTransport } from "./transport/dashboard-widget.trpc.ts";
 import { dashboardRest } from "./transport/dashboard.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 import { graphRest } from "./transport/graph.rest.ts";
 import { graphTrpcTransport } from "./transport/graph.trpc.ts";
 import { savedViewTrpcTransport } from "./transport/saved-view.trpc.ts";
-import {
-  savedWorkbenchChartRest,
-  savedWorkbenchChartUrl,
-} from "./transport/saved-workbench-chart.rest.ts";
+import { savedWorkbenchChartRest } from "./transport/saved-workbench-chart.rest.ts";
 import { savedWorkbenchChartTrpcTransport } from "./transport/saved-workbench-chart.trpc.ts";
 
 export const dashboardProcessModule: PublishedProcessModule<
@@ -45,30 +33,27 @@ export const dashboardProcessModule: PublishedProcessModule<
     savedWorkbenchChartTrpcTransport,
     dashboardWidgetTrpcTransport,
   )
-  // The saved-workbench-chart family declares these facts: the credential's
+  // The saved-workbench-chart family declares this middleware context: the credential's
   // own project content protections, and the deployment's deep link back into
   // the analytics workbench — both resolved through the peer analytics app,
   // exactly as the query door itself resolves the first.
-  .withTransportFacts(({ app, dependencies }) => [
-    bindRestMiddleware(langWatchQLCallerProtections, (context) => {
-      const credential = projectCredentialOfRequest(context.req.raw);
+  .provideMiddlewareContext({
+    langWatchQLCallerProtections: (request, { dependencies }) => {
+      const credential = projectCredentialOfRequest(request);
 
       return dependencies.analytics.resolveApiKeyProtections({
         projectId: credential.project.id,
         credential: credentialPrincipalOfToken(credential),
       });
-    }),
-    bindRestMiddleware(savedWorkbenchChartUrl, (context) =>
+    },
+    savedWorkbenchChartUrl: (request, { dependencies }) =>
       dependencies.analytics.savedWorkbenchChartPlatformUrl({
-        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
+        projectSlug: projectCredentialOfRequest(request).project.slug,
       }),
-    ),
-    bindRestMiddleware(dashboardWidgetUrl, (context) =>
+    dashboardWidgetUrl: (request, { app }) =>
       app.dashboardWidgetPlatformUrl({
-        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
+        projectSlug: projectCredentialOfRequest(request).project.slug,
       }),
-    ),
-    bindRestMiddleware(dashboardWidgetCallerSource, (context) =>
-      widgetSourceOfCredential({ credential: projectCredentialOfRequest(context.req.raw) }),
-    ),
-  ]);
+    dashboardWidgetCallerSource: (request) =>
+      widgetSourceOfCredential({ credential: projectCredentialOfRequest(request) }),
+  });

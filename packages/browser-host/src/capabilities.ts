@@ -327,6 +327,8 @@ export type UiDeployment = {
   passkeysEnabled?: boolean;
   /** Whether this deployment mounted email/password sign-in; absent reads as no. */
   emailPasswordEnabled?: boolean;
+  /** Federated provider ids offered to connect; absent reads as the one `authProvider`. */
+  federatedProviders?: readonly string[];
   /** `invite_only` when accounts here are created by invitation; absent reads as open. */
   signUpMode?: "open" | "invite_only";
   /** Whether ops offers the Cloud admin capability; off unless this is LangWatch's own cloud. */

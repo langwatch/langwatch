@@ -3,11 +3,7 @@
  * The two timestamps leave as ISO strings, as this family has always sent them.
  * A graph posted without a size is 1 by 1 here, as on main; tRPC's default is 4 by 3.
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   DashboardApi,
   graphDeletedResponseSchema,
@@ -19,6 +15,8 @@ import {
   graphRestUpdateSchema,
   type Graph,
 } from "@langwatch/dashboard-contract";
+
+import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
 
 const graphResponse = (graph: Graph) => ({
   id: graph.id,
@@ -34,11 +32,7 @@ const graphResponse = (graph: Graph) => ({
   updatedAt: graph.updatedAt.toISOString(),
 });
 
-export const graphRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<DashboardApi>;
-}> = defineRestRouter(DashboardApi)
+export const graphRest = defineRestRouter(DashboardApi)
   .withNamespace("graphs")
   .withVersion(MANAGEMENT_API_VERSION)
 
@@ -50,9 +44,10 @@ export const graphRest: Readonly<{
     tags: ["Graphs"],
     description: "List all custom graphs, optionally filtered by dashboard",
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     const graphs = await app.listGraphs({
       projectId: scope.id,
+      ...viewerOfActor({ actor }),
       ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
     });
 
@@ -64,8 +59,10 @@ export const graphRest: Readonly<{
   .withPermission("analytics:view")
   .withOutput(graphRestResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Get a custom graph by its ID" })
-  .handle(async ({ app, input, scope }) =>
-    graphResponse(await app.getGraph({ projectId: scope.id, graphId: input.id })),
+  .handle(async ({ app, input, scope, actor }) =>
+    graphResponse(
+      await app.getGraph({ projectId: scope.id, graphId: input.id, ...viewerOfActor({ actor }) }),
+    ),
   )
 
   // Creating asks for `analytics:create`; `:manage` still implies it.
@@ -75,10 +72,11 @@ export const graphRest: Readonly<{
   .withOutput(graphRestResponseSchema)
   .withStatus(201)
   .withDocs({ tags: ["Graphs"], description: "Create a custom graph on a dashboard" })
-  .handle(async ({ app, input, scope }) =>
+  .handle(async ({ app, input, scope, actor }) =>
     graphResponse(
       await app.createGraph({
         projectId: scope.id,
+        ...viewerOfActor({ actor }),
         name: input.name,
         graph: input.graph,
         ...(input.filters === undefined ? {} : { filters: input.filters }),
@@ -102,11 +100,12 @@ export const graphRest: Readonly<{
     tags: ["Graphs"],
     description: "Update a custom graph's name, definition, or filters",
   })
-  .handle(async ({ app, input, scope }) =>
+  .handle(async ({ app, input, scope, actor }) =>
     graphResponse(
       await app.updateGraph({
         projectId: scope.id,
         graphId: input.id,
+        ...viewerOfActor({ actor }),
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.graph === undefined ? {} : { graph: input.graph }),
         ...(input.filters === undefined ? {} : { filters: input.filters }),
@@ -120,8 +119,8 @@ export const graphRest: Readonly<{
   .withPermission("analytics:manage")
   .withOutput(graphDeletedResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Delete a custom graph" })
-  .handle(async ({ app, input, scope }) => {
-    await app.deleteGraph({ projectId: scope.id, graphId: input.id });
+  .handle(async ({ app, input, scope, actor }) => {
+    await app.deleteGraph({ projectId: scope.id, graphId: input.id, ...viewerOfActor({ actor }) });
 
     return { id: input.id, deleted: true };
   })

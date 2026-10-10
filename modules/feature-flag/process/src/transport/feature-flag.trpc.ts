@@ -4,7 +4,11 @@
  * exact tenant target, not the scope id a declaration would read off input.
  */
 
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { FeatureFlagApi, featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import { z } from "zod";
 
@@ -20,14 +24,14 @@ const EXPERIMENT_PERMISSIONS = [
 
 /** The session's email, for an email domain rule — bound once at the process
  * (matched to `organization.trpc.ts`'s fact by name, not import). */
-const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
+const callerEmailContext = defineMiddlewareContext("callerEmail", z.string().nullable());
 
 export const featureFlagTrpcTransport: TrpcRouterDeclaration<
   FeatureFlagApi,
   typeof featureFlagTrpc
 > = defineTrpcRouter(FeatureFlagApi, featureFlagTrpc)
   .procedure("isEnabled")
-  .withFacts(callerEmailFact)
+  .withMiddlewareContext(callerEmailContext)
   .serviceAuthorized({
     reason: AUTHORIZED_BY_THE_APP,
     permissions: TENANT_READ_PERMISSIONS,

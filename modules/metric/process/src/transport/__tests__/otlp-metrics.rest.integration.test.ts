@@ -5,7 +5,12 @@
  */
 import { gzipSync } from "node:zlib";
 
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { ProjectMissingCredentialsError } from "@langwatch/api";
+import {
+  canonicalErrorResponse,
+  createRestRuntime,
+  withOtlpPathAliases,
+} from "@langwatch/api/rest";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -21,7 +26,7 @@ import { MetricModule } from "../../app/metric.app.ts";
 import type { MetricProcessingPipeline } from "../../eventing/metric.pipeline.ts";
 import { metricProcessModule } from "../../metric.module.ts";
 import { MemoryMetricRepositories } from "../../repositories/memory/memory.metric.repositories.ts";
-import { otlpMetricsRest } from "../otlp-metrics.rest.ts";
+import { otlpMetricsDoor, otlpMetricsRest } from "../otlp-metrics.rest.ts";
 
 type Setup = Parameters<typeof MetricModule.create>[0];
 type RecordDataPoint = EventingCommands<MetricProcessingPipeline>["recordDataPoint"];
@@ -45,15 +50,18 @@ function deployment() {
   const sentPoints: CanonicalMetricDataPoint[] = [];
 
   const traces = createApiFixture<TraceApi>({
-    otlpCredential: async () => ({
-      project: PROJECT,
-      identity: {
-        apiKeyId: "api-key-1",
-        organizationId: PROJECT.organizationId,
-        ingestSourceType: null,
-        ingestionTemplateId: null,
-      },
-    }),
+    otlpCredential: async ({ authorization, xAuthToken }) => {
+      if (!authorization && !xAuthToken) throw new ProjectMissingCredentialsError();
+      return {
+        project: PROJECT,
+        identity: {
+          apiKeyId: "api-key-1",
+          organizationId: PROJECT.organizationId,
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+        },
+      };
+    },
     otlpUsageLimit: async () => undefined,
     otlpMarkCredentialUsed: () => undefined,
     recordMetricCorrelations: async () => undefined,
@@ -89,6 +97,7 @@ function deployment() {
   apis.ready();
 
   const runtime = createRestRuntime({
+    doors: { otlp_ingest: otlpMetricsDoor.open(traces) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -101,23 +110,28 @@ function deployment() {
   const declaredRest: readonly FeatureTransportDescriptor[] = metricProcessModule.transports ?? [];
   const mounted = declaredRest.includes(otlpMetricsRest)
     ? [
-        runtime.mount(otlpMetricsRest.router(), {
-          app: () => apis.reference(MetricApi),
-          credential: "public",
-          onError: canonicalErrorResponse,
-        }),
+        // The host rewrites a misconfigured exporter path before routing, as RestHost does.
+        withOtlpPathAliases(
+          runtime.mount(otlpMetricsRest.router(), {
+            app: () => apis.reference(MetricApi),
+            credential: "otlp_ingest",
+            onError: canonicalErrorResponse,
+          }),
+        ),
       ]
     : [];
 
   const post = async ({
     body,
     headers = {},
+    path = "/api/otel/v1/metrics",
   }: {
     body: RequestInit["body"];
     headers?: Record<string, string>;
+    path?: string;
   }) => {
     for (const family of mounted) {
-      return family.request("/api/otel/v1/metrics", {
+      return family.request(path, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Auth-Token": TOKEN, ...headers },
         body,
@@ -217,4 +231,22 @@ describe("given the metric module as a process composes it", () => {
       });
     },
   );
+
+  describe("when an exporter posts to a path the receiver does not recognise", () => {
+    /** @scenario "The log and metric doors answer an unknown exporter path as not found before they ask for the key" */
+    it("answers 404 with or without a key and collects nothing", async () => {
+      const { post, sentPoints } = deployment();
+      const path = "/not-an-exporter/v1/metrics";
+
+      const anonymous = await post({
+        body: otlpMetricBody(),
+        path,
+        headers: { "X-Auth-Token": "" },
+      });
+      const keyed = await post({ body: otlpMetricBody(), path });
+
+      expect([anonymous.status, keyed.status]).toEqual([404, 404]);
+      expect(sentPoints).toHaveLength(0);
+    });
+  });
 });

@@ -40,10 +40,9 @@ app:
     skipEnvValidation: true
 
 workers:
-  # The chart refuses enabled: false (the workers run the upgrade), so the
-  # e2e profile keeps the Deployment and runs no pod.
-  enabled: true
-  replicaCount: 0
+  # The workers run the upgrade. enabled: false runs the worker as a sidecar
+  # in each app pod, so the app pod can finish the upgrade it waits on.
+  enabled: false
 
 langwatch_nlp:
   replicaCount: 0

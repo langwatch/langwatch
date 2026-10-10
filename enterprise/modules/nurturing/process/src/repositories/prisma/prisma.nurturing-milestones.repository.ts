@@ -28,11 +28,16 @@ export class PrismaNurturingMilestonesRepository
     adminUserId,
     seeded,
   }: Parameters<NurturingMilestonesRepository["recordOrganization"]>[0]): Promise<void> {
-    await this.prisma.nurturingOrganization.upsert({
-      where: { organizationId },
-      create: { organizationId, adminUserId, seeded },
-      update: adminUserId ? { adminUserId } : {},
+    // ON CONFLICT DO NOTHING: a concurrent create never raises (so never logs) a P2002.
+    await this.prisma.nurturingOrganization.createMany({
+      data: [{ organizationId, adminUserId, seeded }],
+      skipDuplicates: true,
     });
+    if (adminUserId)
+      await this.prisma.nurturingOrganization.updateMany({
+        where: { organizationId },
+        data: { adminUserId },
+      });
   }
 
   countEvaluation({

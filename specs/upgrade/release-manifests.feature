@@ -54,6 +54,19 @@ Feature: Release manifests order every migration step release by release
     Then loading is refused naming the step id and both releases
 
   @unit
+  Scenario: The shipped deprecation register names the retired project scope tables
+    Given packages/upgrade/releases/deprecations/deprecations.json as this image ships it
+    When the register is loaded
+    Then it names DataPrivacyProjectScope and DataRetentionProjectScope as deprecated Postgres tables
+    And each says what replaces it and that it is removed in a future release
+
+  @unit
+  Scenario: A deprecation removed before it is deprecated, or named twice, is refused
+    Given a register whose entry is removed in 3.21.0 but deprecated in 3.22.0
+    When the register is loaded
+    Then loading is refused naming the entry and both releases
+
+  @unit
   Scenario: A manifest whose file name is not its release is refused
     Given a manifest file named 3.21.0.json whose release reads 3.22.0
     When the manifests are loaded
@@ -106,6 +119,21 @@ Feature: Release manifests order every migration step release by release
     And an image built from a commit, not a release, declaring steps no manifest names
     When the image plans its upgrade
     Then the plan holds exactly one virtual release carrying those steps
+
+  # IMAGE-IDENTITY (Alex, 2026-10-10): the image names a release only when it is that release.
+  @unit
+  Scenario: An image shipping only stamped steps names itself the newest release
+    Given release manifests stamped up to 3.20.1
+    And an image whose every schema and code step a manifest lists
+    When the image's release is derived
+    Then the image names itself 3.20.1
+
+  @unit
+  Scenario: An image shipping a step beyond the stamped ones names itself unreleased
+    Given release manifests stamped up to 3.20.1
+    And an image shipping a step no manifest lists
+    When the image's release is derived
+    Then the image names itself unreleased
 
   # Preview to a target (upgrade-ui plan 6.1.2, U6; Q-U3 ruled: the preview runs from the target
   # image's CLI, so this image never fetches another release's manifests).

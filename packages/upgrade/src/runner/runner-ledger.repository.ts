@@ -44,14 +44,6 @@ export class UpgradeRunnerRepository {
     return rows[0]?.present === true;
   }
 
-  async isEmpty(): Promise<boolean> {
-    const { rows } = await this.query<{ empty: boolean }>(
-      (t) => `SELECT NOT EXISTS (SELECT 1 FROM ${t.step})
-          AND NOT EXISTS (SELECT 1 FROM ${t.run}) AS empty`,
-    );
-    return rows[0]?.empty === true;
-  }
-
   async findLease({ name }: { name: string }): Promise<UpgradeLease | null> {
     const { rows } = await this.query<object>(
       (t) => `SELECT "name", "owner", "image", "host",

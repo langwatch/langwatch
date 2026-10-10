@@ -1,3 +1,5 @@
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+
 import {
   isOrganizationScopedProduct,
   isPathUnder,
@@ -81,6 +83,24 @@ function activeProductFor({
   if (addressedProductId === "dashboards") return "dashboards";
   if (isPersonalScopeRoute) return "me";
   return addressedProductId ?? "llm-ops";
+}
+
+/**
+ * Whether the address names a product whose page-closing flag answered off. Main drew
+ * that 404 with no product chrome around it (WithFeatureFlagGuard outside the layout).
+ */
+export function isSwitchedOffProductAt({
+  pathname,
+  isFlagOff,
+}: {
+  pathname: string;
+  isFlagOff: (flag: FrontendFeatureFlag) => boolean;
+}): boolean {
+  const productId = isSettingsShellRoute(pathname) ? null : productFromPathname(pathname);
+  if (!productId) return false;
+  return productById(productId).gates.some(
+    (gate) => gate.closesPages === true && gate.flag !== void 0 && isFlagOff(gate.flag),
+  );
 }
 
 /** Product and scope resolver; settings detour is not a product; match on segment boundary */

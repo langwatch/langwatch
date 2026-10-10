@@ -2,7 +2,7 @@
  * @vitest-environment node
  * GET /api/trace/:id?format=digest answers the rendered digest, not a pending read.
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
@@ -49,7 +49,7 @@ function mountWithTrace() {
   };
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
+    middlewareContext: [bindMiddlewareContext(tracesRestCredential, () => ({ principal: null }))],
     onError: (_error, context) => context.json({ error: "unexpected" }, 500),
   });
   return (path: string) => family.request(path);

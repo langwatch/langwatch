@@ -161,6 +161,13 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
   ];
 }
 
+/**
+ * `lock_timeout` for the ledger DDL, which runs before the timed lease exists: a session holding
+ * a ledger table fails this run fast instead of queueing it, and every read behind it, forever.
+ * About 2 s, as for the schema DDL (Alex, 2026-10-09; DEFAULT_LOCK_TIMEOUT_MS in upgrade-runner).
+ */
+export const LEDGER_LOCK_TIMEOUT_MS = 2_000;
+
 /** Serialises concurrent creators of one installation's ledger for the rest of the transaction. */
 const lockOf = ({ tables }: { tables: LedgerTableNames }) =>
   `PERFORM pg_advisory_xact_lock(hashtext(${literal(`langwatch-upgrade-ledger:${tables.schema}`)}));`;
@@ -174,6 +181,7 @@ export function createLedgerTablesSql({ tables }: { tables: LedgerTableNames }):
   return [
     "DO $ledger$",
     "BEGIN",
+    `  PERFORM set_config('lock_timeout', '${LEDGER_LOCK_TIMEOUT_MS}ms', true);`,
     `  ${lockOf({ tables })}`,
     `  IF to_regnamespace(${literal(quote(tables.schema))}) IS NULL THEN`,
     `    CREATE SCHEMA ${quote(tables.schema)};`,

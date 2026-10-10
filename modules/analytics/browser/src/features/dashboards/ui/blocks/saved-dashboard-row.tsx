@@ -27,7 +27,7 @@ import {
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import type { ScopeNames } from "../../model/board-scope.ts";
 import { BoardStar } from "../elements/board-star.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";

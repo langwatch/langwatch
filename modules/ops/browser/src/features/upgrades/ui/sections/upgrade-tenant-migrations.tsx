@@ -25,6 +25,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
+import { UpgradeTenantList } from "./upgrade-tenant-list.tsx";
 const STATUS_COLOR: Record<string, string> = {
   finalized: "green",
   migrated: "orange",
@@ -152,7 +153,7 @@ export function UpgradeTenantMigrations() {
           size="sm"
           disabled={!canManage}
           loading={runPass.isPending}
-          onClick={() => runPass.mutate()}
+          onClick={() => runPass.mutate({})}
         >
           <Play size={14} /> Run a pass now
         </Button>
@@ -193,6 +194,8 @@ export function UpgradeTenantMigrations() {
           canManage={canManage}
         />
       ))}
+
+      <UpgradeTenantList steps={migrations} />
     </Stack>
   );
 }
@@ -254,7 +257,13 @@ function MigrationRow({
       </Table.Cell>
       {isSaaS && (
         <Table.Cell textAlign="end">
-          <CountCell count={migration.enrollment?.enrolledCount ?? 0} />
+          {migration.enrollment ? (
+            <CountCell count={migration.enrollment.enrolledCount} />
+          ) : (
+            <Text as="span" textStyle="sm" color="fg.muted">
+              All
+            </Text>
+          )}
         </Table.Cell>
       )}
       {canManage && (
@@ -302,7 +311,9 @@ function MigrationDetail({
   isSaaS: boolean;
   canManage: boolean;
 }) {
-  const showEnrollments = isSaaS && migration.availableOnThisInstallation;
+  // An automatic step admits every organization, so its enrolment rows decide nothing.
+  const showEnrollments =
+    isSaaS && migration.availableOnThisInstallation && !migration.enrolledAutomatically;
   if (!migration.availableOnThisInstallation) return null;
   if (!showEnrollments && migration.attention.length === 0) return null;
   return (

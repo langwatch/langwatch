@@ -4,6 +4,7 @@
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 
+import { formatMoney } from "@langwatch/design-system/format-money";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -20,36 +21,119 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
-import { Coins, MoreVertical, Plus, SearchX } from "lucide-react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { ArrowDown, ArrowUp, ArrowUpDown, Coins, MoreVertical, Plus, SearchX } from "lucide-react";
 import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
+import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import {
+  filterAndSortCosts,
+  nextSort,
+  providerOf,
+  type ModelCostSort,
+  type ModelCostSortKey,
+} from "../../model/model-cost-table.ts";
 import {
   MODEL_COST_MANAGE_PERMISSION,
   useModelProviderHost,
 } from "../../model/model-provider-host.ts";
+import { RegexHighlight } from "../elements/regex-highlight.tsx";
 
-/**
- * One per-token rate, rendered at full precision. Rates run to nine decimal
- * places, so the default number formatting would round several of them to zero.
- */
+const exactRate = (rate: number) =>
+  rate.toLocaleString("fullwide", { useGrouping: false, maximumSignificantDigits: 20 });
+
+/** One rate as US dollars per million tokens; the exact per-token figure sits in the tooltip. */
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
     <Table.Cell padding={0}>
-      <Text whiteSpace="nowrap" paddingX={3} color={isCustom ? "green.fg" : undefined}>
-        {rate?.toLocaleString("fullwide", {
-          useGrouping: false,
-          maximumSignificantDigits: 20,
-        })}
-      </Text>
+      {rate !== undefined && (
+        <Tooltip content={`$${exactRate(rate)} per token`}>
+          <Text
+            as="span"
+            display="inline-block"
+            whiteSpace="nowrap"
+            paddingX={3}
+            textStyle="sm"
+            fontVariantNumeric="tabular-nums"
+            color={isCustom ? "green.fg" : undefined}
+          >
+            {formatMoney({ amount: rate * 1_000_000, currency: "USD" })}
+            <Text as="span" color="fg.muted" textStyle="xs">
+              {" "}
+              / 1M
+            </Text>
+          </Text>
+        </Tooltip>
+      )}
     </Table.Cell>
   );
 }
 
-/** The provider is the part of the model name before its first "/". */
-function providerOf(row: LLMModelCostRow): string {
-  return row.model.includes("/") ? row.model.split("/")[0]! : "other";
+/** The model name in code style; a link to its provider's drawer when that provider is set up. */
+function ModelNameCell(props: { model: string; isCustom: boolean; modelProviderId?: string }) {
+  const host = useModelProviderHost();
+  const { organizationId, projectId } = host.scope();
+  const code = (
+    <Code truncate maxWidth="220px" color={props.isCustom ? "green.fg" : undefined}>
+      {props.model}
+    </Code>
+  );
+  if (!props.modelProviderId) return code;
+  return (
+    <Button
+      variant="plain"
+      size="xs"
+      padding={0}
+      height="auto"
+      aria-label={`Open provider for ${props.model}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        host.openPlatformDrawer({
+          drawer: "editModelProvider",
+          params: {
+            projectId,
+            organizationId,
+            providerKey: props.model.split("/")[0],
+            modelProviderId: props.modelProviderId,
+          },
+        });
+      }}
+    >
+      {code}
+    </Button>
+  );
+}
+
+/** A stored rule opens for editing; a catalogue rate opens as a new rule that overrides it. */
+const editorParams = (row: { id?: string; model: string }) =>
+  row.id ? { id: row.id } : { cloneModel: row.model };
+
+const SORT_ICONS = { asc: ArrowUp, desc: ArrowDown } as const;
+const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
+
+function SortHeader(props: {
+  label: string;
+  sortKey: ModelCostSortKey;
+  sort: ModelCostSort | null;
+  onSort: (key: ModelCostSortKey) => void;
+  minWidth?: string;
+}) {
+  const active = props.sort?.key === props.sortKey ? props.sort.direction : null;
+  const Icon = active ? SORT_ICONS[active] : ArrowUpDown;
+  return (
+    <Table.ColumnHeader
+      minWidth={props.minWidth}
+      whiteSpace="nowrap"
+      aria-sort={active ? ARIA_SORT[active] : "none"}
+    >
+      <Button size="xs" variant="ghost" onClick={() => props.onSort(props.sortKey)}>
+        {props.label}
+        <Icon size={12} />
+      </Button>
+    </Table.ColumnHeader>
+  );
 }
 
 function countLine(args: { loaded: boolean; isFiltering: boolean; shown: number; total: number }) {
@@ -61,6 +145,8 @@ function countLine(args: { loaded: boolean; isFiltering: boolean; shown: number;
 function FilterBar(props: {
   search: string;
   onSearch: (value: string) => void;
+  matchModel: string;
+  onMatchModel: (value: string) => void;
   provider: string;
   onProvider: (value: string) => void;
   customOnly: boolean;
@@ -78,6 +164,13 @@ function FilterBar(props: {
         aria-label="Search model costs"
         value={props.search}
         onChange={(event) => props.onSearch(event.target.value)}
+      />
+      <SearchInput
+        maxWidth="320px"
+        placeholder="Which rule matches this model?"
+        aria-label="Which rule matches this model?"
+        value={props.matchModel}
+        onChange={(event) => props.onMatchModel(event.target.value)}
       />
       <NativeSelect.Root width="56">
         <NativeSelect.Field
@@ -122,28 +215,32 @@ export default function ModelCostsScreen() {
   );
 
   const [search, setSearch] = useState("");
+  const [matchModel, setMatchModel] = useState("");
   const [provider, setProvider] = useState("");
   const [customOnly, setCustomOnly] = useState(false);
+  const [sort, setSort] = useState<ModelCostSort | null>(null);
+  const onSort = (key: ModelCostSortKey) => setSort((current) => nextSort({ current, key }));
 
   const rows = (llmModelCosts.data ?? []).map(toLLMModelCostRow);
   const providerCounts = new Map<string, number>();
   for (const row of rows) {
     providerCounts.set(providerOf(row), (providerCounts.get(providerOf(row)) ?? 0) + 1);
   }
-  const needle = search.trim().toLowerCase();
-  const visibleRows = rows.filter(
-    (row) =>
-      (!needle ||
-        row.model.toLowerCase().includes(needle) ||
-        row.regex.toLowerCase().includes(needle)) &&
-      (!provider || providerOf(row) === provider) &&
-      (!customOnly || !!row.id),
-  );
-  const isFiltering = !!needle || !!provider || customOnly;
+  const { providers } = useAllModelProvidersList();
+  const providerRows = new Map<string, string>();
+  for (const candidate of providers) {
+    if (candidate.enabled && !providerRows.has(candidate.provider)) {
+      providerRows.set(candidate.provider, candidate.id);
+    }
+  }
+  const visibleRows = filterAndSortCosts({ rows, search, matchModel, provider, customOnly, sort });
+  const needle = search.trim();
+  const isFiltering = !!needle || !!matchModel.trim() || !!provider || customOnly;
   const noCosts = llmModelCosts.data?.length === 0;
   const noMatches = rows.length > 0 && visibleRows.length === 0;
   const clearFilters = () => {
     setSearch("");
+    setMatchModel("");
     setProvider("");
     setCustomOnly(false);
   };
@@ -176,6 +273,8 @@ export default function ModelCostsScreen() {
           <FilterBar
             search={search}
             onSearch={setSearch}
+            matchModel={matchModel}
+            onMatchModel={setMatchModel}
             provider={provider}
             onProvider={setProvider}
             customOnly={customOnly}
@@ -210,11 +309,26 @@ export default function ModelCostsScreen() {
               <Table.Root variant="line" width="full" maxWidth="100%">
                 <Table.Header width="full">
                   <Table.Row width="full">
-                    {/* Rates run to nine decimals: headers and values never wrap. */}
-                    <Table.ColumnHeader minWidth="160px">Model name</Table.ColumnHeader>
+                    <SortHeader
+                      label="Model name"
+                      sortKey="model"
+                      sort={sort}
+                      onSort={onSort}
+                      minWidth="160px"
+                    />
                     <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Input cost</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Output cost</Table.ColumnHeader>
+                    <SortHeader
+                      label="Input cost"
+                      sortKey="inputCostPerToken"
+                      sort={sort}
+                      onSort={onSort}
+                    />
+                    <SortHeader
+                      label="Output cost"
+                      sortKey="outputCostPerToken"
+                      sort={sort}
+                      onSort={onSort}
+                    />
                     <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
                     <Table.ColumnHeader whiteSpace="nowrap">
                       Cache write (5 minutes)
@@ -240,24 +354,27 @@ export default function ModelCostsScreen() {
                       </Table.Row>
                     ))}
                   {visibleRows.map((row) => (
-                    <Table.Row key={row.model} width="full">
+                    <Table.Row
+                      key={row.model}
+                      width="full"
+                      cursor="pointer"
+                      _hover={{ bg: "bg.muted" }}
+                      onClick={() =>
+                        host.openPlatformDrawer({
+                          drawer: "llmModelCost",
+                          params: editorParams(row),
+                        })
+                      }
+                    >
                       <Table.Cell>
-                        <Text
-                          truncate
-                          maxWidth="220px"
-                          color={row.updatedAt ? "green.fg" : undefined}
-                        >
-                          {row.model}
-                        </Text>
+                        <ModelNameCell
+                          model={row.model}
+                          isCustom={!!row.updatedAt}
+                          modelProviderId={providerRows.get(providerOf(row))}
+                        />
                       </Table.Cell>
                       <Table.Cell>
-                        <Code
-                          truncate
-                          maxWidth="220px"
-                          color={row.updatedAt ? "green.fg" : undefined}
-                        >
-                          {row.regex}
-                        </Code>
+                        <RegexHighlight pattern={row.regex} />
                       </Table.Cell>
                       <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
                       <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
@@ -266,7 +383,7 @@ export default function ModelCostsScreen() {
                       <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
                       <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
                       <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
-                      <Table.Cell padding={1}>
+                      <Table.Cell padding={1} onClick={(event) => event.stopPropagation()}>
                         <ActionsMenu id={row.id} model={row.model} />
                       </Table.Cell>
                     </Table.Row>
@@ -309,7 +426,7 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
               });
             }}
           >
-            Clone
+            Override cost
           </Menu.Item>
         )}
         {id && (

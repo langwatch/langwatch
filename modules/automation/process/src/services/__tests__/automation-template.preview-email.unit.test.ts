@@ -1,5 +1,6 @@
 import {
   AlertType,
+  automationApiPreviewEmailInputSchema,
   buildExampleGraphAlertTemplateContext,
   defaultsForSourceKind,
 } from "@langwatch/automation-contract";
@@ -66,6 +67,29 @@ describe("AutomationTemplateService.previewEmail", () => {
       });
 
       expect(preview).toEqual(expected);
+    });
+  });
+
+  describe("when the draft is a report on its own schedule", () => {
+    it("names that schedule in the subject and body, through the wire schema", async () => {
+      const { report, trigger, draft } = automationApiPreviewEmailInputSchema.parse({
+        projectId: "project-1",
+        trigger: { name: "Quarter hour", alertType: null },
+        draft: {},
+        report: { sourceKind: "traceQuery", scheduleLabel: "*/15 * * * * (Europe/Amsterdam)" },
+      });
+
+      const preview = await makeService().previewEmail({
+        trigger,
+        project: PROJECT,
+        draft,
+        graphAlert: null,
+        report,
+      });
+
+      expect(preview.subject).toContain("*/15 * * * * (Europe/Amsterdam)");
+      expect(preview.html).toContain("*/15 * * * * (Europe/Amsterdam)");
+      expect(preview.subject).not.toContain("every Monday");
     });
   });
 });

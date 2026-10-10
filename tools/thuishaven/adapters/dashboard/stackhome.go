@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/seedgen"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
@@ -40,7 +41,18 @@ type stackHomeJSON struct {
 	Credentials credentialsJSON  `json:"credentials"`
 	Actions     stackActionsJSON `json:"actions"`
 	// BelowFloor is the upgrade gate's refusal while it holds the api, else "".
-	BelowFloor string `json:"belowFloor"`
+	BelowFloor string   `json:"belowFloor"`
+	Seed       seedJSON `json:"seed"`
+}
+
+// seedJSON is the seed console: the sizes and personas `haven db seed` takes, the
+// last seed's status line and the log tail of a seed started here.
+type seedJSON struct {
+	CanSeed  bool     `json:"canSeed"`
+	Sizes    []string `json:"sizes"`
+	Personas []string `json:"personas"`
+	Status   string   `json:"status"`
+	Log      []string `json:"log"`
 }
 
 type factsJSON struct {
@@ -253,7 +265,23 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 			CanResetDatabases: registered && s.config.Actions.ResetDatabases != nil,
 		},
 		BelowFloor: floorRefusal(surfaces, tails, st.Layout),
+		Seed:       s.seed(slug, h.live),
 	})
+}
+
+func (s *Server) seed(slug string, live bool) seedJSON {
+	out := seedJSON{CanSeed: live && s.config.Actions.Seed != nil, Sizes: []string{}, Personas: append([]string{"all"}, seedgen.Personas...), Log: []string{}}
+	for _, tier := range seedgen.Tiers {
+		out.Sizes = append(out.Sizes, tier.Name)
+	}
+	if s.config.Actions.SeedReport != nil {
+		status, log := s.config.Actions.SeedReport(slug)
+		out.Status = status
+		if log != nil {
+			out.Log = log
+		}
+	}
+	return out
 }
 
 // floorRefusal is the upgrade gate's refusal (code refused_below_floor) from
@@ -452,7 +480,7 @@ func (s *Server) recentErrors(slug string, lanes []string, tails map[string][]lo
 // which from a checkout file, so a row offers no restart of its own for them.
 var simulators = map[string]bool{
 	domain.IdPService: true, domain.MailService: true, domain.StorageService: true, domain.VoiceService: true,
-	domain.LLMService: true, domain.AnalyticsService: true, domain.OutboundService: true, domain.PaymentService: true, domain.TelemetryService: true,
+	domain.LLMService: true, domain.AnalyticsService: true, domain.OutboundService: true, domain.PaymentService: true, domain.TelemetryService: true, domain.LambdaService: true,
 }
 
 // surfaceLanes are the captures a surface's process may write to: a
@@ -461,7 +489,9 @@ func surfaceLanes(name string, layout domain.Layout) []string {
 	switch {
 	case name == "app":
 		return []string{domain.MonolithAppLane, "ui"}
-	case name == domain.APIService || name == "worker":
+	case name == "worker":
+		return []string{"worker", "api", "backend", domain.MonolithAppLane}
+	case name == domain.APIService:
 		return []string{"api", "backend", domain.MonolithAppLane}
 	case simulators[name]:
 		return []string{name, "sims", "go"}
@@ -565,7 +595,7 @@ func reasonFor(h homeState, sf surfaceJSON) (string, bool) {
 func newestErrors(lines []logLine) []logLine {
 	var out []logLine
 	for i := len(lines) - 1; i >= 0 && len(out) < recentErrorsPerLane; i-- {
-		if level := logfmt.Level(lines[i].Level); level == logfmt.LevelError || level == logfmt.LevelFatal {
+		if rec, ok := logfmt.Parse(lines[i].Text); ok && logfmt.Failed(rec) {
 			out = append(out, lines[i])
 		}
 	}

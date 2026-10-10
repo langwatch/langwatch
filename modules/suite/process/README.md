@@ -6,7 +6,7 @@ The server half of [suite](../README.md). Suites (run plans): their definitions,
 
 ## Installation
 
-`defineProcessModule("suite").withRepositories(suiteRepositories).withApi(SuiteModule).withTransports(…, …, …, suiteTrpcTransport, testSuiteTrpcTransport).withTransportFacts(…).withEventing(suiteRunProcessingEventing).withMigrations(…)`, `src/suite.module.ts:22`.
+`defineProcessModule("suite").withRepositories(suiteRepositories).withApi(SuiteModule).withTransports(…, …, …, suiteTrpcTransport, testSuiteTrpcTransport).provideMiddlewareBindings(…).withEventing(suiteRunProcessingEventing).withMigrations(…)`, `src/suite.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

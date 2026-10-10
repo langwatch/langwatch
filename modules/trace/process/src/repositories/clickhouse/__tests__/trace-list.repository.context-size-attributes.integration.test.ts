@@ -7,7 +7,9 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -78,7 +80,7 @@ describe.skipIf(!clickHouseConfigured)(
     beforeAll(async () => {
       if (!clickHouseConfigured) return;
       ch = await startMigratedTraceClickHouse();
-      repo = TraceListClickHouseRepository.create(async () => ch);
+      repo = TraceListClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
 
       await insertRows([
         makeTraceSummaryRow(0, {
@@ -107,7 +109,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario "Context size is shown in the trace list next to tokens" */
       it("surfaces the reserved cache/reasoning/context keys so the list and drawer header can show them", async () => {
         const page = await repo.listAll({
-          tenantId: cacheTenant,
+          authorization: ownProof({ projectId: cacheTenant }),
           timeRange: { from: base - 60_000, to: base + 60_000 },
           sort: { column: "OccurredAt", direction: "desc" },
           limit: 50,

@@ -6,7 +6,7 @@ The server half of [role](../README.md). Roles: the built-in roles and the custo
 
 ## Installation
 
-`defineProcessModule("role").withRepositories(roleRepositories).withApi(RoleModule).withTransports(roleRest, roleTrpcTransport).withTransportFacts(…)`, `src/role.module.ts:10`.
+`defineProcessModule("role").withRepositories(roleRepositories).withApi(RoleModule).withTransports(roleRest, roleTrpcTransport).provideMiddlewareBindings(…)`, `src/role.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -174,7 +174,7 @@ interface Response {
 
 The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding).
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:113`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:114`.
 
 Answers at `/api/roles/permissions`, `/api/v1/roles/permissions`; also, undocumented, `/api/roles/2026-08-07/permissions`, `/api/v1/roles/2026-08-07/permissions`, `/api/roles/latest/permissions`, `/api/v1/roles/latest/permissions`.
 
@@ -195,7 +195,7 @@ interface Response {
 
 Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another organization answers 404 custom_role_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:124`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:125`.
 
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
@@ -211,7 +211,7 @@ type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.sch
 
 Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not hold on the organization answers 403 role_exceeds_caller_permissions.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:144`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:145`.
 
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
@@ -230,7 +230,7 @@ type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.sch
 
 Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409 role_is_built_in.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:173`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:175`.
 
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 

@@ -3,8 +3,9 @@ Feature: Haven dev orb
   I want a floating orb in the app with dev tools and a feedback channel into haven
   So that I can reach the stack's consoles and hand page feedback to an agent
 
-  The orb is dev-server tooling: the ui lane's Vite plugin injects it into the page only
-  when haven runs the stack, and it takes no part in a production build.
+  The orb is dev tooling: on a dev-server stack the ui lane's Vite plugin injects it; on a
+  built-UI stack the dev runtime, which owns the api's port, injects it into the built page
+  (ADR-064, 2026-10-10). Either way only when haven runs the stack, and never in a build.
 
   @integration
   Scenario: absent when not run by haven
@@ -14,8 +15,22 @@ Feature: Haven dev orb
 
   @integration
   Scenario: absent in production
-    When the app is built for production
+    When the app is built for production or for haven's local build cache
     Then the orb plugin takes no part in the build
+    And the orb's own build is held in memory and writes nothing to disk
+
+  @integration
+  Scenario: present on a built-UI stack haven runs
+    Given haven runs the stack "feat-x" with the UI built
+    When the api's port serves the app page
+    Then the page loads the orb script, built apart from the app's bundle
+    And every other answer and upgrade passes through unchanged
+    And a page is served as it is when the orb could not be built
+
+  @integration
+  Scenario: absent from a built-UI stack haven does not run
+    Given the dev runtime serves the api without haven's stack slug, or beside the dev server
+    Then the api's port adds no orb
 
   @integration
   Scenario: present when haven runs the stack
@@ -131,29 +146,29 @@ Feature: Haven dev orb
   @unit
   Scenario: an agent lists open feedback
     Given haven holds two feedback items for the stack, one resolved
-    When the agent runs "haven feedback list --open --json"
+    When the agent runs "haven orb feedback list --open --json"
     Then it receives the open item alone
 
   @unit
   Scenario: an agent resolves feedback
     Given haven holds an open feedback item
-    When the agent runs "haven feedback resolve <id>"
+    When the agent runs "haven orb feedback resolve <id>"
     Then the item is no longer open
 
   @unit
   Scenario: an agent waits for new feedback
-    Given the agent runs "haven feedback wait --timeout 5s"
+    Given the agent runs "haven orb feedback wait --timeout 5s"
     When a reader sends feedback
     Then the wait returns that item
 
   @unit
   Scenario: an agent reads the page's console errors
     Given the orb pushed the page buffer to haven
-    When the agent runs "haven page console --level error --json"
+    When the agent runs "haven orb console --level error --json"
     Then it receives the error messages alone
 
   @unit
   Scenario: an agent reads the page's failed requests
     Given the orb pushed the page buffer to haven
-    When the agent runs "haven page network --failed --json"
+    When the agent runs "haven orb network --failed --json"
     Then it receives the failed requests alone

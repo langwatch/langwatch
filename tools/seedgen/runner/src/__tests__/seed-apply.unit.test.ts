@@ -5,6 +5,7 @@ import { Readable, Writable } from "node:stream";
 
 import type { AuthzApi, AuthzAttachBindingsInput } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { LicenseStatus, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
@@ -27,6 +28,14 @@ class SeedTestRefusal extends HandledError {
 
   constructor() {
     super("seed_test_refusal", "refused for the test", { retryable: true });
+  }
+}
+
+class SeedTestNotYet extends HandledError {
+  declare readonly code: "seed_test_not_yet";
+
+  constructor() {
+    super("seed_test_not_yet", "not confirmed in time", { httpStatus: 503 });
   }
 }
 
@@ -84,6 +93,23 @@ function seedApis(overrides: Partial<{ [Name in keyof SeedApis]: SeedApis[Name] 
       listByTeam: vi.fn(async () => []),
       create: vi.fn(async () => projectOf({ id: "project_new", name: "support" })),
     }),
+    licensing: createApiFixture<LicensingApi>({
+      getLicenseStatus: vi.fn(async (): Promise<LicenseStatus> => ({
+        hasLicense: false,
+        valid: false,
+      })),
+      generateLicenseKey: vi.fn(async () => ({
+        licenseKey: "signed-key",
+        licenseData: createApiFixture<
+          Awaited<ReturnType<LicensingApi["generateLicenseKey"]>>["licenseData"] & object
+        >(),
+      })),
+      validateAndStoreLicense: vi.fn(async () =>
+        createApiFixture<Awaited<ReturnType<LicensingApi["validateAndStoreLicense"]>> & object>({
+          success: true,
+        }),
+      ),
+    }),
     ...overrides,
   };
 }
@@ -138,7 +164,7 @@ describe("seed:apply", () => {
       importModule: () => Promise.resolve(runner),
     });
     expect(tasks.map((task) => task.name)).toEqual(["seed:apply"]);
-    expect(resolved).toBe(8);
+    expect(resolved).toBe(9);
   });
 
   /** @scenario "Each action kind calls its one module API operation" */
@@ -346,6 +372,7 @@ describe("seed:apply", () => {
         { "$project:p": "project_old" },
       ]),
     );
+    expect(replies.find((reply) => reply.id === "r/3")).toMatchObject({ existing: true });
     expect(apis.user.create).not.toHaveBeenCalled();
     expect(apis.organization.createAndAssign).not.toHaveBeenCalled();
     expect(apis.project.create).not.toHaveBeenCalled();
@@ -373,7 +400,7 @@ describe("seed:apply", () => {
     });
   });
 
-  /** @scenario "The persona counts haven seed prints are what it created" */
+  /** @scenario "The persona counts haven db seed prints are what it created" */
   it("refuses a trace chunk whose spans the owner dropped", async () => {
     const apis = seedApis({
       trace: createApiFixture<TraceApi>({ otlpTraces: vi.fn(async () => ({ rejectedSpans: 2 })) }),
@@ -419,7 +446,51 @@ describe("seed:apply", () => {
     });
   });
 
-  /** @scenario "The persona counts haven seed prints are what it created" */
+  /** @scenario "A licence org is put on Enterprise through the licensing API" */
+  it("signs and stores an Enterprise licence, keeps a valid one, and refuses one licensing rejects", async () => {
+    const issue = {
+      id: "r/1",
+      kind: "license.issue",
+      org: "org_1",
+      input: { name: "sso-test-org", email: "admin@acme1.test" },
+    };
+    const apis = seedApis();
+    expect(await applyLines({ apis, lines: [issue] })).toEqual([{ id: "r/1", ok: true }]);
+    expect(apis.licensing.generateLicenseKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org_1",
+        organizationName: "sso-test-org",
+        planType: "ENTERPRISE",
+      }),
+    );
+    expect(apis.licensing.validateAndStoreLicense).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      licenseKey: "signed-key",
+    });
+
+    const licensed = seedApis({
+      licensing: createApiFixture<LicensingApi>({
+        getLicenseStatus: vi.fn(async () =>
+          createApiFixture<LicenseStatus & object>({ valid: true, plan: "ENTERPRISE" }),
+        ),
+        generateLicenseKey: vi.fn(),
+        validateAndStoreLicense: vi.fn(),
+      }),
+    });
+    expect(await applyLines({ apis: licensed, lines: [issue] })).toEqual([{ id: "r/1", ok: true }]);
+    expect(licensed.licensing.generateLicenseKey).not.toHaveBeenCalled();
+
+    const rejecting = seedApis();
+    vi.mocked(rejecting.licensing.validateAndStoreLicense).mockResolvedValueOnce({
+      success: false,
+      error: "Invalid signature",
+    });
+    expect(await applyLines({ apis: rejecting, lines: [issue] })).toEqual([
+      { id: "r/1", ok: false, code: "license_refused" },
+    ]);
+  });
+
+  /** @scenario "The persona counts haven db seed prints are what it created" */
   it("refuses a membership whose seat waits, so it is never counted", async () => {
     const apis = seedApis({
       organization: createApiFixture<OrganizationApi>({
@@ -523,6 +594,22 @@ describe("seed:apply", () => {
       { id: "r/1", ok: false, code: "seed_test_refusal", retryable: true },
       { id: "r/2", ok: true },
     ]);
+  });
+
+  /** @scenario "A refusal the product marks as temporary is retried" */
+  it("refuses a handled 503 as retryable", async () => {
+    const apis = seedApis({
+      dataRetention: createApiFixture<DataRetentionApi>({
+        setForScope: vi.fn(async () => {
+          throw new SeedTestNotYet();
+        }),
+      }),
+    });
+    const [reply] = await applyLines({
+      apis,
+      lines: [{ id: "r/1", kind: "retention.set", org: "org_1", input: { days: 49 } }],
+    });
+    expect(reply).toEqual({ id: "r/1", ok: false, code: "seed_test_not_yet", retryable: true });
   });
 
   /** @scenario "Telemetry the ingest queue could not take is refused as retryable" */

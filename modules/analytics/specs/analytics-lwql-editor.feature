@@ -12,6 +12,12 @@ Feature: LangWatchQL is edited in one kit editor with its grammar, completion an
       Then completion is offered against that schema
 
     @integration
+    Scenario: The editor offers typed columns and functions alongside keywords
+      Given an editor given a schema
+      When the member asks for completion inside a statement reading a dataset
+      Then that dataset's columns are offered with their ClickHouse type, and the schema's functions and the keywords too
+
+    @integration
     Scenario: The dashboard widget reads the schema of its own project for the editor
       Given a widget query in a project
       When its schema is read
@@ -29,7 +35,8 @@ Feature: LangWatchQL is edited in one kit editor with its grammar, completion an
     Scenario: Dataset names complete after FROM in the schema's order
       Given a schema with several datasets
       When the cursor sits after FROM
-      Then every dataset is offered as analytics.<name> in the schema's order
+      Then every dataset is offered by the bare name a statement writes, in the schema's order
+      And no dataset is shown or inserted with the deployment's database name
 
     @unit
     Scenario: Columns complete for the datasets in scope with type and description
@@ -60,6 +67,15 @@ Feature: LangWatchQL is edited in one kit editor with its grammar, completion an
       Given a parameter the host offers
       When the cursor follows an opening brace
       Then the parameter is offered as {name:Type}
+
+  Rule: Typing is never overwritten
+
+    @integration
+    Scenario: Typing ahead of the host keeps the text, the cursor and the completion list
+      Given a member typing faster than the host re-renders
+      When the host re-renders with text the editor has already moved past
+      Then the editor keeps the member's text, cursor and open completion list
+      And a value the host changes while the editor is not focused is shown
 
   Rule: Tooling fails open
 

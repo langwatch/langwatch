@@ -146,8 +146,8 @@ Feature: The daily insights run
       And neither run's row names what the board holds
       And Langy is never called
 
-    # The run's own reads pass for the author. Langy's command line reads over REST, which
-    # reads as a project credential today, so it opens no Only me board yet (ADR-004).
+    # The run's own reads pass for the author. Langy's command line reads over REST with the
+    # run's key, which the author owns, so the door reads the board as the author (ADR-004).
     @unit
     Scenario: The author's run reads their own Only me board
       Given a board its author keeps as Only me

@@ -293,7 +293,7 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 	})
 }
 
-// @scenario "Down keeps the databases, always"
+// @scenario "Down keeps the databases unless it is told to destroy"
 func TestDownKeepsDatabases(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -325,7 +325,7 @@ func TestDownKeepsDatabases(t *testing.T) {
 	})
 }
 
-// @scenario "Down -f kills hard"
+// @scenario "Down --force kills hard"
 func TestDownForceKillsHard(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}

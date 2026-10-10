@@ -1,11 +1,11 @@
 import {
-  defineRestMiddleware,
+  browserSessionContext,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
   adminAuditRequestSchema,
-  adminAuthSessionSchema,
   adminEmptyRequestSchema,
   adminImpersonationRequestSchema,
   adminImpersonationStartedSchema,
@@ -17,8 +17,10 @@ import {
   type OpsOperator,
 } from "@langwatch/ops-contract";
 
-export const adminAuthSession = defineRestMiddleware("adminAuthSession", adminAuthSessionSchema);
-export const adminAuditRequest = defineRestMiddleware("adminAuditRequest", adminAuditRequestSchema);
+export const adminAuditRequest = defineMiddlewareContext(
+  "adminAuditRequest",
+  adminAuditRequestSchema,
+);
 
 /** The operator the door admitted, as the back office reads it: who acts, and for whom. */
 function operatorOf(actor: { id: string; impersonatorId?: string }): OpsOperator {
@@ -37,7 +39,7 @@ export const adminRest = defineRestRouter(OpsApi)
   .withCredential("browser")
   .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
   .withOutput(adminImpersonationStartedSchema)
-  .withMiddleware(adminAuthSession, adminAuditRequest)
+  .withMiddlewareContext(browserSessionContext, adminAuditRequest)
   .handle(({ app, input, actor }, ...[session, req]) =>
     app.startAdminImpersonation({ ...input, actor: operatorOf(actor), session, req }),
   )
@@ -47,7 +49,7 @@ export const adminRest = defineRestRouter(OpsApi)
   .withCredential("browser")
   .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
   .withOutput(adminImpersonationStoppedSchema)
-  .withMiddleware(adminAuthSession, adminAuditRequest)
+  .withMiddlewareContext(browserSessionContext, adminAuditRequest)
   .handle(({ app, actor }, ...[session, req]) =>
     app.stopAdminImpersonation({ actor: operatorOf(actor), session, req }),
   )
@@ -59,7 +61,7 @@ export const adminRest = defineRestRouter(OpsApi)
   // A write method also needs ops:manage, which the application asks (the method is in the body).
   .withPermission("ops:view", { at: "platform", refusal: "hidden" })
   .withOutput(adminOperationResponseSchema)
-  .withMiddleware(adminAuditRequest)
+  .withMiddlewareContext(adminAuditRequest)
   .handle(({ app, input, actor }, req) =>
     app.runAdminOperation({ ...input, actor: operatorOf(actor), req }),
   )

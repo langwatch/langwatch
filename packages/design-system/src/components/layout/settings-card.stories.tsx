@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { OverviewCard, OverviewDetail, StatusChip } from "./settings-card.tsx";
 
 const meta = {
-  title: "Components/Settings card",
+  title: "Navigation and layout/Settings card",
+  parameters: {
+    usage: {
+      use: "One card of settings with a status, facts as name and value rows, and actions.",
+      avoid: "Many rows of the same kind: use List table.",
+    },
+  },
   component: OverviewCard,
   tags: ["autodocs"],
   args: {

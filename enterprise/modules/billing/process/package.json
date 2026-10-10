@@ -26,6 +26,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-connect-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
@@ -58,7 +59,7 @@
     "hono": "catalog:",
     "ioredis": "catalog:",
     "nanoid": "catalog:",
-    "stripe": "^15.12.0",
+    "stripe": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

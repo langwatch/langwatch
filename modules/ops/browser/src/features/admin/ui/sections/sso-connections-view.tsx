@@ -398,6 +398,7 @@ function AttestDomainDialog({
       }}
     >
       <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>{`Vouch for ${domain ?? ""}?`}</Dialog.Title>
         </Dialog.Header>
@@ -422,7 +423,7 @@ function AttestDomainDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
@@ -461,6 +462,7 @@ function RemoveConnectionDialog({
       }}
     >
       <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>
             {resolvable
@@ -496,7 +498,7 @@ function RemoveConnectionDialog({
           )}
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           {resolvable && (

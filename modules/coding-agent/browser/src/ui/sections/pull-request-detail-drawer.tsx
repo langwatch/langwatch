@@ -1,5 +1,6 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import {
   Box,
@@ -220,7 +221,9 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
         </Stat>
         <Stat label="Tokens">
           <Text fontSize="lg" fontWeight="medium">
-            {formatTokens(totals.totalTokens)}
+            <FormattedNumber value={totals.totalTokens} unit="tokens">
+              {formatTokens(totals.totalTokens)}
+            </FormattedNumber>
           </Text>
         </Stat>
         <Stat label="Token cost">

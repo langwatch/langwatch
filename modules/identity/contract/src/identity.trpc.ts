@@ -39,6 +39,11 @@ export const identityTrpc = defineTrpcContract("identity")
   .withInput(emptyInputSchema)
   .withOutput(methodsLastUsedSchema)
 
+  /** Whether an organization's single sign-on governs the caller's sign-in. */
+  .query("mySignInGovernance")
+  .withInput(emptyInputSchema)
+  .withOutput(z.object({ governedBySso: z.boolean() }).strict())
+
   .mutation("addEmailIdentifier")
   .withInput(z.object({ email: z.email().max(254), codeChallenge: identifierCodeChallengeSchema }))
   .withOutput(emailIdentifierAddedSchema)

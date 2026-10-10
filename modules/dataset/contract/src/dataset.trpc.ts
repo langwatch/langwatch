@@ -20,6 +20,7 @@ import {
   datasetApiValidateNameInputSchema,
 } from "./dataset.schemas.ts";
 import {
+  DATASET_NORMALIZATION_SETTLED_EVENT_TYPE,
   appendStoredObjectToDatasetInputSchema,
   createDatasetAttachmentUploadInputSchema,
   datasetAttachmentUploadSchema,
@@ -53,12 +54,12 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .withOutput(datasetNameResultSchema)
 
   /** Every dataset in the project, for the list and picker surfaces. */
-  .query("getAll")
+  .query("getAll", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
   .withInput(datasetApiProjectInputSchema)
   .withOutput(z.array(datasetSummaryWireSchema))
 
   /** One dataset by id or slug; an archived or missing one reads as null. */
-  .query("getById")
+  .query("getById", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
   .withInput(datasetApiDatasetInputSchema)
   .withOutput(datasetWireSchema.nullable())
 

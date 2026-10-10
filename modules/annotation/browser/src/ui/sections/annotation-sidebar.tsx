@@ -1,108 +1,47 @@
 /**
- * Annotations sidebar: three standing lists and per-entry queues.
+ * Annotations sidebar: three standing lists and per-entry queues, on the shared section rail.
  * Local copy (see platform/app/src/components/AnnotationsLayout).
  */
 
 import type { AnnotationQueuePendingCount } from "@langwatch/annotation-contract";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
-import { Inbox, MoreVertical, Pencil, Plus, SquarePen, Users } from "lucide-react";
-import type { PropsWithChildren, ReactNode } from "react";
-import { useState } from "react";
+import { Button, Stack } from "@langwatch/design-system/primitives";
+import {
+  SectionNavigationRail,
+  type SectionNavigationLink,
+} from "@langwatch/design-system/section-navigation-frame";
+import { Inbox, MoreVertical, Pencil, SquarePen, Users } from "lucide-react";
+import type { PropsWithChildren } from "react";
 
+import { useAnnotationHost } from "../../model/annotation-host.ts";
 import type { AnnotationView } from "../../model/annotation-view.ts";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
-import { SidebarMenuLink } from "../elements/sidebar-menu-link.tsx";
 
-/** A badge shows a number or nothing; zero is not news. */
-function PendingCount({ count }: { count: number | undefined }) {
+/** A count shows a number or nothing; zero is not news. */
+const countOf = (count: number | undefined) => (count && count > 0 ? count : void 0);
+
+/** A queue's own actions; they live on the entry, reachable from wherever the reviewer is. */
+function QueueMenu({ name, onEdit }: { name: string; onEdit: () => void }) {
   return (
-    <Text fontSize="xs" color="fg.muted">
-      {count && count > 0 ? count : ""}
-    </Text>
-  );
-}
-
-/**
- * One queue in the sidebar list. Actions live here rather than on the page
- * it opens, reachable from wherever the reviewer is. The trigger takes the
- * pending count's trailing slot on hover only, so a resting sidebar reads counts.
- */
-function QueueSidebarEntry({
-  queue,
-  href,
-  isSelected,
-  icon,
-  canEdit,
-  onEdit,
-}: {
-  queue: AnnotationQueuePendingCount;
-  href: string;
-  isSelected: boolean;
-  icon: ReactNode;
-  canEdit: boolean;
-  onEdit: () => void;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  return (
-    <Box
-      width="full"
-      borderRadius="lg"
-      position="relative"
-      className="group"
-      data-testid="annotation-queue-entry"
-    >
-      <SidebarMenuLink
-        href={href}
-        isSelected={isSelected}
-        icon={icon}
-        menuEnd={
-          <Text
-            fontSize="xs"
-            color="fg.muted"
-            opacity={canEdit && menuOpen ? 0 : 1}
-            _groupHover={canEdit ? { opacity: 0 } : void 0}
-          >
-            {queue.pendingCount > 0 ? queue.pendingCount : ""}
-          </Text>
-        }
-      >
-        {queue.name}
-      </SidebarMenuLink>
-      {canEdit && (
-        // Beside the link rather than inside it: a button nested in an anchor
-        // is invalid, and a click on it would also follow the link.
-        <Box
-          position="absolute"
-          right={1}
-          top="50%"
-          transform="translateY(-50%)"
-          opacity={menuOpen ? 1 : 0}
-          _groupHover={{ opacity: 1 }}
-          _focusWithin={{ opacity: 1 }}
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          size="xs"
+          variant="ghost"
+          aria-label={`Actions for queue ${name}`}
+          minWidth={0}
+          height="20px"
+          paddingX={1}
         >
-          <Menu.Root open={menuOpen} onOpenChange={({ open }) => setMenuOpen(open)}>
-            <Menu.Trigger asChild>
-              <Button
-                size="xs"
-                variant="ghost"
-                aria-label={`Actions for queue ${queue.name}`}
-                minWidth={0}
-                paddingX={1}
-              >
-                <MoreVertical size={14} />
-              </Button>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item value="edit" onClick={onEdit}>
-                <Pencil size={14} /> Edit queue
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
-        </Box>
-      )}
-    </Box>
+          <MoreVertical size={14} />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        <Menu.Item value="edit" onClick={onEdit}>
+          <Pencil size={14} /> Edit queue
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
   );
 }
 
@@ -136,100 +75,69 @@ export function AnnotationSidebar({
   onCreateQueue: () => void;
   onEditQueue: (queueId: string) => void;
 }>) {
+  const host = useAnnotationHost();
+  const base = `/${projectSlug}/annotations`;
+  const standing: SectionNavigationLink[] = [
+    { label: "Inbox", href: base, icon: <Inbox size={14} />, badge: countOf(pendingCount) },
+    {
+      label: `${reviewerName?.split(" ")[0] ?? ""} (You)`,
+      href: `${base}/me`,
+      icon: (
+        <ReviewerAvatar
+          size="2xs"
+          width={5}
+          height={5}
+          name={reviewerName ?? ""}
+          image={reviewerImage}
+        />
+      ),
+      badge: countOf(assignedCount),
+    },
+    { label: "All", href: `${base}/all`, icon: <SquarePen size={14} /> },
+  ];
+  const queueLinks: SectionNavigationLink[] = queues.map((queue) => ({
+    label: queue.name,
+    href: `${base}/${queue.slug}`,
+    icon: <Users size={14} />,
+    badge: countOf(queue.pendingCount),
+    actions: canManageQueues ? (
+      <QueueMenu name={queue.name} onEdit={() => onEditQueue(queue.id)} />
+    ) : (
+      void 0
+    ),
+  }));
+  const activeByView: Record<AnnotationView, string> = {
+    inbox: base,
+    mine: `${base}/me`,
+    all: `${base}/all`,
+    queue: activeQueueSlug ? `${base}/${activeQueueSlug}` : "",
+  };
+
   return (
-    <HStack align="start" width="full" height="full" gap={0} position="relative">
-      <VStack
-        align="start"
-        paddingBottom={4}
-        borderRightWidth="1px"
-        borderColor="border.emphasized"
-        fontSize="sm"
-        minWidth="218px"
-        height="full"
-        gap={0}
-      >
-        <Text
-          fontSize="14px"
-          fontWeight="semibold"
-          paddingX={5}
-          height="48px"
-          display="flex"
-          alignItems="center"
-        >
-          Annotations
-        </Text>
-        <VStack paddingX={2} paddingTop={2} gap={1} width="full">
-          <SidebarMenuLink
-            href={`/${projectSlug}/annotations`}
-            icon={<Inbox width={15} height={15} />}
-            menuEnd={<PendingCount count={pendingCount} />}
-            isSelected={view === "inbox"}
-          >
-            Inbox
-          </SidebarMenuLink>
-          <SidebarMenuLink
-            href={`/${projectSlug}/annotations/me`}
-            isSelected={view === "mine"}
-            icon={
-              <ReviewerAvatar
-                size="2xs"
-                width={5}
-                height={5}
-                name={reviewerName ?? ""}
-                image={reviewerImage}
-              />
-            }
-            menuEnd={<PendingCount count={assignedCount} />}
-          >
-            {reviewerName?.split(" ")[0]} (You)
-          </SidebarMenuLink>
-          <SidebarMenuLink
-            href={`/${projectSlug}/annotations/all`}
-            icon={<SquarePen width={15} height={15} />}
-            isSelected={view === "all"}
-          >
-            All
-          </SidebarMenuLink>
-          <Separator marginY={2} />
-          <HStack width="full" justify="space-between" paddingRight={1}>
-            <Text
-              fontSize="xs"
-              fontWeight="semibold"
-              textTransform="uppercase"
-              letterSpacing="wider"
-              color="fg.muted"
-              paddingX={3}
-            >
-              My Queues
-            </Text>
-            {canManageQueues && (
-              <Button
-                size="xs"
-                variant="ghost"
-                minWidth={0}
-                paddingX={1}
-                aria-label="Create annotation queue"
-                data-testid="annotation-queue-create"
-                onClick={onCreateQueue}
-              >
-                <Plus width={14} height={14} />
-              </Button>
-            )}
-          </HStack>
-          {queues.map((queue) => (
-            <QueueSidebarEntry
-              key={queue.id}
-              queue={queue}
-              href={`/${projectSlug}/annotations/${queue.slug}`}
-              isSelected={view === "queue" && activeQueueSlug === queue.slug}
-              icon={<Users width={15} height={15} />}
-              canEdit={canManageQueues}
-              onEdit={() => onEditQueue(queue.id)}
-            />
-          ))}
-        </VStack>
-      </VStack>
+    <Stack
+      direction={{ base: "column", md: "row" }}
+      align="stretch"
+      width="full"
+      height="full"
+      gap={0}
+      position="relative"
+    >
+      <SectionNavigationRail
+        label="Annotations"
+        links={standing}
+        groups={[
+          {
+            label: "My Queues",
+            links: queueLinks,
+            add: canManageQueues
+              ? { label: "New Queue", onClick: onCreateQueue, testId: "annotation-queue-create" }
+              : void 0,
+          },
+        ]}
+        activeHref={activeByView[view]}
+        onNavigate={(href) => host.navigate(href)}
+      />
       {children}
-    </HStack>
+    </Stack>
   );
 }

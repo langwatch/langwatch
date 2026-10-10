@@ -52,6 +52,13 @@ export interface SsoArrivalJoinRequests {
     organizationId: string;
     domain: string;
   }): Promise<SsoArrivalJoinRequestRaised>;
+  /** Records a membership single sign-on already created, so provenance can name it. */
+  recordSsoArrival(args: {
+    userId: string;
+    organizationId: string;
+    domain: string;
+    connectionId: string;
+  }): Promise<void>;
 }
 
 /** Tells our own team somebody signed up through a domain rule; never fatal to the sign-in. */

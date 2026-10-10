@@ -70,7 +70,7 @@ func askCodex(t *testing.T, o *Orchestrator, payload map[string]any) hookReply {
 // @scenario "The gate never changes the command it admits"
 func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 	// A rewrite used to mask the real command from Claude Code's own
-	// permission rules (a prefix rule matching "haven run" over-admits an
+	// permission rules (a prefix rule matching "haven machine run" over-admits an
 	// allow and a deny never gets to fire on the command it was written for)
 	// and from every log line and prompt. The fix is architectural: Gate must
 	// never produce updatedInput, for a command it admits unchanged, narrows,

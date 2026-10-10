@@ -218,6 +218,7 @@ describe("AggregateReconcilerService", () => {
       expect(grants.attachSharedProjectGrant).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario "The rule may be narrowed to one department" */
     it("reads only the department members' personal projects for a department rule", async () => {
       const { reconciler, projects } = setup({
         aggregate: {

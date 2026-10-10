@@ -83,7 +83,7 @@
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

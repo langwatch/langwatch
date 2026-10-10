@@ -7,29 +7,34 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { z } from "zod";
 
 import type { DatasetModule, DatasetNormalize } from "../app/dataset.app.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
-import { DatasetNormalizeCommandHandler } from "./dataset-normalize.commands.ts";
+import {
+  DATASET_AGGREGATE_TYPE,
+  DatasetNormalizeCommandHandler,
+  datasetNormalizationSettledEventSchema,
+} from "./dataset-normalize.commands.ts";
 
 const DATASET_NORMALIZATION_PIPELINE_NAME = "dataset_normalization";
 
 export type DatasetNormalizationDefinition = StaticPipelineDefinition<
-  never,
+  z.infer<typeof datasetNormalizationSettledEventSchema>,
   Record<string, Projection>,
   { name: "datasetNormalize"; payload: DatasetNormalizePayload }
 >;
 
-/** Replaces main's standalone `datasetNormalize` GroupQueue job: a command with no events. */
+/** Replaces main's standalone `datasetNormalize` GroupQueue job; states where a dataset settled. */
 export function buildDatasetNormalizationPipeline(deps: {
   normalize: DatasetNormalize;
 }): DatasetNormalizationDefinition {
   return (
     definePipeline({
       name: DATASET_NORMALIZATION_PIPELINE_NAME,
-      aggregate: defineAggregate({ type: "dataset" }),
+      aggregate: defineAggregate({ type: DATASET_AGGREGATE_TYPE }),
     })
-      .withEvents([])
+      .withEvents([datasetNormalizationSettledEventSchema])
       .withCommandInstance({
         name: "datasetNormalize",
         handlerClass: DatasetNormalizeCommandHandler,

@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Popover } from "./popover.tsx";
 
 const meta = {
-  title: "Components/Popover",
+  title: "Overlays/Popover",
+  parameters: {
+    usage: {
+      use: "Rich or interactive content anchored to a trigger: a small form, a filter.",
+      avoid: "Text only: use Tooltip. A list of actions: use Menu.",
+    },
+  },
   component: Popover.Root,
   tags: ["autodocs"],
   args: { children: null },

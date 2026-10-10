@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { organizationModuleSetup } from "../../app/__tests__/support/organization-module-setup.ts";
 import { OrganizationModule } from "../../app/organization.app.ts";
 import {
-  organizationKeyFacts,
+  organizationKeyContext,
   organizationManagementRest,
 } from "../organization-management.rest.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
@@ -58,6 +58,7 @@ async function application() {
     return door();
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => requireCredential(request),
@@ -69,7 +70,9 @@ async function application() {
   const hono = runtime.mount(organizationManagementRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: "key-1" })),
+    ],
   });
   const send = (path: string, init: { method?: string; body?: unknown } = {}) =>
     hono.fetch(

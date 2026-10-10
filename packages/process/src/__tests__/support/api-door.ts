@@ -25,7 +25,7 @@ export function inertApiDoor(parts: Partial<ApiDoor> = {}): ApiDoor {
   };
 }
 
-/** The peers a booted api process hands its surface, auth's door among the bound facts. */
+/** The peers a booted api process hands its surface, auth's door among the middleware bindings. */
 export function peersWithDoor({
   resolve,
   door = inertApiDoor(),
@@ -33,5 +33,5 @@ export function peersWithDoor({
   resolve: Parameters<typeof transportPeersOf>[0];
   door?: ApiDoor;
 }): TransportPeers {
-  return transportPeersOf(resolve, [{ feature: "auth", facts: [bindApiDoor(door)] }]);
+  return transportPeersOf(resolve, [{ feature: "auth", middlewareBindings: [bindApiDoor(door)] }]);
 }

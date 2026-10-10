@@ -37,13 +37,18 @@ import {
   type StubAnalyticsHostOptions,
 } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
-import { DEFAULT_BOARD_EXCLUDED_ORIGINS } from "../model/board-period.ts";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const FLAGS = { release_dashboards: true, release_langy_enabled: true };
+const PROJECT = {
+  id: HOME_BOARD.projectId,
+  slug: "test-project",
+  name: "Test Project",
+  hasFirstMessage: true,
+};
 const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
 const BOARD = {
   ...HOME_BOARD,
@@ -152,18 +157,20 @@ async function frameRuns({ frame, queryName }: { frame: Element; queryName: stri
 
 afterEach(cleanup);
 
-describe("given a member opens a stored board", () => {
-  function openBoard() {
-    const server = boardServer();
-    const host = new AddressedHost({
-      flags: FLAGS,
-      permissions: MEMBER,
-      route: { params: { dashboardId: BOARD.id }, query: {} },
-    });
-    renderDashboards({ element: <AddressedBoard host={host} />, host, answer: server.answer });
-    return server;
-  }
+/** Opens the stored board in the project in view, a personal one when asked. */
+function openBoard({ isPersonal = false }: { isPersonal?: boolean } = {}) {
+  const server = boardServer();
+  const host = new AddressedHost({
+    flags: FLAGS,
+    permissions: MEMBER,
+    project: { ...PROJECT, isPersonal },
+    route: { params: { dashboardId: BOARD.id }, query: {} },
+  });
+  renderDashboards({ element: <AddressedBoard host={host} />, host, answer: server.answer });
+  return server;
+}
 
+describe("given a member opens a stored board", () => {
   describe("when a widget's card runs its query", () => {
     /** @scenario "AC193 Langy: the origins a board leaves out are a list a board parameter can set later" */
     it("names the origins the board leaves out as a list, langy by default", async () => {
@@ -171,7 +178,6 @@ describe("given a member opens a stored board", () => {
 
       await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
 
-      expect(DEFAULT_BOARD_EXCLUDED_ORIGINS).toEqual(["langy"]);
       expect(server.runs()).toEqual([
         expect.objectContaining({ sql: WIDGET.graph.queries[0]?.sql, excludeOrigins: ["langy"] }),
       ]);
@@ -198,6 +204,21 @@ describe("given a member opens a stored board", () => {
 
       expect(preview).not.toBe(card);
       expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], ["langy"]]);
+    });
+  });
+});
+
+describe("given a member opens a stored board in their personal project", () => {
+  describe("when a widget's card runs its query", () => {
+    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
+    it("leaves out no origin, so the widget counts Langy's conversations too", async () => {
+      const server = openBoard({ isPersonal: true });
+
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.runs()).toEqual([
+        expect.objectContaining({ sql: WIDGET.graph.queries[0]?.sql, excludeOrigins: [] }),
+      ]);
     });
   });
 });

@@ -7,6 +7,7 @@ import {
   consoleLinks,
 } from "@langwatch/design-system-internal";
 
+import type { Navigate } from "../hub/hub-app.tsx";
 import { getStackHome } from "../shared/api.ts";
 import { nowMs } from "../shared/clock.ts";
 import { Connection } from "../shared/connection.tsx";
@@ -17,7 +18,17 @@ import { StackHome } from "./stack-home.tsx";
 const POLL_MS = 3000;
 
 /** `<slug>.langwatch.localhost`: one worktree's page, read from `/api/stacks/<slug>`. */
-export const StackHomeApp = ({ slug }: { slug: string }) => {
+export const StackHomeApp = ({
+  slug,
+  tab,
+  sub,
+  navigate,
+}: {
+  slug: string;
+  tab: string;
+  sub: string;
+  navigate: Navigate;
+}) => {
   const poll = usePoll({
     key: slug,
     intervalMs: POLL_MS,
@@ -31,6 +42,9 @@ export const StackHomeApp = ({ slug }: { slug: string }) => {
         now={poll.updatedAt ?? nowMs()}
         refresh={poll.refresh}
         stale={poll.error}
+        tab={tab}
+        sub={sub}
+        navigate={navigate}
       />
     );
   }

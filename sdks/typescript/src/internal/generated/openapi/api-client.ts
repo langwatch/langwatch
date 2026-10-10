@@ -5675,6 +5675,18 @@ export interface components {
                     result?: unknown;
                 } | {
                     /** @constant */
+                    type: "tool-call";
+                    toolName?: string;
+                    toolCallId?: string;
+                    input?: unknown;
+                } | {
+                    /** @constant */
+                    type: "tool-result";
+                    toolName?: string;
+                    toolCallId?: string;
+                    output?: unknown;
+                } | {
+                    /** @constant */
                     type: "binary";
                     mimeType: string;
                     data?: string;
@@ -5746,6 +5758,18 @@ export interface components {
                     toolName?: string;
                     toolCallId?: string;
                     result?: unknown;
+                } | {
+                    /** @constant */
+                    type: "tool-call";
+                    toolName?: string;
+                    toolCallId?: string;
+                    input?: unknown;
+                } | {
+                    /** @constant */
+                    type: "tool-result";
+                    toolName?: string;
+                    toolCallId?: string;
+                    output?: unknown;
                 } | {
                     /** @constant */
                     type: "binary";

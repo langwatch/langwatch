@@ -7,7 +7,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
-// @scenario "One command lists every simulator for an agent"
+// @scenario "Bare sim lists every simulator"
 func TestSimsListsEverySimulatorWithItsStateAndVerbs(t *testing.T) {
 	rows := simRows([]app.SessionServiceStatus{
 		{Name: "mail", URL: "https://mail.s.langwatch.localhost", Up: true},
@@ -29,7 +29,7 @@ func TestSimsListsEverySimulatorWithItsStateAndVerbs(t *testing.T) {
 	if llm := byName["llm"]; llm.Running || llm.Start != "haven up +llm" {
 		t.Errorf("llm: got %+v", llm)
 	}
-	if !slices.Contains(byName["llm"].Verbs, "clear") || !slices.Contains(byName["idp"].Verbs, "tenants") {
+	if !slices.Contains(byName["llm"].Verbs, "clear") || !slices.Contains(byName["idp"].Verbs, "list") {
 		t.Errorf("verbs not read from the command table: llm %v, idp %v", byName["llm"].Verbs, byName["idp"].Verbs)
 	}
 }

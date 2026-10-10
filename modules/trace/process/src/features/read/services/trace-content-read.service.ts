@@ -1,26 +1,27 @@
-import {
-  TraceContentReadService as TraceContentReadContract,
-  type Span,
-  type Trace,
-  type TraceLegacyListInput,
-  type TraceSummaryListOptions,
-  type TraceSummaryListQuery,
-  type TraceSummaryPage,
-  type TracesForProjectResult,
+import type { Authorization } from "@langwatch/authorization";
+import type {
+  Span,
+  Trace,
+  TraceLegacyListInput,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
+  TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
 import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
 
-export class TraceContentReadService extends TraceContentReadContract {
+/** The content reads over the legacy read; every store read carries the caller's own-only proof. */
+export class TraceContentReadService {
   static create(read: TraceLegacyRead): TraceContentReadService {
     return new TraceContentReadService(read);
   }
 
-  private constructor(private readonly read: TraceLegacyRead) {
-    super();
-  }
+  private constructor(private readonly read: TraceLegacyRead) {}
 
   listTraces(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     query: TraceLegacyListInput;
     protections: unknown;
     options?: {
@@ -30,7 +31,10 @@ export class TraceContentReadService extends TraceContentReadContract {
       scrollId?: string | null;
     };
   }): Promise<TracesForProjectResult> {
-    return this.read.getAllTracesForProject(input.query, input.protections, input.options);
+    return this.read.getAllTracesForProject(input.query, input.protections, {
+      ...input.options,
+      ownRead: input.authorization,
+    });
   }
 
   listTraceSummaries(input: {
@@ -41,12 +45,15 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   findTrace(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     projectId: string;
     traceId: string;
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace | undefined> {
     return this.read.findById({
+      authorization: input.authorization,
       projectId: input.projectId,
       traceId: input.traceId,
       protections: input.protections,
@@ -58,6 +65,8 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   readTracesWithSpans(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
     protections: unknown;
@@ -65,6 +74,7 @@ export class TraceContentReadService extends TraceContentReadContract {
     withEditOverlay?: boolean;
   }): Promise<Trace[]> {
     return this.read.getTracesWithSpans({
+      authorization: input.authorization,
       projectId: input.projectId,
       traceIds: input.traceIds,
       protections: input.protections,
@@ -77,12 +87,15 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   readTracesWithSpansPreview(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace[]> {
     return this.read.getTracesWithSpans({
+      authorization: input.authorization,
       projectId: input.projectId,
       traceIds: input.traceIds,
       protections: input.protections,
@@ -92,6 +105,8 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   async readOrderedSpansForTrace(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     projectId: string;
     traceId: string;
     protections: unknown;
@@ -108,11 +123,14 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   readThreadTraces(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     projectId: string;
     threadId: string;
     protections: unknown;
   }): Promise<Trace[]> {
     return this.read.getTracesByThreadId({
+      authorization: input.authorization,
       projectId: input.projectId,
       threadId: input.threadId,
       protections: input.protections,
@@ -123,6 +141,8 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   readThreadsTraces(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     projectId: string;
     threadIds: string[];
     protections: unknown;
@@ -130,6 +150,7 @@ export class TraceContentReadService extends TraceContentReadContract {
     maxTraces?: number;
   }): Promise<Trace[]> {
     return this.read.getTracesWithSpansByThreadIds({
+      authorization: input.authorization,
       projectId: input.projectId,
       threadIds: input.threadIds,
       protections: input.protections,
@@ -142,6 +163,8 @@ export class TraceContentReadService extends TraceContentReadContract {
   }
 
   async readSampleTraces(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
     query: TraceLegacyListInput;
     protections: unknown;
     pageSize: number;
@@ -149,6 +172,7 @@ export class TraceContentReadService extends TraceContentReadContract {
     const { groups } = await this.listTraces({
       query: { ...input.query, groupBy: "none", pageSize: input.pageSize },
       protections: input.protections,
+      authorization: input.authorization,
     });
     const traceIds = groups.flatMap((group) => group.map((trace) => trace.trace_id));
     return traceIds.length === 0
@@ -157,6 +181,7 @@ export class TraceContentReadService extends TraceContentReadContract {
           projectId: input.query.projectId,
           traceIds,
           protections: input.protections,
+          authorization: input.authorization,
           occurredAt: { from: input.query.startDate, to: input.query.endDate },
         });
   }

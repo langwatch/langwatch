@@ -16,7 +16,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// `haven install` is the machine check: what haven drives but does not own —
+// `haven self install` is the machine check: what haven drives but does not own —
 // portless, the Node toolchain, the brew formulae behind the managed Postgres
 // and Redis, a container runtime — probed all at once, before anything is
 // running. Until this existed every one of those was discovered as a failed
@@ -383,7 +383,7 @@ func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereq
 		// hand", which blames the wrong tool. Everything ordered after it
 		// is installed THROUGH it, so this is where the run ends.
 		if p.Requirement == domain.PrereqRequired && pick.hasMore {
-			return step, fmt.Errorf("%s has to be installed first — the rest are installed through it. Run its command, then re-run `haven install`", p.Name)
+			return step, fmt.Errorf("%s has to be installed first — the rest are installed through it. Run its command, then re-run `haven self install`", p.Name)
 		}
 		return step, nil
 	}
@@ -554,7 +554,7 @@ func (o *Orchestrator) unskipPrereq(key string) error {
 	return o.store.WritePrereqSkips(skips)
 }
 
-// ResolvePrereqNames turns the positional form (`haven install clickhouse-client
+// ResolvePrereqNames turns the positional form (`haven self install clickhouse-client
 // runtime=colima`) into choices. An unknown name fails with the list rather
 // than being ignored, and an entry with two candidates takes the first unless
 // one is named after an `=`.

@@ -340,6 +340,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
 
     describe("given an aggregate project in this organization", () => {
+      /** @scenario "Aggregate onboarding mints no credential" */
       it("refuses it, because an aggregate owns no credential", async () => {
         const { service } = policyWith({
           project: {

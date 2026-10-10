@@ -33,6 +33,14 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And a project is created by the owner in the main team through the project API
     And a member is admitted by the owner as a membership row, given its role, then added to the main team
     And anything an earlier run created is found and returned instead of created again
+    And a project found rather than created is marked existing, so seedgen sends it no telemetry again
+
+  @unit
+  Scenario: A licence org is put on Enterprise through the licensing API
+    When seedgen sends a license.issue action for an organization
+    Then an Enterprise licence for that organization is signed by licensing with the stack's dev key and stored on it
+    And an organization already on a valid Enterprise licence keeps it and nothing is signed
+    And a licence licensing rejects is refused, so the org is never counted as Enterprise
 
   @unit
   Scenario: A trace chunk older than 31 days asks the trace owner's backfill reach
@@ -50,7 +58,7 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And the password itself never reaches the runner
 
   @unit
-  Scenario: The persona counts haven seed prints are what it created
+  Scenario: The persona counts haven db seed prints are what it created
     Given a membership the organization holds pending for want of a seat
     When the member.add action is applied
     Then the reply is a refusal, so the member is not counted as created
@@ -73,6 +81,12 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     Given a telemetry export whose ingestion failed or whose store was unavailable
     When the action is applied
     Then the reply is a retryable refusal
+
+  @unit
+  Scenario: A refusal the product marks as temporary is retried
+    Given a module API operation refuses with a handled 503, such as an access change its projection has not confirmed
+    When the action is applied
+    Then the reply is a retryable refusal, so seedgen tries it again
 
   @unit
   Scenario: An unknown kind or malformed input is refused without calling any API

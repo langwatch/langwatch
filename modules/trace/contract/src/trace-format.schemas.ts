@@ -76,6 +76,19 @@ export const chatRichContentSchema = z.union([
     toolCallId: z.string().optional(),
     result: z.any().optional(),
   }),
+  /** AI SDK v5 tool parts, stored as sent (WEB-9104). */
+  z.object({
+    type: z.literal("tool-call"),
+    toolName: z.string().optional(),
+    toolCallId: z.string().optional(),
+    input: z.unknown().optional(),
+  }),
+  z.object({
+    type: z.literal("tool-result"),
+    toolName: z.string().optional(),
+    toolCallId: z.string().optional(),
+    output: z.unknown().optional(),
+  }),
   /**
    * AG-UI binary content part. Used for audio/image/video/file attachments. Mutually-exclusive
    * payload: exactly one of `data` (inline base64), `url` (already-externalized reference), or

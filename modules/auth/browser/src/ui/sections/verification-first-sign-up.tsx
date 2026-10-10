@@ -418,21 +418,12 @@ export function VerificationFirstSignUp() {
         <HandledErrorAlert
           error={requestVerification.error}
           fallbackTitle="Couldn't start your sign-up"
-          className="lw-front-door-alert"
         />
       ) : null}
       {/* The router decides whether this address may hold a password at all: its failure
           is why the journey stopped, so it stays on screen with a way to try again. */}
-      <HandledErrorAlert
-        error={routing.error}
-        fallbackTitle="Couldn't check how you sign in"
-        className="lw-front-door-alert"
-      />
-      <HandledErrorAlert
-        error={passkeyError}
-        fallbackTitle="Could not use a passkey"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={routing.error} fallbackTitle="Couldn't check how you sign in" />
+      <HandledErrorAlert error={passkeyError} fallbackTitle="Could not use a passkey" />
       <IdentifierStepForm
         submitLabel="Continue"
         isSubmitting={requestVerification.isPending || routing.isDeciding}
@@ -485,11 +476,7 @@ function WelcomeBack({
     // changes is the words on it.
     <AuthCard title="Welcome back">
       <div data-testid="welcome-back" hidden />
-      <HandledErrorAlert
-        error={passkeyError}
-        fallbackTitle="Could not use a passkey"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={passkeyError} fallbackTitle="Could not use a passkey" />
       {decision ? (
         <SignInMethodPicker
           methodSet={decision.methodSet}
@@ -540,11 +527,7 @@ function AccountIsReady({
         <SuccessPulse label="Account created" />
         <Text data-testid="account-ready">{email} is confirmed.</Text>
       </HStack>
-      <HandledErrorAlert
-        error={passkeyError}
-        fallbackTitle="Could not use a passkey"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={passkeyError} fallbackTitle="Could not use a passkey" />
       {decision ? (
         <SignInMethodPicker
           methodSet={decision.methodSet}

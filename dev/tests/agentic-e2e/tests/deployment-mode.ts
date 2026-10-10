@@ -11,7 +11,7 @@ export function effectiveDeploymentMode(): string {
   const worktree = execFileSync("git", ["rev-parse", "--show-toplevel"], {
     encoding: "utf8",
   }).trim();
-  const status = JSON.parse(execFileSync("haven", ["status", "--json"], { encoding: "utf8" })) as {
+  const status = JSON.parse(execFileSync("haven", ["status", "--json", "stacks"], { encoding: "utf8" })) as {
     stacks?: { worktreeDir: string; effectiveMode?: string }[];
   };
   const stack = status.stacks?.find((s) => s.worktreeDir === worktree);

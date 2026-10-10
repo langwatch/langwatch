@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",

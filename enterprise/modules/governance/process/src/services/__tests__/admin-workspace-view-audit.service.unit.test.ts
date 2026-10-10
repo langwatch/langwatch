@@ -101,6 +101,7 @@ const input = {
 };
 
 describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
+  /** @scenario "Audit rows for personal and team workspace views are unchanged" */
   it("records the scoped view and mirrors it under the audit identifier", async () => {
     const repository = new RecordingAuditLog();
     const teams = new StubTeams();
@@ -125,6 +126,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       targetId: "team",
       metadata: { kind: "personal", workspaceLabel: "Owner workspace" },
     });
+    expect(repository.record).toHaveBeenCalledTimes(1);
     expect(ocsf.insertEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: "governance-project",

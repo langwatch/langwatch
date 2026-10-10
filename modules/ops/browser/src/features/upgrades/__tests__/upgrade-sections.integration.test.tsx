@@ -39,6 +39,7 @@ function statusWith(overrides: Partial<UpgradeStatusView>): UpgradeStatusView {
     counts: { done: 4 },
     failedStepIds: [],
     failedTargets: 0,
+    deprecations: [],
     ...overrides,
   };
 }
@@ -120,6 +121,40 @@ describe("UpgradesOverview", () => {
       expect(screen.getByTestId("upgrade-installed")).toHaveTextContent("3.23.0");
       expect(screen.getByTestId("upgrade-image")).toHaveTextContent("3.23.0");
       expect(screen.getByTestId("upgrade-floor")).toHaveTextContent("3.20.1");
+    });
+  });
+
+  describe("when the image deprecates a table", () => {
+    /** @scenario "The overview lists what the image deprecates, its replacement and when it is removed" */
+    it("lists it under Deprecated with its notice, its replacement and a future removal", () => {
+      renderOverview({
+        status: statusWith({
+          deprecations: [
+            {
+              id: "postgres:DataPrivacyProjectScope",
+              what: "Postgres table DataPrivacyProjectScope",
+              kind: "postgres-table",
+              deprecatedIn: null,
+              removedIn: null,
+              successor: "Project and Team placement",
+              notice: "Nothing reads or writes this table any more.",
+            },
+          ],
+        }),
+      });
+
+      const table = screen.getByTestId("upgrade-deprecations");
+      expect(screen.getByRole("heading", { name: "Deprecated" })).toBeInTheDocument();
+      expect(table).toHaveTextContent("Postgres table DataPrivacyProjectScope");
+      expect(table).toHaveTextContent("Nothing reads or writes this table any more.");
+      expect(table).toHaveTextContent("Project and Team placement");
+      expect(table).toHaveTextContent("A future release");
+    });
+
+    it("shows no Deprecated section when the register is empty", () => {
+      renderOverview({ status: statusWith({}) });
+
+      expect(screen.queryByTestId("upgrade-deprecations")).not.toBeInTheDocument();
     });
   });
 

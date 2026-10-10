@@ -14,8 +14,8 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// `haven idp <verb>` drives idpsim's control API, the same actions its console
-// offers. Bare `haven idp` still runs the standalone simulator (see runIdP).
+// `haven sim idp <verb>` drives idpsim's control API, the same actions its console
+// offers. Bare `haven simulator idp` runs the standalone simulator (see runIdP).
 
 // idpFlags are the idp noun's own flags; table.go adds --json and --stack.
 var idpFlags = []flagSpec{
@@ -70,7 +70,7 @@ type idpCall struct {
 	asJSON bool
 }
 
-// idpVerb is one `haven idp` action. min counts the arguments after the words.
+// idpVerb is one `haven sim idp` action. min counts the arguments after the words.
 type idpVerb struct {
 	usage string
 	min   int
@@ -113,7 +113,7 @@ var idpVerbs = map[string]idpVerb{
 	"auth0-webhook":      {"<tenant> --event create|deactivate --user <u> --target <stack-url> --secret-env <VAR> [--token-env <VAR>]", 1, idpAuth0Webhook},
 }
 
-// runIdP is `haven idp`: a verb drives a running idpsim, no verb runs the standalone one.
+// runIdP is `haven sim idp <verb>` (a running idpsim) and the hidden `haven simulator idp` (the standalone one).
 func runIdP(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) > 0 {
 		return runIdPVerb(d, inv)
@@ -138,10 +138,10 @@ func runIdP(ctx context.Context, d deps, inv invocation) error {
 func runIdPVerb(d deps, inv invocation) error {
 	verb, words, rest, ok := findIdPVerb(inv.args)
 	if !ok {
-		return fmt.Errorf("unknown `haven idp` verb %q\n%s", strings.Join(inv.args, " "), idpUsage())
+		return fmt.Errorf("unknown `haven sim idp` verb %q\n%s", strings.Join(inv.args, " "), idpUsage())
 	}
 	if len(rest) < verb.min {
-		return fmt.Errorf("usage: haven idp %s %s", words, verb.usage)
+		return fmt.Errorf("usage: haven sim idp %s %s", idpPublicWords(words), verb.usage)
 	}
 	api, err := simAPI(d, inv, "idp")
 	if err != nil {
@@ -161,10 +161,18 @@ func findIdPVerb(args []string) (idpVerb, string, []string, bool) {
 	return idpVerb{}, "", nil, false
 }
 
+// idpPublicWords is a verb's words as the public vocabulary spells them.
+func idpPublicWords(words string) string {
+	if words == "tamper" {
+		return "fault"
+	}
+	return strings.Join(simPublicArgv("idp", strings.Fields(words)), " ")
+}
+
 func idpUsage() string {
 	lines := make([]string, 0, len(idpVerbs))
 	for words, verb := range idpVerbs {
-		lines = append(lines, "  haven idp "+words+" "+verb.usage)
+		lines = append(lines, "  haven sim idp "+idpPublicWords(words)+" "+verb.usage)
 	}
 	sort.Strings(lines)
 	return "usage:\n" + strings.Join(lines, "\n")
@@ -293,7 +301,7 @@ func idpTenantShow(c idpCall) error {
 
 func idpAppsAdd(c idpCall) error {
 	if !c.inv.has("--name") {
-		return errors.New("usage: haven idp apps add " + idpAppsAddUsage)
+		return errors.New("usage: haven sim idp apps add " + idpAppsAddUsage)
 	}
 	return c.postTenant("apps", map[string]any{
 		"name": c.inv.value("--name"), "redirectUris": splitList(c.inv.value("--redirect")),
@@ -318,7 +326,7 @@ func idpPopulate(c idpCall) error {
 		return err
 	}
 	if !c.inv.has("--users") {
-		return fmt.Errorf("usage: haven idp populate <tenant> --users <n> [--groups <n>] [--domain <d>] [--seed <n>]")
+		return fmt.Errorf("usage: haven sim idp populate <tenant> --users <n> [--groups <n>] [--domain <d>] [--seed <n>]")
 	}
 	if c.inv.has("--domain") {
 		body["domain"] = c.inv.value("--domain")
@@ -336,7 +344,7 @@ func idpChurn(c idpCall) error {
 
 func idpUserAdd(c idpCall) error {
 	if !c.inv.has("--email") {
-		return fmt.Errorf("usage: haven idp user add <tenant> --email <e> [--given-name <n>] [--family-name <n>] [--groups <id,...>]")
+		return fmt.Errorf("usage: haven sim idp user add <tenant> --email <e> [--given-name <n>] [--family-name <n>] [--groups <id,...>]")
 	}
 	return c.postTenant("users", map[string]any{
 		"email": c.inv.value("--email"), "givenName": c.inv.value("--given-name"),
@@ -385,7 +393,7 @@ func idpReset(c idpCall) error { return c.postTenant("reset", nil) }
 
 func idpSamlp(c idpCall) error {
 	if c.rest[1] != "on" && c.rest[1] != "off" {
-		return fmt.Errorf("usage: haven idp samlp <tenant> <on|off>")
+		return fmt.Errorf("usage: haven sim idp samlp <tenant> <on|off>")
 	}
 	return c.postTenant("config", map[string]bool{"samlpSubjects": c.rest[1] == "on"})
 }

@@ -9,7 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -83,6 +85,7 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => ch,
+    clickhouse: authorizedClickHouseFor(ch),
   });
 }, 60_000);
 
@@ -109,7 +112,7 @@ describe.skipIf(!clickHouseConfigured)(
         await repo.upsertBatch([{ row, retentionDays: 30 }]);
 
         const read = await repo.findByTraceId({
-          tenantId,
+          authorization: ownProof({ projectId: tenantId }),
           traceId: `${tag}-rt`,
           window,
         });
@@ -158,7 +161,7 @@ describe.skipIf(!clickHouseConfigured)(
         ]);
 
         const read = await repo.findByTraceId({
-          tenantId,
+          authorization: ownProof({ projectId: tenantId }),
           traceId: `${tag}-dedup`,
           window,
         });
@@ -174,7 +177,7 @@ describe.skipIf(!clickHouseConfigured)(
         await repo.upsertBatch([{ row, retentionDays: 30, appliedEventIds: ["ev-1", "ev-2"] }]);
 
         const read = await repo.findByTraceId({
-          tenantId,
+          authorization: ownProof({ projectId: tenantId }),
           traceId: `${tag}-applied`,
           window,
         });
@@ -203,7 +206,7 @@ describe.skipIf(!clickHouseConfigured)(
         });
 
         const read = await repo.findByTraceId({
-          tenantId,
+          authorization: ownProof({ projectId: tenantId }),
           traceId,
           window,
         });

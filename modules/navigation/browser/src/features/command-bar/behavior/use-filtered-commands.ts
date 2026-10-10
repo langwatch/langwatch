@@ -17,8 +17,10 @@ import {
   themeCommands,
 } from "../model/command-catalogue.ts";
 import { getPageCommands } from "../model/command-page-commands.ts";
-import { useCommandFeatureFlags } from "./use-command-feature-flags.ts";
-import { useCommandProjectNavigation } from "./use-command-project-navigation.ts";
+import {
+  useCommandFeatureFlags,
+  useCommandProjectNavigation,
+} from "./use-command-feature-flags.ts";
 
 export interface FilteredCommands {
   navigation: Command[];

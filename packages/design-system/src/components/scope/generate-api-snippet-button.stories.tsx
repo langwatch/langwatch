@@ -3,7 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { GenerateApiSnippetButton } from "./generate-api-snippet-button.tsx";
 
 const meta = {
-  title: "Components/Generate API snippet button",
+  title: "Data display/Generate API snippet button",
+  parameters: {
+    usage: { use: "Showing the code that reaches this screen's resource through the API." },
+  },
   component: GenerateApiSnippetButton,
   tags: ["autodocs"],
   args: { hasHandle: true },

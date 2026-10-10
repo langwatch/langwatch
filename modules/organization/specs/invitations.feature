@@ -163,3 +163,16 @@ Feature: Invitation acceptance and role recomputation
     Given a visitor with no session
     When they open the invitation link at "/invite/accept"
     Then the address is one that renders without a session
+
+  # Main focuses the email field of an Add members drawer opened seeded (WEB-8700).
+  @integration
+  Scenario: The invite drawer opened from the inline box takes the typing over
+    Given an administrator typed an address in the inline invite box
+    When the Add members drawer opens with that address
+    Then its email field holds the address and has the focus
+
+  @unit
+  Scenario: A signed-in invitation names who invited the person
+    Given an invitation waiting on an address the person has proved
+    When the offer reads the invitation
+    Then it carries the name of the administrator who sent it

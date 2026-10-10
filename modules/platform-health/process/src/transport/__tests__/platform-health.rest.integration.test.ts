@@ -38,7 +38,6 @@ async function mount(app: PlatformHealthCapability, key: string | null = "monito
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -46,7 +45,7 @@ async function mount(app: PlatformHealthCapability, key: string | null = "monito
     audit: { record: async () => {} },
   });
   host.mount(platformHealthRest.router(), () => app, {
-    facts: [bindRestCredential("internal_secret", () => door)],
+    middlewareBindings: [bindRestCredential("internal_secret", () => door)],
   });
 
   return host.app;

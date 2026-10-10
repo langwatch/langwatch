@@ -58,7 +58,7 @@ func (p *Proxy) argv() []string {
 
 // Installed reports whether a real portless binary is resolvable (PORTLESS_BIN,
 // project-local, or on PATH) as opposed to the `npx --yes portless` fallback,
-// which would re-download on every call. This is the signal `haven setup` uses
+// which would re-download on every call. This is the signal `haven self setup` uses
 // to decide whether to ask the user to install portless first.
 func (p *Proxy) Installed() bool {
 	_, ok := p.resolveBinary()
@@ -101,7 +101,7 @@ func (p *Proxy) EnsureReady() error {
 		// User-level `proxy start` needs no sudo and is enough to route this dev
 		// session (it prints "already running" and exits 0 if a proxy — e.g. the
 		// root launchd service — already holds the port). The persistent root
-		// service stays opt-in via `haven setup`, which needs sudo and so
+		// service stays opt-in via `haven self setup`, which needs sudo and so
 		// must not be triggered from a possibly-non-interactive `pnpm dev`.
 		if err := p.runVerbose("proxy", "start"); err != nil {
 			return fmt.Errorf("could not start the portless proxy: %w", err)

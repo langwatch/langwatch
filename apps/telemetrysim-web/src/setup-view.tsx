@@ -3,10 +3,10 @@ import { SimCode, SimEmpty, SimRefusal } from "@langwatch/sim-console";
 
 import type { ViewProps } from "./view-props.ts";
 
-const commands = `haven telemetry send --preset llm-trace --seed 42 --json
-haven telemetry load --rate 50 --duration 30s
-haven telemetry post --preset logs --encoding json
-haven telemetry runs | run <id> | fixtures | status | stop | console`;
+const commands = `haven sim telemetry send --preset llm-trace --seed 42 --json
+haven sim telemetry load --rate 50 --duration 30s
+haven sim telemetry post --preset logs --encoding json
+haven sim telemetry list | get <id> | fixtures | status | stop | console`;
 
 /** Where runs go, whose key they carry (never the key itself) and the terminal verbs. */
 export const SetupView = ({ status, error }: ViewProps) => (

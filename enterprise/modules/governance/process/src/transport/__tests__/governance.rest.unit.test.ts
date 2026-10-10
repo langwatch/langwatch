@@ -2,13 +2,13 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   canonicalErrorResponse,
-  bindRestHeader,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   InvalidSourceTypeError,
@@ -53,6 +53,7 @@ const PROJECT: ProjectIdentity = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 const ORGANIZATION_ID = "org-1";
@@ -134,6 +135,7 @@ async function buildApi(
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -171,11 +173,13 @@ async function buildApi(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(governanceRestCaller, (context) => ({
-        viewerUserId: viewerOf(context.req.raw),
+    middlewareContext: [
+      bindMiddlewareContext(governanceRestCaller, (request) => ({
+        viewerUserId: viewerOf(request),
       })),
-      bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+      bindMiddlewareContext(governanceRestSurface, (request) =>
+        request.headers.get("X-LangWatch-Surface"),
+      ),
     ],
   });
 

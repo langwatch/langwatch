@@ -1,5 +1,4 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import { AuthzApi } from "@langwatch/authz-contract";
 import { isReleaseBuild, releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
@@ -16,6 +15,8 @@ import {
   type ActivationCodePage,
   type ActivationCodeView,
   type ActivationAnswer,
+  type ConnectActivationCaller,
+  type ConnectLicenceCaller,
   type ConnectPresentedCredential,
   type LicenseSyncAnswer,
   type LicenseSyncBody,
@@ -31,10 +32,9 @@ import {
   type ConnectService,
   type ConnectServiceState,
   type ConnectStatus,
+  type ConnectUpstream,
   type InstanceIdentityView,
   type ContractTerms,
-  type HostedCaller,
-  type HostedUsageAnswer,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
   type SelfHostedInstancePage,
@@ -64,7 +64,6 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -97,13 +96,10 @@ import {
 } from "../services/configured-activation.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
-import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import type { ContractBudgets } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
-import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
-import type { HostedUsageReader } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
 import { LicenseRegistryService } from "../services/license-registry.service.ts";
@@ -160,12 +156,7 @@ type LicensingSetup = FeatureSetup<
 
 export class LicensingModule implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
-  static readonly dependencies = {
-    /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
-    gateway: GatewayApi,
-    /** Whose team a hosted caller's project belongs to, for the usage billing reads. */
-    scopes: AuthzApi,
-  };
+  static readonly dependencies = {};
   static readonly config = licensingConfig;
   /**
    * Each secret has one owner: SSO's gate asks this module for `LANGWATCH_LICENSE_KEY`, and
@@ -269,13 +260,13 @@ export class LicensingModule implements LicensingApiContract {
   }
 
   static #assemble(
-    { config, resources, dependencies, repositories, role }: LicensingSetup,
+    { config, resources, repositories, role }: LicensingSetup,
     {
       instanceLicenseKey,
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
-    const { publicKey, ignoredVariable } = licenseVerifyingKeyOf({
+    const { publicKey, ignoredVariable, refuseDevStack } = licenseVerifyingKeyOf({
       override: config.publicKey,
       isReleaseBuild,
     });
@@ -285,7 +276,7 @@ export class LicensingModule implements LicensingApiContract {
         `${ignoredVariable} is ignored on a release build; licences verify against the embedded LangWatch key`,
       );
     }
-    const cryptography = NodeLicenseCryptographyService.create({ publicKey });
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey, refuseDevStack });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);
@@ -302,10 +293,8 @@ export class LicensingModule implements LicensingApiContract {
       infrastructure: licenseRegistryOver({
         repositories,
         customerFacts,
-        gateway: dependencies.gateway,
         signingKey: licensePrivateKey,
       }),
-      hosted: hostedServicesOverPeers(dependencies),
       instances: selfHostedInstancesOver({ repositories }),
       cryptography,
       logger,
@@ -319,7 +308,6 @@ export class LicensingModule implements LicensingApiContract {
     });
     const connectInfrastructure = connectInstallOver({
       repositories,
-      gateway: dependencies.gateway,
       config,
       cryptography,
       version: releaseVersionOf(config),
@@ -598,15 +586,28 @@ export class LicensingModule implements LicensingApiContract {
     };
   }
 
-  recordLicenseSync(
-    input: ConnectPresentedCredential & { body: LicenseSyncBody },
-  ): Promise<LicenseSyncAnswer> {
+  verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verify(input);
+  }
+
+  verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
+    return this.#activation.verifyPresented(input);
+  }
+
+  recordLicenseSync(input: {
+    caller: ConnectLicenceCaller;
+    body: LicenseSyncBody;
+  }): Promise<LicenseSyncAnswer> {
     return this.#sync.answer(input);
   }
 
   /** The install end of Connect (ADR-156, section 9). */
   getConnectStatus(input: { organizationId: string }): Promise<ConnectStatus> {
     return this.#install.getStatus(input.organizationId);
+  }
+
+  findConnectUpstream(input: { organizationId: string }): Promise<ConnectUpstream[]> {
+    return this.#install.findUpstream(input.organizationId);
   }
 
   findEnabledConnectServices(input: { organizationId: string }): Promise<ConnectService[]> {
@@ -685,10 +686,6 @@ export class LicensingModule implements LicensingApiContract {
     return this.#refresh.refresh(input.organizationId);
   }
 
-  getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer> {
-    return this.#hosted.usage(input);
-  }
-
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
     return this.#contractBudgets.termsOf(input.organizationId);
   }
@@ -740,7 +737,7 @@ export class LicensingModule implements LicensingApiContract {
     return this.#activation.revoke(input);
   }
 
-  redeemActivationCode(input: ConnectPresentedCredential): Promise<ActivationAnswer> {
+  redeemActivationCode(input: ConnectActivationCaller): Promise<ActivationAnswer> {
     return this.#activation.answer(input);
   }
 
@@ -777,13 +774,11 @@ type LicenseRegistryParts = Readonly<{
 
 function licenseRegistryParts({
   infrastructure,
-  hosted,
   instances,
   cryptography,
   logger,
 }: {
   infrastructure: LicenseRegistryInfrastructure;
-  hosted: HostedServicesInfrastructure;
   instances: SelfHostedInstancesInfrastructure;
   cryptography: LicenseCryptography;
   logger?: LicenseLogger;
@@ -839,8 +834,6 @@ function licenseRegistryParts({
     }),
     hosted: HostedServicesService.create({
       licenses: infrastructure.repository,
-      usage: hosted.usage,
-      contractBudgets,
       now,
     }),
     sync: LicenseSyncService.create({
@@ -861,7 +854,6 @@ function licenseRegistryParts({
  */
 function licenseRegistryOver({
   repositories,
-  gateway,
   signingKey,
   customerFacts,
 }: {
@@ -874,12 +866,10 @@ function licenseRegistryOver({
     | "selfHostedCustomerLicensed"
     | "managedKeyRetired"
     | "managedKeyInvalidated"
+    | "managedKeyLicenseSet"
+    | "managedKeyServicesSet"
     | "connectCredentialIssued"
     | "contractTermsChanged"
-  >;
-  gateway: Pick<
-    GatewayApi,
-    "setManagedKeyConnectServicesInternal" | "setManagedKeyLicenseInternal"
   >;
   signingKey: string | undefined;
 }): LicenseRegistryInfrastructure {
@@ -897,8 +887,8 @@ function licenseRegistryOver({
       issue: (issued) => customerFacts.connectCredentialIssued(issued),
       retire: (key) => customerFacts.managedKeyRetired(key),
       invalidate: (key) => customerFacts.managedKeyInvalidated(key),
-      setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
-      setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
+      setConnectServices: (key) => customerFacts.managedKeyServicesSet(key),
+      setLicense: (key) => customerFacts.managedKeyLicenseSet(key),
     },
     // Connect syncs the budget from the fact, so licensing writes none (C3a-S2).
     contractBudgets: { sync: (input) => customerFacts.contractTermsChanged(input) },
@@ -911,25 +901,6 @@ function licenseRegistryOver({
     },
     signingKey: () => signingKey,
     systemActorId,
-  };
-}
-
-/**
- * The hosted usage billing reads, over the gateway's budgets and authz's scopes. The hosted routes,
- * their judge, their spend and the contract budget's writes are the connect module's.
- */
-function hostedServicesOverPeers({
-  gateway,
-  scopes,
-}: {
-  gateway: Pick<
-    GatewayApi,
-    "listBudgetsWithHealth" | "findVirtualKeyById" | "resolveApplicableBudgets"
-  >;
-  scopes: Pick<AuthzApi, "getScope">;
-}): HostedServicesInfrastructure {
-  return {
-    usage: HostedUsageReaderService.create({ gateway, scopes }),
   };
 }
 
@@ -979,14 +950,12 @@ type ConnectInstallParts = Readonly<{
  */
 function connectInstallOver({
   repositories,
-  gateway,
   config,
   cryptography,
   version,
   instanceLicenseKey,
 }: {
   repositories: Pick<LicensingRepositories, "connectOrganizations" | "instanceIdentity">;
-  gateway: Pick<GatewayApi, "setConnectUpstreamInternal" | "clearConnectUpstreamInternal">;
   config: LicensingServerConfig;
   cryptography: LicenseCryptography;
   version: string;
@@ -1011,10 +980,6 @@ function connectInstallOver({
           }),
         }
       : {}),
-    upstream: {
-      set: (slot) => gateway.setConnectUpstreamInternal(slot),
-      clear: (slot) => gateway.clearConnectUpstreamInternal(slot),
-    },
     instanceLicenseKey: () => instanceLicenseKey,
     newInstanceId: () => cryptography.generateInstanceId(),
     version: () => version,
@@ -1062,7 +1027,6 @@ function connectInstallParts({
     ...(infrastructure.gateway ? { gateway: infrastructure.gateway } : {}),
     instanceLicenseKey: infrastructure.instanceLicenseKey,
     ...(publicKey ? { publicKey } : {}),
-    ...(infrastructure.upstream ? { upstream: infrastructure.upstream } : {}),
     ...(logger ? { logger } : {}),
   });
   return {
@@ -1082,11 +1046,6 @@ function connectInstallParts({
     }),
   };
 }
-
-/** The hosted usage licensing still answers billing, on every deployment. */
-type HostedServicesInfrastructure = Readonly<{
-  usage: HostedUsageReader;
-}>;
 
 /** Everything the license registry needs from the rest of the deployment. */
 type LicenseRegistryInfrastructure = Readonly<{
@@ -1117,8 +1076,6 @@ type ConnectInstallInfrastructure = Readonly<{
   /** Composed only where Connect is permitted; absent means no outbound call. */
   gateway?: ConnectGatewayChannel;
   licenseHost?: ConnectLicenseChannel;
-  /** The gateway's hosted provider slot; absent where no gateway is composed beside. */
-  upstream?: ConnectUpstreamSlot;
   /** The key this whole deployment is licensed by, where one is set. */
   instanceLicenseKey: () => string | undefined;
   /** A fresh instance identity. Supplied, so a suite mints a predictable one. */

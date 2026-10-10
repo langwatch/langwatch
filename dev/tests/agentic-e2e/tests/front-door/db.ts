@@ -53,7 +53,7 @@ export async function findSignUpVerificationToken(email: string): Promise<string
 
 /**
  * The id of the account registered under `email`, if any — what better-auth's
- * reset token is keyed by (`redis.ts`), and the one thing `user.register`
+ * reset token is keyed by (`redis.ts`), and the one thing `auth.register`
  * does not hand back.
  */
 export async function findUserIdByEmail(email: string): Promise<string | null> {

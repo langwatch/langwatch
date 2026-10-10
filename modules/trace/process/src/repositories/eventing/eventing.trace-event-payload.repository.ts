@@ -12,16 +12,19 @@ import {
 /** Every offloaded trace field is recorded on the trace aggregate; no other is asked. */
 const TRACE_AGGREGATE_TYPE = "trace";
 
+/** Trace reads one event by id; the seat's stream read is identity's alone. */
+type TraceEventReads = Pick<EventReadSeat, "getEvent">;
+
 /**
  * One offloaded field out of the trace event that recorded it, read through eventing's
  * one-event seat (Q209). Spec: modules/trace/specs/trace-offloaded-event-read.feature.
  */
 export class EventingTraceEventPayloadRepository extends TracePayloadReaderRepository {
-  static create(deps: { eventReadSeat: EventReadSeat }): EventingTraceEventPayloadRepository {
+  static create(deps: { eventReadSeat: TraceEventReads }): EventingTraceEventPayloadRepository {
     return new EventingTraceEventPayloadRepository(deps.eventReadSeat);
   }
 
-  private constructor(private readonly eventReadSeat: EventReadSeat) {
+  private constructor(private readonly eventReadSeat: TraceEventReads) {
     super();
   }
 

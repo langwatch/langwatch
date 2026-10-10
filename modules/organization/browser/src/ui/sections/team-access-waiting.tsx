@@ -28,7 +28,7 @@ export function TeamAccessWaiting({
       closeOnEscape={false}
       onOpenChange={() => void 0}
     >
-      <Dialog.Content aria-label="Waiting for team access" bg="bg" borderRadius={0}>
+      <Dialog.Content aria-label="Waiting for team access" borderRadius={0}>
         <Dialog.Body display="flex" alignItems="center" justifyContent="center" padding={6}>
           <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
             <Box display="flex" justifyContent="center" color="fg.muted">

@@ -3,7 +3,6 @@
  * specs/licensing/sso-license-gating.feature
  */
 import type { EventingCommands } from "@langwatch/eventing";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -75,12 +74,6 @@ async function bootWithConfiguredValue(value: string) {
         seed: { instanceId: "instance-1" },
       }),
     },
-    dependencies: {
-      gateway: createApiFixture<GatewayApi>({
-        setConnectUpstreamInternal: async () => undefined,
-        clearConnectUpstreamInternal: async () => undefined,
-      }),
-    },
     config: { connectDisabled: false },
     secrets: { LANGWATCH_LICENSE_KEY: value },
     resources,
@@ -89,6 +82,12 @@ async function bootWithConfiguredValue(value: string) {
   app.connectCustomerCommands(
     createApiFixture<Senders>({
       recordLicenseStored: createApiFixture<Senders["recordLicenseStored"]>({
+        send: async () => undefined,
+      }),
+      recordConnectUpstreamSet: createApiFixture<Senders["recordConnectUpstreamSet"]>({
+        send: async () => undefined,
+      }),
+      recordConnectUpstreamCleared: createApiFixture<Senders["recordConnectUpstreamCleared"]>({
         send: async () => undefined,
       }),
     }),

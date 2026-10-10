@@ -78,6 +78,8 @@ export const attachGrantEntrySchema = z
     membershipStamp: z.string().min(1).optional(),
     /** Only founder creation may use this while its transaction is open. */
     membershipBootstrap: z.boolean().optional(),
+    /** The writer asked to skip an identical live grant; the fold honours it too. */
+    onDuplicate: z.literal("skip").optional(),
   })
   .strict()
   .refine(grantShapeRefinement.check, {

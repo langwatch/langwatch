@@ -6,7 +6,7 @@ The server half of [saas](../README.md). LangWatch Cloud's own surface.
 
 ## Installation
 
-`defineProcessModule("saas").withRepositories(saasRepositories).withChannels(saasChannels).withApi(SaasModule).withTransports(usageReportRest)`, `src/saas.module.ts:11`.
+`defineProcessModule("saas").withRepositories(saasRepositories).withApi(SaasModule).withTransports(usageReportRest).withEventing(saasUsageReportEventing)`, `src/saas.module.ts:11`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -75,7 +75,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: saas declares no pipeline, process manager, subscriber or task.
+### Pipeline `saas_usage_report` (aggregate `saas_usage_report`)
+
+Declared at `src/eventing/saas-usage-report.pipeline.ts:55`. Events: `usageReportReceivedEventSchema`.
+
+| Kind    | Name                        | Handles | Declared at                                     |
+| ------- | --------------------------- | ------- | ----------------------------------------------- |
+| command | `recordUsageReportReceived` | –       | `src/eventing/saas-usage-report.pipeline.ts:60` |
 
 ## Configuration
 

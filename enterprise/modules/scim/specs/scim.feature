@@ -86,6 +86,18 @@ Feature: Enterprise SCIM package boundary
       When the directory creates that user
       Then the account becomes a member at once
 
+  Rule: Pushes of one new person at once read as one creation
+
+    A provider that retries in parallel sends the same new person twice. One
+    push mints the account; the other answers the conflict a duplicate sent
+    afterwards gets, never a failure.
+
+    @unit
+    Scenario: The push that loses the mint of a new person answers 409
+      Given two pushes of the same new person arrive together
+      When the second loses the race to mint the account
+      Then it answers 409 as a duplicate sent afterwards does
+
   Rule: A name is patched one half at a time
 
     SCIM carries a name as two parts and this product stores one string, so a
@@ -216,6 +228,12 @@ Feature: Enterprise SCIM package boundary
       Given a token belonging to no connection
       When it reads a group another connection pushed
       Then the group is returned
+
+    @unit
+    Scenario: A group made in LangWatch is out of a directory token's reach by id
+      Given a group an administrator made in LangWatch
+      When a directory token reads, patches or deletes it by id
+      Then each answers not found and the group is unchanged
 
     @unit
     Scenario: A write to a sibling connection's group is refused by authority
@@ -475,17 +493,11 @@ Feature: Enterprise SCIM package boundary
   Rule: One connection's recent directory activity reads the sync log in words (ADR-126)
 
     @unit
-    Scenario: Directory activity is refused by name where no sync log can be read
-      Given a process composed without an event stack
+    Scenario: Directory activity reads the sync log through the event read seat
+      Given a connection whose sync log holds directory facts
       When a connection's activity is read
-      Then the read is refused as an unavailable capability rather than answered empty
-
-    @unit
-    Scenario: Directory activity reads the sync log through the sync pipeline's own event store
-      Given the process runs SCIM's directory-sync pipeline
-      When a connection's activity is read
-      Then it is read through the store that pipeline was handed, for that connection's sync in the organization's tenant
-      And a pipeline built only to be listed hands its store to nobody
+      Then it is read through the event read seat, for that connection's sync in the organization's tenant
+      And the facts are answered newest first without the pipeline's own store
 
     @unit
     Scenario: Recent directory activity is served in words under sso:view

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { JsonValue, ProcessStore } from "@langwatch/eventing";
+import type { IntentContext, JsonValue, ProcessStore } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,14 @@ import {
 } from "../aggregate-reconcile.subscriber.ts";
 
 const AT = 1_760_000_000_000;
-const intentContext = { attempt: 1 };
+const intentContext: IntentContext = {
+  processName: AGGREGATE_RECONCILE_PROCESS_NAME,
+  projectId: "agg_1",
+  processKey: "agg_1",
+  tenantId: "org_1",
+  messageKey: "sweep",
+  attempt: 1,
+};
 
 describe("aggregate project reconcile process", () => {
   it("asks for one sweep on every wake, keyed by its schedule time", () => {
@@ -70,7 +77,10 @@ describe("aggregate project reconcile process", () => {
 
   describe("when a reconcile is enqueued", () => {
     it("appends one intent per aggregate on that aggregate's own instance", async () => {
-      const appendIntents = vi.fn<ProcessStore["appendIntents"]>(async () => undefined);
+      const appendIntents = vi.fn<ProcessStore["appendIntents"]>(async () => ({
+        insertedMessageKeys: [],
+        duplicateMessageKeys: [],
+      }));
 
       await OutboxAggregateReconcile.create({ appendIntents }).enqueue({
         organizationId: "org_1",

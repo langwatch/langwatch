@@ -6,6 +6,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
   PrismaQueryGuard,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -917,7 +918,12 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
 
       await expect(
         prisma.$executeRawUnsafe(
-          `-- @tenancy: probe against a session-local temp table\nINSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
+          `${
+            skipTenantCheck({
+              // A probe against a session-local temp table, which holds no tenant's rows.
+              SKIP_TENANT_CHECK: true,
+            }).sql
+          }\nINSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
           processName,
           "project-1",
           oversized(),

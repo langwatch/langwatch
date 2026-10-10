@@ -120,6 +120,7 @@ function harness(
   const summary: TraceSummaryReader = reads.summary ?? { getByTraceId };
 
   const app = TraceModule.fromDependencies({
+    authorizeRead: async ({ projectId }) => ownProof({ projectId }),
     storedObjects: createApiFixture<StoredObjectApi>(),
     spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
@@ -182,6 +183,7 @@ describe("TraceModule", () => {
         });
 
         expect(tryGetById).toHaveBeenCalledWith({
+          authorization: expect.anything(),
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -218,6 +220,7 @@ describe("TraceModule", () => {
         });
 
         expect(tryGetById).toHaveBeenCalledWith({
+          authorization: expect.anything(),
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -362,7 +365,11 @@ describe("TraceModule", () => {
         });
 
         expect(verdicts["trace-1"]?.map((e) => e.evaluation_id)).toEqual([`evaluation-${SELLER}`]);
-        expect(verdicts["trace-1"]?.[0]).toMatchObject({ score: 1, details: null, inputs: null });
+        expect(verdicts["trace-1"]?.[0]).toMatchObject({
+          score: 1,
+          details: null,
+          inputs: undefined,
+        });
       });
     });
 
@@ -445,7 +452,7 @@ describe("TraceModule", () => {
         const { app, spanReads } = harness();
 
         await app.readSpans({
-          projectId: "project-1",
+          authorization: ownProof({ projectId: "project-1" }),
           traceId: "trace-1",
           occurredAtMs: 1_700_000_000_000,
         });
@@ -460,7 +467,10 @@ describe("TraceModule", () => {
       it("omits the key from the span read rather than sending it empty", async () => {
         const { app, spanReads } = harness();
 
-        await app.readSpans({ projectId: "project-1", traceId: "trace-1" });
+        await app.readSpans({
+          authorization: ownProof({ projectId: "project-1" }),
+          traceId: "trace-1",
+        });
 
         expect(spanReads[0]?.args[0]).not.toHaveProperty("occurredAtMs");
       });
@@ -468,7 +478,10 @@ describe("TraceModule", () => {
       it("omits the key from the span-summary read too", async () => {
         const { app, spanReads } = harness();
 
-        await app.readSpanSummaries({ projectId: "project-1", traceId: "trace-1" });
+        await app.readSpanSummaries({
+          authorization: ownProof({ projectId: "project-1" }),
+          traceId: "trace-1",
+        });
 
         expect(spanReads[0]?.args[0]).not.toHaveProperty("occurredAtMs");
       });
@@ -561,8 +574,13 @@ describe("TraceModule", () => {
           groupBy: "none",
           pageSize: 10,
         });
-        expect(getAllTracesForProject.mock.calls[0]?.[2]).toBeUndefined();
+        const ownRead = getAllTracesForProject.mock.calls[0]?.[2]?.ownRead;
+        expect(getAllTracesForProject.mock.calls[0]?.[2]).toEqual({ ownRead });
+        expect(ownRead?.grants).toEqual([
+          expect.objectContaining({ projectId: "project-1", kind: "own" }),
+        ]);
         expect(getTracesWithSpans).toHaveBeenCalledWith({
+          authorization: ownRead,
           projectId: "project-1",
           traceIds: ["trace-1", "trace-2"],
           protections: PROTECTIONS,

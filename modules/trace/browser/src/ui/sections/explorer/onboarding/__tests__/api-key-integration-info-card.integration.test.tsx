@@ -20,9 +20,9 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   useUiDeployment: () => ({ appBaseUrl: mockBaseHost }),
 }));
 
-vi.mock("../../../onboarding/observability/code-preview.tsx", async (importOriginal) => ({
+vi.mock("@langwatch/design-system/code-preview", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  CodePreview: (props: Record<string, unknown>) => {
+  SnippetPreview: (props: Record<string, unknown>) => {
     capturedCodePreviewProps = props;
     return <div data-testid="code-preview">{String(props.code)}</div>;
   },

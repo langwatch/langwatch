@@ -210,9 +210,10 @@ describe("PrismaSuiteRepository.findOrCreatePlanByName", () => {
       });
 
       const sql = rawSqlFrom(executeRaw);
-      expect(sql).toMatch(/^-- @tenancy: /);
+      const [, marker, lockKey] = executeRaw.mock.calls[0] ?? [];
+      expect((marker as { sql?: string } | undefined)?.sql).toContain("SKIP_TENANT_CHECK");
       expect(sql).toContain("pg_advisory_xact_lock");
-      expect(String(executeRaw.mock.calls[0]?.[1])).toContain("project_1");
+      expect(String(lockKey)).toContain("project_1");
     });
   });
 });

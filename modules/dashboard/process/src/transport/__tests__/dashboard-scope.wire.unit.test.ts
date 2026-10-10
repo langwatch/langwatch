@@ -1,12 +1,19 @@
 /**
  * @vitest-environment node
- * Board scope at the doors: the member tRPC procedures and the project-credential REST routes,
- * over the real application and its memory repositories.
- * Spec: dashboards-v2.feature AC171 to AC174 and AC189.
+ * Board scope at the doors: the member tRPC procedures and the REST routes, called with a key
+ * that names a person and with one that names nobody, over the real application and its memory
+ * repositories. Spec: dashboards-v2.feature AC171 to AC174, AC189, AC196 and AC197.
  */
 import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+  type RestMountOptions,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
+import type { Actor } from "@langwatch/authorization";
 import type { DashboardApi, DashboardScope } from "@langwatch/dashboard-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
@@ -93,25 +100,30 @@ function memberDoors(app: DashboardApi) {
   };
 }
 
+/** The actor the project door resolves a key to: its owner, or nobody for a project key. */
+const PROJECT_KEY: Actor = { type: "api_key", id: "key-1" };
+const NOBODY = null;
+const keyOf = (userId: string): Actor => ({ type: "user", id: userId });
+
 /** The credential doors: boards, graphs, widgets and saved charts with one project's API key. */
-function credentialDoors(app: DashboardApi, projectId: string) {
-  const caller = {
-    actor: { type: "api_key" as const, id: "key-1" },
-    scope: { tier: "project" as const, id: projectId },
-  };
+function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | null = PROJECT_KEY) {
+  const caller = { actor, scope: { tier: "project" as const, id: projectId } };
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });
-  const mount = (family: typeof dashboardRest, facts: unknown[] = []) =>
+  const mount = (
+    family: { router: () => RestTransportDeclaration<DashboardApi> },
+    middlewareContext: RestMountOptions<DashboardApi>["middlewareContext"] = [],
+  ) =>
     runtime.mount(family.router(), {
       app: () => app,
-      facts: facts as never,
+      middlewareContext,
       onError: canonicalErrorResponse,
     });
   const families = [
-    { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_FACTS) },
-    { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_FACTS) },
+    { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_CONTEXT) },
+    { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_CONTEXT) },
     { under: "/api/dashboards", hono: mount(dashboardRest) },
     { under: "/api/graphs", hono: mount(graphRest) },
   ];
@@ -131,13 +143,13 @@ function credentialDoors(app: DashboardApi, projectId: string) {
   };
 }
 
-const WIDGET_FACTS = [
-  bindRestMiddleware(dashboardWidgetUrl, () => PLATFORM_URL),
-  bindRestMiddleware(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+const WIDGET_CONTEXT = [
+  bindMiddlewareContext(dashboardWidgetUrl, () => PLATFORM_URL),
+  bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
 ];
-const CHART_FACTS = [
-  bindRestMiddleware(langWatchQLCallerProtections, () => FULLY_PERMITTED),
-  bindRestMiddleware(savedWorkbenchChartUrl, () => PLATFORM_URL),
+const CHART_CONTEXT = [
+  bindMiddlewareContext(langWatchQLCallerProtections, () => FULLY_PERMITTED),
+  bindMiddlewareContext(savedWorkbenchChartUrl, () => PLATFORM_URL),
 ];
 
 /** The author's board in HOME, with a widget, a graph and a saved chart, at the scope asked for. */
@@ -276,6 +288,16 @@ async function codeOf(call: Promise<unknown>): Promise<unknown> {
 }
 
 const idsOf = (rows: unknown) => (rows as { id: string }[]).map(({ id }) => id);
+
+/** What the four REST lists of HOME answer one key: the ids of its boards and what is on them. */
+async function restListed(send: ReturnType<typeof credentialDoors>) {
+  return {
+    boards: idsOf((await send("GET", "/api/dashboards")).json.data),
+    graphs: idsOf((await send("GET", "/api/graphs")).json),
+    widgets: idsOf((await send("GET", WIDGETS)).json.data),
+    charts: idsOf((await send("GET", CHARTS)).json.data),
+  };
+}
 
 describe("board scope at the doors", () => {
   describe("given a board its author set to Only me", () => {
@@ -455,6 +477,117 @@ describe("board scope at the doors", () => {
         code: missing.json.code,
         message: missing.json.message,
       });
+    });
+
+    /** @scenario "AC196 Scope: a key that names a person reads and writes as that person over REST" */
+    it("is listed, opened and edited by its author's own key on every REST route", async () => {
+      const { app, ids } = await boardAt("PRIVATE");
+      const send = credentialDoors(app, HOME, keyOf(AUTHOR));
+
+      const listed = await restListed(send);
+      const refused: string[] = [];
+      for (const [name, [method, path, body]] of Object.entries(credentialAsks(ids))) {
+        if ((await send(method, path, body)).status >= 400) refused.push(name);
+      }
+
+      expect({ listed, refused }).toEqual({
+        listed: {
+          boards: [ids.boardId],
+          graphs: [ids.graphId],
+          widgets: [ids.widgetId],
+          charts: [ids.chartId],
+        },
+        refused: [],
+      });
+    });
+
+    /** @scenario "AC196 Scope: a key that names a person reads and writes as that person over REST" */
+    it("tells another person's key no more than a missing id does, on any REST route", async () => {
+      const { app, ids } = await boardAt("PRIVATE");
+      const send = credentialDoors(app, HOME, keyOf(TEAMMATE));
+      const told = async (named: Ids) => {
+        const result: Record<string, { status: number }> = {};
+        for (const [name, [method, path, body]] of Object.entries(credentialAsks(named))) {
+          result[name] = withoutIds(await send(method, path, body), named) as { status: number };
+        }
+        return result;
+      };
+      const missing = await told(MISSING);
+
+      expect({
+        listed: await restListed(send),
+        hidden: await told(ids),
+        accepted: Object.keys(missing).filter((name) => missing[name]!.status < 400),
+      }).toEqual({
+        listed: { boards: [], graphs: [], widgets: [], charts: [] },
+        hidden: missing,
+        accepted: [],
+      });
+    });
+
+    /** @scenario "AC197 Scope: a key that names no person stands where a project credential does" */
+    it("is not listed or opened by a key that names nobody, which opens a Project board", async () => {
+      const hidden = await boardAt("PRIVATE");
+      const shared = await boardAt("PROJECT");
+      const opened = async ({ app, boardId }: typeof hidden) =>
+        (await credentialDoors(app, HOME, NOBODY)("GET", `/api/dashboards/${boardId}`)).status;
+
+      expect({
+        listed: await restListed(credentialDoors(hidden.app, HOME, NOBODY)),
+        onlyMe: await opened(hidden),
+        project: await opened(shared),
+      }).toEqual({
+        listed: { boards: [], graphs: [], widgets: [], charts: [] },
+        onlyMe: 404,
+        project: 200,
+      });
+    });
+  });
+
+  describe("when a key makes a board over REST", () => {
+    const made = async (actor: Actor | null) => {
+      const { app, call } = await boardAt("PROJECT");
+      const created = await credentialDoors(app, HOME, actor)("POST", "/api/dashboards", {
+        name: "Made by a key",
+      });
+      const board = (await call(AUTHOR, "dashboards.getById", {
+        projectId: HOME,
+        dashboardId: created.json.id,
+      })) as { createdById: string | null; scope: string };
+      return { status: created.status, createdById: board.createdById, scope: board.scope };
+    };
+
+    /** @scenario "AC196 Scope: a key that names a person reads and writes as that person over REST" */
+    it("records the person a key names as the board's author", async () => {
+      expect(await made(keyOf(AUTHOR))).toEqual({
+        status: 201,
+        createdById: AUTHOR,
+        scope: "PROJECT",
+      });
+    });
+
+    /** @scenario "AC197 Scope: a key that names no person stands where a project credential does" */
+    it("records no author for a key that names nobody", async () => {
+      expect(await made(NOBODY)).toEqual({ status: 201, createdById: null, scope: "PROJECT" });
+    });
+  });
+
+  describe("when a key asks a REST route to change a board's scope", () => {
+    /** @scenario "AC197 Scope: a key that names no person stands where a project credential does" */
+    it.each([
+      { key: "its author's own key", actor: keyOf(AUTHOR) },
+      { key: "a key that names nobody", actor: NOBODY },
+    ])("leaves the scope as it was for $key", async ({ actor }) => {
+      const { app, call, boardId } = await boardAt("PROJECT");
+      const send = credentialDoors(app, HOME, actor);
+
+      await send("PATCH", `/api/dashboards/${boardId}`, { name: "Renamed", scope: "PRIVATE" });
+      const board = (await call(AUTHOR, "dashboards.getById", {
+        projectId: HOME,
+        dashboardId: boardId,
+      })) as { scope: string };
+
+      expect(board.scope).toBe("PROJECT");
     });
   });
 

@@ -715,6 +715,7 @@ describe.skipIf(!stores)("the hidden governance project as a member sees it", ()
   });
 
   describe("given an aggregate project on a team whose members are not organization admins", () => {
+    /** @scenario "A Developer seat never sees the aggregate project" */
     it.each(people)("keeps it out of every project list $who can open", async (person) => {
       if (!person.session) throw new Error(`${person.who} was never signed up`);
       expect(await aggregateSightings({ session: person.session, role: person.role })).toEqual({

@@ -112,6 +112,12 @@ Feature: The Agent Testing page
     And "Results" carries the number of run plans
 
   @unit
+  Scenario: The number beside the Scenarios tab counts what the suite rail can reach
+    Given a project with two scenarios filed in a listed suite and one filed in no listed suite
+    When the number beside "Scenarios" is worked out
+    Then only the two filed scenarios are counted
+
+  @unit
   Scenario: The number beside the Results tab counts what the Test Runs list holds
     Given a project with one test suite, one run plan and one throwaway suite of the command line
     When the number beside "Results" is worked out

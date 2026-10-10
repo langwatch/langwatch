@@ -13,6 +13,10 @@ import {
   usableAuthorization,
   type AuthzPermission,
 } from "@langwatch/authorization";
+import {
+  TENANT_SCOPE_TIME_COLUMNS,
+  type TenantScopeTimeColumn,
+} from "@langwatch/clickhouse-markers";
 import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
@@ -43,14 +47,6 @@ export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
   READ_RESOURCES.traces.permission,
 ]);
 
-/**
- * The time columns a marker may name: each table's own occurrence time and partition key
- * (`OccurredAt` trace_summaries, `StartTime` stored_spans, `ScheduledAt` evaluation_runs,
- * `Timestamp` logs), since a shared grant's window is applied to it.
- */
-const TENANT_SCOPE_TIME_COLUMNS = ["OccurredAt", "StartTime", "ScheduledAt", "Timestamp"] as const;
-export type TenantScopeTimeColumn = (typeof TENANT_SCOPE_TIME_COLUMNS)[number];
-
 /** Every parameter the fence binds starts with this; callers may not. */
 const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
 
@@ -64,19 +60,6 @@ const SET_MARKER = /\{\{tenantSet\}\}/g;
  */
 export const HAND_WRITTEN_TENANT_PREDICATE =
   /\bTenantId\s*(?:=|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
-
-/** The marker a repository writes where its tenant predicate used to go. */
-export function tenantScope(column: TenantScopeTimeColumn): string {
-  return `{{tenantScope:${column}}}`;
-}
-
-/**
- * The set-only marker: every tenant the proof names, no window. For a side-table subquery whose
- * timestamp is not the trace's; the statement still needs a `tenantScope` marker for the window.
- */
-export function tenantSet(): string {
-  return "{{tenantSet}}";
-}
 
 /**
  * A stable cache key for who a proof fences, under which windows. Own projects stay readable;

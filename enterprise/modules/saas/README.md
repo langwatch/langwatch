@@ -18,7 +18,6 @@ LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 
 | Kind            | Name                                                                                                                                                              | Declared at                                                 |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Stores required |                                                                                                                                                                   | `process/src/channels/http/http.saas.channels.ts:11`        |
 | Stores required | rateLimiter                                                                                                                                                       | `process/src/repositories/live/live.saas.repositories.ts:9` |
 | Config          | `isSaas` (IS_SAAS), `latestRelease` (LANGWATCH_LATEST_RELEASE), `latestReleaseCommit` (LANGWATCH_LATEST_RELEASE_COMMIT), `releaseFloor` (LANGWATCH_RELEASE_FLOOR) | `contract/src/saas.config.ts:18`                            |
 

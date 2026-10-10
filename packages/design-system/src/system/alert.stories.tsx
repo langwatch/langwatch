@@ -28,7 +28,14 @@ const COPY: Record<(typeof STATUSES)[number], { title: string; description: stri
 };
 
 const meta = {
-  title: "Primitives/Alert",
+  title: "Feedback/Alert",
+  parameters: {
+    usage: {
+      use: "Something still true about this screen, drawer or form (alerts-toasts-and-field-errors.md).",
+      avoid:
+        "Something that just happened: Toaster. One wrong field: its field error. A notice heading a page: Banner. Never restyle an alert at the call site.",
+    },
+  },
   component: Alert.Root,
   tags: ["autodocs"],
   args: { status: "info", variant: "subtle", size: "md" },

@@ -3376,6 +3376,11 @@ const presentations = {
     describe: () =>
       "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain, and not while your identity provider reports the address as unverified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
   },
+  sso_member_deactivated: {
+    title: "Your access has been turned off",
+    describe: () =>
+      "Your organization's directory has turned off your access. Ask an administrator of your organization.",
+  },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
     describe: () =>
@@ -4651,6 +4656,11 @@ const presentations = {
     describe: () =>
       "Langy can only drive this page while it is answering you. Send it a message and ask again.",
   },
+  langy_ui_run_conversation: {
+    title: "This conversation can't change a page",
+    describe: () =>
+      "Langy ran this conversation on its own, so no page is open for it to change. Start a new conversation and ask there.",
+  },
   langy_ui_action_unknown: {
     title: "Langy tried something this page doesn't do",
     describe: () =>
@@ -5561,8 +5571,15 @@ const presentations = {
     // server's sentence: `meta.message` on this code can carry an internal
     // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
-    describe: () =>
-      "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
+    describe: (error) => {
+      if (strEq(error, "reason", "metadata_address")) {
+        return "That address is reserved for the hosting platform's own services, so webhooks can't be sent to it. Use the address of your own receiving service.";
+      }
+      if (strEq(error, "reason", "private_address")) {
+        return "That address is on a private network, so webhooks can't be sent to it. Use a publicly reachable HTTPS address.";
+      }
+      return "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.";
+    },
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
@@ -5855,6 +5872,16 @@ const presentations = {
     title: "This step has no model selected",
     describe: () => "Open the node and choose a model.",
   },
+  workflow_model_provider_unavailable: {
+    title: "A step's model provider isn't available",
+    describe: (error) => {
+      const provider = str(error, "provider", "");
+      const subject = provider ? `The ${provider} model provider` : "The model provider";
+      return error.meta.disabled === true
+        ? `${subject} is switched off. Turn it on in Settings, Model Providers, or pick another model.`
+        : `${subject} isn't set up for this project. Add it in Settings, Model Providers, or pick another model.`;
+    },
+  },
 
   // ---- code node ----
   code_runner_error: {
@@ -5969,6 +5996,29 @@ const presentations = {
     title: "Hosted services are still being set up",
     describe: () =>
       "Your license is valid and its key is being prepared. Try again in a few seconds.",
+  },
+  below_lts_floor: {
+    title: "This version is too old to upgrade from",
+    describe: () =>
+      "Upgrade to the oldest supported long-term release first, then continue to this version.",
+  },
+  image_below_ledger_floor: {
+    title: "This image is older than the database",
+    describe: () =>
+      "The database has already been upgraded past what this image supports. Start an image at or above the version last run.",
+  },
+  step_after_unknown: {
+    title: "An upgrade step depends on a step that doesn't exist",
+    describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
+  },
+  step_after_cycle: {
+    title: "Upgrade steps depend on each other in a loop",
+    describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
+  },
+  contract_archive_failed: {
+    title: "The upgrade couldn't archive data before removing it",
+    describe: () =>
+      "Nothing was dropped. Check the archive destination is reachable and writable, then retry the step.",
   },
   connect_instance_required: {
     title: "This install did not identify itself",

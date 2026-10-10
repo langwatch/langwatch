@@ -327,7 +327,7 @@ Feature: Local IdP simulator (idpsim)
   @unit
   Scenario: The simulator runs alone without the app stack
     Given no LangWatch stack is running
-    When the developer runs `haven idp`
+    When the developer runs `haven simulator idp`
     Then only the simulator process starts — no app, API, workers or databases
     And it is routed at the machine-wide idp hostname while the proxy is available
 
@@ -356,7 +356,7 @@ Feature: Local IdP simulator (idpsim)
     Then only that tenant is marked, because it is the one being come back to
 
   # --- Faults: SAML tampers, clock skew, IdP-initiated, disabled users ---
-  # Driven through the control API and `haven idp`, never a page. Every
+  # Driven through the control API and `haven sim idp`, never a page. Every
   # fault is recorded in the tenant's activity.
 
   @unit
@@ -538,10 +538,10 @@ Feature: Local IdP simulator (idpsim)
     And then asks it to stop
 
   @unit
-  Scenario: haven idp verification sets and clears the well-known verification file
-    When an agent runs `haven idp verification set` with a domain and a token
+  Scenario: haven sim idp verification sets and clears the well-known verification file
+    When an agent runs `haven sim idp verification set` with a domain and a token
     Then the simulator is asked to serve that token for the domain
-    And `haven idp verification clear` with the domain asks it to stop
+    And `haven sim idp verification clear` with the domain asks it to stop
 
   @integration
   Scenario: The console sends a SCIM event with ids, attributes and the enterprise extension

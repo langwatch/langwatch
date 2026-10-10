@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../..");
 const MIGRATION_FILE = join(
   repositoryRoot,
-  "packages/prisma-client/prisma/migrations/20261009160010_dashboard_scope/migration.sql",
+  "packages/prisma-client/prisma/migrations/20261010120005_dashboard_scope/migration.sql",
 );
 
 const TYPE_GUARD = /DO \$\$[\s\S]*?END \$\$;/;

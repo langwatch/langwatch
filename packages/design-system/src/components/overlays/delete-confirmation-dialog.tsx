@@ -40,12 +40,10 @@ export function DeleteConfirmationDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            {title}
-          </Dialog.Title>
+          <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack align="start" gap={4}>

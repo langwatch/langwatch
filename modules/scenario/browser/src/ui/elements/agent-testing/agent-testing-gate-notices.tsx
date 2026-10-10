@@ -1,4 +1,5 @@
 import { Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 
 /** What an address that does not exist for this reader shows. */
 export function PageAbsentNotice() {
@@ -13,9 +14,6 @@ export function PageAbsentNotice() {
 /** What a reader without the grant a page needs is shown. */
 export function PermissionRequiredNotice({ permission }: { permission: string }) {
   return (
-    <VStack paddingY={16} gap={2}>
-      <Heading size="md">Access Restricted</Heading>
-      <Text color="fg.muted">You need the {permission} permission to open this page.</Text>
-    </VStack>
+    <RestrictedAccess permission={permission} area="Agent Testing" />
   );
 }

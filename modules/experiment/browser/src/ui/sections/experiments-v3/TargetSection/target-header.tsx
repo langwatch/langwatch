@@ -522,7 +522,7 @@ export const TargetHeader = memo(function TargetHeader({
               <Text>{switchLabel}</Text>
             </HStack>
           </Menu.Item>
-          <Box borderTopWidth="1px" borderColor="border" my={1} />
+          <Menu.Separator />
           <Menu.Item value="remove" onClick={() => onRemove?.(target.id)}>
             <HStack gap={2} color="red.fg">
               <LuTrash2 size={14} />

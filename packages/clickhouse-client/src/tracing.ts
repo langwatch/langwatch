@@ -71,7 +71,7 @@ export const SPAN_ATTRIBUTES = {
   table: "db.sql.table",
   operation: "db.operation",
   tenant: "langwatch.tenant_id",
-  unscopedReason: "langwatch.unscoped_reason",
+  skipTenantCheck: "langwatch.skip_tenant_check",
   rows: "db.response.returned_rows",
   bytesRead: "db.response.read_bytes",
 } as const;
@@ -121,10 +121,9 @@ export class QueryTracer {
       if (request.table !== undefined) {
         span.setAttribute(SPAN_ATTRIBUTES.table, request.table);
       }
-      // Recorded so an audit can enumerate every statement that opted out of
-      // the tenant predicate, and why, without reading the code.
-      if (request.unscoped !== undefined) {
-        span.setAttribute(SPAN_ATTRIBUTES.unscopedReason, request.unscoped.reason);
+      // Recorded so an audit can find every statement that skipped the tenant predicate.
+      if (request.SKIP_TENANT_CHECK === true) {
+        span.setAttribute(SPAN_ATTRIBUTES.skipTenantCheck, true);
       }
     });
 

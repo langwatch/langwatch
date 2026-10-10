@@ -1,4 +1,8 @@
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -204,6 +208,7 @@ async function mountAsLegacyProjectKey() {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories: LiveGatewayRepositories.create({
       prisma,
@@ -249,13 +254,13 @@ async function mountAsLegacyProjectKey() {
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayRestCredential, () => legacyProjectKey),
-      bindRestMiddleware(gatewayKeyCaller, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayRestCredential, () => legacyProjectKey),
+      bindMiddlewareContext(gatewayKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_A,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_A,
       })),

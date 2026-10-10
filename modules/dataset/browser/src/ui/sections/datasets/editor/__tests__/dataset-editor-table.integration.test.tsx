@@ -125,6 +125,20 @@ describe("given an in-memory dataset", () => {
     });
   });
 
+  describe("when the page hands the editor a header slot", () => {
+    it("puts the count and buttons in the slot and keeps the grid outside it", () => {
+      const slot = document.createElement("div");
+      document.body.appendChild(slot);
+
+      renderInMemory({ headerSlot: slot });
+
+      expect(slot).toContainElement(screen.getByTestId("dataset-row-count"));
+      expect(slot).toContainElement(screen.getByTestId("download-csv"));
+      expect(slot).not.toContainElement(screen.getByTestId("dataset-editor-table"));
+      slot.remove();
+    });
+  });
+
   // ── Inline cell editing ────────────────────────────────────────────
 
   describe("when a cell is double-clicked", () => {

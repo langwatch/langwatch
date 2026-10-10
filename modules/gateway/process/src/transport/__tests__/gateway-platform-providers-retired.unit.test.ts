@@ -1,6 +1,6 @@
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   type IdempotentRunner,
 } from "@langwatch/api/rest";
@@ -60,16 +60,16 @@ function mountedPlatform() {
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayKeyCaller, (): GatewayKeyCaller => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayKeyCaller, (): GatewayKeyCaller => ({
         kind: "project",
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, (): GatewayKeyCaller => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, (): GatewayKeyCaller => ({
         kind: "project",
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayRestCredential, (): GatewayRequestCredential => ({
+      bindMiddlewareContext(gatewayRestCredential, (): GatewayRequestCredential => ({
         kind: "legacyProjectKey",
       })),
     ],

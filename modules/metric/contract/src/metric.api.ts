@@ -1,6 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
-import { z } from "zod";
+import type { OtlpIngestCredential } from "@langwatch/trace-contract";
 
 import type {
   CanonicalMetricDataPoint,
@@ -37,9 +37,6 @@ export type MetricRequestCollectionResult =
 /** What `POST /api/otel/v1/metrics` answers from: the collection, or the door's own refusal. */
 export type MetricOtlpDoorResult = MetricRequestCollectionResult | OtlpDoorRefusal;
 
-/** The exporter base a `/v1/metrics` suffix was appended to; the receiver checks it. */
-export const otlpMetricAliasParamsSchema = z.object({ otlpBase: z.string() });
-
 /** One OTLP metric export to collect for a tenant, as main's `handleOtlpMetricRequest` took it. */
 export type MetricCollectionInput = {
   tenantId: string;
@@ -56,8 +53,11 @@ export interface MetricApi {
     piiRedactionLevel: MetricPiiRedactionLevel;
     acceptedAt?: number;
   }): Promise<MetricDataPointPreparation>;
-  /** One exporter request at the metrics door: key, allowance, parse, then collection. */
-  receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult>;
+  /** One exporter request the metrics door verified: allowance, parse, then collection. */
+  receiveOtlpMetrics(input: {
+    request: OtlpDoorRequest;
+    credential: OtlpIngestCredential;
+  }): Promise<MetricOtlpDoorResult>;
   /** Prepares and records one OTLP metric export, for a receiver that authenticated it itself. */
   collectOtlpMetrics(input: MetricCollectionInput): Promise<MetricRequestCollectionResult>;
   /** Sends prepared points onto the `metric_processing` pipeline for durable storage. */

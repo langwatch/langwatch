@@ -10,7 +10,7 @@ import { Box, Link as ChakraLink, Text, VStack } from "@langwatch/design-system/
 import { Star } from "lucide-react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { useFavourites } from "../../behavior/use-favourites.ts";
 import { dashboardsPath } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";

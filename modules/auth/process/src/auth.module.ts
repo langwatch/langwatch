@@ -1,5 +1,5 @@
 import { bindApiDoor } from "@langwatch/api/hosting";
-import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import type { AuthApi, AuthServerConfig } from "@langwatch/auth-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -12,7 +12,7 @@ import { ApiDoorService } from "./services/api-door.service.ts";
 import { ClearStalePendingSsoSetupTask } from "./tasks/clear-stale-pending-sso-setup.task.ts";
 import { authCliDeviceFlowRest } from "./transport/auth-cli-device-flow.rest.ts";
 import { authRest } from "./transport/auth.rest.ts";
-import { authRequestHeadersFact, authTrpcTransport } from "./transport/auth.trpc.ts";
+import { authRequestHeadersContext, authTrpcTransport } from "./transport/auth.trpc.ts";
 import { signInSecurityTrpcTransport } from "./transport/sign-in-security.trpc.ts";
 
 /**
@@ -34,28 +34,22 @@ export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServ
         organizations: dependencies.organizations,
       }),
     ])
-    .withTransportFacts(({ app, dependencies }) => {
-      if (!(app instanceof AuthModule)) {
-        throw new TypeError("The auth API door requires its constructed application");
-      }
-
-      return [
-        bindTrpcFact(
-          authRequestHeadersFact,
-          (context: TrpcRuntimeContext) => context.req?.headers ?? null,
-        ),
-        bindApiDoor(
-          ApiDoorService.create({
-            sessions: app,
-            twoStep: app,
-            identity: dependencies.identity,
-            apiKeys: dependencies.apiKeys,
-            cliProjects: app,
-            authz: dependencies.authz,
-            organizations: dependencies.organizations,
-            entitlements: dependencies.entitlements,
-            auditLog: dependencies.auditLog,
-          }).door(),
-        ),
-      ];
-    });
+    .provideMiddlewareBindings(({ app, dependencies }) => [
+      bindTrpcMiddlewareContext(
+        authRequestHeadersContext,
+        (context: TrpcRuntimeContext) => context.req?.headers ?? null,
+      ),
+      bindApiDoor(
+        ApiDoorService.create({
+          sessions: app,
+          twoStep: app,
+          identity: dependencies.identity,
+          apiKeys: dependencies.apiKeys,
+          cliProjects: app,
+          authz: dependencies.authz,
+          organizations: dependencies.organizations,
+          entitlements: dependencies.entitlements,
+          auditLog: dependencies.auditLog,
+        }).door(),
+      ),
+    ]);

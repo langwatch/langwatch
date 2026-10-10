@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import {
   TriggerNotFoundError,
   type AutomationApi,
@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTriggerLatestEvaluationRepository } from "../../repositories/memory/memory.trigger-latest-evaluation.repository.ts";
 import { TriggerLatestEvaluationService } from "../../services/trigger-latest-evaluation.service.ts";
-import { automationCallerEmailFact, automationTrpcTransport } from "../automation.trpc.ts";
+import { automationCallerEmailContext, automationTrpcTransport } from "../automation.trpc.ts";
 import type { AutomationTrpcTestContext } from "./automation.trpc.harness.ts";
 
 const SCOPE = { projectId: "project_1", triggerId: "trigger_1" };
@@ -36,7 +36,7 @@ function mount({
     procedure: trpc.procedure,
     members: trpcTestMembers<AutomationTrpcTestContext>({ permits }),
   }).mount(automationTrpcTransport, () => createApiFixture<AutomationApi>(app), {
-    facts: [bindTrpcFact(automationCallerEmailFact, () => null)],
+    middlewareContext: [bindTrpcMiddlewareContext(automationCallerEmailContext, () => null)],
   });
   return router.createCaller({ actor: { id: "user_1" } });
 }

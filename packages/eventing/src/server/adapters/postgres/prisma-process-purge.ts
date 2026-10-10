@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { EventingProcessPersistenceDatabase } from "../../process-persistence.database.ts";
@@ -52,13 +53,19 @@ export class PrismaProcessPurge {
     const rows =
       target === "outbox-dispatched"
         ? await this.database.$queryRaw<{ n: bigint }[]>(Prisma.sql`
-            -- @tenancy: cross-tenant process-manager retention; operator-gated
+            ${skipTenantCheck({
+              // Cross-tenant process-manager retention; operator-gated.
+              SKIP_TENANT_CHECK: true,
+            })}
             SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
             WHERE "status" = 'dispatched'
               AND "dispatchedAt" < now() - (${retentionDays}::int * interval '1 day')
           `)
         : await this.database.$queryRaw<{ n: bigint }[]>(Prisma.sql`
-            -- @tenancy: cross-tenant process-manager retention; operator-gated
+            ${skipTenantCheck({
+              // Cross-tenant process-manager retention; operator-gated.
+              SKIP_TENANT_CHECK: true,
+            })}
             SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
             WHERE "consumedAt" < now() - (${retentionDays}::int * interval '1 day')
           `);
@@ -77,7 +84,10 @@ export class PrismaProcessPurge {
   }): Promise<number> {
     if (target === "outbox-dispatched") {
       return this.database.$executeRaw(Prisma.sql`
-        -- @tenancy: cross-tenant process-manager retention; operator-gated
+        ${skipTenantCheck({
+          // Cross-tenant process-manager retention; operator-gated.
+          SKIP_TENANT_CHECK: true,
+        })}
         WITH batch AS (
           SELECT ctid FROM "ProcessManagerOutbox"
           WHERE "status" = 'dispatched'
@@ -89,7 +99,10 @@ export class PrismaProcessPurge {
     }
 
     return this.database.$executeRaw(Prisma.sql`
-      -- @tenancy: cross-tenant process-manager retention; operator-gated
+      ${skipTenantCheck({
+        // Cross-tenant process-manager retention; operator-gated.
+        SKIP_TENANT_CHECK: true,
+      })}
       WITH batch AS (
         SELECT ctid FROM "ProcessManagerInbox"
         WHERE "consumedAt" < now() - (${retentionDays}::int * interval '1 day')
@@ -104,7 +117,12 @@ export class PrismaProcessPurge {
     for (const table of Object.values(TABLES)) {
       try {
         await this.database.$executeRawUnsafe(
-          `-- @tenancy: cross-tenant process-manager housekeeping; operator-gated\nVACUUM (ANALYZE) "${table}"`,
+          `${
+            skipTenantCheck({
+              // Cross-tenant process-manager housekeeping; operator-gated.
+              SKIP_TENANT_CHECK: true,
+            }).sql
+          }VACUUM (ANALYZE) "${table}"`,
         );
       } catch (error) {
         logger.warn({ error, table }, "the post-purge vacuum failed; the rows are still deleted");

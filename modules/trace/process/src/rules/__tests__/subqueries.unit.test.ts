@@ -10,7 +10,7 @@ import {
   instantEvalJudgmentsSubquery,
   latestEvaluationRunsSubquery,
   scenarioRunSubquery,
-} from "../../features/query/repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
+} from "../../features/query/rules/trace-query-subquery.rules.ts";
 
 describe("filter subqueries", () => {
   describe("when a subquery on a trace-keyed table is built", () => {

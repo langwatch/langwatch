@@ -12,6 +12,7 @@ import {
   lwqlMonarch,
   lwqlVocabularyOf,
 } from "../model/lwql-language/lwql-monarch.ts";
+import { logicalLwqlSchema } from "../model/lwql-language/lwql-scope.ts";
 
 type ModelState = { schema: LangWatchQLSchema | undefined; parameters: readonly LwqlParameter[] };
 
@@ -128,8 +129,9 @@ export function setLwqlModelState({
   schema: LangWatchQLSchema | undefined;
   parameters: readonly LwqlParameter[];
 }): void {
-  stateByModelUri.set(model.uri.toString(), { schema, parameters });
-  const vocabulary = lwqlVocabularyOf(schema);
+  const logical = schema && logicalLwqlSchema(schema);
+  stateByModelUri.set(model.uri.toString(), { schema: logical, parameters });
+  const vocabulary = lwqlVocabularyOf(logical);
   const key = JSON.stringify(vocabulary);
   if (key === vocabularyKey) return;
   vocabularyKey = key;

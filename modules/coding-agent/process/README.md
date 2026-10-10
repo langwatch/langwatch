@@ -6,7 +6,7 @@ The server half of [coding-agent](../README.md). Coding-agent observability: ses
 
 ## Installation
 
-`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).withTransportFacts(…)`, `src/coding-agent.module.ts:25`.
+`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).provideMiddlewareBindings(…)`, `src/coding-agent.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -317,7 +317,7 @@ interface Input {
 type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:81
 
 // codingAgents.sessionGroups
-type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:135
+type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:136
 type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:112
 ```
 

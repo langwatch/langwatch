@@ -56,7 +56,6 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -84,7 +83,7 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
     },
   });
   host.mount(declaration.router(), () => ({ whoAmI: (input: WhoAmI) => input }), {
-    facts: [bindRestCredential("cli_token", () => door)],
+    middlewareBindings: [bindRestCredential("cli_token", () => door)],
   });
 
   return host;
@@ -175,7 +174,8 @@ describe("the CLI token door", () => {
   });
 
   describe("given a family no module bound a CLI token for", () => {
-    it("lets nobody in", async () => {
+    /** @scenario "A route naming a credential nobody bound refuses the boot" */
+    it("refuses the mount, naming the credential", () => {
       const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
       const host = RestHost.create({
         authz: authorizationPort.forRequest(),
@@ -183,20 +183,15 @@ describe("the CLI token door", () => {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },
         bearers: () => closed,
         audit: { record: async () => {} },
       });
-      host.mount(declaration.router(), () => ({ whoAmI: (input: WhoAmI) => input }));
-
-      const response = await host.app.request("/api/cli-token/me", {
-        headers: { authorization: "Bearer lw_at_live" },
-      });
-
-      expect(response.status).toBe(404);
+      expect(() =>
+        host.mount(declaration.router(), () => ({ whoAmI: (input: WhoAmI) => input })),
+      ).toThrow(/"cli_token", which nothing binds/);
     });
   });
 });

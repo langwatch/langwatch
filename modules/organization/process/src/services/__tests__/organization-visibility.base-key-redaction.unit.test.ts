@@ -172,7 +172,7 @@ describe("given the base key in the organizations payload", () => {
     it("leaves the uploaded licence key out of the payload", async () => {
       const organization = await readOrganization(granted);
 
-      expect(organization.license).toBeNull();
+      expect(organization).not.toHaveProperty("license");
       expect(JSON.stringify(organization)).not.toContain(STORED_LICENSE);
     });
   });

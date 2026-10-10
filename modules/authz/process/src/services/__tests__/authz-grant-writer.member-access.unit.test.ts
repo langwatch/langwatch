@@ -191,6 +191,18 @@ class MemberAccessStore {
       revokeResourceGrants: async () => {
         throw new Error("unused");
       },
+      findLiveSharedProjectGrants: async () => {
+        throw new Error("unused");
+      },
+      attachSharedProjectGrant: async () => {
+        throw new Error("unused");
+      },
+      awaitSharedProjectGrants: async () => {
+        throw new Error("unused");
+      },
+      revokeSharedProjectGrants: async () => {
+        throw new Error("unused");
+      },
       changeBindingRole: async () => {
         throw new Error("unused");
       },

@@ -20,7 +20,7 @@ func (o *Orchestrator) stackCredentialsPath(slug string) string {
 
 // stackCredentials reads this stack's generated credentials, minting and
 // persisting (0600) any that are missing, so a value survives down/up and is
-// only rotated by `haven destroy`.
+// only rotated by `haven down --destroy`.
 func (o *Orchestrator) stackCredentials(slug string) (map[string]string, error) {
 	path := o.stackCredentialsPath(slug)
 	stored := map[string]string{}
@@ -60,14 +60,18 @@ func (o *Orchestrator) credentialEnv(slug, worktreeDir string) []string {
 			zap.String("slug", slug), zap.Error(err))
 		return nil
 	}
-	return domain.StackCredentialsEnv(stored, resolvedDevEnv(worktreeDir))
+	resolved := resolvedDevEnv(worktreeDir)
+	// shortcut: the stack public key is held back until licence.issue re-signs seeded licences (S6 part 3);
+	// injecting it now would invalidate every licence signed with the built-in dev key.
+	return domain.StackCredentialsEnv(stored, resolved)
 }
 
-// removeStackCredentials forgets a destroyed stack's credentials, with the
-// data they sealed.
+// removeStackCredentials forgets a destroyed stack's credentials and licence
+// key, with the data they sealed.
 func (o *Orchestrator) removeStackCredentials(slug string) {
-	if o.cfg.Home != "" {
+	if o.cfg.Home != "" && slug != "" {
 		_ = os.Remove(o.stackCredentialsPath(slug))
+		_ = os.RemoveAll(filepath.Dir(o.stackLicenceKeyPath(slug)))
 	}
 }
 

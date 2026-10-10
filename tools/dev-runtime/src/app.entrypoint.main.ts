@@ -6,8 +6,14 @@ import { fileURLToPath } from "node:url";
 import { processFailureLine } from "@langwatch/observability";
 import type * as ApiMain from "@langwatch/platform-api";
 import type * as WorkerMain from "@langwatch/worker";
-import { createServer, createServerModuleRunner, type ViteDevServer } from "vite";
-import type { ModuleRunner } from "vite/module-runner";
+import {
+  createRunnableDevEnvironment,
+  createServer,
+  createServerModuleRunner,
+  type DevEnvironment,
+  type ViteDevServer,
+} from "vite";
+import { ESModulesEvaluator, type ModuleEvaluator, type ModuleRunner } from "vite/module-runner";
 
 import {
   backendHalfOf,
@@ -15,7 +21,6 @@ import {
   BACKEND_READY_MSG,
   disposeGeneration,
   drainBackend,
-  forwardPort,
   freeLoopbackPort,
   listenersAddedSince,
   replaceBackend,
@@ -28,10 +33,13 @@ import {
 } from "./backend.process.ts";
 import {
   createReloadTrigger,
+  createRetrySchedule,
   invalidateModules,
   recycleReason,
   staleModuleIds,
 } from "./backend.reload.ts";
+import { bootFailureOf, type BootFailure } from "./boot-failure.ts";
+import { buildOrb, forwardPortWithOrb, servesOrb, type OrbBuild } from "./haven-orb.ts";
 
 /**
  * Local-only host for the whole Node side of a stack in one process (ADR-168, B1): the UI's Vite
@@ -84,6 +92,12 @@ let stopping: Promise<void> | undefined;
 const watchers: FSWatcher[] = [];
 /** Files changed while the stack is held, applied by the next on-demand reload. */
 const held = new Set<string>();
+/** A failed boot or link retries on its own as well as on a change (Alex, 2026-10-10). */
+const retries = createRetrySchedule({
+  retry: () => {
+    reloading = reloading.then(() => reload([]));
+  },
+});
 
 const stop = (code: number): Promise<void> => {
   stopping ??= (async () => {
@@ -100,6 +114,7 @@ const stop = (code: number): Promise<void> => {
     let exitCode = code;
     try {
       for (const watcher of watchers) watcher.close();
+      retries.reset();
       await reloading;
       if (halves) await drainBackend(halves);
       await apiPort?.close();
@@ -151,7 +166,10 @@ async function startUi(): Promise<ViteDevServer> {
   return server;
 }
 
-/** A bare Vite server for the backend graph: no UI plugins or defines, no HMR, no watcher. */
+/**
+ * A bare Vite server for the backend graph: no UI plugins or defines, no HMR, no watcher.
+ * No inline source maps: base64 maps in every module's code doubled the heap (1107 -> 507 MB).
+ */
 function startBackendVite(): Promise<ViteDevServer> {
   return createServer({
     configFile: false,
@@ -161,6 +179,50 @@ function startBackendVite(): Promise<ViteDevServer> {
     logLevel: "warn",
     optimizeDeps: { noDiscovery: true },
     server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    environments: {
+      ssr: {
+        dev: {
+          createEnvironment: (name, config) =>
+            createRunnableDevEnvironment(name, config, {
+              remoteRunner: { inlineSourceMap: false },
+            }),
+        },
+      },
+    },
+  });
+}
+
+/** Ends each evaluation's sourceURL with `?lw=<n>`: the runner caches a map per URL forever. */
+const EVALUATION_TAG = /\?lw=\d+$/;
+let evaluations = 0;
+
+function taggedEvaluator(): ModuleEvaluator {
+  const base = new ESModulesEvaluator();
+  return {
+    startOffset: base.startOffset,
+    runExternalModule: (file) => base.runExternalModule(file),
+    runInlinedModule: (context, code, mod) => {
+      evaluations += 1;
+      return base.runInlinedModule(context, `${code}\n//# sourceURL=${mod.id}?lw=${evaluations}`);
+    },
+  };
+}
+
+/** Stack traces map through the maps Vite's module graph already holds, not inline copies. */
+function createBackendRunner(ssr: DevEnvironment): ModuleRunner {
+  const evaluator = taggedEvaluator();
+  const padding = ";".repeat(evaluator.startOffset ?? 0);
+  return createServerModuleRunner(ssr, {
+    hmr: false,
+    evaluator,
+    sourcemapInterceptor: {
+      retrieveSourceMap: (url) => {
+        const id = url.replace(EVALUATION_TAG, "");
+        const map = ssr.moduleGraph.getModuleById(id)?.transformResult?.map;
+        if (!map || !("version" in map)) return null;
+        return { url: id, map: { ...map, mappings: padding + map.mappings } };
+      },
+    },
   });
 }
 
@@ -200,21 +262,34 @@ async function disposeOld({
   }
 }
 
-/** A boot that threw: logged by the half that refused it, and retried on the next change. */
-function bootRefused(error: unknown): void {
+/** Logs a failure by the half it came from, shows it on the api's port, and arms the retry. */
+function reportFailure({
+  half,
+  event,
+  error,
+  level,
+}: {
+  half: BootFailure["half"];
+  event: string;
+  error: unknown;
+  level: "fatal" | "warn";
+}): void {
   isRetryOwed = true;
-  const half = backendHalfOf(error);
-  const event = halves
-    ? `${half ?? "backend"} boot failed; generation ${generation} keeps serving what it can`
-    : "boot failed; waiting for a change";
-  write(
-    processFailureLine({
-      service: half ? BACKEND_HALF_SERVICE[half] : APP_SERVICE,
-      event,
-      error,
-      level: "warn",
-    }),
-  );
+  const delay = retries.failed();
+  apiPort?.report(bootFailureOf({ half, error, retryAt: Date.now() + delay }));
+  const service = half === "backend" ? APP_SERVICE : BACKEND_HALF_SERVICE[half];
+  const retry = `retrying in ${delay / 1000}s or on a change`;
+  write(processFailureLine({ service, event: `${event}; ${retry}`, error, level }));
+}
+
+/** A boot that threw: fatal, named by the half that refused it; the api serves if it can. */
+function bootRefused(error: unknown): void {
+  const half = backendHalfOf(error) ?? "backend";
+  let event = `${half} failed to boot; no api is serving`;
+  if (half === "worker")
+    event = "worker failed to boot; the api keeps serving but jobs are not running";
+  else if (halves) event = `${half} failed to boot; generation ${generation} keeps serving`;
+  reportFailure({ half, event, error, level: "fatal" });
 }
 
 /**
@@ -234,11 +309,13 @@ async function bootNext({
   const port = await freeLoopbackPort();
   const old = halves;
   if (!old) {
-    halves = await startBackend({
+    const started = await startBackend({
       startWorker: worker.startWorker,
       startApi: (options) => api.startApi({ ...options, port }),
     });
+    halves = started.halves;
     apiPort?.route(port);
+    if (started.workerFailure !== undefined) throw started.workerFailure;
     return 0;
   }
   let removed = 0;
@@ -286,11 +363,10 @@ async function reload(files: string[]): Promise<void> {
     // A module that failed to evaluate caches its rejection; reset what this attempt ran.
     const added = [...modules.idToModuleMap.keys()].filter((id) => !known.has(id));
     invalidateModules({ modules, ids: [...stale, ...added] });
-    isRetryOwed = true;
     const event = halves
       ? `backend did not link; generation ${generation} keeps serving`
-      : "backend did not link; waiting for a change";
-    write(processFailureLine({ service: APP_SERVICE, event, error, level: "warn" }));
+      : "backend did not link; no api is serving";
+    reportFailure({ half: "backend", event, error, level: "warn" });
     return;
   }
   const drainedAt = Date.now();
@@ -305,6 +381,8 @@ async function reload(files: string[]): Promise<void> {
   }
   const swapMs = Date.now() - drainedAt;
   isRetryOwed = false;
+  retries.reset();
+  apiPort?.report(undefined);
   generation += 1;
   const record = {
     level: "info",
@@ -351,21 +429,40 @@ function watchBackend({ onFile }: { onFile: (file: string) => void }): void {
   }
 }
 
+let orb: Promise<OrbBuild | undefined> | undefined;
+
+/** The orb's build, once per process and on first use; a failed build leaves pages orb-less. */
+function loadOrb(): Promise<OrbBuild | undefined> {
+  orb ??= buildOrb({ uiRoot: UI_ROOT }).catch((error: unknown) => {
+    write(
+      processFailureLine({ service: APP_SERVICE, event: "orb build failed", error, level: "warn" }),
+    );
+    return undefined;
+  });
+  return orb;
+}
+
 /** Starts the UI (not in the api lane), then the watch, then the first backend generation. */
 export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
   if (withUi) {
     process.chdir(UI_ROOT);
     ui = await startUi();
   }
-  apiPort = await forwardPort({ port: envPositive({ name: "API_PORT", fallback: 6_560 }) });
+  const port = envPositive({ name: "API_PORT", fallback: 6_560 });
+  const withOrb = servesOrb({ withUi, slug: process.env.LANGWATCH_SLUG });
+  apiPort = await forwardPortWithOrb({
+    port,
+    orb: withOrb ? loadOrb : undefined,
+    isUiWatch: withOrb && process.env.LANGWATCH_UI_WATCH === "1",
+  });
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
-  runner = createServerModuleRunner(ssr, { hmr: false });
+  runner = createBackendRunner(ssr);
   const trigger = createReloadTrigger({
     quietMs: envPositive({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
     maxWaitMs: envPositive({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),
     run: (files) => {
-      reloading = reload(files);
+      reloading = reloading.then(() => reload(files));
       return reloading;
     },
   });
@@ -376,8 +473,9 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
       const isLoaded = runner?.evaluatedModules.getModulesByFile(file) !== undefined;
       if (!isLoaded && !(isRetryOwed && CODE_FILE.test(file))) return;
       ssr.moduleGraph.onFileChange(file);
-      if (isWatching) trigger.note(file);
-      else held.add(file);
+      if (!isWatching) return void held.add(file);
+      retries.reset();
+      trigger.note(file);
     },
   });
   process.on("SIGUSR2", () => {

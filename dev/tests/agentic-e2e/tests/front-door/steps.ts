@@ -13,7 +13,7 @@ export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
 
 /**
  * Origin headers for the origin-gated endpoints: `/api/auth/*`, `auth.requestSignUpVerification`
- * and `user.register`. `page.request` sends no `Origin`/`Referer`, so a bare POST there is a 403.
+ * and `auth.register`. `page.request` sends no `Origin`/`Referer`, so a bare POST there is a 403.
  */
 export function originGatedRequestHeaders(): Record<string, string> {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
@@ -159,13 +159,13 @@ export async function registerConfirmedAccount(
   { email, password, name }: { email: string; password: string; name?: string },
 ): Promise<void> {
   const addressProof = await requestSignUpAddressProof(request, email);
-  const response = await request.post("/api/trpc/user.register", {
+  const response = await request.post("/api/trpc/auth.register", {
     headers: originGatedRequestHeaders(),
     data: { addressProof, email, password, ...(name ? { name } : {}) },
   });
   if (!response.ok()) {
     throw new Error(
-      `user.register failed for ${email}: ${response.status()} ${(await response.text()).slice(0, 300)}`,
+      `auth.register failed for ${email}: ${response.status()} ${(await response.text()).slice(0, 300)}`,
     );
   }
   await confirmAddressOf(email);

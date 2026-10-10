@@ -9,9 +9,13 @@ import { basename, dirname, join } from "node:path";
 const simulatorConsoles = [
   "analyticssim",
   "idpsim",
+  "lambdasim",
   "llmsim",
   "mailsim",
+  "outboundsim",
+  "paymentsim",
   "storagesim",
+  "telemetrysim",
   "voicesim",
 ].map((name) => `@langwatch/${name}-web`);
 const consoles = {
@@ -28,7 +32,7 @@ const goModule = (root) => ({
   tags: ["go"],
   targets: {
     "test:go": { executor: "nx:run-commands", options: { cwd: root, command: "go test ./..." } },
-    "lint:go": { command: `make --no-print-directory go-lint GO_LINT_MODULES=${root}` },
+    "lint:go": { command: `make --no-print-directory go-lint-slot GO_LINT_MODULES=${root}` },
     ...(root === "tools" ? { herrgen: { command: "go run ./cmd/herrgen" } } : {}),
   },
 });
@@ -54,7 +58,7 @@ const binary = (root) => {
 const consoleInputs = { tags: ["haven-console"], namedInputs: { goBuild: [] } };
 
 export const createNodes = [
-  "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go,apps/{analyticssim,haven,idpsim,llmsim,mailsim,storagesim,voicesim}-web/package.json}",
+  "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go,apps/{analyticssim,haven,idpsim,lambdasim,llmsim,mailsim,outboundsim,paymentsim,storagesim,telemetrysim,voicesim}-web/package.json}",
   (files, _options, context) =>
     files.map((file) => {
       if (file.endsWith("package.json"))

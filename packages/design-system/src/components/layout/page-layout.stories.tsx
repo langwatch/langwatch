@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PageLayout } from "./page-layout.tsx";
 
 const meta = {
-  title: "Patterns/Page layout",
+  title: "Navigation and layout/Page layout",
+  parameters: {
+    usage: {
+      use: "Every product page: the container, header, title and actions.",
+      avoid: "A standalone branded page such as sign-in: use Branded card.",
+    },
+  },
   component: PageLayout.Container,
   tags: ["autodocs"],
   argTypes: { children: { control: false } },

@@ -3,7 +3,7 @@
  * cap fails with the handled `query_memory_exceeded`, by the error shape the driver raises.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
@@ -29,7 +29,7 @@ function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
     insert: () => Promise.reject(new Error("this suite never inserts")),
     command: () => Promise.reject(new Error("this suite never commands")),
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 describe.skipIf(!enabled)("ClickHouseAnalyticsSessionRepository against ClickHouse", () => {

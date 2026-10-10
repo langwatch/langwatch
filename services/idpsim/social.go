@@ -18,10 +18,6 @@ import (
 // response shapes, signing in as the tenant's users. GitLab and Microsoft
 // paths are what Better Auth builds from its `issuer` and `authority` options.
 
-// socialProviderNames are the providers a tenant plays, in the order the
-// console lists them.
-var socialProviderNames = []string{"google", "github", "gitlab", "microsoft"}
-
 // socialBase is where a provider's endpoints live for this tenant.
 func (t *Tenant) socialBase(provider string) string {
 	return t.BaseURL + "/social/" + provider

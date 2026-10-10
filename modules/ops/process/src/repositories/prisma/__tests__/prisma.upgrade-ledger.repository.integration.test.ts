@@ -1,17 +1,18 @@
+import { randomUUID } from "node:crypto";
+
+import { createLogger } from "@langwatch/observability";
 /**
  * @vitest-environment node
  * Ops' ledger repository against a real Postgres, through the tenancy-guarded client. Rows are
  * seeded inside a transaction that is rolled back, so the shared ledger is left as it was.
  * Spec: modules/ops/specs/upgrades-checkup.feature
  */
-import { randomUUID } from "node:crypto";
-
-import { createLogger } from "@langwatch/observability";
 import {
-  type PrismaConnection,
   PrismaConfigService,
+  type PrismaConnection,
   PrismaConnectionService,
   PrismaTenancyGuardService,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLedgerTables } from "@langwatch/upgrade";
@@ -21,7 +22,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaUpgradeLedgerRepository } from "../prisma.upgrade-ledger.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
-const TENANCY = "-- @tenancy: the test seeds the installation's upgrade ledger.\n";
+// The test seeds the installation's upgrade ledger, which belongs to no tenant.
+const TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 class RolledBack extends Error {}
 

@@ -5,7 +5,7 @@
  * answered for the caller alone, as on main.
  */
 import {
-  browserSessionFact,
+  browserSessionContext,
   defineTrpcRouter,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
@@ -30,7 +30,7 @@ export const personalSessionsTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, actor }) => app.cliSessionRevokeAll({ userId: actor.id }))
 
   .procedure("listWebSessions")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({
     reason: "the caller's own signed-in web sessions, answered for the session's user id alone",
   })
@@ -42,7 +42,7 @@ export const personalSessionsTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("revokeWebSession")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({
     reason:
       "the caller ending one of their own sessions, matched on the session's user id; a session that is not theirs ends nothing",

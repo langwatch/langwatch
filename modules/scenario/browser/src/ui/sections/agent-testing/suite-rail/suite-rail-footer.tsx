@@ -24,7 +24,7 @@ export function SuiteRailFooter({
   setRelativePeriod,
 }: SuiteRailFooterProps) {
   return (
-    <HStack gap={2} paddingX={3} paddingBottom={4} paddingTop={4}>
+    <HStack gap={2} paddingX={1} paddingTop={2}>
       {!collapsed && (
         <AgentTestingPeriodPicker
           period={period}

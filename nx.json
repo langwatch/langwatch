@@ -309,6 +309,15 @@
       },
       {
         "filter": {
+          "projects": ["@langwatch/lambdasim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/lambdasim/web/dist"]
+      },
+      {
+        "filter": {
           "plugin": "./dev/nx/go-plugin.mjs"
         },
         "cache": true,
@@ -358,7 +367,7 @@
       },
       {
         "filter": {
-          "projects": ["@langwatch/test-harness"]
+          "projects": ["@langwatch/test-harness", "@langwatch/eventing"]
         },
         "cache": false
       }
@@ -498,7 +507,7 @@
       "outputs": ["{workspaceRoot}/packages/handled-error/src/codes.generated.ts"]
     }
   },
-  "parallel": 4,
+  "parallel": 2,
   "maxCacheSize": "10GB",
   "analytics": false,
   "pluginsConfig": {

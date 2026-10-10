@@ -4,6 +4,7 @@ The working plan for proving PR #7536 ships safely: graceful upgrades, a seed th
 
 - Work ledger: #8493. Tested-flow ledger: #8553 (sub-issue of #8493).
 - Runbook: [upgrade-and-flow-testing.md](../runbooks/upgrade-and-flow-testing.md). Seed design: [seed-2026-10-09.md](seed-2026-10-09.md).
+- Soak rounds (main seeded heavily, upgraded to this branch, repeated): [upgrade-soak-rounds-2026-10-10.md](upgrade-soak-rounds-2026-10-10.md).
 
 ## 1. Goal
 

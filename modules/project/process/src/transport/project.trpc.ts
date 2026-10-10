@@ -141,6 +141,14 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
     .withPermission("project:update")
     .handle(async ({ app, input, actor }) => {
       await traceSharingStanding({ app, input, actor });
+      if (input.traceSharingEnabled !== undefined) {
+        await app.projects().setTraceSharing({
+          projectId: input.projectId,
+          enabled: input.traceSharingEnabled,
+          revokeExistingLinks: input.revokeExistingLinks ?? true,
+          by: { id: actor.id },
+        });
+      }
 
       const updatedProject = await app.projects().updateSettings(
         {
@@ -149,7 +157,6 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
           language: input.language,
           framework: input.framework,
           teamId: input.teamId,
-          traceSharingEnabled: input.traceSharingEnabled,
           presenceEnabled: input.presenceEnabled,
           userLinkTemplate: input.userLinkTemplate,
           s3Endpoint: input.s3Endpoint || null,

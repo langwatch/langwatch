@@ -6,10 +6,9 @@
  */
 import type { UiFailureNotice } from "@langwatch/browser-host/capabilities";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import { resolveErrorCopy } from "@langwatch/error-views";
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { resolveErrorCopy } from "../../../../../../behavior/errors/logic/resolve-error-copy.ts";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),

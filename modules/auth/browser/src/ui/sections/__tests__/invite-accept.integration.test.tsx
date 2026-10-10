@@ -31,4 +31,12 @@ describe("given the link arrived without its code", () => {
     expect(screen.getByTestId("invite-incomplete")).toBeTruthy();
     expect(screen.getByText(/invitation link is incomplete/i)).toBeTruthy();
   });
+
+  it("ends in a full-width Go to sign in button that goes to sign in", () => {
+    renderWithDesignSystem(<Accept />);
+
+    const action = screen.getByRole("link", { name: "Go to sign in" });
+    expect(action.getAttribute("href")).toBe("/auth/signin");
+    expect(action.className).toContain("lw-front-door-primary");
+  });
 });

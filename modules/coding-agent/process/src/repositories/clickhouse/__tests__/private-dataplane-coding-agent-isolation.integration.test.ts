@@ -21,6 +21,7 @@ import {
   routingDriver,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
@@ -80,7 +81,10 @@ function routedMember({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl
     clientFactory: new VendorFactory(),
   });
   const sessions = CodingAgentSessionClickHouseRepository.create({
-    clickhouse: new ClickHouseQueryClient({ driver: routingDriver(connection) }),
+    clickhouse: new ClickHouseQueryClient({
+      tenantGuard: new TenantGuard(),
+      driver: routingDriver(connection),
+    }),
     defaultTraceRetentionDays: 30,
     metrics: NoopCodingAgentReadMetricsService.create(),
     clock: { nowMs: () => Date.now() },

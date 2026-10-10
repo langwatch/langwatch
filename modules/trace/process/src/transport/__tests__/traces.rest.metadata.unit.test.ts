@@ -1,8 +1,8 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /** `PATCH /api/v1/traces/:traceId/metadata`: main's post-creation metadata amendment. */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -27,13 +27,13 @@ function mount(updateTraceMetadata: TraceApi["updateTraceMetadata"]) {
     app: () => createApiFixture<TraceApi>({ updateTraceMetadata }),
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({
+      bindMiddlewareContext(tracesRestCredential, () => ({
         principal: { type: "apiKey" as const, id: "key-1" },
       })),
     ],

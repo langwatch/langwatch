@@ -1,4 +1,13 @@
-import type { TransportFactBinding } from "@langwatch/api";
+import type { MiddlewareBinding } from "@langwatch/api";
+import {
+  bindRestCredential,
+  type DoorCredential,
+  type ErasedRestDoorDefinition,
+  type RestDoorCredential,
+  type MiddlewareContext,
+  type MiddlewareContextBinding,
+  type RestDoorDefinition,
+} from "@langwatch/api/rest";
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
 import { type FeatureEventing, type ProjectionLaneReplayer } from "@langwatch/eventing";
 import {
@@ -15,6 +24,7 @@ import {
   type TokenMap,
 } from "@langwatch/module";
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
+import type { z } from "zod";
 
 import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
 import {
@@ -97,6 +107,7 @@ export type AppDefinition<
   Dependencies extends TokenMap,
   Config,
   App,
+  Created extends App = App,
   Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
@@ -105,7 +116,7 @@ export type AppDefinition<
     readonly repositories?: FeatureRepositories;
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, never, Channels>,
-    ) => NoInfer<App> | Promise<NoInfer<App>>;
+    ) => Created | Promise<Created>;
   }>;
 
 /**
@@ -117,6 +128,7 @@ export type DeclaredConfigAppDefinition<
   Dependencies extends TokenMap,
   Slice extends ConfigSlice,
   App,
+  Created extends App = App,
   Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
@@ -124,42 +136,149 @@ export type DeclaredConfigAppDefinition<
     readonly repositories?: FeatureRepositories;
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, never, Channels>,
-    ) => NoInfer<App> | Promise<NoInfer<App>>;
+    ) => Created | Promise<Created>;
   }>;
 
 /** Static construction metadata for an app with no semantic configuration. */
 export type AppDefinitionWithoutConfig<
   Dependencies extends TokenMap,
   App,
+  Created extends App = App,
   Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly repositories?: FeatureRepositories;
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, undefined, never, Channels>,
-    ) => NoInfer<App> | Promise<NoInfer<App>>;
+    ) => Created | Promise<Created>;
   }>;
 
-/** Module supplies facts (org, link, media type) its routes declare. */
-export interface ModuleTransportFactSetup<Dependencies extends TokenMap, App> {
+/** What a module's transport bindings and middleware context are built from. */
+export interface ModuleMiddlewareSetup<Dependencies extends TokenMap, App> {
   /** This module's own App, already constructed by the same boot. */
   readonly app: App;
   /** The peer Apps this module declared as dependencies, resolved. */
   readonly dependencies: ResolvedTokens<Dependencies>;
 }
 
-/** The binder itself, run once at install in a role that serves doors. */
-export type ModuleTransportFacts<Dependencies extends TokenMap, App> = (
-  setup: ModuleTransportFactSetup<Dependencies, App>,
-) => readonly TransportFactBinding[];
+/** The doors a module's transports name, read off each REST family's declared type. */
+type NamedDoorsOf<Transports extends readonly FeatureTransportDescriptor[]> =
+  Transports[number] extends infer Transport
+    ? Transport extends {
+        readonly protocol: "rest";
+        readonly router: () => { readonly named?: infer Named };
+      }
+      ? // A family typed with every door (not built by the router) names none it can prove.
+        RestDoorCredential extends Named
+        ? never
+        : Extract<Named, RestDoorCredential>
+      : never
+    : never;
 
-/** What a task binder is handed: the transport-fact setup plus the module's own repositories. */
+/**
+ * A door for every module-bound credential the module's routes name, each needing an Api the
+ * module has, its own or a declared peer's (Alex 2026-10-10 TYPED-DOORS).
+ */
+export type ModuleDoors<Named, Reachable> = {
+  readonly [Credential in Extract<Named, DoorCredential>]: RestDoorDefinition<
+    Credential,
+    FeatureApiIdentity & { readonly name: Reachable }
+  >;
+};
+
+/** This module's name and its peers' Api names: what a door's `needs` may be. */
+type ReachableApi<Module, Dependencies extends TokenMap> =
+  | Module
+  | Extract<Dependencies[keyof Dependencies], FeatureApiIdentity>["name"];
+
+/** The middleware context a module's REST families ask for, read off each declared type. */
+type ContextNeedsOf<Transports extends readonly FeatureTransportDescriptor[]> =
+  Transports[number] extends infer Transport
+    ? Transport extends {
+        readonly protocol: "rest";
+        readonly router: () => { readonly needs?: infer Needs };
+      }
+      ? // A family typed with every context (not built by the router) names none it can prove.
+        MiddlewareContext extends Needs
+        ? never
+        : Extract<Needs, MiddlewareContext>
+      : never
+    : never;
+
+/** What a context's value is read from: the request, and the module that provides it. */
+export type MiddlewareContextSetup<Dependencies extends TokenMap, App> = ModuleMiddlewareSetup<
+  Dependencies,
+  App
+> &
+  Readonly<{
+    /** The validated input, for a context declared `source: "input"`; absent before the body. */
+    input?: unknown;
+  }>;
+
+/** One value per context the module's own routes ask for, keyed by its name (Alex 2026-10-10). */
+export type ModuleMiddlewareContext<
+  Needs extends MiddlewareContext,
+  Dependencies extends TokenMap,
+  App,
+> = {
+  readonly [Context in Needs as Context["name"]]: (
+    request: Request,
+    setup: MiddlewareContextSetup<Dependencies, App>,
+  ) => z.input<Context["schema"]> | Promise<z.input<Context["schema"]>>;
+};
+
+/** The binder itself, run once at install in a role that serves doors. */
+export type ModuleMiddlewareBindings<
+  Dependencies extends TokenMap,
+  App,
+  Bindings extends readonly MiddlewareBinding[] = readonly MiddlewareBinding[],
+> = (
+  setup: ModuleMiddlewareSetup<Dependencies, App> &
+    Readonly<{
+      /** The App behind a token: this module's own, or a declared peer's. */
+      api: (token: FeatureApiIdentity) => unknown;
+    }>,
+) => Bindings;
+
+/** The REST context names a hand-bound list answers; an erased name answers none. */
+type BoundContextNames<Bindings extends readonly MiddlewareBinding[]> = Extract<
+  Bindings[number],
+  MiddlewareContextBinding
+>["middlewareContext"] extends infer Name
+  ? Name extends string
+    ? string extends Name
+      ? never
+      : Name
+    : never
+  : never;
+
+/** The need's name when its hand-bound binding answers a value the schema does not accept. */
+type MistypedContextName<Binding, Need extends MiddlewareContext> = [Binding] extends [never]
+  ? never
+  : Binding extends MiddlewareContextBinding<string, infer Value>
+    ? [Value] extends [z.input<Need["schema"]>]
+      ? never
+      : Need["name"]
+    : never;
+
+/** The contexts a hand-bound list answers with a value its route's schema does not accept. */
+type MistypedContextNames<
+  Bindings extends readonly MiddlewareBinding[],
+  Needs extends MiddlewareContext,
+> = Needs extends MiddlewareContext
+  ? MistypedContextName<
+      Extract<Bindings[number], { readonly middlewareContext: Needs["name"] }>,
+      Needs
+    >
+  : never;
+
+/** What a task binder is handed: the middleware setup plus the module's own repositories. */
 export interface ModuleTaskSetup<
   Dependencies extends TokenMap,
   Repositories,
   App,
   Config = unknown,
-> extends ModuleTransportFactSetup<Dependencies, App> {
+> extends ModuleMiddlewareSetup<Dependencies, App> {
   readonly repositories: Repositories;
   /** This module's slice of the one process parse (§6), as its App's `create` received it. */
   readonly config: Config;
@@ -277,11 +396,11 @@ export interface InstalledFeatureState {
   /** The instantiated repositories, for a module that declared a registry. */
   readonly repositories?: unknown;
   /**
-   * What this module bound for the facts its own declarations name, built in
-   * a role that serves doors. The process mounts these with the family; a
-   * fact left unbound is refused by the door at mount, naming fact and route.
+   * What this module bound for its own declarations (credentials, its API door and
+   * middleware context), built in a role that serves doors. The process mounts these
+   * with the family; anything left unbound is refused by the door at mount, by name.
    */
-  readonly facts?: readonly TransportFactBinding[];
+  readonly middlewareBindings?: readonly MiddlewareBinding[];
   /** The tasks this module's binders built over its App, in the tasks role only. */
   readonly tasks?: readonly unknown[];
   /** The migration steps this module's binders built over its App, in every role. */
@@ -375,6 +494,8 @@ export interface PublishedProcessModule<
     provided: Api;
     dependencies: ResolvedTokens<TokenMap>;
   }>;
+  /** Type-only: a module whose routes ask for context it never provided does not publish. */
+  readonly unprovidedMiddlewareContext?: never;
 }
 
 /** One slice per module name, as a process states the config it hands them. */
@@ -543,7 +664,7 @@ export class ServerFeatureBuilder<
       trpc: undefined,
       worker: undefined,
       close: undefined,
-      transportFacts: undefined,
+      middlewareBindings: undefined,
     });
   }
 }
@@ -594,7 +715,7 @@ interface FeatureAssemblyState<
     | ((args: FeatureWorkerArguments<Config, ResolvedTokens<Dependencies>, Provided>) => Worker)
     | undefined;
   readonly close: ((provided: Provided) => void | Promise<void>) | undefined;
-  readonly transportFacts:
+  readonly middlewareBindings:
     | ((
         args: FeatureTransportArguments<
           Config,
@@ -603,7 +724,7 @@ interface FeatureAssemblyState<
           Provided,
           Transport
         >,
-      ) => readonly TransportFactBinding[])
+      ) => readonly MiddlewareBinding[])
     | undefined;
 }
 
@@ -710,7 +831,7 @@ export class ServerFeatureAssembly<
       transport: create,
       rest: undefined,
       trpc: undefined,
-      transportFacts: undefined,
+      middlewareBindings: undefined,
     });
   }
 
@@ -739,8 +860,8 @@ export class ServerFeatureAssembly<
     return new ServerFeatureAssembly({ ...this.state, rest: create });
   }
 
-  /** Module supplies facts its routes declare. Runs once at install. */
-  withTransportFacts(
+  /** Credentials and middleware context its declarations name. Runs once at install. */
+  provideMiddlewareBindings(
     bind: (
       args: FeatureTransportArguments<
         Config,
@@ -749,7 +870,7 @@ export class ServerFeatureAssembly<
         Provided,
         Transport
       >,
-    ) => readonly TransportFactBinding[],
+    ) => readonly MiddlewareBinding[],
   ): ServerFeatureAssembly<
     Config,
     Dependencies,
@@ -761,7 +882,7 @@ export class ServerFeatureAssembly<
     Worker,
     Name
   > {
-    return new ServerFeatureAssembly({ ...this.state, transportFacts: bind });
+    return new ServerFeatureAssembly({ ...this.state, middlewareBindings: bind });
   }
 
   /** What this feature contributes to the process's tRPC surface. */
@@ -875,10 +996,10 @@ export class ServerFeatureAssembly<
         const doors =
           args.role === "api"
             ? this.bindTransports(setupArguments, provided, args)
-            : { rest: void 0, trpc: void 0, facts: void 0 };
+            : { rest: void 0, trpc: void 0, middlewareBindings: void 0 };
         return {
           provided,
-          ...(doors.facts ? { facts: doors.facts } : {}),
+          ...(doors.middlewareBindings ? { middlewareBindings: doors.middlewareBindings } : {}),
           rest: doors.rest,
           trpc: doors.trpc,
           worker: args.role === "worker" && worker ? () => workerResult : undefined,
@@ -895,7 +1016,7 @@ export class ServerFeatureAssembly<
   ): {
     rest: (() => unknown) | undefined;
     trpc: (() => unknown) | undefined;
-    facts: readonly TransportFactBinding[] | undefined;
+    middlewareBindings: readonly MiddlewareBinding[] | undefined;
   } {
     const state = this.state;
     const { rest, trpc } = state;
@@ -918,7 +1039,9 @@ export class ServerFeatureAssembly<
     return {
       rest: rest ? () => restResult : undefined,
       trpc: trpc ? () => trpcResult : undefined,
-      facts: state.transportFacts ? state.transportFacts(doorArguments) : undefined,
+      middlewareBindings: state.middlewareBindings
+        ? state.middlewareBindings(doorArguments)
+        : undefined,
     };
   }
 }
@@ -982,19 +1105,19 @@ class DefinedFeatureBuilder<Name extends ModuleName, Channels = never, Registry 
   > {
     return new DefinedFeatureBuilder(this.name, channels);
   }
-  withApi<Dependencies extends TokenMap, Config, App>(
-    app: AppDefinition<Dependencies, Config, App, Channels>,
-  ): ConfiguredAppBuilder<Name, Dependencies, Config, App, Registry>;
-  withApi<Dependencies extends TokenMap, Slice extends ConfigSlice, App>(
-    app: DeclaredConfigAppDefinition<Dependencies, Slice, App, Channels>,
-  ): ConfiguredAppBuilder<Name, Dependencies, ConfigOf<Slice>, App, Registry>;
-  withApi<Dependencies extends TokenMap, App>(
-    app: AppDefinitionWithoutConfig<Dependencies, App, Channels>,
-  ): UnconfiguredAppBuilder<Name, Dependencies, App, Registry>;
+  withApi<Dependencies extends TokenMap, Config, App, Created extends App>(
+    app: AppDefinition<Dependencies, Config, App, Created, Channels>,
+  ): ConfiguredAppBuilder<Name, Dependencies, Config, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, Slice extends ConfigSlice, App, Created extends App>(
+    app: DeclaredConfigAppDefinition<Dependencies, Slice, App, Created, Channels>,
+  ): ConfiguredAppBuilder<Name, Dependencies, ConfigOf<Slice>, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, App, Created extends App>(
+    app: AppDefinitionWithoutConfig<Dependencies, App, Created, Channels>,
+  ): UnconfiguredAppBuilder<Name, Dependencies, App, Created, Registry>;
   withApi(
     app:
-      | AppDefinition<TokenMap, unknown, unknown, Channels>
-      | AppDefinitionWithoutConfig<TokenMap, unknown, Channels>,
+      | AppDefinition<TokenMap, unknown, unknown, unknown, Channels>
+      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown, Channels>,
   ): object {
     // The overloads typed `setup.channels`; the builders forward it at runtime.
     const erased = app as
@@ -1215,7 +1338,10 @@ class RepositoryAppBuilder<
     ModuleRepositories<Live, Memory>,
     App,
     Dependencies,
-    Created
+    Created,
+    NamedDoorsOf<Transports>,
+    Name,
+    ContextNeedsOf<Transports>
   > {
     return withContributions<
       ReturnType<
@@ -1236,7 +1362,10 @@ class RepositoryAppBuilder<
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
-      Created
+      Created,
+      NamedDoorsOf<Transports>,
+      Name,
+      ContextNeedsOf<Transports>
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
       workers: [],
@@ -1482,6 +1611,7 @@ class ConfiguredAppBuilder<
   Dependencies extends TokenMap,
   Config,
   App,
+  Created extends App = App,
   Registry = undefined,
 > {
   constructor(
@@ -1498,22 +1628,34 @@ class ConfiguredAppBuilder<
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
-    ReturnType<ConfiguredAppBuilder<Name, Dependencies, Config, App, Registry>["build"]> & {
+    ReturnType<
+      ConfiguredAppBuilder<Name, Dependencies, Config, App, Created, Registry>["build"]
+    > & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
     unknown,
     App,
-    Dependencies
+    Dependencies,
+    Created,
+    NamedDoorsOf<Transports>,
+    Name,
+    ContextNeedsOf<Transports>
   > {
     return withContributions<
-      ReturnType<ConfiguredAppBuilder<Name, Dependencies, Config, App, Registry>["build"]> & {
+      ReturnType<
+        ConfiguredAppBuilder<Name, Dependencies, Config, App, Created, Registry>["build"]
+      > & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
       unknown,
       App,
-      Dependencies
+      Dependencies,
+      Created,
+      NamedDoorsOf<Transports>,
+      Name,
+      ContextNeedsOf<Transports>
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
       workers: [],
@@ -1598,6 +1740,7 @@ class UnconfiguredAppBuilder<
   Name extends ModuleName,
   Dependencies extends TokenMap,
   App,
+  Created extends App = App,
   Registry = undefined,
 > {
   constructor(
@@ -1614,22 +1757,30 @@ class UnconfiguredAppBuilder<
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
-    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Registry>["build"]> & {
+    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Created, Registry>["build"]> & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
     unknown,
     App,
-    Dependencies
+    Dependencies,
+    Created,
+    NamedDoorsOf<Transports>,
+    Name,
+    ContextNeedsOf<Transports>
   > {
     return withContributions<
-      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Registry>["build"]> & {
+      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Created, Registry>["build"]> & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
       unknown,
       App,
-      Dependencies
+      Dependencies,
+      Created,
+      NamedDoorsOf<Transports>,
+      Name,
+      ContextNeedsOf<Transports>
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
       workers: [],
@@ -1720,20 +1871,52 @@ export type ModuleContributions<
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
   Created = App,
+  Named extends RestDoorCredential = never,
+  Module = never,
+  Needs extends MiddlewareContext = never,
 > = Declaration &
   Readonly<{
+    /** Type-only: the names of the context its routes ask for that it has not provided yet. */
+    readonly unprovidedMiddlewareContext?: Needs["name"];
     readonly workers: readonly unknown[];
     readonly tasks: readonly unknown[];
     readonly eventing: FeatureEventing | undefined;
     withWorkers(
       ...workers: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
     withTasks(
       bind: ModuleTaskBinder<Dependencies, Repositories, Created, DeclaredConfigOf<Declaration>>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
     withTasks(
       ...tasks: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
     withMigrations(
       bind: ModuleMigrationBinder<
         Dependencies,
@@ -1741,30 +1924,100 @@ export type ModuleContributions<
         Created,
         DeclaredConfigOf<Declaration>
       >,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
     withMigrations(
       ...steps: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
-    /** What this module binds for the facts its own declarations name. */
-    withTransportFacts(
-      bind: ModuleTransportFacts<Dependencies, App>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    /**
+     * Credentials, the API door and hand-bound middleware context its declarations name. A
+     * bound context counts as provided; one whose value its route's schema refuses is an error.
+     */
+    provideMiddlewareBindings<const Bindings extends readonly MiddlewareBinding[]>(
+      bind: ModuleMiddlewareBindings<Dependencies, Created, Bindings>,
+      ...mistyped: [MistypedContextNames<Bindings, Needs>] extends [never]
+        ? []
+        : [mistypedMiddlewareContext: MistypedContextNames<Bindings, Needs>]
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Exclude<Needs, { readonly name: BoundContextNames<Bindings> }>
+    >;
+    /** The doors for the module-bound credentials its own routes name: exactly those, typed. */
+    withDoors<const Doors extends ModuleDoors<Named, ReachableApi<Module, Dependencies>>>(
+      doors: Doors & {
+        readonly [
+          Extra in Exclude<
+            keyof Doors,
+            keyof ModuleDoors<Named, ReachableApi<Module, Dependencies>>
+          >
+        ]: never;
+      },
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
     withEventing<Definition>(
       eventing: FeatureEventing<Repositories, App, unknown, Definition>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    /** A value for every context its own routes ask for: exactly those names, each typed. */
+    provideMiddlewareContext<
+      const Provided extends ModuleMiddlewareContext<Needs, Dependencies, Created>,
+    >(
+      provided: Provided & {
+        readonly [Extra in Exclude<keyof Provided, Needs["name"]>]: never;
+      },
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created, Named, Module>;
   }>;
 
-/** A built declaration, as the facts and tasks wrappers read the fields they need. */
+/** A built declaration, as the binding and task wrappers read the fields they need. */
 interface InstallableDeclaration {
   readonly name: string;
   readonly dependencies: TokenMap;
   readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
 }
 
-/** Bind transport facts at install (API role only). */
-function bindingTransportFacts<Declaration extends object>(
+/** Bind middleware at install (API role only). */
+function bindingMiddleware<Declaration extends object>(
   declaration: Declaration,
-  bind: ModuleTransportFacts<TokenMap, never>,
+  bind: ModuleMiddlewareBindings<TokenMap, never>,
 ): Declaration {
   const installable = declaration as Declaration & InstallableDeclaration;
 
@@ -1776,13 +2029,18 @@ function bindingTransportFacts<Declaration extends object>(
 
       return {
         ...state,
-        facts: bind({
-          app: state.provided as never,
-          dependencies: resolveTokens(
-            installable.dependencies,
-            args.resolve,
-          ) as ResolvedTokens<TokenMap>,
-        }),
+        middlewareBindings: [
+          ...(state.middlewareBindings ?? []),
+          ...bind({
+            app: state.provided as never,
+            dependencies: resolveTokens(
+              installable.dependencies,
+              args.resolve,
+            ) as ResolvedTokens<TokenMap>,
+            api: (token) =>
+              token.name === installable.name ? state.provided : args.resolve(token),
+          }),
+        ],
       };
     },
   };
@@ -1843,13 +2101,16 @@ function bindingMigrations<Declaration extends object>(
   };
 }
 
-/** Adds the worker, task, facts and eventing halves to a built declaration. */
+/** Adds the worker, task, middleware and eventing halves to a built declaration. */
 function withContributions<
   Declaration extends object,
   Repositories = unknown,
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
   Created = App,
+  Named extends RestDoorCredential = never,
+  Module = never,
+  Needs extends MiddlewareContext = never,
 >({
   declaration,
   workers,
@@ -1860,7 +2121,16 @@ function withContributions<
   workers: readonly unknown[];
   tasks: readonly unknown[];
   eventing?: FeatureEventing;
-}): ModuleContributions<Declaration, Repositories, App, Dependencies, Created> {
+}): ModuleContributions<
+  Declaration,
+  Repositories,
+  App,
+  Dependencies,
+  Created,
+  Named,
+  Module,
+  Needs
+> {
   const contributions = {
     ...declaration,
     workers,
@@ -1890,9 +2160,20 @@ function withContributions<
         eventing,
       });
     },
-    withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never>) =>
+    provideMiddlewareBindings: (bind: ModuleMiddlewareBindings<TokenMap, never>) =>
       withContributions({
-        declaration: bindingTransportFacts(declaration, bind),
+        declaration: bindingMiddleware(declaration, bind),
+        workers,
+        tasks,
+        eventing,
+      }),
+    withDoors: (doors: Readonly<Record<string, ErasedRestDoorDefinition>>) =>
+      withContributions({
+        declaration: bindingMiddleware(declaration, ({ api }) =>
+          Object.values(doors).map((door) =>
+            bindRestCredential(door.credential, () => door.open(api(door.needs))),
+          ),
+        ),
         workers,
         tasks,
         eventing,
@@ -1904,10 +2185,37 @@ function withContributions<
         tasks,
         eventing: withAnotherPipeline(eventing, next),
       }),
-  } as ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    provideMiddlewareContext: (provided: Readonly<Record<string, ContextResolver>>) =>
+      withContributions({
+        declaration: bindingMiddleware(declaration, (setup) =>
+          Object.entries(provided).map(([name, resolve]): MiddlewareContextBinding => ({
+            middlewareContext: name,
+            resolve: (request, input) => resolve(request, { ...setup, input }),
+          })),
+        ),
+        workers,
+        tasks,
+        eventing,
+      }),
+  } as ModuleContributions<
+    Declaration,
+    Repositories,
+    App,
+    Dependencies,
+    Created,
+    Named,
+    Module,
+    Needs
+  >;
 
   return contributions;
 }
+
+/** A provided context's resolver, as the installer holds it once the builder checked its type. */
+type ContextResolver = (
+  request: Request,
+  setup: MiddlewareContextSetup<TokenMap, never>,
+) => unknown;
 
 function isTaskBinder(value: unknown): value is ModuleTaskBinder<TokenMap, unknown, never> {
   return typeof value === "function";

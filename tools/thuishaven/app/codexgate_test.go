@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// GateCodex no longer rewrites the command through `haven run` - see
+// GateCodex no longer rewrites the command through `haven machine run` - see
 // specs/setup/haven-agent-hooks.feature, "Codex heavy commands use the
 // existing Haven gate", and app/gate_test.go's
 // TestCodexGateNeverRewritesTheCommandEither for that behavior in full.

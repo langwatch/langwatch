@@ -1,4 +1,5 @@
 import type {
+  OpsUpgradeDeprecation,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
@@ -18,6 +19,7 @@ import type {
   OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
+import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
   UpgradePreview,
   UpgradeReleaseSummary,
@@ -38,7 +40,12 @@ function runSummaryOf(run: UpgradeRunSummary): OpsUpgradeRunSummary {
   return { id, kind, release, floor, startedAt, finishedAt, outcome };
 }
 
-function statusOf(status: UpgradeStatus): OpsUpgradeStatus {
+function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
+  const { id, what, kind, deprecatedIn, removedIn, notice } = entry;
+  return { id, what, kind, deprecatedIn, removedIn, successor: entry.successor ?? null, notice };
+}
+
+function statusOf(status: UpgradeStatus): Omit<OpsUpgradeStatus, "deprecations"> {
   const { lease, lastRun } = status;
   return {
     state: status.state,
@@ -162,7 +169,8 @@ export class OpsUpgradeService {
   private constructor(private readonly ledger: UpgradeLedgerRepository) {}
 
   async getStatus(): Promise<OpsUpgradeStatus> {
-    return statusOf(await this.ledger.findStatus());
+    const deprecations = this.ledger.findDeprecations().map(deprecationOf);
+    return { ...statusOf(await this.ledger.findStatus()), deprecations };
   }
 
   async listReleases(): Promise<OpsUpgradeReleasePage> {

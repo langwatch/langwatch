@@ -45,6 +45,8 @@ export const observabilityOwner = {
     /** The shared release leaves, so a module reporting its version holds the same instances. */
     serviceVersion,
     resourceAttributes: otelResourceAttributes,
+    /** Pyroscope's own push endpoint; absent means the process does not profile. */
+    profilingServerAddress: c.env("PYROSCOPE_SERVER_ADDRESS", optionalString),
     /** GRAFANA_* leaves, so every role can link an error to its trace and logs. */
     grafana,
     serviceName: c.env("OTEL_SERVICE_NAME", optionalString),

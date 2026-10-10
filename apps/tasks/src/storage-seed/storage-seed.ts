@@ -15,6 +15,7 @@ import {
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
 import {
+  type CustomModelEntry,
   elevenLabsLoopbackKeysSchema,
   getSchemaShape,
   modelProviders,
@@ -38,6 +39,7 @@ import {
   type SeedRole,
 } from "./seed-authz.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
+import { seedGithubFixture } from "./seed-github-fixture.ts";
 import {
   buildAdminUserUpsertArgs,
   LOCAL_DEV_ADMIN_USER_ID,
@@ -47,6 +49,25 @@ import {
 import { chooseSeedLicense, type SeedLicenseChoice } from "./seed-license.ts";
 
 const logger = createLogger("langwatch:tasks:storage-seed");
+
+/** llmsim answers a model named "error-<status>" with that status (`llmsim` skill). */
+const LLMSIM_ERROR_MODELS: CustomModelEntry[] = [429, 500].map((status) => ({
+  modelId: `error-${status}`,
+  displayName: `llmsim error ${status}`,
+  mode: "chat",
+}));
+
+/** The OpenAI row's custom models when haven routes OpenAI at llmsim (HAVEN_SEED_LLMSIM_MODELS). */
+export function llmsimCustomModels({
+  provider,
+  environment,
+}: {
+  provider: string;
+  environment: Readonly<Record<string, string | undefined>>;
+}): CustomModelEntry[] | undefined {
+  if (provider !== "openai" || environment.HAVEN_SEED_LLMSIM_MODELS !== "1") return undefined;
+  return LLMSIM_ERROR_MODELS;
+}
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -128,7 +149,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
 
   // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding, so
   // the UI opens on the real product instead of the "waiting for your first
-  // message" journey (`haven seed --preset demo` sets this and ingests sample
+  // message" journey (`haven db seed demo` sets this and ingests sample
   // traces). HAVEN_SEED_FIRST_MESSAGE=1|0 overrides the flag independently.
   const firstMessageOverride = environment.HAVEN_SEED_FIRST_MESSAGE;
   const hasFirstMessageOverride = firstMessageOverride !== undefined;
@@ -220,7 +241,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       integrated: isPastOnboarding,
     },
     // An explicit override must also be able to CLEAR the flags
-    // (`haven seed --no-first-message`); without one, an existing true is kept.
+    // (`haven db seed --no-first-message`); without one, an existing true is kept.
     update:
       hasFirstMessageOverride || isPastOnboarding
         ? {
@@ -378,7 +399,9 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       projectId: project.id,
       organizationId: organization.id,
       userId: user.id,
+      environment,
     });
+    await seedGithubFixture({ prisma, organizationId: organization.id });
   }
 
   // Only the non-secret default ingestion key is shown in full; anything else is redacted.
@@ -678,6 +701,7 @@ async function seedModelProviderFromEnv({
 
   const id = MODEL_PROVIDER_ID_PREFIX + provider;
   const customKeys = encryption.encrypt(JSON.stringify(keys));
+  const customModels = llmsimCustomModels({ provider, environment: envMap });
   const row = await prisma.modelProvider.upsert({
     where: { id },
     create: {
@@ -686,6 +710,7 @@ async function seedModelProviderFromEnv({
       provider,
       enabled: true,
       customKeys,
+      ...(customModels ? { customModels } : {}),
       organizationId,
     },
     update: { customKeys, enabled: true, disabledAt: null },

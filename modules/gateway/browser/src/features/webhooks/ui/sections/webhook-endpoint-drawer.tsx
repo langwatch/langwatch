@@ -1,6 +1,7 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Button,
@@ -466,7 +467,7 @@ function EventFamilySection({
             data-testid={`webhook-event-${t.type}`}
           >
             <HStack gap={2}>
-              <Text fontSize="sm">{t.type}</Text>
+              <InlineCode>{t.type}</InlineCode>
               {!t.isEmitting && (
                 <Badge size="sm" colorPalette="gray">
                   not emitting yet

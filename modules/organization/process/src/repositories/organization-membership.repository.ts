@@ -97,36 +97,8 @@ export interface AuditLogFilters {
   targetId?: string;
 }
 
-/**
- * Enriched audit log entry with resolved user and project data. Backed by one `AuditLog` table
- * storing both gateway-shape and platform-shape rows; `source` is computed from `targetKind`.
- */
-export interface EnrichedAuditLog {
-  id: string;
-  createdAt: ContractEnrichedAuditLog["createdAt"];
-  /** Nullable to support system-actor writes (background jobs, migrations). */
-  userId: string | null;
-  organizationId: string | null;
-  projectId: string | null;
-  action: string;
-  payload: unknown;
-  ipAddress: string | null;
-  userAgent: string | null;
-  error: string | null;
-  args: unknown;
-  user: { id: string; name: string | null; email: string | null } | null;
-  project: { id: string; name: string } | null;
-  /** Computed: gateway = `targetKind` populated, platform = otherwise. */
-  source: "platform" | "gateway";
-  /** Gateway resource kind — only set when source="gateway". */
-  targetKind: string | null;
-  /** Gateway resource id — only set when source="gateway". */
-  targetId: string | null;
-  /** Gateway-side diff (before state). Only set when source="gateway". */
-  before: unknown;
-  /** Gateway-side diff (after state). Only set when source="gateway". */
-  after: unknown;
-}
+/** Enriched audit log entry: the contract's row, which both twins produce. */
+export type EnrichedAuditLog = ContractEnrichedAuditLog;
 
 /**
  * A membership row with the user it belongs to, as the members management

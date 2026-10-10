@@ -73,7 +73,6 @@ function restHost(): RestHost {
       project: projectDoor,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },

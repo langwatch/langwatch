@@ -10,11 +10,10 @@ import {
 import {
   apiErrorSchema,
   canonicalBaseResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
-  type RestTransportDeclaration,
   type RouteResponse,
 } from "@langwatch/api/rest";
 import {
@@ -30,12 +29,14 @@ import {
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
+import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+
 /**
  * The deep link back into the workbench for the project this credential
- * resolved. A fact, because the deployment's own origin is the process's answer
+ * resolved. Middleware context, because the deployment's own origin is the process's answer
  * and not a module's.
  */
-export const savedWorkbenchChartUrl = defineRestMiddleware("savedWorkbenchChartUrl", z.string());
+export const savedWorkbenchChartUrl = defineMiddlewareContext("savedWorkbenchChartUrl", z.string());
 
 /** The tags every operation in this file carries in the published document. */
 const CHART_TAGS = ["Analytics / LangWatchQL"];
@@ -99,15 +100,7 @@ const PROJECT_ANALYTICS = {
   permanent: true,
 } as const;
 
-/**
- * The type is written out rather than inferred so the declaration emit
- * stays portable.
- */
-export const savedWorkbenchChartRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<DashboardApi>;
-}> = defineRestRouter(DashboardApi)
+export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
   .withNamespace("saved-workbench-charts")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")
@@ -116,7 +109,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartProjectParamsSchema)
   .withPermission("analytics:view")
-  .withMiddleware(savedWorkbenchChartUrl)
+  .withMiddlewareContext(savedWorkbenchChartUrl)
   .withOutput(savedWorkbenchChartListSchema)
   .withDocs({
     summary: "List saved workbench charts",
@@ -131,9 +124,9 @@ export const savedWorkbenchChartRest: Readonly<{
       },
     },
   })
-  .handle(async ({ app, scope }, platformUrl) => {
+  .handle(async ({ app, scope, actor }, platformUrl) => {
     const projectId = await projectFor({ app, scope });
-    const charts = await app.listSavedWorkbenchCharts({ projectId });
+    const charts = await app.listSavedWorkbenchCharts({ projectId, ...viewerOfActor({ actor }) });
 
     return { data: charts.map((chart) => chartResource(chart, platformUrl)) };
   })
@@ -146,7 +139,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withParams(savedWorkbenchChartProjectParamsSchema)
   .withInput(createSavedWorkbenchChartSchema)
   .withPermission("analytics:create")
-  .withMiddleware(savedWorkbenchChartUrl, langWatchQLCallerProtections)
+  .withMiddlewareContext(savedWorkbenchChartUrl, langWatchQLCallerProtections)
   .withOutput(savedWorkbenchChartResourceSchema)
   .withStatus(201)
   .withDocs({
@@ -181,7 +174,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:view")
-  .withMiddleware(savedWorkbenchChartUrl)
+  .withMiddlewareContext(savedWorkbenchChartUrl)
   .withOutput(savedWorkbenchChartResourceSchema)
   .withDocs({
     summary: "Get a saved workbench chart",
@@ -197,9 +190,13 @@ export const savedWorkbenchChartRest: Readonly<{
       },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = await projectFor({ app, scope });
-    const chart = await app.getSavedWorkbenchChart({ chartId: input.chartId, projectId });
+    const chart = await app.getSavedWorkbenchChart({
+      chartId: input.chartId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
 
     return chartResource(chart, platformUrl);
   })
@@ -212,7 +209,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withParams(savedWorkbenchChartParamsSchema)
   .withInput(updateSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
-  .withMiddleware(savedWorkbenchChartUrl, langWatchQLCallerProtections)
+  .withMiddlewareContext(savedWorkbenchChartUrl, langWatchQLCallerProtections)
   .withOutput(savedWorkbenchChartResourceSchema)
   .withDocs({
     summary: "Update a saved workbench chart",
@@ -228,12 +225,13 @@ export const savedWorkbenchChartRest: Readonly<{
       },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl, protections) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl, protections) => {
     const projectId = await projectFor({ app, scope });
     const { name, definition } = input;
     const chart = await app.updateSavedWorkbenchChart({
       chartId: input.chartId,
       projectId,
+      ...viewerOfActor({ actor }),
       ...(name === undefined ? {} : { name }),
       ...(definition === undefined ? {} : { definitionUpdate: { definition, protections } }),
     });
@@ -260,10 +258,14 @@ export const savedWorkbenchChartRest: Readonly<{
       204: { description: "The chart was deleted", content: {} },
     },
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = await projectFor({ app, scope });
 
-    await app.deleteSavedWorkbenchChart({ chartId: input.chartId, projectId });
+    await app.deleteSavedWorkbenchChart({
+      chartId: input.chartId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
   })
 
   .put(
@@ -274,7 +276,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withParams(savedWorkbenchChartParamsSchema)
   .withInput(placeSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
-  .withMiddleware(savedWorkbenchChartUrl)
+  .withMiddlewareContext(savedWorkbenchChartUrl)
   .withOutput(savedWorkbenchChartResourceSchema)
   .withDocs({
     summary: "Place a saved workbench chart on a dashboard",
@@ -290,10 +292,15 @@ export const savedWorkbenchChartRest: Readonly<{
       },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = await projectFor({ app, scope });
     const { projectId: _requested, chartId, ...placement } = input;
-    const chart = await app.placeSavedWorkbenchChart({ projectId, chartId, ...placement });
+    const chart = await app.placeSavedWorkbenchChart({
+      projectId,
+      chartId,
+      ...placement,
+      ...viewerOfActor({ actor }),
+    });
 
     return chartResource(chart, platformUrl);
   })
@@ -317,9 +324,13 @@ export const savedWorkbenchChartRest: Readonly<{
       204: { description: "The chart is no longer on any dashboard", content: {} },
     },
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = await projectFor({ app, scope });
 
-    await app.unplaceSavedWorkbenchChart({ chartId: input.chartId, projectId });
+    await app.unplaceSavedWorkbenchChart({
+      chartId: input.chartId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
   })
   .build();

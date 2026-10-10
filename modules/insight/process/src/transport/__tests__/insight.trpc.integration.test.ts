@@ -6,9 +6,13 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
-import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
+import {
+  createTrpcRuntime,
+  TrpcRootDefinition,
+  type TrpcRuntimeMembers,
+} from "@langwatch/api/trpc";
 import { deriveInsightInbox, INSIGHT_EVENT_TYPES } from "@langwatch/insight-contract";
-import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import { testAuthorizeDefaults, trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { nowInstant } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +40,19 @@ const REPLAY = {
   parameters: {},
 };
 
+/** An organisation admin on an aggregate: the admin gate admits, so the write guard decides. */
+const ON_AGGREGATE: Pick<TrpcRuntimeMembers<TestContext>, "authorization"> = {
+  authorization: {
+    forRequest: () => ({
+      ...testAuthorizeDefaults,
+      projectKindOf: async () => "aggregate",
+      getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
+      getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
+      checkScopeLineage: async () => ({ kind: "consistent" }),
+    }),
+  },
+};
+
 let installed: InstalledInsight | undefined;
 
 afterEach(async () => {
@@ -49,12 +66,23 @@ async function project({ isEnabled = true }: { isEnabled?: boolean } = {}) {
   installed = await installInsight({ isEnabled });
   const { app, gateAsks, eventTypesOf } = installed;
 
-  const as = ({ userId, held = VIEW }: { userId: string; held?: readonly string[] }) => {
+  const as = ({
+    userId,
+    held = VIEW,
+    isOnAggregate = false,
+  }: {
+    userId: string;
+    held?: readonly string[];
+    isOnAggregate?: boolean;
+  }) => {
     const trpc = TrpcRootDefinition.forContext<TestContext>().create();
     return createTrpcRuntime<TestContext>({
       root: trpc,
       procedure: trpc.procedure,
-      members: trpcTestMembers<TestContext>({ permits: (permission) => held.includes(permission) }),
+      members: trpcTestMembers<TestContext>({
+        permits: (permission) => held.includes(permission),
+        ...(isOnAggregate ? { overrides: ON_AGGREGATE } : {}),
+      }),
     })
       .mount(insightTrpcTransport, () => app)
       .createCaller({ actor: { id: userId } });
@@ -137,6 +165,31 @@ describe("given the insights tRPC family", () => {
       await expect(owner.getAll({ projectId: PROJECT })).rejects.toMatchObject({
         cause: { code: "insights_not_enabled" },
       });
+    });
+  });
+
+  describe("when an organisation admin writes on an aggregate project", () => {
+    /** @scenario "An aggregate project takes no insight write" */
+    it("refuses each write as read only before the module is asked, and still reads", async () => {
+      const { as, gateAsks } = await project();
+      const admin = as({ userId: OWNER, isOnAggregate: true });
+      const insightId = "insight_any";
+
+      const writes = [
+        admin.file(filing()),
+        admin.markSeen({ projectId: PROJECT, insightIds: [insightId] }),
+        admin.archive({ projectId: PROJECT, insightId }),
+        admin.keep({ projectId: PROJECT, insightId }),
+      ];
+
+      for (const write of writes) {
+        await expect(write).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          cause: { code: "aggregate_project_is_read_only" },
+        });
+      }
+      expect(gateAsks).toEqual([]);
+      await expect(admin.getAll({ projectId: PROJECT })).resolves.toEqual([]);
     });
   });
 

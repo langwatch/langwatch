@@ -20,17 +20,20 @@ export function peopleCutItems({
   memberCount,
   openInviteCount,
   requestCount,
+  joinRequestsEnabled,
 }: {
   memberCount: number;
   openInviteCount: number;
   requestCount: number;
+  joinRequestsEnabled: boolean;
 }): { value: PeopleCut; label: string; count: number }[] {
-  return [
+  const cuts: { value: PeopleCut; label: string; count: number }[] = [
     { value: "all", label: "Everybody", count: memberCount + openInviteCount + requestCount },
     { value: "members", label: "Members", count: memberCount },
     { value: "invited", label: "Invited", count: openInviteCount },
     { value: "waiting", label: "Waiting to join", count: requestCount },
   ];
+  return joinRequestsEnabled ? cuts : cuts.filter((item) => item.value !== "waiting");
 }
 
 /** What an empty cut says; never one sentence for all four. */

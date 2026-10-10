@@ -7,8 +7,8 @@
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Heading, Text, VStack } from "@langwatch/design-system/primitives";
-import { Lock } from "lucide-react";
+import { Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 
 import { scimApi } from "../../behavior/scim-api.ts";
 import { isRunningConnection } from "../../model/connection-lifecycle.ts";
@@ -87,17 +87,7 @@ export function ScimSettingsContent({
           />
         </>
       ) : (
-        <Alert.Root status="warning">
-          <Alert.Indicator>
-            <Lock size={16} />
-          </Alert.Indicator>
-          <Alert.Content>
-            <Alert.Title>Access Restricted</Alert.Title>
-            <Alert.Description>
-              {`You don't have permission to view this content. Required permission: ${SCIM_PAGE_PERMISSION}. Ask your team administrator to request access.`}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <RestrictedAccess permission={SCIM_PAGE_PERMISSION} area="directory provisioning" />
       )}
     </VStack>
   );

@@ -3,9 +3,10 @@
  * Spec: specs/governance/aggregate-project.feature
  */
 import { type Authorization, sealAuthorization } from "@langwatch/authorization";
+import { tenantScope } from "@langwatch/clickhouse-markers";
 import { describe, expect, it, vi } from "vitest";
 
-import { AuthorizedClickHouse, fenceExpression, tenantScope } from "../authorized-reads.ts";
+import { AuthorizedClickHouse, fenceExpression } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import type { QueryDriver } from "../query.ts";
 import { checkTenantScope, TenantGuard } from "../tenantGuard.ts";
@@ -98,8 +99,8 @@ describe("a tenant set bound as one Array(String) parameter", () => {
     const check = ({ sql = read, params = {} }: { sql?: string; params?: object }) =>
       checkTenantScope({ sql, params: { ...fence.params, ...params }, tenantId: AGG, tenantIds });
 
+    /** @scenario "The tenant guard admits the proof's fence and nothing wider" */
     it("accepts it, the shared-grant OR included", () => {
-      // @scenario "The tenant guard admits the proof's fence and nothing wider"
       expect(check({})).toBeNull();
     });
 
@@ -108,6 +109,7 @@ describe("a tenant set bound as one Array(String) parameter", () => {
       expect(check({ sql })).toBeNull();
     });
 
+    /** @scenario "The tenant guard admits the proof's fence and nothing wider" */
     it.each([
       ["holding a tenant outside tenantIds", { tenantScope_all: [...tenantIds, OUTSIDE] }],
       ["missing a declared tenant", { tenantScope_all: [AGG, member(0)] }],
@@ -117,6 +119,7 @@ describe("a tenant set bound as one Array(String) parameter", () => {
       expect(check({ params })).toMatchObject({ kind: "tenant-set-mismatch" });
     });
 
+    /** @scenario "The tenant guard admits the proof's fence and nothing wider" */
     it.each([
       ["at the top level beside the set", `${read} OR 1 = 1`],
       [
@@ -139,6 +142,7 @@ describe("a tenant set bound as one Array(String) parameter", () => {
       expect(check({ sql })).toEqual({ kind: "weakening-disjunction" });
     });
 
+    /** @scenario "The tenant guard admits the proof's fence and nothing wider" */
     it.each([
       ["the fence", `SELECT 1 FROM t WHERE NOT ${fence.sql}`],
       ["the bare set", "SELECT 1 FROM t WHERE NOT TenantId IN ({tenantScope_all:Array(String)})"],

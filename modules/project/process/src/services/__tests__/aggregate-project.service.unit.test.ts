@@ -136,8 +136,9 @@ describe("AggregateProjectService", () => {
     ).rejects.toBeInstanceOf(AggregateProjectAdminOnlyError);
   });
 
+  /** @scenario "A rule that names a project in another organisation is refused" */
   it("refuses an explicit rule naming a project of another organisation or an aggregate", async () => {
-    const { service } = setup({ role: "ADMIN" });
+    const { service, changes } = setup({ role: "ADMIN" });
     for (const projectIds of [["elsewhere"], ["agg"], ["shared", "missing"]]) {
       await expect(
         service.createFields({
@@ -148,6 +149,7 @@ describe("AggregateProjectService", () => {
         }),
       ).rejects.toBeInstanceOf(AggregateRuleOutsideOrganizationError);
     }
+    expect(changes).toEqual([]);
   });
 
   it("replaces a live aggregate's rule, records the change and answers its members pending", async () => {

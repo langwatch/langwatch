@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Spec: enterprise/modules/scim/specs/scim-request-log.feature */
+/** Spec: enterprise/modules/scim/specs/scim-request-log.feature, scim.feature */
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -58,6 +58,28 @@ describe("MemoryScimRepository", () => {
         limit: 10,
       });
       expect(kept.map((row) => row.resource)).toEqual(["Groups"]);
+    });
+  });
+
+  describe("when a group is looked up by id", () => {
+    /** @scenario "A group made in LangWatch is out of a directory token's reach by id" */
+    it("finds a pushed group and not one made in LangWatch", async () => {
+      const { repository } = clocked();
+      const pushed = await repository.createGroup({
+        organizationId: "org_acme",
+        name: "Pushed",
+        slug: "pushed",
+        externalId: null,
+        connectionId: "conn_1",
+      });
+      repository.groups.push({ ...pushed, id: "group_made_here", scimSource: null });
+
+      expect(await repository.findGroup({ organizationId: "org_acme", id: pushed.id })).toEqual(
+        pushed,
+      );
+      expect(
+        await repository.findGroup({ organizationId: "org_acme", id: "group_made_here" }),
+      ).toBeNull();
     });
   });
 

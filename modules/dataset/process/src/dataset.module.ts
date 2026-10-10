@@ -1,3 +1,4 @@
+import { projectRequestContextOf } from "@langwatch/api/rest";
 import type { DatasetApi, DatasetServerConfig } from "@langwatch/dataset-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -18,6 +19,7 @@ export const datasetProcessModule: PublishedProcessModule<
   .withRepositories(datasetRepositories)
   .withApi(DatasetModule)
   .withTransports(createDatasetRest(), datasetTrpcTransport, datasetRecordTrpcTransport)
+  .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
   .withEventing(datasetNormalizationEventing)
   // Background, after old writers are gone: an older image may still write postgres-layout content.
   .withMigrations(({ repositories, dependencies }) => [

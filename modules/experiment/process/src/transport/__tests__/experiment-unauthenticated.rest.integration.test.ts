@@ -4,10 +4,10 @@
  */
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -41,13 +41,13 @@ function keyDoorOver(app: Partial<ExperimentV3RestApi>) {
     app: () => api,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "acme",
         viewerUserId: null,
         actorId: "key-1",
       })),
-      bindRestMiddleware(experimentWorkbenchCredential, () => ({
+      bindMiddlewareContext(experimentWorkbenchCredential, () => ({
         kind: "legacyProjectKey" as const,
       })),
     ],

@@ -19,7 +19,7 @@ type Offer = {
 };
 
 const { state, calls } = vi.hoisted(() => ({
-  state: { offer: undefined as Offer | undefined, order: [] as string[] },
+  state: { offer: undefined as Offer | undefined, order: [] as string[], governedBySso: false },
   calls: {
     dismiss: vi.fn(),
     cancel: vi.fn(),
@@ -48,6 +48,11 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
         },
       },
     }),
+    identity: {
+      mySignInGovernance: {
+        useQuery: () => ({ data: { governedBySso: state.governedBySso }, isPending: false }),
+      },
+    },
     user: {
       secureAccountNudge: { useQuery: () => ({ data: state.offer }) },
       dismissSecureAccountNudge: {
@@ -68,6 +73,7 @@ const BOTH: Offer = { offer: true, passkey: true, twoStep: true, signedInWith: "
 beforeEach(() => {
   state.offer = BOTH;
   state.order = [];
+  state.governedBySso = false;
   for (const call of Object.values(calls)) call.mockReset();
 });
 
@@ -160,6 +166,27 @@ describe("when a passkey is created", () => {
 
     await waitFor(() => expect(host.recording.successes).toEqual([{ title: "Passkey created" }]));
     expect(calls.dismiss).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
+  });
+});
+
+describe("given an account whose organization's single sign-on governs sign-in", () => {
+  /** @scenario "A person whose organization's single sign-on governs sign-in is not offered a passkey" */
+  it("drops the passkey and says single sign-on handles sign-in", () => {
+    state.governedBySso = true;
+    renderWithPersonalWorkspaceHost(<SecureAccountNudge />, { host: fakePersonalWorkspaceHost() });
+
+    expect(screen.queryByTestId("nudge-create-passkey")).toBeNull();
+    expect(screen.getByTestId("nudge-set-up-two-step")).toBeTruthy();
+    expect(screen.getByTestId("nudge-sso-governed")).toBeTruthy();
+  });
+
+  /** @scenario "A person whose organization's single sign-on governs sign-in is not offered a passkey" */
+  it("shows nothing when a passkey was all there was to offer", () => {
+    state.governedBySso = true;
+    state.offer = { ...BOTH, twoStep: false };
+    renderWithPersonalWorkspaceHost(<SecureAccountNudge />, { host: fakePersonalWorkspaceHost() });
+
     expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
   });
 });

@@ -2,7 +2,6 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   BadRequestError,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
@@ -144,11 +143,7 @@ function parseDeliveriesCursor(
   return { firedAt: Temporal.Instant.fromEpochMilliseconds(parsedMs), id: cursorId };
 }
 
-export const webhookRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<WebhookApi>;
-}> = defineRestRouter(WebhookApi)
+export const webhookRest = defineRestRouter(WebhookApi)
   .withNamespace("webhooks")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
@@ -172,6 +167,7 @@ export const webhookRest: Readonly<{
     description:
       "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
   })
+  .withAudit("management.webhook-endpoints.create")
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
@@ -229,6 +225,7 @@ export const webhookRest: Readonly<{
     description:
       "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
   })
+  .withAudit("management.webhook-endpoints.update")
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
@@ -257,6 +254,7 @@ export const webhookRest: Readonly<{
     summary: "Archive a webhook endpoint",
     description: "Archive a webhook endpoint",
   })
+  .withAudit("management.webhook-endpoints.archive")
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
@@ -275,6 +273,7 @@ export const webhookRest: Readonly<{
     description:
       "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
   })
+  .withAudit("management.webhook-endpoints.roll-secret")
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 

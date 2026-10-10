@@ -81,7 +81,7 @@ type Output = {
 }[];
 
 // topics.getTopicCounts
-type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:90
+type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:91
 type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:92
 
 // topics.getClusteringStatus

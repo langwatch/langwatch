@@ -1,5 +1,4 @@
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
-import { Lightbulb } from "lucide-react";
+import { CommandBarHint } from "@langwatch/design-system/app-shell";
 import { useEffect, useState } from "react";
 
 import { HINTS } from "../../model/command-bar-constants.ts";
@@ -16,27 +15,5 @@ export function HintsSection() {
     setHintIndex(Math.floor(Math.random() * HINTS.length));
   }, []);
 
-  const hint = HINTS[hintIndex];
-
-  return (
-    <HStack
-      borderTop="1px solid"
-      borderColor="border.subtle"
-      px={{ base: 4, md: 5 }}
-      py={2.5}
-      gap={2.5}
-      fontSize="12px"
-      color="fg.muted"
-    >
-      <Box color="yellow.500" flexShrink={0}>
-        <Lightbulb size={14} />
-      </Box>
-      <Text>
-        <Text as="span" fontWeight="medium">
-          Tip:
-        </Text>{" "}
-        {hint}
-      </Text>
-    </HStack>
-  );
+  return <CommandBarHint hint={HINTS[hintIndex]} />;
 }

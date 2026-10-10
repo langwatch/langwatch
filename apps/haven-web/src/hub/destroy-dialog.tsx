@@ -8,7 +8,7 @@ export type DestroyDialogProps = {
   onConfirm: () => void;
 };
 
-/** Destroy drops databases, so it waits for the slug typed out: `haven destroy <slug>`. */
+/** Destroy drops databases, so it waits for the slug typed out (`haven down --destroy`). */
 export const DestroyDialog = ({ slug, open, onClose, onConfirm }: DestroyDialogProps) => {
   const [typed, setTyped] = useState("");
   const close = () => {

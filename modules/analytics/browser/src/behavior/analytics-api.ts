@@ -30,6 +30,7 @@ import type { z } from "zod";
 
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
+import type { AnalyticsScopeGraph } from "../model/analytics-personal-project.ts";
 import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
@@ -70,6 +71,7 @@ export type AnalyticsReadScope = ProjectScope & {
   query?: string;
   traceIds?: string[];
   negateFilters?: boolean;
+  excludeOrigins?: string[];
 };
 
 /** One stored builder chart: Graph plus kind discriminator. */
@@ -379,6 +381,10 @@ type BorrowedProcedures = {
         input: { isDemo?: boolean };
         output: unknown;
       };
+    };
+    /** The shell's scope skeleton, narrowed to what this family reads; shares its cache. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: AnalyticsScopeGraph };
     };
   };
   project: {

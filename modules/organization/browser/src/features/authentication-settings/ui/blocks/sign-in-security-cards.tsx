@@ -3,17 +3,9 @@ import type { SignInSecuritySettings } from "@langwatch/auth-contract";
  * The two sign-in security cards (GAC-09, GAC-10). Presentational: each is
  * handed the saved settings and a save callback, and keeps its own draft.
  */
-import {
-  Alert,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Alert, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
+import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { LockKeyhole, Timer } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -70,23 +62,15 @@ function PolicyCard({
   children: ReactNode;
 }) {
   return (
-    <Card.Root width="full" data-testid={testId}>
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <VStack align="start" gap={0.5}>
-            <HStack gap={2}>
-              {leading}
-              <Heading size="sm">{title}</Heading>
-            </HStack>
-            <Text fontSize="xs" color="fg.muted">
-              {hint}
-            </Text>
-          </VStack>
-          {children}
-          {actions}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <SettingsCard
+      title={title}
+      hint={hint}
+      leading={leading}
+      actions={actions}
+      data-testid={testId}
+    >
+      {children}
+    </SettingsCard>
   );
 }
 
@@ -108,15 +92,19 @@ function RuleOptions({
           borderWidth="1px"
           borderColor="border.muted"
           borderRadius="md"
+          background="bg.panel"
+          transition="background 0.15s ease, border-color 0.15s ease"
+          _checked={{ borderColor: "colorPalette.solid", background: "bg.muted" }}
+          _hover={{ borderColor: "border.emphasized" }}
         >
           <RadioGroup.ItemHiddenInput data-testid={`${testIdPrefix}-${option.value}`} />
           <RadioGroup.ItemIndicator />
           <RadioGroup.ItemText>
             <VStack align="start" gap={0}>
-              <Text fontSize="13px" fontWeight="500">
+              <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
                 {option.label}
               </Text>
-              <Text color="fg.muted" fontSize="11.5px">
+              <Text color="fg.muted" fontSize="xs" lineHeight="1.5">
                 {option.help}
               </Text>
             </VStack>
@@ -234,6 +222,7 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
         value={locking ? "lock" : "never"}
         onValueChange={(event) => setAttempts(event.value === "lock" ? OFFERED_ATTEMPTS : 0)}
         disabled={saving}
+        colorPalette="orange"
       >
         <RuleOptions options={LOCKOUT_OPTIONS} testIdPrefix="sign-in-lockout" />
       </RadioGroup.Root>
@@ -301,6 +290,7 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
           if (!next) setMaximum(0);
         }}
         disabled={saving}
+        colorPalette="orange"
       >
         <RuleOptions options={SESSION_OPTIONS} testIdPrefix="session-limit" />
       </RadioGroup.Root>

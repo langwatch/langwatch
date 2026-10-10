@@ -20,6 +20,7 @@ import {
   ScimSyncStateFoldProjection,
   type ScimSyncFoldState,
 } from "../../eventing/scim-sync-state.projection.ts";
+import { MemoryScimSyncActivityRepository } from "../../repositories/memory/memory.scim-sync-activity.repository.ts";
 import { ScimSyncReadRepository } from "../../repositories/scim-sync.repository.ts";
 import {
   ScimReconciliationService,
@@ -180,7 +181,10 @@ function opsViewOver({ row }: { row: ScimSyncState }) {
     }
   }
 
-  return ScimSyncReadsService.create({ syncs: new RowSyncs(), activity: null });
+  return ScimSyncReadsService.create({
+    syncs: new RowSyncs(),
+    activity: MemoryScimSyncActivityRepository.create(),
+  });
 }
 
 describe("given both reconciliation views have been read for an organization", () => {

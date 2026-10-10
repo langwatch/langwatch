@@ -280,16 +280,14 @@ function TokenDialogs({ tokens }: { tokens: ScimTokens }) {
           }
         }}
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Token issued
-            </Dialog.Title>
+            <Dialog.Title>Token issued</Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
-          <Dialog.Body paddingBottom={6}>
+          <Dialog.Body>
             <VStack gap={4} align="start">
-              <Text color="orange.500" fontWeight="600">
+              <Text color="fg.warning" fontWeight="medium">
                 Copy this token now. It is shown once and never again.
               </Text>
               {tokens.newToken && <CopyInput value={tokens.newToken} label="Provisioning token" />}
@@ -304,34 +302,32 @@ function TokenDialogs({ tokens }: { tokens: ScimTokens }) {
           if (!open) tokens.setTokenToRevoke(null);
         }}
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Revoke this token?
-            </Dialog.Title>
+            <Dialog.Title>Revoke this token?</Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
-          <Dialog.Body paddingBottom={6}>
+          <Dialog.Body>
             <VStack gap={4} align="start">
               <Text>
                 The identity provider using it stops being able to provision anyone through this
                 connection, immediately.
               </Text>
-              <HStack width="full" justify="end" gap={2}>
-                <Button variant="outline" onClick={() => tokens.setTokenToRevoke(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  colorPalette="red"
-                  onClick={() => tokens.tokenToRevoke && tokens.handleRevoke(tokens.tokenToRevoke)}
-                  disabled={tokens.revokeMutation.isPending}
-                  data-testid="scim-token-revoke-confirm"
-                >
-                  Revoke
-                </Button>
-              </HStack>
             </VStack>
           </Dialog.Body>
+          <Dialog.Footer>
+            <Button variant="outline" onClick={() => tokens.setTokenToRevoke(null)}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              onClick={() => tokens.tokenToRevoke && tokens.handleRevoke(tokens.tokenToRevoke)}
+              loading={tokens.revokeMutation.isPending}
+              data-testid="scim-token-revoke-confirm"
+            >
+              Revoke
+            </Button>
+          </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
     </>
@@ -354,14 +350,12 @@ function GenerateTokenDialog({ tokens }: { tokens: ScimTokens }) {
         }
       }}
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Issue a provisioning token
-          </Dialog.Title>
+          <Dialog.Title>Issue a provisioning token</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body paddingBottom={6}>
+        <Dialog.Body>
           <VStack gap={4} align="start">
             <Text>
               This token manages the people its connection provisioned, and can take on members no
@@ -433,14 +427,6 @@ function GenerateTokenDialog({ tokens }: { tokens: ScimTokens }) {
                   : "Paste the value from your identity provider if it already has one, or leave this empty."}
               </Text>
             </VStack>
-            <Button
-              width="full"
-              onClick={tokens.handleGenerate}
-              disabled={tokens.generateMutation.isPending || held}
-              data-testid="scim-generate-submit"
-            >
-              {hasSecret ? "Save token" : "Generate token"}
-            </Button>
             {!tokens.generateMutation.isPending && held && (
               <Text color="fg.muted" fontSize="xs">
                 {tokens.hasIssuableConnection
@@ -450,6 +436,20 @@ function GenerateTokenDialog({ tokens }: { tokens: ScimTokens }) {
             )}
           </VStack>
         </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="outline" onClick={tokens.onGenerateClose}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="orange"
+            onClick={tokens.handleGenerate}
+            loading={tokens.generateMutation.isPending}
+            disabled={held}
+            data-testid="scim-generate-submit"
+          >
+            {hasSecret ? "Save token" : "Generate token"}
+          </Button>
+        </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );

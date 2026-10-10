@@ -1,6 +1,6 @@
 // Spec: specs/ai-gateway/budgets.feature. Gateway's per-key spend reads, over real ClickHouse.
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -34,7 +34,7 @@ function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
     insert: () => Promise.reject(new Error("the attribute spend reads never insert")),
     command: () => Promise.reject(new Error("the attribute spend reads never command")),
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 function row(args: {

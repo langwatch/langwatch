@@ -25,11 +25,22 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 The nine simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
 `outbound`, `payment`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
 `mail`, `idp`, `storage`, `payment` and `telemetry` run by default; the rest need `haven up +<name>`.
-`haven logs <name>` reads any of them. `haven sims --json` is the agent's entry:
+`haven logs <name>` reads any of them. `haven sim --json` is the agent's entry:
 one row per simulator with whether it runs in this stack, its console URL, the
 `haven up +<name>` it needs if off, its verbs and its skill. `telemetry` sends
 OTLP traffic:
-`haven telemetry send|load|fuzz|status|stop`.
+`haven sim telemetry send|load|fuzz|status|stop`.
+
+Forced errors: `haven llm|analytics|mail|storage set --error <0|4xx|5xx>` makes that sim
+refuse calls (llm: generation; analytics: captures; mail: SMTP sends; storage: PUT/GET
+object); `--error 0` clears it. `haven browser click <ref> --download-to <path>` saves the
+download a click starts and prints its name, size and mediaType as JSON.
+
+Second factors are mfasim, which lives in the `haven browser` daemon rather than a Go
+service: `haven browser mfa add|list|remove|uv` attaches Chromium virtual passkeys, security keys
+and U2F tokens to a lane's page, and `haven browser mfa totp enroll|fill [--wrong]` reads a TOTP
+secret off the enrolment page into the lane's state (mode 600) and types codes from it.
+No verb prints the secret or a code. Skill: `.claude/skills/mfasim/SKILL.md`.
 
 In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
 with `LANGWATCH_DEV_ONE_PROCESS=0` every selected simulator runs in the `sims` lane: a second `service combined`
@@ -83,17 +94,17 @@ the daemon rather than the stack, so it answers while the stack is down (see
 There is none. The first `haven up` bootstraps the machine itself: installs
 portless if missing, trusts its CA, starts the proxy — every step idempotent.
 `make haven install` (optional) go-installs the binary so plain `haven ...`
-works everywhere, and then runs `haven install`, which checks the machine for
+works everywhere, and then runs `haven self install`, which checks the machine for
 everything else haven drives — node, pnpm, go, the brew formulae behind the
 shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus and
 Loki from Homebrew, the pinned ClickHouse, Tempo and Alloy downloads), and an
 optional container runtime (colima only backs the container fallback, `haven
 play` and sandboxed langy; macOS needs none, so its report leaves the row off and
-`haven install runtime=colima` installs it on request) — and offers to install what is missing. With no
+`haven self install runtime=colima` installs it on request) — and offers to install what is missing. With no
 terminal (`make haven install` from an agent) it runs `--yes`: no prompts, one
 line per step, already-installed rows left alone, and only a missing required
 prerequisite fails. In a terminal nothing is installed without being ticked, and anything declined with
-"never" is remembered for the machine (`haven install --reset-skips` undoes
+"never" is remembered for the machine (`haven self install --reset-skips` undoes
 that). Hostname routing is opt-in — `pnpm dev` uses the plain `PORT` scheme:
 
 ```bash
@@ -113,12 +124,13 @@ Open <https://langwatch.localhost> to see every stack across your worktrees.
 ## Commands
 
 One name per command, one meaning per flag, no aliases (ADR-064). The daily
-surface is six verbs; `db` and `clean` are the only destructive nouns.
+surface is the top level below; `db`, `down --destroy` and `machine clean` are the
+only destructive verbs.
 
 ```text
-haven            the hub: the whole machine — stacks, worktrees, RAM by owner,
+haven            a status summary and grouped help (never interactive)
+haven hub        the hub: the whole machine — stacks, worktrees, RAM by owner,
                  the daemon's reaping — with actions on the selected row
-                 (agents/pipes get the plain status report)
 haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch project tabs; the logs tab has per-service streams. q detaches (the stack
@@ -133,11 +145,11 @@ haven down       stop this worktree's stack and its Nx daemon — data is always
 haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
-haven idp        run ONLY the IdP simulator — no ui, api or databases — routed
+haven simulator idp  (hidden) run ONLY the IdP simulator — no ui, api or databases — routed
                  at idp.langwatch.localhost; --tenants <n> sizes the range;
                  --json [--stack <slug>] reads a running stack's tenant summaries
 haven logs       captured service logs from any terminal, attached or detached:
-                 all interleaved, `haven logs nlp` filters, -t tails,
+                 all interleaved, `haven logs nlp` filters, -f follows,
                  --since 10m windows, --level warn filters severity,
                  --stack <slug> reads another worktree, `logs obs` streams LGTM
 haven status     one-shot report: selection, per-service health, shared servers,
@@ -146,12 +158,12 @@ haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh databases and this
                  stack's Redis db flushed, confirmed; --yes for scripts) · `db url [engine]`. Presets: demo,
                  onboarding, post-onboarding, bare
-haven clean      one cleanup: worktree picker, then job-scratch picker, then safe reclaim
+haven machine clean      one cleanup: worktree picker, then job-scratch picker, then safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
                  safe categories
 haven pr <ref>   try a GitHub PR in a fresh worktree (--allow-closed,
                  --allow-scripts)
-haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
+haven pr --throwaway [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Postgres/ClickHouse/Redis containers, own play-<n> hostname.
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
@@ -164,12 +176,10 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
                  shell's environment (--allow-untrusted in agent mode)
-haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
-haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
+haven switch     print a worktree's dir by name; with `eval "$(haven self shell-init)"`
                  it becomes a real cd, tab-completed
-haven shell-init emit that shell function + completion
-haven hmr        retired no-op (reloads are debounced, ADR-168)
-haven slot       run any command under the machine-wide check slot:
+haven self shell-init emit that shell function + completion
+haven machine slot       run any command under the machine-wide check slot:
                  `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
                  runs with stdio passed through, releases; `slot explain`
                  prints the resolved limit plus every current holder and
@@ -180,11 +190,11 @@ haven slot       run any command under the machine-wide check slot:
                  longer it waits, so a sub-agent is never starved forever;
                  HAVEN_PRIORITY=high states a run matters, honoured once per
                  agent id every ten minutes
-haven typecheck  typecheck under the machine-wide RAM slot: --affected runs
+haven machine typecheck  typecheck under the machine-wide RAM slot: --affected runs
                  `nx affected -t typecheck` from the merge-base with the
                  branch's upstream (or origin/main) and is the agent default;
                  --all is the whole-tree `pnpm typecheck`, the human default
-haven install    check this MACHINE for what haven drives but does not own —
+haven self install    check this MACHINE for what haven drives but does not own —
                  portless, node, pnpm, go, the brew formulae behind the shared
                  Postgres and Redis, a container runtime, the ClickHouse
                  client, rtk — and offer to install what is missing. A terminal gets a
@@ -193,10 +203,10 @@ haven install    check this MACHINE for what haven drives but does not own —
                  and the commands. --yes installs what haven needs without
                  asking, --list only reports, --reset-skips forgets every
                  never-ask-again. Naming one installs exactly that:
-                 `haven install clickhouse-client`, `haven install runtime=docker-desktop`
-haven setup      install optional integrations into this CHECKOUT (the agent
+                 `haven self install clickhouse-client`, `haven self install runtime=docker-desktop`
+haven self setup      install optional integrations into this CHECKOUT (the agent
                  gate hooks) — see "Optional agent hooks" below
-haven upgrade    reinstall the haven binary from this checkout
+haven self upgrade  reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference
 ```
 
@@ -214,7 +224,7 @@ loopback port for every lane; without it `.env`'s value stands. diffsuite's
 idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
 SAML + SCIM tenants with DNS/HTTP domain verification, routed at
 `idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
-want it says `haven up -idp` once. `haven idp` runs the simulator alone —
+want it says `haven up -idp` once. `haven simulator idp` runs the simulator alone —
 no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
 storage — the S3 stand-in (`services/storagesim`) — runs by default too, as
@@ -236,7 +246,11 @@ local or CI stack needs a Stripe account. Unless `.env` or the shell names
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, the overlay
 points billing at it (`STRIPE_API_BASE=https://payment.<slug>.langwatch.localhost`,
 `sk_test_paymentsim`, `whsec_paymentsim`); with your own keys set, those are
-used. `haven up` prints `Stripe: paymentsim` or `Stripe: your key from .env`.
+used, and `STRIPE_API_BASE` stays your custom base URL (a test key without it
+goes to Stripe's test API). A live key (`sk_live_`, `rk_live_`) in
+`STRIPE_SECRET_KEY` makes `haven up` refuse to start: use `sk_test_` or remove
+it. `haven up` prints `Stripe: paymentsim`, `Stripe: your test key from .env` or
+`Stripe: custom base <url>`.
 `haven up -payment` drops the lane. The selection stores it as `"paymentsim"`:
 the old `"payment"` key, written as false while it was opt-in, is not read.
 Objects persist in `storage/<slug>/` under Haven's home.
@@ -289,10 +303,10 @@ key is set, leaving any provider whose host `.env` names alone. Its console and
 Mail, IdP, storage and voice are bundled into the installed Haven binary. Each stack runs its
 own supervised simulator processes with its own ports. Under Haven's home
 (`~/.langwatch/portless`, or `LANGWATCH_PORTLESS_HOME`), mail persists in `mail/<slug>/` and
-IdP state in `idp/<slug>/`. `haven up -f`, `haven restart`, and `haven down`
+IdP state in `idp/<slug>/`. `haven up --force`, `haven restart`, and `haven down`
 preserve received messages, registered IdP applications, users, groups,
 provisioning connections, domain proofs, and signing keys. Standalone
-`haven idp` uses a separate `idp-standalone/` directory.
+`haven simulator idp` uses a separate `idp-standalone/` directory.
 They work even when the checkout predates
 `services/mailsim` or `services/idpsim`, without Go or Make on the child process's
 PATH. Their browser pages are linked from the stack's `mail` and `idp` rows on
@@ -300,8 +314,8 @@ the web dashboard.
 
 After updating Haven, run `haven up --force` in an existing stack to load the
 new launcher and bundled simulators. `haven restart mail` or `haven restart idp`
-bounces a child but does not replace an older launcher. The application's Go services are watched by default
-(`LANGWATCH_GO_WATCH=0` or `up --watch=false` turns it off); to develop the simulators with live reload,
+bounces a child but does not replace an older launcher. The application's Go services are watched under `up --watch` or `--hmr`
+(`LANGWATCH_GO_WATCH=0` keeps them unwatched); to develop the simulators with live reload,
 use `make service-watch svc=mailsim` or `make service-watch svc=idpsim`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
@@ -407,6 +421,54 @@ machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
 `ingestPlaySeed`); it is the seam those seeds return through, and every
 shipped preset's list is empty until they do.
 
+**Keyed API calls.** `haven api <METHOD> <path> [--key project|org|personal]
+[--project slug] [--body file|-] [--header k:v] [--json] [--stack slug]` calls
+this stack's REST API (`LANGWATCH_API_URL`, the loopback API port) with a key
+haven holds, sent as `X-Auth-Token`:
+
+- `--key project` (the default) is the seeded project key
+  (`HAVEN_SEED_LANGWATCH_API_KEY`) for `local-dev-project`. With `--project
+<slug>` naming another project, haven mints a service key bound to that one
+  project through `POST /api/api-keys`.
+- `--key org` is a service key over the whole organization, minted once through
+  `POST /api/api-keys` as the seeded admin.
+- `--key personal` is the seeded admin's personal access token
+  (`LANGWATCH_PRIVATE_ACCESS_TOKEN`, organization ADMIN).
+- With `org` or `personal`, `--project <slug>` sends that project's
+  `X-Project-Id`.
+
+Minted keys are held in `~/.langwatch/portless/keys/<slug>.json` (mode 600) and
+reused; a held key the stack answers 401 to (a reseed or reset) is minted again
+once. No key ever prints: the output is the status line, the response headers
+with `Authorization`, `Set-Cookie` and `X-Auth-Token` redacted, and the body,
+and any echo of any key haven knows becomes `<redacted>`, errors included.
+`haven api whoami [--key kind] [--project slug]` names the key's principal and
+scope, never its value. An unknown `--key` is refused. The seeded key is shared
+by every stack on the machine, so there is no `key rotate`: set
+`LANGWATCH_LOCAL_API_KEY` and reseed to change it.
+
+```bash
+haven api GET /api/prompts --json
+haven api GET /api/api-keys --key org
+haven api whoami --key personal
+echo '{"name":"x"}' | haven api POST /api/datasets --body -
+```
+
+**Gateway calls.** `haven api --gateway <METHOD> <path> [--vk name] [--body file|-]
+[--header k:v] [--json] [--stack slug]` calls this stack's AI gateway (the
+`+gateway` add-on, at `LW_GATEWAY_INTERNAL_URL`) with a virtual key for
+`local-dev-project`, sent as `Authorization: Bearer`. haven mints the key through
+`POST /api/gateway/v1/virtual-keys` with the seeded project key, named
+`haven <name>`, and holds it beside the API keys. `--vk <name>` uses or mints a
+separate named key (default `default`), so a walker can put budgets or policies
+on one key without touching another. The secret never prints.
+
+```bash
+echo '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"hi"}]}' \
+  | haven api --gateway POST /v1/chat/completions --body -
+haven api --gateway GET /v1/models --vk budget-walk
+```
+
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
 container and the observability stack are memory-capped (the container tier by
 cgroup, the native tier by `GOMEMLIMIT`; the colima VM is sized at creation), and the managed Redis gets a `maxmemory` ceiling
@@ -419,7 +481,7 @@ runs as host processes, no VM: `brew install grafana prometheus loki`; haven
 fetches Tempo 3.1.0, Alloy 1.20.1 and Pyroscope 2.3.2 itself (the official darwin release assets,
 pinned and sha256-checked like the native ClickHouse binary, into
 `<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN`, `HAVEN_OBS_ALLOY_BIN` and
-`HAVEN_OBS_PYROSCOPE_BIN` override them). A failed recommended or optional `haven install` row is logged
+`HAVEN_OBS_PYROSCOPE_BIN` override them). A failed recommended or optional `haven self install` row is logged
 and the run carries on; only a failed required row fails it. Same ports (OTLP 4317/4318, Grafana 3000) and
 datasource uids as the container; files under `<haven home>/observability`;
 `haven logs obs` tails its per-process logs. A missing binary prints its
@@ -427,10 +489,10 @@ install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs
 the `grafana/otel-lgtm` container on colima instead (the default off macOS).
 Both tiers serve profiles on Pyroscope's port 4040. See ADR-042.
 
-**Machine limits.** `haven limits` prints the ClickHouse, observability and
+**Machine limits.** `haven machine limits` prints the ClickHouse, observability and
 Redis memory caps, the colima VM's CPUs and memory, and the unit test worker
 count, each with its effective value and source (default, settings, .env or
-env). `haven limits set <name> <value>` / `unset <name>` (for example
+env). `haven machine limits set <name> <value>` / `unset <name>` (for example
 `clickhouse-memory-mb`, `colima-cpus`) edit `limits.json` in haven's home, and
 the hub's Settings page (`/settings`) does the same over `GET /api/limits` and
 `PUT`/`DELETE /api/limits/<name>`. Precedence is environment, then `.env`, then
@@ -439,7 +501,7 @@ the next `haven up`, the observability container when it is next recreated;
 haven never resizes a colima VM, so a VM change is applied with the printed
 `colima stop && colima start --cpu N --memory M`.
 
-**Playing a PR.** `haven play 4913` reviews a PR without letting it near your
+**Playing a PR.** `haven pr --throwaway 4913` reviews a PR without letting it near your
 own stacks: a dedicated checkout under the haven home, dedicated database
 containers and volumes (play-scoped names, freshly allocated ports, never the
 shared servers or volumes), migrated and seeded, served at
@@ -450,12 +512,12 @@ sandbox created, always. That is the contract, disclosed up front, so no
 collects every commit author and committer on the PR and checks their write
 access; anyone without it (including commits with no GitHub account) stops
 play for an explicit default-no confirmation, and in agent mode only
-`--allow-untrusted` proceeds. If a play dies hard, `haven clean` finds its
+`--allow-untrusted` proceeds. If a play dies hard, `haven machine clean` finds its
 record and finishes the teardown.
 
 A sandbox's databases start empty, so the PR opens on the onboarding screen —
 the wrong place to be standing if the change is about anything afterwards.
-`haven play 4913 --seed demo` takes the same presets as `haven db seed` (one
+`haven pr --throwaway 4913 --seed demo` takes the same presets as `haven db seed` (one
 registry, no play-only variants) and applies them where each belongs: the
 preset's switches go to the sandbox's own seed, and any data that has to travel
 through the collector is ingested once the sandbox's app answers, in a lane
@@ -465,13 +527,8 @@ is exactly the PR you want to keep watching. No shipped preset ingests
 anything today (see Seeding), so a sandbox waits for nothing and every preset
 is a plain seed.
 
-**Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
-in-process (a Go module dependency — nothing extra to install) for the current
-worktree; pass a stack slug, worktree name, or path to open another. Inside the
-TUI, Enter on a branch shows its diff against HEAD without checking it out, and
-Enter on a worktree re-targets the whole view at that worktree — the filesystem
-is never touched. The web hub (`hub.langwatch.localhost`) shows the same fleet with
-live health, per-stack RAM, and database names.
+The web hub (`hub.langwatch.localhost`) shows the fleet with live health,
+per-stack RAM, and database names. (`haven git` was deleted; ADR-064.)
 
 **Destructive-operation guards.** Database drops only ever run against the
 managed loopback servers, `db reset` refuses when the worktree's effective
@@ -534,7 +591,7 @@ haven status            # shows what the stack resolved to, no eval needed
 haven makes up the stack's credentials (`NEXTAUTH_SECRET`, `CREDENTIALS_SECRET`,
 `LANGWATCH_INSTANCE_ADMIN_API_KEY`, `HAVEN_SEED_SCIM_TOKEN`) per stack, in
 `<home>/credentials/<slug>.json`, and injects each one `.env` leaves unset;
-`haven destroy` forgets them. `haven seed` ends with what a tester needs: the
+`haven down --destroy` forgets them. `haven db seed` ends with what a tester needs: the
 app URL, the admin login, the org, team and project slugs, the project API
 key, the personal access token, the SCIM token and the instance admin key,
 masked unless `--reveal`, one JSON object with `--json`.
@@ -618,7 +675,7 @@ with a page naming that target.
 
 The route is registered at `haven up`, pointed at the daemon, and re-pointed
 whenever the daemon restarts. `down` and the reaper leave it in place; only
-pruning the worktree (destroying it from the hub or `haven clean`, the daily
+pruning the worktree (destroying it from the hub or `haven machine clean`, the daily
 reclaim, `DestroyStack`) takes it away. A slug that spells a machine-wide name
 (`hub`, `idp`, `observability`, `telemetry`) gets no home.
 
@@ -694,7 +751,7 @@ The daemon's JSON, which the console reads:
 - **Temporary and merged worktrees, and finished job scratch, are reclaimed
   daily.** The two places a multi-agent machine silts up unattended. Once a day
   the daemon removes every worktree classified temporary or merged (see
-  `haven clean` below for both definitions) with `git worktree remove --force`
+  `haven machine clean` below for both definitions) with `git worktree remove --force`
   plus a `git worktree prune`, logging one line per removal naming the reason,
   and reclaims the scratch of every **cold** agent job — terminal for more than
   48 hours, or untouched for a week — while
@@ -723,10 +780,11 @@ The daemon's JSON, which the console reads:
   the mail studio stay in their own packages (`@langwatch/design-system`,
   `@langwatch/mail`); haven only offers to run them, off by default, the way it
   offers langy. Nothing in the application degrades without either, and neither
-  is ever counted among the three Node lanes. Selecting the Storybook also tells
-  the ui lane which port it is on (`LANGWATCH_STORYBOOK_PORT`), so opening
-  `/design-system` in the app frames the Storybook the stack is already running
-  instead of starting a second one.
+  is ever counted among the three Node lanes. The Storybook is never a dev
+  server: the `design-system` lane runs `storybook build` when its output is
+  missing or stale and serves the files with `haven static`. The ui lane is told
+  its routed URL (`LANGWATCH_STORYBOOK_URL`), so `/design-system` in the app frames
+  that build; a worktree that did not select it gets `LANGWATCH_SKIP_STORYBOOK=1`.
 - **Langy worker isolation (sandboxed off macOS, host on macOS).** The langyagent
   worker runs the Langy agent, so off macOS haven isolates it like production
   rather than letting a test model run as your own user. On macOS haven wants no
@@ -768,7 +826,7 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   loopback port. Production is never any of these — it always runs sandboxed under
   gVisor.
 
-- **`haven clean`.** One cleanup command, and **two pickers in turn** — worktrees
+- **`haven machine clean`.** One cleanup command, and **two pickers in turn** — worktrees
   first, then agent job scratch. Never one merged list: the two kinds have
   different guards and different consequences, and a single list invites ticking
   one while reading the other. Every header, progress line and summary counts
@@ -831,14 +889,14 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   ("reclaimed 158 job scratch dirs, 2.1 GB; 3 worktrees, 500 MB"). A zap record
   never lands on the stream a progress render or a parsed line is using.
 
-- **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
-  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). It shares the `checks` semaphore with `haven slot run` and
+- **`haven machine typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
+  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). It shares the `checks` semaphore with `haven machine slot run` and
   hook-launched commands. Plain repository scripts run directly. `--affected`
   (the default for an agent) runs `nx affected -t typecheck` instead, holding
   every check slot free when it starts (at least one) and setting `NX_PARALLEL`
   to that count, so each parallel Nx task is one counted slot. The codegen lane
   `up` runs gets `NX_PARALLEL` set to the free slots the same way.
-- **Nx and untrusted checkouts.** A fork under `haven pr` (and every `haven play`
+- **Nx and untrusted checkouts.** A fork under `haven pr` (and every `haven pr --throwaway`
   sandbox) gets `NX_CACHE_DIRECTORY` and `NX_WORKSPACE_DATA_DIRECTORY` under
   haven's home (`nx-untrusted/<slug>`) and `NX_DAEMON=false` on every lane,
   install included: Nx runs the checkout's own plugins at graph time, and the
@@ -847,7 +905,7 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   the daemon stops any Nx daemon whose worktree has been deleted.
 - **Debounced HMR.** The Vite plugin coalesces a burst of agent edits into one
   catch-up reload, so a human's browser isn't thrashed through broken
-  intermediate states. `haven hmr` is a retired no-op (ADR-168, 2026-10-09).
+  intermediate states. `haven hmr` was deleted (ADR-168).
 
 ## Optional agent hooks
 
@@ -855,7 +913,7 @@ Run either setup command in the worktree where you want Haven to admit heavy
 agent commands, or name both features in one invocation:
 
 ```sh
-haven setup gate-hook codex-gate-hook
+haven self setup gate-hook codex-gate-hook
 ```
 
 `gate-hook` merges the Claude hook into `.claude/settings.local.json`;

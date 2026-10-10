@@ -572,7 +572,7 @@ function PublishModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content bg="bg" borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content borderTop="5px solid" borderColor="green.400">
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
         </Dialog.Header>
@@ -595,7 +595,6 @@ function PublishModalContent({
   return (
     <FormProvider {...form}>
       <Dialog.Content
-        bg="bg"
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
@@ -711,7 +710,7 @@ export const ApiModalContent = () => {
     2,
   );
   return (
-    <Dialog.Content bg="bg">
+    <Dialog.Content>
       <Dialog.Header>
         <Dialog.Title>Workflow API</Dialog.Title>
       </Dialog.Header>

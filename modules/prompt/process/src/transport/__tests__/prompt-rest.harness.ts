@@ -1,4 +1,8 @@
-import { canonicalErrorResponse, bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import {
+  canonicalErrorResponse,
+  bindMiddlewareContext,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -6,7 +10,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * The `/api/prompts` family over the runtime a process mounts it on, with the
- * two facts the process resolves bound to fixed answers.
+ * two middleware contexts the module provides bound to fixed answers.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -17,7 +21,7 @@ import { PromptModule } from "#app/prompt.app";
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import { MemoryPromptRateLimitRepository } from "../../repositories/memory/memory.prompt-rate-limit.repository.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
-import { promptRest, promptRestFacts } from "../prompt.rest.ts";
+import { promptRest, promptRestContext } from "../prompt.rest.ts";
 
 export const PROMPT_TEST_PROJECT = "project_authorized";
 export const PROMPT_TEST_ORGANIZATION = "org_1";
@@ -68,8 +72,8 @@ export function mountPromptRest(options: {
     app: () => options.app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(promptRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(promptRestContext, () => ({
         organizationId,
         promptsUrl: "https://app.test/authorized/prompts",
       })),

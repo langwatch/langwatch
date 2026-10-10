@@ -108,6 +108,7 @@ describe("POST /api/export/traces/download", () => {
     expect(downloadTraceExport).toHaveBeenCalledWith({
       userId: "user-1",
       request: expect.objectContaining({ projectId: "project-1", mode: "full", format: "csv" }),
+      authorization: expect.anything(),
     });
   });
 });

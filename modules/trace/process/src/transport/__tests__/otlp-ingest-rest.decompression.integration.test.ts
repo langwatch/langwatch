@@ -28,7 +28,7 @@ import { TraceBlobStoreService } from "../../features/media/services/trace-blob-
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { traceProcessModule } from "../../trace.module.ts";
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = {
   id: "project-123",
@@ -38,6 +38,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 /** Past the shared reader's 10 MiB decompressed cap. */
 const BOMB_EXPANDED_BYTES = 11 * 1024 * 1024;
@@ -137,6 +138,9 @@ function deployment() {
   apis.ready();
 
   const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
+    },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -151,7 +155,7 @@ function deployment() {
     ? [
         runtime.mount(otlpIngestRest.router(), {
           app: () => apis.reference(TraceApi),
-          credential: "public",
+          credential: "otlp_ingest",
           onError: canonicalErrorResponse,
         }),
       ]

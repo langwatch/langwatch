@@ -8,10 +8,12 @@ import {
   retentionCategorySchema,
   scopeAssignmentSchema,
 } from "@langwatch/data-retention-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { ENTERPRISE_TEMPLATE } from "@langwatch/plans";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
@@ -37,6 +39,10 @@ export type SeedApis = Readonly<{
     "getAllForUser" | "createAndAssign" | "createMembership" | "changeMemberRole" | "addTeamMember"
   >;
   project: Pick<ProjectApi, "listByTeam" | "create">;
+  licensing: Pick<
+    LicensingApi,
+    "getLicenseStatus" | "generateLicenseKey" | "validateAndStoreLicense"
+  >;
 }>;
 
 /** What a run carries beside the Apis: the one dev password's hash every seeded login shares. */
@@ -52,6 +58,7 @@ export const seedApiTokens = {
   user: UserApi,
   organization: OrganizationApi,
   project: ProjectApi,
+  licensing: LicensingApi,
 } as const;
 
 type SeedRefs = Record<string, string>;
@@ -59,7 +66,7 @@ type SeedRefs = Record<string, string>;
  * `retry` names a refusal seedgen retries with back-off (a queue or store was not reachable);
  * `refused` one it does not.
  */
-type SeedOutcome = { refs: SeedRefs } | { retry: string } | { refused: string };
+type SeedOutcome = { refs: SeedRefs; existing?: boolean } | { retry: string } | { refused: string };
 type SeedKind = (input: {
   action: SeedAction;
   apis: SeedApis;
@@ -112,6 +119,8 @@ const memberAddSchema = z.object({
   }),
 });
 
+const licenseIssueSchema = inOrganization(z.object({ name: z.string().min(1), email: z.email() }));
+
 /** The tiny Organization fields find-before-create reads. */
 const noDemo = { isDemo: false, demoProjectUserId: "", demoProjectId: "" } as const;
 
@@ -163,6 +172,27 @@ export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
     const created = await apis.organization.createAndAssign({ orgName: input.name }, { id: as });
     return { refs: { [ref]: created.organization.id, [teamRef]: created.team.id } };
   },
+  /**
+   * Signs an Enterprise licence with the stack's dev key and stores it, as storage-seed does for
+   * the local org (seed plan §18.1); an org already on a valid Enterprise licence keeps it.
+   */
+  "license.issue": async ({ action, apis }) => {
+    const { org, input } = licenseIssueSchema.parse(action);
+    const status = await apis.licensing.getLicenseStatus(org);
+    if (status.valid && status.plan === ENTERPRISE_TEMPLATE.type) return applied;
+    const { licenseKey } = await apis.licensing.generateLicenseKey({
+      organizationId: org,
+      organizationName: input.name,
+      email: input.email,
+      planType: ENTERPRISE_TEMPLATE.type,
+      maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
+    });
+    const stored = await apis.licensing.validateAndStoreLicense({
+      organizationId: org,
+      licenseKey,
+    });
+    return stored.success ? applied : { refused: "license_refused" };
+  },
   "project.create": async ({ action, apis }) => {
     const { ref, org, as, input } = projectCreateSchema.parse(action);
     const existing = (
@@ -180,7 +210,8 @@ export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
         },
         { id: as },
       ));
-    return { refs: { [ref]: project.id } };
+    // A project found, not made, was filled by the run that made it: seedgen sends it no telemetry.
+    return { refs: { [ref]: project.id }, existing: existing !== undefined };
   },
   /**
    * Admits a user as the owner would: a membership row with the owner's admission (a grant alone
@@ -313,10 +344,17 @@ export async function applySeedAction({
     if ("retry" in outcome) return refusal({ action, code: outcome.retry, retryable: true });
     if ("refused" in outcome) return refusal({ action, code: outcome.refused, retryable: false });
     const minted = Object.keys(outcome.refs).length > 0;
-    return { id: action.id, ok: true, ...(minted ? { refs: outcome.refs } : {}) };
+    return {
+      id: action.id,
+      ok: true,
+      ...(minted ? { refs: outcome.refs } : {}),
+      ...(outcome.existing ? { existing: true } : {}),
+    };
   } catch (error) {
     if (error instanceof HandledError) {
-      return refusal({ action, code: error.code, retryable: error.retryable });
+      // A 503 is the product saying "not yet" (a projection lagging the read-your-writes window).
+      const retryable = error.retryable || error.httpStatus === 503;
+      return refusal({ action, code: error.code, retryable });
     }
     if (error instanceof z.ZodError) {
       return refusal({ action, code: "malformed_seed_action", retryable: false });

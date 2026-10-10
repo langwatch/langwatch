@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { IssuedLicense, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -140,8 +141,11 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     // One conditional write, so the database decides which install wins. As
     // SQL, for the reason given above `attachVirtualKey`.
     const updated = await this.prisma.$executeRaw`
-      -- @tenancy: a license is addressed by its own primary key. The row names
-      -- the organization it was issued to rather than belonging to one.
+      ${skipTenantCheck({
+        // A license is addressed by its own primary key. The row names the organization it was
+        // issued to rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "IssuedLicense"
          SET "instanceId" = ${instanceId},
              "instanceBoundAt" = ${toDate(at)},
@@ -166,7 +170,10 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     // SQL because `updateMany` re-checks only its subquery, on the statement's
     // own older snapshot, and tells two concurrent writers yes (ADR-156).
     const updated = await this.prisma.$executeRaw`
-      -- @tenancy: addressed by primary key; the row names its organization.
+      ${skipTenantCheck({
+        // Addressed by primary key; the row names its organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "IssuedLicense"
          SET "virtualKeyId" = ${virtualKeyId},
              "updatedAt" = now()

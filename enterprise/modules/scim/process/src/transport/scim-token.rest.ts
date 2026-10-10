@@ -16,7 +16,7 @@
  * would be a claim nothing checks.
  */
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -30,11 +30,11 @@ import { z } from "zod";
 
 /**
  * Who a mint or a revocation is recorded against: the member the credential
- * acts as, or the credential itself where it acts as nobody. A bound fact,
+ * acts as, or the credential itself where it acts as nobody. Middleware context,
  * because who a management key stands for is the door's answer and not a
  * claim the body can make.
  */
-export const scimTokenRestActor = defineRestMiddleware(
+export const scimTokenRestActor = defineMiddlewareContext(
   "scimTokenRestActor",
   z.object({ actorId: z.string(), apiKeyId: z.string() }),
 );
@@ -78,7 +78,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
     description:
       "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
   })
-  .withMiddleware(scimTokenRestActor)
+  .withMiddlewareContext(scimTokenRestActor)
   .handle(async ({ app, input, scope }, actor) => {
     const created = await app.generateToken(
       {
@@ -119,7 +119,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
     description:
       "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.",
   })
-  .withMiddleware(scimTokenRestActor)
+  .withMiddlewareContext(scimTokenRestActor)
   .handle(async ({ app, input, scope }, actor) => {
     await app.revokeToken({ organizationId: scope.id, tokenId: input.id });
 

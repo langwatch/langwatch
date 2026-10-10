@@ -72,7 +72,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     const writes = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     if (writes && !this.#isFromOwnPages(request)) throw new BrowserOriginRefusedError();
 
-    recordBrowserCaller(request, { userId: caller.userId });
+    recordBrowserCaller(request, { userId: caller.userId, sessionId: caller.sessionId ?? null });
 
     const impersonatorId = caller.impersonator?.id;
     const actor = impersonatorId

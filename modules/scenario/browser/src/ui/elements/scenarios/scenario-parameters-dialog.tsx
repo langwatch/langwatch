@@ -26,7 +26,7 @@ export function ScenarioParametersDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)} size="xl">
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <HStack gap={0}>
             <Dialog.Title>Parameters</Dialog.Title>
@@ -54,7 +54,7 @@ export function ScenarioParametersDialog({
         </Dialog.Body>
         <Dialog.Footer>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={() => onOpenChange(false)}
             data-testid="scenario-parameters-done"
           >

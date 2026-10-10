@@ -57,6 +57,12 @@ type OrganizationTeamMembersOptions = {
   teamIdentities: TeamIdentity;
   /** The owning service's own team creation, so a team created with members is created once. */
   createTeam: (input: CreateOrganizationTeamInput) => Promise<OrganizationTeam>;
+  /** The owning service's name-uniqueness refusal, so a rename is checked as a creation is. */
+  assertTeamNameFree: (input: {
+    organizationId: string;
+    name: string;
+    exceptTeamId?: string;
+  }) => Promise<void>;
 };
 
 export class OrganizationTeamMembersService {
@@ -258,6 +264,11 @@ export class OrganizationTeamMembersService {
     }
 
     await this.validateTeamMembers(team.organizationId, parsed.members);
+    await this.deps.assertTeamNameFree({
+      organizationId: team.organizationId,
+      name: parsed.name,
+      exceptTeamId: team.id,
+    });
     if (parsed.members.length === 0) {
       await this.deps.teams.update({
         organizationId: team.organizationId,

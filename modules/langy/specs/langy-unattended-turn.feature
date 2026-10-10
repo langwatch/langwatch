@@ -36,6 +36,14 @@ Feature: Unattended Langy turns
       When an unattended key is minted for them
       Then the key holds traces:view and no cost permission
 
+    # A door reads a key a person owns as that person, so a board read sees what they see.
+    @unit
+    Scenario: An unattended key is owned by the person it is minted for
+      Given a person who may view in a project
+      When an unattended key is minted for them
+      Then the key names that person as its owner and its creator
+      And it is a Langy session key, never a key no person owns
+
     @unit
     Scenario: An unattended turn asks for no GitHub token
       Given a project with GitHub connected

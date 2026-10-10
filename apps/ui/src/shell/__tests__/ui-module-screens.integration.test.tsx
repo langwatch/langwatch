@@ -150,6 +150,7 @@ describe("given the installed web modules", () => {
           authProvider: "auth0",
           passkeysEnabled: true,
           emailPasswordEnabled: true,
+          federatedProviders: [],
           signUpMode: "invite_only",
         },
         authz: {},

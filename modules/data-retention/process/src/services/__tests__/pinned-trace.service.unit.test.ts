@@ -1,4 +1,4 @@
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -60,6 +60,7 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
 
 /** No statement this suite issues ever reaches a server. */
 const noopClickHouse = new ClickHouseQueryClient({
+  tenantGuard: new TenantGuard(),
   driver: {
     execute: async () => ({ rows: [] }),
     insert: async () => {},

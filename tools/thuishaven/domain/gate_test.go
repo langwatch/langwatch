@@ -81,7 +81,7 @@ func TestClassifyCommandGatesOnInvocationNotSubstring(t *testing.T) {
 		// machine-wide slot for tens of minutes because they mentioned "vitest",
 		// "tsc" and "golangci" as plain text, never as a program they ran.
 		for _, cmd := range []string{
-			`HAVEN_AGENT=1 haven slot explain 2>&1 | head -20; echo ---; ps -eo rss,comm | awk '$2 ~ /node|tsgo|tsc|golangci|vitest/ {n[$2]++} END {for (k in n) print k, n[k]}'`,
+			`HAVEN_AGENT=1 haven machine slot explain 2>&1 | head -20; echo ---; ps -eo rss,comm | awk '$2 ~ /node|tsgo|tsc|golangci|vitest/ {n[$2]++} END {for (k in n) print k, n[k]}'`,
 			`grep -rn 'func.*[Cc]lassif\|"vitest"\|"tsc"\|"golangci' --include='*.go' domain app | grep -v _test`,
 			"grep -rn vitest.config .",
 			"cat vitest.config.ts",
