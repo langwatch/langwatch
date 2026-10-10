@@ -91,9 +91,9 @@ export function PullRequestDetailDrawer({
               <Button
                 asChild
                 flexShrink={0}
-                bg={{ base: "gray.900", _dark: "gray.100" }}
-                color={{ base: "white", _dark: "gray.900" }}
-                _hover={{ bg: { base: "gray.800", _dark: "gray.200" } }}
+                bg="fg"
+                color="fg.inverted"
+                _hover={{ bg: "fg.muted" }}
               >
                 <a href={detail.pullRequest.htmlUrl} target="_blank" rel="noopener noreferrer">
                   <GitHubIcon size={16} />
