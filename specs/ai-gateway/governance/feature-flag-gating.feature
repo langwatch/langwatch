@@ -55,6 +55,12 @@ Feature: Governance visibility rides a single feature flag
     And no governance API calls fire from the client
     And the existing AI Gateway menu still renders (different flag)
 
+  Scenario: A governance address with the flag off is a 404 with no product sidebar
+    Given `release_ui_ai_governance_enabled` evaluates to false for a user
+    When they open /governance/costs by address
+    Then they see the page-not-found screen
+    And no Governance product sidebar is drawn around it
+
   Scenario: Operators force the flag off via env override
     Given an operator disables governance for the whole installation via env override
     When users log in
