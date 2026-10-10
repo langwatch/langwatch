@@ -104,7 +104,7 @@ function CapabilityRow({
           target="_blank"
           rel="noopener noreferrer"
           fontSize="sm"
-          color="blue.600"
+          color="blue.fg"
         >
           <HStack gap={1}>
             <Text>Setup guide</Text>
@@ -133,16 +133,16 @@ function SsoConfiguredButNotInUseNotice() {
   return (
     <Box
       borderWidth="1px"
-      borderColor="orange.300"
-      backgroundColor="orange.50"
+      borderColor="orange.emphasized"
+      backgroundColor="orange.subtle"
       borderRadius="lg"
       padding={4}
       width="full"
       data-testid={unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"}
-      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
+      _dark={{ backgroundColor: "orange.subtle", borderColor: "orange.emphasized" }}
     >
       <HStack align="start" gap={3}>
-        <Box color="orange.600" paddingTop={0.5}>
+        <Box color="orange.fg" paddingTop={0.5}>
           <TriangleAlert size={18} />
         </Box>
         <VStack align="start" gap={1}>
@@ -211,15 +211,14 @@ export function EnterpriseCapabilitiesSection() {
 
         {!isEnterprise && (
           <HStack gap={3}>
-            {/* White on orange.600 is 3.4:1, short of WCAG AA for 14px text;
-                orange.700 carries it at 4.6:1 (license-contrast e2e test). */}
             <Button
               asChild
               size="sm"
               colorPalette="orange"
-              bg="orange.700"
-              color="white"
-              _hover={{ bg: "orange.800", color: "white" }}
+              variant="outline"
+              color="orange.fg"
+              bg="orange.subtle"
+              _hover={{ bg: "orange.muted" }}
             >
               <Link unstyled href="/settings/license">
                 Activate a license

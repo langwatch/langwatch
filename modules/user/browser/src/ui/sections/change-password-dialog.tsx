@@ -185,7 +185,7 @@ export function ChangePasswordDialog({
               {formErrors.length > 0 && (
                 <Stack gap={1} role="alert">
                   {formErrors.map((message) => (
-                    <Text key={message} fontSize="sm" color="red.500">
+                    <Text key={message} fontSize="sm" color="red.fg">
                       {message}
                     </Text>
                   ))}

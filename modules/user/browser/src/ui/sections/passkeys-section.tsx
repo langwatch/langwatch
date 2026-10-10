@@ -231,7 +231,7 @@ function PasskeyGroup({
               <Menu.Item value="rename" onClick={() => onRename(passkey)}>
                 Rename
               </Menu.Item>
-              <Menu.Item value="remove" color="red.500" onClick={() => onRemove(passkey)}>
+              <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(passkey)}>
                 Remove
               </Menu.Item>
             </Menu.Content>

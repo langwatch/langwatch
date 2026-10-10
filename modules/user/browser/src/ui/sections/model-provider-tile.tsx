@@ -150,7 +150,7 @@ export function ModelProviderTile({
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
           </Text>
-          <Text fontSize="xs" color={providerConfigured ? "fg.muted" : "orange.700"}>
+          <Text fontSize="xs" color={providerConfigured ? "fg.muted" : "orange.fg"}>
             {providerConfigured ? "Issue your own virtual key" : "Provider not configured"}
           </Text>
         </VStack>
@@ -162,11 +162,11 @@ export function ModelProviderTile({
           marginTop={4}
           padding={3}
           borderWidth="1px"
-          borderColor="orange.200"
+          borderColor="orange.emphasized"
           borderRadius="sm"
-          backgroundColor="orange.50"
+          backgroundColor="orange.subtle"
         >
-          <Text fontSize="sm" color="orange.900" marginBottom={2}>
+          <Text fontSize="sm" color="orange.fg" marginBottom={2}>
             Your organization doesn&apos;t have {articleFor(displayName)} {displayName} credential
             configured yet, so issuing a key here would mint a VK that fails on first call with{" "}
             <Code fontSize="xs" backgroundColor="transparent">
@@ -174,11 +174,11 @@ export function ModelProviderTile({
             </Code>
             .
           </Text>
-          <Text fontSize="xs" color="orange.800">
+          <Text fontSize="xs" color="orange.fg">
             Ask your organization admin to add {articleFor(displayName)} {displayName} provider in{" "}
             <Link
               href="/settings/model-providers"
-              color="orange.800"
+              color="orange.fg"
               fontWeight="medium"
               textDecoration="underline"
             >
@@ -187,7 +187,7 @@ export function ModelProviderTile({
             . They&apos;ll also need to bind it into the{" "}
             <Link
               href="/gateway/routing-policies"
-              color="orange.800"
+              color="orange.fg"
               fontWeight="medium"
               textDecoration="underline"
             >
@@ -249,11 +249,11 @@ export function ModelProviderTile({
             <Box
               padding={2}
               borderWidth="1px"
-              borderColor="red.300"
+              borderColor="red.emphasized"
               borderRadius="sm"
-              backgroundColor="red.50"
+              backgroundColor="red.subtle"
             >
-              <Text fontSize="xs" color="red.700">
+              <Text fontSize="xs" color="red.fg">
                 {errorMessage}
               </Text>
             </Box>
