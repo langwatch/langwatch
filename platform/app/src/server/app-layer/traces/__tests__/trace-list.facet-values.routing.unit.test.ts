@@ -9,6 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import type { TraceListRepository } from "../repositories/trace-list.repository";
 import { TraceListService } from "../trace-list.service";
 
@@ -36,7 +37,7 @@ function makeService() {
 let seq = 0;
 function params(facetKey: string) {
   return {
-    tenantId: `project_routing_${seq++}`,
+    authorization: ownProof({ projectId: `project_routing_${seq++}` }),
     timeRange: { from: 0, to: 1 },
     facetKey,
     limit: 30,

@@ -4,6 +4,17 @@ import type { Trace } from "~/server/tracer/types";
 
 const mockGetAllTracesForProject = vi.fn();
 
+vi.mock("~/server/app-layer/app", async () => {
+  const { ownProof } = await import("~/test-utils/authorizationProofs");
+  const app = () => ({
+    authorization: {
+      authorizeInternal: async ({ projectId }: { projectId: string }) =>
+        ownProof({ projectId }),
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
+
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: {
     create: () => ({
@@ -58,6 +69,8 @@ vi.mock("~/server/traces/projection", async (importOriginal) => {
 vi.mock("~/server/api/routers/traces.schemas", () => {
   const { z } = require("zod");
   return {
+    publicTraceSearchPageSizeInput: z.number().optional(),
+    MAX_TRACE_LIST_PAGE_SIZE: 1000,
     getAllForProjectInput: z.object({
       projectId: z.string(),
       startDate: z.number(),
@@ -684,7 +697,23 @@ describe("POST /search with a trace filter", () => {
         filterWhere?: { sql: string; params: Record<string, unknown> };
       };
       expect(options.filterWhere?.sql).toContain("ContainsErrorStatus");
-      expect(options.filterWhere?.params.tenantId).toBe("project-123");
+      expect(options.filterWhere?.params).not.toHaveProperty("tenantId");
+    });
+
+    it("expands a span clause's tenant marker into the key's own project", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string; params: Record<string, unknown> };
+      };
+      expect(options.filterWhere?.sql).not.toContain("{{tenantScope");
+      expect(options.filterWhere?.sql).toContain("TenantId IN");
+      expect(options.filterWhere?.params.tenantScope_own).toEqual([
+        "project-123",
+      ]);
     });
 
     it("bounds the translation to the window the search asked for", async () => {

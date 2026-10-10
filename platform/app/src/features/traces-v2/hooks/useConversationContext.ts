@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
+import { useDrawerStore } from "../stores/drawerStore";
 import type { TraceListItem } from "../types/trace";
 import { useDrawerProjectId } from "./useDrawerProjectId";
 
@@ -68,6 +69,11 @@ export function useConversationContext(
   traceId: string | null | undefined,
 ): ConversationContextResult {
   const projectId = useDrawerProjectId();
+  const storeTenantId = useDrawerStore((s) => s.tenantId);
+  const tenantId =
+    storeTenantId !== null && storeTenantId !== projectId
+      ? storeTenantId
+      : null;
   const shared = useSharedTrace();
 
   // Conversation context for preview-mode traces is seeded
@@ -86,6 +92,9 @@ export function useConversationContext(
     {
       projectId,
       conversationId: conversationId ?? "",
+      // On an aggregate two members may share a conversation id; the turns
+      // are the member's the drawer is on (ADR-144 block F).
+      ...(tenantId !== null ? { tenantId } : {}),
     },
     {
       enabled: fetchEnabled,

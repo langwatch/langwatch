@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_AUTO_JOIN_POLICY_ID,
   type DomainJoinSetting,
   isPublicEmailDomain,
@@ -13,11 +14,13 @@ import {
   JoinPolicyNotLicensedError,
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
+  type JoinRequestOrigin,
   JoinRequestThrottledError,
   joinDomainOf,
   normalizeDomain,
   organizationAdmitsDomain,
   resolveJoinLookup,
+  seatForJoiner,
 } from "@langwatch/identity";
 import type {
   JoinCandidateRepository,
@@ -87,6 +90,11 @@ export interface JoinMembershipPort {
     commandId: string;
     /** The approving admin, or nobody when the policy approved. */
     approvedByUserId: string | null;
+    /** The seat this admission lands in, decided by the service from the
+     *  request's origin and the organisation's joiner seat (ADR-143 v6). */
+    role: JoinerRole;
+    /** Where the request was made, for the audit row. */
+    origin: JoinRequestOrigin;
   }): Promise<void>;
   isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
 }
@@ -350,6 +358,8 @@ export class JoinRequestsService {
       matchedVia: "sso-connection-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: true,
+      // No browser made this and no terminal claimed it: a sign-in did.
+      origin: DEFAULT_JOIN_REQUEST_ORIGIN,
     });
 
     return { joinRequestId };
@@ -367,10 +377,13 @@ export class JoinRequestsService {
     userId,
     verifiedEmail,
     organizationId,
+    origin = DEFAULT_JOIN_REQUEST_ORIGIN,
   }: {
     userId: string;
     verifiedEmail: string | null;
     organizationId: string;
+    /** Where the ask was made; `cli` lands a Developer on approval. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }> {
     const domain = this.provenDomainOrRefuse({ verifiedEmail });
     const candidate = await this.deps.candidates.findCandidateOrganization({
@@ -404,6 +417,7 @@ export class JoinRequestsService {
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: true,
+      origin,
     });
 
     return { joinRequestId, state: "PENDING" };
@@ -420,9 +434,12 @@ export class JoinRequestsService {
   async joinAutomaticallyIfAdmitted({
     userId,
     verifiedEmail,
+    origin = DEFAULT_JOIN_REQUEST_ORIGIN,
   }: {
     userId: string;
     verifiedEmail: string | null;
+    /** Where the arrival was made; `cli` walks in as a Developer. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ organization: JoinOffer } | null> {
     const decision = await this.lookup({ userId, verifiedEmail });
     if (decision.outcome !== "auto") return null;
@@ -450,12 +467,17 @@ export class JoinRequestsService {
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: false,
+      origin,
     });
 
+    // The origin travels in memory: the approval follows the request in the
+    // same breath, and the projection row it would be read back from may not
+    // exist yet.
     await this.resolveApproved({
       joinRequestId,
       organizationId,
       userId,
+      origin,
       resolvedBy: { type: "policy", id: DOMAIN_AUTO_JOIN_POLICY_ID },
       actor: policyActor,
       approvedByUserId: null,
@@ -483,6 +505,7 @@ export class JoinRequestsService {
       joinRequestId,
       organizationId,
       userId: request.userId,
+      origin: request.origin,
       resolvedBy: { type: "user", id: adminUserId },
       actor: { type: "user", id: adminUserId },
       approvedByUserId: adminUserId,
@@ -764,6 +787,7 @@ export class JoinRequestsService {
     joinRequestId,
     organizationId,
     userId,
+    origin,
     resolvedBy,
     actor,
     approvedByUserId,
@@ -772,6 +796,8 @@ export class JoinRequestsService {
     joinRequestId: string;
     organizationId: string;
     userId: string;
+    /** Where the request was made; with the joiner seat, decides the seat. */
+    origin: JoinRequestOrigin;
     resolvedBy: { type: "user" | "policy" | "invite"; id: string };
     actor: { type: "user" | "system"; id: string };
     approvedByUserId: string | null;
@@ -801,6 +827,11 @@ export class JoinRequestsService {
       );
       return;
     }
+    // The seat (ADR-143 v6): the organisation's joiner seat for a request
+    // made on the web, a Developer for one made from the terminal. Decided
+    // here, from the request in hand, so the automatic path never reads it
+    // back from a row that may not exist yet.
+    const { joinerRole } = await this.deps.settings.read({ organizationId });
     await this.deps.membership.attachDefaultMembership({
       userId,
       organizationId,
@@ -811,6 +842,8 @@ export class JoinRequestsService {
         resolvedById: resolvedBy.id,
       }),
       approvedByUserId,
+      role: seatForJoiner({ origin, joinerRole }),
+      origin,
     });
   }
 

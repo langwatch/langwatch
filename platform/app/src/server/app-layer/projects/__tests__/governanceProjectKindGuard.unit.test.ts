@@ -5,9 +5,9 @@ import {
   GOVERNANCE_PROJECT_ROUTE_REFUSAL,
   GovernanceProjectProtectedError,
   governanceProjectRouteViolation,
-  INTERNAL_GOVERNANCE_PROJECT_KIND,
   ProjectService,
 } from "../project.service";
+import { INTERNAL_GOVERNANCE_PROJECT_KIND } from "../project-kinds";
 import type { ProjectRepository } from "../repositories/project.repository";
 
 const ORG = "org_a";

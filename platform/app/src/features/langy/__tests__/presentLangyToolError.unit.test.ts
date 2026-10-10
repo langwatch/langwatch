@@ -153,14 +153,14 @@ describe("presentLangyToolError", () => {
     });
 
     it("names a limit type the label table has never heard of in plain words", () => {
-      const scenarioSets = failureDocument({
+      const customGraphs = failureDocument({
         code: "resource_limit_exceeded",
-        message: "You have reached the maximum number of scenario sets",
+        message: "You have reached the maximum number of custom graphs",
         httpStatus: 403,
-        meta: { limitType: "scenarioSets", current: 2, max: 2 },
+        meta: { limitType: "customGraphs", current: 2, max: 2 },
         isHandled: true,
       });
-      expect(present(scenarioSets).limit?.label).toBe("scenario sets");
+      expect(present(customGraphs).limit?.label).toBe("custom graphs");
     });
 
     it("marks it terminal — no argument change can make room", () => {

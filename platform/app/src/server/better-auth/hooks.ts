@@ -172,11 +172,16 @@ export interface DatabaseHookSsoArrivalPort {
  * BOUNCE — the connection is what made the refusal, and carrying it is the
  * difference between sending somebody to their own provider and showing them
  * a page about why they cannot have Google.
+ *
+ * It answers the METHOD beside the connection because the bounce can only be
+ * made when the two are the same string: the error route dials a connection
+ * by its id, and a connection the router reaches through the broker has no
+ * door under that id to dial.
  */
 export interface DatabaseHookConnectionRoutingPort {
   connectionGoverning(args: {
     email: string;
-  }): Promise<{ connectionId: string } | null>;
+  }): Promise<{ connectionId: string; methodId: string } | null>;
 }
 
 /**
@@ -451,6 +456,16 @@ export class BetterAuthDatabaseHooks {
    * itself arrives under its own id, and a brokered sign-in mid-migration is
    * the population `pendingSsoSetup` exists for. Refusing either would turn
    * somebody away from the door they are supposed to be walking through.
+   *
+   * ONLY A CONNECTION THAT DIALS ITSELF. The error route dials the connection
+   * by the id this refusal carries, through the engine. A grandfathered
+   * connection is routed through the broker instead — the router names it but
+   * the method it dials is `auth0` — and the engine registers nothing under
+   * its id, so a bounce there would name a door that does not open: the
+   * person would wait on a spinner for a provider that never answers. That
+   * connection's organization set the legacy columns, so the guard below
+   * refuses them with the page that says to type their address, and the
+   * address routes through the broker exactly as it always has.
    */
   private async bounceNativeProviderToConnection({
     email,
@@ -465,6 +480,18 @@ export class BetterAuthDatabaseHooks {
       email,
     });
     if (!governing) return;
+    if (governing.methodId !== governing.connectionId) {
+      logger.info(
+        {
+          userId: account.userId,
+          attemptedProvider: account.providerId,
+          connectionId: governing.connectionId,
+          methodId: governing.methodId,
+        },
+        "Left a native social sign-in to the legacy guard: the organization's connection is reached through the broker, not by its own id",
+      );
+      return;
+    }
 
     logger.info(
       {

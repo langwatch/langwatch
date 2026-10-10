@@ -86,6 +86,8 @@ function repositoryWith(memberCount: number): ILicenseEnforcementRepository {
     getMemberCount: vi.fn().mockResolvedValue(memberCount),
     getMembersLiteCount: vi.fn().mockResolvedValue(0),
     getMembersDeveloperCount: vi.fn().mockResolvedValue(0),
+    getActiveScenarioCount: vi.fn().mockResolvedValue(0),
+    getEvaluatorCount: vi.fn().mockResolvedValue(0),
     getCurrentMonthCost: vi.fn(),
     getCurrentMonthCostForProjects: vi.fn(),
   };

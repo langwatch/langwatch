@@ -3,6 +3,7 @@ import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../stores/traceEditStore";
+import { traceDrawerParams } from "./traceDrawerParams";
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL
@@ -64,10 +65,13 @@ export function openTraceEditorFromConversation({
     if (drawer.viewMode === "conversation") {
       drawer.setViewModeTransient("summary");
     }
-    if (drawer.isOpen) seedOpenDrawerForEdit({ traceId, occurredAtMs });
+    // A conversation's turns all belong to the member the drawer is on.
+    const tenantId = drawer.tenantId;
+    if (drawer.isOpen) {
+      seedOpenDrawerForEdit({ traceId, occurredAtMs, tenantId });
+    }
     openDrawer("traceV2Details", {
-      traceId,
-      ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+      ...traceDrawerParams({ traceId, occurredAtMs, tenantId }),
       urlParams: { edit: "1" },
     });
   };
@@ -85,13 +89,15 @@ export function openTraceEditorFromConversation({
 function seedOpenDrawerForEdit({
   traceId,
   occurredAtMs,
+  tenantId,
 }: {
   traceId: string;
   occurredAtMs: number | null;
+  tenantId: string | null;
 }): void {
   const drawer = useDrawerStore.getState();
   if (drawer.traceId !== traceId) {
-    drawer.openTrace(traceId, occurredAtMs);
+    drawer.openTrace(traceId, occurredAtMs, { tenantId });
   }
   if (useTraceEditStore.getState().editingTraceId !== traceId) {
     enterTraceEditMode(traceId);
