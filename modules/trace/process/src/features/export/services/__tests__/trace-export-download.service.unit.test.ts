@@ -5,16 +5,16 @@
  */
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceExportRateLimitedError, type Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 import type { TraceExportBounds, TraceExportSlot } from "../trace-export-bounds.service.ts";
 import { TraceExportDownloadService } from "../trace-export-download.service.ts";
 import type { TraceExportService } from "../trace-export.service.ts";
 
-const authorization = restTestAuthorization();
+const authorization = ownProof({ projectId: "project-1" });
 const protections = { canSeeCapturedInput: true, canSeeCapturedOutput: true } as Protections;
 const request = {
   projectId: "project-1",
@@ -61,7 +61,6 @@ function buildService(options: {
     service: TraceExportDownloadService.create({
       exports,
       protections: viewerProtections,
-      authorization,
       bounds: options.bounds,
       presence,
     }),

@@ -1,5 +1,8 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
-import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import {
+  clickHouseClientDouble,
+  clickHouseQueryClientDouble,
+} from "@langwatch/test-harness/client-doubles/clickhouse";
 // Unit tests for `findByTraceId` OccurredAt-resolution branch selection.
 // Three paths: no row -> null; positive ms -> partition-pruned; 0 -> legacy fallback
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -67,7 +70,7 @@ function makeRepo(responder: (sql: string) => unknown[]) {
   const parameters: Record<string, unknown>[] = [];
   const resolvedFor: (string | undefined)[] = [];
   const boundTenants: string[] = [];
-  const client = clickHouseClientDouble({
+  const client = clickHouseQueryClientDouble({
     query: vi.fn(
       async ({
         sql,
@@ -87,7 +90,7 @@ function makeRepo(responder: (sql: string) => unknown[]) {
   });
   return {
     repo: TraceSummaryClickHouseRepository.create({
-      resolveClient: async () => client,
+      resolveClient: async () => clickHouseClientDouble(),
       clickhouse: new AuthorizedClickHouse({
         resolveClient: async (tenantId?: string) => {
           resolvedFor.push(tenantId);
@@ -292,7 +295,9 @@ describe("given the trace-summary row carries a storage anchor", () => {
       return {
         repo: TraceSummaryClickHouseRepository.create({
           resolveClient: async () => client,
-          clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+          clickhouse: new AuthorizedClickHouse({
+            resolveClient: async () => clickHouseQueryClientDouble(),
+          }),
         }),
         insert,
       };

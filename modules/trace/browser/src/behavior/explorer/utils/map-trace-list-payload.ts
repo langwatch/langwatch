@@ -3,11 +3,12 @@ import { NO_TRACE_EVENTS } from "../types/trace.ts";
 
 /**
  * Normalize the raw `traces.list` payload into `TraceListItem` rows: narrow each row's
- * evaluations to what a cell renders and default the optional spanCount field. Each row
- * carries its own evaluations, matched by project and trace id on the server, so two rows
- * with the same trace id (an aggregate's members) never share them.
+ * evaluations to what a cell renders and default the optional counts. Evaluations are matched
+ * by project and trace id on the server, so an aggregate's same-id rows never share them.
  */
-export function mapTraceListPayload(data: { items: TraceListItem[] } | undefined): TraceListItem[] {
+export function mapTraceListPayload(
+  data: { items: Omit<TraceListItem, "events">[] } | undefined,
+): TraceListItem[] {
   if (!data) return [];
   return data.items.map((item) => ({
     ...item,

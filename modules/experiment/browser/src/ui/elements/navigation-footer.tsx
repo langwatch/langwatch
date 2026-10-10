@@ -358,8 +358,8 @@ export function MessagesNavigationFooter({
     <HStack paddingX={6} paddingY={3} gap={4} justify="space-between" flexWrap="wrap">
       {showPageSize ? (
         <HStack gap={2}>
-          <Text as="label" htmlFor="page-size" textStyle="sm" color="fg.muted" flexShrink={0}>
-            Items per page
+          <Text asChild textStyle="sm" color="fg.muted" flexShrink={0}>
+            <label htmlFor="page-size">Items per page</label>
           </Text>
           <NativeSelect.Root size="xs" width="auto">
             <NativeSelect.Field

@@ -38,6 +38,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 /** Past the shared reader's 10 MiB decompressed cap. */
 const BOMB_EXPANDED_BYTES = 11 * 1024 * 1024;

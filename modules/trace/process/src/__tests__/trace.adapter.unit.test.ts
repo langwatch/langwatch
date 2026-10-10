@@ -1,5 +1,5 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
-import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "#app/trace.app";
@@ -96,7 +96,7 @@ function fencedClickHouse(
   calls: FencedCall[],
   rowsFor: (callIndex: number) => unknown[],
 ): AuthorizedClickHouse {
-  const client = clickHouseClientDouble({
+  const client = clickHouseQueryClientDouble({
     query: vi.fn(
       async ({
         sql,

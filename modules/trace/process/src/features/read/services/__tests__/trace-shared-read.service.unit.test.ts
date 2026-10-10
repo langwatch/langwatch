@@ -298,6 +298,7 @@ describe("TraceSharedReadService", () => {
           {
             spanId: "s1",
             parentSpanId: null,
+            startTimeMs: 0,
             resourceAttributes: attrs,
             scopeName: "x",
             scopeVersion: null,

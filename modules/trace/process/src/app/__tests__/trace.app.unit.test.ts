@@ -449,7 +449,7 @@ describe("TraceModule", () => {
         const { app, spanReads } = harness();
 
         await app.readSpans({
-          projectId: "project-1",
+          authorization: ownProof({ projectId: "project-1" }),
           traceId: "trace-1",
           occurredAtMs: 1_700_000_000_000,
         });
@@ -464,7 +464,10 @@ describe("TraceModule", () => {
       it("omits the key from the span read rather than sending it empty", async () => {
         const { app, spanReads } = harness();
 
-        await app.readSpans({ projectId: "project-1", traceId: "trace-1" });
+        await app.readSpans({
+          authorization: ownProof({ projectId: "project-1" }),
+          traceId: "trace-1",
+        });
 
         expect(spanReads[0]?.args[0]).not.toHaveProperty("occurredAtMs");
       });
@@ -472,7 +475,10 @@ describe("TraceModule", () => {
       it("omits the key from the span-summary read too", async () => {
         const { app, spanReads } = harness();
 
-        await app.readSpanSummaries({ projectId: "project-1", traceId: "trace-1" });
+        await app.readSpanSummaries({
+          authorization: ownProof({ projectId: "project-1" }),
+          traceId: "trace-1",
+        });
 
         expect(spanReads[0]?.args[0]).not.toHaveProperty("occurredAtMs");
       });

@@ -26,7 +26,7 @@ const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(
 const classifiedAs = (
   classified: SearchRouteKind,
   overrides: Partial<RouteSearchInput> = {},
-): RouteSearchInput => input({ classified, isInstantEvalAvailable: true, ...overrides });
+): ReturnType<typeof input> => input({ classified, isInstantEvalAvailable: true, ...overrides });
 
 describe("given a text with only field:value terms", () => {
   describe("when routed", () => {

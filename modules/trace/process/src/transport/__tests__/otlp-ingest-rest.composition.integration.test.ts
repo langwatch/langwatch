@@ -58,6 +58,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 const TOKEN = "sk-lw-a-project-key";
 const API_KEY_ID = "api-key-1";

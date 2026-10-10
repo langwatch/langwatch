@@ -36,6 +36,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 /** An empty gRPC frame: an uncompressed flag and a zero length. */
 const EMPTY_GRPC_FRAME = new Uint8Array(5);

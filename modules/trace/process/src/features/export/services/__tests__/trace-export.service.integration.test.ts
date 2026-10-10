@@ -1,4 +1,3 @@
-import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type {
   Protections,
   Evaluation,
@@ -14,11 +13,12 @@ import type {
  */
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceLegacyReadService } from "../../../legacy/services/trace-legacy-read.service.ts";
 import { TraceExportService } from "../trace-export.service.ts";
 import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
-const authorization = restTestAuthorization();
+const authorization = ownProof({ projectId: "proj-1" });
 const fullProtections: Protections = {
   canSeeCosts: true,
   canSeeCapturedInput: true,

@@ -42,6 +42,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 const LEGACY_PROJECT_KEY: ResolvedApiKeyCredential = {

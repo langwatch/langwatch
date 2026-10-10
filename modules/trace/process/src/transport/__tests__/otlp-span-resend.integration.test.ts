@@ -35,6 +35,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 /** Peers the receiver path never reaches: declared, never bound, so a call refuses by name. */

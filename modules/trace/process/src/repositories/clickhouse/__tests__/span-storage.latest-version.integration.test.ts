@@ -6,7 +6,9 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -61,7 +63,10 @@ function versionRow({ offsetMs, version }: { offsetMs: number; version: string }
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = SpanStorageClickHouseRepository.create(async () => ch);
+  repo = SpanStorageClickHouseRepository.create({
+    resolveClient: async () => ch,
+    clickhouse: authorizedClickHouseFor(ch),
+  });
 
   // Separate inserts leave three unmerged parts; the newest is inserted first
   // so insertion order cannot be what picks the winner.
@@ -95,7 +100,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario "The latest of several unmerged versions is the one read back" */
       it("reads back the version with the latest UpdatedAt", async () => {
         const span = await repo.findNormalizedSpanById({
-          tenantId,
+          authorization: ownProof({ projectId: tenantId }),
           traceId,
           spanId,
           occurredAtMs: base,
@@ -114,7 +119,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario "The latest of several unmerged versions is the one read back" */
       it("answers absent rather than reading across tenants", async () => {
         const span = await repo.findNormalizedSpanById({
-          tenantId: `${tenantId}-other`,
+          authorization: ownProof({ projectId: `${tenantId}-other` }),
           traceId,
           spanId,
           occurredAtMs: base,
