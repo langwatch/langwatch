@@ -139,7 +139,9 @@ function usePeopleListState({
   );
 
   const { openDrawer } = useDrawer();
-  const { cut, selectCut } = useCutFromAddress();
+  const joinRequestsEnabled = host.isFeatureEnabled(FrontendFlags.join_requests);
+  const { cut: addressCut, selectCut } = useCutFromAddress();
+  const cut = !joinRequestsEnabled && addressCut === "waiting" ? "all" : addressCut;
 
   const invitesFlow = useInviteFlow({ organization, activePlan });
   const removal = useMemberRemoval(organization.id);
@@ -152,6 +154,7 @@ function usePeopleListState({
 
   return {
     canManage,
+    joinRequestsEnabled,
     department,
     showDepartment,
     departmentNameById,
@@ -187,6 +190,7 @@ function PeopleList({
           memberCount={people.sortedMembers.length}
           openInviteCount={people.openInvites.length}
           requestCount={people.joinRequests.requests.length}
+          joinRequestsEnabled={people.joinRequestsEnabled}
           onInvite={people.openDrawer}
         />
 
@@ -510,6 +514,7 @@ function PeopleHeader({
   memberCount,
   openInviteCount,
   requestCount,
+  joinRequestsEnabled,
   onInvite,
 }: {
   organizationId: string;
@@ -520,6 +525,7 @@ function PeopleHeader({
   memberCount: number;
   openInviteCount: number;
   requestCount: number;
+  joinRequestsEnabled: boolean;
   onInvite: ReturnType<typeof useDrawer>["openDrawer"];
 }) {
   const [draft, setDraft] = useState("");
@@ -559,7 +565,7 @@ function PeopleHeader({
         groupLabel="Filter people by how they got here"
         countNoun={{ singular: "person", plural: "people" }}
         testId="people-cuts"
-        items={peopleCutItems({ memberCount, openInviteCount, requestCount })}
+        items={peopleCutItems({ memberCount, openInviteCount, requestCount, joinRequestsEnabled })}
       />
     </>
   );
