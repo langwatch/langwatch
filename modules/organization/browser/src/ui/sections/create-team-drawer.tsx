@@ -4,6 +4,7 @@ import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
+import { applyHandledErrorToForm } from "../../behavior/handled-error-form.tsx";
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
@@ -64,7 +65,8 @@ export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): Reac
             });
             closeDrawer();
           },
-          onError: () => {
+          onError: (error) => {
+            if (applyHandledErrorToForm({ error, form })) return;
             toaster.create({
               title: "Failed to create team",
               type: "error",
@@ -74,7 +76,7 @@ export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): Reac
         },
       );
     },
-    [createTeam, organization, queryClient, closeDrawer, toaster],
+    [createTeam, form, organization, queryClient, closeDrawer, toaster],
   );
 
   return (

@@ -155,7 +155,7 @@ export class PrismaTeamRepository extends TeamRepository {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw new TeamSlugConflictError();
+        throw new TeamSlugConflictError(input.name);
       }
       throw error;
     }

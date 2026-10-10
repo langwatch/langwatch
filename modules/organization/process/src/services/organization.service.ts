@@ -102,6 +102,7 @@ export class OrganizationService {
     this.teamMembers = OrganizationTeamMembersService.create({
       ...options,
       createTeam: (input) => this.createTeam(input),
+      assertTeamNameFree: (input) => this.teamService.assertNameFree(input),
     });
     this.teamService = OrganizationTeamService.create(options);
     this.settingsService = OrganizationSettingsService.create(options);
