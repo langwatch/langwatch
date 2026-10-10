@@ -32,12 +32,11 @@ function HeaderActions({ canManage }: { canManage: boolean }) {
   return (
     <>
       <PageLayout.HeaderButton
-        background="bg"
         data-testid="monitor-guardrail-open"
         onClick={() => host.openOverlay({ drawer: "guardrails" })}
       >
         <Shield size={16} />
-        Set up Guardrail
+        Set up guardrail
       </PageLayout.HeaderButton>
       <PageLayout.HeaderButton
         primary
@@ -45,7 +44,7 @@ function HeaderActions({ canManage }: { canManage: boolean }) {
         onClick={() => host.openOverlay({ drawer: "onlineEvaluation" })}
       >
         <Plus size={16} />
-        New Online Evaluation
+        New online evaluation
       </PageLayout.HeaderButton>
     </>
   );
@@ -110,7 +109,7 @@ export default function OnlineEvaluationsScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Online Evaluations</PageLayout.Heading>
+        <PageLayout.Heading>Online evaluations</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
           <HeaderActions canManage={canManage} />
@@ -146,11 +145,7 @@ export default function OnlineEvaluationsScreen() {
               .
             </Text>
           }
-        >
-          <HStack marginTop={4}>
-            <HeaderActions canManage={canManage} />
-          </HStack>
-        </NoDataInfoBlock>
+        ></NoDataInfoBlock>
       )}
       {listState === "list" && (
         <FullWidthListPageContent>

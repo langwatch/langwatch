@@ -299,24 +299,10 @@ describe("given a reader who may manage evaluations", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = renderWithMonitorHost(<OnlineEvaluationsScreen />);
 
-      await user.click(screen.getByRole("button", { name: /New Online Evaluation/ }));
-      await user.click(screen.getByRole("button", { name: /Set up Guardrail/ }));
+      await user.click(screen.getByRole("button", { name: /New online evaluation/ }));
+      await user.click(screen.getByRole("button", { name: /Set up guardrail/ }));
 
       expect(host.overlays).toEqual([{ drawer: "onlineEvaluation" }, { drawer: "guardrails" }]);
-    });
-
-    /** jsdom resolves no tokens: this reads the emotion rule the `background` prop emits. */
-    it("fills the guardrail button with the page background token, as main does", () => {
-      renderWithMonitorHost(<OnlineEvaluationsScreen />);
-
-      const button = screen.getByTestId("monitor-guardrail-open");
-      const rules = Array.from(document.querySelectorAll("style"))
-        .flatMap((style) => (style.textContent ?? "").split("}"))
-        .filter((rule) =>
-          Array.from(button.classList).some((name) => rule.startsWith(`.${name}{`)),
-        );
-
-      expect(rules.join("}")).toContain("background:var(--chakra-colors-bg);");
     });
   });
 });
@@ -330,8 +316,8 @@ describe("given a reader who may not manage evaluations", () => {
         new FakeMonitorHost({ grants: new Set(["evaluations:view", "analytics:view"]) }),
       );
 
-      expect(screen.queryByRole("button", { name: /New Online Evaluation/ })).toBeNull();
-      expect(screen.queryByRole("button", { name: /Set up Guardrail/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /New online evaluation/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Set up guardrail/ })).toBeNull();
     });
   });
 });
