@@ -210,16 +210,11 @@ func (System) GroupRSS(pid int) uint64 {
 }
 
 // TotalMemory returns the machine's physical RAM in bytes (0 if undetectable).
-// darwin: sysctl hw.memsize; linux: /proc/meminfo MemTotal.
+// darwin: the hw.memsize sysctl, read in-process; linux: /proc/meminfo MemTotal.
 func (System) TotalMemory() uint64 {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := probe("sysctl", "-n", "hw.memsize")
-		if err != nil {
-			return 0
-		}
-		n, _ := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
-		return n
+		return darwinMemSize()
 	case "linux":
 		f, err := os.Open("/proc/meminfo")
 		if err != nil {

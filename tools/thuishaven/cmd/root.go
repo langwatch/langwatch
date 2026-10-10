@@ -1087,13 +1087,11 @@ func dotenvKnobs() map[string]string {
 }
 
 // dotenvRoot finds the workspace root .env lives in without spawning git: the
-// nearest ancestor holding a .git entry (a linked worktree's is a file). Under
-// GIT_DIR or GIT_WORK_TREE, or outside any checkout, git itself answers.
+// nearest ancestor holding a .git entry (a linked worktree's is a file).
+// Outside any checkout, git itself answers.
 func dotenvRoot(dir string) string {
-	if os.Getenv("GIT_DIR") == "" && os.Getenv("GIT_WORK_TREE") == "" {
-		if root, ok := nearestGitAncestor(dir); ok {
-			return root
-		}
+	if root, ok := nearestGitAncestor(dir); ok {
+		return root
 	}
 	return gitTopLevel(dir)
 }
