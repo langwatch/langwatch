@@ -57,7 +57,7 @@ export function HorizontalFormControl({
             margin={0}
             {...(size === "sm" && {
               textStyle: "eyebrow",
-              color: "gray.500",
+              color: "label.fgMuted",
             })}
             {...(direction === "vertical" && {
               paddingLeft: 2,

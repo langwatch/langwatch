@@ -45,7 +45,7 @@ const toastMesh = (palette: string) => ({
 
 /** A light-mode solid badge is quiet glass on its palette's solid colour: a fine rim, a light. */
 const badgeGlass = {
-  color: "white",
+  color: "colorPalette.onSolid",
   bg: "colorPalette.solid",
   backgroundImage:
     "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)",
@@ -198,6 +198,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.fg}" },
+          onSolid: { value: "{colors.gray.contrast}" },
         },
         orange: {
           solid: { value: { _light: "#ED8926", _dark: "#ED8926" } },
@@ -232,6 +234,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.orange.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         green: {
           solid: {
@@ -268,6 +272,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.green.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         blue: {
           solid: {
@@ -289,6 +295,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.blue.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         yellow: {
           solid: {
@@ -328,6 +336,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.yellow.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         red: {
           solid: {
@@ -349,6 +359,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.red.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         pink: {
           solid: {
@@ -370,6 +382,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.pink.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         purple: {
           solid: {
@@ -409,6 +423,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.purple.solid}" },
+          onSolid: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
         teal: {
           solid: {
@@ -430,6 +446,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.teal.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         cyan: {
           solid: {
@@ -451,6 +469,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.cyan.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
 
         // Brand orange as LangWatch's accent; status.warning remains yellow.
@@ -464,6 +484,8 @@ export const designSystemConfig = defineConfig({
           emphasized: { value: "{colors.orange.emphasized}" },
           hover: { value: "{colors.orange.hover}" },
           focusRing: { value: "{colors.orange.focusRing}" },
+          indicator: { value: "{colors.orange.indicator}" },
+          onSolid: { value: "{colors.orange.onSolid}" },
         },
 
         // The logo: brand navy with white faces on light; on dark the faces
@@ -539,7 +561,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           fgMuted: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
         },
 
@@ -680,7 +702,7 @@ export const designSystemConfig = defineConfig({
       }),
       link: defineRecipe({
         base: {
-          focusRing: "none",
+          focusVisibleRing: "outside",
         },
       }),
       tag: defineRecipe({
@@ -835,7 +857,7 @@ export const designSystemConfig = defineConfig({
           minWidth: 0,
           overflow: "hidden",
         },
-        variants: { variant: { solid: { _light: badgeGlass } } },
+        variants: { variant: { solid: { color: "colorPalette.onSolid", _light: badgeGlass } } },
       }),
     },
     slotRecipes: {
@@ -998,8 +1020,12 @@ export const designSystemConfig = defineConfig({
           variant: {
             line: {
               trigger: {
+                color: "fg.muted",
                 _selected: {
-                  color: "colorPalette.solid",
+                  color: "fg",
+                  fontWeight: "600",
+                  "--indicator-color": "colors.colorPalette.indicator",
+                  "--indicator-thickness": "2px",
                 },
               },
             },
