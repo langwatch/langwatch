@@ -159,6 +159,21 @@ describe("given a deployment that offers several federated providers", () => {
       expect(scope.getByRole("button", { name: "Connect single sign-on" })).toBeTruthy();
       expect(scope.queryByRole("button", { name: "Connect Google" })).toBeNull();
     });
+
+    /** @scenario "A deployment with no federated providers offers no connect buttons" */
+    it("offers no connect button when the deployment lists no provider", () => {
+      const { scope } = renderSection({
+        deployment: {
+          isSaas: true,
+          appBaseUrl: "https://app.langwatch.ai",
+          passkeysEnabled: false,
+          authProvider: "auth0",
+          federatedProviders: [],
+        },
+      });
+
+      expect(scope.queryByRole("button", { name: /^Connect/ })).toBeNull();
+    });
   });
 });
 

@@ -21,6 +21,7 @@ export type UiDeploymentSlices = Readonly<{
   authProvider?: string;
   passkeysEnabled: boolean;
   emailPasswordEnabled: boolean;
+  federatedProviders: readonly string[];
   signUpMode?: "open" | "invite_only";
   hasCloudOps: boolean;
   gatewayBaseUrl?: string;
@@ -37,6 +38,7 @@ export function deriveUiDeployment({
   authProvider,
   passkeysEnabled,
   emailPasswordEnabled,
+  federatedProviders,
   signUpMode,
   hasCloudOps,
   gatewayBaseUrl,
@@ -53,6 +55,7 @@ export function deriveUiDeployment({
     ...(authProvider ? { authProvider } : {}),
     passkeysEnabled,
     emailPasswordEnabled,
+    federatedProviders,
     ...(signUpMode ? { signUpMode } : {}),
     hasCloudOps,
     ...(gatewayBaseUrl ? { gatewayBaseUrl } : {}),

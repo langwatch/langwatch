@@ -16,6 +16,7 @@ function slicesWith(overrides: Partial<UiDeploymentSlices>): UiDeploymentSlices 
     hasEmailProvider: true,
     passkeysEnabled: false,
     emailPasswordEnabled: false,
+    federatedProviders: [],
     hasCloudOps: false,
     ...overrides,
   };
