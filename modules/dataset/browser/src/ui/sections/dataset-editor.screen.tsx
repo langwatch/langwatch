@@ -2,7 +2,7 @@
 
 import { datasetClient } from "@langwatch/dataset-client";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Button, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, Spinner, Text } from "@langwatch/design-system/primitives";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 
@@ -23,6 +23,7 @@ export default function DatasetEditorScreen() {
   const project = host.project();
   const datasetId = host.route().params.id ?? "";
   const [isRetrying, setIsRetrying] = useState(false);
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
 
   const datasetQuery = datasetClient.dataset.getById.useQuery(
@@ -66,62 +67,75 @@ export default function DatasetEditorScreen() {
   };
 
   return (
-    <PageLayout.Container>
-      {(status === "uploading" || status === "processing") && (
-        <Alert.Root status="info" marginBottom={4}>
-          <Alert.Indicator>
-            <Spinner size="sm" />
-          </Alert.Indicator>
-          <Alert.Content>
-            <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-      {status === "failed" && (
-        <Alert.Root status="error" marginBottom={4}>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>We could not prepare your dataset</Alert.Title>
-            <Alert.Description>
-              {datasetQuery.data?.statusError ??
-                "Something went wrong while processing your file. You can retry."}
-            </Alert.Description>
-          </Alert.Content>
-          <Button
-            size="sm"
-            colorPalette="red"
-            variant="outline"
-            loading={isRetrying}
-            onClick={() => void handleRetry()}
-          >
-            Retry
-          </Button>
-        </Alert.Root>
-      )}
-      {datasetGone && <Text color="fg.muted">This dataset is no longer available.</Text>}
-      {isReady ? (
-        <DatasetEditorTable
-          datasetId={datasetId}
-          readEnabled={isReady}
-          floatingSelectionBar
-          headerActions={
-            host.hasPermission(EXPERIMENT_PERMISSION) ? (
-              <PageLayout.HeaderButton
-                primary
-                data-testid="run-experiment-from-dataset"
-                onClick={runExperiment}
-              >
-                <FlaskConical size={16} /> Run experiment
-              </PageLayout.HeaderButton>
-            ) : undefined
-          }
-        />
-      ) : (
-        status !== "failed" &&
-        !datasetGone && (
-          <Text color="fg.muted">Your dataset will appear here once it is ready.</Text>
-        )
-      )}
-    </PageLayout.Container>
+    <>
+      <PageLayout.Header>
+        {/* The editor owns its state, so it portals the heading, counts and buttons in here. */}
+        <Box ref={setHeaderSlot} display="flex" alignItems="center" gap={3} flex={1} minWidth={0}>
+          {!isReady && (
+            <PageLayout.Heading truncate minWidth={0}>
+              {datasetName ?? "Dataset"}
+            </PageLayout.Heading>
+          )}
+        </Box>
+      </PageLayout.Header>
+      <PageLayout.Container>
+        {(status === "uploading" || status === "processing") && (
+          <Alert.Root status="info" marginBottom={4}>
+            <Alert.Indicator>
+              <Spinner size="sm" />
+            </Alert.Indicator>
+            <Alert.Content>
+              <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+        {status === "failed" && (
+          <Alert.Root status="error" marginBottom={4}>
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>We could not prepare your dataset</Alert.Title>
+              <Alert.Description>
+                {datasetQuery.data?.statusError ??
+                  "Something went wrong while processing your file. You can retry."}
+              </Alert.Description>
+            </Alert.Content>
+            <Button
+              size="sm"
+              colorPalette="red"
+              variant="outline"
+              loading={isRetrying}
+              onClick={() => void handleRetry()}
+            >
+              Retry
+            </Button>
+          </Alert.Root>
+        )}
+        {datasetGone && <Text color="fg.muted">This dataset is no longer available.</Text>}
+        {isReady ? (
+          <DatasetEditorTable
+            datasetId={datasetId}
+            readEnabled={isReady}
+            floatingSelectionBar
+            headerSlot={headerSlot}
+            headerActions={
+              host.hasPermission(EXPERIMENT_PERMISSION) ? (
+                <PageLayout.HeaderButton
+                  primary
+                  data-testid="run-experiment-from-dataset"
+                  onClick={runExperiment}
+                >
+                  <FlaskConical size={16} /> Run experiment
+                </PageLayout.HeaderButton>
+              ) : undefined
+            }
+          />
+        ) : (
+          status !== "failed" &&
+          !datasetGone && (
+            <Text color="fg.muted">Your dataset will appear here once it is ready.</Text>
+          )
+        )}
+      </PageLayout.Container>
+    </>
   );
 }
