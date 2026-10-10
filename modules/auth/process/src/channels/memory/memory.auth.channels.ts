@@ -7,9 +7,10 @@ import type { AuthChannels } from "../auth.channels.ts";
 import { SesPasswordResetMailChannel } from "../ses/ses.password-reset-mail.channel.ts";
 import { SesSignUpVerificationMailChannel } from "../ses/ses.sign-up-verification-mail.channel.ts";
 import { SignupAnnouncementChannel } from "../signup-announcement.channel.ts";
+import { MemoryAuth0PasswordChannel } from "./memory.auth0-password.channel.ts";
 import { MemoryCliDeviceSettlementChannel } from "./memory.cli-device-settlement.channel.ts";
 
-/** In-process settlements and announcements; mail goes to notification, a peer on this tier too. */
+/** In-process settlements and announcements, an unconfigured Auth0 tenant; mail to notification. */
 export class MemoryAuthChannels {
   static readonly requires = [] as const;
   static readonly binds = { notifications: NotificationService } as const;
@@ -21,6 +22,7 @@ export class MemoryAuthChannels {
       signupAnnouncements: MemorySignupAnnouncementChannel.create(),
       passwordResetMail: SesPasswordResetMailChannel.create({ mailer }),
       signUpVerificationMail: SesSignUpVerificationMailChannel.create({ mailer }),
+      auth0Passwords: MemoryAuth0PasswordChannel.create({ outcome: "not_configured" }),
     };
   }
 }

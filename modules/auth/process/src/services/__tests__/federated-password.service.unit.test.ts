@@ -4,9 +4,12 @@
  * `not_configured` on the call rather than failing at boot.
  * @see specs/settings/change-password-auth0.feature
  */
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
-import { auth0PasswordChannels } from "../../channels/auth0-password-channels.registry.ts";
+import { NO_SIGN_IN_PROVIDERS } from "../../app/__tests__/support/sign-in-providers.ts";
+import { HttpAuth0PasswordChannel } from "../../channels/http/http.auth0-password.channel.ts";
+import { MemoryAuth0PasswordChannel } from "../../channels/memory/memory.auth0-password.channel.ts";
 import { FederatedPasswordService } from "../federated-password.service.ts";
 
 const CHANGE = {
@@ -23,7 +26,7 @@ function accountsHolding(accounts: { providerId: string; accountId: string }[]) 
 describe("FederatedPasswordService.changePassword", () => {
   describe("given an Auth0 database identity and a tenant that accepts the change", () => {
     it("changes the password of that identity", async () => {
-      const auth0 = auth0PasswordChannels.memory.create({ outcome: "changed" });
+      const auth0 = MemoryAuth0PasswordChannel.create({ outcome: "changed" });
       const service = FederatedPasswordService.create({
         accounts: accountsHolding([
           { providerId: "auth0", accountId: "google-oauth2|99" },
@@ -46,7 +49,7 @@ describe("FederatedPasswordService.changePassword", () => {
 
   describe("given only a social identity brokered through Auth0", () => {
     it("answers no_federated_account and asks the tenant nothing", async () => {
-      const auth0 = auth0PasswordChannels.memory.create({ outcome: "changed" });
+      const auth0 = MemoryAuth0PasswordChannel.create({ outcome: "changed" });
       const service = FederatedPasswordService.create({
         accounts: accountsHolding([{ providerId: "auth0", accountId: "google-oauth2|99" }]),
         auth0,
@@ -63,7 +66,7 @@ describe("FederatedPasswordService.changePassword", () => {
     it("answers no_address_on_record", async () => {
       const service = FederatedPasswordService.create({
         accounts: accountsHolding([{ providerId: "auth0", accountId: "auth0|123" }]),
-        auth0: auth0PasswordChannels.memory.create({ outcome: "changed" }),
+        auth0: MemoryAuth0PasswordChannel.create({ outcome: "changed" }),
       });
 
       await expect(service.changePassword({ ...CHANGE, email: null })).resolves.toEqual({
@@ -76,10 +79,9 @@ describe("FederatedPasswordService.changePassword", () => {
     it("answers not_configured on the call", async () => {
       const service = FederatedPasswordService.create({
         accounts: accountsHolding([{ providerId: "auth0", accountId: "auth0|123" }]),
-        auth0: auth0PasswordChannels.http.create({
-          issuer: undefined,
-          mgmtClientId: undefined,
-          mgmtClientSecret: undefined,
+        auth0: await HttpAuth0PasswordChannel.create({
+          config: { auth0ManagementClientId: undefined, signInProviders: NO_SIGN_IN_PROVIDERS },
+          secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
         }),
       });
 

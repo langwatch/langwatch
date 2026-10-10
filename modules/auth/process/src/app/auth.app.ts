@@ -70,7 +70,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   internalSlackSignupsWebhook,
-  Secret,
   sessionSecret,
   signInProviderSecrets,
 } from "@langwatch/secrets";
@@ -88,7 +87,7 @@ import {
 } from "@langwatch/user-contract";
 
 import type { AuthChannels } from "../channels/auth.channels.ts";
-import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
+import { auth0ManagementSecret } from "../channels/auth0-password.channel.ts";
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -274,8 +273,8 @@ export class AuthModule implements AuthApiContract {
   static readonly secrets = {
     session: sessionSecret,
     ...signInProviderSecrets,
-    /** The Auth0 Management app's secret; absent, the login app's stands in, as main's did. */
-    auth0ManagementSecret: Secret.load("AUTH0_MGMT_CLIENT_SECRET", { optional: true }),
+    /** Read by the live channel tier, which scopes to this module's declared secrets. */
+    auth0ManagementSecret,
     /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and identity. */
     internalSlackSignupsWebhook,
   } as const;
@@ -318,7 +317,7 @@ export class AuthModule implements AuthApiContract {
   readonly #registrations: CredentialRegistrationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
-  /** The Auth0 tenant's password change; set once the provider secrets resolve. */
+  /** The Auth0 tenant's password change; set by {@link AuthModule.create}. */
   #federatedPasswords: FederatedPasswordService | null = null;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
@@ -656,17 +655,9 @@ export class AuthModule implements AuthApiContract {
       baseUrl: config.sessionUrl ?? "",
     });
     app.#mountedSocialMethodIds = mountedSocialMethodIds({ configuration: signInProviders });
-    const auth0ManagementSecret = await setup.secrets.into(
-      AuthModule.secrets.auth0ManagementSecret,
-      (value) => value,
-    );
     app.#federatedPasswords = FederatedPasswordService.create({
       accounts: accountRows,
-      auth0: auth0PasswordChannels.http.create({
-        issuer: config.signInProviders.auth0Issuer,
-        mgmtClientId: config.auth0ManagementClientId ?? config.signInProviders.auth0ClientId,
-        mgmtClientSecret: auth0ManagementSecret ?? signInProviders.auth0ClientSecret,
-      }),
+      auth0: channels.auth0Passwords,
     });
     app.#authProviders = AuthProviderService.create({
       configuredProvider: configuredAuthProvider(config.signInProviders).provider,
