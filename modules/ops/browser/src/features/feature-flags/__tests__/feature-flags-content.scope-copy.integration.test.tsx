@@ -112,7 +112,7 @@ const EXTERNAL_FLAG_SERVICES = [/posthog/i, /launchdarkly/i, /split\.io/i];
 /** Section's own description (not whole section); isolates test from historical
  * fixture data. */
 function sectionDescription(heading: string): string {
-  return screen.getByText(heading).nextElementSibling?.textContent ?? "";
+  return screen.getByRole("heading", { name: heading }).nextElementSibling?.textContent ?? "";
 }
 
 describe("the Ops feature flags page", () => {

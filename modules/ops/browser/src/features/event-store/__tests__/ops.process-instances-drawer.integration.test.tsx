@@ -35,6 +35,8 @@ describe("process instance list drawer", () => {
     const user = userEvent.setup();
     renderWithDesignSystem(<ProcessInstancesDrawer onClose={() => {}} onOpenInstance={onOpen} />);
     const instanceButton = await screen.findByRole("button", { name: "webhook-42" });
+    // Wait for the drawer's autofocus before choosing the row by keyboard.
+    await waitFor(() => expect(screen.getByRole("dialog")).toBe(document.activeElement));
     instanceButton.focus();
     await user.keyboard("{Enter}");
     expect(onOpen).toHaveBeenCalledExactlyOnceWith(instance);
