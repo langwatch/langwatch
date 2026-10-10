@@ -58,7 +58,7 @@ so Stripe's 5-minute tolerance holds after the test clock moves.
 
 ## Known gaps (it is not Stripe)
 
-No proration (previews bill whole periods); no automatic webhook retries; unknown request
+Proration only for proration_behavior always_invoice (preview and update bill the unused-time credit and charge), other behaviours preview whole periods; no automatic webhook retries; unknown request
 parameters are accepted; credit grants are recorded, never applied; invoice items need a
 draft `invoice`. Catalog prices without a unit amount are metered on `BILLABLE_EVENTS` and
 bill nothing until reseeded with tiers.
