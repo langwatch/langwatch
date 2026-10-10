@@ -5,6 +5,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -16,18 +17,18 @@ import {
   Heading,
   HStack,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import {
   CreateProjectDrawerToken,
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
 } from "@langwatch/organization-client";
-import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { RouterOutputs } from "../../../behavior/organization-api.ts";
@@ -1060,7 +1061,7 @@ export default function TeamsScreen() {
     <VStack gap={6} width="full" align="start">
       <HStack width="full">
         <Box>
-          <Heading size="md">Teams &amp; Projects</Heading>
+          <Heading size="md">Teams and projects</Heading>
           <Text fontSize="sm" color="fg.subtle" mt={1}>
             People on a team inherit access to all its projects. Expand a project to add overrides
             or direct access.
@@ -1088,9 +1089,16 @@ export default function TeamsScreen() {
         )}
       </HStack>
 
-      {teams.isLoading && <Spinner />}
+      {teams.isLoading && <SkeletonRows rows={3} />}
 
-      {teams.data?.length === 0 && <Text color="fg.subtle">No teams yet.</Text>}
+      {teams.data?.length === 0 && (
+        <NoDataInfoBlock
+          size="inline"
+          icon={<Users size={24} />}
+          title="No teams yet"
+          description="Create a team to group people and the projects they work on."
+        />
+      )}
 
       <VStack gap={3} width="full" align="stretch">
         {teams.data?.map((team) => (

@@ -88,7 +88,7 @@ export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): Reac
         if (!isOpen) closeDrawer();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <Drawer.Title>Create New Team</Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />

@@ -587,9 +587,7 @@ function InviteLinkDialog({
     <Dialog.Root open={open} onOpenChange={({ open }) => (open ? undefined : onClose())}>
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title textStyle="xl" fontWeight="semibold">
-            Invite Link
-          </Dialog.Title>
+          <Dialog.Title>Invite Link</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>

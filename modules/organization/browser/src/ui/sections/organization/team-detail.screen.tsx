@@ -13,8 +13,6 @@ import {
   HStack,
   Separator,
   Skeleton,
-  Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -308,9 +306,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Team Settings</PageLayout.Heading>
-        <Spacer />
-        {updateTeam.isPending && <Spinner />}
+        <PageLayout.Heading>Team settings</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={8} align="start" width="full" paddingTop={4}>
         <TeamForm
@@ -323,7 +319,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
         <Separator />
         <VStack align="start" gap={3} width="full">
           <Heading size="sm" color="fg.error">
-            Danger Zone
+            Danger zone
           </Heading>
           <Card.Root width="full" borderColor="border.error">
             <Card.Body>

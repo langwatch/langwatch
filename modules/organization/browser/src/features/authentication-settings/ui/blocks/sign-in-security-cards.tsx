@@ -116,11 +116,11 @@ function NumberField({
           onChange={(event) => onChange(Number(event.target.value || 0))}
           data-testid={testId}
         />
-        <Text fontSize="12px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           {suffix}
         </Text>
       </HStack>
-      <Text color="fg.muted" fontSize="11.5px">
+      <Text textStyle="caption" color="fg.muted">
         {hint}
       </Text>
     </VStack>

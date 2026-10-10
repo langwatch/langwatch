@@ -65,11 +65,9 @@ export function InviteMemberDrawer({
         if (!isOpen) closeDrawer();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title textStyle="lg" fontWeight="semibold">
-            Add members
-          </Drawer.Title>
+          <Drawer.Title>Add members</Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>
         <Drawer.Body ref={bodyRef}>

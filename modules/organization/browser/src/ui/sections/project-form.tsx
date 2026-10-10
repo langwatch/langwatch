@@ -366,7 +366,7 @@ function TeamSelectWithCreateButton({
                 }}
               >
                 <Plus size={16} />
-                <Text fontSize={14}>Create new team</Text>
+                <Text textStyle="body">Create new team</Text>
               </Button>
             </Box>
           </Select.Content>

@@ -29,6 +29,7 @@ export function AuditPeriodPicker({
     >
       <Popover.Trigger asChild>
         <Button
+          textStyle="bodySm"
           variant="outline"
           size="sm"
           minWidth="fit-content"
@@ -36,8 +37,6 @@ export function AuditPeriodPicker({
           minHeight="32px"
           paddingX="10px"
           gap={2}
-          fontSize="13px"
-          lineHeight="20px"
           borderRadius="4px"
         >
           <Calendar size={14} />

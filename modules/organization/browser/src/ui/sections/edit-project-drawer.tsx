@@ -123,7 +123,7 @@ export function EditProjectDrawer({
         if (!isOpen) closeDrawer();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={closeDrawer} />
           <Drawer.Title>Edit Project</Drawer.Title>

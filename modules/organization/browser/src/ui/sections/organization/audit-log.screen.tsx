@@ -138,8 +138,7 @@ const DAY_BAND = { "& > td": { height: "28px", paddingTop: 0, paddingBottom: 0 }
 /** Filter controls share one 32px line, 13px text and a 4px radius. */
 const FILTER_CONTROL = {
   height: "32px",
-  fontSize: "13px",
-  lineHeight: "20px",
+  textStyle: "bodySm",
   borderRadius: "4px",
 };
 

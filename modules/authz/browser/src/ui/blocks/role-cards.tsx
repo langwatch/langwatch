@@ -23,7 +23,7 @@ import { permissionsNeedingOrganizationScope } from "../../model/role-permission
 import { PermissionTokenList } from "../elements/permission-token.tsx";
 import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
 
-const TIER_COLOUR = { ADMIN: "red", MEMBER: "blue", VIEWER: "gray" } as const;
+const TIER_COLOUR = { ADMIN: "orange", MEMBER: "blue", VIEWER: "gray" } as const;
 
 export function BuiltinRoleCard({
   card,
@@ -244,13 +244,7 @@ export function CustomRoleCard({
 /** The quiet label every card section, and the role detail dialog, leads with. */
 export function SectionEyebrow({ children }: { children: ReactNode }) {
   return (
-    <Text
-      fontSize="10px"
-      fontWeight="medium"
-      color="fg.subtle"
-      textTransform="uppercase"
-      letterSpacing="0.08em"
-    >
+    <Text textStyle="eyebrow" color="fg.subtle">
       {children}
     </Text>
   );

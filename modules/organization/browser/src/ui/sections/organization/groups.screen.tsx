@@ -6,21 +6,21 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */
 import { Dialog } from "@langwatch/design-system/dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
   Button,
-  Card,
   chakra,
   Heading,
   HStack,
   Separator,
-  Spinner,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -103,136 +103,130 @@ export default function GroupsScreen() {
 
         <Separator />
 
-        {groups.isLoading && <Spinner />}
+        {groups.isLoading && <SkeletonRows rows={4} />}
 
         {!groups.isLoading && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-              <Table.Root variant="line" size="md" width="full" data-testid="groups-list">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Group</Table.ColumnHeader>
-                    <Table.ColumnHeader width="120px">Source</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
-                    <Table.ColumnHeader width="80px" textAlign="right">
-                      Members
-                    </Table.ColumnHeader>
-                    {canManage && <Table.ColumnHeader width="48px" />}
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {(groups.data ?? []).map((g) => (
-                    <Table.Row
-                      key={g.id}
-                      data-testid="group-row"
-                      cursor="pointer"
-                      onClick={() => setSelectedGroup(g)}
-                      _hover={{ bg: "bg.muted" }}
-                    >
-                      <Table.Cell fontWeight="medium">
-                        <chakra.button type="button" cursor="pointer" textAlign="start">
-                          {g.name}
-                        </chakra.button>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <SourceBadge scimSource={g.scimSource} />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <VStack gap={1} align="end">
-                          {g.grants.map((b, i) => (
-                            <HStack key={i} gap={1} fontSize="xs">
-                              <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
-                                {b.customRoleName ?? b.role}
-                              </Badge>
-                              <Text color="fg.muted">on</Text>
-                              <Badge colorPalette="purple" size="sm">
-                                {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
-                              </Badge>
-                            </HStack>
-                          ))}
-                          {g.grants.length === 0 && (
-                            <Text fontSize="xs" color="fg.subtle" textAlign="right">
-                              No access configured
-                            </Text>
-                          )}
-                        </VStack>
-                      </Table.Cell>
-                      <Table.Cell textAlign="right">
-                        <Text fontSize="sm" color="fg.muted">
-                          {g.memberCount}
-                        </Text>
-                      </Table.Cell>
-                      {canManage && (
-                        <Table.Cell>
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                aria-label={`Actions for ${g.name}`}
-                                data-testid="groups-row-actions"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical size={16} />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedGroup(g);
-                                }}
-                              >
-                                <Box display="flex" alignItems="center" gap={2}>
-                                  <Edit2 size={14} />
-                                  Edit
-                                </Box>
-                              </Menu.Item>
-                              <Menu.Item
-                                value="delete"
-                                color="red.fg"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setGroupToDelete(g);
-                                }}
-                              >
-                                <Box display="flex" alignItems="center" gap={2}>
-                                  <Trash2 size={14} />
-                                  Delete
-                                </Box>
-                              </Menu.Item>
-                            </Menu.Content>
-                          </Menu.Root>
-                        </Table.Cell>
-                      )}
-                    </Table.Row>
-                  ))}
-                  {canManage && (
-                    <Table.Row
-                      cursor="pointer"
-                      onClick={() => setCreating(true)}
-                      _hover={{ bg: "bg.muted" }}
-                      color="fg.muted"
-                    >
-                      <Table.Cell colSpan={5}>
-                        <chakra.button
-                          type="button"
-                          cursor="pointer"
-                          data-testid="groups-add-manual"
-                        >
-                          <HStack gap={2}>
-                            <Plus size={14} />
-                            <Text fontSize="sm">Add a group</Text>
+          <Box width="full" data-testid="groups-list">
+            <ListTable containerProps={{ overflowX: "auto" }}>
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Group</Table.ColumnHeader>
+                  <Table.ColumnHeader width="120px">Source</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                  <Table.ColumnHeader width="80px" textAlign="right">
+                    Members
+                  </Table.ColumnHeader>
+                  {canManage && <ListTable.ActionHeader />}
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {(groups.data ?? []).map((g) => (
+                  <Table.Row
+                    key={g.id}
+                    data-testid="group-row"
+                    cursor="pointer"
+                    onClick={() => setSelectedGroup(g)}
+                    _hover={{ bg: "bg.muted" }}
+                  >
+                    <Table.Cell fontWeight="medium">
+                      <chakra.button type="button" cursor="pointer" textAlign="start">
+                        {g.name}
+                      </chakra.button>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <SourceBadge scimSource={g.scimSource} />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <VStack gap={1} align="end">
+                        {g.grants.map((b, i) => (
+                          <HStack key={i} gap={1} fontSize="xs">
+                            <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+                              {b.customRoleName ?? b.role}
+                            </Badge>
+                            <Text color="fg.muted">on</Text>
+                            <Badge colorPalette="purple" size="sm">
+                              {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                            </Badge>
                           </HStack>
-                        </chakra.button>
-                      </Table.Cell>
-                    </Table.Row>
-                  )}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
+                        ))}
+                        {g.grants.length === 0 && (
+                          <Text fontSize="xs" color="fg.subtle" textAlign="right">
+                            No access configured
+                          </Text>
+                        )}
+                      </VStack>
+                    </Table.Cell>
+                    <Table.Cell textAlign="right">
+                      <Text fontSize="sm" color="fg.muted">
+                        {g.memberCount}
+                      </Text>
+                    </Table.Cell>
+                    {canManage && (
+                      <ListTable.ActionCell>
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              aria-label={`Actions for ${g.name}`}
+                              data-testid="groups-row-actions"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical size={16} />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="edit"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedGroup(g);
+                              }}
+                            >
+                              <Box display="flex" alignItems="center" gap={2}>
+                                <Edit2 size={14} />
+                                Edit
+                              </Box>
+                            </Menu.Item>
+                            <Menu.Item
+                              value="delete"
+                              color="red.fg"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setGroupToDelete(g);
+                              }}
+                            >
+                              <Box display="flex" alignItems="center" gap={2}>
+                                <Trash2 size={14} />
+                                Delete
+                              </Box>
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      </ListTable.ActionCell>
+                    )}
+                  </Table.Row>
+                ))}
+                {canManage && (
+                  <Table.Row
+                    cursor="pointer"
+                    onClick={() => setCreating(true)}
+                    _hover={{ bg: "bg.muted" }}
+                    color="fg.muted"
+                  >
+                    <Table.Cell colSpan={5}>
+                      <chakra.button type="button" cursor="pointer" data-testid="groups-add-manual">
+                        <HStack gap={2}>
+                          <Plus size={14} />
+                          <Text textStyle="body">Add a group</Text>
+                        </HStack>
+                      </chakra.button>
+                    </Table.Cell>
+                  </Table.Row>
+                )}
+              </Table.Body>
+            </ListTable>
+          </Box>
         )}
       </VStack>
 

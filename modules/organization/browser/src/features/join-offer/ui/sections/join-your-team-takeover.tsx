@@ -59,7 +59,7 @@ export function JoinYourTeamTakeover({
         intro="Your colleagues are already here, and this organization lets people on your domain straight in."
         testId="join-team-admitting"
       >
-        <Text fontSize="13px" color="fg.muted" textAlign="center">
+        <Text textStyle="bodySm" color="fg.muted" textAlign="center">
           One moment.
         </Text>
       </Takeover>
@@ -69,7 +69,7 @@ export function JoinYourTeamTakeover({
   if (view.kind === "waiting") {
     return (
       <Takeover title="Waiting for an administrator" testId="join-team-waiting">
-        <Text fontSize="14px" lineHeight="1.65" color="fg.muted" textAlign="center">
+        <Text textStyle="body" color="fg.muted" textAlign="center">
           {view.organizationName === null
             ? "Your request to join is with the administrators."
             : `Your request to join ${view.organizationName} is with their administrators.`}{" "}
@@ -114,7 +114,7 @@ export function JoinYourTeamTakeover({
       >
         {dismissLabel}
       </Button>
-      <Text fontSize="12.5px" color="fg.subtle" textAlign="center">
+      <Text textStyle="bodySm" color="fg.subtle" textAlign="center">
         We will not ask about this domain again.
       </Text>
     </Takeover>
@@ -149,16 +149,9 @@ function Takeover({
         <Dialog.Body display="flex" alignItems="center" justifyContent="center" padding={6}>
           <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
             <Box>
-              <Dialog.Title
-                fontSize="22px"
-                fontWeight={600}
-                letterSpacing="-0.01em"
-                textAlign="center"
-              >
-                {title}
-              </Dialog.Title>
+              <Dialog.Title textAlign="center">{title}</Dialog.Title>
               {intro !== undefined && (
-                <Text fontSize="14px" color="fg.muted" textAlign="center" paddingTop="6px">
+                <Text textStyle="body" color="fg.muted" textAlign="center" paddingTop="6px">
                   {intro}
                 </Text>
               )}
