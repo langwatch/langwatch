@@ -4,15 +4,17 @@ import { createLogger } from "@langwatch/observability";
  * or JSON serialization, yielding chunks progressively so the API layer streams straight to the
  * HTTP response; only one batch, up to 100 traces, is held in memory at a time.
  */
-import type {
-  Protections,
-  Evaluation,
-  Trace,
-  ExportProgress,
-  ExportRequest,
+import {
+  explorerHiddenOrigins,
+  type Protections,
+  type Evaluation,
+  type Trace,
+  type ExportProgress,
+  type ExportRequest,
 } from "@langwatch/trace-contract";
 
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
+import { explorerOriginExclusion } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
@@ -28,6 +30,13 @@ import {
 } from "../rules/trace-export-json.rules.ts";
 
 const BATCH_SIZE = 100;
+
+/** The export counts what the Explorer lists: the origins it hides stay out of the file. */
+function explorerHiddenFilter({ request }: { request: ExportRequest }) {
+  return explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(request.query) })(
+    undefined,
+  );
+}
 
 const logger = createLogger("langwatch:export");
 
@@ -74,6 +83,7 @@ export class TraceExportService {
         downloadMode: false,
         includeSpans: false,
         scrollId: null,
+        filterWhere: explorerHiddenFilter({ request }),
       },
     );
 
@@ -182,6 +192,7 @@ export class TraceExportService {
         includeSpans: request.mode === "full",
         resolveBlobs: true,
         scrollId: scrollId ?? null,
+        filterWhere: explorerHiddenFilter({ request }),
       },
     );
   }

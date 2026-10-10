@@ -77,6 +77,33 @@ async function drainExport(service: TraceExportService, request: ExportRequest) 
   }
 }
 
+describe("TraceExportService hides what the Explorer hides", () => {
+  /** @scenario "Langy's own turns are left out of every Analytics read" */
+  it("excludes the langy origin from the count and from every batch", async () => {
+    const seen: GetAllTracesForProjectOptions[] = [];
+    const built = buildOptionsCapturingTraceService();
+    const service = TraceExportService.create({ traceService: built.traceService });
+
+    await service.getTotalCount({ request: buildExportRequest(), protections });
+    await drainExport(service, buildExportRequest());
+    seen.push(...built.optionsSeen);
+
+    expect(seen).toHaveLength(2);
+    for (const options of seen) {
+      expect(options.filterWhere?.params).toEqual({ hiddenOrigins: ["langy"] });
+    }
+  });
+
+  it("keeps them when the query names an origin itself", async () => {
+    const built = buildOptionsCapturingTraceService();
+    const service = TraceExportService.create({ traceService: built.traceService });
+
+    await drainExport(service, buildExportRequest({ query: "origin:langy" }));
+
+    expect(built.optionsSeen[0]?.filterWhere).toBeUndefined();
+  });
+});
+
 describe("TraceExportService — #4991 AC1 full export resolution", () => {
   describe("when TraceExportService.create() receives the process-owned reader", () => {
     it("wraps that reader without constructing another service", async () => {
