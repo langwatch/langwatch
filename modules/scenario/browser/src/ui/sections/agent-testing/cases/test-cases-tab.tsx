@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { HStack, VStack } from "@langwatch/design-system/primitives";
+import { Stack, VStack } from "@langwatch/design-system/primitives";
 
 import { TestCasesDialogs } from "./test-cases-dialogs.tsx";
 import { TestCasesPanel } from "./test-cases-panel.tsx";
@@ -19,7 +19,8 @@ export function TestCasesTab() {
     !data.isLoading && !data.hasAgent && data.suites.length === 0 && data.externalSets.length === 0;
 
   return (
-    <HStack
+    <Stack
+      direction={{ base: "column", md: "row" }}
       width="full"
       height="full"
       gap={0}
@@ -33,6 +34,6 @@ export function TestCasesTab() {
       </VStack>
 
       <TestCasesDialogs model={model} />
-    </HStack>
+    </Stack>
   );
 }

@@ -1,6 +1,20 @@
-import { Box, Spacer, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, IconButton, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { Decorator, Meta, StoryObj } from "@storybook/react-vite";
-import { Calendar, Eye, Hash, KeyRound, Plug, ShieldCheck, Users, Zap } from "lucide-react";
+import {
+  Calendar,
+  Eye,
+  Folder,
+  FolderCode,
+  Hash,
+  Inbox,
+  KeyRound,
+  MoreVertical,
+  PanelRightOpen,
+  Plug,
+  ShieldCheck,
+  Users,
+  Zap,
+} from "lucide-react";
 
 import { PageLayout } from "./page-layout.tsx";
 import { SectionNavigationFrame } from "./section-navigation-frame.tsx";
@@ -150,4 +164,87 @@ export const Mobile: Story = {
 export const Dark: Story = {
   args: { children: paragraphs(30) },
   globals: { colorMode: "dark" },
+};
+
+const rowMenu = (name: string) => (
+  <IconButton size="2xs" variant="ghost" aria-label={`Actions for ${name}`}>
+    <MoreVertical size={13} />
+  </IconButton>
+);
+const suite = (name: string) => ({
+  label: name,
+  href: `/testing/suites/${name.toLowerCase()}`,
+  icon: <Folder size={14} />,
+  actions: rowMenu(name),
+});
+const railFooter = (
+  <Stack direction="row" alignItems="center" paddingX={2} paddingTop={2}>
+    <Button size="xs" variant="outline">
+      30d
+    </Button>
+    <Spacer />
+    <IconButton size="xs" variant="ghost" aria-label="Collapse the rail">
+      <PanelRightOpen size={14} />
+    </IconButton>
+  </Stack>
+);
+
+/** Entries with a row menu under the pointer, a create action under the run, and a footer. */
+export const RowActionsAndFooter: Story = {
+  args: {
+    label: "Test Suites",
+    header: header("Refunds"),
+    links: [],
+    groups: [
+      {
+        links: [suite("Default"), suite("Refunds"), suite("Checkout")],
+        add: { label: "New Test Suite", onClick: () => {} },
+      },
+      {
+        label: "From Code",
+        links: [
+          {
+            label: "nightly-ci",
+            href: "/testing/external/nightly-ci",
+            icon: <FolderCode size={14} />,
+          },
+        ],
+      },
+    ],
+    activeHref: "/testing/suites/refunds",
+    footer: railFooter,
+  },
+};
+
+/** Trailing counts that give way to the row menu under the pointer. */
+export const WithCounts: Story = {
+  args: {
+    label: "Annotations",
+    header: header("Inbox"),
+    links: [
+      { label: "Inbox", href: "/annotations", icon: <Inbox size={14} />, badge: 12 },
+      { label: "All", href: "/annotations/all", icon: <Hash size={14} /> },
+    ],
+    groups: [
+      {
+        label: "My Queues",
+        links: [
+          {
+            label: "Support",
+            href: "/annotations/support",
+            icon: <Users size={14} />,
+            badge: 3,
+            actions: rowMenu("Support"),
+          },
+        ],
+        add: { label: "New Queue", onClick: () => {} },
+      },
+    ],
+    activeHref: "/annotations",
+  },
+};
+
+/** Folded to its icons: each entry keeps its label as its name and title. */
+export const Collapsed: Story = {
+  args: { ...RowActionsAndFooter.args, collapsed: true },
 };
