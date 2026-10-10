@@ -151,6 +151,8 @@ func routeIdentityProvider(env map[string]string, stores Stores) {
 	idp := stores.IDPURL()
 	maps.Copy(env, map[string]string{"NEXTAUTH_PROVIDER": "oidc", "OIDC_ISSUER": idp + "/t/" + ssoTenant, "OIDC_CLIENT_ID": "langwatch-upgradelab",
 		"OIDC_CLIENT_SECRET": "idpsim-accepts-any-secret-for-an-unregistered-client", "LOCAL_PASSWORDS_ENABLED": "on", "SSO_TRUSTED_IDP_ORIGINS": idp})
+	// The operator's lever for self-serve SSO setup (E7), read by both releases.
+	env["FEATURE_FLAG_FORCE_ENABLE"] = strings.Trim(env["FEATURE_FLAG_FORCE_ENABLE"]+",self_serve_sso", ",")
 }
 
 // CheckSourceDir refuses a release directory holding a .env: both releases read one when it exists.

@@ -6,19 +6,32 @@ import (
 )
 
 func TestJudgeSSO(t *testing.T) {
-	main := []SSOResult{{Phase: "main", Check: "signin", OK: true}}
-	head := []SSOResult{{Phase: "head", Check: "cookie", OK: true}, {Phase: "head", Check: "signin", OK: true}}
-	if got := judgeSSO(main, head, 0); got.Result != "pass" {
-		t.Errorf("all checks passed, got %s: %s", got.Result, got.Detail)
+	passed := []SSOResult{
+		{Phase: "main", Door: "deployment", Check: "signin", OK: true},
+		{Phase: "head", Door: "deployment", Check: "cookie", OK: true},
+		{Phase: "head", Door: "deployment", Check: "signin", OK: true},
+		{Phase: "main", Door: "connection", Check: "signin", OK: true},
+		{Phase: "head", Door: "connection", Check: "cookie", OK: true},
+		{Phase: "head", Door: "connection", Check: "signin", OK: true},
 	}
-	if got := judgeSSO(main, head, 2); got.Result != "inconclusive" {
+	if got := judgeSSO("E6", "deployment", passed, 0); got.Result != "pass" {
+		t.Errorf("all deployment checks passed, got %s: %s", got.Result, got.Detail)
+	}
+	if got := judgeSSO("E7", "connection", passed, 0); got.Result != "fail" || !strings.Contains(got.Detail, "head/setup: never ran") {
+		t.Errorf("a connection needs head's setup read, got %s: %s", got.Result, got.Detail)
+	}
+	active := append(append([]SSOResult{}, passed...), SSOResult{Phase: "head", Door: "connection", Check: "setup", OK: true})
+	if got := judgeSSO("E7", "connection", active, 0); got.Result != "pass" {
+		t.Errorf("all connection checks passed, got %s: %s", got.Result, got.Detail)
+	}
+	if got := judgeSSO("E6", "deployment", passed, 2); got.Result != "inconclusive" {
 		t.Errorf("ledger outstanding, got %s", got.Result)
 	}
-	refused := []SSOResult{head[0], {Phase: "head", Member: "member@acme1.test", Check: "signin", URL: "/auth/error", Detail: "ended on /auth/error"}}
-	if got := judgeSSO(main, refused, 0); got.Result != "fail" || !strings.Contains(got.Detail, "/auth/error") {
+	refused := append(append([]SSOResult{}, passed...), SSOResult{Phase: "head", Door: "deployment", Member: "member@acme1.test", Check: "signin", URL: "/auth/error", Detail: "ended on /auth/error"})
+	if got := judgeSSO("E6", "deployment", refused, 0); got.Result != "fail" || !strings.Contains(got.Detail, "/auth/error") {
 		t.Errorf("a refused head sign-in must fail with the page, got %s: %s", got.Result, got.Detail)
 	}
-	if got := judgeSSO(main, head[1:], 0); got.Result != "fail" || !strings.Contains(got.Detail, "head/cookie: never ran") {
-		t.Errorf("a missing cookie check must fail, got %s: %s", got.Result, got.Detail)
+	if got := judgeSSO("E7", "connection", passed[:3], 0); got.Result != "fail" {
+		t.Errorf("another door's results never pass this one, got %s: %s", got.Result, got.Detail)
 	}
 }

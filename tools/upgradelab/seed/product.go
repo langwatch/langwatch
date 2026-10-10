@@ -341,6 +341,11 @@ func orNull(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
+// Call is one tRPC procedure as the seed account, on whichever wire the seeder speaks; out may be nil.
+func (seeder *Seeder) Call(ctx context.Context, mutation bool, path string, input, out any) error {
+	return seeder.trpc(ctx, trpcCall{mutation: mutation, path: path, input: input, out: out})
+}
+
 // Session is the signed-in seed account's headers (Origin and the session cookie), for callers that drive the app as it.
 func (seeder *Seeder) Session() http.Header { return seeder.session() }
 
