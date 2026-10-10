@@ -112,9 +112,9 @@ Feature: Unified Audit Log
       | 10:00       | gateway.budget.updated       | budget       | gateway  |
     When alice visits `/settings/audit-log`
     Then the table renders all 3 rows in DESC order by created_at
-    And each row shows a Source badge: gateway = purple, platform = grey
+    And each gateway row carries a small AI Gateway mark, and a platform row carries none
     And the gateway rows show a Target column with the targetKind + truncated targetId
-    And the platform row shows an em-dash in the Target column
+    And the platform row leaves the Target cell blank
 
   @integration @unimplemented
   Scenario: Filter by target kind narrows to gateway events only
@@ -158,8 +158,40 @@ Feature: Unified Audit Log
   @integration
   Scenario: A row written by a system actor says so rather than naming nobody
     Given a row whose userId is null, written by a background job
-    Then the User column reads "System" rather than rendering empty or a lookup failure
+    Then the Actor column reads "System" rather than rendering empty or a lookup failure
     And a row whose userId names a user that no longer resolves reads "User not found"
+
+  @unit
+  Scenario: Each kind of actor reads distinctly
+    Given rows written by a member, a background job, an unidentified caller and a user since deleted
+    Then each reads with its own icon and name: the member's avatar and name with the email on hover,
+      "System", "Unidentified caller" and "User not found"
+    # API key, SCIM, SSO, Langy and impersonation need the read to carry the credential kind and
+    # actorUserId, which it does not yet.
+
+  @unit
+  Scenario: An audit row reads as a sentence, with the recorded action kept beside it
+    Given a row recorded as "authz.grants.attach"
+    Then the row reads "Attached grant", with the recorded action small and muted beside it
+
+  @unit
+  Scenario: A burst of identical events by one actor reads as one row
+    Given three consecutive rows with the same actor, action, target, project and outcome
+    Then they read as one row marked "×3"
+    And a failed attempt is never folded into a successful one
+
+  @unit
+  Scenario: Columns no row on the page fills are not shown
+    Given no row on the page names a target or a project
+    Then the table has no Target or Project column
+    And the address, user agent and error move into the row's details
+
+  @integration
+  Scenario: Opening a row shows everything the entry stores
+    When alice opens a row
+    Then she sees its exact time, actor, action, target, project, address, user agent, error and id
+    And the before/after diff side by side when the entry carries one, its arguments otherwise
+    And the raw entry as JSON she can copy
 
   @integration
   Scenario: An empty audit history says so

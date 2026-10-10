@@ -133,7 +133,7 @@ describe("given an organization below the Enterprise plan", () => {
 describe("given an Enterprise organization with a mixed audit history", () => {
   describe("when the table renders", () => {
     /** @scenario Settings audit page lists gateway and platform events together */
-    it("shows a gateway row and a platform row with their own Source badges", () => {
+    it("marks the gateway row as the gateway's and reads each action as a sentence", () => {
       state.auditLogs = [
         auditRow(),
         auditRow({
@@ -148,10 +148,11 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 2;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("Gateway")).toBeInTheDocument();
-      expect(screen.getByText("Platform")).toBeInTheDocument();
+      expect(screen.getAllByLabelText("AI Gateway")).toHaveLength(1);
+      expect(screen.queryByText("Platform")).not.toBeInTheDocument();
+      expect(screen.getByText("Created virtual key")).toBeInTheDocument();
       expect(screen.getByText("gateway.virtual_key.created")).toBeInTheDocument();
-      expect(screen.getByText("organization.member.add")).toBeInTheDocument();
+      expect(screen.getByText("Added member")).toBeInTheDocument();
     });
 
     /** @scenario Settings audit page lists gateway and platform events together */
@@ -160,11 +161,48 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("virtual_key")).toBeInTheDocument();
-      // Sixteen characters and an ellipsis. The full id is 29 long, so a cell
-      // that rendered it whole would fail here rather than merely look wide.
-      expect(screen.getByText(/^vk_abcdefghijklm/)).toBeInTheDocument();
+      // Twelve characters and an ellipsis; a cell that rendered the 29-long id whole would fail.
+      expect(screen.getByText("vk_abcdefghi…")).toBeInTheDocument();
       expect(screen.queryByText(/vwxyz/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario Columns no row on the page fills are not shown */
+    it("drops the target, project, address and error columns when no row fills them", () => {
+      state.auditLogs = [
+        auditRow({ source: "platform", targetKind: null, targetId: null, projectId: null }),
+      ];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      const headers = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
+      expect(headers).toEqual(["", "Time", "Actor", "Action"]);
+    });
+
+    /** @scenario A burst of identical events by one actor reads as one row */
+    it("folds three identical consecutive events into one row marked ×3", () => {
+      state.auditLogs = ["a", "b", "c"].map((id) => auditRow({ id }));
+      state.totalCount = 3;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getAllByTestId("audit-log-row")).toHaveLength(1);
+      expect(screen.getByText("×3")).toBeInTheDocument();
+    });
+
+    /** @scenario Opening a row shows everything the entry stores */
+    it("opens a row onto its address, user agent, id and diff", async () => {
+      state.auditLogs = [auditRow({ before: { name: "old" }, after: { name: "new" } })];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.queryByText("203.0.113.9")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /Details of Created virtual key/ }));
+
+      const detail = screen.getByTestId("audit-log-detail");
+      expect(within(detail).getByText("203.0.113.9")).toBeInTheDocument();
+      expect(within(detail).getByText("Mozilla/5.0")).toBeInTheDocument();
+      expect(within(detail).getByText("audit-1")).toBeInTheDocument();
+      expect(within(detail).getByText("Before")).toBeInTheDocument();
+      expect(within(detail).getByText("After")).toBeInTheDocument();
     });
 
     /** @scenario Settings audit page lists gateway and platform events together */
