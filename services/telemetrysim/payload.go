@@ -162,6 +162,20 @@ var presets = append([]Preset{
 			{"conversation.id", "$session"}, {"model", "gpt-5-codex"}, {"input_token_count", 3600}, {"output_token_count", 220},
 		}},
 	}},
+	// Claude Code's own export is events over logs; the user_prompt names the session.
+	{Name: "claude-code-events", Signal: SignalLogs, Service: "claude-code", Logs: []LogShape{
+		{Body: "claude_code.user_prompt", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, Attrs: []Attr{
+			{"event.name", "claude_code.user_prompt"}, {"session.id", "$session"}, {"user.id", "$user"},
+			{"prompt", "Fix the flaky checkout test in the payments suite"}, {"prompt_length", 49},
+		}},
+		{Body: "claude_code.api_request", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 40, Attrs: []Attr{
+			{"event.name", "claude_code.api_request"}, {"session.id", "$session"}, {"model", "claude-sonnet-4-5"},
+			{"input_tokens", 3200}, {"output_tokens", 410}, {"cost_usd", 0.0158}, {"duration_ms", 3800},
+		}},
+		{Body: "claude_code.tool_result", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 3900, Attrs: []Attr{
+			{"event.name", "claude_code.tool_result"}, {"session.id", "$session"}, {"tool_name", "Bash"}, {"success", true},
+		}},
+	}},
 	{Name: "logs", Signal: SignalLogs, Service: "telemetrysim-app", Logs: []LogShape{
 		{Body: "request handled", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, Attrs: []Attr{{"http.route", "/api/chat"}, {"session.id", "$session"}}},
 		{Body: "slow upstream", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_WARN, OffsetMs: 40, Attrs: []Attr{{"upstream.latency_ms", 1800}}},

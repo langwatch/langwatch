@@ -18,6 +18,7 @@ counters in memory: a dev shim, never expose it. Code: `services/telemetrysim`, 
 | `llm-trace` (default) | traces  | an agent run: two chat spans and a tool call |
 | `claude-code-session` | traces  | Claude Code interaction, LLM requests, tools |
 | `codex-session`       | traces  | a Codex session                              |
+| `claude-code-events`  | logs    | Claude Code events; the prompt names it      |
 | `logs`                | logs    | log records                                  |
 | `metrics`             | metrics | metric points                                |
 
