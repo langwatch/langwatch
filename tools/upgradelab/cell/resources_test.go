@@ -117,3 +117,31 @@ func TestMainTabAcrossSwitchIsWindowedAfterTheSwitch(t *testing.T) {
 		t.Error("tolerated before the switch is known")
 	}
 }
+
+// @scenario "Main's page loading its assets from head just after the switch is tolerated"
+func TestMainPageAcrossSwitchIsWindowedAssetNotFound(t *testing.T) {
+	cases := []BrowserRecord{
+		{Kind: "http", AtMs: 1_010, URL: "http://x/assets/index-Bty315CS.js", Status: 404},
+		{Kind: "requestfailed", AtMs: 1_010, URL: "http://x/assets/index-Bty315CS.js", Text: "net::ERR_ABORTED"},
+		{Kind: "console", AtMs: 1_010, URL: "http://x/", Text: "Failed to load resource: the server responded with a status of 404 (Not Found)"},
+	}
+	for _, record := range cases {
+		if !mainPageAcrossSwitch(record, 1_000) {
+			t.Errorf("%s just after the switch not tolerated", record.Kind)
+		}
+		if mainPageAcrossSwitch(record, -1) {
+			t.Errorf("%s tolerated before the switch is known", record.Kind)
+		}
+	}
+	for name, record := range map[string]BrowserRecord{
+		"before the switch": {Kind: "http", AtMs: 900, URL: "http://x/assets/a.js", Status: 404},
+		"a minute after":    {Kind: "http", AtMs: 61_001, URL: "http://x/assets/a.js", Status: 404},
+		"outside /assets/":  {Kind: "http", AtMs: 1_010, URL: "http://x/api/dataset", Status: 404},
+		"another status":    {Kind: "http", AtMs: 1_010, URL: "http://x/assets/a.js", Status: 500},
+		"another console":   {Kind: "console", AtMs: 1_010, Text: "status of 500 (Internal Server Error)"},
+	} {
+		if mainPageAcrossSwitch(record, 1_000) {
+			t.Errorf("%s tolerated", name)
+		}
+	}
+}

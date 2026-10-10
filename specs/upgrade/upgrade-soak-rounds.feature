@@ -92,6 +92,13 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     And the same failure before the switch, later than a minute after, or on another socket stays a finding
 
   @unit
+  Scenario: Main's page loading its assets from head just after the switch is tolerated
+    Given the walker's tab fetched main's page just before the switch
+    When its /assets/* requests reach head within a minute after the switch and head answers 404
+    Then they are counted apart, as the rolling-deploy skew ADR-086 closes with LANGWATCH_ASSET_BASE
+    And the same 404 before the switch, later than a minute after, or on a path outside /assets/ stays a finding
+
+  @unit
   Scenario: Only listed log signatures are accepted, the upgrade error only between the switch and ready
     Given an error line in head's api or worker log
     When it matches an accepted signature

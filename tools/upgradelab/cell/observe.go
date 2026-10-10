@@ -392,6 +392,16 @@ func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
 		record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
+// mainPageAcrossSwitch: main's page, fetched just before the switch, loads its hashed assets from head,
+// which never built them (ADR-086's rolling-deploy skew; the lab has no LANGWATCH_ASSET_BASE). The
+// console line names no url, so only its 404 is matched; the http record beside it carries the path.
+func mainPageAcrossSwitch(record BrowserRecord, switched int64) bool {
+	asset := strings.Contains(record.URL, "/assets/") &&
+		(record.Kind == "http" && record.Status == http.StatusNotFound || record.Kind == "requestfailed")
+	missing := record.Kind == "console" && strings.Contains(record.Text, "status of 404")
+	return (asset || missing) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+}
+
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
 // record's url or text. Reason is printed in the report; they are counted apart from findings.
 type browserNoise struct {
@@ -424,6 +434,8 @@ func BrowserFindings(path string, switched, ready int64) (walks, expected int, t
 		case record.Kind == "walkerror":
 		case mainTabAcrossSwitch(record, switched):
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
+		case mainPageAcrossSwitch(record, switched):
+			tolerated["/assets/* 404 (main's page, fetched across the switch, ADR-086)"]++
 		default:
 			if noise, ok := accepted(record); ok {
 				tolerated[noise.Match[0]+" ("+noise.Reason+")"]++

@@ -299,7 +299,7 @@ func FromBuild(root string) Build {
 
 // HeadBuild is the release image's build; the api serves the UI bundle it writes.
 func HeadBuild(root string) Build {
-	return Build{Root: root, Output: "apps/ui/dist/index.html", Args: []string{"bash", "-c", headBuildScript}}
+	return Build{Root: root, Output: "apps/ui/dist/client/index.html", Args: []string{"bash", "-c", headBuildScript}}
 }
 
 // Fresh answers whether the last build was of commit and its output is still there.
