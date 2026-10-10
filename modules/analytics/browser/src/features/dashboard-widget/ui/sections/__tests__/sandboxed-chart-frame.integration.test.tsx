@@ -9,6 +9,11 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRawColorValue: () => "#123456",
+}));
+
 const { bridgeMock } = vi.hoisted(() => ({ bridgeMock: vi.fn() }));
 
 vi.mock("../../../../../behavior/frame-bridge.ts", () => ({
@@ -53,7 +58,14 @@ describe("given a sandboxed chart frame", () => {
       const iframe = container.querySelector("iframe");
       expect(iframe?.hasAttribute("src")).toBe(false);
       expect(iframe?.hasAttribute("srcdoc")).toBe(false);
-      expect(bridgeMock).toHaveBeenLastCalledWith(expect.objectContaining({ source: "A" }));
+      expect(bridgeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          source: "A",
+          dashboardContext: expect.objectContaining({
+            colors: expect.objectContaining({ "bg.card": "#123456", "chart.1": "#123456" }),
+          }),
+        }),
+      );
     });
   });
 

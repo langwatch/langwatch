@@ -422,9 +422,9 @@ function useChartPalette() {
   return {
     getColor: useGetRotatingColorForCharts(),
     areaFillOpacity: useColorModeValue(0.3, 0.15),
-    gray400: useColorRawValue("gray.400"),
-    gridColor: useColorModeValue("rgba(0, 0, 0, 0.08)", "rgba(255, 255, 255, 0.08)"),
-    cursorColor: useColorModeValue("rgba(0, 0, 0, 0.1)", "rgba(255, 255, 255, 0.1)"),
+    gray400: useColorRawValue("fg.subtle"),
+    gridColor: useColorRawValue("border.muted"),
+    cursorColor: useColorRawValue("bg.nested"),
   };
 }
 
@@ -1437,7 +1437,7 @@ function MonitorGraph({
       summary: summaryTimeseries,
       disabled: !!input.monitorGraph?.disabled,
     });
-  const gray400 = useColorRawValue("gray.400");
+  const gray400 = useColorRawValue("fg.subtle");
 
   // Color adjustments for light/dark mode
   // Light mode: light backgrounds, dark text
