@@ -45,7 +45,7 @@ type stackHomeJSON struct {
 	Seed       seedJSON `json:"seed"`
 }
 
-// seedJSON is the seed console: the sizes and personas `haven seed` takes, the
+// seedJSON is the seed console: the sizes and personas `haven db seed` takes, the
 // last seed's status line and the log tail of a seed started here.
 type seedJSON struct {
 	CanSeed  bool     `json:"canSeed"`

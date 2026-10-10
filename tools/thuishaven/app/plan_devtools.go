@@ -17,7 +17,7 @@ const storybookDir = "packages/design-system/storybook-static"
 const storybookBuildShell = "if ! test -f " + storybookDir + "/index.html || " +
 	"test -n \"$(find packages/design-system/src packages/design-system/stories packages/design-system/.storybook " +
 	"packages/design-system/package.json apps/ui/public pnpm-lock.yaml -newer " + storybookDir + "/index.html -print 2>/dev/null | head -1)\"; " +
-	"then pnpm --silent --filter @langwatch/design-system build:storybook; fi"
+	"then " + nxCacheEnv + "pnpm --silent exec nx run @langwatch/design-system:build:storybook --outputStyle=static; fi"
 
 // designSystemChild is the design-system lane: the Storybook built to static
 // files and served by this haven binary, never `storybook dev`.
@@ -42,7 +42,7 @@ const mailRoomDir = "packages/mail/preview/dist"
 const mailRoomBuildShell = "if ! test -f " + mailRoomDir + "/index.html || " +
 	"test -n \"$(find packages/mail/src packages/mail/preview -path " + mailRoomDir + " -prune -o -type f " +
 	"-newer " + mailRoomDir + "/index.html -print 2>/dev/null | head -1)\"; " +
-	"then pnpm --silent --filter @langwatch/mail build:studio; fi"
+	"then " + nxCacheEnv + "pnpm --silent exec nx run @langwatch/mail:build:studio --outputStyle=static; fi"
 
 // mailRoomChild is the mail-room lane: the studio pre-rendered to static files
 // and served by this haven binary, never a Vite dev server. Props are read-only.

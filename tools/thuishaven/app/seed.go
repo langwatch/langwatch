@@ -1,4 +1,4 @@
-// The `haven seed` verb: drives cmd/seedgen against this worktree's stack, and the
+// The `haven db seed` verb: drives cmd/seedgen against this worktree's stack, and the
 // auto-seed an up runs once on a stack that was never seeded (design §9, Q7 a).
 package app
 
@@ -32,7 +32,7 @@ var autoSeedArgs = []string{"--size", "tiny", "--persona", "all"}
 // onboarding, post-onboarding and bare stay storage-seed switches.
 var seedPresetArgs = map[string][]string{"demo": {"--size", "tiny", "--persona", "startup"}}
 
-// SeedExit is a refusal or failure with the exit code `haven seed` ends with:
+// SeedExit is a refusal or failure with the exit code `haven db seed` ends with:
 // 1 a check failed, 2 refused before writing, 4 stalled (design §9.2).
 type SeedExit struct {
 	Code int
@@ -46,7 +46,7 @@ func refused(format string, args ...any) error {
 	return &SeedExit{Code: 2, Err: fmt.Errorf(format, args...)}
 }
 
-// SeedRequest is one `haven seed`: the seedgen flags, already assembled, and whether it is live mode.
+// SeedRequest is one `haven db seed`: the seedgen flags, already assembled, and whether it is live mode.
 type SeedRequest struct {
 	Args []string
 	Live bool
@@ -61,7 +61,7 @@ type seedTarget struct {
 	IsAuto    bool
 }
 
-// seedStatus is what haven remembers of a stack's last seed, for `haven status` and `haven seed status`.
+// seedStatus is what haven remembers of a stack's last seed, for `haven status` and `haven db status`.
 type seedStatus struct {
 	State      string    `json:"state"` // running, done, failed, stalled or skipped
 	Auto       bool      `json:"auto,omitempty"`
@@ -124,7 +124,7 @@ func (o *Orchestrator) SeedStatusLine(slug string) string {
 	state := st.State
 	switch {
 	case state == "running" && !o.sys.ProcessAlive(st.PID):
-		state = "stalled (its haven process is gone; `haven seed` resumes by natural keys)"
+		state = "stalled (its haven process is gone; `haven db seed` resumes by natural keys)"
 	case state == "running":
 		state = fmt.Sprintf("running for %s", o.sys.Now().Sub(st.StartedAt).Round(time.Second))
 	case state == "done" || state == "failed":
@@ -136,7 +136,7 @@ func (o *Orchestrator) SeedStatusLine(slug string) string {
 	return fmt.Sprintf("seed: %s [%s]", state, strings.Join(st.Args, " "))
 }
 
-// SeedStatus is `haven seed status`.
+// SeedStatus is `haven db status`.
 func (o *Orchestrator) SeedStatus(p UpParams) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
@@ -144,21 +144,21 @@ func (o *Orchestrator) SeedStatus(p UpParams) error {
 	}
 	line := o.SeedStatusLine(slug)
 	if line == "" {
-		line = "seed: never ran on this stack (`haven seed` runs it)"
+		line = "seed: never ran on this stack (`haven db seed` runs it)"
 	}
 	fmt.Println(line)
 	return nil
 }
 
-// Seed is `haven seed`. Flags are validated before anything is touched; --dry-run writes nothing.
+// Seed is `haven db seed`. Flags are validated before anything is touched; --dry-run writes nothing.
 func (o *Orchestrator) Seed(ctx context.Context, p UpParams, req SeedRequest) error {
 	flags, err := seedgen.ParseFlags(req.Args, o.sys.Now().UTC().Truncate(time.Hour))
 	if err != nil {
-		return refused("haven seed: %v", err)
+		return refused("haven db seed: %v", err)
 	}
 	plan, err := seedgen.NewPlan(flags)
 	if err != nil {
-		return refused("haven seed: %v", err)
+		return refused("haven db seed: %v", err)
 	}
 	if flags.DryRun {
 		fmt.Printf("run %s, recipe %s, anchor %s, seed %d\n", plan.Run, seedgen.Recipe, flags.Anchor.Format(time.RFC3339), flags.Seed)
@@ -167,13 +167,13 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, req SeedRequest) er
 	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
-		return refused("haven seed: %v", err)
+		return refused("haven db seed: %v", err)
 	}
 	if req.Live {
 		if _, ok := o.readSeedStatus(slug); !ok {
-			return refused("haven seed --live needs a seed first: run `haven seed`")
+			return refused("haven db seed --live needs a seed first: run `haven db seed`")
 		}
-		return refused("haven seed --live: live mode is not built yet")
+		return refused("haven db seed --live: live mode is not built yet")
 	}
 	st, err := o.seedableStack(slug)
 	if err != nil {
@@ -183,21 +183,21 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, req SeedRequest) er
 	code := o.runSeedgen(ctx, seedTarget{Slug: slug, Dir: st.WorktreeDir, Env: env}, req.Args)
 	if code != 0 {
 		st, _ := o.readSeedStatus(slug)
-		return &SeedExit{Code: code, Err: fmt.Errorf("haven seed: seedgen exited %d: %s", code,
+		return &SeedExit{Code: code, Err: fmt.Errorf("haven db seed: seedgen exited %d: %s", code,
 			cmp.Or(st.Reason, "see `haven logs seed`"))}
 	}
-	return o.printSeedAccess(p, req.JSON, req.Reveal)
+	return o.PrintSeedAccess(p, req.JSON, req.Reveal)
 }
 
 // seedableStack is the registered stack of slug, refused when its launcher or api is down.
 func (o *Orchestrator) seedableStack(slug string) (domain.Stack, error) {
 	reg, ok := o.stackBySlug(slug)
 	if !ok || !o.launcherIsOurs(reg) {
-		return domain.Stack{}, refused("haven seed: the stack %q is not up: run `haven up`", slug)
+		return domain.Stack{}, refused("haven db seed: the stack %q is not up: run `haven up`", slug)
 	}
 	for _, svc := range reg.Services {
 		if svc.Name == "api" && !o.sys.PortInUse(svc.Port) {
-			return domain.Stack{}, refused("haven seed: the api of %q is down: run `haven up`", slug)
+			return domain.Stack{}, refused("haven db seed: the api of %q is down: run `haven up`", slug)
 		}
 	}
 	return reg, nil
@@ -276,16 +276,16 @@ func (o *Orchestrator) AutoSeed(ctx context.Context, seed KeeperSeed) {
 	}
 	sayPhase(seed.Since, "auto-seed: tiny tier, four personas")
 	notice := time.AfterFunc(autoSeedWait, func() {
-		sayPhase(seed.Since, "auto-seed continues in the background (`haven seed status`)")
+		sayPhase(seed.Since, "auto-seed continues in the background (`haven db status`)")
 	})
 	defer notice.Stop()
 	switch code := o.runSeedgen(ctx, seedTarget{Slug: job.Slug, Dir: job.WorktreeDir, Env: job.Env, IsAuto: true}, autoSeedArgs); code {
 	case 0:
 		sayPhase(seed.Since, "auto-seed done")
 	case 2:
-		sayPhase(seed.Since, "auto-seed skipped: seedgen refused to run (exit 2); `haven seed` retries")
+		sayPhase(seed.Since, "auto-seed skipped: seedgen refused to run (exit 2); `haven db seed` retries")
 	default:
-		sayPhase(seed.Since, fmt.Sprintf("auto-seed failed (exit %d, continuing); `haven seed status`", code))
+		sayPhase(seed.Since, fmt.Sprintf("auto-seed failed (exit %d, continuing); `haven db status`", code))
 	}
 }
 
@@ -297,7 +297,7 @@ func (o *Orchestrator) SeedPreset(ctx context.Context, p UpParams, preset string
 	}
 	err := o.Seed(ctx, p, SeedRequest{Args: args})
 	if err != nil {
-		return fmt.Errorf("%w — retry with: haven seed %s", err, strings.Join(args, " "))
+		return fmt.Errorf("%w — retry with: haven db seed %s", err, strings.Join(args, " "))
 	}
 	return nil
 }

@@ -87,7 +87,7 @@ type Lane = {
   seen: Query[];
   inflight: number;
   recording?: Script;
-  /** The CDP session with the lane's virtual authenticators (haven mfa); closing drops them. */
+  /** The CDP session with the lane's virtual authenticators (`browser mfa`); closing drops them. */
   webauthn?: CDPSession;
   authenticators: Map<string, { kind: string; userVerified: boolean }>;
 };
@@ -412,7 +412,7 @@ type Request = {
   };
   authenticatorId?: string;
   verified?: boolean;
-  /** `haven mfa totp fill --wrong`: type a code no window accepts. */
+  /** `haven browser mfa totp fill --wrong`: type a code no window accepts. */
   wrong?: boolean;
 };
 
@@ -821,7 +821,7 @@ async function recordCommand({
   throw new Error(`unknown verb ${verb}`);
 }
 
-/** `haven mfa`: virtual WebAuthn authenticators and TOTP codes on the lane's page. */
+/** `haven browser mfa`: virtual WebAuthn authenticators and TOTP codes on the lane's page. */
 async function mfaCommand({
   lane,
   verb,
@@ -872,7 +872,9 @@ async function mfaCommand({
   const authenticatorId = body.authenticatorId ?? "";
   const about = lane.authenticators.get(authenticatorId);
   if (!about)
-    throw new Error(`lane ${lane.name} has no authenticator ${authenticatorId} (haven mfa list)`);
+    throw new Error(
+      `lane ${lane.name} has no authenticator ${authenticatorId} (haven browser mfa list)`,
+    );
   if (verb === "mfa-remove") {
     await session.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
     lane.authenticators.delete(authenticatorId);
@@ -919,7 +921,8 @@ async function totpEnroll({ lane, body, timeout }: { lane: Lane; body: Request; 
 /** Types the current code (or, with --wrong, one no window accepts) without returning it. */
 async function totpFill({ lane, body, timeout }: { lane: Lane; body: Request; timeout: number }) {
   const totp = readTotp({ lane: lane.name });
-  if (!totp) throw new Error(`lane ${lane.name} has no TOTP secret (haven mfa totp enroll)`);
+  if (!totp)
+    throw new Error(`lane ${lane.name} has no TOTP secret (haven browser mfa totp enroll)`);
   const code = body.wrong
     ? wrongCode({ totp, now: Date.now() })
     : totpCode({ totp, now: Date.now() });

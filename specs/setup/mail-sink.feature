@@ -3,7 +3,7 @@ Feature: Local mail sink (mailsim)
   product sends can be caught, read and asserted on a laptop with no SendGrid
   account and nothing ever leaving the machine. haven runs it as a lane beside
   the stack, assigns each stack an inbox address of its own, and serves the
-  caught messages back three ways: the `haven mail` CLI, a plain HTTP API, and
+  caught messages back three ways: the `haven sim mail` CLI, a plain HTTP API, and
   a browser inbox at mail.<slug>.langwatch.localhost. The sink is a dead end
   by construction — it accepts any delivery and relays none, whatever the
   recipient's domain, so a test can safely address real-looking addresses.
@@ -43,7 +43,7 @@ Feature: Local mail sink (mailsim)
   @unit
   Scenario: Every stack is assigned an inbox address of its own
     Then the stack has an email address derived from the worktree's slug
-    And `haven mail address` prints it, so a signup form or a script can be handed it directly
+    And `haven sim mail address` prints it, so a signup form or a script can be handed it directly
 
   @unit
   Scenario: Any local part at the stack's mail domain lands in the inbox
@@ -57,7 +57,7 @@ Feature: Local mail sink (mailsim)
     Given two worktrees each running their own stack and mail lane
     When a message is delivered to the first stack's address
     Then it appears only in the first stack's inbox
-    And the second stack's `haven mail list` does not show it
+    And the second stack's `haven sim mail list` does not show it
 
   # --- The stack sends its own email into the sink -------------------------
 
@@ -87,54 +87,54 @@ Feature: Local mail sink (mailsim)
   @unit
   Scenario: The inbox lists newest first
     Given the inbox holds several messages
-    When the developer runs `haven mail list`
+    When the developer runs `haven sim mail list`
     Then the messages are listed newest first with an id, sender, recipient, subject and arrival time
 
   @unit
   Scenario: One message can be read in full
-    When the developer runs `haven mail get` with a message's id
+    When the developer runs `haven sim mail get` with a message's id
     Then the output carries the headers and the text body
     And the links the message carries are listed on their own,
       so a verification or invite link can be followed without parsing HTML
 
   @unit
   Scenario: Asking for a message that does not exist is a refusal, not a stack trace
-    When the developer runs `haven mail get` with an id the inbox does not hold
+    When the developer runs `haven sim mail get` with an id the inbox does not hold
     Then the command fails saying the message is not in this stack's inbox
 
   @unit
   Scenario: A test can wait for a message to arrive
-    When the developer runs `haven mail wait` with a recipient or subject filter
+    When the developer runs `haven sim mail wait` with a recipient or subject filter
     Then the command blocks until a matching message arrives and prints it
     And it exits non-zero after its timeout with nothing matched, so a script can tell the difference
 
   @unit
   Scenario: The inbox can be emptied
     Given the inbox holds messages
-    When the developer runs `haven mail clear`
+    When the developer runs `haven sim mail clear`
     Then the inbox reads back empty
 
   @unit
   Scenario: An agent can read the inbox's own facts from the CLI
-    When the developer runs `haven mail inbox`
+    When the developer runs `haven sim mail status`
     Then it prints the stack, its own inbox address, the SMTP listener, the console URL and whether mail survives a restart
     # The same facts the console's "This inbox" panel shows, from GET /api/inbox.
 
   @unit
   Scenario: A test can wait only for mail newer than one it has seen
     Given the inbox already holds a matching message
-    When the developer runs `haven mail wait --after <id>`
+    When the developer runs `haven sim mail wait --after <id>`
     Then only a message caught after that id answers the wait
 
   @unit
   Scenario: Every mail command has a machine-readable form
-    When any `haven mail` command is run with `--json` or under agent mode
+    When any `haven sim mail` command is run with `--json` or under agent mode
     Then the output is plain and parseable, with no tables, color or spinner
 
   @unit
   Scenario: Reading mail with no sink running says so
     Given a stack whose mail lane is not running
-    When the developer runs any `haven mail` command
+    When the developer runs any `haven sim mail` command
     Then it fails immediately, naming the lane and the command that starts it, rather than hanging
 
   # --- The API --------------------------------------------------------------
@@ -179,7 +179,7 @@ Feature: Local mail sink (mailsim)
   Scenario: The console shows the stack's own inbox address
     Given the sink runs for a stack
     When the developer opens the inbox console
-    Then the "This inbox" panel shows the address `haven mail address` prints for that stack
+    Then the "This inbox" panel shows the address `haven sim mail address` prints for that stack
     And a standalone sink, with no stack, shows an example address instead
 
   @unit
@@ -226,7 +226,7 @@ Feature: Local mail sink (mailsim)
   Scenario: Every account a preset seeds is reachable through the sink
     When a preset seeds additional members
     Then an invite the app sends any of them lands in the stack's inbox
-    And can be read back with `haven mail`
+    And can be read back with `haven sim mail`
 
   @unit
   Scenario: Per-stack seed addresses remain available on ask
@@ -269,5 +269,5 @@ Feature: Local mail sink (mailsim)
     When the stack is restarted
     Then the messages are still there
     # An agent restarting the backend mid-test must not lose the email it was
-    # about to assert on. The inbox empties only on `haven mail clear` or when
+    # about to assert on. The inbox empties only on `haven sim mail clear` or when
     # the worktree's stack state is pruned.

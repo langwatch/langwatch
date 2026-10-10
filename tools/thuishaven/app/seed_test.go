@@ -67,7 +67,7 @@ func TestSeedRefusesBadFlagsBeforeWriting(t *testing.T) {
 	}
 }
 
-// @scenario "haven seed refuses a stack that is not up"
+// @scenario "haven db seed refuses a stack that is not up"
 func TestSeedRefusesAStackThatIsNotUp(t *testing.T) {
 	t.Run("given no registered stack", func(t *testing.T) {
 		sup := &fakeSupervisor{}
@@ -146,7 +146,7 @@ func TestSeedLiveNeedsASeedFirst(t *testing.T) {
 	o := seedOrchestrator(t, &fakeSupervisor{}, seedStack())
 	err := o.Seed(context.Background(), UpParams{ExplicitSlug: "feat-x"}, SeedRequest{Live: true})
 	var exit *SeedExit
-	if !errors.As(err, &exit) || exit.Code != 2 || !strings.Contains(err.Error(), "haven seed") {
+	if !errors.As(err, &exit) || exit.Code != 2 || !strings.Contains(err.Error(), "haven db seed") {
 		t.Fatalf("err = %v, want exit 2 asking for a seed first", err)
 	}
 }

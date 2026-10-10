@@ -1,6 +1,6 @@
 ---
 name: storagesim
-description: "Use haven's local S3, storagesim, to store, inspect and assert on uploaded files. Use when someone says 'where did the upload go', 'presigned URL', 'S3 locally', 'storagesim', 'check the object exists', 'NoSuchKey', 'storage console', 'haven storage', or needs to load-test uploads."
+description: "Use haven's local S3, storagesim, to store, inspect and assert on uploaded files. Use when someone says 'haven storage', 'where did the upload go', 'presigned URL', 'S3 locally', 'storagesim', 'check the object exists', 'NoSuchKey', 'storage console', 'haven sim storage', or needs to load-test uploads."
 user-invocable: true
 ---
 
@@ -38,9 +38,9 @@ key answers `NoSuchKey`.
 
 - `STORAGESIM_SEED=1` (haven sets it) stores `seed/hello.txt` and `seed/sample.json` in
   `langwatch`; existing objects are left alone. The console's "Add demo objects" and
-  `haven storage seed` do the same on demand.
+  `haven sim storage seed` do the same on demand.
 - Objects live in `STORAGESIM_DATA_DIR` (haven: `storage/<slug>/` under its home);
-  `haven db reset` removes it. `haven storage clear [bucket]` empties it without a reset.
+  `haven db reset` removes it. `haven sim storage clear [bucket]` empties it without a reset.
 
 ## Tests and load
 
@@ -55,11 +55,11 @@ key answers `NoSuchKey`.
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven storage buckets | objects [bucket] | requests
-haven storage object <bucket> <key> [--raw]     # --raw writes the stored bytes to stdout
-haven storage delete <bucket> <key>
-haven storage clear [bucket]                    # every bucket without one
-haven storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
-haven storage set --error <0|4xx|5xx>      # PUT/GET object refused with that status; 0 clears it
-haven storage seed                              # the demo objects, as STORAGESIM_SEED does
+haven sim storage buckets | objects [bucket] | list
+haven sim storage object <bucket> <key> [--raw]     # --raw writes the stored bytes to stdout
+haven sim storage delete <bucket> <key>
+haven sim storage clear [bucket]                    # every bucket without one
+haven sim storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
+haven sim storage fault --error <0|4xx|5xx>      # PUT/GET object refused with that status; 0 clears it
+haven sim storage seed                              # the demo objects, as STORAGESIM_SEED does
 ```

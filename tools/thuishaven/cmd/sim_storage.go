@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|presign <bucket> <key> [--put] [--expires=<s>]|delete <bucket> <key>|clear [bucket]|seed|requests|set --error <0|4xx|5xx>> [--json]"
+const storageUsage = "usage: haven sim storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|presign <bucket> <key> [--put] [--expires=<s>]|delete <bucket> <key>|clear [bucket]|seed|list|fault <0|4xx|5xx|off>> [--json]"
 
 type storageObject struct {
 	Bucket       string    `json:"bucket"`
@@ -31,7 +31,7 @@ type storageRequest struct {
 	RequestID string    `json:"requestId"`
 }
 
-// runStorage is `haven storage <buckets|objects|object|delete|clear|requests>`.
+// runStorage is `haven sim storage <buckets|objects|object|delete|clear|list>`.
 func runStorage(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(storageUsage)
@@ -86,12 +86,12 @@ func storageCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 			}
 		})
 	}
-	return fmt.Errorf("unknown `haven storage` subcommand %q; %s", inv.args[0], storageUsage)
+	return fmt.Errorf("unknown `haven sim storage` subcommand %q; %s", inv.args[0], storageUsage)
 }
 
 // storagePresign mints a presigned GET (or with --put a PUT) URL for one object.
 func storagePresign(api sources.SimAPI, inv invocation, asJSON bool) error {
-	if err := needArgs(inv, 3, "haven storage presign <bucket> <key> [--put] [--expires=<seconds>]"); err != nil {
+	if err := needArgs(inv, 3, "haven sim storage presign <bucket> <key> [--put] [--expires=<seconds>]"); err != nil {
 		return err
 	}
 	params := url.Values{"bucket": {inv.args[1]}, "key": {inv.args[2]}}
@@ -120,7 +120,7 @@ func storageSeed(api sources.SimAPI, asJSON bool) error {
 
 // storageDelete removes one object.
 func storageDelete(api sources.SimAPI, inv invocation, asJSON bool) error {
-	if err := needArgs(inv, 3, "haven storage delete <bucket> <key>"); err != nil {
+	if err := needArgs(inv, 3, "haven sim storage delete <bucket> <key>"); err != nil {
 		return err
 	}
 	params := url.Values{"bucket": {inv.args[1]}, "key": {inv.args[2]}}
@@ -145,7 +145,7 @@ func storageClear(api sources.SimAPI, inv invocation, asJSON bool) error {
 
 // storageObjectCommand shows one object's metadata, or with --raw its bytes.
 func storageObjectCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
-	if err := needArgs(inv, 3, "haven storage object <bucket> <key> [--raw]"); err != nil {
+	if err := needArgs(inv, 3, "haven sim storage object <bucket> <key> [--raw]"); err != nil {
 		return err
 	}
 	params := url.Values{"bucket": {inv.args[1]}, "key": {inv.args[2]}}

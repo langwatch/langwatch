@@ -1,52 +1,40 @@
-# ADR-064: haven CLI v2 — one name per command, one meaning per flag
+# ADR-064: haven CLI redesign: agents first, one name per command
 
-**Date:** 2026-07-23
+**Date:** 2026-07-23 (amended 2026-10-10)
 
-**Status:** Proposed
+**Status:** Accepted. The amendment of 2026-10-10 supersedes the 2026-07-23
+decision wherever they conflict; its first section lists each superseded point.
 
 ## Context
 
-haven (`tools/thuishaven`) grew command-by-command, each addition locally
-reasonable, with no overall constitution. A full inventory of `cmd/root.go`
-shows where that ends up:
+haven (`tools/thuishaven`) grew command by command. By July 2026 it had 23
+top-level commands with 11 alias sets, `-f` and `--force` meaning different
+things on different commands, four status surfaces, six ways to drop a
+database and service selection spread over a dozen env vars. The 2026-07-23
+decision (v2, below) replaced that with one name per command, one meaning per
+flag, sticky service selection and automatic preparation.
 
-- **Multiple names for everything.** 23 top-level commands, 11 of them with
-  alias sets: `hub` = `ps` = `active` (= bare `haven`), `list` = `ls` =
-  `status`, `restart` = `rs`, `switch` = `sw` (= `cd` in the shell wrapper),
-  `clickhouse` = `ch`, `postgres` = `pg`, `observability` = `obs`,
-  `typecheck` = `tc`, `cleanup` = `oc`, `git` = `moron`. The CLI a newcomer
-  reads in the README is not the CLI they see in a teammate's shell history.
-- **The same letter means opposite things.** `up -f` force-replaces a running
-  stack; `logs -f` follows output. `--force` itself has three unrelated
-  meanings (replace the stack on `up`, allow a non-open PR on `pr`, a required
-  safety confirmation on `cleanup`). `--list` means "plain overview" on `git`
-  but "names only" on `switch`.
-- **`status` means three things**: an alias of `list`, and the default
-  subcommand of `clickhouse`, `postgres`, `observability`, and `hmr`. The two
-  container command groups then disagree on their stop verb (`clickhouse
-stop` vs `observability down`; `postgres` has neither).
-- **Four overlapping status surfaces** — `hub` (interactive + actions),
-  `watch` (interactive, no actions), `list` (one-shot), `doctor` (health +
-  footprints) — and **six ways to drop a database**: `down --drop-db`,
-  `clickhouse drop`, `postgres drop`, `prune`, `prune --artifacts`, and the
-  daemon's TTL prune.
-- **Service selection is env-var soup.** Which services a stack runs is
-  decided by ten-plus env vars with inconsistent polarity and naming
-  (`LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1`,
-  `LANGWATCH_SKIP_LANGYAGENT=1`, `START_WORKERS=false`,
-  `WORKERS_IN_PROCESS=0`, `LANGWATCH_HAVEN_OBS=0`, …). Nothing shows the
-  current selection, and nothing records it — every terminal has to get the
-  incantation right again.
-- **The expensive path is the default.** `HAVEN_LANGY_REBUILD` defaults to
-  rebuilding the langyagent Docker image on _every_ `up` — minutes of build
-  for a service many worktrees never exercise. Reusing the existing image is
-  the thing you need an env var to opt into.
-- **Logs have hoops.** Attached mode writes only to whichever terminal ran
-  `up`; `haven logs` works only for stacks started with `-d`; there is no
-  per-service filter at all. The practical fallback — grep `server.log` or
-  write a gcx query — is exactly the hoop a dev tool should remove.
+By October 2026 the surface had grown back to 50 visible commands, and the
+people typing them had changed. Most invocations now come from coding agents,
+not from a developer at a terminal:
 
-## Decision
+- Ten simulators each took a top-level noun (`mail`, `llm`, `payment`, ...),
+  each with its own verbs for the same job (`calls`, `records`, `requests`,
+  `events` all mean "what you caught"; `set --error` and `fail` and `tamper`
+  all mean "answer badly").
+- The viewer's tabs became commands (`traces`, `metrics`, `profiles`,
+  `stores`, `jobs`) beside `logs` and `errors`, and `auth`, `mfa`, `page` and
+  `feedback` sat beside `browser`, the thing they drive.
+- Bare `haven` opened an interactive TUI, which an agent can only fail on.
+- `--json` shapes were per command, unversioned and unselectable; exit codes
+  did not distinguish "you typed it wrong" from "the stack is down" from "it
+  timed out", so an agent could not tell which to fix.
+- Which stack a command meant came from the working directory alone.
+
+## Decision (2026-07-23, v2)
+
+Where the amendment below conflicts with this section, the amendment wins;
+its first table lists each superseded point.
 
 We will throw the current surface out and replace it, not deprecate it in
 place. haven is an internal dev tool with a handful of users; a clean break
@@ -368,6 +356,303 @@ The rules it adds, and how they honour the constitution:
 
 Spec: `specs/setup/haven-play.feature`.
 
+## Amendment 2026-10-10: agents first, nouns for tools, one output contract
+
+Decided by Alex on 2026-10-10. The v2 rules that survive are rules 1, 3, 4, 5
+and 6 (one name per command, declarative `up`, automatic preparation, logs as
+a tap, explicit data loss), sticky service selection, automatic recovery, data
+retention, and the whole trust and teardown design of the PR sandbox, which now
+lives under `pr --throwaway`. Spec: `specs/setup/haven-cli-surface.feature`.
+
+### What this supersedes
+
+| v2 (2026-07-23) or later addition                                   | Now                                                                           |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Bare `haven` opens the hub                                          | Bare `haven` prints a status summary and grouped help; the hub is `haven hub` |
+| `-t` is `--tail` everywhere; `-f` is lifecycle `--force` on up/down | `logs -f` follows (see Flags); `-t` is retired                                |
+| Destructive actions live under `db` and `clean`                     | Under `db`, `down --destroy` and `machine clean`                              |
+| `destroy <slug>` (added after v2)                                   | `down --destroy`, aimed with `--stack`                                        |
+| `play` is a sibling of `pr`                                         | `pr <n> --throwaway`; the sandbox rules are unchanged                         |
+| Workflow tier: `git`, `shell-init`, `hmr`, `typecheck`, `upgrade`   | `git` and `hmr` deleted; the rest move under `self` and `machine`             |
+| `setup` deleted (no one-time step)                                  | `self setup` exists for optional integrations and the `switch` shell line     |
+| Retired spellings `hub`, `obs`, `doctor`                            | Live again: `hub`, the `obs` group, `self doctor`                             |
+| `db seed [preset]` beside `seed` (tiers, personas)                  | One `db seed`; logins move to `db logins`                                     |
+| One top-level noun per simulator, plus `sims`                       | `sim <name> <verb>` with a shared core vocabulary; bare `sim` lists them      |
+| The daily surface is six verbs                                      | The daily surface is the top level below                                      |
+
+### Who the CLI is for
+
+The primary user is an agent; humans get the hub. **Agent mode is automatic**:
+when stdout is not a TTY, or an agent environment variable is set
+(`CLAUDECODE`, any `CODEX_*`, and the equivalents of other coding agents),
+haven asks no questions, prints no colour and detaches anything it starts.
+`--agent` stays as an explicit override. In agent mode a long command (`up`,
+`db reset`, `pr`, `machine typecheck`, `machine run`) prints a bounded summary
+plus the path of a full log file, so the caller reads the whole log only when
+the summary says it must.
+
+### The surface
+
+```text
+haven                       status summary + grouped help (never interactive)
+haven hub                   the interactive hub (humans)
+
+Daily
+  up [+svc -svc]            start or reconcile this stack; deltas stick for THIS stack
+  down [--all] [--destroy]  stop; --destroy also drops this stack's databases
+  restart [svc]             bounce one service, or all
+  reload [app|api|worker|ui]  move a host onto the current code
+  status                    this stack: services (and where each choice came from), jobs, stores
+  logs [svc…] [-f]          captured logs; -f follows
+  errors                    the last distinct failures, grouped and counted
+  env                       this stack's resolved environment
+  browser <verb>            the shared headless browser (login, mfa, record, ...)
+  pr <n> [--throwaway]      a PR in a lasting worktree + stack; --throwaway deletes all on quit
+  switch <name>             cd to a worktree (shell function from `self setup`)
+  wait --for ready|stopped [--timeout <dur>]
+  defaults [+svc -svc]      the machine-wide default service set; bare lists it
+
+Groups
+  sim [<name> <verb>]       every simulator; bare lists them
+  obs traces|metrics|profiles|query
+  orb feedback|console|network
+  db reset|seed|url|prune|logins
+  api <METHOD> <path> | whoami
+  machine limits|run|slot|typecheck|clean
+  self install|setup|upgrade|doctor|shell-init
+
+Hidden (dispatchable, absent from help)
+  simulator  static  go-watch  ui-watch  keep  daemon  gate
+```
+
+### Services: this stack and the machine default
+
+`up +llm -langy` adds and removes services for this stack and sticks, as v2's
+selection did. `haven defaults +svc -svc` edits the machine-wide default set a
+stack starts from; bare `haven defaults` lists it. A stack's own choices win
+over the defaults, and `status` (and `status --json`) shows, for each service,
+whether it runs because of this stack's choice or because of the defaults.
+
+### Destroying a stack
+
+`down --destroy` replaces `destroy`: it stops the stack and drops its
+databases. In a terminal the developer types the stack's slug to confirm; a
+plain `y` does not count. In agent mode it refuses with exit 64 unless `--yes`
+is passed. Another stack is aimed at with `--stack <slug>`, like everything
+else.
+
+### Pull requests
+
+`pr <n>` absorbs `play`. Without a flag it makes a lasting worktree and stack
+(today's `pr`). `--throwaway` gives today's `play` sandbox: own checkout and
+databases, deleted on quit, with the trust gate, the two-step acceptance, the
+`--ignore-scripts` install and the ordered teardown of the v2 section "haven
+play: an ephemeral PR sandbox" unchanged. The ref forms `pr` accepts today stay
+accepted.
+
+### switch and the shell
+
+`switch <name>` stays top level. The shell function that makes it a real `cd`
+comes from `haven self setup`, which offers to add one line to `~/.zshrc` and
+changes nothing if declined. Without the function, `switch` prints the path and
+a one-line hint naming `haven self setup`. `shell-init` moves to
+`self shell-init`.
+
+### Simulators: one vocabulary
+
+`haven sim` lists every simulator: running here or not, its console, the
+`+name` that starts it, its verbs and its skill. Each simulator is
+`haven sim <name> <verb>`, for mail, llm, payment, storage, idp, outbound,
+analytics, lambda, voice and telemetry. The core vocabulary is the shared
+spelling for a concept a simulator has; it is optional per simulator, and no
+simulator grows a no-op verb to fill the set:
+
+| Core verb  | Meaning                                                         |
+| ---------- | --------------------------------------------------------------- |
+| `status`   | running or not, address, console URL, current fault             |
+| `list`     | what it caught, newest first, with the sim's filters            |
+| `get <id>` | one caught record                                               |
+| `wait`     | block until a matching record arrives (`--timeout`, exit 66)    |
+| `clear`    | forget what it caught (state the sim owns, never its catalogue) |
+| `fault`    | inject an error (`fault <spec>`); `fault off` removes it        |
+| `console`  | the URL of the sim's web console                                |
+
+Settings that are not faults live under `config` (`sim llm config --seed 42`).
+Simulator-specific verbs sit on top. Every current verb has one home:
+
+| Simulator   | Current verb -> core                                                                                    | Kept as extras                                                                                                                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mail`      | `inbox`->`status`, `list`, `get`, `wait`, `clear`, `set --error`->`fault`                               | `address`, `links <id>`, `delete <id>`                                                                                                                                                                      |
+| `llm`       | `info`->`status`, `calls`->`list`, `call <id>`->`get`, `clear`, `set --error`->`fault`                  | `set --seed <value>`->`config --seed <value>`                                                                                                                                                               |
+| `analytics` | `status`, `records`->`list`, `clear`, `wait`, `set --error`->`fault`                                    | none                                                                                                                                                                                                        |
+| `outbound`  | `status`, `records`->`list`, `clear`, `wait`, `fault` (keeps `add\|list\|clear`)                        | `deliveries`, `receiver add\|list\|clear\|set`, `urls`                                                                                                                                                      |
+| `lambda`    | `info`->`status`, `calls`->`list`, `call <id>`->`get`, `clear`, `set --error`->`fault`                  | none                                                                                                                                                                                                        |
+| `payment`   | `status`, `events`->`list`, `reset`->`clear`, `fail`->`fault`, `clear-failures`->`fault off`            | `customers`, `subscriptions`, `checkouts`, `invoices`, `usage`, `complete`, `retry`, `advance`, `deliver`, `hold`, `release`                                                                                |
+| `storage`   | `requests`->`list`, `clear [bucket]`, `set --error`->`fault`                                            | `buckets`, `objects`, `object`, `presign`, `delete`, `seed`                                                                                                                                                 |
+| `idp`       | `tenants`->`list`, `tenant show`->`get <tenant>`, `reset <tenant>`->`clear <tenant>`, `tamper`->`fault` | `apps`, `populate`, `churn`, `user add\|disable\|enable`, `dns`, `verification`, `activity`, `signin`, `samlp`, `legacy`, `skew`, `rotate-key`, `scim …`, `scim-event`, `auth0-webhook`, `saml unsolicited` |
+| `voice`     | `status`, `calls`->`list`, `call <id>`->`get`, `clear`                                                  | none                                                                                                                                                                                                        |
+| `telemetry` | `status`, `runs`->`list`, `run <id>`->`get`, `console`                                                  | `send`, `load`, `fuzz`, `post`, `fixtures`, `fixture`, `stop`                                                                                                                                               |
+
+Bare `haven idp`, which ran the standalone IdP simulator, becomes the hidden
+`haven simulator idp` that already runs every sim standalone.
+
+### Observability, the orb, data, the browser
+
+- `obs traces|metrics|profiles|query` replaces the top-level `traces`,
+  `metrics`, `profiles` and `query`. `logs` and `errors` stay top level.
+- `orb feedback|console|network` replaces `feedback` and `page`.
+  **Requirement:** the orb is injected into built-UI pages on haven stacks, not
+  only the Vite dev server's, and never into a production build.
+- `db reset|seed|url|prune|logins`. `haven seed` folds into `db seed`, which
+  keeps both the preset argument and today's `seed` flags (tiers, personas,
+  history). `db logins` prints the seeded logins, credentials masked unless
+  `--reveal`.
+- `browser` absorbs `auth` as `browser login --as <who>` (still writing the
+  Playwright storage state, never printing a password) and `mfa` as
+  `browser mfa add|list|remove|uv|totp`.
+- `api <METHOD> <path> | whoami` stays its own group; `--gateway` sends the
+  call to this stack's AI gateway with a virtual key haven mints and holds
+  (replacing `haven gateway`), with the same never-printed key handling.
+- `db status` reports the connection URLs, the last seed run, its preset and
+  the migration state (replacing `seed status`).
+- `status` gains the `jobs` and `stores` tables as sections, and as fields of
+  `status --json`.
+
+### Targeting
+
+Every stack-scoped command takes `--stack <slug>`; the machine-wide ones
+(`machine`, `self`, `defaults`, `hub`) refuse it with the usage exit. Without it, the `HAVEN_STACK`
+environment variable decides (set per shell or per agent; there is never a
+machine-global "current stack"). Without that, the worktree containing the
+working directory decides. Without that, a terminal gets a picker and an agent
+gets exit 64 with the list of slugs. An unknown slug is exit 64 with the same
+list. Structured output always reports the stack it resolved.
+
+### Output contract
+
+- Every `--json` output is an object `{"v":1, ...}` with a published schema.
+- `--json f1,f2` selects fields; bare `--json` on a command that has fields
+  lists them (as `gh` does); an unknown field is exit 64 naming the valid ones.
+- Streams (`logs -f --json`, watches, job progress) are NDJSON: one typed
+  event per line with a `type` discriminator.
+
+### Exit codes
+
+haven's own codes sit at 64 and above, so a wrapped command's 0 to 63 passes
+through untouched and the two never collide.
+
+| Code    | Meaning                                                                                                                           |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 0       | ok                                                                                                                                |
+| 64      | usage: unknown command or flag, retired spelling, unknown or ambiguous target, a destructive action without `--yes` in agent mode |
+| 65      | not running: the stack, service or simulator the command needs is down                                                            |
+| 66      | timeout (`wait`, `sim … wait`, any `--timeout`)                                                                                   |
+| 67      | refused by the machine gate                                                                                                       |
+| 0 to 63 | a wrapped command's own code, untouched (`machine run`, `machine slot run`, `machine typecheck`)                                  |
+
+### Flags
+
+`--json`, `--agent` and `--stack` are global. `-f` on `logs` means
+`--follow`, which retires `-t`/`--tail` (`haven logs -t` exits 64 with
+`now: haven logs -f`). Because a shorthand still means one thing across the
+CLI, `up` and `down` keep `--force` only in its long form.
+
+### Compatibility
+
+A clean break. Every old spelling exits 64, changes nothing, and names the exact
+new spelling with the caller's arguments carried over, for example
+`now: haven sim mail list`. A deleted command with no successor says so in one
+line. The implementation PR sweeps skills, docs, scripts and the `make haven`
+passthrough in the same change.
+
+### Old -> new, every current command
+
+The 57 entries of `cmd/table.go` (50 visible, 7 hidden) plus bare `haven`,
+`help` and `version`; one row each.
+
+| Current                              | New                                                             | Note                                             |
+| ------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------ |
+| `haven` (bare: hub)                  | `haven` (status summary + help); hub is `haven hub`             |                                                  |
+| `up [+svc\|-svc]`                    | `up [+svc -svc]`                                                | agent mode detaches; `-f` becomes `--force` only |
+| `down [--all] [-f]`                  | `down [--all] [--destroy]`                                      | `-f` becomes `--force` only                      |
+| `destroy <slug>`                     | `down --destroy --stack <slug>`                                 | typed slug in a TTY; `--yes` for agents          |
+| `restart [service]`                  | `restart [svc]`                                                 |                                                  |
+| `reload [app\|api\|worker\|ui]`      | `reload [app\|api\|worker\|ui]`                                 |                                                  |
+| `idp [verb]`                         | `sim idp <verb>`; bare -> hidden `simulator idp`                | verbs per the simulator table                    |
+| `limits`                             | `machine limits`                                                |                                                  |
+| `mail …`                             | `sim mail …`                                                    | verbs per the simulator table                    |
+| `llm …`                              | `sim llm …`                                                     | verbs per the simulator table                    |
+| `analytics …`                        | `sim analytics …`                                               | verbs per the simulator table                    |
+| `outbound …`                         | `sim outbound …`                                                | verbs per the simulator table                    |
+| `lambda …`                           | `sim lambda …`                                                  | verbs per the simulator table                    |
+| `payment …`                          | `sim payment …`                                                 | verbs per the simulator table                    |
+| `feedback list\|show\|resolve\|wait` | `orb feedback list\|show\|resolve\|wait`                        |                                                  |
+| `page console\|network`              | `orb console\|network`                                          |                                                  |
+| `storage …`                          | `sim storage …`                                                 | verbs per the simulator table                    |
+| `sims`                               | `sim`                                                           |                                                  |
+| `voice …`                            | `sim voice …`                                                   | verbs per the simulator table                    |
+| `logs [service…] [-t]`               | `logs [svc…] [-f]`                                              |                                                  |
+| `query <traceql\|logql\|promql> <q>` | `obs query <traceql\|logql\|promql> <q>`                        |                                                  |
+| `seed [flags]`, `seed status`        | `db seed [preset] [flags]`, `db status`; logins via `db logins` |                                                  |
+| `api <METHOD> <path> \| whoami`      | `api <METHOD> <path> \| whoami`                                 |                                                  |
+| `gateway <METHOD> <path>`            | `api <METHOD> <path> --gateway`                                 | same key handling                                |
+| `telemetry …`                        | `sim telemetry …`                                               | verbs per the simulator table                    |
+| `auth <admin\|email>`                | `browser login --as <admin\|email>`                             | still writes Playwright storage state            |
+| `browser <verb>`                     | `browser <verb>`                                                | gains `login` and `mfa`                          |
+| `mfa add\|list\|remove\|uv\|totp`    | `browser mfa add\|list\|remove\|uv\|totp`                       |                                                  |
+| `status`                             | `status`                                                        | gains service origin, jobs and stores sections   |
+| `env`                                | `env`                                                           |                                                  |
+| `db reset\|seed\|url\|prune`         | `db reset\|seed\|url\|prune\|logins`                            |                                                  |
+| `pr <ref>`                           | `pr <n>`                                                        | lasting worktree + stack                         |
+| `play [pr]`                          | `pr <n> --throwaway`                                            | sandbox rules unchanged                          |
+| `play-launch` (hidden)               | deleted; folded into `pr --throwaway`                           |                                                  |
+| `git [target]`                       | deleted                                                         | the git TUI goes; no successor                   |
+| `switch [name]`                      | `switch <name>`                                                 | prints path + hint without the shell function    |
+| `shell-init`                         | `self shell-init`                                               |                                                  |
+| `hmr [on\|off\|status]`              | deleted                                                         | was a retired no-op                              |
+| `clean`                              | `machine clean`                                                 |                                                  |
+| `run --sh <command>`                 | `machine run --sh <command>`                                    | exit code passes through                         |
+| `install [prerequisite…]`            | `self install [prerequisite…]`                                  |                                                  |
+| `setup [feature…]`                   | `self setup [feature…]`                                         | also offers the `switch` line for `~/.zshrc`     |
+| `gate`                               | `gate` (hidden)                                                 | answered by the PreToolUse hook only             |
+| `slot run\|explain`                  | `machine slot run\|explain`                                     | exit code passes through                         |
+| `typecheck [--affected\|--all]`      | `machine typecheck [--affected\|--all]`                         | exit code passes through                         |
+| `upgrade`                            | `self upgrade`                                                  |                                                  |
+| `errors`                             | `errors`                                                        |                                                  |
+| `traces [trace-id]`                  | `obs traces [trace-id]`                                         |                                                  |
+| `metrics`                            | `obs metrics`                                                   |                                                  |
+| `profiles`                           | `obs profiles`                                                  |                                                  |
+| `stores`                             | `status` (stores section; `status --json stores`)               | deleted as a command                             |
+| `jobs`                               | `status` (jobs section; `status --json jobs`)                   | deleted as a command                             |
+| `simulator` (hidden)                 | `simulator` (hidden)                                            |                                                  |
+| `static` (hidden)                    | `static` (hidden)                                               |                                                  |
+| `go-watch` (hidden)                  | `go-watch` (hidden)                                             |                                                  |
+| `ui-watch` (hidden)                  | `ui-watch` (hidden)                                             |                                                  |
+| `keep` (hidden)                      | `keep` (hidden)                                                 |                                                  |
+| `daemon` (hidden)                    | `daemon` (hidden)                                               |                                                  |
+| `help [command]`, `version`          | unchanged                                                       |                                                  |
+
+New, with no predecessor: `hub` (was bare `haven`), `wait`, `defaults`,
+`db logins`, `db status`, `self doctor`, `api --gateway`.
+
+Spellings retired by v2 keep failing, with their pointers updated: `ls`,
+`list` -> `haven status`; `watch`, `ps`, `active` -> `haven hub`; `rs` ->
+`haven restart`; `sw`, `cd` -> `haven switch`; `ch`, `clickhouse` ->
+`haven db url clickhouse`; `pg`, `postgres` -> `haven db url postgres`;
+`observability` -> `haven obs`; `tc` -> `haven machine typecheck`; `oc`,
+`cleanup`, `prune` -> `haven machine clean`; `moron` -> deleted with `git`;
+`doctor` -> `haven self doctor`. `hub` and `obs` leave the retired list
+because they are live again.
+
+### Rulings of 2026-10-10 on the mapping
+
+Raised while mapping and ruled by Alex the same day: `gateway` becomes
+`api --gateway`; `seed status` becomes `db status`; machine-wide commands
+refuse `--stack`; `logs -f` follows, `-t` is retired and `up`/`down` keep
+`--force` long-only; haven's exit codes move to 64 and above; core simulator
+verbs are optional and settings live under `config`; `play-launch` folds into
+`pr --throwaway`. The verb choices in the simulator table stand as written.
+
 ## Rationale / Trade-offs
 
 The alternative — deprecate aliases gradually, keep env vars working, add the
@@ -391,6 +676,15 @@ Per-service log capture costs disk and a small supervisor change; capped
 files bound the disk, and it is the enabler for the entire no-hoops logs
 story, including post-mortem reads after a crash.
 
+**Amendment 2026-10-10.** Grouping the simulators, the observability tabs and
+the orb under nouns makes the top level longer to type for those tools but
+lets an agent learn one vocabulary instead of ten. Moving the hub off bare
+`haven` costs humans one word and removes the one invocation an agent could
+only fail on. Versioned JSON, field selection and distinct exit codes cost
+schema upkeep; they buy an agent that can branch on what went wrong without
+parsing prose. The clean break costs every skill and script one sweep, done in
+the implementing PR, instead of a compatibility layer that never goes away.
+
 ## Consequences
 
 - `cmd/root.go`'s hand-rolled dispatch, alias table, and ad-hoc flag parsing
@@ -406,12 +700,20 @@ story, including post-mortem reads after a crash.
 - `make haven <cmd>` passthrough and the boxd/quickstart
   docs are updated to the new spellings in the same change.
 - Anyone's shell history breaks once, with a pointer.
+- Amendment 2026-10-10: the command table gains groups (`sim`, `obs`,
+  `orb`, `db`, `machine`, `self`), the retired-spelling map gains every row of
+  the old -> new table, and help is grouped. Skills, `LOCAL_STACK.md`, the
+  haven README, `make haven` and repo scripts move to the new spellings in the
+  same PR. `specs/setup/haven-cli-surface.feature` carries the amendment's
+  rules; its scenarios marked "v2, bound" pin today's behaviour until that PR
+  rewrites them.
 
 ## References
 
 - Related ADRs: ADR-004 (docker dev environment, and its in-process workers
-  amendment)
-- Specs: `specs/setup/haven-cli-surface.feature`,
+  amendment), ADR-090 and ADR-091 (machine gate, `run`, `slot`), ADR-168
+  (reloads; why `hmr` is gone)
+- Specs: `specs/setup/haven-cli-surface.feature` (rewritten for the amendment),
   `specs/setup/haven-service-selection.feature`,
   `specs/setup/haven-automatic-prep.feature`,
   `specs/setup/haven-logs.feature`,

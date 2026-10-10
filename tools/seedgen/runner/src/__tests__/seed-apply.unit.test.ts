@@ -400,7 +400,7 @@ describe("seed:apply", () => {
     });
   });
 
-  /** @scenario "The persona counts haven seed prints are what it created" */
+  /** @scenario "The persona counts haven db seed prints are what it created" */
   it("refuses a trace chunk whose spans the owner dropped", async () => {
     const apis = seedApis({
       trace: createApiFixture<TraceApi>({ otlpTraces: vi.fn(async () => ({ rejectedSpans: 2 })) }),
@@ -490,7 +490,7 @@ describe("seed:apply", () => {
     ]);
   });
 
-  /** @scenario "The persona counts haven seed prints are what it created" */
+  /** @scenario "The persona counts haven db seed prints are what it created" */
   it("refuses a membership whose seat waits, so it is never counted", async () => {
     const apis = seedApis({
       organization: createApiFixture<OrganizationApi>({

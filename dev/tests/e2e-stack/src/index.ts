@@ -142,7 +142,7 @@ function havenBaseUrl(): string | null {
 
   let report: { stacks?: readonly HavenStack[] };
   try {
-    const out = execFileSync(binary, ["status", "--json", "--agent"], {
+    const out = execFileSync(binary, ["status", "--json", "stacks", "--agent"], {
       cwd: REPO_ROOT,
       encoding: "utf8",
       timeout: 60_000,

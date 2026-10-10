@@ -148,8 +148,8 @@ Feature: storagesim, a local S3 stand-in run by haven
     When the developer deletes it, clears its bucket, adds the demo objects and copies a presigned URL
     Then each action calls its control route and the lists refresh
 
-  Scenario: haven storage presigns, seeds and reads the request log for agents
-    When an agent runs "haven storage presign <bucket> <key> --put", "haven storage seed" and "haven storage requests"
+  Scenario: haven sim storage presigns, seeds and reads the request log for agents
+    When an agent runs "haven sim storage presign <bucket> <key> --put", "haven sim storage seed" and "haven sim storage list"
     Then each calls its control route, and the requests verb prints auth and request id per line
 
   Scenario: The console serves its bundle beside the S3 paths

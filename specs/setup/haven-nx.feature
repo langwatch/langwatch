@@ -17,13 +17,13 @@ Feature: haven works with Nx
     And the install, codegen, prepare and service lanes all carry it
 
   Scenario: An agent's typecheck is the affected one
-    Given an agent runs haven typecheck with no scope flag
+    Given an agent runs haven machine typecheck with no scope flag
     Then it runs nx affected -t typecheck from the merge-base with the branch's upstream, or origin/main
     And --all runs the whole-tree typecheck instead
 
   Scenario: The affected typecheck holds one slot per parallel task
     Given two check slots are free besides the one it waits for
-    When haven typecheck --affected runs
+    When haven machine typecheck --affected runs
     Then it holds three slots and sets NX_PARALLEL=3
     And with no other slot free it still runs, with NX_PARALLEL=1
 

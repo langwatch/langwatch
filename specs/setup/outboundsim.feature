@@ -221,19 +221,19 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
     @unimplemented
     Scenario: The agent CLI reads and waits on records
       Given an outbound lane is running
-      When an agent runs "haven outbound records --channel webhook --json"
+      When an agent runs "haven sim outbound list --channel webhook --json"
       Then it gets the records as JSON
-      When an agent runs "haven outbound wait --channel slack-webhook --timeout 10s"
+      When an agent runs "haven sim outbound wait --channel slack-webhook --timeout 10s"
       Then it returns the first matching record, or exits non-zero naming the timeout
 
     @unimplemented
     Scenario: The agent CLI sets and clears faults
-      When an agent runs "haven outbound fault add --channel webhook --target ok --status 503 --times 1 --json"
-      Then the fault is listed by "haven outbound fault list --json"
-      And "haven outbound fault clear" removes it
+      When an agent runs "haven sim outbound fault add --channel webhook --target ok --status 503 --times 1 --json"
+      Then the fault is listed by "haven sim outbound fault list --json"
+      And "haven sim outbound fault clear" removes it
 
     @unimplemented
     Scenario: The agent CLI refuses when no outbound lane runs
       Given the stack runs without +outbound
-      When an agent runs "haven outbound records"
+      When an agent runs "haven sim outbound list"
       Then haven exits non-zero and says to run "haven up +outbound"

@@ -65,7 +65,7 @@ machine, **with the wall-clock impact not established** — the sampling machine
 was too loaded for its timings to carry any, which is the same reason the table
 above has no wall-clock column.
 
-A locally built haven binary keeps the old clamp until `make haven install`, so
+A locally built haven binary keeps the old clamp until `make haven install` (now `make haven self install`), so
 the change reaches developers on their next reinstall rather than immediately.
 
 ## Amendment: pressure mode (2026-08-19)

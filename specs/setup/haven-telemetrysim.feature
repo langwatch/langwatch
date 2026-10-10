@@ -48,9 +48,9 @@ Feature: telemetrysim, a seeded OTLP sender that haven drives at a stack
     And stopping the run marks it stopped
     And the status never carries the project key
 
-  Scenario: haven telemetry targets the worktree's own stack with the overlay key, never printing it
+  Scenario: haven sim telemetry targets the worktree's own stack with the overlay key, never printing it
     Given a worktree whose stack overlay names its app URL and project key
-    When the developer runs "haven telemetry send --preset logs --seed 7"
+    When the developer runs "haven sim telemetry send --preset logs --seed 7"
     Then telemetrysim is asked to send to that stack's /api/otel with that key
     And a worktree with no stack is told to run haven up or pass --target
 
@@ -79,7 +79,7 @@ Feature: telemetrysim, a seeded OTLP sender that haven drives at a stack
 
   Scenario: Send one posts a single OTLP request and shows the door's answer
     Given a door that answers 429 with Retry-After 2
-    When the developer sends one metrics batch as JSON from the console or "haven telemetry post"
+    When the developer sends one metrics batch as JSON from the console or "haven sim telemetry post"
     Then the answer names the URL, signal, encoding, size, status, Retry-After, latency and the door's body
     And no run is started and the project key is never in the answer
 
@@ -106,8 +106,8 @@ Feature: telemetrysim, a seeded OTLP sender that haven drives at a stack
     And a key shorter than sixteen characters shows only that one is set
     And a sim started without haven says every run must name its endpoint and key
 
-  Scenario: haven telemetry post, runs, run, fixtures and console drive the sim's API
-    When the developer runs "haven telemetry post", "runs", "run <id>", "fixtures" or "fixture <name>"
+  Scenario: haven sim telemetry post, list, get, fixtures and console drive the sim's API
+    When the developer runs "haven sim telemetry post", "list", "get <id>", "fixtures" or "fixture <name>"
     Then each calls the sim's matching endpoint and prints its answer, or its JSON with --json
     And "post" exits zero when the door refuses, since a refusal is an answer
     And "run" without an id prints its usage, and an unknown verb fails

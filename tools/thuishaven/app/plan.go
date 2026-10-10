@@ -63,7 +63,7 @@ func (p *childPlan) goCombinedShell(lane string, services []string) string {
 	// ponytail: consoles build once per lane start, as `make service-watch` did; slice 5 retires it for Vite.
 	for _, svc := range services {
 		if strings.HasSuffix(svc, "sim") {
-			fmt.Fprintf(&b, "{ pnpm exec nx run @langwatch/%s-web:build --outputStyle=static || echo '%s-web did not build; its console names the fix'; } && ", svc, svc)
+			fmt.Fprintf(&b, "{ "+nxCacheEnv+"pnpm exec nx run @langwatch/%s-web:build --outputStyle=static || echo '%s-web did not build; its console names the fix'; } && ", svc, svc)
 		}
 	}
 	b.WriteString(`_snap=$(export -p) && . dev/scripts/lib/load-dev-env.sh && { ! test -f .env || load_dev_env .env; } && eval "$_snap" && `)
@@ -151,8 +151,8 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	}
 	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.IsBuiltUI())
 	out := []Child{p.frontChild(mono, isOneProcess)}
-	if isOneProcess && opts.Selection.IsBuiltUI() && !opts.Selection.IsHeld() {
-		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui")))
+	if isOneProcess && opts.Selection.WatchUI && !opts.Selection.IsHeld() && len(p.o.cfg.UIWatchArgv) > 0 {
+		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui"), p.o.cfg.UIWatchArgv))
 	}
 	out = append(out, p.goLanes(mono)...)
 	if opts.Selection.Langevals {
@@ -278,6 +278,9 @@ func (p *childPlan) nodeEnv(lane string) []string {
 		if p.opts.Selection.BundledUI {
 			env = append(env, "LANGWATCH_UI_BUNDLED=1")
 		}
+		if p.opts.Selection.WatchUI && !p.opts.Selection.IsHeld() {
+			env = append(env, "LANGWATCH_UI_WATCH=1") // the api's port marks pages, which then reload once idle
+		}
 		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {
 			env = append(env, "LANGWATCH_DEV_TOOLS_IDLE="+v)
 		}
@@ -292,7 +295,7 @@ func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
 	case p.st.Layout.IsMonolith():
 		return mono.appChild()
 	case isOneProcess && p.opts.Selection.IsBuiltUI():
-		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane), p.opts.Selection.IsHeld())
+		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	case isOneProcess:
 		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}
@@ -482,15 +485,12 @@ func oneProcessChild(repoDir string, env []string, logPath string) Child {
 	}
 }
 
-// builtUIChild is the default UI mode: the api and worker with no Vite (`dev`,
-// --backend-only), serving apps/ui/dist/client as production does; app.<slug>
-// routes to the API port (see provision). A held stack builds first; a watching
-// one builds only a missing bundle and leaves the rest to the ui lane.
-func builtUIChild(repoDir string, env []string, logPath string, held bool) Child {
-	build := UIBuildShell + " && "
-	if !held {
-		build = "test -f " + UIDirRel + "/dist/client/index.html || (" + UIBuildShell + "); "
-	}
+// builtUIChild is the built and watch UI modes' app lane: the api and worker with
+// no Vite (`dev`, --backend-only), serving apps/ui/dist/client as production does;
+// app.<slug> routes to the API port (see provision). It builds once at start (Nx
+// restores an unchanged tree); after that only `haven ui-watch` or `haven reload ui` rebuild.
+func builtUIChild(repoDir string, env []string, logPath string) Child {
+	build := uiPruneStaleShell + "(" + UIBuildShell + ") && "
 	return Child{
 		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
 		Shell: build + "pnpm --silent --filter " + BackendPackage + " dev",
@@ -498,33 +498,49 @@ func builtUIChild(repoDir string, env []string, logPath string, held bool) Child
 	}
 }
 
-// uiWatchChild is a watching built-UI stack's ui lane: Vite's build --watch kept
-// warm, each finished rebuild swapped in whole. Vite logs each one's duration.
-func uiWatchChild(repoDir string, env []string, logPath string) Child {
-	return Child{Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath, Shell: UIWatchShell, Env: env}
+// uiWatchChild is a watching built-UI stack's ui lane: `haven ui-watch` runs a
+// one-shot `vite build` per settled burst of browser edits and logs each
+// rebuild's duration. No long-lived Vite, so no memory held between builds.
+func uiWatchChild(repoDir string, env []string, logPath string, watchArgv []string) Child {
+	args := make([]string, 0, len(watchArgv))
+	for _, arg := range watchArgv {
+		args = append(args, shQuote(arg))
+	}
+	return Child{Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath, Shell: "exec " + strings.Join(args, " "), Env: env}
 }
 
-// UIBuildShell builds apps/ui beside the served bundle and swaps it in with
-// two renames, so the api never serves a half-written one. The old hashed
-// assets are carried over: an open page still loads its lazy chunks.
-// shortcut: assets accumulate across reloads, `rm -rf apps/ui/dist` when it matters.
-const UIBuildShell = "set -e; d=" + UIDirRel + "/dist; rm -rf $d/client.next $d/client.old; " +
-	"pnpm --silent --filter " + UIPackage + " build --outDir dist/client.next; " + uiSwapShell
+// nxCacheEnv is the root scripts' Nx prefix: no .env loaded into tasks, no colour.
+// Every cached Nx build haven starts carries it, so one cache serves them all.
+const nxCacheEnv = "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false "
 
-// uiSwapShell moves $d/client.next over the served bundle, carrying old assets.
-const uiSwapShell = "if [ -d $d/client/assets ]; then cp -Rn $d/client/assets/. $d/client.next/assets/ || true; fi; " +
-	"if [ -d $d/client ]; then mv $d/client $d/client.old; fi; " +
-	"mv $d/client.next $d/client; rm -rf $d/client.old"
+// UIBuildShell builds apps/ui through Nx's cached `build:local` target (an
+// unchanged tree restores in seconds), moves it to a per-pid staging dir and
+// swaps it in with two renames, so the api never serves a half-written bundle.
+// A lock (pid file, stale when its owner is gone) serialises the shared output.
+const UIBuildShell = "set -e; " + uiStageVars + "s=$d/client.local; " + uiLockShell + "rm -rf $n; " +
+	nxCacheEnv + "pnpm --silent nx run " + UIPackage + ":build:local --outputStyle=static; mv $s $n; " + uiSwapShell
 
-// UIWatchShell waits for the app lane's first bundle, then runs Vite's build
-// --watch into client.watch and swaps a copy in after each "built in" line; a
-// failed rebuild prints no such line, so the last good bundle keeps serving.
-// shortcut: the whole bundle is copied per swap, fine at tens of MB.
-const UIWatchShell = "d=" + UIDirRel + "/dist; until test -f $d/client/index.html; do sleep 2; done; " +
-	"rm -rf $d/client.watch; pnpm --silent --filter " + UIPackage + " build --watch --outDir dist/client.watch 2>&1 | " +
-	"while IFS= read -r line; do printf '%s\\n' \"$line\"; case $line in *'built in '*) " +
-	"rm -rf $d/client.next $d/client.old; cp -R $d/client.watch $d/client.next && (" + uiSwapShell + ") && echo 'ui bundle swapped in';; esac; done; " +
-	"echo 'vite build --watch ended'; exit 1"
+// uiStageVars names the served bundle's dir, this shell's staging and old dirs, and the lock.
+const uiStageVars = "d=" + UIDirRel + "/dist; n=$d/client.next.$$; o=$d/client.old.$$; l=$d/client.lock; mkdir -p $d; "
+
+// uiLockShell takes the bundle lock, clearing one whose owner is gone; released on exit.
+const uiLockShell = "until (set -C; echo $$ > $l) 2>/dev/null; do p=$(cat $l 2>/dev/null) && [ -n \"$p\" ] && ! kill -0 $p 2>/dev/null && rm -f $l; sleep 1; done; " +
+	"trap 'rm -f $l' EXIT; trap 'exit 1' INT TERM; "
+
+// uiSwapShell records the staged build's own assets, marks the outgoing build's
+// as superseded now (mtime) and carries them forward, so an open page's lazy
+// chunks never 404; a carried chunk superseded over 24 h ago is dropped. Then
+// two renames put the staged bundle in place.
+const uiSwapShell = "ls $n/assets > $n/.build-assets 2>/dev/null || :; " +
+	"if [ -d $d/client/assets ]; then (cd $d/client/assets && xargs touch < ../.build-assets) 2>/dev/null || :; " +
+	"mkdir -p $n/assets; cp -Rnp $d/client/assets/. $n/assets/ || :; fi; " +
+	"(cd $n/assets && find . -type f -mmin +1440 | while read -r f; do grep -qxF \"${f#./}\" ../.build-assets || rm -f \"$f\"; done) || :; " +
+	"if [ -d $d/client ]; then mv $d/client $o; fi; mv $n $d/client; rm -rf $o"
+
+// uiPruneStaleShell runs at stack start: no page is open yet, so every asset
+// the served build does not list goes.
+const uiPruneStaleShell = "c=" + UIDirRel + "/dist/client; if [ -f $c/.build-assets ]; then " +
+	"(cd $c/assets && for f in *; do grep -qxF \"$f\" ../.build-assets || rm -f \"$f\"; done) || :; fi; "
 
 // The Node lanes a stack supervises, by workspace package name. planChildren
 // runs each with `pnpm --filter <pkg> dev` from the workspace root, so the lane

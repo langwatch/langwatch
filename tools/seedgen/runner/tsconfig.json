@@ -23,28 +23,28 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/plans/tsconfig.build.json"
-    },
-    {
       "path": "../../../modules/log/contract/tsconfig.build.json"
     },
     {
       "path": "../../../modules/metric/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {
       "path": "../../../modules/trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../modules/organization/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../modules/project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../modules/user/contract/tsconfig.build.json"

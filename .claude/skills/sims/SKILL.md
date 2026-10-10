@@ -1,12 +1,12 @@
 ---
 name: sims
-description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim, paymentsim, telemetrysim and lambdasim, the haven sims lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
+description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim, paymentsim, telemetrysim and lambdasim, the haven sim lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'haven sims', 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
 user-invocable: true
 ---
 
 # Simulators
 
-Start here: `haven sims --json` lists every simulator with whether it runs in this stack, its
+Start here: `haven sim --json` lists every simulator with whether it runs in this stack, its
 console URL, the `haven up +<name>` it needs if off, its verbs (read from haven's own command
 table) and its skill path. `--stack <slug>` reads another worktree's stack.
 
@@ -29,7 +29,7 @@ built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 | `lambdasim`    | AWS Lambda + CloudWatch Logs (NLP Lambda fleet)     | `+lambda`    | [`lambdasim`](../lambdasim/SKILL.md)       | none                   |
 
 Passkeys, security keys, U2F tokens and TOTP codes are emulated in the browser, not by a Go
-sim: [`mfasim`](../mfasim/SKILL.md) (`haven mfa`, on a `haven browser` lane).
+sim: [`mfasim`](../mfasim/SKILL.md) (`haven browser mfa`, on a `haven browser` lane).
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
 `analytics`, `idp`, `voice`, `outbound`, `telemetry`, `lambda`) and logs via `haven logs <name>`. `haven up +llm +analytics`
@@ -75,13 +75,13 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 
 | Sim       | Verbs                                                                                                                     |
 | --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| mail      | `haven mail address\|inbox\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                         |
-| llm       | `haven llm info\|calls [--model <text>] [--failed]\|call <id>\|clear\|set --error --seed`                                 |
-| analytics | `haven analytics status\|records\|record <id>\|clear\|wait --event`                                                       |
-| storage   | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|requests` |
-| voice     | `haven voice status\|calls\|call <id>\|clear`                                                                             |
-| telemetry | `haven telemetry send\|load\|fuzz\|status\|stop`                                                                          |
-| outbound  | `haven outbound status\|records\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`           |
-| payment   | `haven payment status\|events\|usage\|advance --seconds\|fail --customer\|deliver --ids\|hold\|release\|reset`            |
-| lambda    | `haven lambda info\|calls\|call <id>\|clear\|set --error <kind>`                                                          |
-| idp       | `haven idp tenants\|tenant show\|apps add\|populate\|churn\|scim ...\|signin\|reset` (full list: `haven sims --json`)     |
+| mail      | `haven sim mail address\|status\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                    |
+| llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault --error\|config --seed`                   |
+| analytics | `haven sim analytics status\|list\|get <id>\|clear\|wait --event`                                                         |
+| storage   | `haven sim storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|list` |
+| voice     | `haven sim voice status\|list\|get <id>\|clear`                                                                           |
+| telemetry | `haven sim telemetry send\|load\|fuzz\|status\|stop`                                                                      |
+| outbound  | `haven sim outbound status\|list\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`          |
+| payment   | `haven sim payment status\|list\|usage\|advance --seconds\|fault --customer\|deliver --ids\|hold\|release\|clear`         |
+| lambda    | `haven sim lambda status\|list\|get <id>\|clear\|fault --error <kind>`                                                    |
+| idp       | `haven sim idp list\|get\|apps add\|populate\|churn\|scim ...\|signin\|clear` (full list: `haven sim --json`)             |

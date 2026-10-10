@@ -22,7 +22,7 @@ import (
 
 // The `haven logs` command: every service's captured output, from any
 // terminal, whether the stack runs attached, detached, or already stopped.
-// Filtering is a plain argument (`haven logs nlp`), following is -t, time
+// Filtering is a plain argument (`haven logs nlp`), following is -f, time
 // windows are --since, severity is --level, another stack is --stack. The
 // supervisor writes the per-service files this reads (adapters/procsupervisor
 // logsink.go); the launcher's terminal view and these files carry the same
@@ -111,7 +111,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	// The observability stack is a container, not a supervised child — its logs
 	// come from docker, but through the same one command.
 	if len(inv.args) == 1 && inv.args[0] == "obs" {
-		return d.orch.ObservabilityLogs(ctx, inv.has("--tail"))
+		return d.orch.ObservabilityLogs(ctx, inv.has("--follow"))
 	}
 
 	if inv.has("--loki") || inv.has("--trace") {
@@ -167,7 +167,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	for _, l := range lines {
 		printLogLine(l, mode, d.isAgent)
 	}
-	if !inv.has("--tail") {
+	if !inv.has("--follow") {
 		if len(lines) == 0 {
 			fmt.Println("(no matching log lines yet)")
 		}
@@ -569,7 +569,7 @@ func formatLogLine(l logLine, mode renderMode, plain bool) string {
 	case renderRaw:
 		return l.text
 	case renderJSON:
-		return logfmt.RenderJSON(l.text, opts)
+		return typedLogEvent(logfmt.RenderJSON(l.text, opts))
 	case renderHuman:
 	}
 	return logfmt.Render(l.text, opts)
@@ -672,7 +672,10 @@ func printLokiLines(out readOutput, lines []sources.LogLine, level string) error
 			continue
 		}
 		if asJSON {
-			if err := enc.Encode(l); err != nil {
+			if err := enc.Encode(struct {
+				Type string `json:"type"`
+				sources.LogLine
+			}{"log", l}); err != nil {
 				return err
 			}
 			continue
@@ -683,4 +686,16 @@ func printLokiLines(out readOutput, lines []sources.LogLine, level string) error
 		fmt.Fprintln(w, "grafana:", out.link)
 	}
 	return nil
+}
+
+// typedLogEvent stamps the NDJSON stream's discriminator onto one rendered
+// line: every event a stream emits says what it is.
+func typedLogEvent(line string) string {
+	switch {
+	case line == "{}":
+		return `{"type":"log"}`
+	case strings.HasPrefix(line, "{"):
+		return `{"type":"log",` + line[1:]
+	}
+	return line
 }

@@ -42,7 +42,7 @@ haven browser status                                       # the whole browser
 haven browser stop                                         # every lane and the daemon
 ```
 
-Passkeys, security keys and TOTP codes: `haven mfa add|list|remove|uv|totp` on the same
+Passkeys, security keys and TOTP codes: `haven browser mfa add|list|remove|uv|totp` on the same
 `--lane`, taught by the `mfasim` skill.
 
 ## Flags
@@ -57,7 +57,7 @@ Passkeys, security keys and TOTP codes: `haven mfa add|list|remove|uv|totp` on t
 | `--out <file>`        | screenshot PNG, or the script `record stop` writes                        |
 | `--json`              | machine-readable reply                                                    |
 
-`--as` is `admin` or a seeded login's email (`haven seed --json` lists them).
+`--as` is `admin` or a seeded login's email (`haven db seed --json` lists them).
 
 ## Limits
 

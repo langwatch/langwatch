@@ -17,7 +17,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// The keys `haven api --key` and `haven gateway` call with. The seeded project
+// The keys `haven api --key` and `haven api --gateway` call with. The seeded project
 // key and the personal access token come from the seed; every other key haven
 // mints through the product's own routes and holds in a per-stack file (0600),
 // so walkers reuse one key per name and never see any of them.

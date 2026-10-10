@@ -12,7 +12,7 @@ import (
 // the lanes have something to bind, under the given selection.
 func devToolsPlan(t *testing.T, sel domain.Selection) []Child {
 	t.Helper()
-	sel.DevUI = true // the split lanes these tests name
+	sel.BundledUI = true // the split lanes these tests name
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.DesignSystemService, Port: 46006},
@@ -50,8 +50,8 @@ func TestSelectedDeveloperToolsAreServedBuiltByHaven(t *testing.T) {
 	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 	for lane, wants := range map[string][]string{
-		"design-system": {"build:storybook", "storybook-static", " static design-system ", "46006"},
-		"mail-room":     {"build:studio", "packages/mail/preview/dist", " static mail-room ", "45566"},
+		"design-system": {"NX_LOAD_DOT_ENV_FILES=false pnpm --silent exec nx run @langwatch/design-system:build:storybook", "storybook-static", " static design-system ", "46006"},
+		"mail-room":     {"NX_LOAD_DOT_ENV_FILES=false pnpm --silent exec nx run @langwatch/mail:build:studio", "packages/mail/preview/dist", " static mail-room ", "45566"},
 	} {
 		child, ok := findChild(children, lane)
 		if !ok {

@@ -21,20 +21,22 @@ const serve = ({
   stubDaemon({
     answer: ({ method, path }) => {
       if (method === "GET" && path === `/api/stacks/${home().slug}`) return { body: home() };
+      const other = others(path);
+      if (other !== undefined) return other;
       if (method === "GET" && path.startsWith("/api/stacks/")) {
         return { status: 404, body: notFound({ slug: path.split("/").at(-1) ?? "" }) };
       }
-      return others(path);
+      return undefined;
     },
   });
 
-const openHome = async ({ slug }: { slug: string }) => {
+const openHome = async ({ slug, tab = "" }: { slug: string; tab?: string }) => {
   render(
     <ToastProvider>
-      <StackHomeApp slug={slug} />
+      <StackHomeApp slug={slug} tab={tab} sub="" navigate={vi.fn()} />
     </ToastProvider>,
   );
-  return screen.findByRole("heading", { name: "Surfaces" });
+  return screen.findByRole("heading", { name: tab === "db" ? "Dev credentials" : "Surfaces" });
 };
 
 const surfaceRow = ({ name }: { name: string }) => {
@@ -273,7 +275,7 @@ describe("StackHome", () => {
             ? { body: { apiKey: "sk-lw-the-whole-key-9f3a" } }
             : undefined,
       });
-      await openHome({ slug: "feat-x" });
+      await openHome({ slug: "feat-x", tab: "db" });
 
       expect(screen.getByText("admin@langwatch.localhost")).toBeDefined();
       expect(screen.getByText("feat-x@mail.langwatch.localhost")).toBeDefined();
@@ -319,7 +321,7 @@ describe("StackHome", () => {
 
   describe("when a seed is started from the seed panel", () => {
     /** @scenario "The stack home seeds a stack at a chosen size and shows its progress" */
-    it("starts haven seed at the chosen size and persona and shows the run's log", async () => {
+    it("starts haven db seed at the chosen size and persona and shows the run's log", async () => {
       const running = {
         ...liveHome({ now: NOW }),
         seed: {
@@ -337,7 +339,7 @@ describe("StackHome", () => {
           return { body: { message: "seeding feat-x at the small size" } };
         },
       });
-      await openHome({ slug: "feat-x" });
+      await openHome({ slug: "feat-x", tab: "db" });
 
       fireEvent.change(screen.getByLabelText("Size"), { target: { value: "small" } });
       fireEvent.change(screen.getByLabelText("Persona"), { target: { value: "startup" } });
@@ -359,7 +361,7 @@ describe("StackHome", () => {
       serve({ home: () => liveHome({ now: NOW }) });
       render(
         <ToastProvider>
-          <StackHomeApp slug="nope" />
+          <StackHomeApp slug="nope" tab="" sub="" navigate={vi.fn()} />
         </ToastProvider>,
       );
       expect(await screen.findByText("No stack is registered for “nope”")).toBeDefined();
@@ -367,5 +369,197 @@ describe("StackHome", () => {
         "https://hub.langwatch.localhost",
       );
     });
+  });
+});
+
+describe("StackHome Sims tab", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const sims = ({ slug }: { slug: string }) => ({
+    v: 1,
+    stack: slug,
+    rows: [
+      {
+        name: "mail",
+        running: true,
+        console: `https://mail.${slug}.langwatch.localhost`,
+        verbs: ["list", "get"],
+        skill: ".claude/skills/mailsim/SKILL.md",
+      },
+      { name: "llm", running: false, start: "haven up +llm", verbs: null, skill: "x" },
+    ],
+  });
+
+  it("lists every simulator and gives each running one a sub-tab", async () => {
+    const home = liveHome({ now: NOW });
+    serve({
+      home: () => home,
+      others: (path) =>
+        path === `/api/stacks/${home.slug}/cli/sims` ? { body: sims(home) } : undefined,
+    });
+    const navigate = vi.fn();
+    render(
+      <ToastProvider>
+        <StackHomeApp slug={home.slug} tab="sims" sub="" navigate={navigate} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText("haven up +llm")).toBeDefined();
+    fireEvent.click(screen.getByRole("tab", { name: "mail" }));
+    expect(navigate).toHaveBeenCalledWith({ path: "/sims/mail" });
+  });
+
+  it("shows one simulator's console link on its sub-tab", async () => {
+    const home = liveHome({ now: NOW });
+    serve({
+      home: () => home,
+      others: (path) =>
+        path === `/api/stacks/${home.slug}/cli/sims` ? { body: sims(home) } : undefined,
+    });
+    render(
+      <ToastProvider>
+        <StackHomeApp slug={home.slug} tab="sims" sub="mail" navigate={vi.fn()} />
+      </ToastProvider>,
+    );
+    const open = await screen.findByRole("link", { name: "Open console" });
+    expect(open.getAttribute("href")).toBe(`https://mail.${home.slug}.langwatch.localhost`);
+  });
+});
+
+describe("StackHome Logs tab", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("lists this stack's distinct failures on its Errors sub-tab", async () => {
+    const home = liveHome({ now: NOW });
+    const group = {
+      signature: "api:boom",
+      message: "boom",
+      lane: "api",
+      app: "",
+      count: 3,
+      firstSeen: "2026-09-28T11:00:00Z",
+      lastSeen: "2026-09-28T11:59:00Z",
+    };
+    serve({
+      home: () => home,
+      others: (path) =>
+        path === `/api/stacks/${home.slug}/cli/errors`
+          ? { body: { v: 1, stack: home.slug, rows: [group] } }
+          : undefined,
+    });
+    render(
+      <ToastProvider>
+        <StackHomeApp slug={home.slug} tab="logs" sub="errors" navigate={vi.fn()} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText("boom")).toBeDefined();
+  });
+});
+
+describe("StackHome Orb tab", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("lists the orb's feedback and resolves an open note", async () => {
+    const home = liveHome({ now: NOW });
+    const note = {
+      id: "0000000000001",
+      receivedAt: "2026-09-28T11:58:00Z",
+      note: "button is cut off",
+      route: "/settings",
+      url: "",
+    };
+    let resolved = false;
+    const daemon = serve({
+      home: () => home,
+      others: (path) => {
+        if (path === `/api/stacks/${home.slug}/feedback/${note.id}/resolve`) {
+          resolved = true;
+          return { body: { message: `resolved ${note.id}` } };
+        }
+        if (path !== `/api/stacks/${home.slug}/cli/feedback`) return undefined;
+        const row = resolved ? { ...note, resolvedAt: "2026-09-28T12:00:00Z" } : note;
+        return { body: { v: 1, stack: home.slug, rows: [row] } };
+      },
+    });
+    render(
+      <ToastProvider>
+        <StackHomeApp slug={home.slug} tab="orb" sub="" navigate={vi.fn()} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText("button is cut off")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+    expect(await screen.findByText("resolved")).toBeDefined();
+    expect(daemon.calls.some((call) => call.method === "POST")).toBe(true);
+  });
+});
+
+describe("StackHome Browser tab", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the first open lane's snapshot and screenshot", async () => {
+    const home = liveHome({ now: NOW });
+    serve({
+      home: () => home,
+      others: (path) => {
+        if (path === `/api/stacks/${home.slug}/cli/browser`) {
+          return { body: { v: 1, stack: home.slug, rows: { running: true, lanes: ["walk"] } } };
+        }
+        if (path !== `/api/stacks/${home.slug}/browser/walk/snapshot`) return undefined;
+        const rows = { url: "https://app/x", title: "X", snapshot: '- heading "Projects"' };
+        return { body: { v: 1, stack: home.slug, rows } };
+      },
+    });
+    render(
+      <ToastProvider>
+        <StackHomeApp slug={home.slug} tab="browser" sub="" navigate={vi.fn()} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText('- heading "Projects"')).toBeDefined();
+    const shot = screen.getByRole("img", { name: "What lane walk shows now" });
+    expect(shot.getAttribute("src")).toContain(`/api/stacks/${home.slug}/browser/walk/screenshot`);
+  });
+});
+
+describe("StackHome Obs tab", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("lists this stack's recent root spans", async () => {
+    const home = liveHome({ now: NOW });
+    const span = {
+      traceId: "t1",
+      time: "2026-09-28T11:59:00Z",
+      service: "api",
+      name: "GET /api/projects",
+      duration: 42e6,
+      error: true,
+    };
+    serve({
+      home: () => home,
+      others: (path) =>
+        path === `/api/stacks/${home.slug}/cli/traces`
+          ? { body: { v: 1, stack: home.slug, rows: [span] } }
+          : undefined,
+    });
+    render(
+      <ToastProvider>
+        <StackHomeApp slug={home.slug} tab="obs" sub="" navigate={vi.fn()} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText("GET /api/projects")).toBeDefined();
+    expect(screen.getByText("42ms")).toBeDefined();
   });
 });

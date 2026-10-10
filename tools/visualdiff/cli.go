@@ -99,7 +99,7 @@ recapture re-renders only the named routes against a run's own stacks - which
 stay up when that run was started with -keep - and appends to the same
 findings.jsonl. It never checks out a worktree, never runs haven up, and
 never tears anything down: pass -keep to run, recapture as many times as a
-triage loop needs, then tear the stacks down yourself (haven destroy, or a
+triage loop needs, then tear the stacks down yourself (haven down --destroy, or a
 fresh run without -keep).
 
 publish shows a finished run's screens on a pull request after the fact:

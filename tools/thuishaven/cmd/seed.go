@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
-// seedValueFlags are the seedgen flags `haven seed` passes through, in the order it passes them.
+// seedValueFlags are the seedgen flags `haven db seed` passes through, in the order it passes them.
 var seedValueFlags = []string{"--size", "--spans", "--days", "--persona", "--private", "--seed", "--anchor", "--shape", "--into", "--age", "--conversations", "--turns"}
 
 func seedSpec() commandSpec {
@@ -43,11 +43,11 @@ func seedSpec() commandSpec {
 	}
 }
 
-// runSeed is `haven seed [status]`. Exit 2 means refused before writing, 4 stalled, 1 a check failed.
+// runSeed is `haven db seed [status]`. Exit 2 means refused before writing, 4 stalled, 1 a check failed.
 func runSeed(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) > 0 {
 		if inv.args[0] != "status" {
-			return fmt.Errorf("haven seed: unknown subcommand %q — status", inv.args[0])
+			return fmt.Errorf("haven db seed: unknown subcommand %q — status", inv.args[0])
 		}
 		return d.orch.SeedStatus(d.params)
 	}

@@ -20,11 +20,12 @@ type Selection struct {
 	// Watch is sticky `haven up --watch`: a built-UI stack refreshes on a change
 	// only when asked, so its pages never move under a tester (IsHeld).
 	Watch bool `json:"watch,omitempty"`
-	// DevUI is sticky `haven up --ui=dev`: the Vite dev server serves apps/ui.
-	// Neither DevUI nor BundledUI is the default, the built UI (IsBuiltUI).
-	DevUI bool `json:"dev-ui,omitempty"`
+	// WatchUI is sticky `haven up --ui=watch`: the built UI, rebuilt by `haven
+	// ui-watch` on a change; open pages reload once idle. Neither WatchUI nor
+	// BundledUI is the default, the built UI built once at up (IsBuiltUI).
+	WatchUI bool `json:"watch-ui,omitempty"`
 	// BundledUI is sticky `haven up --ui=bundled`: Vite serves incrementally
-	// rebuilt bundles from memory (LANGWATCH_UI_BUNDLED=1); HMR stays. Not with DevUI.
+	// rebuilt bundles from memory (LANGWATCH_UI_BUNDLED=1); HMR stays. Not with WatchUI.
 	BundledUI bool `json:"bundled-ui,omitempty"`
 	Gateway   bool `json:"gateway"`
 	NLP       bool `json:"nlp"`
@@ -36,7 +37,7 @@ type Selection struct {
 	// SCIM + domain verification) is one small Go process, and having a
 	// login-capable IdP always routed makes identity flows testable without a
 	// setup step. Worktrees that don't want it say `haven up -idp` once.
-	// `haven idp` runs the simulator alone, with no stack at all.
+	// `haven sim idp` runs the simulator alone, with no stack at all.
 	IDP bool `json:"idp"`
 	// Mail is the local mail sink (mailsim), on by default for the same reason
 	// as IDP: it is one small Go process, and having it always routed means an
@@ -95,14 +96,14 @@ type Selection struct {
 	Lambda bool `json:"lambda"`
 }
 
-// IsBuiltUI is the default UI mode: app.<slug> is the api serving a production
-// build of apps/ui, as production does; no Vite. A watching stack rebuilds it on
-// a change, a held one on `haven reload ui`.
-func (s Selection) IsBuiltUI() bool { return !s.DevUI && !s.BundledUI }
+// IsBuiltUI is whether app.<slug> is the api serving a production build of
+// apps/ui, as production does, with no Vite: the built and watch UI modes.
+// `--ui=watch` rebuilds it on a change; `--ui=built` only on `haven reload ui`.
+func (s Selection) IsBuiltUI() bool { return !s.BundledUI }
 
 // IsHeld is whether nothing refreshes on a file change: `--watch=false`, or a
-// built UI no `--watch` asked to refresh. `haven reload` applies changes.
-func (s Selection) IsHeld() bool { return s.Held || (s.IsBuiltUI() && !s.Watch) }
+// built UI neither `--watch` nor `--ui=watch` asked to refresh. `haven reload` applies changes.
+func (s Selection) IsHeld() bool { return s.Held || (s.IsBuiltUI() && !s.Watch && !s.WatchUI) }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
 // gateway, nlp, the idp, mail, storage, payment and telemetry simulators — no

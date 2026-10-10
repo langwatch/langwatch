@@ -35,7 +35,7 @@ var Personas = []string{"startup", "enterprise", "gateway", "agent-eval"}
 // Shapes are the deployment shapes of design §7.7.
 var Shapes = []string{"saas", "sh-licensed", "sh-free"}
 
-// MaxSpans is the largest --spans a haven seed takes; larger volumes are upgradelab's (design §4).
+// MaxSpans is the largest --spans a haven db seed takes; larger volumes are upgradelab's (design §4).
 const MaxSpans = 2_000_000
 
 // MaxDays bounds --days.

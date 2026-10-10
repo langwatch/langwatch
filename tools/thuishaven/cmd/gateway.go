@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// `haven gateway` calls this stack's AI gateway (the `+gateway` add-on) with a
+// `haven api --gateway` calls this stack's AI gateway (the `+gateway` add-on) with a
 // virtual key for local-dev-project that haven mints through the product's
 // virtual-key route and holds beside its other keys. The secret never prints.
 
@@ -33,7 +33,7 @@ func gatewaySpec() commandSpec {
 
 func runGateway(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) != 2 {
-		return errors.New("usage: haven gateway <METHOD> <path> [--vk name] [--body file|-] [--header k:v] [--json]")
+		return errors.New("usage: haven api --gateway <METHOD> <path> [--vk name] [--body file|-] [--header k:v] [--json]")
 	}
 	ring, err := stackKeyring(d, inv)
 	if err != nil {
@@ -45,7 +45,7 @@ func runGateway(ctx context.Context, d deps, inv invocation) error {
 		base = telemetryOverlayValue(overlay, "LW_GATEWAY_PUBLIC_URL")
 	}
 	if base == "" {
-		return errors.New("haven gateway: this stack runs no AI gateway; start it with haven up +gateway --agent -d")
+		return errors.New("haven api --gateway: this stack runs no AI gateway; start it with haven up +gateway --agent -d")
 	}
 	body, err := apiBody(inv.value("--body"))
 	if err != nil {
@@ -98,7 +98,7 @@ func (k keyring) mintVirtualKey(ctx context.Context, vk string) (heldKey, error)
 		return heldKey{}, err
 	}
 	if minted.Secret == "" {
-		return heldKey{}, errors.New("haven gateway: the virtual-key route minted no secret")
+		return heldKey{}, errors.New("haven api --gateway: the virtual-key route minted no secret")
 	}
 	return heldKey{Secret: minted.Secret, ID: minted.VirtualKey.ID}, nil
 }

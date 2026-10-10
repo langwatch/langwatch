@@ -58,7 +58,7 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And the password itself never reaches the runner
 
   @unit
-  Scenario: The persona counts haven seed prints are what it created
+  Scenario: The persona counts haven db seed prints are what it created
     Given a membership the organization holds pending for want of a seat
     When the member.add action is applied
     Then the reply is a refusal, so the member is not counted as created

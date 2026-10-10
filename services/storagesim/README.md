@@ -68,7 +68,7 @@ unless the type is a plain image (PNG, JPEG, GIF, WebP, AVIF) or `text/plain`.
 haven sets `STORAGESIM_DATA_DIR=<haven home>/storage/<slug>`. It survives
 `haven down`, as the databases do, and `haven db reset` removes it with them.
 `DELETE /_sim/api/object?bucket=&key=` and `DELETE /_sim/api/objects[?bucket=]`
-(`haven storage delete` / `clear`) empty it without a reset.
+(`haven sim storage delete` / `clear`) empty it without a reset.
 
 ## Left out
 

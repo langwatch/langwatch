@@ -18,10 +18,10 @@ as shipped"). The open questions at the foot of the ADR that remain are Alex's, 
 
 ## The two shapes
 
-| Shape               | Node processes                                                   | Start                                                           | Reload                                                      |
-| ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| Split               | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `LANGWATCH_DEV_ONE_PROCESS=0 pnpm dev`                          | re-links only what a change reaches, in process (see below) |
-| One process (default) | one `app` lane: Vite, api and worker                             | `pnpm dev`, or `pnpm dev:one` alone                             | re-links only what a change reaches, in process             |
+| Shape                 | Node processes                                                   | Start                                  | Reload                                                      |
+| --------------------- | ---------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
+| Split                 | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `LANGWATCH_DEV_ONE_PROCESS=0 pnpm dev` | re-links only what a change reaches, in process (see below) |
+| One process (default) | one `app` lane: Vite, api and worker                             | `pnpm dev`, or `pnpm dev:one` alone    | re-links only what a change reaches, in process             |
 
 - `pnpm dev` runs `dev/scripts/dev-stack.sh`, which runs the lanes
   through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It runs the upgrade
@@ -60,16 +60,16 @@ generation serving. A failed boot waits for the next change. Each generation log
 
 ## Reload knobs
 
-| Variable                            | Effect                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------ |
+| Variable                            | Effect                                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `LANGWATCH_DEV_WATCH=0`             | held: no reload on a change; `haven reload` (SIGUSR2) applies them (haven sets it on `up --watch=false`) |
-| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`   | quiet window before a reload (2000)                                            |
-| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`   | never defer longer than this after the first change (30000)                    |
-| `LANGWATCH_DEV_RECYCLE_GENERATIONS` | api lane: after this many generations, the next edit restarts the process (50) |
-| `LANGWATCH_DEV_RECYCLE_RSS_MIB`     | api lane: past this RSS, the next edit restarts the process (4096)             |
+| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`   | quiet window before a reload (2000)                                                                      |
+| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`   | never defer longer than this after the first change (30000)                                              |
+| `LANGWATCH_DEV_RECYCLE_GENERATIONS` | api lane: after this many generations, the next edit restarts the process (50)                           |
+| `LANGWATCH_DEV_RECYCLE_RSS_MIB`     | api lane: past this RSS, the next edit restarts the process (4096)                                       |
 
 There is no agent-turn hold (retired 2026-10-09, ADR-168): the debounce alone coalesces a
-turn's edits, and `haven hmr` is a no-op. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
+turn's edits, and `haven hmr` no longer exists. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
 a `.json` outside `src/`, or a package the watched command cannot reach. The authority for
 this is `tools/dev-runtime/src/app.entrypoint.main.ts` (the supervisor script is gone, ADR-168 amendment 2026-10-10).
 
@@ -100,10 +100,18 @@ waiting for a change`: the old one is drained and the next change retries. Fix t
 - What it showed (2026-10-10, dev UI in-process):
   - RSS is about 2.7 GB, of which about 1.5 GB is JS heap (500 MB of it large objects). A boot takes about 40 s (`readyMs`).
   - At rest the process is about 90% idle, so the boot is the CPU cost.
-  - Most of the heap is loaded code. The module runner keeps each backend module's transformed code with an inline base64 source map, Vite's module graph keeps the map as well, and V8 holds its own copy.
+  - Most of the heap was loaded code: the module runner kept each backend module's transformed code with an inline base64 source map, beside the map in Vite's module graph and V8's own copy (fixed, see below).
   - `modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js` is 8 MB on disk and evaluates as a 41M-char script.
   - The other big ones: sass, the prisma client, `@clickhouse/parser`, `model-catalog.json` and `lwql-prisma-manifest.generated.json`.
 - The built UI, haven's default, takes the UI's Vite server out of the process altogether.
+- Inline source maps are off since 2026-10-10 (`startBackendVite`, `createBackendRunner`): each evaluation gets `//# sourceURL=<id>?lw=<n>` and stack traces map through the maps Vite's module graph already holds, so a frame still reads `throws.ts:12:9`, also after an edit. Backend-only import A/B (`.claude/tmp/prof/srcmap/boot.mjs base|lane`):
+
+  |                      | heap after GC | RSS after GC |
+  | -------------------- | ------------- | ------------ |
+  | inline maps (before) | 1108 MB       | 2873-3097 MB |
+  | no inline maps (now) | 503-506 MB    | 1938-2392 MB |
+
+  Boot times from that run are void (load average 25-68); an earlier quiet run measured 21.4 s -> 18.2 s.
 
 ## Where to read next
 

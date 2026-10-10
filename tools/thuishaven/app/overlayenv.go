@@ -127,7 +127,7 @@ func (o *Orchestrator) Env(p UpParams, asJSON bool, reveal bool) error {
 	return nil
 }
 
-// envShower is how `haven env` and `haven seed` print a value. Masked unless the
+// envShower is how `haven env` and `haven db seed` print a value. Masked unless the
 // caller asked for it: the output is pasted into issues and read over a
 // shoulder far more often than it is evaluated, and a registry this checkout
 // cannot read masks on the key's shape instead.

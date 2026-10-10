@@ -13,7 +13,7 @@ import (
 // meaning, whichever command asks for it (ADR-064).
 // @scenario "An unknown preset is rejected before anything is created"
 func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
-	spec := specByName(t, "play")
+	spec := specByName(t, "pr")
 	var seed *flagSpec
 	for i := range spec.flags {
 		if spec.flags[i].long == "--seed" {
@@ -21,7 +21,7 @@ func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
 		}
 	}
 	if seed == nil {
-		t.Fatal("play does not declare --seed — a sandbox would always open on the onboarding screen")
+		t.Fatal("pr does not declare --seed — a sandbox would always open on the onboarding screen")
 	}
 	if !seed.takesValue {
 		t.Error("--seed takes a preset name; a valueless flag would have to pick one for the developer")
@@ -34,7 +34,7 @@ func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
 
 	t.Run("given a preset that is not in the registry", func(t *testing.T) {
 		t.Run("when play parses it, the value is rejected rather than passed on", func(t *testing.T) {
-			inv, err := parse(spec, []string{"4913", "--seed", "nosuch"})
+			inv, err := parse(spec, []string{"4913", "--throwaway", "--seed", "nosuch"})
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
@@ -56,7 +56,7 @@ func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
 // No @scenario: play-launch is internal (hidden from help, spawned by `haven
 // play`), so its argument handling is not behavior the feature file describes.
 func TestPlayLaunchWithoutANumberFailsInsteadOfPanicking(t *testing.T) {
-	inv, err := parse(specByName(t, "play-launch"), nil)
+	inv, err := parse(specByName(t, "pr"), []string{"--throwaway", "--launch"})
 	if err != nil {
 		t.Fatalf("parse accepted no arguments but errored: %v", err)
 	}
@@ -73,24 +73,21 @@ func TestPlayLaunchWithoutANumberFailsInsteadOfPanicking(t *testing.T) {
 func TestPresetTravelsToTheBackgroundedLauncher(t *testing.T) {
 	t.Run("given a preset", func(t *testing.T) {
 		argv := playLaunchArgs(4913, "demo")
-		if !slices.Equal(argv, []string{"4913", "demo"}) {
-			t.Fatalf("launcher argv = %v, want the number then the preset", argv)
-		}
-		inv, err := parse(specByName(t, "play-launch"), argv)
+		inv, err := parse(specByName(t, "pr"), argv)
 		if err != nil {
-			t.Fatalf("the launcher rejects what play sends it: %v", err)
+			t.Fatalf("the launcher rejects what pr --throwaway sends it: %v", err)
 		}
-		if len(inv.args) != 2 || inv.args[1] != "demo" {
-			t.Errorf("launcher args = %v, want the preset as the second positional", inv.args)
+		if !inv.has("--launch") || inv.value("--seed") != "demo" || len(inv.args) != 1 || inv.args[0] != "4913" {
+			t.Errorf("launcher argv %v parsed to %+v, want PR 4913, --launch and --seed demo", argv, inv)
 		}
 	})
 
 	t.Run("given no preset", func(t *testing.T) {
 		argv := playLaunchArgs(4913, "")
-		if !slices.Equal(argv, []string{"4913"}) {
-			t.Fatalf("launcher argv = %v, want the number alone — never an empty preset", argv)
+		if slices.Contains(argv, "--seed") {
+			t.Fatalf("launcher argv = %v, want no --seed, never an empty preset", argv)
 		}
-		if _, err := parse(specByName(t, "play-launch"), argv); err != nil {
+		if _, err := parse(specByName(t, "pr"), argv); err != nil {
 			t.Fatalf("the launcher rejects a plain sandbox: %v", err)
 		}
 	})

@@ -43,7 +43,7 @@ Feature: visualdiff boots its stacks through haven
     Scenario: Teardown names its own two slugs
       Given both stacks are up
       When the run tears down
-      Then it runs haven destroy for exactly the two visualdiff slugs
+      Then it runs haven down --destroy for exactly the two visualdiff slugs
       And it removes exactly the two worktrees it added
       And no other stack is stopped, restarted or flushed
 

@@ -342,25 +342,32 @@ Feature: The local development process topology
 
   # --- A built UI serves the production bundle from the api (2026-10-10) ---
 
-  # The built UI is haven's default (2026-10-10): one backend-only Node lane, no
-  # Vite dev server; the api serves apps/ui/dist/client. `--ui=dev` and
-  # `--ui=bundled` opt out and stick; `--ui=built` returns to the default.
+  # Three UI modes (Alex 2026-10-10). built, the default: one backend-only Node
+  # lane, no Vite; the api serves apps/ui/dist/client, built once at up and on
+  # `haven reload ui`. watch: the same, rebuilt by `haven ui-watch` on a change.
+  # bundled: Vite bundledDev with HMR. `--ui=dev` left haven; `pnpm dev` runs it.
   @unit
   Scenario: A fresh stack serves the built UI and holds it still
-    Given a worktree with no UI mode chosen and no "--watch"
+    Given a worktree with no UI mode chosen
     When haven plans the Node lanes
     Then one backend-only host runs after a fresh build, with no ui lane
-    And no file change reloads the host or rebuilds the bundle until "haven reload"
+    And no file change rebuilds the bundle until "haven reload ui", even with "--watch"
 
   @unit
-  Scenario: A built UI started with --watch rebuilds it on a change
-    Given a stack started with "haven up --watch"
+  Scenario: A watch UI stack rebuilds the built UI on a change
+    Given a stack started with "haven up --ui=watch"
     When haven plans the Node lanes
-    Then one backend-only host runs, building the bundle only when none exists
-    And a ui lane keeps Vite's build --watch warm
-    And each finished rebuild is swapped in whole and logged with its duration
+    Then one backend-only host runs after a fresh build and marks its pages as watch-mode pages
+    And a ui lane runs "haven ui-watch", one build per settled burst of edits
     And a failed rebuild leaves the last good bundle serving
     And a backend change reloads the host in place, as on any watching stack
+
+  @unit
+  Scenario: An open watch-mode page reloads after a swap only once idle
+    Given a page served by a watch UI stack
+    When a new bundle is swapped in, or a chunk the page asks for is gone
+    Then the page reloads once nobody has touched it for 60 seconds, or at once when hidden
+    And a page from a built or production server reloads at once on a stale chunk and never polls
 
   @unit
   Scenario: A held built UI stack runs no Vite and routes the app hostname to the api
@@ -371,31 +378,32 @@ Feature: The local development process topology
     And only "haven reload ui" rebuilds the bundle
 
   @unit
-  Scenario: A stack chosen as dev before built became the default stays dev
-    Given a .haven.json that names "--ui=dev"
+  Scenario: A stack left on the retired --ui=dev serves the built UI
+    Given a .haven.json that names "dev-ui"
     When haven reads the selection
-    Then the Vite dev server serves the UI
-    And a file that only says "built-ui" serves the built UI
+    Then the built UI serves the page
+    And "haven up --ui=dev" is refused with a pointer to "--ui=bundled" and "pnpm dev"
 
   @unit
   Scenario: A bundled UI stack runs Vite on bundled output and leaves the other modes
     Given a stack started with "haven up --ui=bundled"
     When haven plans the Node lanes
     Then the app lane runs with LANGWATCH_UI_BUNDLED=1 and keeps its Vite server
-    And choosing "--ui=bundled" replaces "--ui=dev", "--ui=built" returns to the default, and an unknown value is refused
+    And choosing "--ui=bundled" replaces "--ui=watch", "--ui=built" returns to the default, and an unknown value is refused
 
   @unit
   Scenario: A built UI is rebuilt beside the served one and swapped in
     Given a stack serving a built UI
     When "haven reload ui" runs
     Then the new bundle is built beside the served one
-    And the old assets stay loadable by open pages
+    And the old assets stay loadable by open pages, until 24 hours after they were superseded
+    And stack start drops every asset the served build does not list
     And the bundles swap only once the build succeeded
 
   # --- Every haven console is built, never a dev server (2026-10-10) ---
 
   # The simulator consoles and haven's own hub are Vite builds embedded in the Go
-  # binary that serves them; `haven install --build` and each simulator lane build
+  # binary that serves them; `haven self install --build` and each simulator lane build
   # them through nx (tag haven-console). The design system's Storybook is built
   # with `storybook build` and served by haven's own binary on the design-system
   # lane; the mail studio is pre-rendered by `build:studio` and served on the

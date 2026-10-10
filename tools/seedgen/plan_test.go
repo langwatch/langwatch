@@ -212,7 +212,7 @@ func TestTheAdminJoinsEveryOrgWithAnAdminGrant(t *testing.T) {
 	}
 }
 
-// @scenario "haven seed creates the orgs it is asked for"
+// @scenario "haven db seed creates the orgs it is asked for"
 func TestOrgFlagsReplaceTheTierOrgs(t *testing.T) {
 	plan := mustPlan(t, "--size", "tiny", "--private", "0", "--org", "name=acme,users=4",
 		"--org", "name=globex,plan=free,users=1,persona=enterprise")
@@ -231,7 +231,7 @@ func TestOrgFlagsReplaceTheTierOrgs(t *testing.T) {
 	}
 }
 
-// @scenario "haven seed --into sends telemetry into one existing project"
+// @scenario "haven db seed --into sends telemetry into one existing project"
 func TestIntoSendsOnlyTelemetry(t *testing.T) {
 	plan := mustPlan(t, "--size", "tiny", "--into", "org_1/project_1", "--admin", "admin@example.test")
 	for step := range plan.Steps() {
@@ -302,7 +302,7 @@ func TestConversationsShareOneIDAcrossTheirTurns(t *testing.T) {
 	}
 }
 
-// @scenario "haven seed gives a test stack a second, a Free and an Enterprise org"
+// @scenario "haven db seed gives a test stack a second, a Free and an Enterprise org"
 func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
 	plan := mustPlan(t, "--size", "tiny", "--admin", "admin@example.test",
 		"--org", "name=sso-test-org,plan=licence,owner=admin@acme1.test",

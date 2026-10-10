@@ -20,7 +20,7 @@ func (o *Orchestrator) stackCredentialsPath(slug string) string {
 
 // stackCredentials reads this stack's generated credentials, minting and
 // persisting (0600) any that are missing, so a value survives down/up and is
-// only rotated by `haven destroy`.
+// only rotated by `haven down --destroy`.
 func (o *Orchestrator) stackCredentials(slug string) (map[string]string, error) {
 	path := o.stackCredentialsPath(slug)
 	stored := map[string]string{}

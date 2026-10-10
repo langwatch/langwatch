@@ -11,7 +11,7 @@ const analyticsTwoRecords = `{"records":[
 	{"id":"rec_000001","provider":"posthog","kind":"identify","distinctId":"u1","properties":{},"receivedAt":"2026-09-30T10:00:01Z","raw":null}
 ]}`
 
-// @scenario "haven analytics shows one record in full"
+// @scenario "haven sim analytics shows one record in full"
 func TestAnalyticsRecordShowsOneAndRefusesAnUnknownID(t *testing.T) {
 	api, _ := stubSim(t, map[string]string{"GET /_sim/api/records": analyticsTwoRecords})
 	for _, asJSON := range []bool{true, false} {
@@ -27,7 +27,7 @@ func TestAnalyticsRecordShowsOneAndRefusesAnUnknownID(t *testing.T) {
 	}
 }
 
-// @scenario "haven analytics status reports the activity and records filter by name"
+// @scenario "haven sim analytics status reports the activity and records filter by name"
 func TestAnalyticsStatusReadsActivityAndNameFilters(t *testing.T) {
 	api, seen := stubSim(t, map[string]string{
 		"GET /_sim/api/status":  `{"stack":"s","records":2,"baseUrl":"http://a","activity":{"total":2,"lastFiveMinutes":1,"distinctIds":1,"lastReceivedAt":"2026-09-30T10:00:02Z","lastName":"scenario_created"}}`,

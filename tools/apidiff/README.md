@@ -37,7 +37,7 @@ its HEAD out into a worktree too (see "Persistent worktrees and caches").
 **Neither haven stack ever boots inside the invoking checkout.** haven
 registers one stack per directory: booting the branch instance in place used
 to let `haven up` there replace a developer's own stack registration for that
-directory, and the run's teardown `haven destroy` take it down with it (an
+directory, and the run's teardown `haven down --destroy` take it down with it (an
 incident on 2026-09-10 — a developer's own stack vanished mid-session). The
 branch side now checks out its own HEAD into `.apidiff/worktrees/branch`, the
 same way the base side checks out into `.apidiff/worktrees/main`, and a run
@@ -78,11 +78,11 @@ left alone. The same prefix, shape, age and live-run rules apply to both.
   database, allocated against the ones live stacks hold, and does the install,
   codegen, migrate and seed itself - so `apidiff run` provisions nothing and a
   run can never reach the datastores the stack you are using sits on. Readiness
-  is `haven status --json` reporting the stack's backend lane listening, and the
+  is `haven status --json stacks` reporting the stack's backend lane listening, and the
   instance is addressed on the API port haven allocated. `haven up` runs from
   each instance's own worktree — never from the invoking checkout, which is
   what a directory-registered stack must never share. Teardown is
-  `haven destroy <slug>` for exactly those two slugs, run from the work root.
+  `haven down --destroy --stack <slug>` for exactly those two slugs, run from the work root.
   `-no-haven` boots the old way; `-env-file` is refused alongside haven,
   because pointing the instances at the servers a dotenv names is the thing
   haven exists to stop.

@@ -53,12 +53,12 @@ type Orchestrator struct {
 	// transcripts, session files, caches — for the report that attributes them to
 	// a worktree. Nil when no Claude home is configured; it never deletes.
 	claudeState ClaudeState
-	// claude edits Claude Code's own settings, which only `haven setup` does.
+	// claude edits Claude Code's own settings, which only `haven self setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
 	claude AgentHookSettings
 	codex  AgentHookSettings
 	// prereqs looks at (and installs onto) the machine itself, which only
-	// `haven install` does. Nil elsewhere; see prereqTools for what a graph
+	// `haven self install` does. Nil elsewhere; see prereqTools for what a graph
 	// without one reports.
 	prereqs PrereqTools
 	// goos is the platform prerequisites are planned and installed for. Empty
@@ -899,7 +899,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	portlessMatches := st.PortlessDisabled == o.cfg.PortlessDisabled
 	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && modeMatches && imageMatches && tierMatches && portlessMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
-		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
+		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up --force · stop: haven down\n")
 		return false, nil
 	}
 	switch {
@@ -983,7 +983,7 @@ func inParallel(calls []func()) {
 // routes, and drops the registry entry. Databases are KEPT, always — no flag
 // on down can discard data; fresh data is `haven db reset`, and long-unused
 // databases are pruned in the background by the daemon (DBIdleTTL) or via
-// `haven clean`.
+// `haven machine clean`.
 func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {

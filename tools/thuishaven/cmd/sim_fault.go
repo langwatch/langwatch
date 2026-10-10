@@ -11,10 +11,10 @@ import (
 // simErrorFlag is the --error flag the analytics, mail and storage `set` verbs share.
 var simErrorFlag = flagSpec{long: "--error", takesValue: true, value: "<status>", summary: "set: force this 4xx/5xx (0 turns it off)"}
 
-// simSetForcedError is `haven <noun> set --error <0|4xx|5xx>` over the sim's /_sim/api/settings.
+// simSetForcedError is `haven sim <noun> fault <0|4xx|5xx|off>` over the sim's /_sim/api/settings.
 func simSetForcedError(api sources.SimAPI, noun string, inv invocation, asJSON bool) error {
 	if !inv.has("--error") {
-		return fmt.Errorf("usage: haven %s set --error <0|4xx|5xx>", noun)
+		return fmt.Errorf("usage: haven sim %s fault <0|4xx|5xx|off>", noun)
 	}
 	status, err := strconv.Atoi(inv.value("--error"))
 	if err != nil {

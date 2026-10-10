@@ -57,7 +57,7 @@ export const RunsView = ({ status, error, refresh }: ViewProps) => {
                 empty={
                   <SimEmpty
                     title="No runs yet"
-                    hint="Start one above, or run haven telemetry send."
+                    hint="Start one above, or run haven sim telemetry send."
                   />
                 }
               />

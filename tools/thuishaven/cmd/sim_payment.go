@@ -10,9 +10,9 @@ import (
 	"strings"
 )
 
-const paymentUsage = "usage: haven payment <status|customers|subscriptions|checkouts|invoices|events|usage|complete <checkout id>|retry <invoice id>|advance --seconds <n>|fail --customer <id> [--times <n>]|clear-failures|deliver --ids <a,b> [--secret <s>]|hold|release|reset> [--json]"
+const paymentUsage = "usage: haven sim payment <status|customers|subscriptions|checkouts|invoices|list|usage|complete <checkout id>|retry <invoice id>|advance --seconds <n>|fault --customer <id> [--times <n>]|fault off|deliver --ids <a,b> [--secret <s>]|hold|release|clear> [--json]"
 
-// runPayment is `haven payment <verb>`: paymentsim's control API from a terminal.
+// runPayment is `haven sim payment <verb>`: paymentsim's control API from a terminal.
 func runPayment(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(paymentUsage)
@@ -82,5 +82,5 @@ func runPayment(_ context.Context, d deps, inv invocation) error {
 		}
 		return simDone(asJSON, "reset", "paymentsim state reset; the catalog stays")
 	}
-	return fmt.Errorf("unknown `haven payment` subcommand %q; %s", inv.args[0], paymentUsage)
+	return fmt.Errorf("unknown `haven sim payment` subcommand %q; %s", inv.args[0], paymentUsage)
 }

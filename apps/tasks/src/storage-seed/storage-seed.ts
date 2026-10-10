@@ -127,7 +127,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
 
   // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding, so
   // the UI opens on the real product instead of the "waiting for your first
-  // message" journey (`haven seed --preset demo` sets this and ingests sample
+  // message" journey (`haven db seed demo` sets this and ingests sample
   // traces). HAVEN_SEED_FIRST_MESSAGE=1|0 overrides the flag independently.
   const firstMessageOverride = environment.HAVEN_SEED_FIRST_MESSAGE;
   const hasFirstMessageOverride = firstMessageOverride !== undefined;
@@ -219,7 +219,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       integrated: isPastOnboarding,
     },
     // An explicit override must also be able to CLEAR the flags
-    // (`haven seed --no-first-message`); without one, an existing true is kept.
+    // (`haven db seed --no-first-message`); without one, an existing true is kept.
     update:
       hasFirstMessageOverride || isPastOnboarding
         ? {

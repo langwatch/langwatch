@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const lambdaUsage = "usage: haven lambda <info|calls|call <id>|clear|set --error <none|throttled|not-found|function-error|service>> [--json]"
+const lambdaUsage = "usage: haven sim lambda <status|list|get <id>|clear|fault <none|throttled|not-found|function-error|service|off>> [--json]"
 
 type lambdaCall struct {
 	ID            string    `json:"id"`
@@ -26,7 +26,7 @@ type lambdaCall struct {
 	Error         string    `json:"error"`
 }
 
-// runLambda is `haven lambda <info|calls|call|clear|set>`.
+// runLambda is `haven sim lambda <status|list|get|clear|fault>`.
 func runLambda(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(lambdaUsage)
@@ -72,11 +72,11 @@ func lambdaCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 	case "set":
 		return lambdaSet(api, inv, asJSON)
 	}
-	return fmt.Errorf("unknown `haven lambda` subcommand %q; %s", inv.args[0], lambdaUsage)
+	return fmt.Errorf("unknown `haven sim lambda` subcommand %q; %s", inv.args[0], lambdaUsage)
 }
 
 func lambdaShowCall(api sources.SimAPI, inv invocation) error {
-	if err := needArgs(inv, 2, "haven lambda call <id>"); err != nil {
+	if err := needArgs(inv, 2, "haven sim lambda get <id>"); err != nil {
 		return err
 	}
 	raw, err := api.GetRaw("/_sim/api/calls/"+url.PathEscape(inv.args[1]), nil)

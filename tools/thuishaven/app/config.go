@@ -41,6 +41,7 @@ type Config struct {
 	DaemonArgv     []string      // how to (re)launch `haven daemon`
 	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
 	GoWatchArgv    []string      // this Haven executable plus its internal Go watch command
+	UIWatchArgv    []string      // this Haven executable plus its internal UI watch command
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
@@ -100,7 +101,7 @@ type Config struct {
 	ShouldDisableGoogleDLP bool
 	// ShouldMockInstantEvalJudge judges Instant Evals with the app's memory
 	// stand-in (INSTANT_EVAL_CLASSIFIER=memory). Off by default; resolved from
-	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven limits` and the hub also set.
+	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven machine limits` and the hub also set.
 	ShouldMockInstantEvalJudge bool
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the

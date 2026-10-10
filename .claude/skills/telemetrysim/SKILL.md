@@ -1,6 +1,6 @@
 ---
 name: telemetrysim
-description: "Send seeded OTLP traces, logs and metrics at a stack with telemetrysim, haven's telemetry sender: one-off batches, sustained load at a rate, replayable fuzz, and single requests that show the door's answer (415, 429 with Retry-After, 503). Use when someone says 'send test traces', 'load the OTLP door', 'fuzz ingestion', 'what does the OTLP door answer', 'post one OTLP request', 'telemetrysim', 'haven telemetry', 'fake coding-agent traffic', 'telemetry console', 'OTLP fixtures', or needs to assert that telemetry landed."
+description: "Send seeded OTLP traces, logs and metrics at a stack with telemetrysim, haven's telemetry sender: one-off batches, sustained load at a rate, replayable fuzz, and single requests that show the door's answer (415, 429 with Retry-After, 503). Use when someone says 'haven telemetry', 'send test traces', 'load the OTLP door', 'fuzz ingestion', 'what does the OTLP door answer', 'post one OTLP request', 'telemetrysim', 'haven sim telemetry', 'fake coding-agent traffic', 'telemetry console', 'OTLP fixtures', or needs to assert that telemetry landed."
 user-invocable: true
 ---
 
@@ -13,20 +13,20 @@ counters in memory: a dev shim, never expose it. Code: `services/telemetrysim`, 
 
 ## Presets
 
-| Preset | Signal | Shape |
-|---|---|---|
-| `llm-trace` (default) | traces | an agent run: two chat spans and a tool call |
-| `claude-code-session` | traces | Claude Code interaction, LLM requests, tools |
-| `codex-session` | traces | a Codex session |
-| `logs` | logs | log records |
-| `metrics` | metrics | metric points |
+| Preset                | Signal  | Shape                                        |
+| --------------------- | ------- | -------------------------------------------- |
+| `llm-trace` (default) | traces  | an agent run: two chat spans and a tool call |
+| `claude-code-session` | traces  | Claude Code interaction, LLM requests, tools |
+| `codex-session`       | traces  | a Codex session                              |
+| `logs`                | logs    | log records                                  |
+| `metrics`             | metrics | metric points                                |
 
 A batch is a pure function of preset, seed and index: the same seed sends the same ids.
 
 ## Run it
 
 - Opt-in: `haven up +telemetry` (sticky). Hosted in the `sims` lane.
-- Console: `https://telemetry.<slug>.langwatch.localhost` (`haven telemetry console` prints
+- Console: `https://telemetry.<slug>.langwatch.localhost` (`haven sim telemetry console` prints
   it). haven gives the sim the stack's door and key, so nothing there needs a key. Tabs:
   - **Runs**: a start form, the current run and the last ten; a run opens with its rate,
     `sent = acked + refused + failed`, answers by status (every attempt, retries included),
@@ -47,14 +47,14 @@ A batch is a pure function of preset, seed and index: the same seed sends the sa
 drives another worktree.
 
 ```
-haven telemetry send  [--preset] [--seed] [--batches n]          # answers when done
-haven telemetry load  --rate <n/s> --duration 30s [--preset]     # open loop; returns at once
-haven telemetry fuzz  [--budget n] [--seed]                      # every mutation id replays
-haven telemetry post  [--preset | --fixture <family/name> | --body-file <otlp.json>]
+haven sim telemetry send  [--preset] [--seed] [--batches n]          # answers when done
+haven sim telemetry load  --rate <n/s> --duration 30s [--preset]     # open loop; returns at once
+haven sim telemetry fuzz  [--budget n] [--seed]                      # every mutation id replays
+haven sim telemetry post  [--preset | --fixture <family/name> | --body-file <otlp.json>]
                                                                  # one request, the door's answer
-haven telemetry runs | run <id|current>                          # list; one with answers, latency, mutations
-haven telemetry fixtures | fixture <name> [--seed]               # list; one body as OTLP JSON
-haven telemetry status | stop | console                          # console prints the URL
+haven sim telemetry list | get <id|current>                          # list; one with answers, latency, mutations
+haven sim telemetry fixtures | fixture <name> [--seed]               # list; one body as OTLP JSON
+haven sim telemetry status | stop | console                          # console prints the URL
 ```
 
 Other flags: `--encoding protobuf|json`, `--no-gzip`, `--target <otlp base>`, `--sim <url>`.
@@ -83,16 +83,16 @@ because 64 sends were still out; `lastError` is the newest refusal or transport 
 
 ## Assert a run landed
 
-1. `haven telemetry send --seed 42 --json`; expect `state: "done"`, `acked == sent`,
+1. `haven sim telemetry send --seed 42 --json`; expect `state: "done"`, `acked == sent`,
    `refused == 0`, `failed == 0`. A refusal reads `the door answered <status>`.
 2. Then read the product, never the sim: the stack's traces, logs or metrics for the
    seeded project (the app's pages, or the `langwatch` CLI against the stack), filtered on
    the preset's `service.name` (`telemetrysim-agent` for `llm-trace`). Ingestion is
    eventually consistent: poll with a timeout rather than read once.
 3. Fuzz: each `mutations[]` entry carries its id and the door's status; a 5xx is a finding,
-   a 4xx is the door refusing malformed input as it should. `haven telemetry run current --json`
+   a 4xx is the door refusing malformed input as it should. `haven sim telemetry get current --json`
    gives them all.
-4. One answer: `haven telemetry post --encoding json --json` and assert on `status` (and
+4. One answer: `haven sim telemetry post --encoding json --json` and assert on `status` (and
    `retryAfter` for a 429/503). To see the door refuse on purpose, post a broken export as
    JSON (`--body-file broken.json --encoding json`); the sim only refuses a body with no
    `resourceSpans`, `resourceLogs` or `resourceMetrics`.

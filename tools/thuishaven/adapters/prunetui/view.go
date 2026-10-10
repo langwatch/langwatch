@@ -99,9 +99,9 @@ func (m model) renderHeader() string {
 // as acting on the other one.
 func (m model) title() string {
 	if m.actions.Kind.Plural == "" {
-		return " ⌂ haven clean "
+		return " ⌂ haven machine clean "
 	}
-	return " ⌂ haven clean — " + m.actions.Kind.Plural + " "
+	return " ⌂ haven machine clean — " + m.actions.Kind.Plural + " "
 }
 
 func (m model) divider() int {

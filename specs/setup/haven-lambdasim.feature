@@ -91,5 +91,5 @@ Feature: lambdasim, a local stand-in for the per-project NLP Lambda fleet
     But a LANGWATCH_NLP_LAMBDA_CONFIG the developer named is left alone
 
   Scenario: An agent drives lambdasim from the terminal
-    When the agent runs "haven lambda info", "calls", "call <id>", "clear" or "set --error <kind>"
+    When the agent runs "haven sim lambda status", "list", "get <id>", "clear" or "fault <kind>"
     Then each is a thin client over lambdasim's /_sim/api, with --json on reads

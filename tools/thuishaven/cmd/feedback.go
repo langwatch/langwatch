@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	feedbackUsage = "usage: haven feedback <list [--open]|show <id>|resolve <id>|wait [--timeout <dur>]> [--json]"
-	pageUsage     = "usage: haven page <console [--level <level>]|network [--failed]> [--json]"
+	feedbackUsage = "usage: haven orb feedback <list [--open]|show <id>|resolve <id>|wait [--timeout <dur>]> [--json]"
+	pageUsage     = "usage: haven orb <console [--level <level>]|network [--failed]> [--json]"
 	// orbPollEvery is how often `feedback wait` re-reads the store.
 	orbPollEvery   = 250 * time.Millisecond
 	orbWaitDefault = 30 * time.Second
 )
 
-// orbCLI is one `haven feedback` or `haven page` call over a stack's orb store.
+// orbCLI is one `haven orb feedback` or `haven orb` call over a stack's orb store.
 type orbCLI struct {
 	store  orbstore.Store
 	inv    invocation
@@ -30,7 +30,7 @@ type orbCLI struct {
 	out    io.Writer
 }
 
-// runFeedback is `haven feedback <list|show|resolve|wait>`: notes readers sent from the orb.
+// runFeedback is `haven orb feedback <list|show|resolve|wait>`: notes readers sent from the orb.
 func runFeedback(ctx context.Context, d deps, inv invocation) error {
 	c, err := newOrbCLI(d, inv)
 	if err != nil {
@@ -39,7 +39,7 @@ func runFeedback(ctx context.Context, d deps, inv invocation) error {
 	return feedbackCommand(ctx, c)
 }
 
-// runPage is `haven page <console|network>`: the app page's buffer as the orb last pushed it.
+// runPage is `haven orb <console|network>`: the app page's buffer as the orb last pushed it.
 func runPage(_ context.Context, d deps, inv invocation) error {
 	c, err := newOrbCLI(d, inv)
 	if err != nil {

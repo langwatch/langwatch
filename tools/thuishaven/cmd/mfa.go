@@ -6,12 +6,12 @@ import (
 	"fmt"
 )
 
-// `haven mfa` (mfasim): second factors on a haven browser lane. Passkeys and
+// `haven browser mfa` (mfasim): second factors on a haven browser lane. Passkeys and
 // security keys are Chromium's CDP WebAuthn domain; TOTP codes come from a
 // secret the daemon reads off the enrollment page and keeps in the lane's
 // state, so neither the secret nor a code ever reaches the caller.
 
-const mfaUsage = "usage: haven mfa <add [--kind passkey|security-key|u2f] [--uv yes|no] [--resident yes|no] | list | remove <id> | uv <id> yes|no | totp enroll [ref] | totp fill <ref> [--wrong]> --lane <name>"
+const mfaUsage = "usage: haven browser mfa <add [--kind passkey|security-key|u2f] [--uv yes|no] [--resident yes|no] | list | remove <id> | uv <id> yes|no | totp enroll [ref] | totp fill <ref> [--wrong]> --lane <name>"
 
 func mfaSpec() commandSpec {
 	return commandSpec{

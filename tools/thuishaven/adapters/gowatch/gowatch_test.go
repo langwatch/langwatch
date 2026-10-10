@@ -133,3 +133,36 @@ func TestFingerprintPathsSeesAWatchedFileAndATreeButNotATest(t *testing.T) {
 		t.Error("an edited go.mod did not change the fingerprint")
 	}
 }
+
+func TestUIFingerprintSeesBrowserSourceButNotTestsOrBackendHalves(t *testing.T) {
+	repo := t.TempDir()
+	write := func(rel string) {
+		path := filepath.Join(repo, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(rel+time.Now().String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("modules/a/browser/src/a.tsx")
+	before := UIFingerprint(repo)
+	for _, ignored := range []string{
+		"modules/a/browser/src/a.test.tsx", "modules/a/browser/src/__tests__/b.ts",
+		"modules/a/process/src/service.ts", "apps/ui/dist/client/index.js",
+		"packages/x/node_modules/y/z.ts", "apps/ui/.vite/deps.json", "apps/ui/src/notes.md",
+	} {
+		write(ignored)
+		if UIFingerprint(repo) != before {
+			t.Fatalf("%s changed the UI fingerprint", ignored)
+		}
+	}
+	for _, watched := range []string{"apps/ui/src/main.tsx", "packages/design-system/theme.css", "enterprise/modules/b/browser/icon.svg", "modules/a/browser/package.json"} {
+		write(watched)
+		if fp := UIFingerprint(repo); fp == before {
+			t.Fatalf("%s did not change the UI fingerprint", watched)
+		} else {
+			before = fp
+		}
+	}
+}

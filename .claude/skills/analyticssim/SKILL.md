@@ -1,6 +1,6 @@
 ---
 name: analyticssim
-description: "Catch and inspect PostHog and Customer.io calls with analyticssim, haven's product-analytics stand-in. Use when someone says 'did the tracking event fire', 'posthog events', 'customer.io identify', 'analyticssim', 'nurturing calls', 'haven analytics', 'haven up +analytics', 'what did the app send to analytics', or needs to assert on analytics in a test."
+description: "Catch and inspect PostHog and Customer.io calls with analyticssim, haven's product-analytics stand-in. Use when someone says 'haven analytics', 'did the tracking event fire', 'posthog events', 'customer.io identify', 'analyticssim', 'nurturing calls', 'haven sim analytics', 'haven up +analytics', 'what did the app send to analytics', or needs to assert on analytics in a test."
 user-invocable: true
 ---
 
@@ -48,11 +48,11 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven analytics status        # record count + activity (last 5 min, distinct ids, last call)
-haven analytics records [--provider] [--kind] [--event|--name] [--id] | clear
-haven analytics record <id>   # one record: facts, properties, raw call
-haven analytics set --error <0|4xx|5xx>   # the next capture calls fail with that status; 0 clears it
-haven analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 1 on timeout
+haven sim analytics status        # record count + activity (last 5 min, distinct ids, last call)
+haven sim analytics list [--provider] [--kind] [--event|--name] [--id] | clear
+haven sim analytics get <id>   # one record: facts, properties, raw call
+haven sim analytics fault --error <0|4xx|5xx>   # the next capture calls fail with that status; 0 clears it
+haven sim analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 66 on timeout
 ```
 
 The console shows the same: an Activity panel, provider tabs, kind and search filters, and

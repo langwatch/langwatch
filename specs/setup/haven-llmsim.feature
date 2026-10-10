@@ -106,11 +106,11 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     And a panel names the X-Llmsim-Seed, X-Llmsim-Mode and X-Llmsim-Error headers, the "error-<status>" model name and the "langy-echo" model
 
   @unit
-  Scenario: haven llm calls filters by model and failure
+  Scenario: haven sim llm list filters by model and failure
     Given llmsim has answered calls to two models, one of them failing
-    When an agent runs "haven llm calls --model <name>" or "haven llm calls --failed"
+    When an agent runs "haven sim llm list --model <name>" or "haven sim llm list --failed"
     Then only the matching calls are listed, with their dialect and mode, in text and in --json
-    And "haven llm info" prints how many calls the sim keeps
+    And "haven sim llm status" prints how many calls the sim keeps
 
   Scenario: haven +llm points the OpenAI and Anthropic providers at llmsim
     Given a worktree that has never been up

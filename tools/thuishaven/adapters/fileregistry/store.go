@@ -104,7 +104,7 @@ type selectionFile struct {
 	Mode      string           `json:"mode,omitempty"`
 	Held      bool             `json:"held,omitempty"`
 	Watch     bool             `json:"watch,omitempty"`
-	DevUI     bool             `json:"dev-ui,omitempty"`
+	WatchUI   bool             `json:"watch-ui,omitempty"`
 	BundledUI bool             `json:"bundled-ui,omitempty"`
 	Services  *selectionFields `json:"services"`
 }
@@ -200,7 +200,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	}
 	sel := domain.DefaultSelection()
 	f.Services.applyTo(&sel)
-	sel.Mode, sel.Held, sel.Watch, sel.DevUI, sel.BundledUI = f.Mode, f.Held, f.Watch, f.DevUI, f.BundledUI
+	sel.Mode, sel.Held, sel.Watch, sel.WatchUI, sel.BundledUI = f.Mode, f.Held, f.Watch, f.WatchUI, f.BundledUI
 	return sel, true
 }
 
@@ -212,7 +212,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // on the default-keeping behaviour above — that is there for files it did not
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
-	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Held: sel.Held, Watch: sel.Watch, DevUI: sel.DevUI, BundledUI: sel.BundledUI, Services: &selectionFields{
+	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Held: sel.Held, Watch: sel.Watch, WatchUI: sel.WatchUI, BundledUI: sel.BundledUI, Services: &selectionFields{
 		Gateway:      &sel.Gateway,
 		NLP:          &sel.NLP,
 		Langy:        &sel.Langy,
@@ -248,7 +248,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 // answer from every checkout, and so is the developer's decision about it.
 func (s *Store) prereqSkipsPath() string { return filepath.Join(s.home, "install-skips.json") }
 
-// prereqSkipsFile is the on-disk shape: what `haven install` was told about
+// prereqSkipsFile is the on-disk shape: what `haven self install` was told about
 // this machine. A list for the skips rather than a map, so the file reads as
 // the sentence it is ("never ask me about these") and a hand edit is obvious.
 type prereqSkipsFile struct {
@@ -649,7 +649,7 @@ func readWaiterClaim(path string) (WaiterClaim, bool) {
 
 func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "holders", name) }
 
-// HolderClaim is one `haven slot run` holding name's slot: the label a waiter
+// HolderClaim is one `haven machine slot run` holding name's slot: the label a waiter
 // sees it under and when it took the slot.
 type HolderClaim struct {
 	Label     string    `json:"label"`

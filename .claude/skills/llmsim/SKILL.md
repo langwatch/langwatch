@@ -1,6 +1,6 @@
 ---
 name: llmsim
-description: "Answer every LLM call for free and deterministically with llmsim, haven's provider stand-in. Use when someone says 'run without a real model', 'no API key', 'cheap playground', 'llmsim', 'haven up +llm', 'force a 429', 'mock the LLM', 'haven llm', 'Langy echo', or needs repeatable model output in a test or load run."
+description: "Answer every LLM call for free and deterministically with llmsim, haven's provider stand-in. Use when someone says 'haven llm', 'run without a real model', 'no API key', 'cheap playground', 'llmsim', 'haven up +llm', 'force a 429', 'mock the LLM', 'haven sim llm', 'Langy echo', or needs repeatable model output in a test or load run."
 user-invocable: true
 ---
 
@@ -54,7 +54,8 @@ GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven llm info | calls | call <id> | clear
-haven llm calls [--model <text>] [--failed]                     # model contains text; 4xx/5xx only
-haven llm set [--error <0|4xx|5xx>] [--seed <value|random>]    # only the flags given change
+haven sim llm status | list | get <id> | clear
+haven sim llm list [--model <text>] [--failed]                     # model contains text; 4xx/5xx only
+haven sim llm fault [--error <0|4xx|5xx>]   # `fault off` removes it
+haven sim llm config [--seed <value|random>]   # only the flags given change
 ```

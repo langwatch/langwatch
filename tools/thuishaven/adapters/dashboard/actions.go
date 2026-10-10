@@ -27,7 +27,7 @@ type Actions struct {
 	// ResetDatabases runs `haven db reset --yes` for it. Both return once spawned.
 	StartService   func(slug, service string) error
 	ResetDatabases func(slug string) error
-	// Seed runs `haven seed --size <size> --persona <persona>` for a stack and
+	// Seed runs `haven db seed --size <size> --persona <persona>` for a stack and
 	// returns once spawned; SeedReport is its status line and log tail.
 	Seed       func(slug, size, persona string) error
 	SeedReport func(slug string) (string, []string)
@@ -147,7 +147,7 @@ func (s *Server) handleDown(w http.ResponseWriter, r *http.Request) {
 	writeActionResult(w, "stopped "+slug, s.config.Actions.Down(r.Context(), slug))
 }
 
-// handleDestroy stops a stack and drops its databases: `haven destroy <slug>`.
+// handleDestroy stops a stack and drops its databases: `haven down --destroy --stack <slug>`.
 // The body must repeat the slug, the same typed confirmation the hub asks for,
 // so a stray POST at the route cannot take data away.
 func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
@@ -227,7 +227,7 @@ func (s *Server) handleResetDatabases(w http.ResponseWriter, r *http.Request) {
 	writeActionResult(w, "resetting "+slug+"'s databases: migrating and seeding them fresh", s.config.Actions.ResetDatabases(slug))
 }
 
-// handleSeed is the seed console's start: `haven seed` at the chosen size and
+// handleSeed is the seed console's start: `haven db seed` at the chosen size and
 // persona. seedgen validates both before anything is spawned.
 func (s *Server) handleSeed(w http.ResponseWriter, r *http.Request) {
 	if !guardAction(w, r) {

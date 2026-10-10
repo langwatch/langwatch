@@ -17,7 +17,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 )
 
-// buildStep is one quiet step of `haven install --build`: its output goes to a
+// buildStep is one quiet step of `haven self install --build`: its output goes to a
 // log file, and the screen gets one progress line instead.
 type buildStep struct {
 	running string // "building haven consoles", shown while it runs
@@ -48,7 +48,7 @@ func havenBuildSteps() []buildStep {
 	}
 }
 
-// runInstallBuild is `haven install --build`, run from the repository root.
+// runInstallBuild is `haven self install --build`, run from the repository root.
 func runInstallBuild(ctx context.Context, d deps) error {
 	logDir := filepath.Join(havenHome(), "logs", "install")
 	if err := os.MkdirAll(logDir, 0o700); err != nil { //nolint:gosec // log folder is owner-only

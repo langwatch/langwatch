@@ -162,11 +162,14 @@ func AlreadyWrapped(command string) bool {
 		if i > 0 && words[i-1] != "&&" && words[i-1] != ";" && words[i-1] != "||" {
 			continue
 		}
-		switch words[i+1] {
+		if words[i+1] != "machine" || i+2 >= len(words) {
+			continue
+		}
+		switch words[i+2] {
 		case "run", "typecheck":
 			return true
 		case "slot":
-			if i+2 < len(words) && words[i+2] == "run" {
+			if i+3 < len(words) && words[i+3] == "run" {
 				return true
 			}
 		}
@@ -181,7 +184,7 @@ func AlreadyWrapped(command string) bool {
 //
 // Deliberately excludes haven's path, since the wrapper writes an absolute one
 // and a nested wrap could arrive by any spelling.
-const havenRunMarker = "run --class " + HeavySlotClass
+const havenRunMarker = "machine run --class " + HeavySlotClass
 
 // HeavySlotClass is the only slot pool there is. Named here, where the wrapper
 // writes it, so the command that validates the flag and the command that emits

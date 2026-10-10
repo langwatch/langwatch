@@ -216,7 +216,7 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 	t.Run("builds a missing binary on the host tier and keeps Langy", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		opts := run(t, sup, false, domain.LangyTierHostUnsafe)
-		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "@langwatch/langyworker build:binary") {
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "@langwatch/langyworker:build:binary") {
 			t.Fatalf("expected one build, got %v", sup.shells)
 		}
 		if !opts.Selection.Langy {

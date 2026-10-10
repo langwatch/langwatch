@@ -15,7 +15,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// The `haven mail` noun: read this worktree's own caught email — one client
+// The `haven sim mail` noun: read this worktree's own caught email — one client
 // over the sink's own HTTP API (services/mailsim), the same API a test would
 // call directly. `address` needs no request; every other subcommand dials
 // d.orch.MailBaseURL, which refuses immediately, naming the lane and the
@@ -26,7 +26,7 @@ import (
 // before the server's own deadline fires.
 const mailHTTPTimeout = 5 * time.Second
 
-// mailWaitDefaultTimeout is `haven mail wait`'s timeout when --timeout is not
+// mailWaitDefaultTimeout is `haven sim mail wait`'s timeout when --timeout is not
 // given, matching the sink's own default.
 const mailWaitDefaultTimeout = 30 * time.Second
 
@@ -218,9 +218,9 @@ func (c mailClient) getHTML(ctx context.Context, id string) (string, error) {
 }
 
 // mailUsage is printed on a missing or unknown subcommand.
-const mailUsage = "usage: haven mail <address|inbox|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--after <id>] [--timeout]|delete <id>|clear|set --error <0|4xx|5xx>> [--json]"
+const mailUsage = "usage: haven sim mail <address|status|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--after <id>] [--timeout]|delete <id>|clear|fault <0|4xx|5xx|off>> [--json]"
 
-// runMail is `haven mail <address|inbox|list|get|links|wait|delete|clear>`.
+// runMail is `haven sim mail <address|status|list|get|links|wait|delete|clear>`.
 func runMail(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(mailUsage)
@@ -252,7 +252,7 @@ type mailSink struct {
 	asJSON  bool
 }
 
-// runMailSubcommand is every `haven mail` subcommand but `address`, given the
+// runMailSubcommand is every `haven sim mail` subcommand but `address`, given the
 // sink's base URL — split out so it can be unit-tested against a stub HTTP
 // server implementing the pinned contract, with no Orchestrator involved.
 func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error {
@@ -276,7 +276,7 @@ func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error
 	case "inbox":
 		return cmd.inbox(ctx)
 	default:
-		return fmt.Errorf("unknown `haven mail` subcommand %q — %s", inv.args[0], mailUsage)
+		return fmt.Errorf("unknown `haven sim mail` subcommand %q — %s", inv.args[0], mailUsage)
 	}
 }
 
@@ -300,7 +300,7 @@ func (cmd mailCommand) list(ctx context.Context, inv invocation) error {
 
 func (cmd mailCommand) get(ctx context.Context, inv invocation) error {
 	if len(inv.args) < 2 {
-		return errors.New("usage: haven mail get <id> [--html]")
+		return errors.New("usage: haven sim mail get <id> [--html]")
 	}
 	id := inv.args[1]
 	if inv.has("--html") {
@@ -341,7 +341,7 @@ func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
 // links prints the links found in one message, one per line.
 func (cmd mailCommand) links(ctx context.Context, inv invocation) error {
 	if len(inv.args) < 2 {
-		return errors.New("usage: haven mail links <id>")
+		return errors.New("usage: haven sim mail links <id>")
 	}
 	msg, err := cmd.client.get(ctx, inv.args[1])
 	if err != nil {
@@ -359,7 +359,7 @@ func (cmd mailCommand) links(ctx context.Context, inv invocation) error {
 // delete removes one message from the inbox.
 func (cmd mailCommand) delete(ctx context.Context, inv invocation) error {
 	if len(inv.args) < 2 {
-		return errors.New("usage: haven mail delete <id>")
+		return errors.New("usage: haven sim mail delete <id>")
 	}
 	id := inv.args[1]
 	notFound := fmt.Errorf("message %q is not in this stack's inbox", id)

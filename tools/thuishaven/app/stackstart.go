@@ -111,7 +111,7 @@ func (o *Orchestrator) stackByDir(dir string) (domain.Stack, bool) {
 	return domain.Stack{}, false
 }
 
-// SeedStack runs `haven seed --size <size> --persona <persona>` detached in a
+// SeedStack runs `haven db seed --size <size> --persona <persona>` detached in a
 // stack's worktree, for the stack home's seed console. The flags are checked by
 // seedgen's own parser first, so a bad request spawns nothing; the slug is
 // pinned as for ResetStackDatabases.
@@ -129,7 +129,7 @@ func (o *Orchestrator) SeedStack(slug, size, persona string) error {
 	}
 	haven := o.cfg.UpArgv[:len(o.cfg.UpArgv)-1]
 	argv := append([]string{"/usr/bin/env", "LANGWATCH_SLUG=" + slug}, haven...)
-	argv = append(append(argv, "seed"), args...)
+	argv = append(append(argv, "db", "seed"), args...)
 	logPath := o.seedConsoleLog(slug)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
 		return err

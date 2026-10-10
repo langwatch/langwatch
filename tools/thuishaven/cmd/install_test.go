@@ -13,18 +13,18 @@ import (
 // parses exactly the flags it reads — ADR-064's whole point.
 // @scenario "A required prerequisite that is missing fails the check"
 func TestInstallIsOnTheCommandTable(t *testing.T) {
-	spec := specByName(t, "install")
+	spec := specByName(t, "self install")
 	declared := map[string]bool{}
 	for _, f := range spec.flags {
 		declared[f.long] = true
 	}
 	for _, want := range []string{"--list", "--yes", "--reset-skips"} {
 		if !declared[want] {
-			t.Errorf("haven install must declare %s — an undeclared flag is an error, not a silent ignore", want)
+			t.Errorf("haven self install must declare %s — an undeclared flag is an error, not a silent ignore", want)
 		}
 	}
 	if spec.maxArgs != -1 {
-		t.Error("haven install takes prerequisite names, so positionals must be allowed")
+		t.Error("haven self install takes prerequisite names, so positionals must be allowed")
 	}
 	if spec.hidden {
 		t.Error("install is a command a developer runs by hand; it belongs in help")
@@ -35,23 +35,23 @@ func TestInstallIsOnTheCommandTable(t *testing.T) {
 // where a developer works out which one they want.
 // @scenario "A required prerequisite that is missing fails the check"
 func TestInstallAndSetupSaySoWhichScopeTheyTouch(t *testing.T) {
-	install := specByName(t, "install")
+	install := specByName(t, "self install")
 	if !strings.Contains(install.summary, "machine") {
 		t.Errorf("install's summary %q should say it is about the machine", install.summary)
 	}
-	setup := specByName(t, "setup")
+	setup := specByName(t, "self setup")
 	if !strings.Contains(setup.summary, "checkout") {
 		t.Errorf("setup's summary %q should say it is about the checkout", setup.summary)
 	}
 }
 
 // --list promises to change nothing, and it is resolved before the positional
-// form so that promise holds. `haven install --list redis` used to fall
+// form so that promise holds. `haven self install --list redis` used to fall
 // straight through to the installer: the one command a reader has been told
 // is safe to run would have run `brew install redis`.
 // @scenario "The report-only flag refuses to be given something to install"
 func TestListRefusesToBeCombinedWithNamesToInstall(t *testing.T) {
-	spec := specByName(t, "install")
+	spec := specByName(t, "self install")
 	if !strings.Contains(spec.flags[0].summary, "change nothing") {
 		t.Fatalf("--list's summary %q no longer makes the promise this test guards", spec.flags[0].summary)
 	}
@@ -112,7 +112,7 @@ func TestReportOffersBothRuntimesOnOneLine(t *testing.T) {
 	if !strings.Contains(got, "brew install colima docker") {
 		t.Errorf("the report should name the default runtime command, got:\n%s", got)
 	}
-	if !strings.Contains(got, "haven install runtime=docker-desktop") {
+	if !strings.Contains(got, "haven self install runtime=docker-desktop") {
 		t.Errorf("the report should name the alternative, got:\n%s", got)
 	}
 }
@@ -177,7 +177,7 @@ func TestNonInteractiveHintNamesTheCommandsThatWouldAct(t *testing.T) {
 	var out bytes.Buffer
 	printNonInteractiveHint(&out, domain.PlanPrereqs(map[string]domain.Found{}, nil, "darwin"))
 	got := out.String()
-	if !strings.Contains(got, "haven install --yes") {
+	if !strings.Contains(got, "haven self install --yes") {
 		t.Errorf("an agent must be told the non-interactive form, got:\n%s", got)
 	}
 	if !strings.Contains(got, "no terminal here") {

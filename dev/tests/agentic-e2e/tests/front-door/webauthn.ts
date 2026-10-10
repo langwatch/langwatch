@@ -10,7 +10,7 @@ export interface VirtualAuthenticator {
   session: CDPSession;
 }
 
-/** The kinds `haven mfa add --kind` (mfasim) offers, with the same defaults. */
+/** The kinds `haven browser mfa add --kind` (mfasim) offers, with the same defaults. */
 const KINDS = {
   passkey: {
     protocol: "ctap2",

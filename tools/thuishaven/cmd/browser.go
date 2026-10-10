@@ -24,7 +24,7 @@ import (
 
 // The `haven browser` noun: one light headless browser per stack (Playwright's
 // chromium-headless-shell, apps/haven-web/scripts/browser-daemon.ts), started
-// on first use, one context per lane signed in by `haven auth`. The daemon
+// on first use, one context per lane signed in by `haven browser login --as`. The daemon
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
@@ -41,7 +41,7 @@ func browserSpec() commandSpec {
 		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--lane", takesValue: true, value: "<name>", summary: "the caller's own context; lanes never share one"},
-			{long: "--as", takesValue: true, value: "<admin|email>", summary: "sign the lane in as this login (haven auth); omit to stay signed out"},
+			{long: "--as", takesValue: true, value: "<admin|email>", summary: "sign the lane in as this login (haven browser login --as); omit to stay signed out"},
 			{long: "--wait-for", takesValue: true, value: "<selector>", summary: "also wait for this CSS or text= selector before answering"},
 			{long: "--out", takesValue: true, value: "<file>", summary: "screenshot: where to write the PNG; record stop: where to write the script"},
 			{long: "--download-to", takesValue: true, value: "<path>", summary: "click: save the download the click starts to this file and print its name, size and mediaType as JSON"},
@@ -88,7 +88,7 @@ func runBrowser(ctx context.Context, d deps, inv invocation) error {
 	return driveBrowser(ctx, d, verb, inv)
 }
 
-// driveBrowser sends one daemon verb for the lane; `haven mfa` shares it.
+// driveBrowser sends one daemon verb for the lane; `haven browser mfa` shares it.
 func driveBrowser(ctx context.Context, d deps, verb string, inv invocation) error {
 	slug, err := d.orch.ResolveSlug(authParams(d, inv))
 	if err != nil {

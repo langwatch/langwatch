@@ -15,7 +15,7 @@ import (
 
 // offKey marks a settings file as opted out of the gate hook, so a later
 // EnsureHook for the same path - including the automatic one `haven up` makes
-// on every start - is a no-op until a developer runs `haven setup <feature>`
+// on every start - is a no-op until a developer runs `haven self setup <feature>`
 // again without --off. It lives beside "hooks" rather than in a second file:
 // one file to read, one place the opt-out can be found.
 const offKey = "havenGateHookOff"
@@ -27,7 +27,7 @@ func EnsureHook(path, command, matcher string) (bool, error) {
 		return false, err
 	}
 	if settings[offKey] == true {
-		// Turned off on purpose (`haven setup <feature> --off`). Both a manual
+		// Turned off on purpose (`haven self setup <feature> --off`). Both a manual
 		// install and haven up's automatic one must honor it, or the opt-out
 		// would not survive the next `haven up`.
 		return false, nil
@@ -106,7 +106,7 @@ func writeSettings(path string, settings map[string]any) error {
 }
 
 // mergeHook adds the entry unless one already runs this exact command,
-// and reports whether it changed anything — so a second `haven setup` is a
+// and reports whether it changed anything — so a second `haven self setup` is a
 // no-op rather than a duplicate hook or a pointless rewrite.
 //
 // An existing haven entry whose command DIFFERS is replaced in place rather
@@ -175,7 +175,7 @@ func updateGateHook(entry any, hook map[string]any, gate gateSpec) bool {
 // set, reporting whether it changed anything.
 //
 // Without this, widening the tool set reaches nobody who already ran
-// `haven setup`. haven's own path usually has not moved, so the merge above finds
+// `haven self setup`. haven's own path usually has not moved, so the merge above finds
 // the command equal, reports "no change", and leaves the old matcher in place —
 // and a matcher missing a tool is a branch of the gate that never runs, which is
 // the defect this pass exists to fix rather than reproduce one release later.
@@ -295,7 +295,7 @@ func findGateHook(entry any) map[string]any {
 // It identifies the EXECUTABLE, not the word: `gate` is a perfectly ordinary
 // thing to call something, and a hook running `run quality gate` or
 // `run gateway-lint` belongs to whoever wrote it. Matching either of those
-// would make `haven setup` report success having written nothing — or, worse,
+// would make `haven self setup` report success having written nothing — or, worse,
 // rewrite a stranger's hook.
 //
 // The command haven installs is its own absolute path (shell-quoted, since a
@@ -307,7 +307,7 @@ func findGateHook(entry any) map[string]any {
 // first place. Splitting on whitespace would read `'/src/my worktree/haven'
 // gate` as four words starting with `'/src`, decide the hook is a stranger's,
 // and append a second gate — so every checkout with a space in its path would
-// collect another hook on every `haven setup` and gate each tool call twice.
+// collect another hook on every `haven self setup` and gate each tool call twice.
 func isHavenGate(command string) bool {
 	words := domain.ShellWords(command)
 	if len(words) >= 4 && words[len(words)-2] == "--client" && words[len(words)-1] == "codex" {

@@ -4,6 +4,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { havenOrb, havenOrbTags } from "../haven-orb";
+import orbBuildConfig from "../haven-orb.config";
 import { buildFeedback, feedbackSchema, havenEndpoint, postToHaven } from "../haven-orb/feedback";
 import { readDock } from "../haven-orb/langy-dock";
 import { OrbIsland } from "../haven-orb/orb-panel";
@@ -57,6 +58,12 @@ describe("haven dev orb", () => {
     /** @scenario "absent in production" */
     it("applies to the dev server alone, never to a build", () => {
       expect(havenOrb({ slug: "feat-x" }).apply).toBe("serve");
+    });
+
+    /** @scenario "absent in production" */
+    it("builds the built-UI orb in memory only, never into the bundle's directory", () => {
+      expect(orbBuildConfig.build?.write).toBe(false);
+      expect(orbBuildConfig.build?.outDir).toBeUndefined();
     });
   });
 

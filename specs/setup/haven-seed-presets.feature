@@ -5,7 +5,7 @@ Feature: Seed presets — a database that is ready to look at
   (an idempotent upsert, nothing dropped); `haven db reset [preset]` is the
   destructive sibling that starts from a fresh database. Presets are
   positional and shared by both: demo, onboarding, post-onboarding, bare
-  (ADR-064). One registry serves the whole CLI — `haven play --seed <preset>`
+  (ADR-064). One registry serves the whole CLI — `haven pr --throwaway --seed <preset>`
   seeds a throwaway PR sandbox from the same list (haven-play.feature).
 
   # Every preset is env switches that apps/tasks/src/storage-seed/storage-seed.ts
@@ -80,7 +80,7 @@ Feature: Seed presets — a database that is ready to look at
   Scenario: The demo preset seeds the startup persona at the tiny tier
     Given the stack is up
     When I run "haven db seed demo"
-    Then "haven seed --size tiny --persona startup" runs against the stack
+    Then "haven db seed --size tiny --persona startup" runs against the stack
     And the onboarding, post-onboarding and bare presets stay storage-seed switches
 
   # Cheap variants composed from switches the seed already understands:

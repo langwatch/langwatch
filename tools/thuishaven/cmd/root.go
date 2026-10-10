@@ -75,6 +75,10 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	if handled, err := runMetaCommand(args, version); handled {
 		return err
 	}
+	args, stackFlag, err := stripStackFlag(args)
+	if err != nil {
+		return err
+	}
 
 	// SIGINT/SIGTERM cancel the context. Supervisors hard-kill child process
 	// groups immediately; command cleanup then deregisters routes and resources.
@@ -89,15 +93,20 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return (deps{}).dispatch(ctx, args[0], args[1:])
 	}
 
-	d := wire(logger, isAgent)
+	name := ""
+	if len(args) > 0 {
+		name = args[0]
+	}
+	cwd, _ := os.Getwd()
+	worktree, target, err := resolveTarget(name, stackFlag, gitTopLevel(cwd), isAgent)
+	if err != nil {
+		return err
+	}
+	d := wire(logger, isAgent, worktree, target)
 
-	// Bare `haven`: the interactive hub in a terminal, the plain stack list when
-	// driven by an agent/pipe.
+	// Bare `haven`: the status summary and the grouped help, never interactive.
 	if len(args) == 0 {
-		if isAgent {
-			return d.orch.Status(true, d.worktree, false)
-		}
-		return runHub(ctx, d)
+		return printBareHaven(d)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
 }
@@ -111,10 +120,7 @@ func runMetaCommand(args []string, version string) (handled bool, err error) {
 	switch args[0] {
 	case "help", "-h", "--help":
 		// `haven help <topic>` drills in; bare help stays short enough to read.
-		topic := ""
-		if len(args) > 1 {
-			topic = args[1]
-		}
+		topic := strings.Join(args[1:], " ")
 		body, ok := helpTopic(topic)
 		if !ok {
 			// An unknown topic is a failed request, not help. Returning it as an
@@ -138,16 +144,17 @@ type deps struct {
 	opts     app.PlanOptions
 	worktree string
 	isAgent  bool
+	// target is the stack named by --stack or HAVEN_STACK; empty means this
+	// worktree's own.
+	target string
 }
 
 // wire builds every adapter and injects them into the application core. It is the
 // only function that knows the full dependency graph.
-func wire(logger *zap.Logger, isAgent bool) deps {
-	cwd, _ := os.Getwd()
-	// The workspace root is the whole of the "where does haven run things"
-	// answer now: every lane is `pnpm --filter <package>` from here, .env lives
-	// here, and there is no single application directory left to point at.
-	worktree := gitTopLevel(cwd)
+// The workspace root is the whole of the "where does haven run things" answer:
+// every lane is `pnpm --filter <package>` from here and .env lives here. It is
+// the targeted stack's worktree, or the one containing the working directory.
+func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 
 	naming := domain.DefaultNaming(devEnv("LANGWATCH_LOCAL_TLD"))
 	proxy := portlessproxy.New(naming, worktree)
@@ -214,6 +221,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),
 		GoWatchArgv:             goWatchArgv(),
+		UIWatchArgv:             uiWatchArgv(),
 		UpArgv:                  selfArgv(worktree, "up"),
 		KeepArgv:                selfArgv(trustedRepoRoot(), "keep"),
 		IsAgent:                 isAgent,
@@ -274,7 +282,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 			// The lifecycle actions the hub offers, over HTTP. Restart bounces a
 			// live stack's children; Start brings up a worktree that has none (and
 			// refuses any directory git does not list as one); Down and Destroy
-			// are `haven down` and `haven destroy <slug>` for one stack.
+			// are `haven down` and `haven down --destroy --stack <slug>` for one stack.
 			Actions: dashboard.Actions{
 				Restart: orch.RestartStackQuiet,
 				Start:   orch.StartWorktreeStack,
@@ -288,13 +296,25 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				// The up's hand-over: the daemon is the one place keepers start.
 				StartKeeper: orch.StartKeeper,
 			},
-			Limits: dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
+			Limits:   dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
+			CLIReads: dashboardCLIReads(orch),
+			Browser:  dashboardBrowser(),
 		}),
-		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
+		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: explicitSlug(target), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
 		isAgent:  isAgent,
+		target:   target,
 	}
+}
+
+// explicitSlug is the slug a run is pinned to: the targeted stack, else
+// LANGWATCH_SLUG.
+func explicitSlug(target string) string {
+	if target != "" {
+		return target
+	}
+	return os.Getenv("LANGWATCH_SLUG")
 }
 
 // jobsRoot is where agent job directories live. HAVEN_JOBS_ROOT overrides it;
@@ -558,10 +578,10 @@ func rejectRemovedSelectionEnv() error {
 	return nil
 }
 
-// resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a
+// resolveAgent turns agent mode on for AI drivers: HAVEN_AGENT, a coding agent's own env (CLAUDECODE, CODEX_*), NO_COLOR, or a
 // non-terminal stdout — unless FORCE_COLOR asks us to keep color under a pipe.
 func resolveAgent() bool {
-	if os.Getenv("HAVEN_AGENT") == "1" {
+	if os.Getenv("HAVEN_AGENT") == "1" || agentEnvSet(os.Environ()) {
 		return true
 	}
 	if os.Getenv("NO_COLOR") != "" {
@@ -587,7 +607,7 @@ func havenHome() string {
 // binary.
 //
 // repoRoot must be the TRUSTED checkout haven's own source is read from, never
-// the directory the child will run in. `haven play` and `haven pr` deliberately
+// the directory the child will run in. `haven pr --throwaway` and `haven pr` deliberately
 // set a child's cwd to an unreviewed PR checkout, and a relative "./cmd/haven"
 // resolves against that cwd — which would compile and run the PR's own copy of
 // the orchestrator, with the docker socket, the overlay writer and teardown, and
@@ -602,7 +622,7 @@ func selfArgv(repoRoot, subcommand string) []string {
 
 // goRunPackage resolves haven's own package against the trusted repo root. It
 // must never return a relative path when a root is known: `go run` resolves a
-// relative package against the child's working directory, and both `haven play`
+// relative package against the child's working directory, and both `haven pr --throwaway`
 // and `haven pr` set that to an unreviewed PR checkout containing its own
 // cmd/haven.
 func goRunPackage(repoRoot string) string {
@@ -614,7 +634,7 @@ func goRunPackage(repoRoot string) string {
 
 // trustedRepoRoot answers "whose haven source may this process re-invoke".
 //
-// It is not derived from cwd on a re-invoked process: `haven play` and `haven pr`
+// It is not derived from cwd on a re-invoked process: `haven pr --throwaway` and `haven pr`
 // point a child's cwd at an unreviewed PR checkout, so cwd there is exactly the
 // thing that must not be trusted. The parent hands the root down explicitly
 // through the process environment (never through .env — that file lives in the
@@ -702,7 +722,7 @@ func runHavenUpIn(ctx context.Context, dir string, untrustedCheckout bool) error
 
 // runSwitch resolves a worktree by name and prints its directory. A process
 // cannot change its parent shell's cwd, so the actual cd happens in the shell
-// function `haven shell-init` emits — this command just answers "where".
+// function `haven self shell-init` emits — this command just answers "where".
 func runSwitch(d deps, inv invocation) error {
 	if inv.has("--list") {
 		for _, t := range d.orch.SwitchTargets(d.worktree) {
@@ -724,7 +744,7 @@ func runSwitch(d deps, inv invocation) error {
 			fmt.Printf("  %s %-28s %s\n", mark, t.Name, t.Dir)
 		}
 		fmt.Println("\nTo make `haven switch <name>` cd your shell, add to ~/.zshrc:")
-		fmt.Println(`  eval "$(haven shell-init)"`)
+		fmt.Println(`  eval "$(haven self shell-init)"`)
 		return nil
 	}
 	dir, err := d.orch.ResolveSwitch(d.worktree, query)
@@ -735,7 +755,7 @@ func runSwitch(d deps, inv invocation) error {
 	return nil
 }
 
-// shellInitScript is what `eval "$(haven shell-init)"` installs: a haven()
+// shellInitScript is what `eval "$(haven self shell-init)"` installs: a haven()
 // wrapper that turns `haven switch <name>` into a real cd, plus zsh completion
 // of the worktree names.
 const shellInitScript = `haven() {
@@ -842,7 +862,7 @@ func runUpDetached(d deps, rest []string) error {
 		return err
 	}
 	fmt.Printf("stack %q starting detached (pid %d)\n", st.slug, st.pid)
-	fmt.Printf("  logs:   haven logs -t    (%s)\n", st.logPath)
+	fmt.Printf("  logs:   haven logs -f    (%s)\n", st.logPath)
 	fmt.Printf("  stop:   haven down\n")
 	return nil
 }
@@ -861,7 +881,7 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 		return err
 	}
 	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)
-	fmt.Printf("  logs:   haven logs -t   ·   attach again: haven up   ·   stop: haven down\n")
+	fmt.Printf("  logs:   haven logs -f   ·   attach again: haven up   ·   stop: haven down\n")
 	return nil
 }
 

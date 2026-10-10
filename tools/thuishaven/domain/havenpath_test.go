@@ -109,7 +109,7 @@ func TestPlanHavenPathSaysNothingWithoutAGoBinDir(t *testing.T) {
 // @scenario "Go bin dir missing from PATH, user accepts"
 func TestTheRCBlockSaysWhoWroteIt(t *testing.T) {
 	block := HavenPathRCBlock(`export PATH="/go/bin:$PATH"`)
-	if !strings.Contains(block, "haven install") || !strings.Contains(block, "langwatch") {
+	if !strings.Contains(block, "haven self install") || !strings.Contains(block, "langwatch") {
 		t.Errorf("block %q must say who added it", block)
 	}
 	if !strings.Contains(block, `export PATH="/go/bin:$PATH"`) {

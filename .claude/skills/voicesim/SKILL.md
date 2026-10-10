@@ -1,6 +1,6 @@
 ---
 name: voicesim
-description: "Run ElevenLabs voice calls locally against voicesim, haven's voice-provider stand-in. Use when someone says 'voicesim', 'haven up +voice', 'test a voice agent without ElevenLabs', 'signed URL', 'convai socket', 'fake ElevenLabs', 'voice call console', 'haven voice', or needs a deterministic voice call in a test."
+description: "Run ElevenLabs voice calls locally against voicesim, haven's voice-provider stand-in. Use when someone says 'haven voice', 'voicesim', 'haven up +voice', 'test a voice agent without ElevenLabs', 'signed URL', 'convai socket', 'fake ElevenLabs', 'voice call console', 'haven sim voice', or needs a deterministic voice call in a test."
 user-invocable: true
 ---
 
@@ -63,5 +63,5 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven voice status | calls | call <id> | clear
+haven sim voice status | list | get <id> | clear
 ```

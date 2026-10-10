@@ -1,4 +1,4 @@
-/** RFC 6238 codes for `haven mfa totp`; the secret and codes stay in the daemon. */
+/** RFC 6238 codes for `haven browser mfa totp`; the secret and codes stay in the daemon. */
 import { createHmac } from "node:crypto";
 
 export type Totp = { secret: string; algorithm: string; digits: number; period: number };

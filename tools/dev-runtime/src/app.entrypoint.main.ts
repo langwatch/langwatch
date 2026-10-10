@@ -6,8 +6,14 @@ import { fileURLToPath } from "node:url";
 import { processFailureLine } from "@langwatch/observability";
 import type * as ApiMain from "@langwatch/platform-api";
 import type * as WorkerMain from "@langwatch/worker";
-import { createServer, createServerModuleRunner, type ViteDevServer } from "vite";
-import type { ModuleRunner } from "vite/module-runner";
+import {
+  createRunnableDevEnvironment,
+  createServer,
+  createServerModuleRunner,
+  type DevEnvironment,
+  type ViteDevServer,
+} from "vite";
+import { ESModulesEvaluator, type ModuleEvaluator, type ModuleRunner } from "vite/module-runner";
 
 import {
   backendHalfOf,
@@ -32,6 +38,7 @@ import {
   recycleReason,
   staleModuleIds,
 } from "./backend.reload.ts";
+import { buildOrb, forwardPortWithOrb, servesOrb, type OrbBuild } from "./haven-orb.ts";
 
 /**
  * Local-only host for the whole Node side of a stack in one process (ADR-168, B1): the UI's Vite
@@ -151,7 +158,10 @@ async function startUi(): Promise<ViteDevServer> {
   return server;
 }
 
-/** A bare Vite server for the backend graph: no UI plugins or defines, no HMR, no watcher. */
+/**
+ * A bare Vite server for the backend graph: no UI plugins or defines, no HMR, no watcher.
+ * No inline source maps: base64 maps in every module's code doubled the heap (1107 -> 507 MB).
+ */
 function startBackendVite(): Promise<ViteDevServer> {
   return createServer({
     configFile: false,
@@ -161,6 +171,50 @@ function startBackendVite(): Promise<ViteDevServer> {
     logLevel: "warn",
     optimizeDeps: { noDiscovery: true },
     server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    environments: {
+      ssr: {
+        dev: {
+          createEnvironment: (name, config) =>
+            createRunnableDevEnvironment(name, config, {
+              remoteRunner: { inlineSourceMap: false },
+            }),
+        },
+      },
+    },
+  });
+}
+
+/** Ends each evaluation's sourceURL with `?lw=<n>`: the runner caches a map per URL forever. */
+const EVALUATION_TAG = /\?lw=\d+$/;
+let evaluations = 0;
+
+function taggedEvaluator(): ModuleEvaluator {
+  const base = new ESModulesEvaluator();
+  return {
+    startOffset: base.startOffset,
+    runExternalModule: (file) => base.runExternalModule(file),
+    runInlinedModule: (context, code, mod) => {
+      evaluations += 1;
+      return base.runInlinedModule(context, `${code}\n//# sourceURL=${mod.id}?lw=${evaluations}`);
+    },
+  };
+}
+
+/** Stack traces map through the maps Vite's module graph already holds, not inline copies. */
+function createBackendRunner(ssr: DevEnvironment): ModuleRunner {
+  const evaluator = taggedEvaluator();
+  const padding = ";".repeat(evaluator.startOffset ?? 0);
+  return createServerModuleRunner(ssr, {
+    hmr: false,
+    evaluator,
+    sourcemapInterceptor: {
+      retrieveSourceMap: (url) => {
+        const id = url.replace(EVALUATION_TAG, "");
+        const map = ssr.moduleGraph.getModuleById(id)?.transformResult?.map;
+        if (!map || !("version" in map)) return null;
+        return { url: id, map: { ...map, mappings: padding + map.mappings } };
+      },
+    },
   });
 }
 
@@ -351,16 +405,36 @@ function watchBackend({ onFile }: { onFile: (file: string) => void }): void {
   }
 }
 
+let orb: Promise<OrbBuild | undefined> | undefined;
+
+/** The orb's build, once per process and on first use; a failed build leaves pages orb-less. */
+function loadOrb(): Promise<OrbBuild | undefined> {
+  orb ??= buildOrb({ uiRoot: UI_ROOT }).catch((error: unknown) => {
+    write(
+      processFailureLine({ service: APP_SERVICE, event: "orb build failed", error, level: "warn" }),
+    );
+    return undefined;
+  });
+  return orb;
+}
+
 /** Starts the UI (not in the api lane), then the watch, then the first backend generation. */
 export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
   if (withUi) {
     process.chdir(UI_ROOT);
     ui = await startUi();
   }
-  apiPort = await forwardPort({ port: envPositive({ name: "API_PORT", fallback: 6_560 }) });
+  const port = envPositive({ name: "API_PORT", fallback: 6_560 });
+  apiPort = servesOrb({ withUi, slug: process.env.LANGWATCH_SLUG })
+    ? await forwardPortWithOrb({
+        port,
+        orb: loadOrb,
+        isUiWatch: process.env.LANGWATCH_UI_WATCH === "1",
+      })
+    : await forwardPort({ port });
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
-  runner = createServerModuleRunner(ssr, { hmr: false });
+  runner = createBackendRunner(ssr);
   const trigger = createReloadTrigger({
     quietMs: envPositive({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
     maxWaitMs: envPositive({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),

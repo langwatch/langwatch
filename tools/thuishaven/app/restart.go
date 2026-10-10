@@ -232,6 +232,12 @@ func restartableNames(st domain.Stack) []string {
 // detached up).
 func (o *Orchestrator) ResolveSlug(p UpParams) (string, error) { return o.resolveSlug(p) }
 
+// HasSelection reports whether the worktree has chosen its services yet.
+func (o *Orchestrator) HasSelection(worktreeDir string) bool {
+	_, found := o.store.ReadSelection(worktreeDir)
+	return found
+}
+
 // ResolveSelection loads the worktree's sticky service selection (lean default
 // when none exists), applies any ±deltas, and persists the result — so the
 // choice survives terminals, reboots, and detach. The file is also written on
@@ -292,15 +298,19 @@ func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, hel
 	return sel, nil
 }
 
-// ResolveUI applies `up --ui=dev|bundled|built` to the sticky selection. Persists only a change.
+// ResolveUI applies `up --ui=built|watch|bundled` to the sticky selection. Persists only a change.
+// The Vite dev server left haven: `pnpm dev` runs it on its own.
 func (o *Orchestrator) ResolveUI(worktreeDir string, sel domain.Selection, ui string) (domain.Selection, error) {
-	if ui != "dev" && ui != "bundled" && ui != "built" {
-		return sel, fmt.Errorf("--ui takes dev, bundled or built, not %q", ui)
+	if ui == "dev" {
+		return sel, fmt.Errorf("--ui=dev is retired: --ui=bundled keeps HMR in haven, and `pnpm dev` runs the Vite dev server outside it")
 	}
-	if sel.DevUI == (ui == "dev") && sel.BundledUI == (ui == "bundled") {
+	if ui != "built" && ui != "watch" && ui != "bundled" {
+		return sel, fmt.Errorf("--ui takes built, watch or bundled, not %q", ui)
+	}
+	if sel.WatchUI == (ui == "watch") && sel.BundledUI == (ui == "bundled") {
 		return sel, nil
 	}
-	sel.DevUI, sel.BundledUI = ui == "dev", ui == "bundled"
+	sel.WatchUI, sel.BundledUI = ui == "watch", ui == "bundled"
 	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
 		return sel, fmt.Errorf("saving the ui mode: %w", err)
 	}

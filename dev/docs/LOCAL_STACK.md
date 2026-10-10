@@ -39,12 +39,12 @@ its Zod parse. Never read `.env` to find a value and never print one:
 A haven stack needs no real credential. haven makes up `NEXTAUTH_SECRET`,
 `CREDENTIALS_SECRET`, `LANGWATCH_INSTANCE_ADMIN_API_KEY` and
 `HAVEN_SEED_SCIM_TOKEN` per stack, keeps them in its own state (never the
-checkout), and rotates them only on `haven destroy`; one you set in `.env` wins.
-The seeded admin login, slugs and access tokens are fixed. `haven seed` ends by
+checkout), and rotates them only on `haven down --destroy`; one you set in `.env` wins.
+The seeded admin login, slugs and access tokens are fixed. `haven db seed` ends by
 printing all of them, masked (`--reveal` shows the values, `--json` gives one
 object); `haven env --reveal` has the same credentials.
 
-`haven auth <admin|email>` signs in to this stack's own app through the normal email
+`haven browser login --as <admin|email>` signs in to this stack's own app through the normal email
 sign-in with the credentials above and writes a Playwright storage-state file (mode 600) without printing the password; it refuses any app that is not `*.localhost`.
 `haven browser open|snap|shot|eval|close --lane <name> --as <who>` drives one shared
 headless shell per stack with a signed-in context per lane, for agent testers: see the
@@ -97,10 +97,10 @@ there is no `/etc/hosts`, no sudo and no port collision between worktrees.
 
 ```bash
 make haven up          # start this worktree's stack (bootstraps portless on first run)
-make haven install     # go install so plain `haven …` works, then check prerequisites
+make haven self install     # go install so plain `haven …` works, then check prerequisites
 make haven status      # every stack, service health, shared servers
 haven up +langy        # add a service to this stack, sticky (likewise -gateway, -nlp, -langy)
-haven logs nlp -t      # tail one service's logs from any terminal
+haven logs nlp -f      # tail one service's logs from any terminal
 ```
 
 haven supervises two Node lanes, `ui` and `api`, beside one `go` lane holding the
@@ -181,7 +181,7 @@ adds a sample call; `VOICESIM_MAX_CALLS` and `VOICESIM_MAX_EVENTS_PER_CALL` cap 
 `observability.langwatch.localhost` proxies local Grafana;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. When
 driving haven as an agent, add `--agent` (or `HAVEN_AGENT=1`);
-`haven status --json` is machine-readable. Full reference:
+`haven status --json <fields>` is machine-readable (bare `--json` lists the fields). Full reference:
 `tools/thuishaven/README.md`.
 
 `haven up` also installs `haven gate` as a PreToolUse hook in the worktree's
@@ -262,16 +262,51 @@ stack (`haven up --watch -f` lifts it). `haven reload [app|api|worker]` then re-
 backend in place on demand (SIGUSR2; the UI and sessions stay up) and returns when the host
 logs `backend reload finished`. A changed env still needs `haven up -f`.
 
-**Serving the built UI (the default).** `haven up` runs the backend host without Vite; the api
-serves `apps/ui/dist/client` the way production does, at the same `app.<slug>` URL, so sessions,
-cookies and routes are unchanged. `--ui=dev` or `--ui=bundled` opts out and sticks
-(`--ui=built` returns). There is no HMR. A watching stack runs a `ui` lane that keeps Vite's
-`build --watch` warm and swaps each finished rebuild in (`haven logs ui` shows the durations);
-a held one builds at start and `haven reload ui` rebuilds beside the served bundle, swaps it in
-and returns once the swap is done (old hashed chunks are kept, so an open page still loads);
-`haven reload app` still reloads the backend. Use it for test
+**UI modes.** `haven up --ui=<mode>` picks how apps/ui is served, and the choice sticks:
+
+| mode              | what serves `app.<slug>`                                          | after a `.tsx` edit                                           |
+| ----------------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| `built` (default) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing until `haven reload ui`; pages never reload           |
+| `watch`           | the same, plus a `ui` lane, `haven ui-watch`                      | one build that exits, swapped in; open pages reload once idle |
+| `bundled`         | Vite 8 `bundledDev`, bundles rebuilt in memory                    | HMR updates the page in place                                 |
+
+The Vite dev server has left haven (`--ui=dev` is refused); `pnpm dev` still runs it on its own.
+
+**Built and watch.** The api serves `apps/ui/dist/client` the way production does, at the same
+`app.<slug>` URL, so sessions, cookies and routes are unchanged. There is no HMR. Both build at
+`up`; `haven reload ui` rebuilds beside the served bundle, swaps it in and returns once the swap
+is done. A `watch` stack also runs a `ui` lane (`haven ui-watch`) that polls the browser source
+(`apps/ui`, `modules`, `enterprise/modules`, `packages`; tests and `process/` halves ignored) and,
+once edits settle (`LANGWATCH_UI_WATCH_DEBOUNCE_MS`, default 5 s quiet,
+`LANGWATCH_UI_WATCH_MAX_WAIT_MS`, default 60 s), runs one build that exits and swaps the bundle in
+(`haven logs ui` shows each duration; a failed build keeps the last good one). Every build is the
+cached Nx target `@langwatch/ui:build:local` (output `apps/ui/dist/client.local`, no gzip size
+report): a tree another worktree already built restores from the shared cache in seconds. A lock
+file (`dist/client.lock`) lets one build at a time use that output; the result moves to a
+per-build staging dir and is renamed over `dist/client`.
+
+**Open pages across a swap.** Each swap carries the previous build's hashed chunks forward, so a
+page opened before it never 404s on a lazy chunk; a chunk superseded more than 24 h ago is
+dropped at the next swap, and stack start drops every chunk the served build does not list
+(`dist/client/.build-assets`). On a `watch` stack the api's port marks each page
+(`<meta name="haven-ui-watch">`); a marked page polls the served index and, when its entry chunk
+changed, reloads once nobody has touched it for 60 s (or at once when the tab is hidden). A stale
+chunk (a route or a `vite:preloadError`) waits the same way there; everywhere else, production
+included, it reloads at once and nothing polls. The idle time is the `haven-reload-idle-ms` key
+in the page's local storage. `haven reload app` still reloads the backend. Use `built` for test
 drives and shared headless browsers: measured on `/governance`, a signed-in page costs about
 400 MB of browser RSS instead of 710 MB, with a quarter of the requests.
+
+Measured 2026-10-10 on a 10-core, 64 GB Mac under heavy load (load average 40 to 86), one `.tsx` edit:
+
+| mode      | edit to new bundle                                                        | RSS at rest                    | peak RSS                |
+| --------- | ------------------------------------------------------------------------- | ------------------------------ | ----------------------- |
+| `built`   | none (`haven reload ui`: a 21.5 to 25 s build, seconds from the Nx cache) | 0                              | 4.5 GB during a build   |
+| `watch`   | 33.5 s (about 12 s to notice and settle, then a 21.5 s build)             | about 35 MB (`haven ui-watch`) | 4.7 GB during the build |
+| `bundled` | not measured: the run was stopped                                         | about 5.5 GB                   | 5.6 GB                  |
+
+On `watch`, add up to 5 s for the open page to see the swap, then the idle wait. A kept-warm
+`vite build --watch` was measured and dropped: an 18.8 s rebuild for 3.4 GB held at rest.
 
 A backend edit that touches a loaded file re-links only what it reaches, then
 drains the old generation (worker, then api) and boots the new one; the browser
@@ -334,4 +369,4 @@ See `dev/docs/best_practices/local-observability.md`. With the stack down,
 Locally built binaries land only in `.bin/<name>/<name>` (git- and
 Docker-ignored). Release pipelines pass their own `--outfile`.
 
-haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven play`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.
+haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven pr --throwaway`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.

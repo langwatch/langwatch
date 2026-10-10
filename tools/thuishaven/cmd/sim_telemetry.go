@@ -13,9 +13,9 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const telemetryUsage = "usage: haven telemetry <send|load|fuzz|post|status|runs|run <id>|fixtures|fixture <name>|stop|console> [--preset <name>] [--seed <n>] [--json]"
+const telemetryUsage = "usage: haven sim telemetry <send|load|fuzz|post|status|list|get <id>|fixtures|fixture <name>|stop|console> [--preset <name>] [--seed <n>] [--json]"
 
-// telemetrySpec is `haven telemetry`: telemetrysim's sends at this stack's OTLP door.
+// telemetrySpec is `haven sim telemetry`: telemetrysim's sends at this stack's OTLP door.
 func telemetrySpec() commandSpec {
 	return commandSpec{
 		name:    "telemetry",
@@ -40,7 +40,7 @@ func telemetrySpec() commandSpec {
 	}
 }
 
-// runTelemetry is `haven telemetry <verb>`.
+// runTelemetry is `haven sim telemetry <verb>`.
 func runTelemetry(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(telemetryUsage)
@@ -78,14 +78,14 @@ func telemetryRead(api sources.SimAPI, inv invocation, asJSON bool) error {
 	case "runs":
 		return simGet(api, "/_sim/api/runs", nil, asJSON, printTelemetryRuns)
 	case "run":
-		if err := needArgs(inv, 2, "haven telemetry run <id|current>"); err != nil {
+		if err := needArgs(inv, 2, "haven sim telemetry get <id|current>"); err != nil {
 			return err
 		}
 		return simGet(api, "/_sim/api/runs/"+url.PathEscape(inv.args[1]), nil, asJSON, func(st telemetrysim.RunStatus) { printTelemetryRun(&st) })
 	case "fixtures":
 		return simGet(api, "/_sim/api/fixtures", nil, asJSON, printTelemetryFixtures)
 	case "fixture":
-		if err := needArgs(inv, 2, "haven telemetry fixture <name> [--seed <n>]"); err != nil {
+		if err := needArgs(inv, 2, "haven sim telemetry fixture <name> [--seed <n>]"); err != nil {
 			return err
 		}
 		return simGet(api, "/_sim/api/fixtures/"+inv.args[1], telemetrySeedQuery(inv), true, func(json.RawMessage) {})
@@ -95,7 +95,7 @@ func telemetryRead(api sources.SimAPI, inv invocation, asJSON bool) error {
 		}
 		return simDone(asJSON, "stopped", "run stopped")
 	}
-	return fmt.Errorf("unknown `haven telemetry` subcommand %q; %s", inv.args[0], telemetryUsage)
+	return fmt.Errorf("unknown `haven sim telemetry` subcommand %q; %s", inv.args[0], telemetryUsage)
 }
 
 func telemetryRoute(d deps, inv invocation) (string, error) {

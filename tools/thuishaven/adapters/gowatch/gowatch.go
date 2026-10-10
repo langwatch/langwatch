@@ -56,6 +56,32 @@ func Fingerprint(repoRoot string) uint64 {
 
 // FingerprintPaths is Fingerprint over the given files and trees under root.
 func FingerprintPaths(root string, paths ...string) uint64 {
+	return fingerprint(root, isWatchedFile, skippedDirs, paths)
+}
+
+// uiWatchedDirs hold the source `vite build` bundles; a dir named `process` is
+// a module's backend half, never in the bundle.
+var uiWatchedDirs = []string{"apps/ui", "modules", "enterprise/modules", "packages"}
+
+var uiSkippedDirs = map[string]bool{"node_modules": true, "dist": true, "__tests__": true, "process": true}
+
+// UIFingerprint hashes the browser source the built UI is bundled from.
+func UIFingerprint(repoRoot string) uint64 {
+	return fingerprint(repoRoot, isUIFile, uiSkippedDirs, uiWatchedDirs)
+}
+
+func isUIFile(name string) bool {
+	if strings.HasSuffix(name, ".test.ts") || strings.HasSuffix(name, ".test.tsx") {
+		return false
+	}
+	switch filepath.Ext(name) {
+	case ".ts", ".tsx", ".css", ".json", ".svg":
+		return true
+	}
+	return false
+}
+
+func fingerprint(root string, isWatched func(string) bool, skipped map[string]bool, paths []string) uint64 {
 	h := fnv.New64a()
 	for _, p := range paths {
 		top := filepath.Join(root, p)
@@ -64,8 +90,8 @@ func FingerprintPaths(root string, paths ...string) uint64 {
 			case err != nil:
 				return filepath.SkipDir // an unreadable entry ends that directory's walk
 			case d.IsDir():
-				return skipDir(path, top, d.Name())
-			case isWatchedFile(d.Name()):
+				return skipDir(path, top, d.Name(), skipped)
+			case isWatched(d.Name()):
 				if info, err := d.Info(); err == nil {
 					_, _ = fmt.Fprintf(h, "%s|%d|%d\n", path, info.Size(), info.ModTime().UnixNano())
 				}
@@ -76,8 +102,8 @@ func FingerprintPaths(root string, paths ...string) uint64 {
 	return h.Sum64()
 }
 
-func skipDir(path, top, name string) error {
-	if skippedDirs[name] || (strings.HasPrefix(name, ".") && path != top) {
+func skipDir(path, top, name string, skipped map[string]bool) error {
+	if skipped[name] || (strings.HasPrefix(name, ".") && path != top) {
 		return filepath.SkipDir
 	}
 	return nil

@@ -18,16 +18,16 @@ independent tenants** (`/t/1` … `/t/N`), each of which is:
 
 Haven persists each stack's simulator under `~/.langwatch/portless/idp/<slug>/`.
 Registered applications, users, groups, provisioning credentials, domain proofs,
-and signing keys survive `haven up -f`, service restarts, and stop/start cycles.
+and signing keys survive `haven up --force`, service restarts, and stop/start cycles.
 Direct runs persist when `IDPSIM_DATA_DIR` is set; otherwise they start in memory.
 Nothing here is production code.
 
 ## Running
 
 ```bash
-haven idp                        # ONLY the simulator — no app, API or databases —
+haven simulator idp              # ONLY the simulator — no app, API or databases —
                                  #   routed at idp.langwatch.localhost
-haven idp --tenants 20           # same, with a wider range
+haven simulator idp --tenants 20 # same, with a wider range
 make service svc=idpsim          # run once (SERVER_ADDR :5565, DNS :15353)
 make service-watch svc=idpsim    # live reload via air
 IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
@@ -35,10 +35,10 @@ IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
 
 Under haven the lane is **on by default** in every stack (`haven up -idp`
 turns it off for a worktree), routed at `idp.<slug>.langwatch.localhost`.
-Both `haven up` and `haven idp` use the simulator bundled into Haven, so the
+Both `haven up` and `haven simulator idp` use the simulator bundled into Haven, so the
 checkout does not need this package or a Go toolchain to launch the simulator.
 The stack's `idp` link on the Haven web dashboard opens its browser page.
-Standalone `haven idp` keeps its separate state under
+Standalone `haven simulator idp` keeps its separate state under
 `~/.langwatch/portless/idp-standalone/`. Both paths follow `LANGWATCH_PORTLESS_HOME` when set.
 Changes are saved atomically before the simulator acknowledges them. Invalid
 state files stop startup instead of silently resetting the directory. Explicit
@@ -68,7 +68,7 @@ a simulator on `IDPSIM_URL` (default `http://127.0.0.1:5565`) for work on the
 console itself.
 
 The project terminal viewer has an `idp` tab with searchable tenant summaries;
-Enter opens the chosen tenant in the browser. `haven idp --json` reads those
+Enter opens the chosen tenant in the browser. `haven sim idp list --json` reads those
 summaries for the current stack, and `--stack <slug>` selects another stack.
 This read-only mode does not start a standalone simulator.
 
@@ -321,15 +321,15 @@ seeded two back.
 
 ## From the command line
 
-Every console action has a `haven idp <verb>` twin that talks to the running
+Every console action has a `haven sim idp <verb>` twin that talks to the running
 simulator's control API. Tenants are numbers (`1`, `2`, ...). Reads take `--json`
 (agent mode implies it); `--stack <slug>` aims at another worktree's stack. A
-stopped simulator says `start it with haven up +idp`. Bare `haven idp` is
-unchanged: it runs the standalone simulator.
+stopped simulator says `start it with haven up +idp`. The hidden `haven simulator idp`
+runs the standalone simulator.
 
 | Verb                                                                                                   | Does                                                                                                                                                                                                                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tenant show <t>`                                                                                      | domain, issuer, SCIM token, users and applications                                                                                                                                                                                                                                                                   |
+| `get <t>`                                                                                              | domain, issuer, SCIM token, users and applications                                                                                                                                                                                                                                                                   |
 | `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>`     | register or drop an OIDC or SAML application                                                                                                                                                                                                                                                                         |
 | `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change; each user gets `department`, `costCenter` and `manager` from the seed, pushed under the SCIM enterprise extension (the first user has no manager)                                                                                                                                         |
 | `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]`                               | one user                                                                                                                                                                                                                                                                                                             |
@@ -338,9 +338,9 @@ unchanged: it runs the standalone simulator.
 | `scim-event <t> <kind> [--style okta\|entra] [--user] [--group] [--set k=v]...`                        | one SCIM event on demand; kinds: `user.lookup\|create\|replace\|patch\|deactivate\|reactivate\|delete`, `group.lookup\|create\|add-member\|remove-member\|rename\|delete`                                                                                                                                            |
 | `dns add <domain> <txt>...` / `dns remove <domain>`                                                    | TXT records (global, not per tenant)                                                                                                                                                                                                                                                                                 |
 | `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]`                        | the feed; the IdP-initiated sign-in URL                                                                                                                                                                                                                                                                              |
-| `reset <t>` / `samlp <t> on\|off`                                                                      | seeded state; Auth0-broker `samlp\|` subjects                                                                                                                                                                                                                                                                        |
+| `clear <t>` / `samlp <t> on\|off`                                                                      | seeded state; Auth0-broker `samlp\|` subjects                                                                                                                                                                                                                                                                        |
 | `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>`        | the legacy provider and the env lines that point a stack at it                                                                                                                                                                                                                                                       |
-| `tamper <t> <mode>`                                                                                    | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
+| `fault <t> <mode>` (`fault <t> off` removes it)                                                        | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
 | `skew <t> <seconds>`                                                                                   | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion                                                                                                                                                                                                                           |
 | `rotate-key <t> [--drop-previous]`                                                                     | make a fresh signing key current while JWKS and SAML metadata still publish the previous one; `--drop-previous` then stops publishing it                                                                                                                                                                             |
 | `user disable <t> <email>` / `user enable <t> <email>`                                                 | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML                                                                                                                                                                                                                                           |

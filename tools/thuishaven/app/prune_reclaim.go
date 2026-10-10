@@ -44,7 +44,7 @@ func (o *Orchestrator) PlanReclaimableWorktrees(ctx context.Context, repoRoot, s
 
 // ReclaimClassifiedWorktrees removes every temporary and merged worktree,
 // reporting each outcome to onDone. It is the one unattended worktree removal —
-// the daemon's daily pass and `haven clean --yes` both go through it, so neither
+// the daemon's daily pass and `haven machine clean --yes` both go through it, so neither
 // can drift into doing more than the other.
 //
 // It removes the directory and git's admin entry and NOTHING else. In

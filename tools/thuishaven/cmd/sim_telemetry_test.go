@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// @scenario "haven telemetry targets the worktree's own stack with the overlay key, never printing it"
+// @scenario "haven sim telemetry targets the worktree's own stack with the overlay key, never printing it"
 func TestTelemetryTargetsTheStackOTLPDoorWithTheOverlayKey(t *testing.T) {
 	overlay := []string{"LANGWATCH_ENDPOINT=https://app.demo.langwatch.localhost/", "HAVEN_SEED_LANGWATCH_API_KEY=sk-lw-overlay"}
 	inv := invocation{flags: map[string]string{"--preset": "logs", "--seed": "7"}, args: []string{"send"}}
@@ -25,7 +25,7 @@ func TestTelemetryTargetsTheStackOTLPDoorWithTheOverlayKey(t *testing.T) {
 	}
 }
 
-// @scenario "haven telemetry post, runs, run, fixtures and console drive the sim's API"
+// @scenario "haven sim telemetry post, list, get, fixtures and console drive the sim's API"
 func TestTelemetryVerbsReadTheSimsAPI(t *testing.T) {
 	api, seen := stubSim(t, map[string]string{
 		"POST /_sim/api/send-one":               `{"url":"http://door/v1/logs","signal":"logs","encoding":"json","status":415,"latencyMs":1}`,

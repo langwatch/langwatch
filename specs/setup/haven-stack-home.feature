@@ -66,13 +66,13 @@ Feature: A worktree's own home page at <slug>.langwatch.localhost
     And the reset waits until I type the stack's database name
     And the stack's databases are dropped, migrated and seeded fresh
 
-  # The seed console drives the same `haven seed` the CLI runs (tools/seedgen);
+  # The seed console drives the same `haven db seed` the CLI runs (tools/seedgen);
   # it adds no seeding logic of its own.
   @integration
   Scenario: The stack home seeds a stack at a chosen size and shows its progress
     Given the stack is running
     When I open the stack home, choose a size and a persona and press Seed
-    Then "haven seed --size <size> --persona <persona>" runs in the stack's worktree
+    Then "haven db seed --size <size> --persona <persona>" runs in the stack's worktree
     And a size or persona seedgen refuses starts nothing
     And the seed panel shows the last seed's status line and the run's latest log lines
     And Seed stays disabled while a seed is running or the stack is down

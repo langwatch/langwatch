@@ -47,16 +47,16 @@ Feature: analyticssim, a local stand-in for PostHog and Customer.io
     When the operator opens a record and asks for that person's records
     Then the list shows only records with that distinct id
 
-  Scenario: haven analytics shows one record in full
+  Scenario: haven sim analytics shows one record in full
     Given records from both providers
-    When an agent runs "haven analytics record <id>"
+    When an agent runs "haven sim analytics record <id>"
     Then it prints that record's facts, properties and raw call
     And an unknown id is refused
 
-  Scenario: haven analytics status reports the activity and records filter by name
-    When an agent runs "haven analytics status"
+  Scenario: haven sim analytics status reports the activity and records filter by name
+    When an agent runs "haven sim analytics status"
     Then it prints the activity the console shows beside the record count
-    And "haven analytics records --name <name>" filters like "--event <name>"
+    And "haven sim analytics list --name <name>" filters like "--event <name>"
 
   Scenario: haven runs analyticssim only when the worktree asks for it
     Given a worktree that has never been up

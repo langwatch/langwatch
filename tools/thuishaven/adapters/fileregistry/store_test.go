@@ -308,7 +308,7 @@ func TestReapEventsPersistBoundedNewestLast(t *testing.T) {
 	}
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestWaiterSnapshotsListsLiveRegistrations(t *testing.T) {
 	s := New(t.TempDir())
 
@@ -345,7 +345,7 @@ func TestWaiterSnapshotsListsLiveRegistrations(t *testing.T) {
 	}
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestWaiterSnapshotsDropsDeadAndExpiredEntries(t *testing.T) {
 	s := New(t.TempDir())
 	dir := s.waitersDir("checks")
@@ -436,12 +436,12 @@ func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
 	}
 }
 
-// @scenario "A stack chosen as dev before built became the default stays dev"
-// The sticky stack modes (--watch=false, --ui=dev|bundled) survive a write and a read.
+// @scenario "A stack left on the retired --ui=dev serves the built UI"
+// The sticky stack modes (--watch=false, --ui=watch|bundled) survive a write and a read.
 func TestSelectionKeepsTheStickyModes(t *testing.T) {
 	s, dir := New(t.TempDir()), t.TempDir()
 	want := domain.DefaultSelection()
-	want.Held, want.DevUI = true, true
+	want.Held, want.WatchUI = true, true
 	if err := s.WriteSelection(dir, want); err != nil {
 		t.Fatalf("WriteSelection: %v", err)
 	}
@@ -451,8 +451,12 @@ func TestSelectionKeepsTheStickyModes(t *testing.T) {
 	} else if back, _ := s.ReadSelection(dir); !back.Watch {
 		t.Fatal("--watch did not survive a write and a read")
 	}
-	if !ok || !got.Held || !got.DevUI || got.BundledUI || got.IsBuiltUI() {
-		t.Fatalf("read back held=%v dev=%v bundled=%v ok=%v", got.Held, got.DevUI, got.BundledUI, ok)
+	if !ok || !got.Held || !got.WatchUI || got.BundledUI || !got.IsBuiltUI() {
+		t.Fatalf("read back held=%v watch-ui=%v bundled=%v ok=%v", got.Held, got.WatchUI, got.BundledUI, ok)
+	}
+	writeSelectionJSON(t, dir, `{"dev-ui":true,"services":{}}`)
+	if got, _ := s.ReadSelection(dir); !got.IsBuiltUI() || got.WatchUI {
+		t.Error("a file left on the retired --ui=dev should serve the built UI")
 	}
 	writeSelectionJSON(t, dir, `{"built-ui":true,"services":{}}`)
 	if got, _ := s.ReadSelection(dir); !got.IsBuiltUI() {
