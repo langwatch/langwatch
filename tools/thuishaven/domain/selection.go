@@ -17,6 +17,9 @@ type Selection struct {
 	// Held is sticky `haven up --watch=false`: the Node host does not reload on
 	// a file change (LANGWATCH_DEV_WATCH=0); `haven reload` applies changes.
 	Held bool `json:"held,omitempty"`
+	// Watch is sticky `haven up --watch`: a built-UI stack refreshes on a change
+	// only when asked, so its pages never move under a tester (IsHeld).
+	Watch bool `json:"watch,omitempty"`
 	// DevUI is sticky `haven up --ui=dev`: the Vite dev server serves apps/ui.
 	// Neither DevUI nor BundledUI is the default, the built UI (IsBuiltUI).
 	DevUI bool `json:"dev-ui,omitempty"`
@@ -96,6 +99,10 @@ type Selection struct {
 // build of apps/ui, as production does; no Vite. A watching stack rebuilds it on
 // a change, a held one on `haven reload ui`.
 func (s Selection) IsBuiltUI() bool { return !s.DevUI && !s.BundledUI }
+
+// IsHeld is whether nothing refreshes on a file change: `--watch=false`, or a
+// built UI no `--watch` asked to refresh. `haven reload` applies changes.
+func (s Selection) IsHeld() bool { return s.Held || (s.IsBuiltUI() && !s.Watch) }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
 // gateway, nlp, the idp, mail, storage, payment and telemetry simulators — no

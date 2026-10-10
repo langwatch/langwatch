@@ -282,10 +282,10 @@ func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, req
 // ResolveHold applies `up --watch[=false]` to the sticky selection: a held
 // stack's Node host does not reload on a file change. Persists only a change.
 func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, held bool) (domain.Selection, error) {
-	if sel.Held == held {
+	if sel.Held == held && sel.Watch == !held {
 		return sel, nil
 	}
-	sel.Held = held
+	sel.Held, sel.Watch = held, !held
 	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
 		return sel, fmt.Errorf("saving the hold: %w", err)
 	}

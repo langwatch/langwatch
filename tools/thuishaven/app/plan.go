@@ -151,7 +151,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	}
 	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.IsBuiltUI())
 	out := []Child{p.frontChild(mono, isOneProcess)}
-	if isOneProcess && opts.Selection.IsBuiltUI() && !opts.Selection.Held {
+	if isOneProcess && opts.Selection.IsBuiltUI() && !opts.Selection.IsHeld() {
 		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui")))
 	}
 	out = append(out, p.goLanes(mono)...)
@@ -270,7 +270,7 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	env := append(domain.LaneDatabaseEnv(p.base, lane),
 		"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
 		p.o.compileCacheEnv(p.st.Slug))
-	if p.opts.Selection.Held {
+	if p.opts.Selection.IsHeld() {
 		env = append(env, "LANGWATCH_DEV_WATCH=0")
 	}
 	if lane == "ui" || lane == AppLane {
@@ -292,7 +292,7 @@ func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
 	case p.st.Layout.IsMonolith():
 		return mono.appChild()
 	case isOneProcess && p.opts.Selection.IsBuiltUI():
-		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane), p.opts.Selection.Held)
+		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane), p.opts.Selection.IsHeld())
 	case isOneProcess:
 		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}

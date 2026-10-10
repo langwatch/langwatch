@@ -446,6 +446,11 @@ func TestSelectionKeepsTheStickyModes(t *testing.T) {
 		t.Fatalf("WriteSelection: %v", err)
 	}
 	got, ok := s.ReadSelection(dir)
+	if watching := (domain.Selection{Watch: true}); s.WriteSelection(dir, watching) != nil {
+		t.Fatal("WriteSelection with --watch")
+	} else if back, _ := s.ReadSelection(dir); !back.Watch {
+		t.Fatal("--watch did not survive a write and a read")
+	}
 	if !ok || !got.Held || !got.DevUI || got.BundledUI || got.IsBuiltUI() {
 		t.Fatalf("read back held=%v dev=%v bundled=%v ok=%v", got.Held, got.DevUI, got.BundledUI, ok)
 	}

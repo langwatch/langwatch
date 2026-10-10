@@ -346,9 +346,16 @@ Feature: The local development process topology
   # Vite dev server; the api serves apps/ui/dist/client. `--ui=dev` and
   # `--ui=bundled` opt out and stick; `--ui=built` returns to the default.
   @unit
-  Scenario: A fresh stack serves the built UI and rebuilds it on a change
-    Given a worktree with no UI mode chosen
-    When haven plans the Node lanes of a watching stack
+  Scenario: A fresh stack serves the built UI and holds it still
+    Given a worktree with no UI mode chosen and no "--watch"
+    When haven plans the Node lanes
+    Then one backend-only host runs after a fresh build, with no ui lane
+    And no file change reloads the host or rebuilds the bundle until "haven reload"
+
+  @unit
+  Scenario: A built UI started with --watch rebuilds it on a change
+    Given a stack started with "haven up --watch"
+    When haven plans the Node lanes
     Then one backend-only host runs, building the bundle only when none exists
     And a ui lane keeps Vite's build --watch warm
     And each finished rebuild is swapped in whole and logged with its duration

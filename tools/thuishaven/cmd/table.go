@@ -239,7 +239,7 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change (the default): Go rebuilds, Node reloads, and the built UI rebuilds in a warm Vite. --watch=false holds the stack, sticks; `haven reload` applies changes"},
+			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change: Go rebuilds, Node reloads, and the built UI rebuilds. Off by default for the built UI, on for bundled; --watch=false holds any stack. Sticks; `haven reload` applies changes"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
@@ -279,7 +279,7 @@ var baseTable = []commandSpec{
 					return err
 				}
 			}
-			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.Held
+			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.IsHeld()
 			d.opts.Selection = sel
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")

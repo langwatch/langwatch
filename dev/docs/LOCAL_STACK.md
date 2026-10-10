@@ -255,7 +255,8 @@ disagrees. The Go lane is watched by default (`haven go-watch` rebuilds and swap
 the child); `LANGWATCH_GO_WATCH=0` turns it off.
 
 **Holding a stack.** Commits and cherry-picks reload the backend under anyone using the
-stack. `haven up --watch=false -f` holds it: no Go rebuilds and no backend reloads
+stack, so a built-UI stack (the default) is held unless `haven up --watch -f` asked it to
+refresh. `haven up --watch=false -f` holds any stack: no Go rebuilds and no backend reloads
 (`LANGWATCH_DEV_WATCH=0` in the Node lane; Vite HMR still works), and the hold sticks for the
 stack (`haven up --watch -f` lifts it). `haven reload [app|api|worker]` then re-links the
 backend in place on demand (SIGUSR2; the UI and sessions stay up) and returns when the host

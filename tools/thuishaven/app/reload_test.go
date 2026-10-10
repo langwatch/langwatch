@@ -41,7 +41,7 @@ func TestHeldStackSetsWatchOffOnTheNodeLane(t *testing.T) {
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
 	for _, held := range []bool{false, true} {
 		sel := domain.DefaultSelection()
-		sel.Held = held
+		sel.Held, sel.Watch = held, !held
 		children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo, ShouldRunOneProcess: true}, repo)
 		child, ok := findChild(children, AppLane)
 		if !ok {
@@ -108,15 +108,32 @@ func TestBundledUISetsTheViteEnvAndIsExclusiveWithBuilt(t *testing.T) {
 	}
 }
 
-// @scenario "A fresh stack serves the built UI and rebuilds it on a change"
-func TestBuiltUIIsTheDefaultAndWatchesWithAWarmViteBuild(t *testing.T) {
+// @scenario "A fresh stack serves the built UI and holds it still"
+func TestBuiltUIIsTheDefaultAndHoldsWithoutWatch(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
 	sel := domain.DefaultSelection()
-	if !sel.IsBuiltUI() {
-		t.Fatal("a fresh worktree should serve the built UI")
+	if !sel.IsBuiltUI() || !sel.IsHeld() {
+		t.Fatal("a fresh worktree should serve the built UI, held")
 	}
+	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
+	child, ok := findChild(children, AppLane)
+	if !ok || !strings.HasPrefix(child.Shell, UIBuildShell+" && ") || !slices.Contains(child.Env, "LANGWATCH_DEV_WATCH=0") {
+		t.Fatalf("want a fresh build then a host that does not reload, got %+v", child)
+	}
+	if _, ok := findChild(children, "ui"); ok {
+		t.Fatal("a built stack without --watch runs no ui-watch lane")
+	}
+}
+
+// @scenario "A built UI started with --watch rebuilds it on a change"
+func TestBuiltUIWithWatchRebuildsInAWarmViteBuild(t *testing.T) {
+	repo := t.TempDir()
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
+	sel := domain.DefaultSelection()
+	sel.Watch = true
 	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	child, ok := findChild(children, AppLane)
 	if !ok || !strings.HasPrefix(child.Shell, "test -f apps/ui/dist/client/index.html || (") || !strings.HasSuffix(child.Shell, BackendPackage+" dev") {
@@ -147,7 +164,7 @@ func TestHeldBuiltUIPlansTheBackendOnlyHost(t *testing.T) {
 	}
 }
 
-// @scenario "A fresh stack serves the built UI and rebuilds it on a change"
+// @scenario "A built UI started with --watch rebuilds it on a change"
 func TestUIWatchShellSwapsEachFinishedRebuild(t *testing.T) {
 	repo := t.TempDir()
 	served := filepath.Join(repo, "apps", "ui", "dist", "client")
