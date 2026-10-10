@@ -4,6 +4,7 @@ export {
 } from "./memory.tenant-state.repository.ts";
 export { TenantStepStateRepository } from "./tenant-state.repository.ts";
 export {
+  type TenantStepBucket,
   type TenantStepLedger,
   type TenantStepSettleState,
   TenantStepSettleService,
