@@ -43,13 +43,17 @@ export type SectionNavigationGroup = {
 const mix = (token: string, alpha: string) =>
   `color-mix(in srgb, var(--chakra-colors-${token}) ${alpha}, transparent)`;
 
-/** Faint glass over the card: the page ground, thinned, with a hairline to the content. */
+/** Tinted glass separates the rail from the page and keeps the selected fill distinct. */
 const RAIL_GLASS = {
   background: {
-    _light: `linear-gradient(180deg, ${mix("bg-page", "100%")}, ${mix("bg-page", "70%")})`,
+    _light: `linear-gradient(135deg, ${mix("bg-panel", "65%")}, transparent 45%), linear-gradient(180deg, ${mix("nav-bg-active", "55%")}, ${mix("nav-bg-active", "20%")}), ${mix("bg-page", "var(--lw-panel-alpha, 85%)")}`,
     _dark: `linear-gradient(180deg, ${mix("fg", "4%")}, ${mix("fg", "1%")}), ${mix("bg-muted", "var(--lw-panel-alpha, 70%)")}`,
   },
   border: "border",
+  shadow: {
+    _light: `inset 0 1px 0 ${mix("bg-panel", "90%")}, inset 1px 0 0 ${mix("bg-panel", "70%")}`,
+    _dark: `inset 0 1px 0 ${mix("fg", "6%")}`,
+  },
 };
 /** The current link wears the main sidebar's active fill; hover is a lighter step of it. */
 const LINK_ACTIVE = { background: "nav.bgActive", color: "fg" };
@@ -199,6 +203,7 @@ export function SectionNavigationRail({
       minWidth={{ base: 0, md: `${width}px` }}
       flexShrink={0}
       background={RAIL_GLASS.background}
+      boxShadow={RAIL_GLASS.shadow}
       backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(1.35))"
       borderRightWidth={{ base: 0, md: "1px" }}
       borderRightColor={RAIL_GLASS.border}
@@ -309,10 +314,11 @@ export function SectionNavigationFrame({
       gap={0}
       width="full"
       flex="1"
+      minWidth={0}
       minHeight={0}
     >
       <SectionNavigationRail {...rail} />
-      <Box flex={1} minWidth={0} minHeight={0} overflowY="auto">
+      <Box position="relative" flex={1} minWidth={0} minHeight={0} overflowY="auto">
         {header}
         <Box
           data-testid="section-navigation-content"
