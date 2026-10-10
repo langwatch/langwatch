@@ -422,6 +422,13 @@ Feature: Unified Audit Log
     Then no audit rows are returned at all
     And the audit table is never read for that filter
 
+  @unit
+  Scenario: A project-filtered read holds only that project's events
+    Given an "acme" administrator filters the audit trail by one of "acme"'s projects
+    When the audit trail is read
+    Then only rows recorded against that project are returned
+    And organization-wide events, such as membership, billing and sign-on changes, are not
+
   @integration @unimplemented
   Scenario: Audit log respects org/project boundaries
     Given alice is in organization "acme" only

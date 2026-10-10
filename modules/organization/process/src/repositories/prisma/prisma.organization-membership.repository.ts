@@ -833,10 +833,9 @@ function auditLogFilterConditions({
     });
   }
 
+  // A project-filtered read holds that project's rows only, never the organization-wide ones.
   if (projectId) {
-    conditions.push({
-      OR: [{ projectId }, { projectId: null }],
-    });
+    conditions.push({ projectId });
   }
 
   if (startDate !== undefined || endDate !== undefined) {
