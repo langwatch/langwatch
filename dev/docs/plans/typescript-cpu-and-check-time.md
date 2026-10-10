@@ -72,4 +72,6 @@ Not doing: `isolatedDeclarations` (ruled out, `typescript-tidy-projects.md`
 
 ## Decisions needed
 
-- Step 5: A, B or C (recommendation: C now; A only if RAM is allowed above 2 GiB).
+- Step 5: C chosen (Alex, 2026-10-10).
+
+Lesson from step 8: an exported builder method or hook without an explicit return type has its inferred type spelled out in its `.d.ts`, so every consumer recomputes it. Candidate lint rule.
