@@ -46,7 +46,8 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   const connection = view?.connection ?? null;
   const refusal = view && !view.availability.available ? view.availability.refusal : null;
   // A refusal is said above the cards, and nothing is offered that it would refuse.
-  const canOffer = canManage && refusal === null;
+  const enterpriseRequired = view?.enterpriseRequired === true;
+  const canOffer = canManage && refusal === null && !enterpriseRequired;
 
   return (
     <VStack align="stretch" gap={3} width="full" height="full">
@@ -57,6 +58,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
         <SingleSignOnPreviewCard
           state={connection?.state ?? null}
           canManage={canOffer}
+          enterpriseRequired={enterpriseRequired}
           updatePhase={view?.migration?.phase ?? null}
           goLiveBlockedBecause={
             setupProgressFor(goLiveFactsOf(view?.goLive ?? null)).goLiveBlockedBecause
@@ -276,12 +278,15 @@ function UpdateNotice({
 export function SingleSignOnPreviewCard({
   state = null,
   canManage = false,
+  enterpriseRequired = false,
   goLiveBlockedBecause = null,
   updatePhase = null,
   domains,
 }: {
   state?: SetupConnection["state"] | null;
   canManage?: boolean;
+  /** The plan refuses single sign-on: said on the card, no control offered. */
+  enterpriseRequired?: boolean;
   goLiveBlockedBecause?: string | null;
   /** Where an update to the organization's own identity provider got to. */
   updatePhase?: NonNullable<SsoSetupPageView["migration"]>["phase"] | null;
@@ -308,6 +313,12 @@ export function SingleSignOnPreviewCard({
         )
       }
     >
+      {enterpriseRequired && (
+        <Text fontSize="13px" color="fg.muted" data-testid="sso-card-enterprise-gate">
+          Single sign-on is an Enterprise feature. Contact sales to upgrade.
+        </Text>
+      )}
+
       <OverviewDetail label="What it does">
         <Text>
           Your people sign in with your company&apos;s identity provider, and you decide there who
