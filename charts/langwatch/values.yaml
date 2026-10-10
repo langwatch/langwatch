@@ -421,7 +421,7 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
-        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Earlier spelling of `app.dataplane.objectRetentionConfirmed`, still honoured: either one confirms. Retired at the LTS floor.
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Earlier spelling of `app.dataplane.objectRetentionConfirmed`, still honoured: either one confirms. It stops being read in 3.23.
         spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
