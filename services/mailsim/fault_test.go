@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestForcedErrorRefusesSendUntilCleared(t *testing.T) {
+func TestForcedErrorRefusesSendUntilClearedAndKeepsTheAttempt(t *testing.T) {
 	s := newTestServer(t, Config{})
 	put := func(body string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
@@ -21,6 +21,10 @@ func TestForcedErrorRefusesSendUntilCleared(t *testing.T) {
 	require.Equal(t, http.StatusOK, put(`{"forcedError":550}`).Code)
 	require.Error(t, deliverRaw(t, s, "a@example.com", []string{"b@example.com"}, simpleMessage, nil))
 	assert.Empty(t, s.store.List("", ""))
+	settings := httptest.NewRecorder()
+	s.Handler().ServeHTTP(settings, httptest.NewRequest(http.MethodGet, "/_sim/api/settings", nil))
+	assert.Contains(t, settings.Body.String(), `"refused":1`, "the refused attempt is kept")
+	assert.Contains(t, settings.Body.String(), `"from":"a@example.com","code":550`)
 
 	assert.Equal(t, http.StatusBadRequest, put(`{"forcedError":200}`).Code)
 	require.Equal(t, http.StatusOK, put(`{"forcedError":0}`).Code)

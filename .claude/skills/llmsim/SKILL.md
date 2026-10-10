@@ -60,6 +60,6 @@ GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"
 ```
 haven sim llm status | list | get <id> | clear
 haven sim llm list [--model <text>] [--failed]                     # model contains text; 4xx/5xx only
-haven sim llm fault [--error <0|4xx|5xx>]   # `fault off` removes it
+haven sim llm fault <4xx|5xx|off>   # `fault off` removes it
 haven sim llm config [--seed <value|random>]   # only the flags given change
 ```

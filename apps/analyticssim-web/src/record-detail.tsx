@@ -52,6 +52,16 @@ export const RecordDetail = ({
                 copy: false,
               },
               { label: "Record id", value: record.id },
+              ...(record.status
+                ? [
+                    {
+                      label: "Answered",
+                      value: `${record.status}, refused by the forced error`,
+                      mono: false,
+                      copy: false,
+                    },
+                  ]
+                : []),
             ]}
           />
         </Panel>
