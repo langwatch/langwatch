@@ -1,6 +1,6 @@
 /**
  * Alerts, toasts and banners wear their status as a mesh: soft blobs of the palette's own steps
- * over a flat tint, strongest on alerts. Text keeps the ordinary foreground colours.
+ * over a flat tint, strongest on alerts. Text keeps the ordinary foreground colour.
  * {@link dev/docs/best_practices/alerts-toasts-and-field-errors.md}
  */
 
@@ -22,25 +22,20 @@ export const statusTint = ({
 const step = (name: string, amount: number) =>
   `color-mix(in srgb, var(--chakra-colors-color-palette-${name}) ${amount}%, transparent)`;
 
-/** Three soft blobs in three of the palette's steps (solid, emphasized, fg) at `spot` strength. */
+/** Two broad washes of one hue; no foreground-colour blobs that muddy the corners. */
 const meshImage = (spot: number) =>
   [
-    `radial-gradient(70% 140% at 0% 0%, ${step("solid", spot)} 0%, transparent 70%)`,
-    `radial-gradient(60% 120% at 100% 100%, ${step("emphasized", Math.round(spot * 0.9))} 0%, transparent 70%)`,
-    `radial-gradient(45% 90% at 80% 0%, ${step("fg", Math.round(spot * 0.6))} 0%, transparent 70%)`,
+    `radial-gradient(110% 180% at 0% 0%, ${step("solid", spot)} 0%, transparent 100%)`,
+    `radial-gradient(100% 160% at 100% 100%, ${step("solid", Math.round(spot * 0.6))} 0%, transparent 100%)`,
   ].join(", ");
 
-/**
- * How strongly each status surface carries its colour, lightest first: a flat base tint and the
- * mesh blobs over it (light, dark), and the hairline (light, dark). Banners sit quietest, toasts
- * between, alerts strongest, rising outline, subtle, surface.
- */
+/** Base carries the status; the mesh adds only a small, even variation in that same hue. */
 const MESH = {
-  banner: { base: [5, 9], spot: [14, 18], rim: [26, 34] },
-  toast: { base: [10, 14], spot: [26, 30], rim: [32, 42] },
-  outline: { base: [0, 0], spot: [10, 14], rim: [40, 50] },
-  subtle: { base: [14, 20], spot: [32, 38], rim: [38, 50] },
-  surface: { base: [22, 28], spot: [44, 50], rim: [48, 60] },
+  banner: { base: [3, 7], spot: [2, 3], rim: [20, 30] },
+  toast: { base: [7, 12], spot: [3, 4], rim: [26, 36] },
+  outline: { base: [1, 3], spot: [1, 2], rim: [32, 42] },
+  subtle: { base: [12, 18], spot: [4, 5], rim: [30, 40] },
+  surface: { base: [18, 25], spot: [5, 6], rim: [38, 48] },
 } as const;
 
 export type MeshLevel = keyof typeof MESH;
@@ -63,7 +58,7 @@ export const statusMesh = (level: MeshLevel) => {
 /** The mesh at `level` under a shade that deepens with `--index`: a stacked toast's depth. */
 export const deepeningMesh = (level: MeshLevel) => {
   const { spot } = MESH[level];
-  const shade = "rgba(0, 0, 0, calc(var(--index, 0) * 0.2))";
+  const shade = "rgba(0, 0, 0, clamp(0, calc(var(--index, 0) * 0.08), 0.24))";
   const under = `linear-gradient(${shade}, ${shade})`;
   return { _light: `${under}, ${meshImage(spot[0])}`, _dark: `${under}, ${meshImage(spot[1])}` };
 };
@@ -91,7 +86,7 @@ export const alertSlotRecipe = defineSlotRecipe({
       fontWeight: "medium",
     },
     description: {
-      color: "fg.muted",
+      color: "inherit",
     },
   },
   variants: {
@@ -110,7 +105,7 @@ export const alertSlotRecipe = defineSlotRecipe({
       solid: {
         root: {
           bg: { _light: "colorPalette.fg", _dark: "colorPalette.muted" },
-          backgroundImage: { _light: meshImage(40), _dark: meshImage(34) },
+          backgroundImage: { _light: meshImage(4), _dark: meshImage(8) },
           borderColor: "transparent",
           color: { _light: "fg.inverted", _dark: "fg" },
         },

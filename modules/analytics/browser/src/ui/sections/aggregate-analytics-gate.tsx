@@ -20,7 +20,7 @@ function AggregateAnalyticsPage({ title, projectSlug }: { title: string; project
         <Alert.Root status="info" size="sm" variant="subtle" width="full">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Description fontSize="sm">
+            <Alert.Description>
               Analytics across member projects is not available yet.{" "}
               <Link href={`/${projectSlug}/traces`} color="fg">
                 Open Trace Explorer

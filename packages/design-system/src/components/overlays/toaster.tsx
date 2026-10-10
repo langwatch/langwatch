@@ -41,7 +41,7 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
     }),
 };
 
-/** The icon carries the status; the card itself stays the ordinary panel. */
+/** Status glyphs remain distinct even when the status colour cannot be perceived. */
 const STATUS = {
   error: { fg: "red.fg" },
   warning: { fg: "orange.fg" },
@@ -104,9 +104,13 @@ export function Toaster({
           return (
             <Toast.Root width={{ md: "sm" }} role={status === "error" ? "alert" : undefined}>
               <StatusIcon status={status} />
-              <Stack gap="0.5" flex="1" maxWidth="100%">
+              <Stack gap="0.5" flex="1" minWidth={0} maxWidth="100%">
                 {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
-                {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
+                {toast.description && (
+                  <Toast.Description color="inherit" opacity={1}>
+                    {toast.description}
+                  </Toast.Description>
+                )}
                 {renderMeta?.(toast.meta)}
               </Stack>
               {toast.action && (

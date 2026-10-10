@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
 import { describe, expect, it } from "vitest";
 
+import { statusMesh } from "../src/system/alert.recipe.ts";
 import { system } from "../src/system/index.ts";
 
 type Mode = "light" | "dark";
@@ -83,6 +84,33 @@ function luminance(colour: string): number {
 function contrast({ a, b }: { a: string; b: string }): number {
   const [light, dark] = [luminance(a), luminance(b)].toSorted((x, y) => y - x);
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
+}
+
+/** Bound every pixel, including overlapping blob peaks, rather than just the flat base. */
+function meshGrounds({ root, ground, mode }: { root: Declarations; ground: string; mode: Mode }) {
+  const stops = [
+    ...(root.backgroundImage ?? "").matchAll(
+      /color-mix\(in srgb, (var\([^)]+\)) (\d+)%, transparent\)/g,
+    ),
+  ];
+  expect(stops).toHaveLength((root.backgroundImage?.match(/radial-gradient/g) ?? []).length);
+  return stops.reduce<string[]>(
+    (grounds, stop) => {
+      const colour = channels(resolve({ value: stop[1] ?? "", mode, root }));
+      const share = Number(stop[2]) / 100;
+      return grounds.flatMap((base) => [
+        base,
+        `#${channels(base)
+          .map((channel, at) =>
+            Math.round(channel * (1 - share) + (colour[at] ?? 0) * share)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("")}`,
+      ]);
+    },
+    [ground],
+  );
 }
 
 /** The colours one alert paints in one mode; an outline alert sits on the surface. */
@@ -182,9 +210,77 @@ describe("the alert recipe", () => {
     it.each(cases)("reads at AA for $status $variant in $mode", ({ mode, variant, status }) => {
       const painted = paint({ status, variant, mode });
 
-      expect(contrast({ a: painted.title, b: painted.ground })).toBeGreaterThanOrEqual(4.5);
-      expect(contrast({ a: painted.description, b: painted.ground })).toBeGreaterThanOrEqual(4.5);
-      expect(contrast({ a: painted.indicator, b: painted.ground })).toBeGreaterThanOrEqual(3);
+      for (const ground of meshGrounds({ ...painted, mode })) {
+        expect(contrast({ a: painted.title, b: ground })).toBeGreaterThanOrEqual(4.5);
+        expect(contrast({ a: painted.description, b: ground })).toBeGreaterThanOrEqual(4.5);
+        expect(contrast({ a: painted.indicator, b: ground })).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+
+  describe("given the quieter status surfaces", () => {
+    /** @scenario "Status meshes keep their hierarchy and contrast" */
+    it.each(["light", "dark"] as const)("keeps banners and toasts readable in %s", (mode) => {
+      for (const status of STATUSES) {
+        const painted = paint({ status, variant: "subtle", mode });
+        for (const level of ["banner", "toast"] as const) {
+          const surface = slotIn({
+            styles: system.sva({ slots: ["root"], base: { root: statusMesh(level) } })({}).root,
+            mode,
+          });
+          const root = { ...painted.root, ...surface };
+          const ground = resolve({ value: root.background ?? "", mode, root });
+          for (const background of meshGrounds({ root, ground, mode })) {
+            expect(contrast({ a: painted.title, b: background })).toBeGreaterThanOrEqual(4.5);
+            expect(contrast({ a: painted.indicator, b: background })).toBeGreaterThanOrEqual(3);
+          }
+        }
+      }
+    });
+  });
+
+  describe("given the status strength hierarchy", () => {
+    /** @scenario "Status meshes keep their hierarchy and contrast" */
+    it.each(["light", "dark"] as const)("orders the painted colour strength in %s", (mode) => {
+      for (const status of STATUSES) {
+        const painted = paint({ status, variant: "subtle", mode });
+        const plain = channels(
+          resolve({
+            value:
+              mode === "light"
+                ? "var(--chakra-colors-bg-surface)"
+                : "var(--chakra-colors-bg-panel)",
+            mode,
+            root: painted.root,
+          }),
+        );
+        const strength = (ground: string) =>
+          channels(ground).reduce(
+            (sum, channel, at) => sum + Math.abs(channel - (plain[at] ?? 0)),
+            0,
+          );
+        let previousMinimum = -1;
+        let previousMaximum = -1;
+        for (const level of ["outline", "banner", "toast", "subtle", "surface", "solid"] as const) {
+          const surface =
+            level === "solid"
+              ? paint({ status, variant: "solid", mode })
+              : (() => {
+                  const styles = slotIn({
+                    styles: system.sva({ slots: ["root"], base: { root: statusMesh(level) } })({})
+                      .root,
+                    mode,
+                  });
+                  const root = { ...painted.root, ...styles };
+                  return { root, ground: resolve({ value: root.background ?? "", mode, root }) };
+                })();
+          const bounds = meshGrounds({ ...surface, mode }).map(strength);
+          expect(Math.min(...bounds), `${status} ${level} base`).toBeGreaterThan(previousMinimum);
+          expect(Math.max(...bounds), `${status} ${level} peaks`).toBeGreaterThan(previousMaximum);
+          previousMinimum = Math.min(...bounds);
+          previousMaximum = Math.max(...bounds);
+        }
+      }
     });
   });
 

@@ -121,7 +121,7 @@ export function Banner({
         )}
         {title && children ? " " : null}
         {children && (
-          <Text as="span" color="fg.muted">
+          <Text as="span" color="inherit">
             {children}
           </Text>
         )}
