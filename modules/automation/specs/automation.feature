@@ -409,3 +409,10 @@ Feature: Automation ownership
     Given a graph alert on a saved chart whose series carries its display name and colour set
     When the alert is evaluated
     Then analytics is asked with only the series' query fields, and the evaluation runs
+
+  @unit
+  Scenario: A graph alert whose delivery fails retryably is sent again on the retry
+    Given a graph alert crossed its threshold and its delivery failed with a retryable error
+    When the evaluation is retried
+    Then the alert's open claim was rolled back, so the retry delivers it
+    And a terminal failure keeps the claim, as main does
