@@ -1427,6 +1427,17 @@ ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY O
 `OPTIMIZE ... FINAL` and `POPULATE`; the note excuses only a mutation, never the last three. Migrations
 in the newest `langwatch@v*` tag, read from git, are history and never rewritten; a clone without the
 tags fails the guards rather than passing (Alex, 2026-10-09).
+**No stuck states** (Alex, 2026-10-10, STUCK-STATES; `specs/upgrade/upgrade-stuck-states-*.feature`):
+- Once the gate admits (the ledger is current), a schema-not-ready error is a 500 that logs "schema and
+  ledger disagree", never `upgrade_in_progress`. That 503 is only for an api the gate has not admitted.
+- A tenant step settles done only when every eligible tenant holds a finished row. A pass that claimed
+  nothing, Redis down included, leaves it pending.
+- A background step run has a 15-minute deadline. When it passes, the run aborts and keeps its
+  checkpoint, the step goes back to pending, and the sweep moves on; Ops shows the expiry.
+- A failed upgrade run with no failed step row backs off exponentially from 10 s to 5 minutes, and its
+  log says it is retrying and why.
+- Legacy `pnpm task` runs and `upgrade` never overlap. Both take the one timed upgrade lease, and each
+  refuses while the other holds it. Legacy tasks are to fold into upgrade steps, in a later drive.
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
 `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
