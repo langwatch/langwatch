@@ -14,7 +14,11 @@ import { LuCalendarClock } from "react-icons/lu";
 
 // The serif display face (Sentient) is declared once in apps/ui globals.scss.
 import { homeApi } from "../../../behavior/home-api.ts";
-import { GuidedOnboardingOffer, PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
+import {
+  GuidedOnboardingOffer,
+  PendingJoinRequests,
+  UpgradeActionNeeded,
+} from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
 import { HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
@@ -68,6 +72,8 @@ export function HomePage() {
             {/* Above every composition: whoever can answer a join request sees the
                 wait wherever the home opens. Organization draws nothing for anyone else. */}
             <PendingJoinRequests />
+            {/* Beside it, ops' unfinished operator steps for whoever holds ops:view. */}
+            <UpgradeActionNeeded />
 
             {/* The Langy home carries the offer inside its hero, under the ask field;
                 the classic home carries it here, under the header. */}

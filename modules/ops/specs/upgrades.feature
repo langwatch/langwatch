@@ -343,7 +343,7 @@ Feature: Ops shows an installation's release upgrades, read-only
   Scenario: Home shows Action needed for updates while an operator step is unfinished
     Given an operator step of the running version that is not finished
     When someone holding ops:view opens Home
-    Then an "Action needed for updates" bar shows in the slot pending join requests use
+    Then an "Action needed for updates" card shows in the slot pending join requests use
     And it links to Ops, Upgrades
     And nothing offers to mark the step done
 
@@ -352,6 +352,18 @@ Feature: Ops shows an installation's release upgrades, read-only
     Given every operator step of the running version is finished, or the read is pending or failed
     When someone holding ops:view opens Home
     Then no update bar is drawn and no error flashes
+
+  @integration
+  Scenario: Project's home renders ops' action-needed card through its client token
+    Given ops lends its action-needed card by its client token
+    When project's home draws the slot beside the pending join requests
+    Then ops' card is drawn there
+
+  @integration
+  Scenario: An uninstalled ops leaves project's home without the action-needed card
+    Given no installed module lends the action-needed token
+    When project's home draws the slot
+    Then nothing is drawn in its place and nothing fails
 
   @integration
   Scenario: Home shows no update bar to someone without ops:view

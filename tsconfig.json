@@ -830,6 +830,9 @@
     },
     {
       "path": "./tools/visualdiff/runner"
+    },
+    {
+      "path": "./modules/ops/client"
     }
   ]
 }

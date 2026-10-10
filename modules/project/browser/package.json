@@ -35,6 +35,7 @@
     "@langwatch/navigation-client": "workspace:*",
     "@langwatch/onboarding-client": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/ops-client": "workspace:*",
     "@langwatch/organization-client": "workspace:*",
     "@langwatch/project-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

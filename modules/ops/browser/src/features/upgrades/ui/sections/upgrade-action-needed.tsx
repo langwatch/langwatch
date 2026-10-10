@@ -1,11 +1,19 @@
 /**
- * "Action needed for updates" on Home, for whoever holds ops:view, while an operator step of the
- * running version is unfinished. Draws nothing otherwise, nor while loading or on a failed read.
+ * Home's "Action needed for updates" card, shaped as the join requests card in its slot: for
+ * ops:view holders while an operator step of this version is unfinished, else nothing.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { Link } from "@langwatch/browser-host/link";
-import { Banner, BannerAction } from "@langwatch/design-system/banner";
-import { ArrowRight } from "lucide-react";
+import {
+  Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
+import { ArrowRight, Wrench } from "lucide-react";
 
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { useUnfinishedOperatorSteps } from "../../behavior/use-unfinished-operator-steps.ts";
@@ -17,22 +25,38 @@ export function UpgradeActionNeeded() {
   if (!hasAccess || steps.length === 0) return null;
 
   return (
-    <Banner
-      status="warning"
-      title="Action needed for updates"
-      data-testid="home-upgrade-action-needed"
-      action={
-        <BannerAction asChild>
-          <Link href="/ops/upgrades">
-            Open Upgrades
-            <ArrowRight size={12} aria-hidden />
-          </Link>
-        </BannerAction>
-      }
-    >
-      {steps.length === 1
-        ? "One operator step of this version is not finished."
-        : `${steps.length} operator steps of this version are not finished.`}
-    </Banner>
+    <Box width="full" data-testid="home-upgrade-action-needed">
+      <Card.Root
+        bg="bg.card/50"
+        backdropBlur="md"
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="14px"
+        boxShadow="none"
+      >
+        <Card.Body padding={4} gap={3}>
+          <HStack gap={2}>
+            <Box color="fg.muted" display="flex" alignItems="center">
+              <Wrench size={16} aria-hidden />
+            </Box>
+            <Heading as="h3" size="sm">
+              Action needed for updates
+            </Heading>
+            <Text fontSize="sm" color="fg.muted">
+              {steps.length === 1
+                ? "One operator step of this version is not finished."
+                : `${steps.length} operator steps of this version are not finished.`}
+            </Text>
+            <Spacer />
+            <Link href="/ops/upgrades">
+              <Button size="xs" variant="ghost" color="fg.muted">
+                Open Upgrades
+                <ArrowRight size={14} aria-hidden />
+              </Button>
+            </Link>
+          </HStack>
+        </Card.Body>
+      </Card.Root>
+    </Box>
   );
 }
