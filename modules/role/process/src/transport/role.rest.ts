@@ -93,6 +93,7 @@ export const roleRest: Readonly<{
       "Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken.",
   })
   .withMiddleware(roleRestFacts)
+  .withAudit("management.role.create")
   .handle(async ({ app, input, actor }, organization) =>
     wire(
       await app.createRole(
@@ -153,6 +154,7 @@ export const roleRest: Readonly<{
       "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not hold on the organization answers 403 role_exceeds_caller_permissions.",
   })
   .withMiddleware(roleRestFacts)
+  .withAudit("management.role.update")
   .handle(async ({ app, input, actor }, organization) =>
     wire(
       await app.updateRoleInOrganization(
@@ -181,6 +183,7 @@ export const roleRest: Readonly<{
       "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409 role_is_built_in.",
   })
   .withMiddleware(roleRestFacts)
+  .withAudit("management.role.delete")
   .handle(async ({ app, input, actor }, organization) =>
     app.deleteRoleInOrganization(
       { roleId: input.id, organizationId: organization.organizationId },

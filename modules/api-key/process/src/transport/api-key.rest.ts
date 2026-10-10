@@ -342,6 +342,7 @@ export const apiKeyRest: Readonly<{
     ],
   })
   .withMiddleware(apiKeyRestCredential)
+  .withAudit("management.api-key.create")
   .handle(async ({ app, input, scope }, caller) => {
     const isService = input.keyType === "service";
 
@@ -497,6 +498,7 @@ export const apiKeyRest: Readonly<{
     ],
   })
   .withMiddleware(apiKeyRestCredential)
+  .withAudit("management.api-key.revoke")
   .handle(async ({ app, input, scope }, caller) => {
     // Real adminness, so revoke() can enforce its owner-only path: without
     // this, any organization:manage holder could revoke anyone's key.
@@ -534,6 +536,7 @@ export const apiKeyRest: Readonly<{
     ],
   })
   .withMiddleware(apiKeyIngestionCaller)
+  .withAudit("management.api-key.create-ingestion")
   .handle(async ({ app, input, scope }, caller) => {
     const result = await app.createIngestionKey({
       key: input,
@@ -576,6 +579,7 @@ export const apiKeyRest: Readonly<{
     ],
   })
   .withMiddleware(apiKeyIngestionCaller)
+  .withAudit("management.api-key.create-full-access")
   .handle(async ({ app, input, scope }, caller) => {
     const userId = fullAccessKeyOwner({ principal: caller.principal, input, projectId: scope.id });
 

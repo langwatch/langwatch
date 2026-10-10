@@ -128,6 +128,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
     ],
   })
   .withMiddleware(apiKeyRestCredential)
+  .withAudit("management.project.create")
   .handle(async ({ app, input, scope }, credential) => {
     const { project, serviceKey } = await provisionProject({
       app,

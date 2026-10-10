@@ -94,6 +94,7 @@ export const groupsRest: Readonly<{
   .withDocs({ tags: ["Groups"], description: "Create a new group" })
   .withMiddleware(organizationKeyFacts)
   .withEntitlement("enterprise", { feature: "GROUPS" })
+  .withAudit("management.group.create")
   .handle(async ({ app, input, scope, actor }, key) => {
     const group = await app.createGroup(
       {
@@ -141,6 +142,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationGroupRestRenamedSchema)
   .withDocs({ tags: ["Groups"], description: "Rename a group" })
   .withEntitlement("enterprise", { feature: "GROUPS" })
+  .withAudit("management.group.rename")
   .handle(async ({ app, input, scope }) => {
     const group = await app.renameGroup({
       groupId: input.groupId,
@@ -158,6 +160,7 @@ export const groupsRest: Readonly<{
   .withDocs({ tags: ["Groups"], description: "Delete a group" })
   .withMiddleware(organizationKeyFacts)
   .withEntitlement("enterprise", { feature: "GROUPS" })
+  .withAudit("management.group.delete")
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.deleteGroup(
       { groupId: input.groupId, organizationId: scope.id },
@@ -188,6 +191,7 @@ export const groupsRest: Readonly<{
   .withDocs({ tags: ["Groups"], description: "Add a member to a group" })
   .withMiddleware(organizationKeyFacts)
   .withEntitlement("enterprise", { feature: "GROUPS" })
+  .withAudit("management.group.add-member")
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.addGroupMember(
       { groupId: input.groupId, organizationId: scope.id, userId: input.userId },
@@ -203,6 +207,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Remove a member from a group" })
   .withEntitlement("enterprise", { feature: "GROUPS" })
+  .withAudit("management.group.remove-member")
   .handle(async ({ app, input, scope }) => {
     await app.removeGroupMember({
       groupId: input.groupId,

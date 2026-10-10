@@ -187,6 +187,7 @@ export const organizationManagementRest: Readonly<{
       "Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.organization.update")
   .handle(async ({ app, input, scope, actor }) => {
     await app.updateSettings({ organizationId: scope.id, ...input }, deriveCaller(actor));
 
@@ -272,6 +273,7 @@ export const organizationManagementRest: Readonly<{
   })
   .withMiddleware(organizationKeyFacts)
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.organization.update-member-role")
   .handle(async ({ app, input, scope, actor }, key) =>
     updatedMemberWire(
       await app.updateMember(
@@ -296,6 +298,7 @@ export const organizationManagementRest: Readonly<{
       "Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.organization.delete-member")
   .handle(async ({ app, input, scope, actor }) => {
     await app.deleteMember({ organizationId: scope.id, userId: input.userId }, deriveCaller(actor));
 
@@ -329,6 +332,7 @@ export const organizationManagementRest: Readonly<{
   })
   .withMiddleware(organizationKeyFacts)
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.invite.create-invites")
   .handle(async ({ app, input, scope, actor }, key) => {
     const created = await app.createInvitations(
       {
@@ -371,6 +375,7 @@ export const organizationManagementRest: Readonly<{
       "Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
+  .withAudit("management.invite.delete-invite")
   .handle(async ({ app, input, scope }) => {
     await app.revokeInvitation({ organizationId: scope.id, inviteId: input.inviteId });
 

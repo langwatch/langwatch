@@ -49,6 +49,7 @@ function mount(
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),

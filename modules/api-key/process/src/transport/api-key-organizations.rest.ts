@@ -54,6 +54,7 @@ export const apiKeyOrganizationsRest: Readonly<{
     description:
       "Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.",
   })
+  .withAudit("management.organization.provision")
   .handle(({ app, input }) =>
     app.provisionOrganization({
       name: input.name,

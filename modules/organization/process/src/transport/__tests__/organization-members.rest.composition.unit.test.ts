@@ -134,6 +134,7 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   });
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {

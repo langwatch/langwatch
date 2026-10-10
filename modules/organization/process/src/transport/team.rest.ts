@@ -138,6 +138,7 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Create a new team that can group projects and members",
   })
+  .withAudit("management.team.create-team-with-members")
   .handle(async ({ app, input, scope }) =>
     teamResponse(
       await app.createTeam({
@@ -175,6 +176,7 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Update a team by its id",
   })
+  .withAudit("management.team.update")
   .handle(async ({ app, input, scope }) =>
     teamResponse(
       await app.updateTeam({
@@ -194,6 +196,7 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Archive a team (soft-delete)",
   })
+  .withAudit("management.team.archive-by-id")
   .handle(async ({ app, input, scope }) => {
     const team = await app.archiveTeam({
       teamId: input.teamId,
@@ -246,6 +249,7 @@ export const teamsRest: Readonly<{
     description: "Add a member to a team",
   })
   .withMiddleware(organizationKeyFacts)
+  .withAudit("management.team.add-member")
   .handle(async ({ app, input, scope, actor }, key) => {
     const ledgerActor =
       actor && actor.type === "user"
@@ -275,6 +279,7 @@ export const teamsRest: Readonly<{
     description: "Remove a member from a team",
   })
   .withMiddleware(organizationKeyFacts)
+  .withAudit("management.team.remove-member")
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeTeamMember(
       {

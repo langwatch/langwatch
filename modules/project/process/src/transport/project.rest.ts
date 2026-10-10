@@ -153,6 +153,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     ],
   })
   .withMiddleware(projectRestCaller)
+  .withAudit("management.project.update")
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
 
@@ -179,6 +180,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     ],
   })
   .withMiddleware(projectRestCaller)
+  .withAudit("management.project.archive-by-id")
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
     const project = await archiveProject({ app, id: input.id, organizationId: scope.id });

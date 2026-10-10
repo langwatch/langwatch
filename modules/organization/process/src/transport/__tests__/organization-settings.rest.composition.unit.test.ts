@@ -58,6 +58,7 @@ async function application() {
     return door();
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => requireCredential(request),

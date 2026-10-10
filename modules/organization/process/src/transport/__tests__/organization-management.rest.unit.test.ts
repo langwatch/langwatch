@@ -46,6 +46,7 @@ function mount(app: Partial<OrganizationApi>) {
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),

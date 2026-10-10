@@ -70,6 +70,7 @@ export function mountWebhookRest(
   const app = WebhookModule.fromDependencies({ ...unreachableDependencies(), ...dependencies });
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

@@ -57,6 +57,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
     // 400 comes from `baseResponses` with the framework's envelope.
     responses: { ...baseResponses, ...conflictResponses },
   })
+  .withAudit("management.model-provider.update")
   .handle(async ({ app, input, scope }) => {
     const { provider, ...data } = input;
 

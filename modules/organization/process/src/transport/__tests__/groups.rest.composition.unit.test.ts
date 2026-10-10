@@ -65,6 +65,7 @@ async function application({ foreignTeamId }: { foreignTeamId?: string } = {}) {
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
