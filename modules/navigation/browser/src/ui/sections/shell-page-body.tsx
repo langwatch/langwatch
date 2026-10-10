@@ -226,7 +226,14 @@ export const ShellPageBody = ({
   // while it is out; `flex: 1` + `minHeight: 0` keep a `height="full"` page inside.
   const body =
     userIsPartOfTeam || isOrganizationLoading ? (
-      <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
+      <Box
+        flex="1"
+        minHeight={0}
+        width="full"
+        display="flex"
+        flexDirection="column"
+        overflowY="auto"
+      >
         <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
           <PageHeaderSizeProvider size="lg">
             <PageMeasure pathname={pathname}>{children}</PageMeasure>

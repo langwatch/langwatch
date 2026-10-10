@@ -85,3 +85,19 @@ describe("given a settings page", () => {
     );
   });
 });
+
+describe("wide tool pages", () => {
+  it.each(["/ops/upgrades/runs/run_1", "/demo/analytics"])(
+    "keeps %s in a bounded scroll container",
+    (pathname) => {
+      frameAt({ pathname });
+      const body = screen.getByText("Page content").parentElement;
+      expect(body).not.toBeNull();
+      if (!body) return;
+      const style = getComputedStyle(body);
+      expect(style.overflowY).toBe("auto");
+      expect(style.minHeight).toBe("0px");
+      expect(style.display).toBe("flex");
+    },
+  );
+});
