@@ -17,12 +17,13 @@ import (
 // --- fakes -------------------------------------------------------------------
 
 type fakeStore struct {
-	stacks     []domain.Stack
-	removed    []string
-	slugCache  map[string]string
-	dbActivity map[string]time.Time
-	selection  map[string]domain.Selection
-	touched    []string
+	waiterClaims []domain.SlotClaim
+	stacks       []domain.Stack
+	removed      []string
+	slugCache    map[string]string
+	dbActivity   map[string]time.Time
+	selection    map[string]domain.Selection
+	touched      []string
 
 	pressure           domain.PressureRecord
 	hasWrittenPressure bool
@@ -101,6 +102,7 @@ func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
 	f.pressure, f.hasWrittenPressure = rec, true
 	return nil
 }
+func (f *fakeStore) WaiterClaims(string) []domain.SlotClaim { return f.waiterClaims }
 func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
 	return f.pressure, f.hasWrittenPressure
 }

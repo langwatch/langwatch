@@ -593,6 +593,16 @@ func (s *Store) ClaimWaiter(pid int, name string, claim WaiterClaim) (func(), er
 // dead pid or an expired marker is swept as it is found rather than reported,
 // and a marker this cannot parse is dropped rather than reaching code that
 // assumes its fields.
+// WaiterClaims is WaiterSnapshots as unit claims, for `haven status`.
+func (s *Store) WaiterClaims(name string) []domain.SlotClaim {
+	snaps := s.WaiterSnapshots(name)
+	out := make([]domain.SlotClaim, 0, len(snaps))
+	for _, w := range snaps {
+		out = append(out, domain.SlotClaim{PID: w.PID, Class: w.Class, Units: w.Units, Worktree: w.Worktree, Label: w.Command, StartedAt: w.QueuedAt})
+	}
+	return out
+}
+
 func (s *Store) WaiterSnapshots(name string) []WaiterSnapshot {
 	dir := s.waitersDir(name)
 	entries, err := os.ReadDir(dir)

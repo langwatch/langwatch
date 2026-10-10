@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -37,6 +38,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			"selection":     r.selection,
 			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
 			"nxDaemons":     r.nxDaemons,
+			"slots":         r.slots,
 		})
 	}
 	if r.haveSelection {
@@ -45,6 +47,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 	o.printStacks(r)
 	fmt.Println()
 	o.printShared(r)
+	printSlots(r.slots)
 	o.printWorktreeOverlay(worktreeDir, reveal)
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
 		len(r.stacks), r.live, domain.HumanBytes(int64(r.rss)), r.shared(domain.HubService), o.cfg.Naming.TLD)
@@ -63,6 +66,7 @@ type statusReport struct {
 	rss           uint64
 	selection     domain.Selection
 	haveSelection bool
+	slots         slotsStatus
 }
 
 func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
@@ -83,6 +87,11 @@ func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
 		r.selection = domain.DefaultSelection()
 		r.haveSelection = true
 	}
+	var holders []domain.SlotClaim
+	if o.sem != nil {
+		holders = o.sem.Holders("checks")
+	}
+	r.slots = o.collectSlots(holders, o.store.WaiterClaims("checks"), time.Now())
 	return r
 }
 

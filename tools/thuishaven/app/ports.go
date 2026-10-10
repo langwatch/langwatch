@@ -91,6 +91,8 @@ type Store interface {
 	// and nothing else, so slot counting never depends on the daemon running.
 	WritePressure(domain.PressureRecord) error
 	ReadPressure() (domain.PressureRecord, bool)
+	// WaiterClaims lists the runs queued for name's units: Label is the command, StartedAt when it queued.
+	WaiterClaims(name string) []domain.SlotClaim
 	// HeavyRuns counts the heavy runs live on this machine right now, across
 	// every worktree and terminal. Occupancy is derived from whether each
 	// recorded pid is still alive, so a killed run frees its place with no
@@ -382,6 +384,8 @@ type Semaphore interface {
 	// TryAcquireUnits takes claim.Units of a `budget`-unit counter now, all or
 	// none, and records claim against them; ok=false means not enough are free.
 	TryAcquireUnits(name string, budget int, claim domain.SlotClaim) (release func(), ok bool, err error)
+	// Holders lists who holds name's units, one claim per holder; a unit with no claim is its own.
+	Holders(name string) []domain.SlotClaim
 }
 
 // Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,

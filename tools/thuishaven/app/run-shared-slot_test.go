@@ -158,6 +158,8 @@ func (unavailableSemaphore) TryAcquire(string, int) (func(), int, bool, error) {
 	return nil, 0, false, errors.New("lock directory unavailable")
 }
 
+func (unavailableSemaphore) Holders(string) []domain.SlotClaim { return nil }
+
 func (unavailableSemaphore) TryAcquireUnits(string, int, domain.SlotClaim) (func(), bool, error) {
 	return nil, false, errors.New("lock directory unavailable")
 }

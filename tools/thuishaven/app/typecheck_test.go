@@ -29,6 +29,8 @@ func (f *fakeSemaphore) TryAcquire(name string, slots int) (func(), int, bool, e
 	return func() { f.released++ }, 2, true, nil
 }
 
+func (f *fakeSemaphore) Holders(string) []domain.SlotClaim { return nil }
+
 func (f *fakeSemaphore) TryAcquireUnits(name string, budget int, _ domain.SlotClaim) (func(), bool, error) {
 	f.acquired++
 	f.lastSlots = budget
