@@ -63,7 +63,10 @@ export type ManagedKeyProvisionedSender = Readonly<{
  * worked out, or an organization with projects of its own reads as ambiguous.
  */
 export type ConnectManagedKeyHome = Readonly<{
-  ensureInternal(input: { organizationId: string }): Promise<{ id: string }>;
+  ensureInternal(input: {
+    organizationId: string;
+    kind: "internal_governance";
+  }): Promise<{ id: string }>;
 }>;
 
 export class ConnectManagedKeyService {
@@ -86,7 +89,10 @@ export class ConnectManagedKeyService {
     licenseId: string;
     actorUserId: string;
   }): Promise<{ id: string }> {
-    const home = await this.home.ensureInternal({ organizationId: input.organizationId });
+    const home = await this.home.ensureInternal({
+      organizationId: input.organizationId,
+      kind: "internal_governance",
+    });
     const { virtualKey } = await this.virtualKeys.create({
       organizationId: input.organizationId,
       name: `Connect ${input.licenseId}`,
