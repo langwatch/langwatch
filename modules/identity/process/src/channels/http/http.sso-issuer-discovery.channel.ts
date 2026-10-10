@@ -66,7 +66,7 @@ class DiscoveryDowngradedError extends Error {
 }
 
 /** Every address a name resolves to; injected so a test never asks a resolver. */
-export type HostLookup = (hostname: string) => Promise<readonly string[]>;
+type HostLookup = (hostname: string) => Promise<readonly string[]>;
 
 const systemLookup: HostLookup = async (hostname) =>
   (await lookup(hostname, { all: true })).map(({ address }) => address);

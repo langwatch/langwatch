@@ -6,7 +6,7 @@ import type { Trace } from "@langwatch/trace-contract";
 import { extractParentTraceForNlpgo } from "../../../rules/evaluation-causality.rules.ts";
 import type { WorkflowEvaluationService } from "../../evaluators/services/workflow-evaluation.service.ts";
 
-export type EvaluationCustomEvaluationDeps = Readonly<{
+type EvaluationCustomEvaluationDeps = Readonly<{
   evaluators: Pick<EvaluatorApi, "executeCode">;
   workflowExecutor: Pick<WorkflowEvaluationService, "run">;
 }>;

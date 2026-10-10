@@ -4,7 +4,7 @@ import type { LangySessionKeyMetrics } from "./langy-session-key.service.ts";
 
 /** Series name pinned because two processes write it: App via prom-client, worker via OTLP.
  * Same lifecycle counter, name, and op label so operators don't know which process swept. */
-export const LANGY_SESSION_KEYS_METRIC_NAME = "langwatch_langy_session_keys_total";
+const LANGY_SESSION_KEYS_METRIC_NAME = "langwatch_langy_session_keys_total";
 
 /** Langy session-key lifecycle counts, pushed over OTLP. */
 export class LangySessionKeyMetricsOtelService implements LangySessionKeyMetrics {

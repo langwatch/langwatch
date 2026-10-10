@@ -12,7 +12,7 @@ import { scimSyncActivityOutcome } from "../../rules/scim-sync-activity.rules.ts
 import { ScimSyncActivityRepository } from "../scim-sync-activity.repository.ts";
 
 /** The one read this repository takes: one connection's scim_sync stream. */
-export type ScimSyncEventReads = Pick<EventReadSeat, "findAggregateEvents">;
+type ScimSyncEventReads = Pick<EventReadSeat, "findAggregateEvents">;
 
 const SCIM_SYNC_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SCIM_SYNC_EVENT_TYPES);
 

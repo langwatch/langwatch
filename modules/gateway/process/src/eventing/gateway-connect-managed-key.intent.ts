@@ -10,7 +10,7 @@ import {
 import { z } from "zod";
 
 export const GATEWAY_CONNECT_MANAGED_KEY_PIPELINE_NAME = "gateway_connect_managed_key" as const;
-export const RECORD_MANAGED_KEY_PROVISIONED_COMMAND_TYPE =
+const RECORD_MANAGED_KEY_PROVISIONED_COMMAND_TYPE =
   "lw.gateway.record_managed_key_provisioned" as const;
 const MINUTE_MS = 60_000;
 

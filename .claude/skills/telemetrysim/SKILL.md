@@ -35,7 +35,7 @@ A batch is a pure function of preset, seed and index: the same seed sends the sa
   - **Send one**: one request (a preset, or pasted OTLP JSON) as protobuf or JSON, gzip or
     not, no retry, no run; shows the URL, status, Retry-After, latency and the door's body.
   - **Fixtures**: every preset (its body from any seed) and every recording under
-    `services/telemetrysim/fixtures/<family>/<name>.otlp.json`; each sends with one click.
+    the sim's fixtures directory (`<family>/<name>.otlp.json`); each sends with one click.
   - **Setup**: the OTLP base, the key's ends and source (`TELEMETRYSIM_API_KEY`, never the
     key), the project (`local-dev-org/local-dev-project`), and the terminal verbs.
 - Standalone: `make service svc=telemetrysim` (:5599); then every run must name `endpoint`

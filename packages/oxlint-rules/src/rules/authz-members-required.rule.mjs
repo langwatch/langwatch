@@ -75,7 +75,7 @@ export const authzMembersRequiredRule = defineRule({
     optionalMember: {
       what: "`{{name}}` is an optional question on an exported authorization type.",
       why: "Authorization fails closed: a question a process may leave unanswered is a check the door may skip.",
-      fix: "Make `{{name}}` required (drop `?` and `| undefined`) and supply it at every call site.",
+      fix: "Make `{{name}}` required (drop `?` and `| undefined`) and supply it at every call site. Read the `api-transports` skill.",
     },
   },
   create(context) {

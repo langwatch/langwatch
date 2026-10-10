@@ -3,7 +3,7 @@
  * decision 14). A self-hosted install that sets one gets no classifier, so it judges through
  * Connect or not at all. Self-hosted judging waits for wave 3.
  */
-export type CloudClassifierKey = { available: true; apiKey: string } | { available: false };
+type CloudClassifierKey = { available: true; apiKey: string } | { available: false };
 
 export function cloudClassifierKeyOf({
   isCloud,

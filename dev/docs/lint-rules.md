@@ -116,7 +116,7 @@ Messages:
 
 - `optionalMember`
   - what: `{{name}}` is an optional question on an exported authorization type.
-  - fix: Make `{{name}}` required (drop `?` and `| undefined`) and supply it at every call site.
+  - fix: Make `{{name}}` required (drop `?` and `| undefined`) and supply it at every call site. Read the `api-transports` skill.
   - why: Authorization fails closed: a question a process may leave unanswered is a check the door may skip.
 
 ## `langwatch/banned-test-model-names`
@@ -1293,7 +1293,7 @@ Messages:
 
 - `sliceReaderName`
   - what: `{{name}}` holds a `{{factory}}(...)` reader, which is a hook.
-  - fix: Rename it `use{{suggestion}}` and call it only where a hook may be called.
+  - fix: Rename it `use{{suggestion}}` and call it only where a hook may be called. Read the `browser-module` skill.
   - why: The React Compiler caches a call to a non-`use` name, so the hook runs on one render and not the next.
 
 ## `langwatch/stand-in-cast`
