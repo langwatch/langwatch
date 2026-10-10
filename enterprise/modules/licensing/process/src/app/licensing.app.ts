@@ -15,6 +15,8 @@ import {
   type ActivationCodePage,
   type ActivationCodeView,
   type ActivationAnswer,
+  type ConnectActivationCaller,
+  type ConnectLicenceCaller,
   type ConnectPresentedCredential,
   type LicenseSyncAnswer,
   type LicenseSyncBody,
@@ -30,6 +32,7 @@ import {
   type ConnectService,
   type ConnectServiceState,
   type ConnectStatus,
+  type ConnectUpstream,
   type InstanceIdentityView,
   type ContractTerms,
   type IncomingUsageReport,
@@ -61,7 +64,6 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -94,7 +96,6 @@ import {
 } from "../services/configured-activation.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
-import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import type { ContractBudgets } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
@@ -155,10 +156,7 @@ type LicensingSetup = FeatureSetup<
 
 export class LicensingModule implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
-  static readonly dependencies = {
-    /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
-    gateway: GatewayApi,
-  };
+  static readonly dependencies = {};
   static readonly config = licensingConfig;
   /**
    * Each secret has one owner: SSO's gate asks this module for `LANGWATCH_LICENSE_KEY`, and
@@ -262,7 +260,7 @@ export class LicensingModule implements LicensingApiContract {
   }
 
   static #assemble(
-    { config, resources, dependencies, repositories, role }: LicensingSetup,
+    { config, resources, repositories, role }: LicensingSetup,
     {
       instanceLicenseKey,
       licensePrivateKey,
@@ -310,7 +308,6 @@ export class LicensingModule implements LicensingApiContract {
     });
     const connectInfrastructure = connectInstallOver({
       repositories,
-      gateway: dependencies.gateway,
       config,
       cryptography,
       version: releaseVersionOf(config),
@@ -589,15 +586,28 @@ export class LicensingModule implements LicensingApiContract {
     };
   }
 
-  recordLicenseSync(
-    input: ConnectPresentedCredential & { body: LicenseSyncBody },
-  ): Promise<LicenseSyncAnswer> {
+  verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verify(input);
+  }
+
+  verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
+    return this.#activation.verifyPresented(input);
+  }
+
+  recordLicenseSync(input: {
+    caller: ConnectLicenceCaller;
+    body: LicenseSyncBody;
+  }): Promise<LicenseSyncAnswer> {
     return this.#sync.answer(input);
   }
 
   /** The install end of Connect (ADR-156, section 9). */
   getConnectStatus(input: { organizationId: string }): Promise<ConnectStatus> {
     return this.#install.getStatus(input.organizationId);
+  }
+
+  findConnectUpstream(input: { organizationId: string }): Promise<ConnectUpstream[]> {
+    return this.#install.findUpstream(input.organizationId);
   }
 
   findEnabledConnectServices(input: { organizationId: string }): Promise<ConnectService[]> {
@@ -727,7 +737,7 @@ export class LicensingModule implements LicensingApiContract {
     return this.#activation.revoke(input);
   }
 
-  redeemActivationCode(input: ConnectPresentedCredential): Promise<ActivationAnswer> {
+  redeemActivationCode(input: ConnectActivationCaller): Promise<ActivationAnswer> {
     return this.#activation.answer(input);
   }
 
@@ -940,14 +950,12 @@ type ConnectInstallParts = Readonly<{
  */
 function connectInstallOver({
   repositories,
-  gateway,
   config,
   cryptography,
   version,
   instanceLicenseKey,
 }: {
   repositories: Pick<LicensingRepositories, "connectOrganizations" | "instanceIdentity">;
-  gateway: Pick<GatewayApi, "setConnectUpstreamInternal" | "clearConnectUpstreamInternal">;
   config: LicensingServerConfig;
   cryptography: LicenseCryptography;
   version: string;
@@ -972,10 +980,6 @@ function connectInstallOver({
           }),
         }
       : {}),
-    upstream: {
-      set: (slot) => gateway.setConnectUpstreamInternal(slot),
-      clear: (slot) => gateway.clearConnectUpstreamInternal(slot),
-    },
     instanceLicenseKey: () => instanceLicenseKey,
     newInstanceId: () => cryptography.generateInstanceId(),
     version: () => version,
@@ -1023,7 +1027,6 @@ function connectInstallParts({
     ...(infrastructure.gateway ? { gateway: infrastructure.gateway } : {}),
     instanceLicenseKey: infrastructure.instanceLicenseKey,
     ...(publicKey ? { publicKey } : {}),
-    ...(infrastructure.upstream ? { upstream: infrastructure.upstream } : {}),
     ...(logger ? { logger } : {}),
   });
   return {
@@ -1073,8 +1076,6 @@ type ConnectInstallInfrastructure = Readonly<{
   /** Composed only where Connect is permitted; absent means no outbound call. */
   gateway?: ConnectGatewayChannel;
   licenseHost?: ConnectLicenseChannel;
-  /** The gateway's hosted provider slot; absent where no gateway is composed beside. */
-  upstream?: ConnectUpstreamSlot;
   /** The key this whole deployment is licensed by, where one is set. */
   instanceLicenseKey: () => string | undefined;
   /** A fresh instance identity. Supplied, so a suite mints a predictable one. */

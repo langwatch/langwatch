@@ -204,6 +204,7 @@ async function mountAsLegacyProjectKey() {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories: LiveGatewayRepositories.create({
       prisma,

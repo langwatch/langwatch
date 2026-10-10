@@ -17,6 +17,7 @@ import {
   LicenseSyncRateLimitedError,
   licenseSyncBodySchema,
   type LicenseSyncRefusalCode,
+  type ConnectLicenceCaller,
   type ConnectPresentedCredential,
   type LicenseSyncAnswer,
   type LicenseSyncBody,
@@ -71,39 +72,45 @@ export class LicenseSyncService {
 
   private constructor(private readonly options: LicenseSyncOptions) {}
 
-  /** The connect host's answer to one presented sync; a refusal throws its code. */
-  async answer(input: ConnectPresentedCredential & { body: unknown }): Promise<LicenseSyncAnswer> {
-    const result = await this.recordSync({
+  /** The `licence_token` door's check: who presented this bearer, or its refusal thrown. */
+  async verify(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    const resolution = await this.options.credentials.resolve({
       token: bearerTokenOf(input.authorization),
       instanceId: input.instanceId,
-      body: input.body,
     });
+    if (!resolution.ok) throw SYNC_REFUSALS[resolution.code]();
+    const { license, virtualKeyId } = resolution;
+    return {
+      licenseRowId: license.id,
+      organizationId: license.organizationId,
+      instanceId: license.instanceId,
+      virtualKeyId,
+    };
+  }
+
+  /** The connect host's answer to one verified sync; a refusal throws its code. */
+  async answer(input: { caller: ConnectLicenceCaller; body: unknown }): Promise<LicenseSyncAnswer> {
+    const result = await this.recordSync(input);
     if (!result.ok) throw SYNC_REFUSALS[result.code]();
     return { services: result.services, ...(result.license ? { license: result.license } : {}) };
   }
 
   async recordSync(input: {
-    token: string;
-    instanceId: string | null | undefined;
+    caller: ConnectLicenceCaller;
     body: unknown;
   }): Promise<LicenseSyncResult> {
     const parsed = licenseSyncBodySchema.safeParse(input.body);
     if (!parsed.success) return { ok: false, code: "validation_error" };
 
-    const resolution = await this.options.credentials.resolve({
-      token: input.token,
-      instanceId: input.instanceId,
-    });
-    if (!resolution.ok) return { ok: false, code: resolution.code };
-
-    const row = resolution.license;
+    const row = await this.options.repository.findById(input.caller.licenseRowId);
+    if (!row?.organizationId) return { ok: false, code: "connect_license_not_registered" };
     if (!(await this.options.rateLimit.allow({ licenseRowId: row.id }))) {
       return { ok: false, code: "rate_limited" };
     }
 
     await this.record({ row, seats: parsed.data.seats, version: parsed.data.version });
     await this.options.managedKeys.setConnectServices({
-      virtualKeyId: resolution.virtualKeyId,
+      virtualKeyId: input.caller.virtualKeyId,
       organizationId: row.organizationId,
       services: entitledConnectServices(row.services),
     });

@@ -64,6 +64,7 @@ async function gatewayHolding({ updateAt }: { updateAt: string[] }) {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {

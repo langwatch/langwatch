@@ -16,6 +16,7 @@ import {
   type ActivationCodePage,
   type ActivationCodeView,
   type ActivationRedemption,
+  type ConnectActivationCaller,
   type ConnectPresentedCredential,
   type ConnectService,
   type IssueActivationCodeInput,
@@ -140,12 +141,14 @@ export class ActivationCodeService {
     return this.#view(row);
   }
 
-  /** The connect host's answer: the code travels as the bearer, as a license token does. */
-  async answer(input: ConnectPresentedCredential): Promise<ActivationAnswer> {
-    const redemption = await this.redeem({
-      code: bearerTokenOf(input.authorization),
-      instanceId: input.instanceId,
-    });
+  /** The `licence_token` door's check: the code travels as the bearer, as a license token does. */
+  verifyPresented(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
+    return this.verify({ code: bearerTokenOf(input.authorization), instanceId: input.instanceId });
+  }
+
+  /** The connect host's answer to a code its door found redeemable. */
+  async answer(caller: ConnectActivationCaller): Promise<ActivationAnswer> {
+    const redemption = await this.redeem(caller);
     return {
       license: redemption.licenseKey,
       planType: redemption.planType,
@@ -155,11 +158,11 @@ export class ActivationCodeService {
     };
   }
 
-  /** One install presenting one code. */
-  async redeem(input: {
+  /** One install presenting one code: looked up, never claimed (W02-ACTIVATE-DOOR). */
+  async verify(input: {
     code: string;
     instanceId: string | null | undefined;
-  }): Promise<ActivationRedemption> {
+  }): Promise<ConnectActivationCaller> {
     const normalised = normaliseActivationCode(input.code ?? "");
     if (!normalised) throw new ActivationCodeMalformedError();
 
@@ -176,9 +179,22 @@ export class ActivationCodeService {
     // two it is would tell the caller something about our customers.
     if (!row || row.revokedAt) throw new ActivationCodeNotFoundError();
 
-    const now = this.#now();
-    if (Temporal.Instant.compare(now, row.expiresAt) >= 0) throw new ActivationCodeExpiredError();
+    if (Temporal.Instant.compare(this.#now(), row.expiresAt) >= 0) {
+      throw new ActivationCodeExpiredError();
+    }
 
+    return { activationCodeId: row.id, organizationId: row.organizationId, instanceId };
+  }
+
+  /** Claims a verified code; the claim is conditional, so a revoke or race since still loses. */
+  async redeem({
+    activationCodeId,
+    instanceId,
+  }: ConnectActivationCaller): Promise<ActivationRedemption> {
+    const row = await this.collaborators.repository.findById(activationCodeId);
+    if (!row) throw new ActivationCodeNotFoundError();
+
+    const now = this.#now();
     const claimed = await this.#claim({ row, instanceId, at: now });
     if (!claimed) throw await this.#whyTheClaimLost({ row, at: now });
 

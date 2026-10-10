@@ -152,6 +152,18 @@ Feature: License sync
     And no seats are recorded
 
   @unit
+  Scenario: The connect host's door refuses a malformed licence token before the body
+    When a sync arrives with no bearer, or a bearer that is not a licence token
+    Then the licence token door refuses it as connect_license_token_malformed with status 401
+    And the body is not read and no seats are recorded
+
+  @unit
+  Scenario: The connect host's door refuses a licence token presented without an instance id
+    When a sync arrives with a well-formed licence token and no instance id
+    Then the licence token door refuses it as connect_instance_required with status 400
+    And no seats are recorded
+
+  @unit
   Scenario: A sync with a malformed payload is refused
     When a sync arrives with seat counts that are not whole non-negative numbers
     Then it is refused as invalid

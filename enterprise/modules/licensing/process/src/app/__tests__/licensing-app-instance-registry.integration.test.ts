@@ -1,4 +1,3 @@
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -60,9 +59,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
         raisedSignals: [],
       });
       const app = await LicensingModule.create({
-        dependencies: {
-          gateway: createApiFixture<GatewayApi>(),
-        },
+        dependencies: {},
         repositories: LiveLicensingRepositories.create({
           prisma,
           encryption: createApiFixture<IssuedLicenseCipher>(),

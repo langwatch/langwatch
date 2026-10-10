@@ -416,6 +416,15 @@ Feature: Transport declaration split
     And a family no module bound the door for lets nobody in
 
   @integration
+  Scenario: The licence token door verifies a connect host bearer before the body
+    Given a family behind the licence token door, bound by the module that issues licences (Alex, 2026-10-10, W02-DOOR-SHAPE)
+    When an install presents a bearer the owning module accepts
+    Then the handler is handed no actor, the holder's organization as the scope and the resolution as the session
+    When an install presents a bearer the module refuses, with a body that fails the schema
+    Then the module's own refusal answers with its code and status, before the body is read
+    And a family no module bound the door for lets nobody in
+
+  @integration
   Scenario: A route admits only the key kinds it names
     Given a route behind the project door names the key kinds it admits (Alex, 2026-10-05, E7)
     When a caller presents a key of a kind the route does not name

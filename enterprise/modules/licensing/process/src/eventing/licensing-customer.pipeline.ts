@@ -5,6 +5,7 @@ import type {
   LicenseClearedEventData,
   LicenseStoredEventData,
   LicenseSyncFinishedEventData,
+  ConnectUpstreamChangedEventData,
   ManagedKeyInvalidatedEventData,
   ManagedKeyLicenseSetEventData,
   ManagedKeyRetiredEventData,
@@ -41,6 +42,10 @@ import {
   licenseStoredEventSchema,
   type LicenseSyncFinishedEvent,
   licenseSyncFinishedEventSchema,
+  type ConnectUpstreamClearedEvent,
+  connectUpstreamClearedEventSchema,
+  type ConnectUpstreamSetEvent,
+  connectUpstreamSetEventSchema,
   type ManagedKeyInvalidatedEvent,
   managedKeyInvalidatedEventSchema,
   type ManagedKeyLicenseSetEvent,
@@ -50,6 +55,8 @@ import {
   type ManagedKeyServicesSetEvent,
   managedKeyServicesSetEventSchema,
   RecordConnectServiceSwitchedCommand,
+  RecordConnectUpstreamClearedCommand,
+  RecordConnectUpstreamSetCommand,
   RecordContractTermsChangedCommand,
   RecordLicenseClearedCommand,
   RecordLicenseStoredCommand,
@@ -75,6 +82,8 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | ManagedKeyInvalidatedEvent
   | ManagedKeyLicenseSetEvent
   | ManagedKeyServicesSetEvent
+  | ConnectUpstreamSetEvent
+  | ConnectUpstreamClearedEvent
   | ConnectCredentialIssuedEvent
   | ContractTermsChangedEvent,
   Record<string, Projection>,
@@ -87,6 +96,8 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | { name: "recordManagedKeyInvalidated"; payload: ManagedKeyInvalidatedEventData }
   | { name: "recordManagedKeyLicenseSet"; payload: ManagedKeyLicenseSetEventData }
   | { name: "recordManagedKeyServicesSet"; payload: ManagedKeyServicesSetEventData }
+  | { name: "recordConnectUpstreamSet"; payload: ConnectUpstreamChangedEventData }
+  | { name: "recordConnectUpstreamCleared"; payload: ConnectUpstreamChangedEventData }
   | { name: "recordConnectCredentialIssued"; payload: ConnectCredentialIssuedEventData }
   | { name: "recordContractTermsChanged"; payload: ContractTermsChangedEventData }
 >;
@@ -112,6 +123,8 @@ export function buildLicensingCustomerPipeline({
         managedKeyInvalidatedEventSchema,
         managedKeyLicenseSetEventSchema,
         managedKeyServicesSetEventSchema,
+        connectUpstreamSetEventSchema,
+        connectUpstreamClearedEventSchema,
         connectCredentialIssuedEventSchema,
         contractTermsChangedEventSchema,
       ])
@@ -124,6 +137,8 @@ export function buildLicensingCustomerPipeline({
       .withCommand("recordManagedKeyInvalidated", RecordManagedKeyInvalidatedCommand)
       .withCommand("recordManagedKeyLicenseSet", RecordManagedKeyLicenseSetCommand)
       .withCommand("recordManagedKeyServicesSet", RecordManagedKeyServicesSetCommand)
+      .withCommand("recordConnectUpstreamSet", RecordConnectUpstreamSetCommand)
+      .withCommand("recordConnectUpstreamCleared", RecordConnectUpstreamClearedCommand)
       .withCommand("recordConnectCredentialIssued", RecordConnectCredentialIssuedCommand)
       .withCommand("recordContractTermsChanged", RecordContractTermsChangedCommand)
       // C3B-ORDER: attaches under the row's guard; a redelivery finds the key already attached.

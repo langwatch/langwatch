@@ -8,6 +8,10 @@ import {
   CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
   type ConnectCredentialIssuedEventData,
   connectCredentialIssuedEventDataSchema,
+  CONNECT_UPSTREAM_CLEARED_EVENT_TYPE,
+  CONNECT_UPSTREAM_SET_EVENT_TYPE,
+  type ConnectUpstreamChangedEventData,
+  connectUpstreamChangedEventDataSchema,
   LICENSING_CUSTOMER_AGGREGATE_TYPE,
   LICENSING_CUSTOMER_EVENT_VERSION,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
@@ -74,6 +78,16 @@ function licensingStandIn() {
         type: z.literal(MANAGED_KEY_SERVICES_SET_EVENT_TYPE),
         data: managedKeyServicesSetEventDataSchema,
       }),
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(CONNECT_UPSTREAM_SET_EVENT_TYPE),
+        data: connectUpstreamChangedEventDataSchema,
+      }),
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(CONNECT_UPSTREAM_CLEARED_EVENT_TYPE),
+        data: connectUpstreamChangedEventDataSchema,
+      }),
     ])
     .build();
 }
@@ -84,6 +98,7 @@ function harness() {
   const issued: unknown[] = [];
   const licensed: unknown[] = [];
   const serviced: unknown[] = [];
+  const slot: string[] = [];
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
     processStore: InMemoryProcessStore.createForTesting(),
@@ -97,6 +112,10 @@ function harness() {
         invalidate: async (input) => void invalidated.push(input),
         setLicense: async (input) => void licensed.push(input),
         setConnectServices: async (input) => void serviced.push(input),
+      },
+      upstream: {
+        setFromLicensing: async ({ organizationId }) => void slot.push(`set:${organizationId}`),
+        clear: async ({ organizationId }) => void slot.push(`cleared:${organizationId}`),
       },
     }),
   );
@@ -113,7 +132,9 @@ function harness() {
       | { type: typeof MANAGED_KEY_RETIRED_EVENT_TYPE; data: ManagedKeyRetiredEventData }
       | { type: typeof MANAGED_KEY_INVALIDATED_EVENT_TYPE; data: ManagedKeyInvalidatedEventData }
       | { type: typeof MANAGED_KEY_LICENSE_SET_EVENT_TYPE; data: ManagedKeyLicenseSetEventData }
-      | { type: typeof MANAGED_KEY_SERVICES_SET_EVENT_TYPE; data: ManagedKeyServicesSetEventData };
+      | { type: typeof MANAGED_KEY_SERVICES_SET_EVENT_TYPE; data: ManagedKeyServicesSetEventData }
+      | { type: typeof CONNECT_UPSTREAM_SET_EVENT_TYPE; data: ConnectUpstreamChangedEventData }
+      | { type: typeof CONNECT_UPSTREAM_CLEARED_EVENT_TYPE; data: ConnectUpstreamChangedEventData };
   }) =>
     licensing.service.storeEvents(
       [
@@ -130,7 +151,7 @@ function harness() {
       ],
       { tenantId: createTenantId(ORGANIZATION_ID) },
     );
-  return { eventing, append, retired, invalidated, issued, licensed, serviced };
+  return { eventing, append, retired, invalidated, issued, licensed, serviced, slot };
 }
 
 const facts = {
@@ -255,6 +276,35 @@ describe("given gateway's managed-key pipeline beside licensing's facts", () => 
 
       expect(issued).toEqual([fact]);
       expect(retired).toEqual([]);
+      await eventing.close();
+    });
+  });
+
+  describe("when licensing records the install's upstream set and then cleared", () => {
+    /** @scenario "Licensing records the install's hosted provider slot set and cleared as facts" */
+    it("pulls the slot from licensing on the set fact and clears it on the cleared fact, in order", async () => {
+      const { eventing, append, slot } = harness();
+      const data = {
+        tenantId: ORGANIZATION_ID,
+        occurredAt: OCCURRED_AT,
+        organizationId: ORGANIZATION_ID,
+      };
+
+      await append({
+        id: "evt-upstream-set-1",
+        fact: { type: CONNECT_UPSTREAM_SET_EVENT_TYPE, data },
+      });
+      await vi.waitFor(() => expect(slot).toHaveLength(1));
+      await append({
+        id: "evt-upstream-cleared-1",
+        fact: {
+          type: CONNECT_UPSTREAM_CLEARED_EVENT_TYPE,
+          data: { ...data, occurredAt: OCCURRED_AT + 1 },
+        },
+      });
+      await vi.waitFor(() => expect(slot).toHaveLength(2));
+
+      expect(slot).toEqual([`set:${ORGANIZATION_ID}`, `cleared:${ORGANIZATION_ID}`]);
       await eventing.close();
     });
   });

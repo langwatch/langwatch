@@ -112,6 +112,20 @@ export const managedKeyServicesSetEventDataSchema = z.object({
 });
 export type ManagedKeyServicesSetEventData = z.infer<typeof managedKeyServicesSetEventDataSchema>;
 
+export const CONNECT_UPSTREAM_SET_EVENT_TYPE = "lw.licensing.connect_upstream_set" as const;
+export const CONNECT_UPSTREAM_CLEARED_EVENT_TYPE = "lw.licensing.connect_upstream_cleared" as const;
+
+/**
+ * Licensing decided an organization's gateway reaches LangWatch-hosted models (set) or not
+ * (cleared). Ids only: gateway pulls the token through `LicensingApi.findConnectUpstream`.
+ */
+export const connectUpstreamChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+});
+export type ConnectUpstreamChangedEventData = z.infer<typeof connectUpstreamChangedEventDataSchema>;
+
 export const CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE =
   "lw.licensing.connect_credential_issued" as const;
 

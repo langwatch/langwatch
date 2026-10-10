@@ -782,13 +782,6 @@ export interface GatewayApi extends GatewayInternalProtocol {
   rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualKey>;
   revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 
-  /**
-   * Where one organization's gateway reaches LangWatch-hosted models, replaced whole.
-   * Only licensing writes it, and it clears it on every change of license, service or Connect.
-   */
-  setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void>;
-  /** Drops the organization's hosted provider slot. Safe to repeat. */
-  clearConnectUpstreamInternal(input: { organizationId: string }): Promise<void>;
   disableVirtualKey(input: GatewayVirtualKeyDisableCommand): Promise<GatewayVirtualKeyRecord>;
   enableVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 

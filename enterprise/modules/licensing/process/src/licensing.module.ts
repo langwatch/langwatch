@@ -1,3 +1,4 @@
+import { bindRestCredential } from "@langwatch/api/rest";
 import type { LicensingApi, LicensingServerConfig } from "@langwatch/enterprise-licensing-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -10,7 +11,7 @@ import { LicenseMintService } from "./services/license-mint.service.ts";
 import { OrganizationLicenseCopyService } from "./services/organization-license-copy.service.ts";
 import { OrganizationLicenseWriterService } from "./services/organization-license-writer.service.ts";
 import { GenerateLicenseTask } from "./tasks/generate-license.task.ts";
-import { connectHostRest } from "./transport/connect-host.rest.ts";
+import { connectHostDoor, connectHostRest } from "./transport/connect-host.rest.ts";
 import { connectTrpcTransport } from "./transport/connect.trpc.ts";
 import { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 
@@ -24,6 +25,10 @@ export const licensingProcessModule: PublishedProcessModule<
   .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest)
   .withEventing(licenseSyncEventing)
   .withEventing(licensingCustomerEventing)
+  // The connect host's bearer, verified before the body (W02-DOOR-SHAPE, 2026-10-10).
+  .withTransportFacts(({ app }) => [
+    bindRestCredential("licence_token", () => connectHostDoor(app)),
+  ])
   .withTasks(({ app, repositories }) => [
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({

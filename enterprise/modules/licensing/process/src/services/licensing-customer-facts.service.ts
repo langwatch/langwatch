@@ -179,6 +179,24 @@ export class LicensingCustomerFactsService {
     });
   }
 
+  /** Gateway pulls the organization's upstream from licensing on this fact; ids only. */
+  async connectUpstreamSet({ organizationId }: { organizationId: string }): Promise<void> {
+    await this.commands().recordConnectUpstreamSet.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+    });
+  }
+
+  /** Gateway drops the organization's hosted provider slot on this fact. */
+  async connectUpstreamCleared({ organizationId }: { organizationId: string }): Promise<void> {
+    await this.commands().recordConnectUpstreamCleared.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+    });
+  }
+
   /** Gateway provisions the licence's managed key from this fact; names the token by hash only. */
   async connectCredentialIssued({
     organizationId,

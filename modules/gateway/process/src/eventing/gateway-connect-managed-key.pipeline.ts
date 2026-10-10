@@ -1,11 +1,14 @@
 /**
- * Gateway's side of a licence's managed key (C3b): it provisions the key from licensing's issued
- * fact and says so, and ends or re-resolves it from licensing's facts. Every write repeats safely.
+ * Gateway's side of licensing's Connect facts (C3b): a licence's managed key (provision, end,
+ * re-resolve) and the install's hosted provider slot. Every write repeats safely.
  * Spec: enterprise/modules/licensing/specs/licensing.feature
  */
 import {
   CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
+  CONNECT_UPSTREAM_CLEARED_EVENT_TYPE,
+  CONNECT_UPSTREAM_SET_EVENT_TYPE,
   connectCredentialIssuedEventDataSchema,
+  connectUpstreamChangedEventDataSchema,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
   MANAGED_KEY_LICENSE_SET_EVENT_TYPE,
   MANAGED_KEY_RETIRED_EVENT_TYPE,
@@ -32,6 +35,7 @@ import { Temporal } from "@langwatch/time";
 import type { GatewayModule } from "../app/gateway.app.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import type { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
+import type { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
 import {
   GATEWAY_CONNECT_MANAGED_KEY_PIPELINE_NAME,
   type GatewayManagedKeyProvisionedEvent,
@@ -47,11 +51,13 @@ export type GatewayConnectManagedKeyPipeline = StaticPipelineDefinition<
 
 export function buildGatewayConnectManagedKeyPipeline({
   managedKeys,
+  upstream,
 }: {
   managedKeys: Pick<
     ConnectManagedKeyService,
     "provisionForLicense" | "retire" | "invalidate" | "setLicense" | "setConnectServices"
   >;
+  upstream: Pick<GatewayConnectUpstreamService, "setFromLicensing" | "clear">;
 }): GatewayConnectManagedKeyPipeline {
   return (
     definePipeline({
@@ -101,6 +107,17 @@ export function buildGatewayConnectManagedKeyPipeline({
         data: managedKeyServicesSetEventDataSchema,
         handle: ({ virtualKeyId, organizationId, services }) =>
           managedKeys.setConnectServices({ virtualKeyId, organizationId, services }),
+      })
+      // Pulls the token from licensing and rewrites the slot whole, so a redelivery rewrites it.
+      .withPeerSubscriber("gatewayConnectUpstreamSet", {
+        eventType: CONNECT_UPSTREAM_SET_EVENT_TYPE,
+        data: connectUpstreamChangedEventDataSchema,
+        handle: ({ organizationId }) => upstream.setFromLicensing({ organizationId }),
+      })
+      .withPeerSubscriber("gatewayConnectUpstreamCleared", {
+        eventType: CONNECT_UPSTREAM_CLEARED_EVENT_TYPE,
+        data: connectUpstreamChangedEventDataSchema,
+        handle: ({ organizationId }) => upstream.clear({ organizationId }),
       })
       .build()
   );

@@ -138,6 +138,7 @@ async function mountedCreate(
       traces: createApiFixture({}),
       oneTimeReveals: oneTimeReveals ?? createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {

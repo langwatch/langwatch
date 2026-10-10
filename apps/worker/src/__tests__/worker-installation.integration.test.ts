@@ -452,6 +452,8 @@ describe("the worker process installation", () => {
         expect.arrayContaining([
           "gateway_connect_managed_key.gatewayConnectManagedKeyLicenseSet",
           "gateway_connect_managed_key.gatewayConnectManagedKeyServicesSet",
+          "gateway_connect_managed_key.gatewayConnectUpstreamSet",
+          "gateway_connect_managed_key.gatewayConnectUpstreamCleared",
         ]),
       );
     } finally {

@@ -28,6 +28,7 @@ import type {
   RestTransportDeclaration,
 } from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
+import { LicenceTokenIdentity } from "./licence-token-identity.ts";
 import { OtlpIngestIdentity } from "./otlp-ingest-identity.ts";
 import {
   isRestCredentialBinding,
@@ -47,10 +48,13 @@ import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
 import { assertEveryRouteDeclared } from "./security.ts";
 import { SessionKeyIdentity } from "./session-key-identity.ts";
 
-/** Every credential kind a family may name, except the four a module binds for itself. */
+/** Every credential kind a family may name, except the five a module binds for itself. */
 export type RestIdentities = Readonly<
   Record<
-    Exclude<RestDoorCredential, "internal_secret" | "session_key" | "cli_token" | "otlp_ingest">,
+    Exclude<
+      RestDoorCredential,
+      "internal_secret" | "session_key" | "cli_token" | "otlp_ingest" | "licence_token"
+    >,
     RestIdentity
   >
 >;
@@ -226,6 +230,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       session_key: SessionKeyIdentity.unbound(declaration.namespace),
       cli_token: CliTokenIdentity.unbound(declaration.namespace),
       otlp_ingest: OtlpIngestIdentity.unbound(declaration.namespace),
+      licence_token: LicenceTokenIdentity.unbound(declaration.namespace),
     };
   }
 }

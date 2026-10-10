@@ -19,6 +19,10 @@ import {
   type LicenseSyncFinishedEventData,
   LICENSING_CUSTOMER_AGGREGATE_TYPE,
   LICENSING_CUSTOMER_EVENT_VERSION,
+  CONNECT_UPSTREAM_CLEARED_EVENT_TYPE,
+  CONNECT_UPSTREAM_SET_EVENT_TYPE,
+  connectUpstreamChangedEventDataSchema,
+  type ConnectUpstreamChangedEventData,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
   MANAGED_KEY_LICENSE_SET_EVENT_TYPE,
   MANAGED_KEY_RETIRED_EVENT_TYPE,
@@ -422,6 +426,93 @@ export class RecordManagedKeyServicesSetCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: ManagedKeyServicesSetEventData): string {
+    return payload.organizationId;
+  }
+}
+
+const RECORD_CONNECT_UPSTREAM_SET_COMMAND_TYPE =
+  "lw.licensing.record_connect_upstream_set" as const;
+const RECORD_CONNECT_UPSTREAM_CLEARED_COMMAND_TYPE =
+  "lw.licensing.record_connect_upstream_cleared" as const;
+
+export const connectUpstreamSetEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(CONNECT_UPSTREAM_SET_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: connectUpstreamChangedEventDataSchema,
+});
+export type ConnectUpstreamSetEvent = z.infer<typeof connectUpstreamSetEventSchema>;
+
+export const connectUpstreamClearedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(CONNECT_UPSTREAM_CLEARED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: connectUpstreamChangedEventDataSchema,
+});
+export type ConnectUpstreamClearedEvent = z.infer<typeof connectUpstreamClearedEventSchema>;
+
+/** Records that the organization's gateway may reach hosted models; gateway pulls the token. */
+export class RecordConnectUpstreamSetCommand implements CommandHandler<
+  Command<ConnectUpstreamChangedEventData>,
+  ConnectUpstreamSetEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_CONNECT_UPSTREAM_SET_COMMAND_TYPE,
+    connectUpstreamChangedEventDataSchema,
+    "Record that an organization's gateway reaches LangWatch-hosted models",
+  );
+
+  handle(command: Command<ConnectUpstreamChangedEventData>): ConnectUpstreamSetEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ConnectUpstreamSetEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: CONNECT_UPSTREAM_SET_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:connect_upstream_set:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ConnectUpstreamChangedEventData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that the organization's gateway no longer reaches hosted models; gateway clears it. */
+export class RecordConnectUpstreamClearedCommand implements CommandHandler<
+  Command<ConnectUpstreamChangedEventData>,
+  ConnectUpstreamClearedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_CONNECT_UPSTREAM_CLEARED_COMMAND_TYPE,
+    connectUpstreamChangedEventDataSchema,
+    "Record that an organization's gateway no longer reaches LangWatch-hosted models",
+  );
+
+  handle(command: Command<ConnectUpstreamChangedEventData>): ConnectUpstreamClearedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ConnectUpstreamClearedEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: CONNECT_UPSTREAM_CLEARED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:connect_upstream_cleared:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ConnectUpstreamChangedEventData): string {
     return payload.organizationId;
   }
 }

@@ -1824,7 +1824,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
   guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
   `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`, `otlp_ingest` (an OTLP exporter's
-  key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE).
+  key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a
+  connect-host bearer, bound by licensing: a licence token on sync, an activation code looked up unclaimed on
+  activate, which `redeemActivationCode` claims; Alex 2026-10-10 W02-ACTIVATE-DOOR).
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
@@ -2849,9 +2851,10 @@ billing, so connect syncs on licensing's `contract_terms_changed` and resets on 
 `connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
 billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
 spend share. `connect.errors.ts` stays in licensing-contract.
-The connect upstream reaches gateway as a licensing fact carrying the organization, base URL, instance id and
-the licence token's fingerprint, never the token; gateway reads the token from licensing's row through a declared
-read-only share (Alex, 2026-10-09, C3b D2; the C3-KEY-HASH shape).
+The connect upstream reaches gateway as licensing's `connect_upstream_set` / `connect_upstream_cleared` facts
+naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceId }` from
+`LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
+instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`

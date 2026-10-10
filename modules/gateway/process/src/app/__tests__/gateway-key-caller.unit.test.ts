@@ -56,6 +56,7 @@ async function gatewayApp(): Promise<GatewayModule> {
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
+      licensing: peer("licensing"),
     },
     repositories: MemoryGatewayRepositories.create(),
     config: {

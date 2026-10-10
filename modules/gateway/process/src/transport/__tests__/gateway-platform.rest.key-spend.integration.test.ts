@@ -117,6 +117,7 @@ async function mountedSpendRead({
       traces: createApiFixture<TraceApi>({ findSpendByProjectAndValue }),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {

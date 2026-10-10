@@ -74,6 +74,7 @@ async function mountedCreate({ stashed }: { stashed: StashRevealInput[] }) {
         },
       }),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {
