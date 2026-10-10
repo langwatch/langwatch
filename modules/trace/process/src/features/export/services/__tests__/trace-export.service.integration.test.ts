@@ -1,3 +1,4 @@
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type {
   Protections,
   Evaluation,
@@ -17,6 +18,7 @@ import type { TraceLegacyReadService } from "../../../legacy/services/trace-lega
 import { TraceExportService } from "../trace-export.service.ts";
 import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
+const authorization = restTestAuthorization();
 const fullProtections: Protections = {
   canSeeCosts: true,
   canSeeCapturedInput: true,
@@ -128,6 +130,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -161,6 +164,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -201,6 +205,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -235,6 +240,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest({ format: "json" }),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -287,6 +293,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full", format: "json" }),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -315,6 +322,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -337,6 +345,7 @@ describe("TraceExportService", () => {
         for await (const _ of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
+          authorization,
         })) {
           // consume
         }
@@ -363,6 +372,7 @@ describe("TraceExportService", () => {
         for await (const _ of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           // consume
         }

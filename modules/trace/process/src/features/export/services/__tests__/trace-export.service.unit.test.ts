@@ -1,3 +1,4 @@
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type {
   Protections,
   TracesForProjectResult,
@@ -12,6 +13,7 @@ import type { TraceLegacyReadService } from "../../../legacy/services/trace-lega
 import { TraceExportService } from "../trace-export.service.ts";
 import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
+const authorization = restTestAuthorization();
 const protections: Protections = {
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
@@ -72,7 +74,7 @@ function buildOptionsCapturingTraceService(): {
 }
 
 async function drainExport(service: TraceExportService, request: ExportRequest) {
-  for await (const _chunk of service.exportTraces({ request, protections })) {
+  for await (const _chunk of service.exportTraces({ request, protections, authorization })) {
     // consume the generator
   }
 }
@@ -87,13 +89,15 @@ describe("TraceExportService hides what the Explorer hides", () => {
       traceService: built.traceService,
     });
 
-    await service.getTotalCount({ request: buildExportRequest(), protections });
+    await service.getTotalCount({ request: buildExportRequest(), protections, authorization });
     await drainExport(service, buildExportRequest());
     seen.push(...built.optionsSeen);
 
     expect(seen).toHaveLength(2);
     for (const options of seen) {
       expect(options.filterWhere?.params).toEqual({ hiddenOrigins: ["langy"] });
+      // The repository expands the filter's tenant markers from this proof.
+      expect(options.authorization).toBe(authorization);
     }
   });
 
@@ -110,6 +114,7 @@ describe("TraceExportService hides what the Explorer hides", () => {
     await service.getTotalCount({
       request: buildExportRequest({ query: "status:error" }),
       protections,
+      authorization,
     });
 
     expect(inputs[0]).not.toHaveProperty("query", "status:error");
@@ -203,6 +208,7 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
         for await (const { chunk } of service.exportTraces({
           request: buildExportRequest({ mode: "summary", format: "csv" }),
           protections,
+          authorization,
         })) {
           payload += chunk;
         }

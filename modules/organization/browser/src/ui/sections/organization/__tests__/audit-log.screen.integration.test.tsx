@@ -270,6 +270,21 @@ describe("given an Enterprise organization with a mixed audit history", () => {
   });
 });
 
+describe("given a user search that names nobody in the organization", () => {
+  it("lists no entries instead of every entry", () => {
+    state.members = [{ userId: "u-1", user: { name: "Alice", email: "alice@example.com" } }];
+    state.auditLogs = [auditRow()];
+    state.totalCount = 1;
+
+    renderWithOrganizationHost(
+      <AuditLogScreen />,
+      planHost({ query: { userSearch: "nobody@none.test" } }),
+    );
+
+    expect(screen.getByText("No audit logs found")).toBeInTheDocument();
+  });
+});
+
 describe("given a reader who arrived from a Virtual Key detail page", () => {
   const deepLinked = () =>
     planHost({

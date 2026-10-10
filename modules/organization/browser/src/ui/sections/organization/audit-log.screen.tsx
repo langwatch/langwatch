@@ -39,6 +39,7 @@ import {
 import {
   auditBackLink,
   matchMemberId,
+  searchMatchesNobody,
   readAuditPaging,
   readAuditTarget,
   withAuditFilter,
@@ -98,6 +99,7 @@ export default function AuditLogScreen() {
     { enabled: !!organizationId },
   );
   const searchUserId = matchMemberId(members.data?.members ?? [], userSearch);
+  const matchesNobody = searchMatchesNobody(members.data?.members, userSearch);
 
   const filters: AuditLogFilters = {
     organizationId,
@@ -112,7 +114,7 @@ export default function AuditLogScreen() {
 
   const auditLogs = organizationApi.organization.getAuditLogs.useQuery(
     { ...filters, pageOffset, pageSize },
-    { enabled: !!organizationId && isEnterprise },
+    { enabled: !!organizationId && isEnterprise && !matchesNobody },
   );
 
   const utils = organizationApi.useUtils();
@@ -142,8 +144,9 @@ export default function AuditLogScreen() {
     );
   }
 
-  const rows: EnrichedAuditLog[] = auditLogs.data?.auditLogs ?? [];
-  const totalHits = auditLogs.data?.totalCount ?? 0;
+  const feed = matchesNobody ? undefined : auditLogs.data;
+  const rows: EnrichedAuditLog[] = feed?.auditLogs ?? [];
+  const totalHits = feed?.totalCount ?? 0;
   const backLink = auditBackLink({ target, projectSlug: scope.projectSlug });
   const projects = (organization?.teams ?? []).flatMap((team) =>
     team.projects.map((project) => ({ id: project.id, label: project.name, teamName: team.name })),
@@ -223,7 +226,10 @@ export default function AuditLogScreen() {
         <PageLayout.Heading>Audit Log</PageLayout.Heading>
         <Spacer />
         {host.projectSwitcher()}
-        <PageLayout.HeaderButton onClick={() => void downloadCsv()} disabled={isExporting}>
+        <PageLayout.HeaderButton
+          onClick={() => void downloadCsv()}
+          disabled={isExporting || matchesNobody}
+        >
           <Download />
           Export CSV
         </PageLayout.HeaderButton>

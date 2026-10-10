@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 /**
  * TraceExportService — the download half of the trace read. It orchestrates batch fetching and CSV
@@ -73,9 +74,11 @@ export class TraceExportService {
   async getTotalCount({
     request,
     protections,
+    authorization,
   }: {
     request: ExportRequest;
     protections: Protections;
+    authorization: Authorization;
   }): Promise<number> {
     const result = await this.traceService.getAllTracesForProject(
       {
@@ -92,6 +95,7 @@ export class TraceExportService {
         includeSpans: false,
         scrollId: null,
         filterWhere: this.compileFilter({ request }),
+        authorization,
       },
     );
 
@@ -106,9 +110,11 @@ export class TraceExportService {
   async *exportTraces({
     request,
     protections,
+    authorization,
   }: {
     request: ExportRequest;
     protections: Protections;
+    authorization: Authorization;
   }): AsyncGenerator<{ chunk: string; progress: ExportProgress }> {
     logger.info(
       { projectId: request.projectId, mode: request.mode, format: request.format },
@@ -126,7 +132,7 @@ export class TraceExportService {
     let shouldFetch = true;
 
     while (shouldFetch) {
-      const result = await this.fetchBatch({ request, protections, scrollId });
+      const result = await this.fetchBatch({ request, protections, authorization, scrollId });
       const traces: Trace[] = result.groups.flat();
       if (isFirstBatch) {
         total = result.totalHits;
@@ -177,10 +183,12 @@ export class TraceExportService {
   private async fetchBatch({
     request,
     protections,
+    authorization,
     scrollId,
   }: {
     request: ExportRequest;
     protections: Protections;
+    authorization: Authorization;
     scrollId: string | undefined;
   }) {
     return this.traceService.getAllTracesForProject(
@@ -200,6 +208,7 @@ export class TraceExportService {
         resolveBlobs: true,
         scrollId: scrollId ?? null,
         filterWhere: this.compileFilter({ request }),
+        authorization,
       },
     );
   }
