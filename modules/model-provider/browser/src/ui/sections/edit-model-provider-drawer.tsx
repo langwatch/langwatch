@@ -1,17 +1,18 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { HStack } from "@langwatch/design-system/primitives";
+import { Button, HStack } from "@langwatch/design-system/primitives";
 import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useModelProvidersSettings } from "@langwatch/model-provider-client";
 import { modelProviders } from "@langwatch/model-provider-contract";
+import { useState } from "react";
 
 import {
   findModelProviderById,
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../behavior/use-all-model-providers-list.ts";
-import { EditModelProviderForm } from "./model-provider-form.tsx";
+import { EditModelProviderForm, type ModelProviderSaveState } from "./model-provider-form.tsx";
 
 type EditModelProviderDrawerProps = {
   projectId?: string;
@@ -23,6 +24,11 @@ type EditModelProviderDrawerProps = {
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
   const { projectId, organizationId, modelProviderId, providerKey } = props;
   const { closeDrawer } = useDrawer();
+  const [saveState, setSaveState] = useState<ModelProviderSaveState>({
+    busy: false,
+    label: "Save",
+    canSave: true,
+  });
   const { providers, isLoading } = useModelProvidersSettings({ projectId });
   // Resolve by id from the flat list — see useAllModelProvidersList for
   // why the collapsed Record is wrong here (#5380). `isAllProvidersLoading`
@@ -89,9 +95,29 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
               organizationId={organizationId}
               modelProviderId={modelProviderId}
               providerKey={providerKey}
+              formId="model-provider-form"
+              onSaveStateChange={setSaveState}
             />
           )}
         </Drawer.Body>
+        {!isFormDataLoading && (
+          <Drawer.Actions
+            onCancel={closeDrawer}
+            busy={saveState.busy}
+            primary={
+              <Button
+                colorPalette="orange"
+                type="submit"
+                form="model-provider-form"
+                loading={saveState.busy}
+                disabled={!saveState.canSave}
+                data-testid="model-provider-save"
+              >
+                {saveState.label}
+              </Button>
+            }
+          />
+        )}
       </Drawer.Content>
     </Drawer.Root>
   );

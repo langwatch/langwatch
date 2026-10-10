@@ -600,6 +600,15 @@ function ProviderModelSections({
   );
 }
 
+/** What a drawer needs to draw the form's Save in its own footer. */
+export type ModelProviderSaveState = { busy: boolean; label: string; canSave: boolean };
+
+type ModelProviderFormProps = EditModelProviderFormProps & {
+  /** Submit target: set, the form has no Save of its own; the owner's button submits it. */
+  formId?: string;
+  onSaveStateChange?: (state: ModelProviderSaveState) => void;
+};
+
 export const EditModelProviderForm = ({
   projectId,
   organizationId,
@@ -609,7 +618,9 @@ export const EditModelProviderForm = ({
   guided = false,
   embedded = false,
   onFailed,
-}: EditModelProviderFormProps) => {
+  formId,
+  onSaveStateChange,
+}: ModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
   });
@@ -898,6 +909,13 @@ export const EditModelProviderForm = ({
   const isBusy = state.isSaving || isValidatingApiKey;
   const providerName = providerDefinition?.name ?? provider.provider;
 
+  const reportSaveState = useEffectEvent((next: ModelProviderSaveState) =>
+    onSaveStateChange?.(next),
+  );
+  useEffect(() => {
+    reportSaveState({ busy: isBusy, label: saveLabel, canSave: !cannotResolveTarget });
+  }, [isBusy, saveLabel, cannotResolveTarget]);
+
   if (guided) {
     return (
       <GuidedProviderForm
@@ -954,7 +972,7 @@ export const EditModelProviderForm = ({
     );
   }
 
-  return (
+  const body = (
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
         <Text color="red.fg" fontSize="sm">
@@ -1027,13 +1045,29 @@ export const EditModelProviderForm = ({
           skipPermissionsPlaceholder={skipPermissionsPlaceholder}
         />
 
-        <SaveProviderButton
-          canResolveTarget={!cannotResolveTarget}
-          isBusy={isBusy}
-          label={saveLabel}
-          onSave={handleSave}
-        />
+        {!formId && (
+          <SaveProviderButton
+            canResolveTarget={!cannotResolveTarget}
+            isBusy={isBusy}
+            label={saveLabel}
+            onSave={handleSave}
+          />
+        )}
       </VStack>
     </VStack>
+  );
+
+  if (!formId) return body;
+  return (
+    <form
+      id={formId}
+      style={{ width: "100%" }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSave();
+      }}
+    >
+      {body}
+    </form>
   );
 };
