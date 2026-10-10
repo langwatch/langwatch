@@ -13,7 +13,7 @@ import type {
   ExportRequest,
 } from "@langwatch/trace-contract";
 
-import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
+import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
 import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it

@@ -13,7 +13,7 @@ import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { enrichTracesWithEvaluations } from "../../../../../rules/trace-evaluation-enrichment.rules.ts";
+import { enrichTracesWithEvaluations } from "../../../../../rules/trace-evaluation-mapping.rules.ts";
 import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
 /** @vitest-environment node
  * @integration

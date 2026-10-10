@@ -23,7 +23,7 @@ import { z } from "zod";
 
 import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
 import { traceLegacySearchBodySchema } from "#features/legacy/rules/trace-legacy-search-body.rules";
-import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-mapping.rules";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,

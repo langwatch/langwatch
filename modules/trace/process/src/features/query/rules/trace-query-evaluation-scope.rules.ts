@@ -31,7 +31,7 @@ import { extractStringValue, nextParam, validateValueLength } from "./trace-quer
  * the facet its SQL expression comes from. `evaluatorStatus` is typed by hand;
  * `evaluatorPassed` is the old name of `evaluatorVerdict`.
  */
-export const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
+const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
   [EVALUATOR_VERDICT_FIELD, "evaluatorVerdict"],
   [EVALUATOR_SCORE_FIELD, "evaluatorScore"],
   [EVALUATOR_LABEL_FIELD, "evaluatorLabel"],
@@ -40,7 +40,7 @@ export const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
 ]);
 
 /** A result condition bound to the evaluator, kept or excluded. */
-export interface ScopedCondition {
+interface ScopedCondition {
   /** The chain operand: the tag, or the NOT around it. */
   node: LiqeQuery;
   tag: TagToken;

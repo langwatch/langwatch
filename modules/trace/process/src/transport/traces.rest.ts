@@ -40,7 +40,7 @@ import type { z } from "zod";
 
 import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
 import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
-import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-mapping.rules";
 /**
  * /api/traces: v1 trace reads (search, facets, get-by-id, transcript, metadata
  * PATCH). Route order load-bearing: register :traceId sub-resources, and the
