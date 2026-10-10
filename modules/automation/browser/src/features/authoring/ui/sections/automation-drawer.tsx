@@ -25,7 +25,6 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
   Button,
-  Heading,
   HStack,
   Skeleton,
   Spacer,
@@ -562,7 +561,7 @@ export function AutomationDrawer({
         <Drawer.Content bg="bg">
           <Drawer.Header>
             <Drawer.CloseTrigger />
-            <Heading size="md">{labels.title}</Heading>
+            <Drawer.Title>{labels.title}</Drawer.Title>
           </Drawer.Header>
           <Drawer.Body>
             {source === "email-link" ? <EmailLinkLandingBanner /> : null}

@@ -9,7 +9,7 @@ import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { Button, Field, Heading, Input, Text } from "@langwatch/design-system/primitives";
+import { Button, Field, Input, Text } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { FormServerError } from "@langwatch/error-views";
 import { useState } from "react";
@@ -151,7 +151,7 @@ export function LLMModelCostDrawer({
     <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading>{drawerTitle({ id, cloneModel })}</Heading>
+          <Drawer.Title>{drawerTitle({ id, cloneModel })}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

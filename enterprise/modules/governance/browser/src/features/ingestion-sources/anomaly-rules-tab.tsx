@@ -6,7 +6,6 @@ import {
   Badge,
   Box,
   Button,
-  Heading,
   HStack,
   Input,
   Spacer,
@@ -720,9 +719,7 @@ function RuleComposer({
       <Drawer.Content>
         <Drawer.Header>
           <Drawer.CloseTrigger />
-          <Heading as="h2" size="md">
-            {isEdit ? "Edit anomaly rule" : "New anomaly rule"}
-          </Heading>
+          <Drawer.Title>{isEdit ? "Edit anomaly rule" : "New anomaly rule"}</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>

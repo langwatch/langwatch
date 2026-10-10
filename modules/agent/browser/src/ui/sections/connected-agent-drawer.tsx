@@ -7,7 +7,6 @@
 import {
   Box,
   Button,
-  Heading,
   HStack,
   Spacer,
   Spinner,
@@ -65,7 +64,7 @@ export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
 function AgentTitle({ agent }: { agent: ConnectedAgentBrowser | null | undefined }) {
   return (
     <VStack align="start" gap={1}>
-      <Heading size="md">{agent?.name ?? "Agent"}</Heading>
+      <Drawer.Title>{agent?.name ?? "Agent"}</Drawer.Title>
       {agent ? <PresenceLine agent={agent} /> : null}
     </VStack>
   );

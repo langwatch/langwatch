@@ -91,16 +91,8 @@ export function CaseModalHeader({
   openHistoryOnOpen?: boolean;
 }) {
   return (
-    <Drawer.Header
-      borderBottomWidth="1px"
-      borderColor="border"
-      paddingX={5}
-      paddingY={3.5}
-      display="block"
-    >
-      <Drawer.Title fontSize="14px" fontWeight="semibold">
-        {isEditing ? "Edit scenario" : "New scenario"}
-      </Drawer.Title>
+    <Drawer.Header>
+      <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>

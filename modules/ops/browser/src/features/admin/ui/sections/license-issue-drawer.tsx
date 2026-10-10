@@ -180,7 +180,7 @@ export function LicenseIssueDrawer({ open, onClose }: { open: boolean; onClose: 
             {issuedKey ? <SignedLicenseOnce licenseKey={issuedKey} /> : null}
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <IssueFooter
             form={form}
             issuedKey={issuedKey}

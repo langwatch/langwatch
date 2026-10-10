@@ -14,7 +14,6 @@ import {
   chakra,
   Grid,
   GridItem,
-  Heading,
   HStack,
   Skeleton,
   Text,
@@ -252,7 +251,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
-        <Drawer.Header borderBottomWidth="1px">
+        <Drawer.Header>
           {/* Being pointed at a scenario is enough to be editing one. Keying
               this off the loaded record alone retitled the drawer "Create
               Scenario" for the whole of the read. */}
@@ -936,16 +935,14 @@ function ScenarioDrawerHeading({
     <VStack align="start" gap={1}>
       {isAgentTesting ? (
         <HStack gap={2}>
-          <Heading size="md">{isEditing ? "Edit scenario" : "New scenario"}</Heading>
+          <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
           <CaseVersionChip version={version} />
         </HStack>
       ) : (
-        <Heading size="md">{isEditing ? "Edit Scenario" : "Create Scenario"}</Heading>
+        <Drawer.Title>{isEditing ? "Edit Scenario" : "Create Scenario"}</Drawer.Title>
       )}
       {isAgentTesting && (
-        <Text fontSize="sm" color="fg.muted">
-          {AGENT_TESTING_EDITOR_DESCRIPTION}
-        </Text>
+        <Drawer.Description>{AGENT_TESTING_EDITOR_DESCRIPTION}</Drawer.Description>
       )}
     </VStack>
   );

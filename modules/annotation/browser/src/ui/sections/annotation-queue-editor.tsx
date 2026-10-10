@@ -202,9 +202,9 @@ export function AnnotationQueueEditor({
             <Drawer.CloseTrigger onClick={onClose} />
           </HStack>
           <HStack>
-            <Text paddingTop={5} fontSize="2xl">
+            <Drawer.Title>
               {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
-            </Text>
+            </Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

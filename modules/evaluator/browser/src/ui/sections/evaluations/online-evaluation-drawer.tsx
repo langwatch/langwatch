@@ -570,7 +570,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
             )}
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
+        <Drawer.Footer>
           <HStack gap={3} width="full" justify="flex-end">
             <Button variant="outline" data-testid="online-evaluation-cancel" onClick={handleClose}>
               Cancel

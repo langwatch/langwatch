@@ -89,7 +89,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
               </VStack>
             </VStack>
           </Drawer.Body>
-          <Drawer.Footer borderTopWidth="1px" borderColor="border">
+          <Drawer.Footer>
             <Button variant="outline" onClick={props.onClose}>
               Cancel
             </Button>

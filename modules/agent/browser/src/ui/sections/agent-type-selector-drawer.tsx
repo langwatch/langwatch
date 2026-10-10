@@ -105,7 +105,7 @@ export function AgentTypeSelectorDrawer({
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <Button variant="outline" onClick={selection.close}>
             Cancel
           </Button>

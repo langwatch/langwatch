@@ -187,9 +187,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
             </Menu.Content>
           </Menu.Root>
         )}
-        <Button variant="ghost" size="sm" color="fg.muted" onClick={handleClose}>
-          <X size={16} />
-        </Button>
+        <StudioDrawerClose expanded={propertiesExpanded} onClose={handleClose} />
       </HStack>
     </HStack>
   ) : null;
@@ -207,21 +205,13 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
         modal={false}
       >
         <Drawer.Content bg="bg" marginTop="56px">
-          {node && (
-            <Drawer.Header paddingTop={4} paddingBottom={3} paddingLeft={4} paddingRight={3}>
-              {headerContent}
-            </Drawer.Header>
-          )}
+          {node && <Drawer.Header>{headerContent}</Drawer.Header>}
 
           <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>
             {children}
           </Drawer.Body>
 
-          {effectiveFooter && (
-            <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
-              {effectiveFooter}
-            </Drawer.Footer>
-          )}
+          {effectiveFooter && <Drawer.Footer>{effectiveFooter}</Drawer.Footer>}
         </Drawer.Content>
       </Drawer.Root>
 
@@ -378,5 +368,15 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
           document.body,
         )}
     </>
+  );
+}
+
+/** Expanded canvas panels sit outside the drawer context. */
+function StudioDrawerClose({ expanded, onClose }: { expanded: boolean; onClose: () => void }) {
+  if (!expanded) return <Drawer.CloseTrigger />;
+  return (
+    <Button variant="ghost" size="sm" color="fg.muted" aria-label="Close drawer" onClick={onClose}>
+      <X size={16} />
+    </Button>
   );
 }

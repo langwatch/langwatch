@@ -282,9 +282,9 @@ export const AddAnnotationQueueDrawer = ({
             <Drawer.CloseTrigger onClick={() => closeAll()} />
           </HStack>
           <HStack>
-            <Text paddingTop={5} fontSize="2xl">
+            <Drawer.Title>
               {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
-            </Text>
+            </Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
