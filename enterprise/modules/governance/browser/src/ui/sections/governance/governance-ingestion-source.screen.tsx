@@ -194,7 +194,7 @@ function SourcePullStatus({ source }: { source: Source }) {
         </Text>
       )}
       {pull?.error && (
-        <Text fontSize="sm" color="red.600">
+        <Text fontSize="sm" color="red.fg">
           {pull.error}{" "}
           {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
           records may be incomplete.

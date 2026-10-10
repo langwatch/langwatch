@@ -274,13 +274,13 @@ export function OttlEditor({
       {hasStarter && isEmpty && (
         <Box
           borderWidth="1px"
-          borderColor="orange.300"
+          borderColor="orange.emphasized"
           backgroundColor="orange.subtle"
           borderRadius="md"
           padding={3}
         >
           <HStack alignItems="center" gap={3}>
-            <Box color="orange.600">
+            <Box color="orange.fg">
               <FileText size={18} />
             </Box>
             <VStack align="start" gap={0} flex={1}>
@@ -418,6 +418,6 @@ function statementMarkerColor({
   showError: boolean;
   isValid: boolean;
 }): string {
-  if (showError) return "red.500";
-  return isValid ? "green.400" : "border.muted";
+  if (showError) return "red.fg";
+  return isValid ? "green.fg" : "border.muted";
 }

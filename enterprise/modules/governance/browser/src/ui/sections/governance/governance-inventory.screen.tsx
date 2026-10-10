@@ -3543,8 +3543,8 @@ export function parserFieldPresentation({
 function invalidInputStyles(isInvalid: boolean) {
   return isInvalid
     ? ({
-        borderColor: "red.500",
-        _hover: { borderColor: "red.500" },
+        borderColor: "red.fg",
+        _hover: { borderColor: "red.fg" },
         "aria-invalid": true,
       } as const)
     : {};
@@ -3825,7 +3825,7 @@ function ParserConfigField({
         <Text fontSize="xs" fontWeight="medium">
           {field.label}
           {isRequired && (
-            <Text as="span" color="red.500" marginLeft={1}>
+            <Text as="span" color="red.fg" marginLeft={1}>
               *
             </Text>
           )}
@@ -3850,7 +3850,7 @@ function ParserConfigField({
           says what to do rather than restating that something is invalid —
           the red border has already said that much. */}
       {isInvalid && (
-        <Text fontSize="xs" color="red.500" data-testid={`parser-field-error-${field.key}`}>
+        <Text fontSize="xs" color="red.fg" data-testid={`parser-field-error-${field.key}`}>
           Enter a value: this source cannot be saved without it.
         </Text>
       )}
@@ -4735,7 +4735,7 @@ function OtlpEndpointPanel({
         auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-          color="blue.600"
+          color="blue.fg"
         >
           Choosing the right OTel endpoint
         </Link>

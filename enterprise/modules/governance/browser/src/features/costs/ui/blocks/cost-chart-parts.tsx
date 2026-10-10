@@ -65,7 +65,7 @@ export function EmptyPanel({
  * mark-colour guard rightly refuses on a drawn shape. `CHART_SEAT_CONTRACT_FILL`
  * in `chartTheme` is the same slate for the same reason.
  */
-export const PROJECTION_INK = "#94a3b8";
+export const PROJECTION_INK = "var(--chakra-colors-gray-emphasized)";
 /**
  * Called as a plain function at the call sites below, not rendered as
  * `<ChartLegend />`. Recharts inspects the *type* of each direct child to

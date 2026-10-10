@@ -523,7 +523,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 <Text fontSize="xs" color="fg.muted">
                   No departments yet. The tool stays visible to every member. Create departments
                   under{" "}
-                  <Link href="/governance/people" color="blue.600">
+                  <Link href="/governance/people" color="blue.fg">
                     Governance → People
                   </Link>{" "}
                   to scope tools to a group of people.
@@ -603,7 +603,7 @@ function RadioCard({
   return (
     <Box
       borderWidth="1px"
-      borderColor={checked ? "blue.500" : "border.muted"}
+      borderColor={checked ? "blue.fg" : "border.muted"}
       backgroundColor={checked ? "blue.subtle" : "transparent"}
       borderRadius="sm"
       paddingX={3}
@@ -932,7 +932,7 @@ function ModelProviderFields({
               <Alert.Description>
                 This provider has no enabled credential yet. Tiles will publish but VK issuance will
                 502 until you{" "}
-                <Link href="/settings/model-providers" color="orange.600">
+                <Link href="/settings/model-providers" color="orange.fg">
                   configure it
                 </Link>
                 .
@@ -1010,7 +1010,7 @@ function ExternalToolFields({
                   type="button"
                   variant="outline"
                   onClick={() => onIconAssetChange(value)}
-                  borderColor={selected ? "blue.500" : "border.muted"}
+                  borderColor={selected ? "blue.fg" : "border.muted"}
                   backgroundColor={selected ? "blue.subtle" : "transparent"}
                   borderRadius="sm"
                   paddingX={3}

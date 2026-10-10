@@ -1137,7 +1137,7 @@ function AssignmentLink({
         _hover={{ backgroundColor: "bg.muted" }}
       >
         <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="medium" color="blue.600">
+          <Text fontSize="sm" fontWeight="medium" color="blue.fg">
             {title}
           </Text>
           <Text fontSize="xs" color="fg.muted" maxW="2xl">
@@ -1351,7 +1351,7 @@ function DepartmentRow({
               <Menu.Item value="rename" onClick={onRename}>
                 <Pencil size={14} /> Rename
               </Menu.Item>
-              <Menu.Item value="archive" color="red.500" onClick={onArchive}>
+              <Menu.Item value="archive" color="red.fg" onClick={onArchive}>
                 <Archive size={14} /> Archive
               </Menu.Item>
             </Menu.Content>
