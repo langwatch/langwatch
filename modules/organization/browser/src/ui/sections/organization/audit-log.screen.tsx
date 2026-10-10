@@ -346,7 +346,7 @@ export default function AuditLogScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Audit Log</PageLayout.Heading>
+        <PageLayout.Heading>Audit log</PageLayout.Heading>
         <Spacer />
         <PageLayout.HeaderButton
           onClick={() => setIsExportOpen(true)}
@@ -395,7 +395,7 @@ export default function AuditLogScreen() {
         </VStack>
 
         <HStack gap={2} width="full" flexWrap="wrap">
-          <InputGroup startElement={<Search size={14} />} width="240px">
+          <InputGroup startElement={<Search size={14} />} width="220px">
             <Input
               size="sm"
               {...FILTER_CONTROL}
@@ -408,13 +408,13 @@ export default function AuditLogScreen() {
           <Input
             size="sm"
             {...FILTER_CONTROL}
-            width="200px"
+            width="220px"
             placeholder="Filter by action..."
             aria-label="Filter by Action"
             value={actionFilter}
             onChange={(event) => handleActionFilterChange(event.target.value)}
           />
-          <Box width="200px" data-testid="audit-project-filter">
+          <Box width="220px" data-testid="audit-project-filter">
             <ScopeChipPicker
               variant="single-select"
               size="sm"

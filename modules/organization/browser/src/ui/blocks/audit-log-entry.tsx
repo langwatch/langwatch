@@ -75,9 +75,7 @@ const OPEN_ROW_CELLS = { "& > td": { ...CELL, borderBottomWidth: 0 }, ...EDGES }
 const CHANGE_COLUMNS = "160px minmax(0, max-content) 16px minmax(0, 1fr)";
 /** The detail's left edge lines up with the Time column's text. */
 const DETAIL_CELL = { "& > td": { padding: "16px" } } as const;
-const LINE = "13px";
-const SMALL = "12px";
-const SECONDARY = { fontSize: SMALL, lineHeight: "18px" } as const;
+const SECONDARY = { textStyle: "caption" } as const;
 
 /** `…` and the key id's last six characters: enough to tell keys apart in a row. */
 function keyTail(id: string): string {
@@ -151,7 +149,7 @@ export function AuditLogEntry({
         css={open === "closed" ? ROW_CELLS : OPEN_ROW_CELLS}
       >
         <Table.Cell>
-          <Text as="span" fontSize={LINE} color="fg.muted">
+          <Text as="span" textStyle="bodySm" color="fg.muted">
             <FormattedDate value={log.createdAt} display="time" seconds />
           </Text>
         </Table.Cell>
@@ -161,7 +159,7 @@ export function AuditLogEntry({
         <Table.Cell>
           <Box display="flex" flexDirection="column" gap="2px" minWidth={0}>
             <HStack gap={2} minWidth={0} height="20px">
-              <Text fontSize={LINE} lineHeight="20px" fontWeight="medium" color="fg" truncate>
+              <Text textStyle="label" title={log.action} truncate>
                 {auditActionPhrase(log.action)}
               </Text>
               {log.error && (
@@ -171,9 +169,6 @@ export function AuditLogEntry({
               )}
             </HStack>
             <HStack gap={2} minWidth={0} height="18px" {...SECONDARY}>
-              <InlineCode variant="neutral" flexShrink={0} maxWidth="70%">
-                {log.action}
-              </InlineCode>
               {log.targetId && (
                 <InlineCode variant="neutral" truncate="middle" minWidth={0}>
                   {log.targetId}
@@ -186,7 +181,7 @@ export function AuditLogEntry({
                   height="18px"
                   minWidth={0}
                   padding={0}
-                  fontSize={SMALL}
+                  textStyle="caption"
                   fontWeight="normal"
                   color="fg.muted"
                   flexShrink={0}
@@ -206,21 +201,21 @@ export function AuditLogEntry({
         </Table.Cell>
         <Table.Cell>
           {log.projectId ? (
-            <Text fontSize={LINE} color="fg" truncate>
+            <Text textStyle="bodySm" color="fg" truncate>
               {projectLabel(log.projectId)}
             </Text>
           ) : (
-            <Text fontSize={LINE} color="fg.subtle">
+            <Text textStyle="bodySm" color="fg.subtle">
               <span aria-hidden>—</span>
               <VisuallyHidden>Not recorded</VisuallyHidden>
             </Text>
           )}
         </Table.Cell>
         <Table.Cell>
-          <Text fontSize={LINE} lineHeight="20px" color="fg" truncate>
+          <Text textStyle="bodySm" color="fg" truncate>
             {log.source === "gateway" ? "AI Gateway" : "Platform"}
           </Text>
-          <Text {...SECONDARY} fontFamily="mono" color="fg.muted" truncate>
+          <Text {...SECONDARY} textStyle="monoSm" color="fg.muted" truncate>
             {log.ipAddress || "—"}
           </Text>
         </Table.Cell>
@@ -282,7 +277,7 @@ function IconBubble({ children, palette }: { children: ReactNode; palette?: stri
 function ActorName({ name, hint }: { name: string; hint?: string | null }) {
   return (
     <Tooltip content={hint}>
-      <Text fontSize={LINE} lineHeight="20px" fontWeight="medium" color="fg" truncate>
+      <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
         {name}
       </Text>
     </Tooltip>
@@ -462,7 +457,7 @@ function EntryDetail({
           <Text color="fg" flexShrink={0}>
             {log.targetKind}
           </Text>
-          <InlineCode variant="neutral" truncate="middle" fontSize={SMALL} minWidth={0}>
+          <InlineCode variant="neutral" truncate="middle" textStyle="caption" minWidth={0}>
             {log.targetId}
           </InlineCode>
           <Link
@@ -480,7 +475,7 @@ function EntryDetail({
   ];
 
   return (
-    <Box data-testid="audit-log-detail" fontSize={SMALL} lineHeight="18px">
+    <Box data-testid="audit-log-detail" textStyle="caption" lineHeight="18px">
       <Grid
         templateColumns={{
           base: "80px minmax(0, 1fr)",

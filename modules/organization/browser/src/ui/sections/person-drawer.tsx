@@ -6,8 +6,9 @@
 
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
 import { Ban, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -98,7 +99,7 @@ function PersonDetail({
     return <HandledErrorAlert error={member.error} fallbackTitle="Couldn't open this person" />;
   }
   const person = member.data;
-  if (!person) return <Spinner />;
+  if (!person) return <SkeletonRows rows={2} />;
   const disabled = !!person.disabledAt;
 
   return (

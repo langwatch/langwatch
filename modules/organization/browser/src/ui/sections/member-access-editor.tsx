@@ -8,11 +8,11 @@ import {
   Button,
   HStack,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -321,7 +321,7 @@ function DirectAssignments({
       />
     );
   }
-  if (directGrants.isLoading) return <Spinner size="sm" />;
+  if (directGrants.isLoading) return <SkeletonRows rows={2} />;
   const held = directGrants.data ?? [];
   if (held.length === 0 && staged.length === 0) {
     return (
@@ -405,7 +405,7 @@ function MemberGroups({
       <HandledErrorAlert error={memberGroups.error} fallbackTitle="Couldn't read their groups" />
     );
   }
-  if (memberGroups.isLoading) return <Spinner size="sm" />;
+  if (memberGroups.isLoading) return <SkeletonRows rows={2} />;
   if (!memberGroups.data?.length) {
     return (
       <Text fontSize="sm" color="fg.muted">

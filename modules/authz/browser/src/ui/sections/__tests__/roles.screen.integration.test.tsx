@@ -156,9 +156,9 @@ describe("the Roles screen", () => {
         "permission-token",
       );
       expect(chips.map((chip) => chip.textContent)).toEqual([
-        "traces:view",
-        "analytics:view",
-        "datasets:view",
+        "View traces",
+        "View analytics",
+        "View datasets",
       ]);
     });
 
@@ -202,9 +202,9 @@ describe("the Roles screen", () => {
         }),
       );
 
-      expect(await screen.findByText("View traces")).toBeInTheDocument();
+      expect(await within(await screen.findByRole("dialog")).findByText("View traces")).toBeInTheDocument();
       // The viewer reads, so its lines are views and never full access.
-      expect(screen.queryByText(/^Full access to/)).not.toBeInTheDocument();
+      expect(within(screen.getByRole("dialog")).queryByText(/^Full access to/)).not.toBeInTheDocument();
     });
 
     /** @scenario A reader without the grant cannot create a role */

@@ -4,11 +4,11 @@ import {
   createListCollection,
   Field,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { AggregateRule } from "@langwatch/project-contract";
 import type React from "react";
 import { useMemo } from "react";
@@ -257,7 +257,7 @@ function SpecificProjects({
       />
     );
   }
-  if (!candidates.data) return <Spinner size="sm" />;
+  if (!candidates.data) return <SkeletonRows rows={2} />;
 
   return (
     <Field.Root>

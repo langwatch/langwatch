@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { StatusDot } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { format } from "@langwatch/time";
 import { Pencil, Trash2 } from "lucide-react";
@@ -23,6 +24,7 @@ import { permissionsNeedingOrganizationScope } from "../../model/role-permission
 import { PermissionTokenList } from "../elements/permission-token.tsx";
 import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
 
+const TIER_TONE = { ADMIN: "warning", MEMBER: "ok", VIEWER: "neutral" } as const;
 const TIER_COLOUR = { ADMIN: "orange", MEMBER: "blue", VIEWER: "gray" } as const;
 
 export function BuiltinRoleCard({
@@ -50,22 +52,13 @@ export function BuiltinRoleCard({
     >
       <Card.Body display="flex" flexDirection="column" gap={2.5} padding={4}>
         <HStack width="full" align="baseline" gap={2}>
-          <Box
-            width="7px"
-            height="7px"
-            borderRadius="full"
-            backgroundColor="colorPalette.solid"
-            alignSelf="center"
-            flexShrink={0}
-          />
-          <Text fontWeight="semibold" fontSize="sm">
-            {card.name}
-          </Text>
+          <StatusDot tone={TIER_TONE[card.teamRole]} />
+          <Text textStyle="cardTitle">{card.name}</Text>
           <Spacer />
           <PeopleCount people={people} />
         </HStack>
 
-        <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
+        <Text textStyle="caption" color="fg.muted">
           {card.description}
         </Text>
 
@@ -77,8 +70,8 @@ export function BuiltinRoleCard({
               ? `Everything ${card.inheritsFrom} has, and`
               : "The base every other role builds on"}
           </SectionEyebrow>
-          <PermissionTokenList permissions={card.headline} limit={card.headline.length} />
-          <Text fontSize="xs" color="fg.subtle">
+          <PermissionTokenList permissions={card.headline} limit={card.headline.length} readable />
+          <Text textStyle="caption" color="fg.subtle">
             {totalPermissions} permissions in total
           </Text>
         </CardSection>
@@ -94,14 +87,14 @@ export function BuiltinRoleCard({
 function PeopleCount({ people }: { people: number | null }) {
   if (people === null) {
     return (
-      <Text fontSize="xs" color="fg.subtle">
+      <Text textStyle="caption" color="fg.subtle">
         Holders unavailable
       </Text>
     );
   }
   return (
     <Tooltip content="Counted from the role assignments in this organization, including people who hold it through a group.">
-      <Text fontSize="xs" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         {people} {people === 1 ? "person" : "people"}
       </Text>
     </Tooltip>
@@ -153,11 +146,9 @@ export function CustomRoleCard({
       <Card.Body display="flex" flexDirection="column" gap={3} padding={4}>
         <HStack width="full" align="start" gap={3}>
           <VStack align="start" gap={1} flex={1} minWidth={0}>
-            <Text fontWeight="semibold" fontSize="sm">
-              {role.name}
-            </Text>
+            <Text textStyle="cardTitle">{role.name}</Text>
             {role.description ? (
-              <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
+              <Text textStyle="caption" color="fg.muted">
                 {role.description}
               </Text>
             ) : null}
@@ -206,7 +197,7 @@ export function CustomRoleCard({
         <CardSection>
           <SectionEyebrow>In force on</SectionEyebrow>
           {scopes.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
+            <Text textStyle="body" color="fg.muted">
               Nowhere yet. This role grants nothing until somebody is assigned it.
             </Text>
           ) : (
@@ -219,7 +210,7 @@ export function CustomRoleCard({
             />
           )}
           {assignedBelowOrganizationOnly && (
-            <Text fontSize="xs" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               {inert.length} {inert.length === 1 ? "permission takes" : "permissions take"} effect
               only where this role is assigned on the organization.
             </Text>
@@ -232,7 +223,7 @@ export function CustomRoleCard({
         </CardSection>
 
         {role.createdAt && (
-          <Text fontSize="xs" color="fg.subtle">
+          <Text textStyle="caption" color="fg.subtle">
             Created {format(role.createdAt, "d MMM yyyy")}
           </Text>
         )}
@@ -274,14 +265,14 @@ function RoleHolderStrip({
 }) {
   if (people === null) {
     return (
-      <Text fontSize="sm" color="fg.subtle">
+      <Text textStyle="body" color="fg.subtle">
         Who holds this could not be read.
       </Text>
     );
   }
   if (holders.length === 0) {
     return (
-      <Text fontSize="sm" color="fg.muted">
+      <Text textStyle="body" color="fg.muted">
         Nobody yet.
       </Text>
     );
@@ -309,7 +300,9 @@ function RoleHolderStrip({
             name={holder.name}
             image={holder.image}
           />
-          <Text fontSize="xs">{holder.kind === "group" ? `via ${holder.name}` : holder.name}</Text>
+          <Text textStyle="caption">
+            {holder.kind === "group" ? `via ${holder.name}` : holder.name}
+          </Text>
           {holder.kind === "group" && holder.directory ? (
             <Badge
               size="xs"
@@ -322,7 +315,7 @@ function RoleHolderStrip({
         </HStack>
       ))}
       {remaining > 0 && (
-        <Box fontSize="xs" color="fg.muted">
+        <Box textStyle="caption" color="fg.muted">
           and {remaining} more
         </Box>
       )}

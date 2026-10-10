@@ -6,11 +6,11 @@ import {
   createListCollection,
   HStack,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -329,7 +329,7 @@ export function GroupDetailDialog({
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body pb={6}>
-          {isLoadingDetail && <Spinner />}
+          {isLoadingDetail && <SkeletonRows rows={2} />}
           {!isLoadingDetail && d && (
             <VStack gap={5} align="stretch">
               {canManage && !d.scimSource && (

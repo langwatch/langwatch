@@ -1,6 +1,7 @@
 // biome-ignore lint/suspicious/noEmptyBlockStatements: empty blocks are deliberate.
 
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button } from "@langwatch/design-system/primitives";
 import type { UiInviteMemberDrawerProps } from "@langwatch/organization-contract";
 import type React from "react";
 import { useRef } from "react";
@@ -77,6 +78,7 @@ export function InviteMemberDrawer({
               organizationId={organization.id}
               onSubmit={onSubmit}
               isLoading={isSubmitting}
+              formId="invite-members-form"
               hasEmailProvider={hasEmailProvider}
               onClose={closeDrawer}
               isInviterAdmin={isAdmin}
@@ -84,6 +86,21 @@ export function InviteMemberDrawer({
             />
           )}
         </Drawer.Body>
+        <Drawer.Actions
+          onCancel={closeDrawer}
+          busy={isSubmitting}
+          primary={
+            <Button
+              colorPalette="orange"
+              type="submit"
+              form="invite-members-form"
+              loading={isSubmitting}
+              data-testid="members-invite-submit"
+            >
+              {hasEmailProvider ? "Send invites" : "Create invites"}
+            </Button>
+          }
+        />
       </Drawer.Content>
     </Drawer.Root>
   );

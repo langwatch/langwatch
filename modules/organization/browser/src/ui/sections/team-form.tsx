@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   createListCollection,
-  Field,
   Heading,
   HStack,
   Input,
@@ -41,8 +40,8 @@ import { ProjectAvatar } from "../elements/project-avatar.tsx";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Select } from "@langwatch/design-system/select";
+import { SettingsField, SettingsFieldGroup } from "@langwatch/design-system/settings-field";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
 import { memberLabel } from "../../model/member-label.ts";
@@ -261,11 +260,11 @@ export const TeamForm = ({
   return (
     <form style={{ width: "100%" }} onSubmit={handleSubmit(onSubmit)}>
       <VStack gap={4} width="full" align="start">
-        <VStack width="full" gap={0}>
-          <HorizontalFormControl
+        <SettingsFieldGroup>
+          <SettingsField
             label="Name"
-            helper="The name of your team"
-            invalid={!!errors.name}
+            hint="The name of your team."
+            error={errors.name ? errors.name.message || "Name is required" : undefined}
           >
             {/* A Controller, not register(): the React Compiler memoises register()
                 past form.reset, so typing never reached the form (WEB-5603). */}
@@ -277,14 +276,13 @@ export const TeamForm = ({
                 <Input width="full" type="text" data-testid="team-form-name" {...field} />
               )}
             />
-            <Field.ErrorText>{errors.name?.message || "Name is required"}</Field.ErrorText>
-          </HorizontalFormControl>
+          </SettingsField>
           {team && (
-            <HorizontalFormControl label="Slug" helper="The unique ID of your team">
+            <SettingsField label="Slug" hint="The unique ID of your team.">
               <Input width="full" disabled type="text" value={team.slug} />
-            </HorizontalFormControl>
+            </SettingsField>
           )}
-        </VStack>
+        </SettingsFieldGroup>
         <HStack width="full" marginTop={2}>
           <Heading>Members</Heading>
           <Spacer />
@@ -302,7 +300,7 @@ export const TeamForm = ({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader width="48%">Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Team Role</Table.ColumnHeader>
+                  <Table.ColumnHeader>Team role</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px" />
                 </Table.Row>
               </Table.Header>

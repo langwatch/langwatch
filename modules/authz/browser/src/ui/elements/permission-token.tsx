@@ -8,8 +8,11 @@ import { permissionSentence, resourceCopy, splitPermission } from "../../model/r
 export function PermissionToken({
   permission,
   muted = false,
+  readable = false,
 }: {
   permission: string;
+  /** Show the sentence a person reads; the engine's key moves to the hover. */
+  readable?: boolean;
   /** For a permission that is listed but not in force where it is assigned. */
   muted?: boolean;
 }) {
@@ -17,7 +20,11 @@ export function PermissionToken({
 
   return (
     <Tooltip
-      content={`${permissionSentence(permission)}. ${resourceCopy(resource).blurb}`}
+      content={
+        readable
+          ? `${permission}. ${resourceCopy(resource).blurb}`
+          : `${permissionSentence(permission)}. ${resourceCopy(resource).blurb}`
+      }
       positioning={{ placement: "top" }}
       showArrow
     >
@@ -32,19 +39,25 @@ export function PermissionToken({
         borderWidth="1px"
         borderColor="border.muted"
         background="bg.subtle"
-        fontFamily="mono"
-        fontSize="xs"
-        lineHeight="1.4"
+        textStyle={readable ? "caption" : "monoSm"}
         whiteSpace="nowrap"
         opacity={muted ? 0.55 : 1}
         data-testid="permission-token"
       >
-        <Text as="span" color="fg">
-          {resource}
-        </Text>
-        <Text as="span" color="fg.subtle">
-          :{action}
-        </Text>
+        {readable ? (
+          <Text as="span" color="fg">
+            {permissionSentence(permission)}
+          </Text>
+        ) : (
+          <>
+            <Text as="span" color="fg">
+              {resource}
+            </Text>
+            <Text as="span" color="fg.subtle">
+              :{action}
+            </Text>
+          </>
+        )}
       </Box>
     </Tooltip>
   );
@@ -55,7 +68,9 @@ export function PermissionTokenList({
   permissions,
   limit = 4,
   mutedPermissions,
+  readable = false,
 }: {
+  readable?: boolean;
   permissions: readonly string[];
   limit?: number;
   /** Permissions to dim, because they do nothing where this role is used. */
@@ -66,7 +81,7 @@ export function PermissionTokenList({
 
   if (permissions.length === 0) {
     return (
-      <Text fontSize="xs" color="fg.subtle">
+      <Text textStyle="caption" color="fg.subtle">
         No permissions yet
       </Text>
     );
@@ -79,10 +94,11 @@ export function PermissionTokenList({
           key={permission}
           permission={permission}
           muted={mutedPermissions?.has(permission)}
+          readable={readable}
         />
       ))}
       {remaining > 0 && (
-        <Text fontSize="xs" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           and {remaining} more
         </Text>
       )}
