@@ -98,6 +98,20 @@ Feature: Entitlement's meters, decisions and who learns them
     Then a second pass replays the lane from that cursor
     And the span counts once, in the month it arrived
 
+  @unit @usage
+  Scenario: The trace meter seed writes a tenant's replayed spans in batches, not one at a time
+    Given trace's span log holds hundreds of spans of one tenant's traces this month
+    When the trace meter seed replays them
+    Then the tenant's organization is looked up once per batch
+    And the meter takes one insert per batch, not one per span or per trace
+
+  @unit @usage
+  Scenario: A replayed batch from a project in no organization is skipped, loudly
+    Given a project that belongs to no organization
+    When the trace meter seed replays a batch of its spans
+    Then a warning names the project
+    And no trace meter row is written
+
   @integration @usage @unimplemented
   Scenario: A seeded month's trace meter count equals trace's own count for that month
     Given ClickHouse holding a month of trace's spans and no trace meter rows

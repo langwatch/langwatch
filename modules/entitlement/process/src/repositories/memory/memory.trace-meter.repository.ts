@@ -15,13 +15,13 @@ export class MemoryTraceMeterRepository extends TraceMeterRepository {
   }
 
   async insert({
-    record,
+    records,
     organizationId,
   }: {
-    record: TraceMeterRecord;
+    records: readonly TraceMeterRecord[];
     organizationId: string;
   }): Promise<void> {
-    this.rows.push({ ...record, organizationId });
+    for (const record of records) this.rows.push({ ...record, organizationId });
   }
 
   async findTotal({

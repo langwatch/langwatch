@@ -85,7 +85,7 @@ function compose({
   const log = new WarningLog();
   for (const traceId of ["t1", "t2", "t3"]) {
     void traceMeter.insert({
-      record: { organizationId: ORGANIZATION, tenantId: "project_a", traceId, month: MONTH },
+      records: [{ organizationId: ORGANIZATION, tenantId: "project_a", traceId, month: MONTH }],
       organizationId: ORGANIZATION,
     });
   }

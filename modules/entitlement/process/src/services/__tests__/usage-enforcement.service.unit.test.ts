@@ -404,7 +404,7 @@ describe("UsageService over the trace meter", () => {
           traceId: `${projectId}-trace-${trace % count}`,
           month,
         };
-        await meter.insert({ record, organizationId: "org-1" });
+        await meter.insert({ records: [record], organizationId: "org-1" });
       }
     }
     return meter;

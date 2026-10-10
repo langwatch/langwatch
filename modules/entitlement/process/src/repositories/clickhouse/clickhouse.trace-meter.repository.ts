@@ -22,24 +22,24 @@ export class TraceMeterClickHouseRepository extends TraceMeterRepository {
   }
 
   async insert({
-    record,
+    records,
     organizationId,
   }: {
-    record: TraceMeterRecord;
+    records: readonly TraceMeterRecord[];
     organizationId: string;
   }): Promise<void> {
+    const first = records[0];
+    if (!first) return;
     await this.#clickhouse.insert({
-      tenantId: record.tenantId,
+      tenantId: first.tenantId,
       organizationId,
       table: TABLE_NAME,
-      rows: [
-        {
-          OrganizationId: organizationId,
-          TenantId: record.tenantId,
-          Month: `${record.month}-01`,
-          TraceId: record.traceId,
-        },
-      ],
+      rows: records.map((record) => ({
+        OrganizationId: organizationId,
+        TenantId: record.tenantId,
+        Month: `${record.month}-01`,
+        TraceId: record.traceId,
+      })),
       settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
   }

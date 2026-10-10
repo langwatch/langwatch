@@ -31,14 +31,32 @@ export class TraceMeterAppendService implements AppendStore<TraceMeterRecord> {
 
   /** An orphan project is skipped loudly, and the miss is not remembered. */
   async append(record: TraceMeterRecord): Promise<void> {
-    const placement = await this.projects.getProjectPlacement({ projectId: record.tenantId });
+    await this.appendProject({ projectId: record.tenantId, records: [record] });
+  }
+
+  /** Replay's write: one placement lookup and one insert per project in the batch. */
+  async bulkAppend(records: TraceMeterRecord[]): Promise<void> {
+    const byProject = new Map<string, TraceMeterRecord[]>();
+    for (const record of records) {
+      byProject.set(record.tenantId, [...(byProject.get(record.tenantId) ?? []), record]);
+    }
+    for (const [projectId, projectRecords] of byProject) {
+      await this.appendProject({ projectId, records: projectRecords });
+    }
+  }
+
+  private async appendProject({
+    projectId,
+    records,
+  }: {
+    projectId: string;
+    records: readonly TraceMeterRecord[];
+  }): Promise<void> {
+    const placement = await this.projects.getProjectPlacement({ projectId });
     if (placement.kind === "unplaced") {
-      this.logger.warn(
-        { projectId: record.tenantId },
-        "orphan project has no organization, trace not metered",
-      );
+      this.logger.warn({ projectId }, "orphan project has no organization, trace not metered");
       return;
     }
-    await this.meter.insert({ record, organizationId: placement.organizationId });
+    await this.meter.insert({ records, organizationId: placement.organizationId });
   }
 }
