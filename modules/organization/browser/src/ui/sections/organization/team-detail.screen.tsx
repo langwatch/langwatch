@@ -121,7 +121,9 @@ export default function TeamDetailScreen() {
   if (trpcErrorCode(team.error) === "NOT_FOUND") {
     return (
       <VStack gap={2} align="start">
-        <Heading as="h1">Team not found</Heading>
+        <Heading size="sm" as="h1">
+          Team not found
+        </Heading>
         <Text color="fg.muted">
           This team does not exist, or it was archived. Pick another from the Teams list.
         </Text>
@@ -318,7 +320,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
         />
         <Separator />
         <VStack align="start" gap={3} width="full">
-          <Heading size="sm" color="fg.error">
+          <Heading textStyle="cardTitle" color="fg.error">
             Danger zone
           </Heading>
           <Card.Root width="full" borderColor="border.error">

@@ -56,7 +56,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
 
       <Card.Root variant="outline" overflow="hidden" borderColor="border.muted" boxShadow="none">
         <Card.Header>
-          <Heading size="sm">Throughput</Heading>
+          <Heading textStyle="cardTitle">Throughput</Heading>
           <Text textStyle="sm" color="fg.muted">
             Arrival and completion rates alongside the queue backlog.
           </Text>

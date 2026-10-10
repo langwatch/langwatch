@@ -79,7 +79,7 @@ export function AuthenticationSettings({
       {cards.length > 0 && (
         <VStack align="stretch" gap={4} width="full">
           <VStack align="stretch" gap={1}>
-            <Heading size="sm">Sign-in and provisioning</Heading>
+            <Heading textStyle="cardTitle">Sign-in and provisioning</Heading>
             <Text color="fg.muted" fontSize="sm">
               Connect your identity provider for single sign-on and directory sync.
             </Text>

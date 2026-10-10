@@ -44,6 +44,7 @@ export function ReturningUserHub({ onJump }: ReturningUserHubProps): React.React
   return (
     <VStack align="center" gap={5} maxWidth="58ch" textAlign="center">
       <Heading
+        size="sm"
         fontSize={{ base: "3xl", md: "4xl" }}
         letterSpacing="-0.035em"
         fontWeight="normal"

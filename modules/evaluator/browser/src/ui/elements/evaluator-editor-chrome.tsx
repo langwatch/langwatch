@@ -134,7 +134,7 @@ export function EvaluatorEditorHeading({
 }: EvaluatorEditorHeadingProps) {
   return (
     <>
-      <Heading>{title}</Heading>
+      <Heading size="sm">{title}</Heading>
       {showUnpublishedBadge && (
         <Tooltip
           content="Unpublished modifications"

@@ -14,6 +14,7 @@ export function StaticHero({ stage, heading, subhead }: StaticHeroProps): React.
   return (
     <VStack align="center" gap={4} maxWidth="58ch" textAlign="center">
       <Heading
+        size="sm"
         fontSize={{ base: "3xl", md: "4xl" }}
         letterSpacing="-0.035em"
         fontWeight="normal"

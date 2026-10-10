@@ -45,7 +45,7 @@ export function PendingJoinRequests() {
             <Box color="fg.muted" display="flex" alignItems="center">
               <UserPlus size={16} aria-hidden />
             </Box>
-            <Heading as="h3" size="sm">
+            <Heading as="h3" textStyle="cardTitle">
               Waiting to join
             </Heading>
             <Text fontSize="sm" color="fg.muted">

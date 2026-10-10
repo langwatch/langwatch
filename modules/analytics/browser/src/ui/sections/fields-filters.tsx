@@ -140,7 +140,9 @@ export function FieldsFilters({
   return (
     <VStack align="start" width="300px" gap={4}>
       <HStack width={"full"}>
-        <Heading fontSize="sm">Filters</Heading>
+        <Heading size="sm" fontSize="sm">
+          Filters
+        </Heading>
 
         <Spacer />
 

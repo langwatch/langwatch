@@ -208,7 +208,7 @@ function UsersContent() {
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root overflow="auto">
               <Card.Header>
-                <Heading size="sm">User traces</Heading>
+                <Heading textStyle="cardTitle">User traces</Heading>
               </Card.Header>
               <Card.Body>
                 <CustomGraph input={messagesCount} emptyState={userEmptyState} />
@@ -218,7 +218,7 @@ function UsersContent() {
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root overflow="auto">
               <Card.Header>
-                <Heading size="sm">User threads</Heading>
+                <Heading textStyle="cardTitle">User threads</Heading>
               </Card.Header>
               <Card.Body>
                 <CustomGraph input={userThreads} emptyState={userEmptyState} />

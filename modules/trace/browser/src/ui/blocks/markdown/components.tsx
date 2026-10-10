@@ -19,7 +19,7 @@ function codeText(children: React.ReactNode): string {
 export function buildMarkdownComponents(colorMode: string) {
   return {
     h1: ({ children }: { children?: React.ReactNode }) => (
-      <Heading as="h1" size="md" marginTop={3} marginBottom={2}>
+      <Heading as="h1" size="sm" marginTop={3} marginBottom={2}>
         {children}
       </Heading>
     ),

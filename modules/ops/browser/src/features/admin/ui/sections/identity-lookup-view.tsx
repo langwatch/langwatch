@@ -124,7 +124,7 @@ function ResolvedAddress({ typed, resolved }: { typed: string; resolved: string 
 function RoutingPanel({ routing }: { routing: IdentityLookupAnswer["routing"] }) {
   return (
     <Box>
-      <Heading size="sm" paddingBottom={2}>
+      <Heading textStyle="cardTitle" paddingBottom={2}>
         Routing
       </Heading>
       <SummaryList>
@@ -166,7 +166,7 @@ function PeopleTable({
 }) {
   return (
     <Box>
-      <Heading size="sm" paddingBottom={2}>
+      <Heading textStyle="cardTitle" paddingBottom={2}>
         People holding this address
       </Heading>
       <ListTable
@@ -325,7 +325,7 @@ function ClaimQueuePanel() {
 
   return (
     <Box>
-      <Heading size="sm" paddingBottom={2}>
+      <Heading textStyle="cardTitle" paddingBottom={2}>
         Domain claims awaiting review
       </Heading>
       {queue.data?.length === 0 ? (

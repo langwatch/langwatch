@@ -25,7 +25,7 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
   return (
     <VStack gap={8} align="center">
       <VStack gap={3} textAlign="center">
-        <Heading as="h2" size="xl">
+        <Heading as="h2" size="lg">
           Welcome to Scenarios
         </Heading>
         <Text fontSize="md" color="fg.muted">

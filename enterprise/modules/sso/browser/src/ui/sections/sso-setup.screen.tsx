@@ -160,7 +160,7 @@ function LegacyUpdateStart({
   return (
     <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">Single sign-on is active</Heading>
+        <Heading textStyle="cardTitle">Single sign-on is active</Heading>
         <Text fontSize="sm">
           {name
             ? `Your people sign in through ${name} today. Connect your organization's own identity provider to take that over.`

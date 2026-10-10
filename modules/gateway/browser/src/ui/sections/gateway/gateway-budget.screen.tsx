@@ -456,7 +456,7 @@ function BudgetDetailSkeleton() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Box>
-      <Heading size="sm" mb={2}>
+      <Heading textStyle="cardTitle" mb={2}>
         {title}
       </Heading>
       <Separator mb={3} />

@@ -48,7 +48,7 @@ export function EnterpriseLockedSurface({ children, featureName, description }: 
           <Box color="fg.muted">
             <Lock size={32} />
           </Box>
-          <Heading as="h2" size="lg">
+          <Heading as="h2" size="xl">
             {featureName}
           </Heading>
           <Text color="fg.muted" fontSize="sm">

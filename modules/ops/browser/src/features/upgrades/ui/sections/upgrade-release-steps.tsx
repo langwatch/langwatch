@@ -235,7 +235,7 @@ export function UpgradeReleaseSteps({
     <Stack gap={8}>
       <StepSummary steps={steps} />
       <Stack gap={3}>
-        <Heading size="sm">Still to do ({unfinished.length})</Heading>
+        <Heading textStyle="cardTitle">Still to do ({unfinished.length})</Heading>
         {unfinished.length > 0 ? (
           <UnfinishedTable steps={unfinished} onOpenStep={onOpenStep} />
         ) : (
@@ -254,7 +254,7 @@ export function UpgradeReleaseSteps({
             <Button variant="ghost" size="sm" paddingX={1}>
               <HStack gap={2}>
                 {showApplied ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <Heading size="sm">Applied ({finished.length})</Heading>
+                <Heading textStyle="cardTitle">Applied ({finished.length})</Heading>
               </HStack>
             </Button>
           </Collapsible.Trigger>

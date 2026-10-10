@@ -260,7 +260,7 @@ const renderGridItems = (
             <Card.Header>
               <HStack gap={2}>
                 <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                <Heading size="sm">{check.name}</Heading>
+                <Heading textStyle="cardTitle">{check.name}</Heading>
               </HStack>
               {!check.enabled && (
                 <Text color="fg.muted" fontSize="sm">
@@ -288,7 +288,7 @@ const renderGridItems = (
             <Card.Header>
               <HStack gap={2}>
                 <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                <Heading size="sm">{check.name}</Heading>
+                <Heading textStyle="cardTitle">{check.name}</Heading>
                 {traceCheck && <Text fontWeight={300}>- {traceCheck.name}</Text>}
               </HStack>
               {!check.enabled && (
@@ -321,7 +321,7 @@ const renderGridItems = (
               <Card.Header>
                 <HStack gap={2}>
                   <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                  <Heading size="sm">{check.name} - Pass Rate Trend</Heading>
+                  <Heading textStyle="cardTitle">{check.name} - Pass Rate Trend</Heading>
                 </HStack>
               </Card.Header>
               <Card.Body>
@@ -456,7 +456,7 @@ function EvaluationsContent() {
               <GridItem colSpan={1} display="inline-grid">
                 <Card.Root>
                   <Card.Header>
-                    <Heading size="sm">Overall Health</Heading>
+                    <Heading textStyle="cardTitle">Overall Health</Heading>
                   </Card.Header>
                   <Card.Body>
                     <CustomGraph input={aggregateHealthSummary} />
@@ -466,7 +466,7 @@ function EvaluationsContent() {
               <GridItem colSpan={3} display="inline-grid">
                 <Card.Root>
                   <Card.Header>
-                    <Heading size="sm">Pass / Fail Trend</Heading>
+                    <Heading textStyle="cardTitle">Pass / Fail Trend</Heading>
                   </Card.Header>
                   <Card.Body>
                     <CustomGraph input={aggregatePassFailTrend} />

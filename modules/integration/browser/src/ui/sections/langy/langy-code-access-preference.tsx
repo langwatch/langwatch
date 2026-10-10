@@ -39,7 +39,7 @@ export function LangyCodeAccessPreference({
         <VStack align="stretch" gap={2}>
           <HStack gap={2}>
             <GitHub size={18} />
-            <Heading size="sm">Langy code access</Heading>
+            <Heading textStyle="cardTitle">Langy code access</Heading>
           </HStack>
           {line}
         </VStack>

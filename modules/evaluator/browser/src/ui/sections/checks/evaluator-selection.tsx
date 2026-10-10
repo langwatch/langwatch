@@ -303,7 +303,7 @@ function EvaluatorChoiceCard({
                 <Tag.Label>Beta</Tag.Label>
               </Tag.Root>
             )}
-            <Heading as="h2" size="sm">
+            <Heading as="h2" textStyle="cardTitle">
               {evaluatorDisplayName(evaluator.name)}
             </Heading>
           </HStack>

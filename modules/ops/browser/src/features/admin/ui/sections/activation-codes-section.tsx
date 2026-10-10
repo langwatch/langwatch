@@ -29,7 +29,7 @@ export function ActivationCodesSection() {
   return (
     <VStack gap={4} width="full" align="start">
       <HStack width="full">
-        <Heading size="md">Activation codes</Heading>
+        <Heading size="sm">Activation codes</Heading>
         <Spacer />
         <Button size="sm" variant="outline" onClick={() => setIssuing(true)}>
           <Plus size={16} />

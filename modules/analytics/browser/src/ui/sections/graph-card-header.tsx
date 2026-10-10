@@ -162,7 +162,7 @@ export function GraphCardHeader({
           shouldTruncate
         />
       ) : (
-        <Heading size="sm" marginLeft={2}>
+        <Heading textStyle="cardTitle" marginLeft={2}>
           {displayName}
         </Heading>
       )}

@@ -112,7 +112,7 @@ export function OperatorFeatureFlagCatalogueView({
 
       {catalogue.families.length > 0 && (
         <Box>
-          <Heading size="sm" marginBottom={2}>
+          <Heading textStyle="cardTitle" marginBottom={2}>
             Flag families
           </Heading>
           <Text fontSize="xs" color="fg.muted" marginBottom={3}>
@@ -177,7 +177,7 @@ function ScopeSection({
 }) {
   return (
     <Box>
-      <Heading size="md" marginBottom={1}>
+      <Heading size="sm" marginBottom={1}>
         {heading}
       </Heading>
       <Text fontSize="xs" color="fg.muted" marginBottom={3}>

@@ -222,7 +222,7 @@ export function TryItOut({
   return (
     <VStack width="full" gap={6} marginTop={6}>
       <HStack width="full" align="end">
-        <Heading as="h2" size="lg" textAlign="center" paddingTop={4}>
+        <Heading as="h2" size="xl" textAlign="center" paddingTop={4}>
           Try it out
         </Heading>
         <Spacer />

@@ -182,7 +182,7 @@ export function SectionHeader({
         {icon}
       </Box>
       <HStack gap={2} align="center" flex="1 0 auto">
-        <Heading size="md">{title}</Heading>
+        <Heading size="sm">{title}</Heading>
         <Badge colorPalette={accent} variant="subtle" borderRadius="full">
           {count}
         </Badge>

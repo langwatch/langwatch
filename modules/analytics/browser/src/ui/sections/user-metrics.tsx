@@ -170,7 +170,7 @@ export function UserMetrics() {
       <GridItem rowSpan={2}>
         <Card.Root width="100%" height="100%">
           <Card.Header paddingBottom={4}>
-            <Heading size="sm">Top topics</Heading>
+            <Heading textStyle="cardTitle">Top topics</Heading>
           </Card.Header>
           <Card.Body overflowY="auto">
             <TopicsSelector showTitle={false} />
@@ -180,7 +180,7 @@ export function UserMetrics() {
       <GridItem>
         <Card.Root overflow="auto">
           <Card.Header>
-            <Heading size="sm">Thread metrics</Heading>
+            <Heading textStyle="cardTitle">Thread metrics</Heading>
           </Card.Header>
           <Card.Body>
             <CustomGraph input={threadMetrics} />

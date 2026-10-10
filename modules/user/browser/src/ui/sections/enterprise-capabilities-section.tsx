@@ -185,7 +185,7 @@ export function EnterpriseCapabilitiesSection() {
         <SsoConfiguredButNotInUseNotice />
 
         <VStack align="start" gap={1}>
-          <Heading as="h2" size="md">
+          <Heading as="h2" size="sm">
             Organization sign-in and governance
           </Heading>
           <Text color="fg.muted" fontSize="sm">

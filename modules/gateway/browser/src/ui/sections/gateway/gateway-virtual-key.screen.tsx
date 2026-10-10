@@ -655,7 +655,7 @@ function Section({
   return (
     <Box>
       <HStack mb={2}>
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         <Spacer />
         {action}
       </HStack>

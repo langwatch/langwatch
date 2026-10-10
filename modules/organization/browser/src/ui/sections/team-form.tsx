@@ -284,7 +284,7 @@ export const TeamForm = ({
           )}
         </SettingsFieldGroup>
         <HStack width="full" marginTop={2}>
-          <Heading>Members</Heading>
+          <Heading size="sm">Members</Heading>
           <Spacer />
           {team && (
             <Link href={`/settings/members`}>
@@ -440,7 +440,7 @@ function TeamFormProjects({ team }: { team: TeamWithProjectsAndMembers }): React
 
   return (
     <HStack width="full" marginTop={2}>
-      <Heading>Projects</Heading>
+      <Heading size="sm">Projects</Heading>
       <Spacer />
       <Button
         variant="outline"

@@ -34,7 +34,7 @@ export function RetroactiveProgressCard({
   return (
     <Card.Root width="full">
       <Card.Header>
-        <Heading as="h3" fontSize="lg">
+        <Heading size="sm" as="h3" fontSize="lg">
           Applying retention to existing data
         </Heading>
         <Text fontSize="sm" color="fg.muted">

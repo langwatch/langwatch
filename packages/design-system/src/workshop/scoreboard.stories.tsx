@@ -62,7 +62,7 @@ function Scoreboard() {
       </Grid>
 
       <Stack gap={3}>
-        <Heading size="md">Most adopted</Heading>
+        <Heading size="sm">Most adopted</Heading>
         <Table.Root size="sm" variant="line">
           <Table.Body>
             {top.map(([subpath, entry]) => (
@@ -81,7 +81,7 @@ function Scoreboard() {
       {DEBT.map(({ key, label, rule }) => (
         <Stack key={key} gap={2}>
           <HStack gap={2}>
-            <Heading size="sm">{label}</Heading>
+            <Heading textStyle="cardTitle">{label}</Heading>
             <Badge variant="outline">{rule}</Badge>
           </HStack>
           <Text color="fg.muted">The files with the most, to move first.</Text>
@@ -90,7 +90,7 @@ function Scoreboard() {
       ))}
 
       <Stack gap={2}>
-        <Heading size="sm">Published but imported nowhere</Heading>
+        <Heading textStyle="cardTitle">Published but imported nowhere</Heading>
         <Text color="fg.muted">
           Candidates to retire, or to adopt where a screen hand-rolls the same thing.
         </Text>

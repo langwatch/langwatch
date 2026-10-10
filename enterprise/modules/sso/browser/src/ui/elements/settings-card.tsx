@@ -23,7 +23,7 @@ export function SettingsCard({
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <VStack align="start" gap={0.5}>
-            <Heading size="sm">{title}</Heading>
+            <Heading textStyle="cardTitle">{title}</Heading>
             {hint && (
               <Text fontSize="xs" color="fg.muted">
                 {hint}

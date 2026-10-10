@@ -70,7 +70,7 @@ export function InviteTeamAssignments(props: TeamAssignmentsProps) {
   }
   return (
     <VStack align="start" gap={3} width="100%" marginTop={2}>
-      <Heading>Team Assignments</Heading>
+      <Heading size="sm">Team Assignments</Heading>
       {fields.length === 0 && orgRole === OrganizationUserRole.EXTERNAL && (
         <LiteMemberNeedsTeamWarning />
       )}

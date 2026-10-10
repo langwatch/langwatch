@@ -398,7 +398,7 @@ function UsageBreakdown({
 
       {showKeys && (
         <VStack align="stretch" gap={2}>
-          <Heading size="sm">Top virtual keys</Heading>
+          <Heading textStyle="cardTitle">Top virtual keys</Heading>
           <Card.Root variant="showcase" width="full" overflowX="auto">
             <ListTable
               containerProps={{ overflowX: "auto", maxWidth: "full" }}
@@ -439,7 +439,7 @@ function UsageBreakdown({
 
       <VStack align="stretch" gap={2}>
         <HStack>
-          <Heading size="sm">Top models</Heading>
+          <Heading textStyle="cardTitle">Top models</Heading>
           <Spacer />
           {viewTracesHref && (
             <Link href={viewTracesHref}>
@@ -496,7 +496,7 @@ function SpendSparkline({
   return (
     <VStack align="stretch" gap={2}>
       <HStack>
-        <Heading size="sm">Spend over time</Heading>
+        <Heading textStyle="cardTitle">Spend over time</Heading>
         <Spacer />
         <Text fontSize="xs" color="fg.muted">
           day-bucketed UTC

@@ -326,7 +326,7 @@ function MigrationDetail({
   if (!showEnrollments && migration.attention.length === 0) return null;
   return (
     <Stack gap={3}>
-      <Heading size="sm" truncate title={migration.title}>
+      <Heading textStyle="cardTitle" truncate title={migration.title}>
         {migration.title}
       </Heading>
       {showEnrollments && <EnrollmentTable enrollments={enrollments} canManage={canManage} />}

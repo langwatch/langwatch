@@ -54,7 +54,7 @@ export const LLMSummary = () => {
     <Card.Root>
       <Card.Header>
         <HStack gap={1}>
-          <Heading size="sm">Summary</Heading>
+          <Heading textStyle="cardTitle">Summary</Heading>
           {project?.slug && (
             <Tooltip content="View LLM metrics">
               <Link href={`/${project.slug}/analytics/metrics`}>

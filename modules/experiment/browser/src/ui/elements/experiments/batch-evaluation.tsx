@@ -250,7 +250,7 @@ const EvaluationTable = ({
   const hasDetails = group.all.some((evaluation) => evaluation.details);
   return (
     <VStack align="start" gap={8} paddingTop={12}>
-      <Heading as={"h2"} size="md">
+      <Heading as={"h2"} size="sm">
         {name}
       </Heading>
       <Box>

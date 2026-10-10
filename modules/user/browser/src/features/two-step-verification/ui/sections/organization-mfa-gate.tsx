@@ -43,7 +43,7 @@ export default function OrganizationMfaGate({
           <Box color="fg.muted">
             <ShieldCheck size={28} />
           </Box>
-          <Heading as="h1" size="lg">
+          <Heading as="h1" size="xl">
             {gate.organizationName} requires two-step verification
           </Heading>
           <Text color="fg.muted">{HELD_AT_THE_GATE.description}</Text>

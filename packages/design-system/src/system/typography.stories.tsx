@@ -131,7 +131,7 @@ export const Expressive: Story = {
         </Text>
       </Stack>
       <Stack gap={2}>
-        <Heading size="sm">Mail&apos;s expressive cut</Heading>
+        <Heading textStyle="cardTitle">Mail&apos;s expressive cut</Heading>
         <Text color="fg.muted">
           Mail uses one system face and no web font (a remote font in mail is a tracking pixel). Its
           scale lives in <Code>packages/mail/src/templates/email-layout.tsx</Code>; the

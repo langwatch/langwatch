@@ -10,7 +10,7 @@ export function ChartCard({
     <GridItem colSpan={colSpan} display="inline-grid">
       <Card.Root>
         <Card.Header>
-          <Heading size="sm">{title}</Heading>
+          <Heading textStyle="cardTitle">{title}</Heading>
         </Card.Header>
         <Card.Body>{children}</Card.Body>
       </Card.Root>

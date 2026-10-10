@@ -82,7 +82,7 @@ function DocumentsMetrics() {
   return (
     <>
       <HStack width="full" align="top">
-        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
           Documents
         </Heading>
       </HStack>
@@ -120,7 +120,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
     if (isAggregateProjectKind(project?.kind)) return null;
     return (
       <>
-        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
           Custom Dashboards
         </Heading>
         <Card.Root borderStyle="dashed">
@@ -153,7 +153,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
 
   return (
     <>
-      <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+      <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
         Custom Dashboards
       </Heading>
       <Grid width="full" gap={3} gridTemplateColumns="repeat(auto-fill, minmax(250px, 1fr))">

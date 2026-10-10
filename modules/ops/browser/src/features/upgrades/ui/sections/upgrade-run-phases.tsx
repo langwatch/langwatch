@@ -66,7 +66,7 @@ export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
       </HStack>
       {run.phases.length > 0 && (
         <Stack gap={2} data-testid="upgrade-run-phases">
-          <Heading size="sm">Phases</Heading>
+          <Heading textStyle="cardTitle">Phases</Heading>
           {run.phases.map((phase, index) => (
             <PhaseRow key={`${phase.name}:${phase.release ?? ""}:${index}`} phase={phase} />
           ))}
@@ -82,7 +82,7 @@ export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
             data-testid="upgrade-run-release"
           >
             <Card.Header>
-              <Heading size="sm">{group.release ?? "Unreleased"}</Heading>
+              <Heading textStyle="cardTitle">{group.release ?? "Unreleased"}</Heading>
             </Card.Header>
             <Card.Body>
               <Stack gap={2}>
@@ -96,7 +96,7 @@ export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
       )}
       {run.plan !== null && (
         <Stack gap={2}>
-          <Heading size="sm">Plan</Heading>
+          <Heading textStyle="cardTitle">Plan</Heading>
           <CodePreview
             code={JSON.stringify(run.plan, null, 2)}
             language="json"
@@ -109,7 +109,7 @@ export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
       )}
       {run.report !== null && (
         <Stack gap={2}>
-          <Heading size="sm">Report</Heading>
+          <Heading textStyle="cardTitle">Report</Heading>
           <CodePreview
             code={JSON.stringify(run.report, null, 2)}
             language="json"

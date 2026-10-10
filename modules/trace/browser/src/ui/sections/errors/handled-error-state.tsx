@@ -52,7 +52,7 @@ export function HandledErrorState({
         {/* `role="alert"` on the text, not the whole box: a screen reader
             should hear what went wrong, not the decoration around it. */}
         <Stack gap={2} role="alert">
-          <Heading size="lg" letterSpacing="-0.01em">
+          <Heading size="xl" letterSpacing="-0.01em">
             {copy.title}
           </Heading>
           {copy.description && (

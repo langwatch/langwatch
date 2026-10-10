@@ -27,7 +27,7 @@ export function CheckupSection({
                 {icon}
               </Box>
             ) : null}
-            <Heading size="sm" overflowWrap="anywhere">
+            <Heading textStyle="cardTitle" overflowWrap="anywhere">
               {title}
             </Heading>
           </HStack>

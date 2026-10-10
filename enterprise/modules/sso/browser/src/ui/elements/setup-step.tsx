@@ -123,7 +123,7 @@ export function SetupStep({
         >
           <Marker number={number} state={state} />
           <VStack align="start" gap={0.5} flex="1" minWidth={0}>
-            <Heading size="sm">{title}</Heading>
+            <Heading textStyle="cardTitle">{title}</Heading>
             {/* Never while the step is open — the body already says it, at length. */}
             {!open && summary && (
               <Text fontSize="sm" color="fg.muted" truncate maxWidth="full">

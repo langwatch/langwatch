@@ -61,7 +61,7 @@ export function ConnectionHeader({ connection }: { connection: AdminSsoConnectio
 export function ConnectionSummary({ connection }: { connection: AdminSsoConnection }) {
   return (
     <Box as="section" aria-label="Summary">
-      <Heading as="h3" size="sm" marginBottom={3}>
+      <Heading as="h3" textStyle="cardTitle" marginBottom={3}>
         Summary
       </Heading>
       <SummaryList>
@@ -111,7 +111,7 @@ export function ConnectionDomains({ connection }: { connection: AdminSsoConnecti
       borderColor="border.muted"
       paddingTop={5}
     >
-      <Heading as="h3" size="sm" marginBottom={3}>
+      <Heading as="h3" textStyle="cardTitle" marginBottom={3}>
         Domains
       </Heading>
       <VStack align="stretch" gap={2}>

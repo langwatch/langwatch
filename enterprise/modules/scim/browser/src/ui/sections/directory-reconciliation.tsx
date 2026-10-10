@@ -82,7 +82,7 @@ export function DirectoryReconciliation({
   return (
     <VStack gap={6} width="full" align="stretch" data-testid="scim-reconciliation">
       <VStack gap={3} width="full" align="stretch">
-        <Heading size="sm">Connections</Heading>
+        <Heading textStyle="cardTitle">Connections</Heading>
         {connections.length === 0 && <NoConnectionYet maySetUp={maySetUpSingleSignOn} />}
         {connections
           .filter((connection) =>
@@ -317,7 +317,7 @@ function RecentDirectoryChanges({ changes }: { changes: DirectoryChangeRow[] }) 
 
   return (
     <VStack align="stretch" gap={3} data-testid="directory-recent-changes">
-      <Heading size="sm">Access changes assigned by your identity provider</Heading>
+      <Heading textStyle="cardTitle">Access changes assigned by your identity provider</Heading>
       <VStack align="stretch" gap={2}>
         {shown.map((change) => (
           <HStack key={`${change.grantId}-${change.kind}`} gap={3}>

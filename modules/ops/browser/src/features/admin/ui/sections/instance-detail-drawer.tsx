@@ -170,7 +170,7 @@ function DomainsSection({ instance }: { instance: SelfHostedInstance }) {
   return (
     <Card.Root variant="outline" width="full">
       <Card.Header>
-        <Heading size="sm">Who uses it</Heading>
+        <Heading textStyle="cardTitle">Who uses it</Heading>
       </Card.Header>
       <Card.Body>
         {domains.length === 0 ? (
@@ -204,7 +204,7 @@ function LadderSection({ instance }: { instance: SelfHostedInstance }) {
   return (
     <Card.Root variant="outline" width="full">
       <Card.Header>
-        <Heading size="sm">Getting started</Heading>
+        <Heading textStyle="cardTitle">Getting started</Heading>
       </Card.Header>
       <Card.Body>
         <VStack align="start" gap={1} width="full">
@@ -242,7 +242,7 @@ function UsageSection({ instance }: { instance: SelfHostedInstance }) {
   return (
     <Card.Root variant="outline" width="full">
       <Card.Header>
-        <Heading size="sm">What they do</Heading>
+        <Heading textStyle="cardTitle">What they do</Heading>
       </Card.Header>
       <Card.Body>
         {rows.length === 0 ? (
@@ -276,7 +276,7 @@ function HistorySection({
   return (
     <Card.Root variant="outline" width="full">
       <Card.Header>
-        <Heading size="sm">Reports</Heading>
+        <Heading textStyle="cardTitle">Reports</Heading>
       </Card.Header>
       <Card.Body>
         {reports.length === 0 ? (

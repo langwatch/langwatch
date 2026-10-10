@@ -131,12 +131,12 @@ export function UpgradePreview({ preview }: { preview: UpgradePreviewView }) {
         </Alert.Root>
       ) : (
         <Stack gap={3}>
-          <Heading size="sm">Plan</Heading>
+          <Heading textStyle="cardTitle">Plan</Heading>
           <PlannedReleases releases={plan.releases} />
         </Stack>
       )}
       <Stack gap={3}>
-        <Heading size="sm">Preflight</Heading>
+        <Heading textStyle="cardTitle">Preflight</Heading>
         <Preflight rows={preview.preflight} />
       </Stack>
     </Stack>

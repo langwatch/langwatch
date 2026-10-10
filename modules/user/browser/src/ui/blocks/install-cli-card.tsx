@@ -67,7 +67,7 @@ export function InstallCliCard({
               <Box color="fg.muted">
                 <Terminal size={18} />
               </Box>
-              <Heading as="h3" size="sm">
+              <Heading as="h3" textStyle="cardTitle">
                 {heading}
               </Heading>
             </HStack>

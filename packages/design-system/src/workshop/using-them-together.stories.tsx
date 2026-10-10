@@ -41,7 +41,7 @@ export const SpacingRhythm: Story = {
       why="The parent's gap keeps every space on the scale and lets a child move without leaving a hole."
       dont={
         <Box>
-          <Heading size="sm" marginBottom="13px">
+          <Heading textStyle="cardTitle" marginBottom="13px">
             Budget
           </Heading>
           <Text marginBottom="7px">92 percent of this period&apos;s limit is used.</Text>
@@ -50,15 +50,15 @@ export const SpacingRhythm: Story = {
           </Button>
         </Box>
       }
-      dontCode={`<Heading marginBottom="13px"/> <Text marginBottom="7px"/> <Button marginTop="10px"/>`}
+      dontCode={`<Heading size="sm" marginBottom="13px"/> <Text marginBottom="7px"/> <Button marginTop="10px"/>`}
       doThis={
         <Stack gap={3} align="start">
-          <Heading size="sm">Budget</Heading>
+          <Heading textStyle="cardTitle">Budget</Heading>
           <Text>92 percent of this period&apos;s limit is used.</Text>
           <Button size="sm">Raise the limit</Button>
         </Stack>
       }
-      doCode={`<Stack gap={3}> <Heading/> <Text/> <Button/> </Stack>`}
+      doCode={`<Stack gap={3}> <Heading size="sm"/> <Text/> <Button/> </Stack>`}
     />
   ),
 };

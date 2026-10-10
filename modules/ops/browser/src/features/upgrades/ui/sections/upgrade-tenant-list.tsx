@@ -55,7 +55,7 @@ export function UpgradeTenantList({
   return (
     <Stack gap={3} data-testid="upgrade-tenant-list">
       <HStack gap={3} flexWrap="wrap">
-        <Heading size="sm" flex={1}>
+        <Heading textStyle="cardTitle" flex={1}>
           Tenants
         </Heading>
         <NativeSelect.Root size="sm" width={{ base: "full", md: "60" }}>

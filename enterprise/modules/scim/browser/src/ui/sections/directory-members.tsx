@@ -28,7 +28,7 @@ export function DirectoryMembers({ organizationId }: { organizationId: string })
 
   return (
     <VStack gap={2} align="start" width="full" data-testid="directory-members">
-      <Heading size="sm">People your directory manages</Heading>
+      <Heading textStyle="cardTitle">People your directory manages</Heading>
       <Text color="fg.muted" fontSize="sm">
         Your identity provider created these accounts and decides whether they stay.
       </Text>

@@ -62,7 +62,7 @@ export function DirectoryRequests({
       </Button>
       {open && (
         <>
-          <Heading size="md">Requests from your identity provider</Heading>
+          <Heading size="sm">Requests from your identity provider</Heading>
           {connections.map((connection) => (
             <ConnectionRequests
               key={connection.connectionId}

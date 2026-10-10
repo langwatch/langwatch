@@ -527,7 +527,7 @@ function OverviewBlock({
   return (
     <Stack gap={3}>
       <HStack justify="space-between">
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         {action}
       </HStack>
       {children}

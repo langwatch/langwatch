@@ -5,7 +5,7 @@ import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 export function PageAbsentNotice() {
   return (
     <VStack paddingY={16} gap={2}>
-      <Heading size="md">Page not found</Heading>
+      <Heading size="sm">Page not found</Heading>
       <Text color="fg.muted">Sorry, this page does not exist.</Text>
     </VStack>
   );

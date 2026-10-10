@@ -30,7 +30,7 @@ export function CostPanel({
       padding={4}
     >
       <HStack gap={2}>
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         <SampleMark shown={sample} />
         <Spacer />
         {action}

@@ -184,7 +184,7 @@ export function DSPyExperiment({
             <>
               <Card.Root width="100%">
                 <Card.Header>
-                  <Heading as="h2" size="md">
+                  <Heading as="h2" size="sm">
                     {optimizerHeading(optimizerNames)}
                   </Heading>
                 </Card.Header>
@@ -480,7 +480,7 @@ export function DSPyExperimentRunList({
       overflowY="auto"
     >
       {size !== "sm" && (
-        <Heading as="h2" size="md" paddingX={6} paddingY={4}>
+        <Heading as="h2" size="sm" paddingX={6} paddingY={4}>
           DSPy Optimizer Runs
         </Heading>
       )}
@@ -820,7 +820,7 @@ const RunDetailsHeader = ({
     <HStack width="full" gap={8} padding={4}>
       <HStack gap={3}>
         <RunColorMark runId={dspyStepSummary.run_id} workflowVersion={workflowVersion} />
-        <Heading as="h2" size="md" marginTop="-1px">
+        <Heading as="h2" size="sm" marginTop="-1px">
           {runName} (step {dspyStepSummary.index})
         </Heading>
       </HStack>

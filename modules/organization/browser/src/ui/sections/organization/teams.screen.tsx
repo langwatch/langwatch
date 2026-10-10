@@ -1061,7 +1061,7 @@ export default function TeamsScreen() {
     <VStack gap={6} width="full" align="start">
       <HStack width="full">
         <Box>
-          <Heading size="md">Teams and projects</Heading>
+          <Heading size="sm">Teams and projects</Heading>
           <Text fontSize="sm" color="fg.subtle" mt={1}>
             People on a team inherit access to all its projects. Expand a project to add overrides
             or direct access.

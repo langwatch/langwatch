@@ -115,7 +115,7 @@ export function PersonalOverviewScreen() {
 
           <HStack alignItems="end" paddingTop={4}>
             <VStack align="start" gap={0}>
-              <Heading as="h3" size="md">
+              <Heading as="h3" size="sm">
                 My usage
               </Heading>
               <Text color="fg.muted" textStyle="body">

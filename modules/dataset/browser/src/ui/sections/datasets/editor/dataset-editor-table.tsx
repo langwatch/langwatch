@@ -163,7 +163,7 @@ function EditorTableHeading({
       </PageLayout.Heading>
     );
   }
-  if (typeof title === "string") return <Heading size="md">{title}</Heading>;
+  if (typeof title === "string") return <Heading size="sm">{title}</Heading>;
 
   return <>{title}</>;
 }

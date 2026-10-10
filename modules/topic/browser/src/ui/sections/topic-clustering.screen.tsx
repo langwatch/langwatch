@@ -136,7 +136,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
       <ClusteringStatusCard projectId={project.id} />
       <Card.Root width="full">
         <Card.Header>
-          <Heading>Manual topic clustering</Heading>
+          <Heading size="sm">Manual topic clustering</Heading>
         </Card.Header>
         <Card.Body width="full">
           <VStack align="start" gap={4}>
@@ -411,7 +411,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
 
   return (
     <VStack align="stretch" gap={3} width="full">
-      <Heading size="md">Run history</Heading>
+      <Heading size="sm">Run history</Heading>
       <RunHistoryBody isLoading={history.isLoading} runs={history.data ?? []} />
     </VStack>
   );

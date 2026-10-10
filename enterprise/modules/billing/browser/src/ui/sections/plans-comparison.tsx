@@ -185,7 +185,7 @@ function PlanCard({
           <VStack align="start" gap={3}>
             {plan.id !== "free" && <AccessStateIcon kind="upgrade" compact />}
             <HStack gap={2}>
-              <Heading as="h2" size="xl">
+              <Heading as="h2" size="lg">
                 {plan.name}
               </Heading>
               {isCurrent && <StatusChip label="Current" tone="good" />}

@@ -690,13 +690,18 @@ export const designSystemConfig = defineConfig({
       }),
       heading: defineRecipe({
         base: {
-          fontWeight: "500",
+          fontWeight: "600",
           color: "fg",
         },
         variants: {
           size: {
-            md: { textStyle: "md" },
-            lg: { textStyle: "2xl" },
+            sm: { textStyle: "sectionTitle" },
+            md: { textStyle: "metric" },
+            lg: { textStyle: "pageTitle" },
+            xl: { textStyle: "2xl" },
+            "2xl": { textStyle: "3xl" },
+            "3xl": { textStyle: "4xl" },
+            "4xl": { textStyle: "5xl" },
           },
         },
         defaultVariants: {

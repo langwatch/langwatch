@@ -328,7 +328,7 @@ export function SourceEventsTable({
     <VStack align="stretch" gap={3}>
       <VStack align="start" gap={1}>
         <HStack gap={1}>
-          <Heading as="h3" size="sm">
+          <Heading as="h3" textStyle="cardTitle">
             Events
           </Heading>
           {headerAside}

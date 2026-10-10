@@ -112,7 +112,7 @@ export function AiToolsPortal() {
         width="full"
       >
         <VStack align="start" gap={2}>
-          <Heading as="h3" size="md">
+          <Heading as="h3" size="sm">
             Your AI tools portal
           </Heading>
           <Text fontSize="sm" color="fg.muted">
@@ -131,7 +131,7 @@ export function AiToolsPortal() {
         if (items.length === 0) return null;
         return (
           <VStack key={type} align="stretch" gap={3}>
-            <Heading as="h3" size="sm" color="fg.muted">
+            <Heading as="h3" textStyle="cardTitle" color="fg.muted">
               {SECTION_LABELS[type]}
             </Heading>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>

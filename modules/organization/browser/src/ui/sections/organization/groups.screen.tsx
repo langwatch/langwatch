@@ -93,7 +93,9 @@ export default function GroupsScreen() {
       <VStack gap={6} width="full" align="start">
         <HStack justify="space-between" width="full">
           <VStack align="start" gap={1}>
-            <Heading as="h2">Groups</Heading>
+            <Heading size="sm" as="h2">
+              Groups
+            </Heading>
             <Text color="fg.muted" fontSize="sm">
               Assign access to many people at once. SCIM-synced groups are managed by your identity
               provider.

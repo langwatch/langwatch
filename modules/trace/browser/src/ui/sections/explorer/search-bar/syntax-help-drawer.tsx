@@ -281,7 +281,7 @@ const Section: React.FC<{
     borderRadius="lg"
   >
     <HStack justify="space-between" align="baseline">
-      <Heading size="sm" letterSpacing="-0.01em">
+      <Heading textStyle="cardTitle" letterSpacing="-0.01em">
         {title}
       </Heading>
       {caption && (

@@ -51,6 +51,7 @@ export function FrontDoorValuePanel({
           <FullLogo width={176} height={43.2} />
         </Box>
         <Heading
+          size="sm"
           as="h2"
           fontSize="clamp(30px, 3.1vw, 48px)"
           fontFamily={HEADING_FONT}

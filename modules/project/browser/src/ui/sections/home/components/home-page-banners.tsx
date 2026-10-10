@@ -1072,7 +1072,7 @@ function LegacyBanner({
                   <HStack gap={2} minWidth={0}>
                     <Heading
                       as="h2"
-                      size="md"
+                      size="sm"
                       fontWeight="600"
                       color="fg"
                       letterSpacing="-0.01em"

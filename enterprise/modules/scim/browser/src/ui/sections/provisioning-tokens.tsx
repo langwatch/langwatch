@@ -50,7 +50,7 @@ export function ProvisioningTokens({
     <>
       <VStack width="full" align="stretch" gap={2}>
         <HStack width="full">
-          <Heading size="sm">Provisioning tokens</Heading>
+          <Heading textStyle="cardTitle">Provisioning tokens</Heading>
           <Spacer />
           {mayManage && (
             <Button size="sm" onClick={onGenerateOpen} data-testid="scim-generate-open">

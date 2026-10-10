@@ -72,7 +72,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       minHeight={minHeight ? `${minHeight}px` : undefined}
     >
       {showTitle && (
-        <Heading fontSize="sm" as="h2">
+        <Heading size="sm" fontSize="sm" as="h2">
           Topics
         </Heading>
       )}

@@ -153,7 +153,7 @@ export function LLMMetrics() {
   return (
     <>
       <HStack paddingTop={6} paddingBottom={2}>
-        <Heading as="h2" size="md">
+        <Heading as="h2" size="sm">
           LLM metrics
         </Heading>
         <Tooltip content="View LLM metrics dashboard">
@@ -235,7 +235,7 @@ export function LLMMetrics() {
           <Card.Root height="full">
             <Card.Header>
               <HStack gap={1}>
-                <Heading size="sm">Evaluations summary</Heading>
+                <Heading textStyle="cardTitle">Evaluations summary</Heading>
                 <Tooltip content="View online evaluations">
                   <Link href={`/${project?.slug}/analytics/evaluations`}>
                     <IconButton
@@ -263,7 +263,7 @@ export function LLMMetrics() {
         <GridItem>
           <Card.Root height="full">
             <Card.Header>
-              <Heading size="sm">Error trend</Heading>
+              <Heading textStyle="cardTitle">Error trend</Heading>
             </Card.Header>
             <Card.Body>
               <CustomGraph input={errorTrend} />
@@ -273,7 +273,7 @@ export function LLMMetrics() {
         <GridItem>
           <Card.Root height="full">
             <Card.Header>
-              <Heading size="sm">Latency trend</Heading>
+              <Heading textStyle="cardTitle">Latency trend</Heading>
             </Card.Header>
             <Card.Body>
               <CustomGraph input={latencyTrend} />

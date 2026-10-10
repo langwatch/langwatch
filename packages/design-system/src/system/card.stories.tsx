@@ -29,7 +29,7 @@ function FigureCard({ label, figure, info }: { label: string; figure: string; in
     <Card.Root variant="elevated">
       <Card.Body padding={4} gap={1}>
         <HStack gap={2}>
-          <Heading size="sm">{label}</Heading>
+          <Heading textStyle="cardTitle">{label}</Heading>
           <FieldInfoTooltip description={info} />
         </HStack>
         <Text textStyle="2xl" fontWeight="semibold">
@@ -44,7 +44,7 @@ export const Default: Story = {
   render: (args) => (
     <Card.Root {...args} width="20rem">
       <Card.Body padding={4} gap={1}>
-        <Heading size="sm">Metered by gateway</Heading>
+        <Heading textStyle="cardTitle">Metered by gateway</Heading>
         <Text textStyle="2xl" fontWeight="semibold">
           $0.02013
         </Text>
@@ -60,7 +60,7 @@ export const Variants: Story = {
       {(["elevated", "outline", "subtle"] as const).map((variant) => (
         <Card.Root key={variant} variant={variant} width="16rem">
           <Card.Body padding={4} gap={1}>
-            <Heading size="sm">{variant}</Heading>
+            <Heading textStyle="cardTitle">{variant}</Heading>
             <Text color="fg.muted" textStyle="sm">
               A group of facts or controls about one thing.
             </Text>
@@ -82,7 +82,7 @@ export const FiguresAndAnEmptySlot: Story = {
       <FigureCard label="Metered by gateway" figure="$0.02013" info="What the gateway metered." />
       <Card.Root variant="outline" borderStyle="dashed" boxShadow="none">
         <Card.Body padding={4} gap={1}>
-          <Heading size="sm">Seats</Heading>
+          <Heading textStyle="cardTitle">Seats</Heading>
           <Stack gap={1}>
             <Text color="fg.muted" textStyle="sm">
               Seat data is not yet available.
@@ -99,7 +99,7 @@ export const Clickable: Story = {
   render: () => (
     <Card.Root variant="elevated" width="18rem" cursor="pointer" _hover={{ boxShadow: "lg" }}>
       <Card.Body padding={4} gap={1}>
-        <Heading size="sm">Exact match evaluator</Heading>
+        <Heading textStyle="cardTitle">Exact match evaluator</Heading>
         <Text color="fg.muted" textStyle="sm">
           Checks the output equals the expected answer.
         </Text>

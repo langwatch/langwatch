@@ -53,7 +53,7 @@ function TopicsContent() {
           <GridItem colSpan={1} display="inline-grid">
             <Card.Root height="100%">
               <Card.Header>
-                <Heading size="sm">Top Topics</Heading>
+                <Heading textStyle="cardTitle">Top Topics</Heading>
               </Card.Header>
               <Card.Body maxHeight="340px" overflowY="auto">
                 <TopicsSelector showTitle={false} />
@@ -65,7 +65,7 @@ function TopicsContent() {
               <Card.Header>
                 <HStack gap={2}>
                   <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                  <Heading size="sm">Threads Per Topic</Heading>
+                  <Heading textStyle="cardTitle">Threads Per Topic</Heading>
                 </HStack>
               </Card.Header>
               <Card.Body>
@@ -78,7 +78,7 @@ function TopicsContent() {
               <Card.Header>
                 <HStack gap={2}>
                   <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                  <Heading size="sm">Most Discussed Topics</Heading>
+                  <Heading textStyle="cardTitle">Most Discussed Topics</Heading>
                 </HStack>
               </Card.Header>
               <Card.Body>

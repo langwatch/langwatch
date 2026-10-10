@@ -115,7 +115,7 @@ export function CostLanePanel({
     <Card.Root variant="showcase" data-testid={testId} padding={4}>
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
-          <Heading size="sm">{label}</Heading>
+          <Heading textStyle="cardTitle">{label}</Heading>
           {/* WHAT THE LANE IS goes here rather than under the figure. Three
               cards sit in a row and each closed on a paragraph, which set the
               row's height by its longest sentence and left the shortest card
@@ -218,7 +218,7 @@ export function SeatLanePanel({
     >
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
-          <Heading size="sm">Seats</Heading>
+          <Heading textStyle="cardTitle">Seats</Heading>
           <FieldInfoTooltip
             description="Seats your provider reports as bought, and how many are assigned to someone."
             testId={`${testId}-about`}
