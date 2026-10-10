@@ -296,6 +296,29 @@ function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateW
   );
 }
 
+/** Whether the worker stops asking; one that said it was behind also says it caught up. */
+function settled({
+  verdict,
+  wasBehind,
+  warn,
+}: {
+  verdict: ServingVerdict;
+  wasBehind: boolean;
+  warn: ServingGateWarn;
+}): boolean {
+  if (verdict.outcome === "first-install" || verdict.outcome === "behind") return false;
+  if (wasBehind && verdict.admitted) {
+    warn(
+      `\`${UPGRADE_COMMAND}\` finished: the installation is current, so this worker takes jobs`,
+      {
+        phase: "current",
+        next: "nothing to do",
+      },
+    );
+  }
+  return true;
+}
+
 /**
  * The worker runs `upgrade` while its installation is behind (UPGRADE-IN-WORKER): it waits while
  * another runner holds the lease, after a failed step for a Retry that returns it to `pending`,
@@ -322,9 +345,11 @@ export async function admitAfterFirstInstall({
   let ranClean = false;
   let lastWait = "";
   let retries = 0;
+  let wasBehind = false;
   for (;;) {
     const verdict = await gate.admit();
-    if (verdict.outcome !== "first-install" && verdict.outcome !== "behind") return verdict;
+    if (settled({ verdict, wasBehind, warn })) return verdict;
+    wasBehind = true;
     const reason = await waitReason({ findLeaseHolder, findFailedSteps, mayRunPastFailure });
     if (reason) {
       const next = "nothing to do: this worker asks again every 10 s";

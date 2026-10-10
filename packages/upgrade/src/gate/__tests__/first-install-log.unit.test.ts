@@ -34,6 +34,7 @@ describe("admitAfterFirstInstall", () => {
           /^first install: .*this worker runs `pnpm task upgrade` before it takes jobs/,
         ),
         "upgrade ran",
+        expect.stringMatching(/finished: the installation is current/),
       ]);
       expect(said[0]?.fields).toMatchObject({ phase: "first-install", next: expect.any(String) });
     });
@@ -64,6 +65,41 @@ describe("admitAfterFirstInstall", () => {
         next: expect.stringMatching(/^nothing to do/),
       });
       expect(said[1]?.message).toBe("upgrade ran");
+    });
+  });
+
+  describe("given a worker that ran the upgrade because it was behind", () => {
+    /** @scenario "A worker that said it was behind says when the installation is current" */
+    it("says the installation is current and it takes jobs, after the upgrade's lines", async () => {
+      const said: string[] = [];
+      const answers: ServingVerdict[] = [
+        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+        { admitted: true, outcome: "current" },
+      ];
+      await admitAfterFirstInstall({
+        gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
+        firstInstall: async () => {
+          said.push("upgrade ran");
+          return { exitCode: 0, logTail: [] };
+        },
+        warn: (message) => void said.push(message),
+      });
+
+      expect(said.slice(1)).toEqual([
+        "upgrade ran",
+        "`pnpm task upgrade` finished: the installation is current, so this worker takes jobs",
+      ]);
+    });
+
+    it("says nothing when the installation was current from the start", async () => {
+      const said: string[] = [];
+      await admitAfterFirstInstall({
+        gate: { admit: async () => ({ admitted: true, outcome: "current" }) },
+        firstInstall: async () => ({ exitCode: 0, logTail: [] }),
+        warn: (message) => void said.push(message),
+      });
+
+      expect(said).toEqual([]);
     });
   });
 
@@ -138,7 +174,10 @@ describe("admitAfterFirstInstall", () => {
       expect(verdict).toEqual(current);
       expect(runs).toBe(0);
       expect(waits).toEqual([10_000, 10_000]);
-      expect(said).toEqual([expect.stringMatching(/held by worker-2 on pod-b/)]);
+      expect(said).toEqual([
+        expect.stringMatching(/held by worker-2 on pod-b/),
+        expect.stringMatching(/finished: the installation is current/),
+      ]);
     });
   });
 
