@@ -76,7 +76,14 @@ export class SessionBoundService {
    * the caller's answer for "no" is a null session AND a destroyed row, and
    * being signed out by your own policy is expected, not a failure.
    */
-  async enforce({ session }: { session: BoundableSession }): Promise<SessionBoundVerdict> {
+  async enforce({
+    session,
+    background = false,
+  }: {
+    session: BoundableSession;
+    /** The browser's own polling read: judged, but not counted as use (diverges from main). */
+    background?: boolean;
+  }): Promise<SessionBoundVerdict> {
     const bound = await this.boundFor({ userId: session.userId });
     if (bound === null) return { withinBound: true };
 
@@ -89,7 +96,7 @@ export class SessionBoundService {
       now,
     });
 
-    if (!verdict.withinBound) return verdict;
+    if (!verdict.withinBound || background) return verdict;
 
     await this.touchIfDue({ session, bound, lastSeenAt, now });
 

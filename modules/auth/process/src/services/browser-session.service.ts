@@ -81,13 +81,16 @@ export class BrowserSessionService {
   async resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
     fresh?: boolean;
+    background?: boolean;
   }): Promise<BrowserSessionResolution> {
     const verified = verifiedBrowserSessionSchema.parse(input.verified);
 
     const stored = await this.deps.sessions.findById({ id: verified.session.id });
     if (!stored) return { kind: "anonymous" };
 
-    if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
+    if (await this.pastItsWindow({ stored, background: input.background ?? false })) {
+      return { kind: "anonymous" };
+    }
 
     const { user, identityEmail } = await this.person({
       userId: verified.user.id,
@@ -201,8 +204,15 @@ export class BrowserSessionService {
    * so: a session honoured in one place and refused in another has not
    * ended. A destroy that fails still refuses the caller.
    */
-  private async pastItsWindow({ stored }: { stored: StoredBrowserSession }): Promise<boolean> {
+  private async pastItsWindow({
+    stored,
+    background = false,
+  }: {
+    stored: StoredBrowserSession;
+    background?: boolean;
+  }): Promise<boolean> {
     const verdict = await this.deps.sessionBound.enforce({
+      background,
       session: {
         id: stored.id,
         userId: stored.userId,

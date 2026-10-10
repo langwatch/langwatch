@@ -890,6 +890,7 @@ export class AuthModule implements AuthApiContract {
 
   resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
+    background?: boolean;
   }): Promise<BrowserSessionResolution> {
     return this.#sessions.resolveBrowserSession(input);
   }

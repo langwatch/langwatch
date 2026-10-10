@@ -30,6 +30,8 @@ const BRIEFING_STALE_MS = 60_000;
  * visible (react-query pauses interval refetches for hidden tabs by default).
  */
 const BRIEFING_POLL_MS = 30_000;
+/** A poll is not the person using LangWatch: it never extends an idle session. */
+const BACKGROUND_READ = { context: { background: true } };
 /**
  * How long cached reads survive an unmount. Long enough that stepping into a
  * trace and back to the home re-paints instantly from cache, then refreshes in
@@ -534,6 +536,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
+      trpc: BACKGROUND_READ,
       // Keep the last roll-up on screen through a refetch so the card never
       // blanks and re-fills (see modules/project/specs/langy-briefing.feature).
       placeholderData: keepPreviousData,
@@ -598,6 +601,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
+      trpc: BACKGROUND_READ,
       placeholderData: keepPreviousData,
     },
   );
@@ -626,6 +630,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
+      trpc: BACKGROUND_READ,
       placeholderData: keepPreviousData,
     },
   );
@@ -649,6 +654,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
+      trpc: BACKGROUND_READ,
       placeholderData: keepPreviousData,
     },
   );
