@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 
 import {
   createSsrfUrlValidator,
+  isCloudMetadataHost,
   isPrivateOrLocalhostIP,
   type SsrfUrlValidator,
 } from "@langwatch/egress";
@@ -10,7 +11,7 @@ import { findWebhookUrlProblem } from "@langwatch/webhook-contract";
 /**
  * The one admission policy for a customer-supplied webhook destination:
  * https-only, default port, no credentials, and private/loopback/link-local
- * blocked — `allowInsecureLocal` relaxes only origin and that block, nothing else.
+ * blocked — `allowInsecureLocal` relaxes only origin and that block; metadata stays refused.
  */
 
 const strictValidator = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
@@ -32,8 +33,11 @@ function unbracketedHost(host: string): string {
   return host.slice(1, -1);
 }
 
-/** What the URL's host is written as: a private address literal, or anything else. */
-type HostAddress = { kind: "private-literal"; address: string } | { kind: "other" };
+/** What the URL's host is written as: a metadata endpoint, a private address literal, or else. */
+type HostAddress =
+  | { kind: "metadata"; host: string }
+  | { kind: "private-literal"; address: string }
+  | { kind: "other" };
 
 /**
  * Whether the URL's host is an IP literal that is private/loopback/link-local,
@@ -47,7 +51,8 @@ function describeHostAddress(url: string): HostAddress {
   } catch {
     return { kind: "other" };
   }
-  const bare = unbracketedHost(host);
+  const bare = unbracketedHost(host).replace(/\.$/, "");
+  if (isCloudMetadataHost(bare)) return { kind: "metadata", host: bare };
   if (isIP(bare) === 0 || !isPrivateOrLocalhostIP(bare)) return { kind: "other" };
   return { kind: "private-literal", address: bare };
 }
@@ -69,8 +74,14 @@ export function judgeWebhookUrl({
 }): WebhookUrlVerdict {
   const problem = findWebhookUrlProblem(url, { allowInsecureOrigin: allowInsecureLocal });
   if (problem) return { admitted: false, reason: problem.message };
-  if (allowInsecureLocal) return { admitted: true };
   const host = describeHostAddress(url);
+  if (host.kind === "metadata") {
+    return {
+      admitted: false,
+      reason: `the destination "${host.host}" is a cloud metadata endpoint, which is not allowed.`,
+    };
+  }
+  if (allowInsecureLocal) return { admitted: true };
   if (host.kind === "private-literal") {
     return {
       admitted: false,

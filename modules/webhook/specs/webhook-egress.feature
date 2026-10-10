@@ -55,6 +55,13 @@ Feature: The fence a customer-supplied webhook leaves through
       And a scheme that is neither http nor https is still refused
 
     @unit
+    Scenario: A cloud metadata destination is refused whatever the escape hatch says
+      Given the webhook URL admission policy, with the escape hatch off or on
+      When it is asked to admit a cloud metadata endpoint by IPv4 address, by an
+        IPv6 or IPv4-mapped spelling, or by a metadata hostname
+      Then the destination is refused as a cloud metadata endpoint
+
+    @unit
     Scenario: An endpoint save is judged by the rule its delivery is judged by
       Given a process composed with the escape hatch off
       When an endpoint is saved with a loopback or private address, or a non-default port
