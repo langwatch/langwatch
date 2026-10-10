@@ -8,6 +8,7 @@ import { ChevronRight, CornerDownLeft, Lightbulb, Search, type LucideIcon } from
 import type React from "react";
 import type { ReactNode } from "react";
 
+import { ICON_RAIL_LABEL_PX } from "../../system/text-styles.ts";
 import { useReducedMotion } from "../../use-reduced-motion.ts";
 import { Dialog } from "../overlays/dialog.tsx";
 
@@ -59,7 +60,12 @@ export function IconRailTile({
       ) : null}
       <VStack gap={1}>
         <Icon size={19} strokeWidth={isActive ? 2.1 : 1.9} />
-        <Text fontSize="8.5px" fontWeight="semibold" lineHeight="1" letterSpacing="tight">
+        <Text
+          fontSize={`${ICON_RAIL_LABEL_PX}px`}
+          fontWeight="semibold"
+          lineHeight="1"
+          letterSpacing="tight"
+        >
           {label}
         </Text>
       </VStack>

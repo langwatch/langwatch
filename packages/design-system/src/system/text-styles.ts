@@ -85,3 +85,6 @@ export const TYPE_SCALE_PX = {
 
 /** Block-glyph pixel art (the coding agents' startup marks): a glyph is one art pixel, not text. */
 export const GLYPH_ART_PX = 4;
+
+/** The icon rail's tile label: a documented exception below the scale, as the 56px rail needs. */
+export const ICON_RAIL_LABEL_PX = 8.5;
