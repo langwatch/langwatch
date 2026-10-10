@@ -1,6 +1,6 @@
 /**
- * Home's "Action needed for updates" card, shaped as the join requests card in its slot: for
- * ops:view holders while an operator step of this version is unfinished, else nothing.
+ * Home's "Action needed for updates" card: the join requests card's shape in warning colours,
+ * first on Home, for ops:view holders while an operator step of this version is unfinished.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { Link } from "@langwatch/browser-host/link";
@@ -27,16 +27,15 @@ export function UpgradeActionNeeded() {
   return (
     <Box width="full" data-testid="home-upgrade-action-needed">
       <Card.Root
-        bg="bg.card/50"
-        backdropBlur="md"
+        bg="bg.warning"
         borderWidth="1px"
-        borderColor="border"
+        borderColor="border.warning"
         borderRadius="14px"
         boxShadow="none"
       >
         <Card.Body padding={4} gap={3}>
           <HStack gap={2}>
-            <Box color="fg.muted" display="flex" alignItems="center">
+            <Box color="fg.warning" display="flex" alignItems="center">
               <Wrench size={16} aria-hidden />
             </Box>
             <Heading as="h3" size="sm">

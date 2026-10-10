@@ -69,11 +69,11 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
+            {/* First, ops' unfinished operator steps for whoever holds ops:view. */}
+            <UpgradeActionNeeded />
             {/* Above every composition: whoever can answer a join request sees the
                 wait wherever the home opens. Organization draws nothing for anyone else. */}
             <PendingJoinRequests />
-            {/* Beside it, ops' unfinished operator steps for whoever holds ops:view. */}
-            <UpgradeActionNeeded />
 
             {/* The Langy home carries the offer inside its hero, under the ask field;
                 the classic home carries it here, under the header. */}
