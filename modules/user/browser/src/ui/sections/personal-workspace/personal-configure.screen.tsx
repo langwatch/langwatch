@@ -206,7 +206,7 @@ function PersonalCredentialsSection({
         credentialsTab === "keys" &&
         !showAddForm && (
           <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
-            + Add a new key
+            Add a new key
           </Button>
         )
       }

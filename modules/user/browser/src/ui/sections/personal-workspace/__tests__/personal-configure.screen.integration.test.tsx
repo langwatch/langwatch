@@ -194,26 +194,26 @@ describe("PersonalConfigureScreen", () => {
       renderScreen({ tab: "devices" });
 
       expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "+ Add a new key" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add a new key" })).not.toBeInTheDocument();
     });
   });
 
   describe("when the reader switches tabs", () => {
     it("moves between the keys and devices tabs", async () => {
       renderScreen();
-      expect(screen.getByRole("button", { name: "+ Add a new key" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add a new key" })).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("tab", { name: "Devices and keys" }));
       expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("tab", { name: "Virtual keys" }));
-      expect(await screen.findByRole("button", { name: "+ Add a new key" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Add a new key" })).toBeInTheDocument();
     });
   });
 
   describe("when a key is issued", () => {
     async function issueKey() {
-      await userEvent.click(screen.getByRole("button", { name: "+ Add a new key" }));
+      await userEvent.click(screen.getByRole("button", { name: "Add a new key" }));
       await userEvent.type(screen.getByPlaceholderText("e.g. jane-laptop-2"), "  jane-laptop ");
       await userEvent.click(screen.getByRole("button", { name: "Create key" }));
     }

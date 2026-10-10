@@ -4,7 +4,8 @@
  * Spec: specs/identity/authentication-settings.feature
  */
 
-import { Box, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { type ReactNode, useState } from "react";
 
@@ -39,7 +40,7 @@ export function EmailIdentifiersSection({
     <VStack width="full" align="stretch" gap={4} data-testid="email-identifiers-section">
       <AddressConfirmationNotice onConfirmed={identifiers.refresh} />
 
-      {identifiers.isPending ? <Spinner size="sm" /> : null}
+      {identifiers.isPending ? <SkeletonRows rows={2} /> : null}
 
       {identifiers.error ? (
         <HandledErrorAlert

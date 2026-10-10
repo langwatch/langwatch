@@ -1,3 +1,4 @@
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
@@ -162,7 +163,11 @@ function BudgetTooltip({ item }: { item: BudgetOverviewItemView }) {
       ) : (
         <Text>Warns when the limit is reached, without blocking</Text>
       )}
-      {item.resetsAt && <Text>Resets {readableDate(item.resetsAt).toLocaleString()}</Text>}
+      {item.resetsAt && (
+        <Text>
+          Resets <FormattedDate value={toEpochMs(item.resetsAt)} display="datetime" />
+        </Text>
+      )}
       {item.topModels && item.topModels.length > 0 && (
         <>
           <Text marginTop={1}>Top models this month:</Text>

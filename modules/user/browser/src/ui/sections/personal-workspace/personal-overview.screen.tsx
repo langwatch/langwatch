@@ -1,3 +1,4 @@
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
@@ -8,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
@@ -101,7 +103,7 @@ export function PersonalOverviewScreen() {
           <GuidedOnboardingOffer space="me" spaceInUse={spaceInUse} />
 
           <VStack id={PERSONAL_AI_TOOLS_ANCHOR} align="stretch" gap={3} scrollMarginTop={4}>
-            <Text color="fg.muted" fontSize="sm">
+            <Text color="fg.muted" textStyle="body">
               Pick a tool to get started, or issue a virtual key for your own integrations.
             </Text>
             <AiToolsPortal />
@@ -114,9 +116,9 @@ export function PersonalOverviewScreen() {
           <HStack alignItems="end" paddingTop={4}>
             <VStack align="start" gap={0}>
               <Heading as="h3" size="md">
-                My Usage
+                My usage
               </Heading>
-              <Text color="fg.muted" fontSize="sm">
+              <Text color="fg.muted" textStyle="body">
                 Your AI usage in {organizationName} this month
               </Text>
             </VStack>
@@ -178,7 +180,9 @@ export function PersonalOverviewScreen() {
                         positioning={{ placement: "top" }}
                         content={
                           <VStack gap={0.5} align="start">
-                            <Text fontWeight="semibold">{d.day}</Text>
+                            <Text textStyle="label">
+                              <FormattedDate value={d.day} display="date" />
+                            </Text>
                             <Text>Theoretical: {fmtUsd(d.usd)}</Text>
                             <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
                           </VStack>
@@ -221,8 +225,14 @@ export function PersonalOverviewScreen() {
                   })}
                 </HStack>
                 <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
-                  <Text>{spendByDay[0]?.day}</Text>
-                  <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
+                  <Text>
+                    {spendByDay[0] && <FormattedDate value={spendByDay[0].day} display="date" />}
+                  </Text>
+                  <Text>
+                    {spendByDay.length > 0 && (
+                      <FormattedDate value={spendByDay[spendByDay.length - 1].day} display="date" />
+                    )}
+                  </Text>
                 </HStack>
               </VStack>
             )}
@@ -292,30 +302,13 @@ function SummaryCard({
 }: {
   title: string;
   value: string;
-  /** Omitted or empty renders no second line at all, so the card keeps its
-   *  shape instead of reserving a blank row. */
+  /** Omitted or empty renders no hint at all. */
   subline?: string;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-      backgroundColor="bg.subtle"
-    >
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
-        {title}
-      </Text>
-      <Text fontSize="2xl" fontWeight="semibold" marginTop={1} color="fg">
-        {value}
-      </Text>
-      {subline ? (
-        <Text fontSize="sm" color="fg.muted" marginTop={1}>
-          {subline}
-        </Text>
-      ) : null}
-    </Box>
+    <StatTile label={title} hint={subline || undefined}>
+      <StatTileFigure>{value}</StatTileFigure>
+    </StatTile>
   );
 }
 

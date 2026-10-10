@@ -1,3 +1,4 @@
+import { Banner } from "@langwatch/design-system/banner";
 import {
   Alert,
   Box,
@@ -239,14 +240,7 @@ export function ModelProviderTile({
               {PERSONAL_WORKSPACE_WAIT_HINT}
             </Text>
           )}
-          {errorMessage && (
-            <Alert.Root status="error" size="sm">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>{errorMessage}</Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
-          )}
+          {errorMessage && <Banner status="error">{errorMessage}</Banner>}
         </VStack>
       )}
 

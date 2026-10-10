@@ -1,8 +1,3 @@
-/**
- * Two-step verification, beside passkeys: a passkey is a way in, this stands
- * behind whichever way in was used. Absent entirely where the deployment offers none.
- * Spec: specs/identity/mfa-and-session-shape.feature
- */
 import {
   Badge,
   Box,
@@ -10,11 +5,16 @@ import {
   Card,
   HStack,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
+/**
+ * Two-step verification, beside passkeys: a passkey is a way in, this stands
+ * behind whichever way in was used. Absent entirely where the deployment offers none.
+ * Spec: specs/identity/mfa-and-session-shape.feature
+ */
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Smartphone } from "lucide-react";
 import { useState } from "react";
 
@@ -58,7 +58,7 @@ export function TwoStepVerificationSection() {
       }
       data-testid="two-factor-section"
     >
-      {twoStep.loading ? <Spinner size="sm" /> : null}
+      {twoStep.loading ? <SkeletonRows rows={2} /> : null}
 
       {!twoStep.loading && !twoStep.enabled ? (
         <Card.Root width="full" data-testid="two-factor-empty">
