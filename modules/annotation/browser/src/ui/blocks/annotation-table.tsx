@@ -370,7 +370,7 @@ function RowActions({
         {queueItemId && (
           <Menu.Item
             value="remove-from-queue"
-            color="red.500"
+            color="red.fg"
             onClick={(event) => {
               event.stopPropagation();
               onRemoveFromQueue(queueItemId);
