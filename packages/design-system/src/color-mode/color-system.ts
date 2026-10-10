@@ -14,23 +14,23 @@ export const colorSystem = {
     100: { value: "#f1f5f9" },
     50: { value: "#f8fafc" },
   },
-  // Dark blue ink: OKLCH hue 250°, chroma tapers as lightness rises.
+  // Primer dark gray scale; semantic gray steps select this backing scale in dark mode.
   zinc: {
-    50: { value: "#f7f8fa" }, // oklch(0.980 0.0020 250)
-    100: { value: "#e9ebee" }, // oklch(0.940 0.0040 250)
-    150: { value: "#dbdee1" }, // oklch(0.900 0.0050 250)
-    200: { value: "#d1d5d8" }, // oklch(0.870 0.0060 250)
-    300: { value: "#babec3" }, // oklch(0.800 0.0080 250)
-    400: { value: "#9a9fa5" }, // oklch(0.700 0.0100 250)
-    450: { value: "#878d93" }, // oklch(0.640 0.0110 250)
-    500: { value: "#595e64" }, // oklch(0.480 0.0120 250)
-    600: { value: "#42484f" }, // oklch(0.400 0.0140 250)
-    700: { value: "#2d343b" }, // oklch(0.320 0.0160 250)
-    750: { value: "#232a31" }, // oklch(0.280 0.0170 250)
-    800: { value: "#192028" }, // oklch(0.240 0.0180 250)
-    850: { value: "#0f171e" }, // oklch(0.200 0.0190 250)
-    900: { value: "#0b121a" }, // oklch(0.180 0.0195 250)
-    950: { value: "#070e16" }, // oklch(0.160 0.0200 250)
+    50: { value: "#f0f6fc" },
+    100: { value: "#e6edf3" },
+    150: { value: "#d8dee4" },
+    200: { value: "#c9d1d9" },
+    300: { value: "#b1bac4" },
+    400: { value: "#9198a1" },
+    450: { value: "#838c97" },
+    500: { value: "#6e7681" },
+    600: { value: "#484f58" },
+    700: { value: "#3d444d" },
+    750: { value: "#2f3742" },
+    800: { value: "#212830" },
+    850: { value: "#151b23" },
+    900: { value: "#0d1117" },
+    950: { value: "#010409" },
   },
   red: {
     50: { value: "#FFF5F5" },
@@ -140,4 +140,22 @@ export const colorSystem = {
     800: { value: "#702459" },
     900: { value: "#521B41" },
   },
+};
+// Keep the light gray scale unchanged while Chakra roles use Primer gray in dark mode.
+export const grayScale = {
+  ...Object.fromEntries(
+    Object.entries(colorSystem.gray).map(([step, token]) => [
+      step,
+      {
+        value: {
+          _light: token.value,
+          _dark:
+            Object.entries(colorSystem.zinc).find(([darkStep]) => darkStep === step)?.[1].value ??
+            colorSystem.zinc[50].value,
+        },
+      },
+    ]),
+  ),
+  850: { value: { _light: colorSystem.gray[800].value, _dark: colorSystem.zinc[850].value } },
+  750: { value: { _light: colorSystem.gray[700].value, _dark: colorSystem.zinc[750].value } },
 };

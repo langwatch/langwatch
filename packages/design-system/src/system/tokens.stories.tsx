@@ -149,7 +149,7 @@ const SEMANTIC_GROUPS: { title: string; note: string; matches: (name: string) =>
   },
   {
     title: "Background",
-    note: "Four nested levels: bg.page, bg.card, bg.nested, bg.control.",
+    note: "Four nested levels: bg.page, bg.panel, bg.muted, bg.emphasized.",
     matches: (n) => n === "bg" || n.startsWith("bg."),
   },
   {
@@ -330,16 +330,19 @@ function oklch(hex: string): string {
 
 function InkSwatches() {
   const levels = [
-    ["Ground · page / surface", 950],
-    ["Card / overlay", 800],
-    ["Nested well / card edge", 700],
-    ["Control / well edge", 600],
-    ["Control edge", 400],
+    ["Inset app frame · bg.page", 950],
+    ["Content · bg", 900],
+    ["Raised · bg.panel", 850],
+    ["Controls / hover · bg.muted / bg.emphasized", 800],
+    ["Muted edge · border.muted", 750],
+    ["Default edge · border", 700],
+    ["Muted text · fg.muted", 400],
+    ["Text · fg", 50],
   ] as const;
   return (
     <DarkMode>
       <Stack bg="bg.page" color="fg" padding={4} gap={3} borderRadius="lg">
-        <Text fontSize="sm">Blue ink · hue 250° · chroma tapers with lightness</Text>
+        <Text fontSize="sm">Primer dark · four grounds · hairlines before colour</Text>
         {levels.map(([label, step]) => {
           const hex = colorSystem.zinc[step].value;
           return (
@@ -351,7 +354,7 @@ function InkSwatches() {
                 borderRadius="md"
                 style={{ background: hex }}
                 borderWidth="1px"
-                borderColor="border.card"
+                borderColor="border"
               />
               <Stack gap={0}>
                 <Text fontSize="sm">{label}</Text>
@@ -367,16 +370,16 @@ function InkSwatches() {
   );
 }
 
-export const DarkInk: Story = { render: () => <InkSwatches /> };
+export const PrimerDark: Story = { render: () => <InkSwatches /> };
 
 const SURFACE_ROLES = [
-  ["App sidebar / top bar", "bg.page", "border.card"],
-  ["Content / section nav / title", "bg.surface", "hairline after scroll"],
-  ["Card / ListTable container", "bg.card", "border.card"],
-  ["Table header / row / empty state", "container ground", "quiet state tint"],
-  ["Well / code block", "bg.nested", "border.nested"],
-  ["Input / chip / inline code", "bg.control", "border.control"],
-  ["Drawer / menu / dialog / tooltip", "bg.overlay = card", "border.card"],
+  ["App sidebar / top bar", "bg.page", "border"],
+  ["Content / section nav / title", "bg", "hairline after scroll"],
+  ["Card / ListTable container", "bg.panel", "border"],
+  ["Table header / row / empty state", "container ground", "bg.muted / bg.emphasized"],
+  ["Well / code block", "bg.muted", "border.muted"],
+  ["Input / chip / inline code", "bg.emphasized", "border"],
+  ["Drawer / menu / dialog / tooltip", "bg.panel", "border"],
 ] as const;
 
 function NestedSurfaces() {
@@ -384,21 +387,21 @@ function NestedSurfaces() {
     <Stack bg="bg.page" color="fg" padding={4} gap={4} borderRadius="xl">
       <Text fontSize="sm">App frame · bg.page</Text>
       <Stack
-        bg="bg.surface"
+        bg="bg"
         borderWidth="1px"
-        borderColor="border.card"
+        borderColor="border"
         borderRadius="lg"
         gap={0}
         overflow="hidden"
       >
-        <HStack padding={3} borderBottomWidth="1px" borderColor="border.card">
+        <HStack padding={3} borderBottomWidth="1px" borderColor="border">
           <Text fontSize="sm">Section nav</Text>
           <Text fontSize="sm">Page title · same content ground</Text>
         </HStack>
         <Stack padding={4} gap={4}>
           <Card.Root variant="outline">
             <Card.Body gap={3}>
-              <Text>Card · bg.card / border.card</Text>
+              <Text>Card · bg.panel / border</Text>
               <Table.Root size="sm">
                 <Table.Header>
                   <Table.Row>
@@ -418,21 +421,21 @@ function NestedSurfaces() {
                 </Table.Body>
               </Table.Root>
               <Stack
-                bg="bg.nested"
+                bg="bg.muted"
                 borderWidth="1px"
-                borderColor="border.nested"
+                borderColor="border.muted"
                 borderRadius="lg"
                 padding={3}
               >
-                <Text fontSize="sm">Nested well · bg.nested</Text>
+                <Text fontSize="sm">Nested well · bg.muted</Text>
                 <Box
-                  bg="bg.control"
+                  bg="bg.emphasized"
                   borderWidth="1px"
-                  borderColor="border.control"
+                  borderColor="border"
                   borderRadius="md"
                   padding={2}
                 >
-                  <Text fontSize="sm">Small control · bg.control</Text>
+                  <Text fontSize="sm">Small control · bg.emphasized</Text>
                   <Text color="fg.subtle" fontSize="xs">
                     Secondary text remains AA here.
                   </Text>
@@ -441,15 +444,15 @@ function NestedSurfaces() {
             </Card.Body>
           </Card.Root>
           <Stack
-            bg="bg.overlay"
+            bg="bg.panel"
             borderWidth="1px"
-            borderColor="border.card"
+            borderColor="border"
             borderRadius="lg"
             padding={3}
             boxShadow="lg"
           >
             <Text fontSize="sm">Drawer / menu · one opaque overlay</Text>
-            <Box borderTopWidth="1px" borderColor="border.card" paddingTop={2}>
+            <Box borderTopWidth="1px" borderColor="border" paddingTop={2}>
               <Text fontSize="sm">Header, body and footer share this ground.</Text>
               <Box bg="bg.hover" padding={2} borderRadius="sm">
                 Hovered menu item · 4% tint

@@ -54,70 +54,64 @@ variable), or `getRawColorValue` / `useColorRawValue` for a literal in the curre
 
 ### Which surface for which region
 
-**One ground, one card, one overlay: levels lift toward the reader only for a
-real container or control. Separate regions with a hairline before colour;
-chrome belongs to the ground it frames, and interaction is a quiet tint.**
+**One inset frame, one content ground, one raised panel: separate regions with a
+hairline before colour. Dark surfaces follow GitHub Primer; colour carries
+status or accent, and chrome belongs to the ground it frames.**
 
-| Region                                               | Surface                                | Edge / state                                                   |
-| ---------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
-| Body, global sidebar, top bar                        | `bg.page`                              | `border.card` where needed                                     |
-| Content, section rail, page title                    | `bg.surface`                           | hairline; sticky header adds it after scrolling                |
-| Card, bordered ListTable                             | `bg.card`                              | `border.card`                                                  |
-| Table header and body rows, EmptyState               | transparent; container owns the ground | `bg.hover`, `bg.selected`, `bg.stripe` tints                   |
-| Well, grouped content inside a card, code block      | `bg.nested`                            | `border.nested`                                                |
-| Input, select, textarea, checkbox, chip, inline code | `bg.control`                           | `border.control`; checked/status meaning retains palette roles |
-| Drawer, dialog, menu, popover, tooltip, select menu  | opaque `bg.overlay` (= card)           | `border.card`; headers/footers share the overlay               |
-| Tabs / segmented control                             | transparent / `bg.control` track       | quiet selected tint; no new content ground                     |
+Use Chakra's semantic names in new code. The dark gray scale uses the Primer
+reference values below; its light values are unchanged. `grayScale` selects the
+mode before Chakra's roles resolve, so a raw gray step also follows the theme.
+`zinc` is only the backing dark scale retained for compatibility.
 
-A table is not a stack of wells: its header, ordinary rows and empty state
-stay on its container. Hover is a 4% foreground tint, selection 8%, stripes 2%;
-none introduces a new elevation. Status badges retain their semantic palette
-fill; colour communicates meaning there, not depth. A neutral badge uses the
-control ground. Prefer removing a call-site background override to adding one.
-The sticky page title is the intentional glass exception: it samples the same
-content ground, with the reduced-graphics switch restoring opacity.
+| Region                                                     | Chakra role                      | Dark              | Separation                              |
+| ---------------------------------------------------------- | -------------------------------- | ----------------- | --------------------------------------- |
+| App frame, sidebar, top bar                                | `bg.page` (one documented extra) | #010409           | `border.muted`                          |
+| Content, section nav, page title                           | `bg`                             | #0d1117           | hairline; title adds it after scrolling |
+| Cards, tables, drawers, dialogs, menus, popovers, tooltips | `bg.panel`                       | #151b23           | `border`                                |
+| Wells, hover, small controls                               | `bg.muted` / `bg.emphasized`     | #212830           | `border`                                |
+| Table header/body, EmptyState                              | inherit owning container         | no extra ground   | `bg.muted` hover                        |
+| Default / muted hairline                                   | `border` / `border.muted`        | #3d444d / #2f3742 | structure, not elevation                |
+| Primary / secondary text                                   | `fg` / `fg.muted`                | #f0f6fc / #9198a1 | AA on all four grounds                  |
+
+`bg.page` is the sole extra surface role: Chakra's `bg` cannot represent both
+Primer's inset shell and its distinct content canvas. `bg.subtle` shares the
+raised value in dark mode. `bg.muted` and `bg.emphasized` share the control value;
+the app uses at most four dark grounds. Status surfaces and per-palette roles
+retain their meaning and colours. Overlay header/body/footer all inherit one
+opaque `bg.panel`; only the sticky title uses glass.
+
+Primer's adjacent surface gaps are deliberately below 8 CIELAB L*. The old
+minimum forced washed-out elevated panels, so the test now checks the four
+reference colours, ascending 3–8 L* steps, shared well/control ground, AA text
+and status contrast, and visible structural hairlines. `border.emphasized`
+remains a stronger edge for focus/meaningful outlines and meets 3:1 against
+controls; ordinary structural borders are intentionally quieter.
+
+### Deprecated aliases — use the Chakra name
+
+| Compatibility name                                        | Use instead                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| `bg.surface`, `bg.rail`                                   | `bg`                                                          |
+| `bg.card`, `bg.overlay`, `bg.inputHover` (old raised use) | `bg.panel` (`bg.inputHover` now aliases `bg.muted` for hover) |
+| `bg.nested`, `bg.raised`, `bg.softHover`, `bg.hover`      | `bg.muted`                                                    |
+| `bg.control`, `bg.input`, `bg.selected`                   | `bg.emphasized`                                               |
+| `bg.stripe`                                               | `bg.subtle`                                                   |
+| `border.card`, `border.control`                           | `border`                                                      |
+| `border.nested`                                           | `border.muted`                                                |
+| `border.strong`                                           | `border.emphasized`                                           |
+
+A table is not a stack of wells: its ordinary rows and header inherit its
+container. Prefer removing call-site background overrides. New shared
+components use Chakra names; aliases keep existing module call sites working.
 
 ### Sticky page titles
 
 `PageLayout.Header` stays at the top of its scrolling content panel. Its
-65% `bg.surface` glass and 16px backdrop blur reveal content passing underneath;
-`--lw-panel-alpha` and `--lw-backdrop-blur` make it opaque when reduced graphics
-is enabled. A reserved 1px hairline starts transparent and fades to `border.card`
-after scrolling, without changing layout. Reduced motion disables the fade.
-Section-navigation headers use the same behavior and surface as ordinary page
-headers. `withBorder={false}` explicitly opts out of the scroll hairline.
-
-### Surface ladder
-
-The dark material is blue ink: OKLCH hue **250°**, with chroma tapering from
-**0.020 to 0.014** across the four surface steps. The values below are sRGB
-hexes derived from that curve; the Tokens story shows hex and measured OKLCH
-swatches together. Light values are unchanged.
-
-| Level          | Background   | Light    | Dark               | Matching edge  |
-| -------------- | ------------ | -------- | ------------------ | -------------- |
-| App frame      | `bg.page`    | gray.100 | #070e16 · zinc.950 | —              |
-| Content ground | `bg.surface` | white    | #070e16 · zinc.950 | border.card    |
-| Card / overlay | `bg.card`    | white    | #192028 · zinc.800 | border.card    |
-| Nested well    | `bg.nested`  | gray.100 | #2d343b · zinc.700 | border.nested  |
-| Small control  | `bg.control` | gray.200 | #42484f · zinc.600 | border.control |
-
-Dark borders follow the same hue: `border.card` uses the nested step,
-`border.nested` the control step, and `border.control` is #9a9fa5 (zinc.400).
-The four dark surface targets are OKLCH lightness 0.16 / 0.24 / 0.32 / 0.40.
-The existing separation test still requires each adjacent step to be at least
-8 CIELAB L* apart, with at most 3 L* variation between gaps. Neutral and
-status text remain AA on every level, and control edges have 3:1 contrast.
-Orange and status palettes retain their values; blue ink is only the neutral
-material beneath them.
-
-Compatibility aliases: `bg.panel` → card; `bg.raised` / `bg.muted` → nested;
-`bg.emphasized` / `bg.input` → control. `bg.surface` is the content ground,
-not a card. `bg.subtle` is an auxiliary low-contrast tint, not another container
-level. Use the canonical names for new components.
-
-Card `outline`, `elevated` and `showcase` use `bg.card` / `border.card`;
-`subtle` is a nested well on `bg.nested` / `border.nested`.
+65% content-ground glass and 16px backdrop blur reveal passing content;
+`--lw-panel-alpha` and `--lw-backdrop-blur` restore opacity and remove blur for
+reduced graphics. A reserved 1px hairline starts transparent and fades in
+after scrolling without changing layout. Reduced motion disables the fade.
+Section headers share the same behaviour. `withBorder={false}` opts out.
 
 ## Checklist
 

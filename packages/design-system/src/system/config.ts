@@ -5,7 +5,7 @@
  */
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 
-import { colorSystem } from "../color-mode/color-system.ts";
+import { colorSystem, grayScale } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
@@ -57,7 +57,7 @@ export const designSystemConfig = defineConfig({
     body: {
       background: "bg.page",
       fontSize: "14px",
-      color: { _light: "{colors.gray.900}", _dark: "{colors.zinc.50}" },
+      color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
     "*::selection": {
       // Undo Chakra's selection color override
@@ -140,26 +140,27 @@ export const designSystemConfig = defineConfig({
       colors: {
         // Palette-specific semantic tokens
         gray: {
+          ...grayScale,
           solid: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
           },
           hover: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.600}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
           },
           contrast: {
-            value: { _light: "{colors.gray.800}", _dark: "{colors.zinc.100}" },
+            value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" },
           },
           subtle: {
             value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.400}", _dark: "{colors.zinc.600}" },
+            value: { _light: "{colors.gray.400}", _dark: "{colors.gray.600}" },
           },
           fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.zinc.200}" },
+            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
           },
           focusRing: { value: "{colors.blue.500}" },
         },
@@ -433,10 +434,10 @@ export const designSystemConfig = defineConfig({
         // The logo: brand navy with white faces on light; on dark the faces
         // drop out and the lines go off-white, as the dark-theme wordmark draws it.
         logo: {
-          mark: { value: { _light: "#213B41", _dark: "{colors.zinc.100}" } },
+          mark: { value: { _light: "#213B41", _dark: "{colors.gray.100}" } },
           face: { value: { _light: "white", _dark: "transparent" } },
-          wordmark: { value: { _light: "#1D293D", _dark: "{colors.zinc.100}" } },
-          wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.zinc.300}" } },
+          wordmark: { value: { _light: "#1D293D", _dark: "{colors.gray.100}" } },
+          wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.gray.300}" } },
         },
 
         // Data series, in the order `rotatingColors` hands out hues.
@@ -482,13 +483,13 @@ export const designSystemConfig = defineConfig({
         // Navigation semantic tokens - for sidebar menu items
         nav: {
           fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.zinc.300}" },
+            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
           },
           fgMuted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.400}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           bgActive: {
-            value: "{colors.bg.selected}",
+            value: { _light: "{colors.bg.selected}", _dark: "{colors.bg.selected}" },
           },
           bgSelected: {
             value: {
@@ -497,63 +498,45 @@ export const designSystemConfig = defineConfig({
             },
           },
           bgHover: {
-            value: "{colors.bg.hover}",
+            value: { _light: "{colors.bg.hover}", _dark: "{colors.bg.hover}" },
           },
         },
 
         // Label semantic tokens - for form labels, section headers
         label: {
           fg: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.400}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           fgMuted: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.zinc.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
           },
         },
 
-        // Surface ladder: page, card, nested group, then small control.
+        // Chakra surface roles. bg.page is the sole extra ground: the inset app frame.
         bg: {
-          // Page/sidebar background
-          page: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.950}" },
+          DEFAULT: { value: { _light: "white", _dark: "{colors.gray.900}" } },
+          page: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.950}" } },
+          panel: { value: { _light: "white", _dark: "{colors.gray.850}" } },
+          subtle: { value: { _light: "{colors.gray.50}", _dark: "{colors.gray.850}" } },
+          muted: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" } },
+          emphasized: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" } },
+          inverted: { value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" } },
+          // Deprecated compatibility aliases: use the Chakra role in new code.
+          surface: { value: { _light: "{colors.bg}", _dark: "{colors.bg}" } },
+          card: { value: { _light: "{colors.bg.panel}", _dark: "{colors.bg.panel}" } },
+          overlay: { value: { _light: "{colors.bg.panel}", _dark: "{colors.bg.panel}" } },
+          nested: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
+          raised: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
+          control: { value: { _light: "{colors.bg.emphasized}", _dark: "{colors.bg.emphasized}" } },
+          hover: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
+          selected: {
+            value: { _light: "{colors.bg.emphasized}", _dark: "{colors.bg.emphasized}" },
           },
-          // Four levels: page, card, nested group, then a small control.
-          card: {
-            value: {
-              _light: "white",
-              _dark: "{colors.zinc.800}",
-            },
-          },
-          nested: {
-            value: {
-              _light: "{colors.gray.100}",
-              _dark: "{colors.zinc.700}",
-            },
-          },
-          control: {
-            value: {
-              _light: "{colors.gray.200}",
-              _dark: "{colors.zinc.600}",
-            },
-          },
-          surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
-          overlay: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
-          hover: { value: "color-mix(in srgb, {colors.fg} 4%, transparent)" },
-          selected: { value: "color-mix(in srgb, {colors.fg} 8%, transparent)" },
-          stripe: { value: "color-mix(in srgb, {colors.fg} 2%, transparent)" },
-          panel: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
-          raised: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
-          muted: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
-          // Navigation rail: one step off the page, so the rail reads as
-          // its own surface next to the sidebar
-          rail: {
-            value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.850}" },
-          },
-          emphasized: { value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" } },
-          subtle: { value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.900}" } },
-          softHover: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
-          input: { value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" } },
-          inputHover: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
+          stripe: { value: { _light: "{colors.bg.subtle}", _dark: "{colors.bg.subtle}" } },
+          rail: { value: { _light: "{colors.bg}", _dark: "{colors.bg}" } },
+          softHover: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
+          input: { value: { _light: "{colors.bg.emphasized}", _dark: "{colors.bg.emphasized}" } },
+          inputHover: { value: { _light: "{colors.bg.muted}", _dark: "{colors.bg.muted}" } },
           // Status surfaces, one per meaning.
           error: { value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" } },
           success: { value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" } },
@@ -568,15 +551,15 @@ export const designSystemConfig = defineConfig({
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
           DEFAULT: {
-            value: { _light: "{colors.gray.900}", _dark: "{colors.zinc.100}" },
+            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
           },
           muted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.200}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.zinc.300}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
-          inverted: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
+          inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Status text, one per meaning.
           error: { value: { _light: "{colors.red.700}", _dark: "{colors.red.100}" } },
           success: { value: { _light: "{colors.green.700}", _dark: "{colors.green.200}" } },
@@ -584,19 +567,19 @@ export const designSystemConfig = defineConfig({
           info: { value: { _light: "{colors.blue.700}", _dark: "{colors.blue.100}" } },
         },
 
-        // Border semantic tokens - visible in dark mode
+        // Structural hairlines separate Primer's deliberately close dark grounds.
         border: {
-          card: { value: { _light: "{colors.gray.300}", _dark: "{colors.bg.nested}" } },
-          nested: { value: { _light: "{colors.gray.400}", _dark: "{colors.bg.control}" } },
-          control: { value: { _light: "{colors.gray.450}", _dark: "{colors.zinc.400}" } },
-          DEFAULT: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
-          muted: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
-          subtle: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
-          emphasized: {
-            value: { _light: "{colors.border.nested}", _dark: "{colors.border.nested}" },
-          },
+          DEFAULT: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" } },
+          muted: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.750}" } },
+          subtle: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.750}" } },
+          emphasized: { value: { _light: "{colors.gray.450}", _dark: "{colors.gray.500}" } },
+          inverted: { value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" } },
+          // Deprecated aliases. Strong emphasis remains available for focus/meaningful outlines.
+          card: { value: { _light: "{colors.border}", _dark: "{colors.border}" } },
+          nested: { value: { _light: "{colors.border.muted}", _dark: "{colors.border.muted}" } },
+          control: { value: { _light: "{colors.border}", _dark: "{colors.border}" } },
           strong: {
-            value: { _light: "{colors.border.control}", _dark: "{colors.border.control}" },
+            value: { _light: "{colors.border.emphasized}", _dark: "{colors.border.emphasized}" },
           },
           // Status borders, one per meaning.
           error: { value: { _light: "{colors.red.300}", _dark: "{colors.red.700}" } },
