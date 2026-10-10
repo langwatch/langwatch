@@ -214,6 +214,7 @@ export async function buildFilterRoute({
   try {
     built = await context.deps.buildFilter({
       projectId: context.input.projectId,
+      authorization: context.input.authorization,
       prompt: context.sentence,
       timeRange: context.input.timeRange,
     });

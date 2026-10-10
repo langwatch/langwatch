@@ -12,7 +12,10 @@ import {
   DatasetAttachmentTooLargeError,
   storeDatasetAttachment,
 } from "../../../../server/datasets/attachments";
-import { UploadValidationError } from "../../../../server/datasets/dataset.service";
+import {
+  type DatasetService,
+  UploadValidationError,
+} from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {
   DatasetColumns,
@@ -1061,6 +1064,37 @@ secured.access(requires("datasets:manage")).delete(
 );
 
 // ── List Records (paginated) ───────────────────────────────────
+/** One page of a dataset's records; serves `/:slugOrId/records` and `/:slug/entries`. */
+async function respondWithRecordsPage({
+  c,
+  service,
+  projectId,
+  slugOrId,
+  page,
+  limit,
+}: {
+  c: { json: (body: unknown, status?: 200 | 425) => Response };
+  service: DatasetService;
+  projectId: string;
+  slugOrId: string;
+  page: number;
+  limit: number;
+}): Promise<Response> {
+  try {
+    const result = await service.listRecords({
+      slugOrId,
+      projectId,
+      page,
+      limit,
+    });
+    return c.json(result);
+  } catch (error) {
+    const notReady = mapDatasetNotReadyError(error, c);
+    if (notReady) return notReady;
+    return mapDatasetNotFoundError(error);
+  }
+}
+
 secured.access(requires("datasets:view")).get(
   "/:slugOrId/records",
   datasetServiceMiddleware,
@@ -1068,26 +1102,34 @@ secured.access(requires("datasets:view")).get(
     description: "List records for a dataset (paginated)",
   }),
   zValidator("query", paginationQuerySchema),
-  async (c) => {
-    const { slugOrId } = c.req.param();
-    const project = c.get("project");
-    const { page, limit } = c.req.valid("query");
-    const service = c.get("datasetService");
+  async (c) =>
+    await respondWithRecordsPage({
+      c,
+      service: c.get("datasetService"),
+      projectId: c.get("project").id,
+      slugOrId: c.req.param("slugOrId"),
+      ...c.req.valid("query"),
+    }),
+);
 
-    try {
-      const result = await service.listRecords({
-        slugOrId,
-        projectId: project.id,
-        page,
-        limit,
-      });
-      return c.json(result);
-    } catch (error) {
-      const notReady = mapDatasetNotReadyError(error, c);
-      if (notReady) return notReady;
-      return mapDatasetNotFoundError(error);
-    }
-  },
+// The legacy spelling of the records list, beside the legacy `POST` of the
+// same path; SDKs that add entries there read them back from it too.
+secured.access(requires("datasets:view")).get(
+  "/:slug/entries",
+  datasetServiceMiddleware,
+  describeRoute({
+    description:
+      "List entries of a dataset (paginated). Same as GET /:slugOrId/records.",
+  }),
+  zValidator("query", paginationQuerySchema),
+  async (c) =>
+    await respondWithRecordsPage({
+      c,
+      service: c.get("datasetService"),
+      projectId: c.get("project").id,
+      slugOrId: c.req.param("slug"),
+      ...c.req.valid("query"),
+    }),
 );
 
 // ── Update / Upsert Record ─────────────────────────────────────

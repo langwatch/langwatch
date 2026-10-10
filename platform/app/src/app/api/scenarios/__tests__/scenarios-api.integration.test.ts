@@ -488,6 +488,38 @@ describe("Scenarios API", () => {
         });
       });
 
+      describe("when the body carries a field the endpoint does not have", () => {
+        const putWithUnknownField = () =>
+          helpers.api.put(`/api/scenarios/${scenario.id}`, {
+            labels: ["relabelled"],
+            status: "active",
+          });
+
+        it("answers 422 naming the field", async () => {
+          const res = await putWithUnknownField();
+
+          expect(res.status).toBe(422);
+          const body = await res.json();
+          expect(body.error).toBe("validation_error");
+          expect(JSON.stringify(body.reasons)).toContain("status");
+        });
+
+        it("leaves the scenario and its version history as they were", async () => {
+          await putWithUnknownField();
+
+          const stored = await prisma.scenario.findFirst({
+            where: { id: scenario.id, projectId: testProjectId },
+          });
+          expect(stored?.labels).toEqual(["original"]);
+          // The fixture is written straight to the table, so it starts with no
+          // version rows; a refused save must not add one.
+          const versions = await prisma.scenarioVersion.count({
+            where: { scenarioId: scenario.id, projectId: testProjectId },
+          });
+          expect(versions).toBe(0);
+        });
+      });
+
       describe("when name is empty", () => {
         it("returns a validation error", async () => {
           const res = await helpers.api.put(`/api/scenarios/${scenario.id}`, {
@@ -678,6 +710,34 @@ describe("Scenarios API", () => {
         const body = await res.json();
         expect(body.name).toBe("Patched Name");
         expect(body.situation).toBe("Original situation");
+      });
+
+      describe("when the body carries a field the endpoint does not have", () => {
+        it("answers 422 naming the field and leaves the scenario as it was", async () => {
+          const scenario = await prisma.scenario.create({
+            data: {
+              projectId: testProjectId,
+              name: "Patch Unknown Field",
+              situation: "Original situation",
+              criteria: [],
+              labels: ["original"],
+            },
+          });
+
+          const res = await helpers.api.patch(`/api/scenarios/${scenario.id}`, {
+            labels: ["relabelled"],
+            status: "active",
+          });
+
+          expect(res.status).toBe(422);
+          const body = await res.json();
+          expect(body.error).toBe("validation_error");
+          expect(JSON.stringify(body.reasons)).toContain("status");
+          const stored = await prisma.scenario.findFirst({
+            where: { id: scenario.id, projectId: testProjectId },
+          });
+          expect(stored?.labels).toEqual(["original"]);
+        });
       });
     });
 

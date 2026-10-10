@@ -362,6 +362,7 @@ describe("better-auth config", () => {
         AZURE_AD_CLIENT_ID: undefined,
         AZURE_AD_CLIENT_SECRET: undefined,
         AZURE_AD_TENANT_ID: undefined,
+        NEXTAUTH_URL: "http://localhost:3000",
       });
       expect(socialProviders.google).toBeDefined();
       // Credentials must be threaded through from env, not just present.

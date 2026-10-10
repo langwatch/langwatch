@@ -138,9 +138,32 @@ export const mockGetPendingInvites = vi.fn(() => ({
     email?: string;
     role: string;
     status: string;
+    displayStatus: string;
   }>,
   isLoading: false,
 }));
+
+export type MockSeatLimitInfo = {
+  status: "ok" | "exceeded";
+  message: string;
+};
+
+// Defaults to the usage query not having answered yet, which is the state
+// the page falls back to its own member count in. Suites about the seat
+// limit set real usage data.
+export const mockGetUsage = vi.fn(
+  (): {
+    data:
+      | { seatLimitInfo: MockSeatLimitInfo; membersCount: number }
+      | undefined;
+    isLoading: boolean;
+    refetch: () => void;
+  } => ({
+    data: undefined,
+    isLoading: true,
+    refetch: vi.fn(),
+  }),
+);
 
 export const mockDetectCurrency = vi.fn(() => ({
   data: { currency: "EUR" as "EUR" | "USD" },
@@ -191,6 +214,11 @@ export function resetMocks() {
   mockGetPendingInvites.mockReturnValue({
     data: [],
     isLoading: false,
+  });
+  mockGetUsage.mockReturnValue({
+    data: undefined,
+    isLoading: true,
+    refetch: vi.fn(),
   });
   mockDetectCurrency.mockReturnValue({
     data: { currency: "EUR" },

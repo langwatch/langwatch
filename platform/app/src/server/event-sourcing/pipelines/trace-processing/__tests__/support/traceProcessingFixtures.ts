@@ -1,5 +1,8 @@
 import { vi } from "vitest";
+import type { JobRegistryEntry } from "../../../../services/queues/queueManager";
+import { QueueManager } from "../../../../services/queues/queueManager";
 import type { TraceProcessingPipelineDeps } from "../../pipeline";
+import { createTraceProcessingPipeline } from "../../pipeline";
 import type {
   RecordLogContributionCommandData,
   RecordMetricCorrelationCommandData,
@@ -39,6 +42,48 @@ export function buildTraceDeps(
     spanStorageBroadcastHandler: handlerStub(),
     ...overrides,
   };
+}
+
+/**
+ * The real pipeline's registration for one command. Throws rather than
+ * returning undefined: `?.options` on a missing command reads as an absent
+ * option, so a renamed command would otherwise pass every assertion.
+ */
+export function traceCommandRegistration(name: string) {
+  const entry = createTraceProcessingPipeline(buildTraceDeps()).commands.find(
+    (candidate) => candidate.name === name,
+  );
+  if (!entry) throw new Error(`no command registered as "${name}"`);
+  return entry;
+}
+
+/**
+ * Wires the named commands' real registrations through the real QueueManager
+ * over a stub queue and returns the job registry it populated. Narrowed to the
+ * named commands because initializeCommandQueues constructs every handler it
+ * is given, and RecordSpanCommand's zero-arg constructor reaches for prisma.
+ */
+export function wireTraceCommands(
+  names: readonly string[],
+): Map<string, JobRegistryEntry> {
+  const globalJobRegistry = new Map<string, JobRegistryEntry>();
+  const manager = new QueueManager({
+    aggregateType: "trace",
+    pipelineName: "trace_processing",
+    globalQueue: {
+      send: vi.fn().mockResolvedValue(void 0),
+      sendBatch: vi.fn().mockResolvedValue(void 0),
+      close: vi.fn().mockResolvedValue(void 0),
+      waitUntilReady: vi.fn().mockResolvedValue(void 0),
+    } as never,
+    globalJobRegistry,
+  });
+  manager.initializeCommandQueues(
+    names.map(traceCommandRegistration) as never,
+    vi.fn(),
+    "trace_processing",
+  );
+  return globalJobRegistry;
 }
 
 export const FIXTURE_TENANT_ID = "tenant-span-coalescing";

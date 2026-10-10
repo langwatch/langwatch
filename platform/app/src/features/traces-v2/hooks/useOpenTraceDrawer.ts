@@ -12,6 +12,7 @@ import {
 } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 import type { TraceListItem } from "../types/trace";
+import { memberTenantOf, traceDrawerParams } from "../utils/traceDrawerParams";
 import { spanTreeQueryFn, spanTreeQueryKey } from "./spanTreePagedQuery";
 
 function listItemToHeader(item: TraceListItem): TraceHeader {
@@ -64,6 +65,15 @@ export function useOpenTraceDrawer() {
 
   return useCallback(
     (trace: TraceListItem) => {
+      // On an aggregate the row names its member, and every read the drawer
+      // makes stays on it (ADR-144 block F). The seeds and prefetches below
+      // name it too, so they land in the cache entries the drawer reads; on
+      // a plain project it is null and every key stays as it was.
+      const tenantId = memberTenantOf({
+        ownerProjectId: trace.projectId,
+        projectId: project?.id,
+      });
+      const tenantArg = tenantId !== null ? { tenantId } : {};
       if (project?.id) {
         // Seed both keyed-with-timestamp and keyed-without — the drawer
         // hook always sends `occurredAtMs` when present in the URL, but
@@ -74,13 +84,19 @@ export function useOpenTraceDrawer() {
         // or the drawer's mount just sees a cache miss and reloads anyway.
         const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
         utils.tracesV2.header.setData(
-          { projectId: project.id, traceId: trace.traceId, full: true },
+          {
+            projectId: project.id,
+            traceId: trace.traceId,
+            ...tenantArg,
+            full: true,
+          },
           seed,
         );
         utils.tracesV2.header.setData(
           {
             projectId: project.id,
             traceId: trace.traceId,
+            ...tenantArg,
             occurredAtMs: trace.timestamp,
             full: true,
           },
@@ -106,13 +122,19 @@ export function useOpenTraceDrawer() {
               : buildPreviewTraceDetail(trace);
 
           utils.tracesV2.header.setData(
-            { projectId: project.id, traceId: trace.traceId, full: true },
+            {
+              projectId: project.id,
+              traceId: trace.traceId,
+              ...tenantArg,
+              full: true,
+            },
             detail.header,
           );
           utils.tracesV2.header.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
+              ...tenantArg,
               occurredAtMs: trace.timestamp,
               full: true,
             },
@@ -120,26 +142,28 @@ export function useOpenTraceDrawer() {
           );
 
           utils.tracesV2.spanTree.setData(
-            { projectId: project.id, traceId: trace.traceId },
+            { projectId: project.id, traceId: trace.traceId, ...tenantArg },
             detail.spanTree,
           );
           utils.tracesV2.spanTree.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
+              ...tenantArg,
               occurredAtMs: trace.timestamp,
             },
             detail.spanTree,
           );
 
           utils.tracesV2.spansFull.setData(
-            { projectId: project.id, traceId: trace.traceId },
+            { projectId: project.id, traceId: trace.traceId, ...tenantArg },
             detail.spansFull,
           );
           utils.tracesV2.spansFull.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
+              ...tenantArg,
               occurredAtMs: trace.timestamp,
             },
             detail.spansFull,
@@ -150,6 +174,7 @@ export function useOpenTraceDrawer() {
               {
                 projectId: project.id,
                 traceId: trace.traceId,
+                ...tenantArg,
                 spanId: span.spanId,
               },
               span,
@@ -158,6 +183,7 @@ export function useOpenTraceDrawer() {
               {
                 projectId: project.id,
                 traceId: trace.traceId,
+                ...tenantArg,
                 spanId: span.spanId,
                 occurredAtMs: trace.timestamp,
               },
@@ -169,33 +195,35 @@ export function useOpenTraceDrawer() {
           // seed an empty array so the badges UI doesn't spin while the
           // disabled query "loads".
           utils.tracesV2.spanLangwatchSignals.setData(
-            { projectId: project.id, traceId: trace.traceId },
+            { projectId: project.id, traceId: trace.traceId, ...tenantArg },
             [],
           );
           utils.tracesV2.spanLangwatchSignals.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
+              ...tenantArg,
               occurredAtMs: trace.timestamp,
             },
             [],
           );
 
           utils.tracesV2.traceEvents.setData(
-            { projectId: project.id, traceId: trace.traceId },
+            { projectId: project.id, traceId: trace.traceId, ...tenantArg },
             [],
           );
           utils.tracesV2.traceEvents.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
+              ...tenantArg,
               occurredAtMs: trace.timestamp,
             },
             [],
           );
 
           utils.tracesV2.evals.setData(
-            { projectId: project.id, traceId: trace.traceId },
+            { projectId: project.id, traceId: trace.traceId, ...tenantArg },
             detail.evaluations,
           );
 
@@ -204,6 +232,7 @@ export function useOpenTraceDrawer() {
               {
                 projectId: project.id,
                 conversationId: trace.conversationId,
+                ...tenantArg,
               },
               detail.conversation,
             );
@@ -221,6 +250,7 @@ export function useOpenTraceDrawer() {
         const input = {
           projectId: project.id,
           traceId: trace.traceId,
+          ...tenantArg,
           occurredAtMs: trace.timestamp,
         };
         const opts = { staleTime: 300_000 };
@@ -257,6 +287,7 @@ export function useOpenTraceDrawer() {
       // happened once the real data landed.
       useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp, {
         expectedSpanCount: trace.spanCount,
+        tenantId,
       });
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
@@ -267,12 +298,17 @@ export function useOpenTraceDrawer() {
       if (isPreviewTraceId(trace.traceId)) {
         useDrawerStore.getState().setVizTabTransient("waterfall");
       }
-      openDrawer("traceV2Details", {
-        traceId: trace.traceId,
-        // `t` (timestamp) is read by useTraceHeader as a partition-pruning
-        // hint when refetching the heavy summary fields.
-        t: String(trace.timestamp),
-      });
+      // `t` (timestamp) is read by useTraceHeader as a partition-pruning
+      // hint when refetching the heavy summary fields; the member, when
+      // there is one, lets a reload reopen the same member's trace.
+      openDrawer(
+        "traceV2Details",
+        traceDrawerParams({
+          traceId: trace.traceId,
+          occurredAtMs: trace.timestamp,
+          tenantId,
+        }),
+      );
     },
     [openDrawer, project?.id, utils, queryClient],
   );

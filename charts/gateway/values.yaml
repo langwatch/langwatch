@@ -35,9 +35,15 @@ autoscaling:
   # Optional autoscaling/v2 scale-up/down stabilization and rate policies.
   behavior: {}
 
+# Rendered only when the gateway runs more than one pod (autoscaling
+# minReplicas, or replicaCount with autoscaling off). A PDB over a single pod
+# blocks every node drain, so none is rendered there. maxUnavailable: 1 lets a
+# drain evict one pod at a time at any replica count. Set minAvailable instead
+# to use that form; the chart refuses a budget that leaves no pod evictable.
 podDisruptionBudget:
   enabled: true
-  minAvailable: 1
+  maxUnavailable: 1
+  minAvailable: ""
 
 service:
   type: ClusterIP
@@ -51,33 +57,11 @@ service:
     enabled: false
     port: 80
 
-ingress:
-  enabled: true
-  className: nginx
-  host: gateway.langwatch.ai
-  path: /v1
-  pathType: Prefix
-  # Public status-page surface. An Exact match publishes this one path and
-  # nothing else, so /healthz, /readyz, /metrics and /internal stay
-  # in-cluster. Methods are bounded by the gateway route, which serves GET
-  # and HEAD and answers 405 otherwise, not by the ingress.
-  # The endpoint is unauthenticated by design: it reports the gateway
-  # process plus the control-plane connectivity verdict cached by a
-  # background probe, returns no tenant data, makes no upstream call per
-  # poll, and can never go red from a model-provider outage. Point the
-  # status-page HTTP monitor at https://<ingress.host>/health.
-  healthPath:
-    enabled: true
-    path: /health
-  tls:
-    enabled: true
-    secretName: gateway-tls
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"        # SSE needs unbuffered
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"     # long-lived streams
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+# This chart renders no Ingress. Under the langwatch chart, publish the
+# gateway with ingress.gateway.host on the app Ingress. Installed on its own,
+# route to the Service above (Gateway API HTTPRoute, a LoadBalancer Service,
+# your own Ingress). Paths, timeouts and body size:
+# docs/self-hosting/deployment/routing.
 
 # Control-plane connection (LangWatch app). Left empty, this resolves to the
 # app Service of the install the gateway is part of, `<release>-app:5560` —

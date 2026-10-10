@@ -174,7 +174,9 @@ describe("given a person the previous connection's sync provisioned, who has nev
     /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
     it("is let through on the address, since the replacement proved its domain", async () => {
       await expect(resolve(unprovisionedId)).resolves.toEqual({
-        action: "continue",
+        action: "link",
+        userId: unprovisionedId,
+        profile: "preserve",
       });
       await expect(decide(unprovisionedId)).resolves.toMatchObject({
         kind: "allow_replacement_pair",

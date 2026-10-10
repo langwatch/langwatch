@@ -109,6 +109,22 @@ describe("project.getHasFirstMessage", () => {
     });
   });
 
+  describe("when the project is an aggregate that was never sent a trace", () => {
+    /** @scenario "Aggregate Trace Explorer shows member rows without onboarding" */
+    it("returns firstMessage as true, since it reads its members' traces", async () => {
+      mockGetById.mockResolvedValueOnce({
+        kind: "aggregate",
+        firstMessage: false,
+      });
+
+      const result = await caller.getHasFirstMessage({
+        projectId: "project_aggregate",
+      });
+
+      expect(result).toEqual({ firstMessage: true });
+    });
+  });
+
   describe("when project does not exist", () => {
     it("returns firstMessage as false", async () => {
       mockGetById.mockResolvedValueOnce(null);

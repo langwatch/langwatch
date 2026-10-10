@@ -260,14 +260,14 @@ $(cat "$err")"
     return
   fi
 
-  # One render Job (revision-suffixed name) that runs the app image and renders
+  # One render Job (named by a hash of its spec) that runs the app image and renders
   # the access files. It is MAIN-PHASE on install and a PRE-UPGRADE hook on
   # upgrade (asserted below): the render reads the app + PostgreSQL Secrets, which
   # exist only in the main phase, so a pre-install hook would fail on a first
   # install; on upgrade those Secrets already exist and the render must precede
   # the StatefulSet roll.
-  if ! grep -qE "name: lw-lwql-access-render-[0-9]+" "$out"; then
-    fail "topology-no-job" "no revision-named lw-lwql-access-render-<n> Job rendered on chart-managed ClickHouse."
+  if ! grep -qE "name: lw-lwql-access-render-[0-9a-f]{10}$" "$out"; then
+    fail "topology-no-job" "no hash-named lw-lwql-access-render-<hash> Job rendered on chart-managed ClickHouse."
   fi
   if ! grep -q "renderLwqlAccessConfig" "$out"; then
     fail "topology-no-render-cmd" "the access-render Job does not invoke renderLwqlAccessConfig."

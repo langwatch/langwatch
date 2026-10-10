@@ -19,8 +19,9 @@ import (
 //   - structural — the mirror copy has the message bodies removed; timings,
 //     usage, cost, status and model survive.
 //
-// The reserved marker attributes are stripped from BOTH copies: they are
-// internal signaling and must reach neither project. The customer's own copy
+// The reserved marker attributes must reach neither project: the mirror copy
+// is rebuilt without them here, and resourceScrubExporter, which sits inside
+// this exporter, removes them from every span it sends. The customer's own copy
 // is otherwise untouched — the mirror leg can only ADD a copy, never alter or
 // withhold the customer's.
 //
@@ -38,8 +39,8 @@ func (m mirrorExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOn
 	out := make([]sdktrace.ReadOnlySpan, 0, len(spans)+1)
 	for _, s := range spans {
 		tier := spanAttr(s, attrMirrorTier)
-		// The customer copy, always — with the reserved markers stripped.
-		out = append(out, stripMarkers(s))
+		// The customer copy, always. The scrub stage inside strips its markers.
+		out = append(out, s)
 		if tier != mirrorTierContent && tier != mirrorTierStructural {
 			continue
 		}
@@ -86,23 +87,23 @@ func (m mirrorExporter) mirrorCopy(s sdktrace.ReadOnlySpan, tier string) sdktrac
 	return stub.Snapshot()
 }
 
-// stripMarkers returns the span with only the reserved mirror markers removed,
-// so the customer's own copy never carries internal signaling.
-func stripMarkers(s sdktrace.ReadOnlySpan) sdktrace.ReadOnlySpan {
-	// Fast path: nothing to strip.
-	if spanAttr(s, attrMirrorTier) == "" && spanAttr(s, attrMirrorSourceOrg) == "" {
-		return s
-	}
-	stub := tracetest.SpanStubFromReadOnlySpan(s)
-	kept := make([]attribute.KeyValue, 0, len(stub.Attributes))
-	for _, a := range stub.Attributes {
-		if a.Key == attrMirrorTier || a.Key == attrMirrorSourceOrg {
+// withoutMirrorMarkers returns attrs without the reserved mirror markers. It
+// returns attrs itself when there is nothing to remove.
+func withoutMirrorMarkers(attrs []attribute.KeyValue) []attribute.KeyValue {
+	for i, a := range attrs {
+		if a.Key != attrMirrorTier && a.Key != attrMirrorSourceOrg {
 			continue
 		}
-		kept = append(kept, a)
+		kept := make([]attribute.KeyValue, 0, len(attrs)-1)
+		kept = append(kept, attrs[:i]...)
+		for _, b := range attrs[i+1:] {
+			if b.Key != attrMirrorTier && b.Key != attrMirrorSourceOrg {
+				kept = append(kept, b)
+			}
+		}
+		return kept
 	}
-	stub.Attributes = kept
-	return stub.Snapshot()
+	return attrs
 }
 
 func spanAttr(s sdktrace.ReadOnlySpan, key attribute.Key) string {

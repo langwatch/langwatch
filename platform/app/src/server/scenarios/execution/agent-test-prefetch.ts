@@ -18,6 +18,7 @@ import type {
   PrefetchContext,
   PrefetchResult,
 } from "./data-prefetcher";
+import { resolveExecuteSyncRoute } from "./resolve-execute-sync-route";
 import type { TargetAdapterData, TargetConfig } from "./types";
 
 /** The project fields the run reads, or why they could not be read. */
@@ -124,6 +125,7 @@ export async function prefetchAgentTestData({
       parameters: {},
       adapterData: adapterResult,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
+      executeSyncRoute: resolveExecuteSyncRoute(),
       target,
       script: { kind: "agent_test", userMessage: AGENT_TEST_USER_MESSAGE },
     },

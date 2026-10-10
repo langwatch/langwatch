@@ -412,7 +412,7 @@ describe("Feature: Dataset REST API", () => {
       });
 
       /** @scenario Update a dataset name and column types */
-      it("updates the dataset and changes the slug", async () => {
+      it("updates the dataset and keeps the slug", async () => {
         const res = await helpers.api.patch("/api/dataset/old-name", {
           name: "New Name",
           columnTypes: [{ name: "question", type: "string" }],
@@ -421,7 +421,7 @@ describe("Feature: Dataset REST API", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.name).toBe("New Name");
-        expect(body.slug).toBe("new-name");
+        expect(body.slug).toBe("old-name");
         expect(body.columnTypes).toEqual([
           { name: "question", type: "string" },
         ]);
@@ -433,15 +433,41 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "Original", slug: "original" });
       });
 
-      /** @scenario Update a dataset name regenerates the slug */
-      it("regenerates the slug", async () => {
+      /** @scenario Renaming a dataset keeps its slug */
+      it("keeps the slug", async () => {
         const res = await helpers.api.patch("/api/dataset/original", {
           name: "Renamed Dataset",
         });
 
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.slug).toBe("renamed-dataset");
+        expect(body.slug).toBe("original");
+
+        const getRes = await helpers.api.get("/api/dataset/original");
+        expect(getRes.status).toBe(200);
+        const fetched = await getRes.json();
+        expect(fetched.name).toBe("Renamed Dataset");
+      });
+    });
+
+    describe("when a renamed dataset's columns change and another dataset holds its name's slug", () => {
+      beforeEach(async () => {
+        await createDataset({ name: "Alpha", slug: "first-alpha" });
+        await createDataset({ name: "Other", slug: "alpha" });
+      });
+
+      /** @scenario Editing columns of a renamed dataset does not collide on its unchanged name */
+      it("updates the columns and keeps the slug", async () => {
+        const res = await helpers.api.patch("/api/dataset/first-alpha", {
+          columnTypes: [{ name: "question", type: "string" }],
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.slug).toBe("first-alpha");
+        expect(body.columnTypes).toEqual([
+          { name: "question", type: "string" },
+        ]);
       });
     });
 
@@ -451,7 +477,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "Beta", slug: "beta" });
       });
 
-      /** @scenario Update a dataset fails when new slug conflicts */
+      /** @scenario Update a dataset fails when the new name collides with another dataset's slug */
       it("returns 409 Conflict", async () => {
         const res = await helpers.api.patch("/api/dataset/alpha", {
           name: "Beta",
@@ -533,6 +559,23 @@ describe("Feature: Dataset REST API", () => {
       });
     });
 
+    describe("when the dataset was renamed after creation", () => {
+      beforeEach(async () => {
+        await createDataset({ name: "Something Else", slug: "kept-slug" });
+      });
+
+      /** @scenario Archiving a renamed dataset suffixes the slug it kept */
+      it("suffixes the kept slug, not one derived from the name", async () => {
+        const res = await helpers.api.delete("/api/dataset/kept-slug");
+        expect(res.status).toBe(200);
+
+        const archived = await prisma.dataset.findFirst({
+          where: { projectId: testProjectId, name: "Something Else" },
+        });
+        expect(archived?.slug).toMatch(/^kept-slug-archived-/);
+      });
+    });
+
     describe("when the dataset does not exist", () => {
       /** @scenario Delete a non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
@@ -592,6 +635,55 @@ describe("Feature: Dataset REST API", () => {
       /** @scenario List records for non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.get("/api/dataset/ghost/records");
+        expect(res.status).toBe(404);
+      });
+    });
+  });
+
+  // ── List Entries (legacy spelling of List Records) ────────────
+
+  describe("GET /api/dataset/:slug/entries", () => {
+    describe("when the dataset has 100 records", () => {
+      beforeEach(async () => {
+        const dataset = await createDataset({
+          name: "My Dataset",
+          slug: "my-dataset",
+        });
+        await prisma.datasetRecord.createMany({
+          data: Array.from({ length: 100 }, (_, i) => ({
+            id: `rec-${i + 1}`,
+            datasetId: dataset.id,
+            projectId: testProjectId,
+            entry: { input: `input-${i + 1}` },
+          })),
+        });
+      });
+
+      /** @scenario List entries through the legacy GET /:slug/entries path */
+      it("returns the same page as GET /:slugOrId/records", async () => {
+        const entriesRes = await helpers.api.get(
+          "/api/dataset/my-dataset/entries?page=2&limit=10",
+        );
+        const recordsRes = await helpers.api.get(
+          "/api/dataset/my-dataset/records?page=2&limit=10",
+        );
+
+        expect(entriesRes.status).toBe(200);
+        const entries = await entriesRes.json();
+        expect(entries.data).toHaveLength(10);
+        expect(entries.pagination).toMatchObject({
+          page: 2,
+          limit: 10,
+          total: 100,
+        });
+        expect(entries).toEqual(await recordsRes.json());
+      });
+    });
+
+    describe("when the dataset does not exist", () => {
+      /** @scenario List entries for non-existent dataset returns 404 */
+      it("returns 404 Not Found", async () => {
+        const res = await helpers.api.get("/api/dataset/ghost/entries");
         expect(res.status).toBe(404);
       });
     });

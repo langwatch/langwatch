@@ -12,6 +12,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { env } from "../../env.mjs";
 import { prepareLitellmParams } from "../api/routers/modelProviders.utils";
+import { nlpgoInternalHeaders } from "../nlpgo/internalSecret";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import type { MaybeStoredModelProvider } from "./registry";
 
@@ -29,12 +30,15 @@ export async function nlpgoModelHandle({
     modelProvider,
     projectId,
   });
-  const headers = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
-      `x-litellm-${key}`,
-      value,
-    ]),
-  );
+  const headers = {
+    ...Object.fromEntries(
+      Object.entries(litellmParams).map(([key, value]) => [
+        `x-litellm-${key}`,
+        value,
+      ]),
+    ),
+    ...nlpgoInternalHeaders(),
+  };
 
   // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
   // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
