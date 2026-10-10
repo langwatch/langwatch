@@ -1216,6 +1216,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: SERVICE_VERSION
   value: {{ .Values.images.app.tag | default .Chart.AppVersion | quote }}
 
+{{- /* How the install was deployed and which chart release rendered it. The
+       usage report and the checkup preview carry both, and the chart release
+       moves separately from the app image. */}}
+- name: INSTALL_METHOD
+  value: "helm"
+- name: LANGWATCH_CHART_VERSION
+  value: {{ .Chart.Version | quote }}
+
 {{- /* LangWatch-hosted services. There is no switch that turns them on: the
        license decides what an install may call, and a license naming no hosted
        service reaches nothing. So a default render carries no LANGWATCH_CONNECT_
