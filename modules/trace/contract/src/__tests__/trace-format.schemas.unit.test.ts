@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { langWatchEventSchema } from "../trace-format.schemas.ts";
+import { chatMessageSchema, langWatchEventSchema } from "../trace-format.schemas.ts";
 
 const baseEvent = {
   event_id: "event_1",
@@ -43,6 +43,29 @@ describe("langWatchEventSchema", () => {
 
         expect(result.success).toBe(true);
       });
+    });
+  });
+});
+
+describe("chatMessageSchema", () => {
+  describe("given AI SDK v5 tool parts", () => {
+    /** @scenario "AI SDK tool parts in a stored message satisfy the trace schema" */
+    it("accepts a tool-call and a tool-result part as stored", () => {
+      const call = chatMessageSchema.safeParse({
+        role: "assistant",
+        content: [
+          { type: "tool-call", toolCallId: "c1", toolName: "search", input: { query: "x" } },
+        ],
+      });
+      const result = chatMessageSchema.safeParse({
+        role: "tool",
+        content: [
+          { type: "tool-result", toolCallId: "c1", toolName: "search", output: { type: "json" } },
+        ],
+      });
+
+      expect(call.success).toBe(true);
+      expect(result.success).toBe(true);
     });
   });
 });

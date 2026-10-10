@@ -143,7 +143,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       app,
       onError: (error, context) => {
         const response = canonicalErrorResponse(error, context);
-        if (response.status >= 500) {
+        // A client that went away mid-request aborts its own read: no answer reaches it, no fault.
+        const clientGone = context.req.raw.signal.aborted;
+        if (response.status >= 500 && !clientGone) {
           restErrorLogger.error(
             { error, method: context.req.method, path: context.req.path },
             "REST request failed",

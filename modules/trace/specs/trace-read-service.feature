@@ -97,3 +97,9 @@ Feature: Trace span-tree read service
     Given a span whose input messages attribute holds a record without messages
     When the span is read
     Then its input is read as json rather than an invalid chat_messages value
+
+  @unit
+  Scenario: AI SDK tool parts in a stored message satisfy the trace schema
+    Given a stored assistant message holding a "tool-call" part and a tool message holding a "tool-result" part
+    When the trace is read with its spans
+    Then the chat message schema accepts both parts as stored
