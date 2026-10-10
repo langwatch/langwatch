@@ -1,6 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { UpgradeRequired } from "@langwatch/design-system/access-state";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The provisioning tokens an organization holds, and the two acts on them.
@@ -13,7 +14,6 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   Heading,
   HStack,
   Input,
@@ -91,81 +91,77 @@ export function ProvisioningTokens({
           />
         )}
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          <Table.Root variant="line" size="md" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Description</Table.ColumnHeader>
-                <Table.ColumnHeader>Connection</Table.ColumnHeader>
-                <Table.ColumnHeader>Issued</Table.ColumnHeader>
-                <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                {mayManage && <Table.ColumnHeader width="80px" />}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {!list.isError && list.data?.length === 0 && (
-                <Table.Row>
-                  <Table.Cell colSpan={mayManage ? 5 : 4}>
-                    <Text color="fg.muted" textAlign="center" paddingY={4}>
-                      No provisioning token has been issued yet.
+      <ListTable size="md" width="full">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Description</Table.ColumnHeader>
+            <Table.ColumnHeader>Connection</Table.ColumnHeader>
+            <Table.ColumnHeader>Issued</Table.ColumnHeader>
+            <Table.ColumnHeader>Last used</Table.ColumnHeader>
+            {mayManage && <Table.ColumnHeader width="80px" />}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {!list.isError && list.data?.length === 0 && (
+            <Table.Row>
+              <Table.Cell colSpan={mayManage ? 5 : 4}>
+                <Text color="fg.muted" textAlign="center" paddingY={4}>
+                  No provisioning token has been issued yet.
+                </Text>
+              </Table.Cell>
+            </Table.Row>
+          )}
+          {list.data?.map((token) => (
+            <Table.Row key={token.id}>
+              <Table.Cell>
+                <HStack>
+                  <Key size={14} />
+                  <Text>{token.description ?? "No description"}</Text>
+                </HStack>
+              </Table.Cell>
+              <Table.Cell>
+                {token.connectionId ? (
+                  <Text>{labelFor(token.connectionId)}</Text>
+                ) : (
+                  <Badge size="sm" colorPalette="gray">
+                    Every connection
+                  </Badge>
+                )}
+              </Table.Cell>
+              <Table.Cell>{readableDate(token.createdAt).toLocaleDateString()}</Table.Cell>
+              <Table.Cell>
+                {token.lastUsedAt ? (
+                  readableDate(token.lastUsedAt).toLocaleDateString()
+                ) : (
+                  <VStack align="start" gap={0}>
+                    <Badge size="sm" colorPalette="gray">
+                      Never
+                    </Badge>
+                    <Text fontSize="xs" color="fg.muted">
+                      Nothing has presented this token yet. If your identity provider says it is
+                      syncing, check the token it is using.
                     </Text>
-                  </Table.Cell>
-                </Table.Row>
+                  </VStack>
+                )}
+              </Table.Cell>
+              {mayManage && (
+                <Table.Cell>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    data-testid="scim-token-revoke"
+                    aria-label={`Revoke ${token.description ?? "token"}`}
+                    onClick={() => setTokenToRevoke(token.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </Table.Cell>
               )}
-              {list.data?.map((token) => (
-                <Table.Row key={token.id}>
-                  <Table.Cell>
-                    <HStack>
-                      <Key size={14} />
-                      <Text>{token.description ?? "No description"}</Text>
-                    </HStack>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {token.connectionId ? (
-                      <Text>{labelFor(token.connectionId)}</Text>
-                    ) : (
-                      <Badge size="sm" colorPalette="gray">
-                        Every connection
-                      </Badge>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>{readableDate(token.createdAt).toLocaleDateString()}</Table.Cell>
-                  <Table.Cell>
-                    {token.lastUsedAt ? (
-                      readableDate(token.lastUsedAt).toLocaleDateString()
-                    ) : (
-                      <VStack align="start" gap={0}>
-                        <Badge size="sm" colorPalette="gray">
-                          Never
-                        </Badge>
-                        <Text fontSize="xs" color="fg.muted">
-                          Nothing has presented this token yet. If your identity provider says it is
-                          syncing, check the token it is using.
-                        </Text>
-                      </VStack>
-                    )}
-                  </Table.Cell>
-                  {mayManage && (
-                    <Table.Cell>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        data-testid="scim-token-revoke"
-                        aria-label={`Revoke ${token.description ?? "token"}`}
-                        onClick={() => setTokenToRevoke(token.id)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </Table.Cell>
-                  )}
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card.Body>
-      </Card.Root>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </ListTable>
 
       {mayManage && <TokenDialogs tokens={tokens} />}
     </>
