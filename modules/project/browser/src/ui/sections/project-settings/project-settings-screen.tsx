@@ -7,7 +7,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Card,
+  Box,
   createListCollection,
   Field,
   Heading,
@@ -18,11 +18,12 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import isEqual from "lodash-es/isEqual";
-import { Lock } from "lucide-react";
+import { Building2, FolderCog, Lock } from "lucide-react";
 import { useState } from "react";
 import {
   Controller,
@@ -87,7 +88,7 @@ function setupDialogAfterIntentChange({
 /** "Admin only" lock badge for settings a non-manager can see but not change. */
 function AdminOnlyBadge() {
   return (
-    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+    <Badge colorPalette="gray" variant="surface" size={"xs"}>
       <Tooltip content="Contact your admin to change this setting">
         <HStack>
           <Lock size={10} />
@@ -116,6 +117,11 @@ function OrganizationIdentityFields({
   return (
     <>
       <HorizontalFormControl
+        direction="vertical"
+        align="start"
+        labelProps={{ paddingLeft: 0 }}
+        borderBottomWidth={0}
+        paddingY={3}
         label="Name"
         helper="The name of your organization"
         invalid={!!errors.name}
@@ -136,7 +142,15 @@ function OrganizationIdentityFields({
           <Text>{organization.name}</Text>
         )}
       </HorizontalFormControl>
-      <HorizontalFormControl label="Slug" helper="The unique ID of your organization">
+      <HorizontalFormControl
+        direction="vertical"
+        align="start"
+        labelProps={{ paddingLeft: 0 }}
+        borderBottomWidth={0}
+        paddingY={3}
+        label="Slug"
+        helper="The unique ID of your organization"
+      >
         {canManage ? (
           <Input width="full" disabled type="text" value={organization.slug} />
         ) : (
@@ -145,6 +159,11 @@ function OrganizationIdentityFields({
       </HorizontalFormControl>
       {project ? (
         <HorizontalFormControl
+          direction="vertical"
+          align="start"
+          labelProps={{ paddingLeft: 0 }}
+          borderBottomWidth={0}
+          paddingY={3}
           label="Project ID"
           helper="Use this ID when authenticating with API Keys"
         >
@@ -152,6 +171,11 @@ function OrganizationIdentityFields({
         </HorizontalFormControl>
       ) : null}
       <HorizontalFormControl
+        direction="vertical"
+        align="start"
+        labelProps={{ paddingLeft: 0 }}
+        borderBottomWidth={0}
+        paddingY={3}
         label="Support contact"
         helper={
           "Surfaced to your members in CLI 'contact your admin' messages and the in-app budget-exceeded banner. " +
@@ -208,7 +232,12 @@ function S3StorageField({
 }) {
   return (
     <HorizontalFormControl
-      label="S3 Storage"
+      direction="vertical"
+      align="start"
+      labelProps={{ paddingLeft: 0 }}
+      borderBottomWidth={0}
+      paddingY={3}
+      label="S3 storage"
       helper="Configure S3 storage to host data on your own members. Leave empty to use LangWatch's managed storage."
     >
       {canManage ? (
@@ -321,148 +350,167 @@ function SettingsForm({
   };
 
   return (
-    <>
+    <Box width="full" css={{ "--page-inset": "var(--chakra-spacing-8)" }}>
       <PageLayout.Header>
-        <PageLayout.Heading>Organization Settings</PageLayout.Heading>
+        <PageLayout.Heading>Organization settings</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" maxWidth="820px" align="stretch" paddingTop={4}>
         <Text color="fg.muted">
           How your organization is named, where members land, and what they can share.
         </Text>
         <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
           <VStack gap={0}>
-            <Card.Root width="full">
-              <Card.Body paddingY={0}>
-                <OrganizationIdentityFields
-                  canManage={canManageOrganization}
+            <SettingsSection
+              icon={<Building2 size={18} />}
+              title="Organization"
+              hint="Identity, defaults, and collaboration across your projects."
+            >
+              <OrganizationIdentityFields
+                canManage={canManageOrganization}
+                control={control}
+                organization={organization}
+                project={project}
+                register={register}
+              />
+
+              {governanceEnabled && (
+                <HorizontalFormControl
+                  direction="vertical"
+                  align="start"
+                  labelProps={{ paddingLeft: 0 }}
+                  borderBottomWidth={0}
+                  paddingY={3}
+                  label="Primary use"
+                  helper={
+                    <VStack align="start" gap={1}>
+                      <Text>
+                        What this organization mainly uses LangWatch for. Decides where everyone
+                        lands when opening the app: coding-agent tracking opens the personal usage
+                        page, LLM apps open the project home. &quot;Not set&quot; keeps the current
+                        behavior.
+                      </Text>
+                      {!hasPermission("organization:manage") && <AdminOnlyBadge />}
+                    </VStack>
+                  }
+                >
+                  {hasPermission("organization:manage") ? (
+                    <Controller
+                      control={control}
+                      name="primaryIntent"
+                      render={({ field }) => (
+                        <Select.Root
+                          collection={primaryUseCollection}
+                          value={[field.value]}
+                          width="full"
+                          onValueChange={(d) =>
+                            field.onChange((d.value[0] ?? "") as "" | OrganizationIntent)
+                          }
+                        >
+                          <Select.Trigger background="bg" aria-label="Primary use">
+                            <Select.ValueText />
+                          </Select.Trigger>
+                          <Select.Content>
+                            {primaryUseCollection.items.map((item) => (
+                              <Select.Item key={item.value} item={item}>
+                                {item.label}
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                      )}
+                    />
+                  ) : (
+                    <Text>
+                      {organization.primaryIntent ? (
+                        primaryUseCollection.items.find(
+                          (item) => item.value === organization.primaryIntent,
+                        )?.label
+                      ) : (
+                        <Text as="span" color="fg.muted">
+                          Not set
+                        </Text>
+                      )}
+                    </Text>
+                  )}
+                </HorizontalFormControl>
+              )}
+
+              <HorizontalFormControl
+                direction="vertical"
+                align="start"
+                labelProps={{ paddingLeft: 0 }}
+                borderBottomWidth={0}
+                paddingY={3}
+                label="Live presence"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      Lets teammates see who else is on the site in real time - avatars, cursors,
+                      and which view each person is in. Disable to turn it off across every project
+                      in this organization.
+                    </Text>
+                    {!hasPermission("organization:manage") && <AdminOnlyBadge />}
+                  </VStack>
+                }
+              >
+                <Controller
                   control={control}
-                  organization={organization}
-                  project={project}
+                  name="presenceEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      colorPalette="accent"
+                      checked={field.value}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
+                      disabled={!hasPermission("organization:manage")}
+                    />
+                  )}
+                />
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
+                direction="vertical"
+                align="start"
+                labelProps={{ paddingLeft: 0 }}
+                borderBottomWidth={0}
+                paddingY={3}
+                label="Trace sharing"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      Lets members create share links to traces. Disable to turn sharing off across
+                      every project in this organization and revoke all existing links.
+                    </Text>
+                    {!hasPermission("organization:manage") && <AdminOnlyBadge />}
+                  </VStack>
+                }
+              >
+                <Controller
+                  control={control}
+                  name="traceSharingEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      colorPalette="accent"
+                      checked={field.value}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
+                      disabled={!hasPermission("organization:manage")}
+                    />
+                  )}
+                />
+              </HorizontalFormControl>
+
+              {organization.useCustomS3 && (
+                <S3StorageField
+                  canManage={hasPermission("organization:manage")}
+                  hasStoredKey={Boolean(defaultValues.s3AccessKeyId)}
                   register={register}
                 />
-
-                {governanceEnabled && (
-                  <HorizontalFormControl
-                    label="Primary use"
-                    helper={
-                      <VStack align="start" gap={1}>
-                        <Text>
-                          What this organization mainly uses LangWatch for. Decides where everyone
-                          lands when opening the app: coding-agent tracking opens the personal usage
-                          page, LLM apps open the project home. &quot;Not set&quot; keeps the
-                          current behavior.
-                        </Text>
-                        {!hasPermission("organization:manage") && <AdminOnlyBadge />}
-                      </VStack>
-                    }
-                  >
-                    {hasPermission("organization:manage") ? (
-                      <Controller
-                        control={control}
-                        name="primaryIntent"
-                        render={({ field }) => (
-                          <Select.Root
-                            collection={primaryUseCollection}
-                            value={[field.value]}
-                            width="full"
-                            onValueChange={(d) =>
-                              field.onChange((d.value[0] ?? "") as "" | OrganizationIntent)
-                            }
-                          >
-                            <Select.Trigger background="bg" aria-label="Primary use">
-                              <Select.ValueText />
-                            </Select.Trigger>
-                            <Select.Content>
-                              {primaryUseCollection.items.map((item) => (
-                                <Select.Item key={item.value} item={item}>
-                                  {item.label}
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select.Root>
-                        )}
-                      />
-                    ) : (
-                      <Text>
-                        {organization.primaryIntent ? (
-                          primaryUseCollection.items.find(
-                            (item) => item.value === organization.primaryIntent,
-                          )?.label
-                        ) : (
-                          <Text as="span" color="fg.muted">
-                            Not set
-                          </Text>
-                        )}
-                      </Text>
-                    )}
-                  </HorizontalFormControl>
-                )}
-
-                <HorizontalFormControl
-                  label="Live presence"
-                  helper={
-                    <VStack align="start" gap={1}>
-                      <Text>
-                        Lets teammates see who else is on the site in real time - avatars, cursors,
-                        and which view each person is in. Disable to turn it off across every
-                        project in this organization.
-                      </Text>
-                      {!hasPermission("organization:manage") && <AdminOnlyBadge />}
-                    </VStack>
-                  }
-                >
-                  <Controller
-                    control={control}
-                    name="presenceEnabled"
-                    render={({ field }) => (
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={({ checked }) => field.onChange(checked)}
-                        disabled={!hasPermission("organization:manage")}
-                      />
-                    )}
-                  />
-                </HorizontalFormControl>
-
-                <HorizontalFormControl
-                  label="Trace Sharing"
-                  helper={
-                    <VStack align="start" gap={1}>
-                      <Text>
-                        Lets members create share links to traces. Disable to turn sharing off
-                        across every project in this organization and revoke all existing links.
-                      </Text>
-                      {!hasPermission("organization:manage") && <AdminOnlyBadge />}
-                    </VStack>
-                  }
-                >
-                  <Controller
-                    control={control}
-                    name="traceSharingEnabled"
-                    render={({ field }) => (
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={({ checked }) => field.onChange(checked)}
-                        disabled={!hasPermission("organization:manage")}
-                      />
-                    )}
-                  />
-                </HorizontalFormControl>
-
-                {organization.useCustomS3 && (
-                  <S3StorageField
-                    canManage={hasPermission("organization:manage")}
-                    hasStoredKey={Boolean(defaultValues.s3AccessKeyId)}
-                    register={register}
-                  />
-                )}
-              </Card.Body>
-            </Card.Root>
+              )}
+            </SettingsSection>
 
             {!isLiteMember && (
               <HStack width="full" justify="flex-end" paddingTop={4}>
-                <Button type="submit" colorPalette="orange" loading={updateOrganization.isPending}>
-                  Save Changes
+                <Button type="submit" colorPalette="accent" loading={updateOrganization.isPending}>
+                  Save changes
                 </Button>
               </HStack>
             )}
@@ -496,7 +544,7 @@ function SettingsForm({
                 Later
               </Button>
               <Button
-                colorPalette="orange"
+                colorPalette="accent"
                 onClick={() => {
                   setShowCreateProjectDialog(false);
                   host.openOverlay("createProject", {
@@ -536,7 +584,7 @@ function SettingsForm({
                 Later
               </Button>
               <Button
-                colorPalette="orange"
+                colorPalette="accent"
                 onClick={() => {
                   // Dialog only opens when a project exists (see open guard).
                   window.location.href = `/onboarding/product?projectSlug=${project?.slug ?? ""}`;
@@ -548,7 +596,7 @@ function SettingsForm({
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
-    </>
+    </Box>
   );
 }
 
@@ -667,124 +715,144 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
     <>
       <HStack width="full">
         <Heading as="h2" size="md">
-          Project-level Settings
+          Project settings
         </Heading>
         <Spacer />
         {host.projectSwitcher()}
       </HStack>
       <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        <Card.Root width="full">
-          <Card.Body paddingY={0}>
-            <HorizontalFormControl
-              label="Name"
-              helper="The name of the project"
-              invalid={!!formState.errors.name}
-            >
-              <Input
-                width="full"
-                type="text"
-                {...register("name", {
-                  required: true,
-                  validate: (value) => value.trim().length > 0,
-                })}
-              />
-              <Field.ErrorText>Name is required</Field.ErrorText>
-            </HorizontalFormControl>
-            <ProjectDepartmentField
-              organizationId={organization?.id ?? ""}
-              projectId={project.id}
-              governanceEnabled={governanceEnabled}
+        <SettingsSection icon={<FolderCog size={18} />} title="Project configuration">
+          <HorizontalFormControl
+            direction="vertical"
+            align="start"
+            labelProps={{ paddingLeft: 0 }}
+            borderBottomWidth={0}
+            paddingY={3}
+            label="Name"
+            helper="The name of the project"
+            invalid={!!formState.errors.name}
+          >
+            <Input
+              width="full"
+              type="text"
+              {...register("name", {
+                required: true,
+                validate: (value) => value.trim().length > 0,
+              })}
             />
-            <HorizontalFormControl
-              label="Tech Stack"
-              helper="The project language and framework"
-              invalid={!!formState.errors.language || !!formState.errors.framework}
-            >
-              {changeLanguageFramework ? (
-                <TechStackSelector form={form} language={language} framework={framework} />
-              ) : (
-                <HStack>
-                  <ProjectTechStackIcon project={project} />
-                  <Text>
-                    {project.language} / {project.framework}
-                  </Text>
-                  <Button
-                    variant="ghost"
-                    textDecoration="underline"
-                    onClick={() => setChangeLanguageFramework(true)}
-                  >
-                    (change)
-                  </Button>
-                </HStack>
-              )}
-            </HorizontalFormControl>
-            <HorizontalFormControl
-              label="Live presence"
-              helper={
-                <VStack align="start" gap={1}>
-                  <Text>
-                    Show teammate avatars, cursors, and active views inside this project.{" "}
-                    {!organization?.presenceEnabled
-                      ? "Disabled at the organization level - turn it on there first."
-                      : "Disable to turn presence off for this project only."}
-                  </Text>
-                  {!userIsAdmin && <AdminOnlyBadge />}
-                </VStack>
-              }
-              invalid={!!formState.errors.presenceEnabled}
-            >
-              <Controller
-                control={control}
-                name="presenceEnabled"
-                render={({ field }) => (
-                  <Switch
-                    checked={field.value && (organization?.presenceEnabled ?? true)}
-                    onCheckedChange={({ checked }) => field.onChange(checked)}
-                    disabled={!userIsAdmin || !(organization?.presenceEnabled ?? true)}
-                  />
-                )}
-              />
-            </HorizontalFormControl>
-
-            <HorizontalFormControl
-              label="Trace Sharing"
-              helper={
-                <VStack align="start" gap={1}>
-                  <Text>
-                    Allow users to share traces with public links.{" "}
-                    {!organization?.traceSharingEnabled
-                      ? "Disabled at the organization level - turn it on there first."
-                      : "Disable to turn sharing off for this project only."}
-                  </Text>
-                  {!userIsAdmin && <AdminOnlyBadge />}
-                </VStack>
-              }
-              invalid={!!formState.errors.traceSharingEnabled}
-            >
-              <Controller
-                control={control}
-                name="traceSharingEnabled"
-                render={({ field }) => (
-                  <Switch
-                    checked={field.value && (organization?.traceSharingEnabled ?? true)}
-                    onCheckedChange={({ checked }) => handleTraceSharingChange(checked)}
-                    disabled={!userIsAdmin || !(organization?.traceSharingEnabled ?? true)}
-                  />
-                )}
-              />
-            </HorizontalFormControl>
-
-            {organization?.useCustomS3 && (
-              <ProjectS3Fields
-                register={register}
-                hasStoredAccessKey={!!defaultValues.s3AccessKeyId}
-              />
+            <Field.ErrorText>Name is required</Field.ErrorText>
+          </HorizontalFormControl>
+          <ProjectDepartmentField
+            organizationId={organization?.id ?? ""}
+            projectId={project.id}
+            governanceEnabled={governanceEnabled}
+          />
+          <HorizontalFormControl
+            direction="vertical"
+            align="start"
+            labelProps={{ paddingLeft: 0 }}
+            borderBottomWidth={0}
+            paddingY={3}
+            label="Tech stack"
+            helper="The project language and framework"
+            invalid={!!formState.errors.language || !!formState.errors.framework}
+          >
+            {changeLanguageFramework ? (
+              <TechStackSelector form={form} language={language} framework={framework} />
+            ) : (
+              <HStack>
+                <ProjectTechStackIcon project={project} />
+                <Text>
+                  {project.language} / {project.framework}
+                </Text>
+                <Button
+                  variant="ghost"
+                  textDecoration="underline"
+                  onClick={() => setChangeLanguageFramework(true)}
+                >
+                  (change)
+                </Button>
+              </HStack>
             )}
-          </Card.Body>
-        </Card.Root>
+          </HorizontalFormControl>
+          <HorizontalFormControl
+            direction="vertical"
+            align="start"
+            labelProps={{ paddingLeft: 0 }}
+            borderBottomWidth={0}
+            paddingY={3}
+            label="Live presence"
+            helper={
+              <VStack align="start" gap={1}>
+                <Text>
+                  Show teammate avatars, cursors, and active views inside this project.{" "}
+                  {!organization?.presenceEnabled
+                    ? "Disabled at the organization level - turn it on there first."
+                    : "Disable to turn presence off for this project only."}
+                </Text>
+                {!userIsAdmin && <AdminOnlyBadge />}
+              </VStack>
+            }
+            invalid={!!formState.errors.presenceEnabled}
+          >
+            <Controller
+              control={control}
+              name="presenceEnabled"
+              render={({ field }) => (
+                <Switch
+                  colorPalette="accent"
+                  checked={field.value && (organization?.presenceEnabled ?? true)}
+                  onCheckedChange={({ checked }) => field.onChange(checked)}
+                  disabled={!userIsAdmin || !(organization?.presenceEnabled ?? true)}
+                />
+              )}
+            />
+          </HorizontalFormControl>
+
+          <HorizontalFormControl
+            direction="vertical"
+            align="start"
+            labelProps={{ paddingLeft: 0 }}
+            borderBottomWidth={0}
+            paddingY={3}
+            label="Trace sharing"
+            helper={
+              <VStack align="start" gap={1}>
+                <Text>
+                  Allow users to share traces with public links.{" "}
+                  {!organization?.traceSharingEnabled
+                    ? "Disabled at the organization level - turn it on there first."
+                    : "Disable to turn sharing off for this project only."}
+                </Text>
+                {!userIsAdmin && <AdminOnlyBadge />}
+              </VStack>
+            }
+            invalid={!!formState.errors.traceSharingEnabled}
+          >
+            <Controller
+              control={control}
+              name="traceSharingEnabled"
+              render={({ field }) => (
+                <Switch
+                  colorPalette="accent"
+                  checked={field.value && (organization?.traceSharingEnabled ?? true)}
+                  onCheckedChange={({ checked }) => handleTraceSharingChange(checked)}
+                  disabled={!userIsAdmin || !(organization?.traceSharingEnabled ?? true)}
+                />
+              )}
+            />
+          </HorizontalFormControl>
+
+          {organization?.useCustomS3 && (
+            <ProjectS3Fields
+              register={register}
+              hasStoredAccessKey={!!defaultValues.s3AccessKeyId}
+            />
+          )}
+        </SettingsSection>
         <HStack width="full" justify="flex-end" paddingTop={4}>
-          <Button type="submit" colorPalette="orange" loading={updateProject.isPending}>
-            Save Changes
+          <Button type="submit" colorPalette="accent" loading={updateProject.isPending}>
+            Save changes
           </Button>
         </HStack>
       </form>
@@ -807,7 +875,12 @@ function ProjectS3Fields({
 }) {
   return (
     <HorizontalFormControl
-      label="S3 Storage"
+      direction="vertical"
+      align="start"
+      labelProps={{ paddingLeft: 0 }}
+      borderBottomWidth={0}
+      paddingY={3}
+      label="S3 storage"
       helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
     >
       <VStack width="full" align="start" gap={3}>
