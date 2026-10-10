@@ -124,7 +124,7 @@ export default function OnlineEvaluationsScreen() {
       )}
       {listState === "error" && (
         <PageLayout.Container>
-          <Text color="red.500">Error loading online evaluations</Text>
+          <Text color="red.fg">Error loading online evaluations</Text>
         </PageLayout.Container>
       )}
       {listState === "empty" && (
