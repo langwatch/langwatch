@@ -180,7 +180,8 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
 
     /** The service refuses anyone but an organisation admin (ADR-177 decision 5). */
     .procedure("updateAggregateRule")
-    .withPermission("organization:manage")
+    // As main: the input names the aggregate, so the organisation is read through its project.
+    .withPermission({ kind: "permission", permission: "organization:manage", via: "projectId" })
     .handle(async ({ app, input, actor }) => {
       const members = await app.updateAggregateRule({
         projectId: input.projectId,
