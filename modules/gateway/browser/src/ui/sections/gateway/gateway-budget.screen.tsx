@@ -284,6 +284,8 @@ function BudgetDetailPage() {
                       <strong>
                         {budget.window === "TOTAL" ? (
                           "never"
+                        ) : budget.window === "MANUAL" ? (
+                          "on request"
                         ) : (
                           <Tooltip content={readableDate(budget.resetsAt).toLocaleString()}>
                             <span>{formatTimeAgo(toEpochMs(budget.resetsAt))}</span>
