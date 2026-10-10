@@ -1,3 +1,5 @@
+import type { ClickHouseColumns } from "@langwatch/clickhouse-client";
+
 import type { SimulationClickHouseClient } from "./simulation-clickhouse.repository.ts";
 
 /** The process's one routing `clickhouse` member, as the simulation reads query it. */
@@ -8,6 +10,7 @@ type ScenarioReadOnlyClickHouse = Readonly<{
     sql: string;
     params?: Record<string, unknown>;
   }): Promise<{ rows: Row[] }>;
+  columns(input: { tenantId: string }): ClickHouseColumns;
 }>;
 
 /** One tenant's view of the routing member, in the `.query()` shape the simulation reads use. */
@@ -38,5 +41,10 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
     };
 
     return { json: async <Result>() => (await this.clickhouse.query<Result>(request)).rows };
+  }
+
+  /** A select list naming only the columns this tenant's target has, the rest as defaults. */
+  select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
+    return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);
   }
 }

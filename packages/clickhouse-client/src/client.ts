@@ -5,6 +5,7 @@
  */
 
 import type { ClickHouseStatementAdmission } from "./managed-client.ts";
+import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
@@ -39,6 +40,7 @@ export class ClickHouseQueryClient {
   private readonly retries: RetryPolicy | undefined;
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
+  private readonly columnLists = new Map<string, ClickHouseColumns>();
 
   constructor({
     driver,
@@ -64,6 +66,30 @@ export class ClickHouseQueryClient {
    */
   privateRoutes(): ReadonlyMap<string, string> {
     return this.routes;
+  }
+
+  /**
+   * The column list of the target `tenantId` routes to, for a read naming a column a pending
+   * ClickHouse step adds (NO-HOLDS, ARCHITECTURE.md section 7). Kept per tenant, since only the
+   * driver knows a tenant's target; each list refreshes on the helper's own interval.
+   */
+  columns({ tenantId }: { tenantId: string }): ClickHouseColumns {
+    const known = this.columnLists.get(tenantId);
+    if (known !== undefined) return known;
+    const columns = ClickHouseColumns.over({
+      read: async () =>
+        (
+          await this.query<{ table: string; name: string }>({
+            tenantId,
+            sql: CLICKHOUSE_COLUMNS_QUERY,
+            table: "system.columns",
+            // The schema's column list describes the server, which no tenant owns.
+            SKIP_TENANT_CHECK: true,
+          })
+        ).rows,
+    });
+    this.columnLists.set(tenantId, columns);
+    return columns;
   }
 
   /**

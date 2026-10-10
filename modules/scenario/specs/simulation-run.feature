@@ -32,3 +32,16 @@ Feature: A simulation run reports its true state and never leaks secrets
     Given a run completion already folded into the batch metrics
     When the same completion is replayed
     Then the metrics are unchanged
+
+  # NO-HOLDS (ARCHITECTURE.md section 7): head's api serves while goose 00101 is still pending.
+  @unit
+  Scenario: A run read before the per-criterion columns exist answers no per-criterion verdicts
+    Given the ClickHouse target has no `Criteria.*` columns on simulation_runs yet
+    When a run is read by id or listed
+    Then the read selects empty per-criterion arrays under the column names instead of failing
+
+  @unit
+  Scenario: A run read once the per-criterion columns exist answers the stored verdicts
+    Given the ClickHouse target has the `Criteria.*` columns on simulation_runs
+    When a run is read by id or listed
+    Then the read selects the stored per-criterion columns
