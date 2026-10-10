@@ -415,7 +415,13 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+    <Box
+      background="bg.card"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
       <HStack alignItems="start" marginBottom={3}>
         <VStack align="start" gap={0}>
           <Text fontSize="sm" fontWeight="semibold">

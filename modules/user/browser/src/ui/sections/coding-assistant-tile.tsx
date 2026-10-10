@@ -30,7 +30,14 @@ export function CodingAssistantTile({ displayName, config, iconAsset, iconKey }:
   const { isSaas, appBaseUrl } = usePersonalDeployment();
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4} width="full">
+    <Box
+      background="bg.card"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+      width="full"
+    >
       <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
         <TileIcon iconAsset={iconAsset} iconKey={iconKey} type="coding_assistant" />
         <VStack align="start" gap={0} flex={1}>

@@ -336,7 +336,13 @@ function SectionCard({
 }) {
   if (flushContent) {
     return (
-      <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
+      <Box
+        background="bg.card"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        overflow="hidden"
+      >
         <HStack paddingX={4} paddingTop={4} paddingBottom={3}>
           <Text fontSize="sm" fontWeight="semibold">
             {title}
@@ -352,7 +358,13 @@ function SectionCard({
   }
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+    <Box
+      background="bg.card"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
       <HStack marginBottom={3}>
         <Text fontSize="sm" fontWeight="semibold">
           {title}
