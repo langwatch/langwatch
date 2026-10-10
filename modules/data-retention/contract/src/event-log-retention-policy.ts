@@ -44,6 +44,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   trace_collector_evaluation: "traces",
   langy_conversation: "traces",
   insight: "traces",
+  insight_daily_schedule: "traces",
   topic_clustering: "traces",
   gateway_request: "traces",
   trigger: "traces",

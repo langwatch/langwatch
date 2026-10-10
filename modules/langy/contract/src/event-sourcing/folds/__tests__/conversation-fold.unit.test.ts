@@ -77,7 +77,33 @@ function recorded({
   };
 }
 
+function started({ origin }: { origin?: "interactive" | "run" } = {}): LangyConversationStateEvent {
+  return {
+    type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+    occurredAt: 500,
+    data: {
+      conversationId: CONVERSATION_ID,
+      userId: "user-1",
+      title: null,
+      ...(origin ? { origin } : {}),
+    },
+  };
+}
+
 describe("foldLangyConversationState", () => {
+  describe("when a conversation is started", () => {
+    /** @scenario "A conversation started before origins existed is interactive" */
+    it("reads an event stored without an origin as interactive", () => {
+      expect(fold([started()]).Origin).toBe("interactive");
+    });
+
+    it("keeps the origin a run conversation was started with", () => {
+      const state = fold([started({ origin: "run" }), accepted({ turnId: "t1" })]);
+
+      expect(state.Origin).toBe("run");
+    });
+  });
+
   describe("when a turn is accepted carrying its model", () => {
     /** @scenario Reopening a conversation restores the model it last ran on */
     it("remembers the model as the conversation's last model", () => {

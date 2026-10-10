@@ -3,7 +3,9 @@
  * its real pipeline on an in-memory event store, so a write is folded before the next read.
  */
 
-import { createTenantId, EventSourcing } from "@langwatch/eventing";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DashboardApi } from "@langwatch/dashboard-contract";
+import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
@@ -14,11 +16,13 @@ import {
   type InsightFiledEventData,
 } from "@langwatch/insight-contract";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+import type { LangyApi } from "@langwatch/langy-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
 
 import { insightProcessModule } from "../../insight.module.ts";
 
@@ -37,9 +41,26 @@ export function filing(overrides: Partial<FileInsightInput> = {}): FileInsightIn
   };
 }
 
-export async function installInsight({ isEnabled = true }: { isEnabled?: boolean } = {}) {
+/** The peers a daily run asks. The inbox calls none, so each defaults to one that throws. */
+export type InsightRunPeers = Readonly<{
+  project?: Partial<ProjectApi>;
+  user?: UserApi;
+  authz?: AuthzApi;
+  dashboard?: DashboardApi;
+  langy?: LangyApi;
+}>;
+
+export async function installInsight({
+  isEnabled = true,
+  peers = {},
+}: {
+  /** A function is asked on every check, so a test can turn the flag off between two acts. */
+  isEnabled?: boolean | (() => boolean);
+  peers?: InsightRunPeers;
+} = {}) {
   const eventStore = EventStoreMemory.createForTesting();
-  const eventing = new EventSourcing({ eventStore });
+  const processStore = InMemoryProcessStore.createForTesting();
+  const eventing = new EventSourcing({ eventStore, processStore });
   /** The projects the release gate was asked about: empty while no handler has run. */
   const gateAsks: string[] = [];
   const runtime = await createApp({ role: "worker" })
@@ -47,18 +68,28 @@ export async function installInsight({ isEnabled = true }: { isEnabled?: boolean
     .withStores(memoryStores())
     .withEventing(eventing)
     .provide({
-      "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => isEnabled }),
+      "feature-flag": createApiFixture<FeatureFlagApi>({
+        isEnabled: async () => (typeof isEnabled === "function" ? isEnabled() : isEnabled),
+      }),
       project: createApiFixture<ProjectApi>({
         getOrganizationId: async (projectId) => {
           gateAsks.push(projectId);
           return "organization-1";
         },
+        ...peers.project,
       }),
+      user: peers.user ?? createApiFixture<UserApi>(),
+      authz: peers.authz ?? createApiFixture<AuthzApi>(),
+      dashboard: peers.dashboard ?? createApiFixture<DashboardApi>(),
+      langy: peers.langy ?? createApiFixture<LangyApi>(),
     })
     .boot();
 
   return {
     app: runtime.service(InsightApi),
+    eventing,
+    eventStore,
+    processStore,
     gateAsks,
     /**
      * Files an insight the way the scheduled run will: through the pipeline's own command,

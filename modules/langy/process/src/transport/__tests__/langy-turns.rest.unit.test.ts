@@ -84,7 +84,14 @@ describe("given a project key starting a Langy turn", () => {
       const api = buildApi({
         settle: async () => ({
           kind: "settled",
-          settlement: { succeeded: true, outcome: "completed", text: "hi there", error: null },
+          settlement: {
+            succeeded: true,
+            outcome: "completed",
+            text: "hi there",
+            messageId: "message-1",
+            parts: [{ type: "text", text: "hi there" }],
+            error: null,
+          },
         }),
       });
 

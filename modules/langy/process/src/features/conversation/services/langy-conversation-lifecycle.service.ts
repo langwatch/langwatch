@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
+  LANGY_CONVERSATION_ORIGIN,
   LANGY_CONVERSATION_STATUS,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
@@ -196,6 +197,7 @@ export class LangyConversationLifecycleService {
         title,
         isShared: false,
         isOwn: true,
+        origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE,
         lastActivityAt,
         messageCount: importedMessages.length,
         status: LANGY_CONVERSATION_STATUS.IDLE,

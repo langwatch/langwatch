@@ -54,6 +54,7 @@ export class LangyTurnStartService {
         requestedConversationId: input.requestedConversationId,
         ...(input.adoptConversationId ? { adoptConversationId: true } : {}),
         ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
+        ...(input.unattended ? { unattended: true } : {}),
       });
     const turnModel = this.requireTurnModel(input.modelOverride, resolvedModel);
     const admission = await this.deps.admission.claim({
@@ -252,6 +253,7 @@ export class LangyTurnStartService {
         identity: request.identity,
         isRetry: input.isRetry,
         turnContext: input.turnContext,
+        ...(input.unattended ? { unattended: input.unattended } : {}),
         ...runtime,
         credentials,
         turnModel,

@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 
+import { LANGY_CONVERSATION_ORIGINS } from "../../constants.ts";
 import {
   langyJsonValueSchema,
   langyMessagePartSchema,
@@ -28,6 +29,8 @@ export const langyConversationStartedEventDataSchema = z.object({
    * client-facing projection.
    */
   runToken: z.string().nullable().optional(),
+  /** Absent on a conversation started before origins existed, which reads as interactive. */
+  origin: z.enum(LANGY_CONVERSATION_ORIGINS).optional(),
 });
 export type LangyConversationStartedEventData = z.infer<
   typeof langyConversationStartedEventDataSchema

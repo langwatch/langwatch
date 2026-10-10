@@ -25,6 +25,7 @@ type Row = {
   lastActivityAtMs: number;
   cursorActivityAtMs?: number | null;
   createdAtMs: number;
+  origin?: string;
 };
 
 function makeRepo(
@@ -526,6 +527,28 @@ describe("LangyConversationService", () => {
         messageCount: 3,
       });
       expect(result[0]).not.toHaveProperty("status");
+    });
+
+    /** @scenario "A run conversation shows in the person's history as a run" */
+    it("lists a run conversation as a run beside the person's own chats", async () => {
+      const repo = makeRepo({
+        findAllForUser: vi
+          .fn()
+          .mockResolvedValue([
+            row({ id: "run-1", title: "Daily insights - Costs - 2026-10-09", origin: "run" }),
+            row({ id: "chat-1", origin: "interactive" }),
+            row({ id: "chat-before-origins" }),
+          ]),
+      });
+      const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
+
+      const result = await svc.getAll({ projectId: "p1", userId: "alice" });
+
+      expect(result.map(({ id, origin, isOwn }) => ({ id, origin, isOwn }))).toEqual([
+        { id: "run-1", origin: "run", isOwn: true },
+        { id: "chat-1", origin: "interactive", isOwn: true },
+        { id: "chat-before-origins", origin: "interactive", isOwn: true },
+      ]);
     });
 
     it("falls back to createdAt when lastActivityAt is unset", async () => {

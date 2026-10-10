@@ -2313,6 +2313,44 @@ model InsightReaderProjection {
   @@index([projectId, userId])
 }
 
+/// One person's daily insights run on one board in a project, folded from its
+/// `insight_daily_schedule` aggregate (modules/insight). A read model: rebuildable by
+/// replaying the event log. Epochs in milliseconds.
+model InsightDailyScheduleProjection {
+  /// The schedule id, which is also its aggregate id: one per project, person and board.
+  id                    String  @id
+  projectId             String
+  userId                String
+  /// dashboard | template. A pointer only, never a relation: a run checks the board is there.
+  boardKind             String
+  boardId               String
+  boardName             String
+  /// on | off | undecided. Nothing writes it before the schedule itself is built.
+  state                 String  @default("undecided")
+  hour                  Int?
+  timezone              String?
+  maxInsights           Int?
+  /// The last run that recorded an outcome. NULL until one did.
+  lastRunId             String?
+  lastRunAt             Float?
+  /// filed | nothing | failed | skipped
+  lastRunOutcome        String?
+  lastRunReason         String?
+  lastRunFiled          Int?
+  /// Nothing writes it before a run can renew an insight.
+  lastRunRenewed        Int?
+  lastRunConversationId String?
+  createdAt             Float
+  updatedAt             Float
+  occurredAt            Float
+  acceptedAt            Float
+  lastEventId           String
+  projectionVersion     String
+
+  /// Named by hand: the generated name is longer than Postgres keeps.
+  @@unique([projectId, userId, boardKind, boardId], map: "InsightDailySchedule_projectId_userId_board_key")
+}
+
 model SavedView {
   id        String   @id @default(nanoid())
   projectId String
@@ -3154,6 +3192,10 @@ model LangyConversationProjection {
   Title                String?                    @map("title")
   /// derived | auto | user — governs auto-title precedence (user is sticky).
   TitleSource          LangyProjectionTitleSource @map("titleSource")
+  /// Who started the conversation: `interactive` for the person in the panel, `run` for a
+  /// module acting for them with nobody at the keyboard. A row folded before the column
+  /// existed reads as interactive.
+  Origin               String                     @default("interactive") @map("origin")
   Status               String                     @map("status")
   IsShared             Boolean                    @default(false) @map("isShared")
   SharedAt             Float?                     @map("sharedAt")

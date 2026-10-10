@@ -641,6 +641,7 @@
     ["CurrentTurnId", "currentTurnId", []],
     ["LastError", "lastError", ["output"]],
     ["LastModel", "lastModel", []],
+    ["Origin", "origin", []],
     ["PendingHandoffTurnId", "pendingHandoffTurnId", []],
     ["ArchivedAt", "archivedAt", []],
     ["CreatedAt", "createdAt", []],

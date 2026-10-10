@@ -43,6 +43,7 @@ export const KSUID_RESOURCES = {
   GROUP: "group",
   INSIGHT: "insight",
   INSIGHT_READER: "insightreader",
+  INSIGHT_RUN: "insightrun",
   INVITE: "invite",
   ROLE_BINDING: "rolebinding",
   API_KEY_ROLE: "apikeyrole",

@@ -61,6 +61,7 @@ export class LangyTurnPreparationService {
     identity: { messageId: string };
     isRetry: boolean;
     turnContext: object;
+    unattended?: StartConversationTurnInput["unattended"];
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
     handoffStore: LangyTurnServiceDependencies["handoffStore"];
@@ -78,9 +79,8 @@ export class LangyTurnPreparationService {
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
     });
-    const earlyWorkerProbe = args.credentials.githubToken
-      ? null
-      : this.probeWorker(args, disabledSkillsPromise);
+    const needsOwnKey = Boolean(args.credentials.githubToken) || args.unattended !== undefined;
+    const earlyWorkerProbe = needsOwnKey ? null : this.probeWorker(args, disabledSkillsPromise);
     const results = await this.readPreparation(args, mintedRunToken);
     const disabledSkills = await disabledSkillsPromise;
     if (disabledSkills.length > 0) {
@@ -88,7 +88,8 @@ export class LangyTurnPreparationService {
     }
     const runToken = this.requireRunnableTurn(args, results);
     const permit = await this.reservePermit(args);
-    await this.ensureWorkerAccess(args, earlyWorkerProbe ?? this.probeWorker(args, disabledSkills));
+    const lateProbe = () => earlyWorkerProbe ?? this.probeWorker(args, disabledSkills);
+    await this.ensureWorkerAccess(args, lateProbe);
     const prepared = this.buildPreparedTurn(args, results, permit.capReachedNote);
     await this.stashPreparedTurn({ args, prepared, runToken, permitReserved: permit.reserved });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
@@ -248,10 +249,10 @@ export class LangyTurnPreparationService {
 
   private async ensureWorkerAccess(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    workerProbe: Promise<boolean>,
+    probeWorker: () => Promise<boolean>,
   ) {
-    const workerAvailable = await workerProbe;
-    if (workerAvailable) {
+    // An unattended turn never borrows a running worker's key, which may hold writes.
+    if (!args.unattended && (await probeWorker())) {
       return;
     }
 
@@ -259,6 +260,7 @@ export class LangyTurnPreparationService {
       session: args.session,
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
+      ...(args.unattended ? { ceiling: "read" as const } : {}),
     });
     args.credentials.langwatchApiKey = minted.token;
     args.credentials.langwatchApiKeyId = minted.apiKeyId;
@@ -402,8 +404,11 @@ export class LangyTurnPreparationService {
           ? {
               conversationStart: {
                 userId: args.userId,
-                title: startsWithGuidedKickoff(firstUserParts) ? title : null,
+                title:
+                  args.unattended?.title ??
+                  (startsWithGuidedKickoff(firstUserParts) ? title : null),
                 ...(mintedRunToken ? { runToken: mintedRunToken } : {}),
+                ...(args.unattended ? { origin: "run" as const } : {}),
               },
             }
           : {}),

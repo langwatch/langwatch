@@ -4,6 +4,7 @@
  */
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_ORIGIN,
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
   type LangyTitleSource,
@@ -37,6 +38,8 @@ export interface LangyConversationStateData {
   Title: string | null;
   /** Where `Title` came from: `derived` < `auto` < `user` (sticky). */
   TitleSource: LangyTitleSource;
+  /** `interactive` or `run`, set once by the event that started the conversation. */
+  Origin: string;
   Status: string;
   IsShared: boolean;
   SharedAt: number | null;
@@ -74,6 +77,7 @@ export function initLangyConversationState(): LangyConversationStateFoldState {
     UserId: "",
     Title: null,
     TitleSource: LANGY_TITLE_SOURCE.DERIVED,
+    Origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE,
     Status: LANGY_CONVERSATION_STATUS.ACTIVE,
     IsShared: false,
     SharedAt: null,
@@ -188,6 +192,8 @@ function foldConversationStarted<S extends LangyConversationStateFoldState>(
     UserId: state.UserId || event.data.userId,
     Title: title,
     TitleSource: titleSource,
+    // An event stored before origins existed names none, and leaves the origin as it is.
+    Origin: event.data.origin ?? state.Origin,
     Status: nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
     LastActivityAt: state.LastActivityAt ?? event.occurredAt,
     // First-writer-wins: the runToken is minted once at creation and never

@@ -151,6 +151,7 @@ import { LangyVirtualKeyGatewayService } from "../features/session-key/services/
 import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
 import { LangyTurnSettlementWaiterService } from "../features/turn/services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../features/turn/services/langy-turns-bounds.service.ts";
+import { LangyUnattendedTurnService } from "../features/turn/services/langy-unattended-turn.service.ts";
 import { LangyUiActionBackendService } from "../features/ui-action/services/langy-ui-action-backend.service.ts";
 import { LangyUiActionCatalogService } from "../features/ui-action/services/langy-ui-action-catalog.service.ts";
 import { LangyUiActionDoorService } from "../features/ui-action/services/langy-ui-action-door.service.ts";
@@ -197,6 +198,8 @@ type LangyAppDependencies = {
   presence: PresenceApi;
   /** The per-project window every turn is counted against before it dispatches. */
   turnBounds: LangyTurnsBoundsService;
+  /** Turns a module starts for a person who is not at the keyboard, read-only. */
+  unattendedTurns: LangyUnattendedTurnService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
@@ -445,6 +448,13 @@ export class LangyModule implements LangyApiContract {
       repositories: setup.repositories,
       presence: setup.dependencies.presence,
       turnBounds,
+      unattendedTurns: LangyUnattendedTurnService.create({
+        users: setup.dependencies.users,
+        projects: setup.dependencies.projects,
+        featureFlags: setup.dependencies.featureFlags,
+        bounds: turnBounds,
+        turns: langy,
+      }),
       virtualKeyProvisioning: LangyVirtualKeyProvisioningService.create({
         virtualKeys: built.credentials.virtualKeys,
       }),
@@ -861,6 +871,14 @@ export class LangyModule implements LangyApiContract {
     await this.dependencies.turnBounds.assertTurnWithinBounds({ projectId: input.projectId });
 
     return this.dependencies.langy.startConversationTurn(input);
+  }
+
+  /** Counted against its own window, apart from the one chat turns start under. */
+  startUnattendedTurn(input: langyContractModule.LangyStartUnattendedTurnInput): Promise<{
+    conversationId: string;
+    turnId: string;
+  }> {
+    return this.dependencies.unattendedTurns.start(input);
   }
 
   /** A `Prefer: wait` hold borrows its own blocking connection and gives it back on release. */

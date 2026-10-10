@@ -169,10 +169,30 @@ export type LangyControlPollInput = Readonly<{
 export type LangyControlFramesInput = Readonly<{ instanceToken: string; frames: CliFrame[] }>;
 export type LangyRestCallerInput = LangyKeyCaller & Readonly<{ surface: LangyRestSurface }>;
 
-/** How one turn settled: its reply text, or why it failed. */
+/** How one turn settled: its reply (text, message id and parts), or why it failed. */
 export type LangyTurnSettlement =
-  | { succeeded: true; outcome: "completed" | "stopped"; text: string; error: null }
+  | {
+      succeeded: true;
+      outcome: "completed" | "stopped";
+      text: string;
+      messageId: string;
+      parts: jsonModule.LangyMessagePart[];
+      error: null;
+    }
   | { succeeded: false; outcome: "failed"; text: null; error: string };
+
+/**
+ * One turn a module starts for a person who is not at the keyboard. `text` is the whole user
+ * message; `title` names the run conversation in the person's history.
+ */
+export type LangyStartUnattendedTurnInput = Readonly<{
+  projectId: string;
+  userId: string;
+  /** The same key and text replay the same turn; the same key with other text is refused. */
+  idempotencyKey: string;
+  text: string;
+  title: string;
+}>;
 
 /** One turn a caller holds for; `signal` is the caller's deadline and disconnect. */
 export type LangyTurnSettlementWaitInput = Readonly<{
@@ -313,6 +333,15 @@ export interface LangyApi {
   updateById(input: LangyUpdateByIdInput): Promise<LangyConversationDetail>;
   forkById(input: LangyForkByIdInput): Promise<{ conversation: LangyConversationDetail }>;
   startConversationTurn(input: LangyStartConversationTurnInput): Promise<{
+    conversationId: string;
+    turnId: string;
+  }>;
+  /**
+   * Starts a read-only turn as the person, in a new conversation marked as a run: view
+   * permissions only, as they hold them now, and no GitHub token. A missing person, one
+   * without Langy access or one with nothing to read with is refused, and nothing starts.
+   */
+  startUnattendedTurn(input: LangyStartUnattendedTurnInput): Promise<{
     conversationId: string;
     turnId: string;
   }>;

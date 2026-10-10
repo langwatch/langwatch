@@ -1,12 +1,12 @@
 # @langwatch/insight-process
 
-The server half of [insight](../README.md). The `insight_processing` pipeline, its two Postgres projections and the doors of the inbox.
+The server half of [insight](../README.md). The `insight_processing` pipeline, its two Postgres projections and the doors of the inbox; and the `insight_daily_run` pipeline, whose process carries out one daily run for a person on a board and keeps how it ended.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
 ## Installation
 
-`defineProcessModule("insight").withRepositories(insightRepositories).withApi(InsightModule).withTransports(insightTrpcTransport).withEventing(insightEventing)`, `src/insight.module.ts:8`.
+`defineProcessModule("insight").withRepositories(insightRepositories).withApi(InsightModule).withTransports(insightTrpcTransport).withEventing(insightEventing).withEventing(insightDailyRunEventing).withTasks(…)`, `src/insight.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Each person's own insights in a project. Every operation refuses with `insights_not_enabled` while `release_insights` is off for the project, and an insight another person owns answers `insight_not_found`, exactly as an id no insight has.
 
-Peers call these through the token, declared at `../contract/src/insight.api.ts:13`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/insight.api.ts:14`; nothing else in this package is public.
 
 #### `findInsights`
 
@@ -54,6 +54,22 @@ archiveInsight(input: { projectId: string; insightId: string } & Reader): Promis
 
 ```typescript
 keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
+```
+
+#### `requestDailyRun`
+
+Asks for one daily insights run now, for a person on a board. The worker carries it out as that person, as they are then, and records how it ended; the answer names the run.
+
+```typescript
+requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ runId: string }>;
+```
+
+#### `findDailyRuns`
+
+The reader's own runs in the project, one per board, each with how its last run ended.
+
+```typescript
+findDailyRuns(input: { projectId: string } & Reader): Promise<InsightDailyRun[]>;
 ```
 
 ## REST transport
@@ -116,6 +132,18 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `insight_daily_run` (aggregate `insight_daily_schedule`)
+
+Declared at `src/eventing/insight-daily-run.pipeline.ts:61`. Events: `INSIGHT_DAILY_RUN_EVENT_SCHEMAS`.
+
+| Kind                | Name                                                                    | Handles                     | Declared at                                     |
+| ------------------- | ----------------------------------------------------------------------- | --------------------------- | ----------------------------------------------- |
+| command             | `requestRun`                                                            | –                           | `src/eventing/insight-daily-run.pipeline.ts:67` |
+| command             | `recordRunStarted`                                                      | –                           | `src/eventing/insight-daily-run.pipeline.ts:68` |
+| command             | `settleRun`                                                             | –                           | `src/eventing/insight-daily-run.pipeline.ts:69` |
+| process manager     | `dailyInsightsSchedule`                                                 | intents `runBoard` (outbox) | `src/eventing/insight-daily-run.pipeline.ts:70` |
+| Postgres projection | `≈ createInsightDailyScheduleProjection({ store: deps.scheduleStore })` | –                           | `src/eventing/insight-daily-run.pipeline.ts:66` |
+
 ### Pipeline `insight_processing` (aggregate `insight`)
 
 Declared at `src/eventing/insight.pipeline.ts:39`. Events: `INSIGHT_EVENT_SCHEMAS`.
@@ -128,6 +156,14 @@ Declared at `src/eventing/insight.pipeline.ts:39`. Events: `INSIGHT_EVENT_SCHEMA
 | command             | `keepInsight`                                                  | –       | `src/eventing/insight.pipeline.ts:49` |
 | Postgres projection | `≈ createInsightProjection({ store: deps.insightStore })`      | –       | `src/eventing/insight.pipeline.ts:44` |
 | Postgres projection | `≈ createInsightReaderProjection({ store: deps.readerStore })` | –       | `src/eventing/insight.pipeline.ts:45` |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                        | Class                        | Declared at                                      |
+| --------------------------- | ---------------------------- | ------------------------------------------------ |
+| `insight-daily-run-request` | `InsightDailyRunRequestTask` | `src/tasks/insight-daily-run-request.task.ts:16` |
 
 ## Configuration
 

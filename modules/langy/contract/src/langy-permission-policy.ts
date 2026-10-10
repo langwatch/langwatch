@@ -231,6 +231,16 @@ export function langyCandidatePermissions(): AuthzPermission[] {
   return candidates;
 }
 
+/**
+ * The ceiling of an unattended turn: what Langy may read, and nothing it may write. A run reads
+ * customer trace text with nobody watching, so text that steers it must find no write to use.
+ */
+export function langyReadOnlyPermissions(): AuthzPermission[] {
+  return langyCandidatePermissions().filter(
+    (permission) => splitPermission(permission).action === READ_ACTION,
+  );
+}
+
 /** Splits `resource:action`, tolerating anything that is not in that shape. */
 export function splitPermission(permission: string): {
   family: string;

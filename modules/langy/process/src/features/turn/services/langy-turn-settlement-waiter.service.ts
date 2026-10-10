@@ -94,6 +94,8 @@ export class LangyTurnSettlementWaiterService {
         succeeded: true,
         outcome: event.data.outcome,
         text: extractLangyTextFromParts(event.data.parts),
+        messageId: event.data.messageId,
+        parts: event.data.parts,
         error: null,
       };
     }

@@ -28,6 +28,8 @@ export class LangyTurnBaseDependenciesService {
     requestedConversationId: string | null;
     adoptConversationId?: boolean;
     modelOverride?: string;
+    /** An unattended turn is handed no GitHub token. */
+    unattended?: boolean;
   }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
     await this.refuseOnAggregate(input);
     const results = await this.read(input);
@@ -61,6 +63,7 @@ export class LangyTurnBaseDependenciesService {
       requestedConversationId,
       adoptConversationId,
       modelOverride,
+      unattended,
     } = input;
 
     return Promise.allSettled([
@@ -71,7 +74,12 @@ export class LangyTurnBaseDependenciesService {
         ...(adoptConversationId ? { adoptUnknownId: true } : {}),
       }),
       modelOverride ? Promise.resolve(null) : deps.models.resolve({ projectId }),
-      deps.credentials.getOrProvision({ projectId, session, mintSessionKey: false }),
+      deps.credentials.getOrProvision({
+        projectId,
+        session,
+        mintSessionKey: false,
+        ...(unattended ? { mintGithubToken: false } : {}),
+      }),
       deps.credentials.findEgressAllowlist({ projectId }),
       deps.credentials.resolveMirrorTier({ projectId }),
     ]);

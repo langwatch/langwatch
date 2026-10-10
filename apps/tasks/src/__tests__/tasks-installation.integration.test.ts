@@ -153,6 +153,7 @@ describe("the tasks process installation", () => {
         "stripe-prices-sync",
         "demo-data",
         "trace-destination-report",
+        "insight-daily-run-request",
         "generate-license",
         "model-registry-sync",
         "model-provider-migrate-custom-models",

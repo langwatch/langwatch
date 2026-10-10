@@ -27,10 +27,19 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../dashboard/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -39,7 +48,13 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../langy/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
@@ -51,7 +66,13 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/task/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 
+import type { InsightDailyRun, RequestInsightDailyRunInput } from "./insight-daily-run.ts";
 import type { FileInsightInput, InsightEntry } from "./insight.ts";
 
 /** Who is asking. An insight is read and acted on by its owner alone. */
@@ -23,6 +24,13 @@ export interface InsightApi {
   archiveInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
   /** "Still relevant": back in the reader's inbox, whatever its validity says. */
   keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
+  /**
+   * Asks for one daily insights run now, for a person on a board. The worker carries it out as
+   * that person, as they are then, and records how it ended; the answer names the run.
+   */
+  requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ runId: string }>;
+  /** The reader's own runs in the project, one per board, each with how its last run ended. */
+  findDailyRuns(input: { projectId: string } & Reader): Promise<InsightDailyRun[]>;
 }
 
 export const InsightApi = moduleApi<InsightApi>()("insight");

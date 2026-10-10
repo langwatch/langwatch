@@ -409,6 +409,25 @@ describe("LangyConversationProcess", () => {
       );
       expect(titles).toHaveLength(0);
     });
+
+    /** @scenario "A run conversation keeps the title it was started with" */
+    it("records no automatic title for a run conversation started with its title", async () => {
+      await deliver([
+        conversationStartedEvent({
+          id: "evt_conv",
+          occurredAt: T0,
+          title: "Daily insights - Costs - 2026-10-09",
+          origin: "run",
+        }),
+        ...turnCycle(1, T0 + 1_000),
+      ]);
+
+      expect((await state()).titleSource).toBe("user");
+      const titles = (await store.findMessagesByRef({ ref })).filter(
+        (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
+      );
+      expect(titles).toHaveLength(0);
+    });
   });
 
   describe("given a shutdown handoff (ADR-048)", () => {

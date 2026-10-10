@@ -27,14 +27,35 @@ export class LangyTurnsBoundsService {
   ) {}
 
   /** Counts one turn against the project's window, before the turn is dispatched. */
-  async assertTurnWithinBounds(input: { projectId: string }): Promise<void> {
-    const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
+  assertTurnWithinBounds(input: { projectId: string }): Promise<void> {
+    return this.count({ ...input, key: "langyTurnsPerMinute", counter: "langy-turn" });
+  }
 
-    const requests = await this.deps.entitlement.requestBound({
-      key: "langyTurnsPerMinute",
-      organizationId,
+  /**
+   * Counts one unattended turn against a smaller window of its own, so scheduled runs never
+   * spend the window people chatting with Langy start their turns under.
+   */
+  assertUnattendedTurnWithinBounds(input: { projectId: string }): Promise<void> {
+    return this.count({
+      ...input,
+      key: "langyUnattendedTurnsPerMinute",
+      counter: "langy-unattended-turn",
     });
-    const decision = await this.deps.rateLimits.check(`langy-turn:${input.projectId}`, {
+  }
+
+  private async count({
+    projectId,
+    key,
+    counter,
+  }: {
+    projectId: string;
+    key: "langyTurnsPerMinute" | "langyUnattendedTurnsPerMinute";
+    counter: string;
+  }): Promise<void> {
+    const organizationId = await this.deps.projects.getOrganizationId(projectId);
+
+    const requests = await this.deps.entitlement.requestBound({ key, organizationId });
+    const decision = await this.deps.rateLimits.check(`${counter}:${projectId}`, {
       requests,
       seconds: 60,
     });

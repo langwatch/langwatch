@@ -39,6 +39,6 @@ Anything else dashboard needs belongs to another module and is reached through i
 
 ## Who depends on dashboard
 
-[onboarding](../onboarding/README.md), [ops](../ops/README.md) (as a peer).
+[insight](../insight/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

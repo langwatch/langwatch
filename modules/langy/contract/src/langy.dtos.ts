@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { LANGY_CONVERSATION_ORIGINS } from "./constants.ts";
 import { langyEventCursorSchema } from "./event-sourcing/contracts/cursor.ts";
 import { langyConversationTurnEventSchema } from "./event-sourcing/contracts/turn-wire.ts";
 import { langyMessageRoleSchema } from "./json.ts";
@@ -24,6 +25,8 @@ export const langyConversationListItemSchema = z.object({
   title: z.string().nullable(),
   isShared: z.boolean().default(false),
   isOwn: z.boolean().default(true),
+  /** `run` for a conversation a module started for the person, such as a daily insights run. */
+  origin: z.enum(LANGY_CONVERSATION_ORIGINS).default("interactive"),
   messageCount: z.number().int().nonnegative().default(0),
   lastActivityAtMs: z.number().default(0),
 });

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:279`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -116,6 +116,14 @@ forkById(input: LangyForkByIdInput): Promise<{ conversation: LangyConversationDe
 
 ```typescript
 startConversationTurn(input: LangyStartConversationTurnInput): Promise<{ conversationId: string; turnId: string; }>;
+```
+
+#### `startUnattendedTurn`
+
+Starts a read-only turn as the person, in a new conversation marked as a run: view permissions only, as they hold them now, and no GitHub token. A missing person, one without Langy access or one with nothing to read with is refused, and nothing starts.
+
+```typescript
+startUnattendedTurn(input: LangyStartUnattendedTurnInput): Promise<{ conversationId: string; turnId: string; }>;
 ```
 
 #### `awaitTurnSettlement`
@@ -995,7 +1003,7 @@ interface Input {
   };
   query?: string;
 }
-type Output = z.infer<typeof langyConversationListPageDtoSchema>; // ../contract/src/langy.dtos.ts:97
+type Output = z.infer<typeof langyConversationListPageDtoSchema>; // ../contract/src/langy.dtos.ts:100
 
 // langy.conversationEventsAfter
 // Input: langyEventsAfterInputSchema, ../contract/src/langy-trpc.schemas.ts:61
@@ -1007,7 +1015,7 @@ interface Input {
     eventId: string;
   };
 }
-type Output = z.infer<typeof langyConversationEventPageDtoSchema>; // ../contract/src/langy.dtos.ts:104
+type Output = z.infer<typeof langyConversationEventPageDtoSchema>; // ../contract/src/langy.dtos.ts:107
 
 // langy.detail
 // Input: langyPanelConversationInputSchema, ../contract/src/langy-trpc.schemas.ts:49
@@ -1021,6 +1029,7 @@ type Output = {
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
+  origin: "interactive" | "run";
   messageCount: number;
   lastActivityAtMs: number;
   status: "active" | "running" | "idle" | "failed" | "archived";
@@ -1028,11 +1037,11 @@ type Output = {
 
 // langy.messages
 type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
-type Output = z.infer<typeof langyConversationMessagesDtoSchema>; // ../contract/src/langy.dtos.ts:115
+type Output = z.infer<typeof langyConversationMessagesDtoSchema>; // ../contract/src/langy.dtos.ts:118
 
 // langy.deleteConversation
 type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
-// Output: langyConversationDeletedSchema, ../contract/src/langy.dtos.ts:152
+// Output: langyConversationDeletedSchema, ../contract/src/langy.dtos.ts:155
 interface Output {
   success: boolean;
 }
@@ -1044,12 +1053,13 @@ interface Input {
   conversationId: string;
   title: string;
 }
-// Output: langyConversationDetailSchema, ../contract/src/langy.dtos.ts:40
+// Output: langyConversationDetailSchema, ../contract/src/langy.dtos.ts:43
 interface Output {
   id: string;
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
+  origin: "interactive" | "run";
   messageCount: number;
   lastActivityAtMs: number;
   status: "active" | "running" | "idle" | "failed" | "archived";
@@ -1061,11 +1071,11 @@ interface Input {
   projectId: string;
   conversationId: string;
 }
-type Output = z.infer<typeof langyConversationDetailSchema>; // ../contract/src/langy.dtos.ts:40
+type Output = z.infer<typeof langyConversationDetailSchema>; // ../contract/src/langy.dtos.ts:43
 
 // langy.createConversation
 type Input = z.infer<typeof langyPanelCreateConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:93
-// Output: langyTurnStartedSchema, ../contract/src/langy.dtos.ts:155
+// Output: langyTurnStartedSchema, ../contract/src/langy.dtos.ts:158
 interface Output {
   conversationId: string;
   turnId: string;
@@ -1073,7 +1083,7 @@ interface Output {
 
 // langy.continueConversation
 type Input = z.infer<typeof langyContinueConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:98
-type Output = z.infer<typeof langyTurnStartedSchema>; // ../contract/src/langy.dtos.ts:155
+type Output = z.infer<typeof langyTurnStartedSchema>; // ../contract/src/langy.dtos.ts:158
 
 // langy.stopTurn
 // Input: langyStopTurnPanelInputSchema, ../contract/src/langy-trpc.schemas.ts:103
@@ -1082,7 +1092,7 @@ interface Input {
   conversationId: string;
   turnId: string;
 }
-// Output: langyTurnStoppedSchema, ../contract/src/langy.dtos.ts:161
+// Output: langyTurnStoppedSchema, ../contract/src/langy.dtos.ts:164
 interface Output {
   stopped: boolean;
 }
@@ -1094,7 +1104,7 @@ interface Input {
   conversationId: string;
   actionId: string;
 }
-// Output: langyUiActionClaimedSchema, ../contract/src/langy.dtos.ts:164
+// Output: langyUiActionClaimedSchema, ../contract/src/langy.dtos.ts:167
 interface Output {
   isClaimed: boolean;
 }
@@ -1109,7 +1119,7 @@ interface Input {
   result?: unknown;
   errorCode?: string;
 }
-// Output: langyUiActionCompletedSchema, ../contract/src/langy.dtos.ts:167
+// Output: langyUiActionCompletedSchema, ../contract/src/langy.dtos.ts:170
 interface Output {
   isAccepted: boolean;
 }
@@ -1217,7 +1227,7 @@ interface Input {
   conversationId?: string;
   modelOverride?: string;
 }
-// Output: langyWarmedWorkerSchema, ../contract/src/langy.dtos.ts:170
+// Output: langyWarmedWorkerSchema, ../contract/src/langy.dtos.ts:173
 interface Output {
   conversationId: string | null;
   warmed: boolean;
@@ -1225,7 +1235,7 @@ interface Output {
 
 // langy.modelsAllowed
 type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:47
-// Output: langyModelsAllowedSchema, ../contract/src/langy.dtos.ts:176
+// Output: langyModelsAllowedSchema, ../contract/src/langy.dtos.ts:179
 interface Output {
   modelsAllowed: string[] | null;
 }
@@ -1252,7 +1262,7 @@ interface Input {
 
 // langy.onConversationUpdate
 type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:47
-// Output: langyConversationUpdateFrameSchema, ../contract/src/langy.dtos.ts:181
+// Output: langyConversationUpdateFrameSchema, ../contract/src/langy.dtos.ts:184
 interface Output {
   event: unknown;
   timestamp?: number;
@@ -1351,7 +1361,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:283`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:286`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

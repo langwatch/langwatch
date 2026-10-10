@@ -12,6 +12,7 @@ export function toListItemDto(item: LangyConversationListItem): LangyConversatio
     title: item.title,
     isShared: item.isShared,
     isOwn: item.isOwn,
+    origin: item.origin,
     messageCount: item.messageCount,
     lastActivityAtMs: item.lastActivityAt.epochMilliseconds,
   };

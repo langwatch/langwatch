@@ -212,6 +212,13 @@ export class LangyService {
     return this.turns.startConversationTurn(input);
   }
 
+  /** A turn for a person who is not at the keyboard: read-only, in a run conversation. */
+  startUnattendedTurn(
+    input: LangyStartConversationTurnInput & { unattended: { title: string } },
+  ): Promise<{ conversationId: string; turnId: string }> {
+    return this.turns.startConversationTurn(input);
+  }
+
   warmConversationWorker(input: {
     projectId: string;
     session: LangyCredentialSession;

@@ -83,6 +83,11 @@ export interface StartConversationTurnInput {
   modelOverride?: string;
   isRetry: boolean;
   turnContext: object;
+  /**
+   * Set for a turn nobody is watching: it reads only, holds no GitHub token, and starts a run
+   * conversation under this title.
+   */
+  unattended?: { title: string };
 }
 
 export interface LangyTurnServiceDeps {

@@ -41,6 +41,15 @@ const settledPage = {
   truncated: false,
 };
 
+const settledAnswer = {
+  succeeded: true,
+  outcome: "completed",
+  text: "from the fold",
+  messageId: "msg-1",
+  parts: [{ type: "text", text: "from the fold" }],
+  error: null,
+};
+
 const args = {
   langy: { getEventsAfter: mockGetEventsAfter },
   openBuffer: () => ({
@@ -71,11 +80,31 @@ describe("awaitTurnSettlement", () => {
       pollIntervalMs: 5,
     });
 
+    expect(settlement).toEqual({ kind: "settled", settlement: settledAnswer });
+    expect(mockDisconnect).toHaveBeenCalled();
+  });
+
+  /** @scenario "A settled turn answers its message id and parts" */
+  it("hands back the answer's message id and its parts beside its text", async () => {
+    mockGetEventsAfter.mockResolvedValue(settledPage);
+
+    const settlement = await awaitTurnSettlement({
+      ...args,
+      signal: AbortSignal.timeout(5_000),
+      pollIntervalMs: 5,
+    });
+
     expect(settlement).toEqual({
       kind: "settled",
-      settlement: { succeeded: true, outcome: "completed", text: "from the fold", error: null },
+      settlement: {
+        succeeded: true,
+        outcome: "completed",
+        text: "from the fold",
+        messageId: "msg-1",
+        parts: [{ type: "text", text: "from the fold" }],
+        error: null,
+      },
     });
-    expect(mockDisconnect).toHaveBeenCalled();
   });
 
   it("settles from a terminal already in the buffer", async () => {
@@ -236,10 +265,7 @@ describe("awaitTurnSettlement (user wait)", () => {
         shouldSettleOnUserWait: true,
       });
 
-      expect(settlement).toEqual({
-        kind: "settled",
-        settlement: { succeeded: true, outcome: "completed", text: "from the fold", error: null },
-      });
+      expect(settlement).toEqual({ kind: "settled", settlement: settledAnswer });
       expect(mockGetEventsAfter).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ after: waitingPage.cursor }),

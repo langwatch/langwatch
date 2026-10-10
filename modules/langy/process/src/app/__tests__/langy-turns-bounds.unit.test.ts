@@ -92,8 +92,21 @@ async function harness() {
   const app = await LangyModule.create({
     dependencies: {
       presence: fakePresence(),
-      featureFlags: createApiFixture<FeatureFlagApi>(),
-      users: createApiFixture<UserApi>(),
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
+      users: createApiFixture<UserApi>({
+        findById: async ({ id }) => ({
+          id,
+          name: "Riley",
+          email: "riley@example.test",
+          emailVerified: true,
+          image: null,
+          pendingSsoSetup: false,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          lastLoginAt: null,
+          deactivatedAt: null,
+        }),
+      }),
       github: createApiFixture<GithubApi>(),
       gateway: createApiFixture<GatewayApi>(),
       secrets: createApiFixture<SecretApi>(),
@@ -111,6 +124,16 @@ async function harness() {
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async (projectId) =>
           projectId === "project-enterprise" ? "org-enterprise" : "org-free",
+        findIdentity: async (id) => ({
+          id,
+          name: "Shop",
+          slug: "shop",
+          teamId: "team-1",
+          organizationId: id === "project-enterprise" ? "org-enterprise" : "org-free",
+          isPersonal: false,
+          ownerUserId: null,
+          kind: "application",
+        }),
       }),
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key, organizationId }) =>
@@ -154,10 +177,27 @@ async function harness() {
       turnContext: {},
     });
 
-  return { startTurn, dispatched };
+  const unattendedDispatched = vi
+    .spyOn(app.langyService, "startUnattendedTurn")
+    .mockResolvedValue({ conversationId: "conversation_run", turnId: "turn_run" });
+
+  const startUnattendedTurn = (projectId: string) =>
+    app.startUnattendedTurn({
+      projectId,
+      userId: "user_1",
+      idempotencyKey: `run-${projectId}-${unattendedDispatched.mock.calls.length}`,
+      text: "Read the board.",
+      title: "Daily insights - Costs - 2026-10-09",
+    });
+
+  return { startTurn, dispatched, startUnattendedTurn, unattendedDispatched };
 }
 
 const FREE_TURNS_PER_MINUTE = resolveRequestBound("langyTurnsPerMinute", "FREE");
+const FREE_UNATTENDED_TURNS_PER_MINUTE = resolveRequestBound(
+  "langyUnattendedTurnsPerMinute",
+  "FREE",
+);
 
 describe("LangyModule.startConversationTurn", () => {
   describe("given a free-tier project under its turn ceiling", () => {
@@ -207,6 +247,46 @@ describe("LangyModule.startConversationTurn", () => {
         turnId: "turn_1",
       });
       expect(dispatched).toHaveBeenCalledTimes(FREE_TURNS_PER_MINUTE + 1);
+    });
+  });
+});
+
+describe("LangyModule.startUnattendedTurn", () => {
+  describe("given a project whose unattended turns reached their window", () => {
+    /** @scenario "Unattended turns are counted apart from chat turns" */
+    it("refuses the next unattended turn while a chat turn in the project still starts", async () => {
+      const { startTurn, dispatched, startUnattendedTurn, unattendedDispatched } = await harness();
+      for (let index = 0; index < FREE_UNATTENDED_TURNS_PER_MINUTE; index++) {
+        await expect(startUnattendedTurn("project-free")).resolves.toEqual({
+          conversationId: "conversation_run",
+          turnId: "turn_run",
+        });
+      }
+      unattendedDispatched.mockClear();
+
+      const refusal = await startUnattendedTurn("project-free").catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "langy_turns_rate_limited", httpStatus: 429 });
+      expect(unattendedDispatched).not.toHaveBeenCalled();
+      await expect(startTurn("project-free")).resolves.toEqual({
+        conversationId: "conversation_1",
+        turnId: "turn_1",
+      });
+      expect(dispatched).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a project whose chat turns reached their window", () => {
+    it("still starts an unattended turn", async () => {
+      const { startTurn, startUnattendedTurn } = await harness();
+      for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
+        await startTurn("project-free");
+      }
+
+      await expect(startUnattendedTurn("project-free")).resolves.toEqual({
+        conversationId: "conversation_run",
+        turnId: "turn_run",
+      });
     });
   });
 });

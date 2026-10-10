@@ -58,6 +58,7 @@ function detail(id: string): LangyConversationDetail {
     lastError: null,
     lastModel: "gpt-5-mini",
     eventCursor: null,
+    origin: "interactive",
   };
 }
 

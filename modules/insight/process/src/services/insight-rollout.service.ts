@@ -22,13 +22,17 @@ export class InsightRolloutService {
     return new InsightRolloutService(featureFlags, projects);
   }
 
-  async assertEnabled({ projectId }: { projectId: string }): Promise<void> {
+  async assertEnabled(scope: { projectId: string }): Promise<void> {
+    if (!(await this.isEnabled(scope))) throw new InsightsNotEnabledError();
+  }
+
+  /** For work nobody is waiting on, such as a run: it asks, and skips instead of refusing. */
+  async isEnabled({ projectId }: { projectId: string }): Promise<boolean> {
     const organizationId = await this.projects.getOrganizationId(projectId);
-    const enabled = await this.featureFlags.isEnabled(INSIGHTS_FLAG, {
+    return this.featureFlags.isEnabled(INSIGHTS_FLAG, {
       kind: "project",
       projectId,
       organizationId,
     });
-    if (!enabled) throw new InsightsNotEnabledError();
   }
 }

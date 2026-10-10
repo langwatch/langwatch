@@ -4,6 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   langyCandidatePermissions,
   type LangyCredentialSession,
+  langyReadOnlyPermissions,
   LangySessionKeyScopeError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -17,13 +18,23 @@ export interface LangySessionKeyMetrics {
   record(input: { operation: "minted" | "revoked" | "reaped"; count?: number }): void;
 }
 
+/**
+ * How much of the person's own access a session key may carry: everything Langy may hold for
+ * them (`full`, a chat), or only what it may read (`read`, a turn nobody is watching).
+ */
+type LangySessionKeyCeiling = "full" | "read";
+
+type LangySessionKeyMintInput = {
+  session: LangyCredentialSession;
+  projectId: string;
+  organizationId: string;
+  /** Absent means `full`. */
+  ceiling?: LangySessionKeyCeiling;
+};
+
 /** Mints and revokes the restricted worker session credential. */
 export abstract class LangySessionKey {
-  abstract mint(input: {
-    session: LangyCredentialSession;
-    projectId: string;
-    organizationId: string;
-  }): Promise<{ token: string; apiKeyId: string }>;
+  abstract mint(input: LangySessionKeyMintInput): Promise<{ token: string; apiKeyId: string }>;
   abstract revoke(input: { apiKeyId: string; projectId: string }): Promise<void>;
 }
 
@@ -36,6 +47,27 @@ const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
  * 403s came from lines nobody remembered to add.
  */
 export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissions());
+
+/** The same ceiling with every write taken out: what an unattended turn's key may ask for. */
+export const LANGY_READ_ONLY_PERMISSIONS = Object.freeze(langyReadOnlyPermissions());
+
+const CEILING_PERMISSIONS = {
+  full: LANGY_CANDIDATE_PERMISSIONS,
+  read: LANGY_READ_ONLY_PERMISSIONS,
+} as const;
+
+const KEY_DESCRIPTION = {
+  full: [
+    "Ephemeral per-session key for the Langy assistant.",
+    "Mirrors your own permissions in this project and auto-expires.",
+    "Revoked automatically when it lapses.",
+  ].join(" "),
+  read: [
+    "Ephemeral read-only key for a Langy run started on your behalf.",
+    "Holds only what you may view in this project and auto-expires.",
+    "Revoked automatically when it lapses.",
+  ].join(" "),
+} as const;
 
 type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_found" | "refused";
 
@@ -67,11 +99,8 @@ export class LangySessionKeyService extends LangySessionKey {
     return new LangySessionKeyService(input);
   }
 
-  async mint(input: {
-    session: LangyCredentialSession;
-    projectId: string;
-    organizationId: string;
-  }): Promise<{ token: string; apiKeyId: string }> {
+  async mint(input: LangySessionKeyMintInput): Promise<{ token: string; apiKeyId: string }> {
+    const ceiling = input.ceiling ?? "full";
     const scope = await this.repository.getProjectScope(input.projectId).catch((error: unknown) => {
       if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
       throw error;
@@ -89,7 +118,7 @@ export class LangySessionKeyService extends LangySessionKey {
           })
         : [];
     const heldPermissions = new Set(permissions);
-    const permissionsToGrant = LANGY_CANDIDATE_PERMISSIONS.filter((permission) =>
+    const permissionsToGrant = CEILING_PERMISSIONS[ceiling].filter((permission) =>
       heldPermissions.has(permission),
     );
     if (permissionsToGrant.length === 0) {
@@ -101,11 +130,7 @@ export class LangySessionKeyService extends LangySessionKey {
     const result = await this.apiKeys.create({
       isSystemManaged: true,
       name: LANGY_SESSION_API_KEY_NAME,
-      description: [
-        "Ephemeral per-session key for the Langy assistant.",
-        "Mirrors your own permissions in this project and auto-expires.",
-        "Revoked automatically when it lapses.",
-      ].join(" "),
+      description: KEY_DESCRIPTION[ceiling],
       userId: input.session.user.id,
       createdByUserId: input.session.user.id,
       organizationId: input.organizationId,

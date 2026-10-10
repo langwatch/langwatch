@@ -396,6 +396,22 @@ export class LangyApiIdentityDeniedError extends HandledError {
   }
 }
 
+/**
+ * An unattended turn's person cannot be acted as: no such user, or Langy is not released to
+ * them in the project. Refused before anything is counted, minted or started.
+ */
+export class LangyUnattendedTurnRefusedError extends HandledError {
+  declare readonly code: "langy_unattended_actor_missing" | "langy_unattended_no_langy_access";
+  constructor(code: "langy_unattended_actor_missing" | "langy_unattended_no_langy_access") {
+    super(code, "Langy cannot run for this person in this project.", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation(code),
+    });
+    this.name = "LangyUnattendedTurnRefusedError";
+  }
+}
+
 /** The body did not parse against the turn schema. */
 export class LangyApiRequestInvalidError extends HandledError {
   declare readonly code: "langy_api_request_invalid";

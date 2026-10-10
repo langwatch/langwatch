@@ -60,6 +60,12 @@ const tips: Record<string, readonly string[]> = {
   langy_api_actor_missing: [
     "The user who owns this key no longer exists — mint a new key under a current user",
   ],
+  langy_unattended_actor_missing: [
+    "The person this run acts as no longer exists, so the run has nobody to read as",
+  ],
+  langy_unattended_no_langy_access: [
+    "Langy is not released to this person in this project, so nothing can run for them",
+  ],
   langy_api_request_invalid: [
     "Read the `issues` array in `meta` — it names the field that failed and why",
   ],

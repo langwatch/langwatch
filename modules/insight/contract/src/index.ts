@@ -1,5 +1,7 @@
 export * from "./insight.ts";
 export * from "./insight.constants.ts";
+export * from "./insight-daily-run.ts";
+export * from "./insight-daily-run.events.ts";
 export * from "./insight.events.ts";
 export * from "./insight.errors.ts";
 export * from "./insight-inbox.ts";

@@ -7,7 +7,13 @@
  */
 import { assert, describe, expect, it } from "vitest";
 
-import { classifyForLangy, LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langy-permission-policy.ts";
+import {
+  classifyForLangy,
+  LANGY_AUTH_SCOPE_FAMILY_NAMES,
+  langyCandidatePermissions,
+  langyReadOnlyPermissions,
+  splitPermission,
+} from "../langy-permission-policy.ts";
 
 // The cross-products live at module scope rather than as loops inside the
 // `it`. Nested `describe`s already put a test body four levels deep, so a
@@ -194,6 +200,21 @@ describe("classifyForLangy", () => {
         expect(classifyForLangy("nonsense").disposition).toBe("excluded");
         expect(classifyForLangy("").disposition).toBe("excluded");
       });
+    });
+  });
+});
+
+describe("langyReadOnlyPermissions", () => {
+  describe("when the ceiling of an unattended turn is derived", () => {
+    it("holds every view permission Langy may hold, and no other action", () => {
+      const readOnly = langyReadOnlyPermissions();
+      const views = langyCandidatePermissions().filter(
+        (permission) => splitPermission(permission).action === "view",
+      );
+
+      expect(readOnly).toEqual(views);
+      expect(readOnly).toContain("traces:view");
+      expect(readOnly.length).toBeGreaterThan(0);
     });
   });
 });

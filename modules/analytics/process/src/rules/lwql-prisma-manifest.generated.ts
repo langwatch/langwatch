@@ -772,6 +772,31 @@ export interface LwqlPrismaRows {
     readonly lastEventId: "String";
     readonly projectionVersion: "String";
   };
+  readonly InsightDailyScheduleProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly userId: "String";
+    readonly boardKind: "String";
+    readonly boardId: "String";
+    readonly boardName: "String";
+    readonly state: "String";
+    readonly hour: "Int?";
+    readonly timezone: "String?";
+    readonly maxInsights: "Int?";
+    readonly lastRunId: "String?";
+    readonly lastRunAt: "Float?";
+    readonly lastRunOutcome: "String?";
+    readonly lastRunReason: "String?";
+    readonly lastRunFiled: "Int?";
+    readonly lastRunRenewed: "Int?";
+    readonly lastRunConversationId: "String?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
   readonly SavedView: {
     readonly id: "String";
     readonly projectId: "String";
@@ -1067,6 +1092,7 @@ export interface LwqlPrismaRows {
     readonly UserId: "String";
     readonly Title: "String?";
     readonly TitleSource: "LangyProjectionTitleSource";
+    readonly Origin: "String";
     readonly Status: "String";
     readonly IsShared: "Boolean";
     readonly SharedAt: "Float?";

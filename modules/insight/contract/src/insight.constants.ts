@@ -53,3 +53,29 @@ export const INSIGHT_PIPELINE_NAME = "insight_processing";
 
 /** The release flag the inbox, its chrome and its procedures sit behind. */
 export const INSIGHTS_FLAG = "release_insights";
+
+/**
+ * The daily run pipeline's names. One aggregate per person and board, the project is the
+ * tenant, and the run's request, start and outcome ride on its stream.
+ * @see modules/insight/adrs/004-daily-run.md
+ */
+export const INSIGHT_DAILY_RUN_EVENT_TYPES = {
+  RUN_REQUESTED: "lw.insight.daily_schedule.run_requested",
+  RUN_STARTED: "lw.insight.daily_schedule.run_started",
+  RUN_SETTLED: "lw.insight.daily_schedule.run_settled",
+} as const;
+
+export const INSIGHT_DAILY_RUN_COMMAND_TYPES = {
+  REQUEST_RUN: "lw.insight.daily_schedule.request_run",
+  RECORD_RUN_STARTED: "lw.insight.daily_schedule.record_run_started",
+  SETTLE_RUN: "lw.insight.daily_schedule.settle_run",
+} as const;
+
+/** One calendar version for the three run events. */
+export const INSIGHT_DAILY_RUN_EVENT_VERSION = "2026-10-10";
+
+export const INSIGHT_DAILY_SCHEDULE_PROJECTION_VERSION = "2026-10-10";
+
+export const INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE = "insight_daily_schedule";
+
+export const INSIGHT_DAILY_RUN_PIPELINE_NAME = "insight_daily_run";
