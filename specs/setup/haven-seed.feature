@@ -115,6 +115,13 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And the seeded admin is a member of every one of them
 
   @unit
+  Scenario: An org asked for with admin=no is one the seeded admin is outside
+    When I run "haven seed --org name=sso-test-org,plan=licence,owner=admin@acme1.test,admin=no --org name=free-test-org"
+    Then sso-test-org is created and licensed without admitting the seeded admin
+    And the seeded admin still joins free-test-org
+    And an admin= value other than no or yes is refused naming --org
+
+  @unit
   Scenario: haven seed --into sends telemetry into one existing project
     When I run "haven seed --into <org-id>/<project-id>"
     Then no user, org, project or membership is created
@@ -201,6 +208,28 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     Given sending has been paused for 10 minutes
     Then the seed exits 4 "stalled", naming the signal and its value
     And "haven seed --resume" continues from the last acknowledged action without duplicating data
+
+  @unit
+  Scenario: The seed waits only for its own data to land
+    Given the stack's worker also holds other tenants' jobs and jobs deferred by minutes
+    When the seed has sent its last action
+    Then it waits until none of its own organizations' or projects' jobs are due or running
+    And a job deferred past a minute (trace origin's fallback) is counted, not waited on
+    And a job group of the seed's the worker blocked fails the run, naming it
+
+  @unit
+  Scenario: Identity lands before telemetry and a temporary refusal is retried
+    When a seed sends its organizations, members and grants, then its telemetry
+    Then no telemetry is sent until every identity action has answered
+    And an identity action refused as retryable is sent again with back-off
+    And one still refused is left unacknowledged, so a re-run sends it again
+    And a project an earlier run made is not sent its telemetry again, so a re-run duplicates nothing
+
+  @unit
+  Scenario: A failed seed says why on its last line
+    When seedgen exits non-zero
+    Then haven's last line names seedgen's reason, and "haven seed status" shows it too
+    And plain output such as a build note or the run summary shows line by line, never as one error line
 
   @unit
   Scenario: The seed refuses a plan that cannot fit

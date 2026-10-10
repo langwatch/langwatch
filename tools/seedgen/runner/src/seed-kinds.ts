@@ -66,7 +66,7 @@ type SeedRefs = Record<string, string>;
  * `retry` names a refusal seedgen retries with back-off (a queue or store was not reachable);
  * `refused` one it does not.
  */
-type SeedOutcome = { refs: SeedRefs } | { retry: string } | { refused: string };
+type SeedOutcome = { refs: SeedRefs; existing?: boolean } | { retry: string } | { refused: string };
 type SeedKind = (input: {
   action: SeedAction;
   apis: SeedApis;
@@ -210,7 +210,8 @@ export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
         },
         { id: as },
       ));
-    return { refs: { [ref]: project.id } };
+    // A project found, not made, was filled by the run that made it: seedgen sends it no telemetry.
+    return { refs: { [ref]: project.id }, existing: existing !== undefined };
   },
   /**
    * Admits a user as the owner would: a membership row with the owner's admission (a grant alone
@@ -343,10 +344,17 @@ export async function applySeedAction({
     if ("retry" in outcome) return refusal({ action, code: outcome.retry, retryable: true });
     if ("refused" in outcome) return refusal({ action, code: outcome.refused, retryable: false });
     const minted = Object.keys(outcome.refs).length > 0;
-    return { id: action.id, ok: true, ...(minted ? { refs: outcome.refs } : {}) };
+    return {
+      id: action.id,
+      ok: true,
+      ...(minted ? { refs: outcome.refs } : {}),
+      ...(outcome.existing ? { existing: true } : {}),
+    };
   } catch (error) {
     if (error instanceof HandledError) {
-      return refusal({ action, code: error.code, retryable: error.retryable });
+      // A 503 is the product saying "not yet" (a projection lagging the read-your-writes window).
+      const retryable = error.retryable || error.httpStatus === 503;
+      return refusal({ action, code: error.code, retryable });
     }
     if (error instanceof z.ZodError) {
       return refusal({ action, code: "malformed_seed_action", retryable: false });

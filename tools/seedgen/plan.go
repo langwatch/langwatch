@@ -34,6 +34,7 @@ type Org struct {
 	Name     string
 	Plan     string // "licence" seeds an Enterprise licence; anything else leaves the product's default
 	Private  bool
+	NoAdmin  bool // the seeded admin is not admitted (--org admin=no)
 	Projects []*Project
 	Users    []User
 	curve    Curve
@@ -72,7 +73,7 @@ func NewPlan(flags Flags) (*Plan, error) {
 	case len(flags.Orgs) > 0:
 		for _, spec := range flags.Orgs {
 			org := plan.newOrg(spec.Persona, spec.Name, false)
-			org.Key, org.Plan = spec.Name, spec.Plan // the org is named as asked; its users' emails derive from the name
+			org.Key, org.Plan, org.NoAdmin = spec.Name, spec.Plan, spec.NoAdmin // named as asked; users' emails derive from the name
 			plan.fill(org, 1, spec.Users)
 			if spec.Owner != "" {
 				org.Users[0].Email = spec.Owner
@@ -257,7 +258,7 @@ func (w *walker) identity() bool {
 		}
 	}
 	for _, org := range w.plan.Orgs {
-		actions := org.actions(w.plan.Flags.Days, w.plan.Flags.Admin != "")
+		actions := org.actions(w.plan.Flags.Days, w.plan.Flags.Admin != "" && !org.NoAdmin)
 		for i := range actions {
 			if !w.emit(Step{Action: &actions[i]}) {
 				return false
@@ -335,7 +336,8 @@ func (t *telemetry) cell(i, hour int) (Cell, bool) {
 		Spans: spans, Logs: spans, MetricPoints: 2 * spans}, spans > 0
 }
 
-// AdminRef is the seeded admin's ref: one account, a member of every org the seed creates.
+// AdminRef is the seeded admin's ref: one account, a member of every org the seed creates but one
+// asked for with admin=no.
 const AdminRef = "$user:admin"
 
 // orgRoles maps a plan role to the member row's role; a viewer holds a Lite (EXTERNAL) seat.

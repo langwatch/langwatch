@@ -26,7 +26,7 @@ func seedSpec() commandSpec {
 		{long: "--conversations", takesValue: true, value: "<n>", summary: "long conversations per project (default 1)"},
 		{long: "--turns", takesValue: true, value: "<n>", summary: "turns in each conversation, one trace each (default 15)"},
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
-		{long: "--org", takesValue: true, value: "name=..,plan=free,users=N[,persona=..]", summary: "create this org instead of the tier's (repeatable)"},
+		{long: "--org", takesValue: true, value: "name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]", summary: "create this org instead of the tier's (repeatable)"},
 		{long: "--into", takesValue: true, value: "<org-id>/<project-id>", summary: "send telemetry only, into an existing project"},
 		{long: "--live", summary: "stream a gentle live load into the last seed's orgs"},
 		{long: "--dry-run", summary: "print the plan's counts, rows, bytes and duration; write nothing"},

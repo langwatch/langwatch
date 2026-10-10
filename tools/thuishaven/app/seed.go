@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -69,6 +70,7 @@ type seedStatus struct {
 	StartedAt  time.Time `json:"startedAt"`
 	FinishedAt time.Time `json:"finishedAt,omitzero"`
 	Exit       int       `json:"exit,omitempty"`
+	Reason     string    `json:"reason,omitempty"` // seedgen's own line saying why it failed
 }
 
 func (o *Orchestrator) seedStatusPath(slug string) string {
@@ -128,6 +130,9 @@ func (o *Orchestrator) SeedStatusLine(slug string) string {
 	case state == "done" || state == "failed":
 		state = fmt.Sprintf("%s in %s (exit %d)", state, st.FinishedAt.Sub(st.StartedAt).Round(time.Second), st.Exit)
 	}
+	if st.Reason != "" {
+		state += ": " + st.Reason
+	}
 	return fmt.Sprintf("seed: %s [%s]", state, strings.Join(st.Args, " "))
 }
 
@@ -177,7 +182,9 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, req SeedRequest) er
 	env := append(o.seedEnv(p), "DOTENV_CONFIG_QUIET=true")
 	code := o.runSeedgen(ctx, seedTarget{Slug: slug, Dir: st.WorktreeDir, Env: env}, req.Args)
 	if code != 0 {
-		return &SeedExit{Code: code, Err: fmt.Errorf("haven seed: seedgen exited %d; `haven seed status` shows the last run", code)}
+		st, _ := o.readSeedStatus(slug)
+		return &SeedExit{Code: code, Err: fmt.Errorf("haven seed: seedgen exited %d: %s", code,
+			cmp.Or(st.Reason, "see `haven logs seed`"))}
 	}
 	return o.printSeedAccess(p, req.JSON, req.Reveal)
 }
@@ -208,6 +215,10 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 	env = append(env, o.licenceEnv(t.Slug, resolvedDevEnv(t.Dir), true)...)
 	err := o.sup.RunOnce(ctx, "seed", t.Dir, shell, env)
 	status.Exit, status.FinishedAt = exitCodeOf(err), o.sys.Now()
+	if dir := o.seedRunDir(t.Slug, args); err != nil && dir != "" {
+		reason, _ := os.ReadFile(filepath.Join(dir, seedgen.FailureFile))
+		status.Reason = strings.TrimSpace(string(reason))
+	}
 	if status.Exit < 0 {
 		status.Exit = 1
 	}
@@ -228,20 +239,28 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 // runRecordArgs points seedgen at this stack's record of the run args plan; a run seen before
 // resumes from its checkpoint, so seeding again sends nothing twice.
 func (o *Orchestrator) runRecordArgs(slug string, args []string) []string {
-	flags, err := seedgen.ParseFlags(args, o.sys.Now().UTC().Truncate(time.Hour))
-	if err != nil || o.cfg.Home == "" {
+	dir := o.seedRunDir(slug, args)
+	if dir == "" {
 		return args // seedgen refuses the same flags itself, with exit 2
 	}
-	plan, err := seedgen.NewPlan(flags)
-	if err != nil {
-		return args
-	}
-	dir := filepath.Join(o.seedRunsDir(slug), plan.Run)
 	record := append(slices.Clone(args), "--run-dir", dir)
 	if _, err := os.Stat(filepath.Join(dir, "run.json")); err == nil {
 		record = append(record, "--resume")
 	}
 	return record
+}
+
+// seedRunDir is this stack's record directory for the run args plan, "" when they plan nothing.
+func (o *Orchestrator) seedRunDir(slug string, args []string) string {
+	flags, err := seedgen.ParseFlags(args, o.sys.Now().UTC().Truncate(time.Hour))
+	if err != nil || o.cfg.Home == "" {
+		return ""
+	}
+	plan, err := seedgen.NewPlan(flags)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(o.seedRunsDir(slug), plan.Run)
 }
 
 // AutoSeed runs after an up's identity seed (design §9.1). It seeds a stack that was never seeded

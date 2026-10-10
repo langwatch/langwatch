@@ -33,6 +33,7 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And a project is created by the owner in the main team through the project API
     And a member is admitted by the owner as a membership row, given its role, then added to the main team
     And anything an earlier run created is found and returned instead of created again
+    And a project found rather than created is marked existing, so seedgen sends it no telemetry again
 
   @unit
   Scenario: A licence org is put on Enterprise through the licensing API
@@ -80,6 +81,12 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     Given a telemetry export whose ingestion failed or whose store was unavailable
     When the action is applied
     Then the reply is a retryable refusal
+
+  @unit
+  Scenario: A refusal the product marks as temporary is retried
+    Given a module API operation refuses with a handled 503, such as an access change its projection has not confirmed
+    When the action is applied
+    Then the reply is a retryable refusal, so seedgen tries it again
 
   @unit
   Scenario: An unknown kind or malformed input is refused without calling any API

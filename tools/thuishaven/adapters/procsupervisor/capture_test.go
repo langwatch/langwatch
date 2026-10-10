@@ -143,3 +143,24 @@ func TestAChildThatPrintsAHugeLineIsNotBlocked(t *testing.T) {
 		t.Errorf("captured %d bytes of the huge line, want all 2000000", got)
 	}
 }
+
+// A build note or a run's summary is plain output: each line shows as itself, never folded into
+// one error line. Only a run holding a stack frame is a crash, collapsed at error.
+func TestPlainRawRunsShowLineByLineAndOnlyCrashesCollapse(t *testing.T) {
+	c, _ := captureSink(t)
+	c.stream(strings.NewReader("ensure-built: building @langwatch/mail\nbuilt in 9s\nseeded: 3 orgs\n"))
+	plain := strings.Join(c.preview.lines, "\n")
+	if len(c.preview.lines) != 3 || strings.Contains(plain, "error") || strings.Contains(plain, "+2 lines") {
+		t.Errorf("plain run rendered as %q, want three lines and no error", c.preview.lines)
+	}
+	c.preview.lines = nil
+	c.stream(strings.NewReader(strings.Repeat("CJS dist/index.js 60 KB\n", 20)))
+	if len(c.preview.lines) != 1 || strings.Contains(c.preview.lines[0], "error") {
+		t.Errorf("a build's burst rendered as %q, want one info line", c.preview.lines)
+	}
+	c.preview.lines = nil
+	c.stream(strings.NewReader("file:///x.js:1\nSyntaxError: boom\n    at load (node:internal)\n"))
+	if len(c.preview.lines) != 1 || !strings.Contains(c.preview.lines[0], "error") {
+		t.Errorf("crash rendered as %q, want one collapsed error line", c.preview.lines)
+	}
+}

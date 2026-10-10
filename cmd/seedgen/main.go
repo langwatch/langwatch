@@ -14,7 +14,7 @@ import (
 
 const usage = "usage: seedgen plan|run [--size tiny|small|medium|large] [--spans N] [--days D] " +
 	"[--persona startup,enterprise,gateway,agent-eval|all] [--private N] [--seed S] [--anchor RFC3339] " +
-	"[--shape saas|sh-licensed|sh-free] [--org name=..,plan=free,users=N,persona=..]... [--into ORG_ID/PROJECT_ID] " +
+	"[--shape saas|sh-licensed|sh-free] [--org name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]]... [--into ORG_ID/PROJECT_ID] " +
 	"[--admin EMAIL (default LANGWATCH_ADMIN_EMAIL)] [--dry-run]\n" +
 	"       run only: [--executor task|door] [--app URL] [--run-dir DIR] [--resume]\n       seedgen coverage --static [--manifest FILE] [--json]"
 

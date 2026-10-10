@@ -75,7 +75,8 @@ type Flags struct {
 	DryRun bool   `json:"-"`
 }
 
-// OrgSpec is one --org: name=..,plan=..,users=N[,persona=..][,owner=EMAIL]; users counts the owner.
+// OrgSpec is one --org: name=..,plan=..,users=N[,persona=..][,owner=EMAIL][,admin=no]; users counts
+// the owner.
 type OrgSpec struct {
 	Name    string `json:"name"`
 	Plan    string `json:"plan"`
@@ -83,6 +84,8 @@ type OrgSpec struct {
 	Persona string `json:"persona"`
 	// Owner, when set, is the owner's email, e.g. an idpsim tenant's admin so the org can bind that tenant.
 	Owner string `json:"owner,omitempty"`
+	// NoAdmin (admin=no) keeps the seeded admin out of this org, so testers have an org they are outside.
+	NoAdmin bool `json:"noAdmin,omitempty"`
 }
 
 // OrgPlans are the plans an --org may name: licence is an Enterprise licence signed by the
@@ -101,7 +104,7 @@ func ParseOrgSpec(value string) (OrgSpec, error) {
 	for part := range strings.SplitSeq(value, ",") {
 		key, field, ok := strings.Cut(part, "=")
 		if !ok {
-			return spec, refuse("name=..,plan=..,users=N,persona=..,owner=.. pairs")
+			return spec, refuse("name=..,plan=..,users=N,persona=..,owner=..,admin=no pairs")
 		}
 		switch key {
 		case "name":
@@ -112,6 +115,11 @@ func ParseOrgSpec(value string) (OrgSpec, error) {
 			spec.Persona = field
 		case "owner":
 			spec.Owner = field
+		case "admin":
+			if field != "no" && field != "yes" {
+				return spec, refuse("admin=no or admin=yes")
+			}
+			spec.NoAdmin = field == "no"
 		case "users":
 			n, err := strconv.Atoi(field)
 			if err != nil {
@@ -119,7 +127,7 @@ func ParseOrgSpec(value string) (OrgSpec, error) {
 			}
 			spec.Users = n
 		default:
-			return spec, refuse("the keys name, plan, users, persona and owner")
+			return spec, refuse("the keys name, plan, users, persona, owner and admin")
 		}
 	}
 	switch {

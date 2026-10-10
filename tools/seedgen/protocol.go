@@ -32,6 +32,8 @@ type Reply struct {
 	Refs      map[string]string `json:"refs,omitempty"`
 	Code      string            `json:"code,omitempty"`
 	Retryable bool              `json:"retryable,omitempty"`
+	// Existing says the action found what it names instead of creating it (a re-run).
+	Existing bool `json:"existing,omitempty"`
 }
 
 // WriteAction writes one action as an NDJSON line.

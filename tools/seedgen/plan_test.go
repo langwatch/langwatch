@@ -355,6 +355,30 @@ func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
 	}
 }
 
+// @scenario "An org asked for with admin=no is one the seeded admin is outside"
+func TestAdminNoKeepsTheAdminOutOfThatOrg(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--admin", "admin@example.test",
+		"--org", "name=sso-test-org,plan=licence,owner=admin@acme1.test,admin=no",
+		"--org", "name=free-test-org")
+	joined, licensed := map[string]bool{}, map[string]bool{}
+	for step := range plan.Steps() {
+		if a := step.Action; a != nil && a.Kind == KindMemberAdd && strings.Contains(string(a.Input), AdminRef) {
+			joined[a.Org] = true
+		} else if a != nil && a.Kind == KindLicenseIssue {
+			licensed[a.Org] = true
+		}
+	}
+	if joined["$org:sso-test-org"] || !licensed["$org:sso-test-org"] {
+		t.Errorf("sso-test-org: admin joined %v, licensed %v; want outside and licensed", joined["$org:sso-test-org"], licensed["$org:sso-test-org"])
+	}
+	if !joined["$org:free-test-org"] {
+		t.Error("the seeded admin must still join free-test-org")
+	}
+	if _, err := ParseFlags([]string{"--org", "name=acme,admin=maybe"}, anchor); !isFlagError(err, "org") {
+		t.Errorf("admin=maybe: want a refusal naming --org, got %v", err)
+	}
+}
+
 func (p *Plan) orgNamed(ref string) *Org {
 	for _, org := range p.Orgs {
 		if org.Ref == ref {

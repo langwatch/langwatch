@@ -31,6 +31,14 @@ class SeedTestRefusal extends HandledError {
   }
 }
 
+class SeedTestNotYet extends HandledError {
+  declare readonly code: "seed_test_not_yet";
+
+  constructor() {
+    super("seed_test_not_yet", "not confirmed in time", { httpStatus: 503 });
+  }
+}
+
 const grant = {
   principal: { userId: "user_1" },
   role: "ADMIN",
@@ -364,6 +372,7 @@ describe("seed:apply", () => {
         { "$project:p": "project_old" },
       ]),
     );
+    expect(replies.find((reply) => reply.id === "r/3")).toMatchObject({ existing: true });
     expect(apis.user.create).not.toHaveBeenCalled();
     expect(apis.organization.createAndAssign).not.toHaveBeenCalled();
     expect(apis.project.create).not.toHaveBeenCalled();
@@ -585,6 +594,22 @@ describe("seed:apply", () => {
       { id: "r/1", ok: false, code: "seed_test_refusal", retryable: true },
       { id: "r/2", ok: true },
     ]);
+  });
+
+  /** @scenario "A refusal the product marks as temporary is retried" */
+  it("refuses a handled 503 as retryable", async () => {
+    const apis = seedApis({
+      dataRetention: createApiFixture<DataRetentionApi>({
+        setForScope: vi.fn(async () => {
+          throw new SeedTestNotYet();
+        }),
+      }),
+    });
+    const [reply] = await applyLines({
+      apis,
+      lines: [{ id: "r/1", kind: "retention.set", org: "org_1", input: { days: 49 } }],
+    });
+    expect(reply).toEqual({ id: "r/1", ok: false, code: "seed_test_not_yet", retryable: true });
   });
 
   /** @scenario "Telemetry the ingest queue could not take is refused as retryable" */

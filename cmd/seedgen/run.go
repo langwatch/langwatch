@@ -78,8 +78,11 @@ func runSeed(options runOptions, plan *seedgen.Plan, out streams) int {
 	stdout, stderr := out.stdout, out.stderr
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	failure := filepath.Join(options.runDir, seedgen.FailureFile)
+	_ = os.Remove(failure)
 	fail := func(code int, err error) int {
 		_, _ = fmt.Fprintf(stderr, "seedgen run: %v\n", err)
+		_ = os.WriteFile(failure, []byte(err.Error()+"\n"), 0o600) //nolint:gosec // seedgen's own --run-dir; haven ends its last line with it
 		return code
 	}
 	checkpointPath := filepath.Join(options.runDir, "run.json")
@@ -98,8 +101,12 @@ func runSeed(options runOptions, plan *seedgen.Plan, out streams) int {
 	if err != nil {
 		return fail(1, err)
 	}
-	result, err := seedgen.Run(ctx, seedgen.RunConfig{Plan: plan, Executor: executor, Checkpoint: checkpoint,
-		Path: checkpointPath, Sensors: seedgen.StackSensors(options.app), Log: stderr, Drain: options.app != ""})
+	config := seedgen.RunConfig{Plan: plan, Executor: executor, Checkpoint: checkpoint,
+		Path: checkpointPath, Sensors: seedgen.StackSensors(options.app), Log: stderr, Drain: options.app != ""}
+	if redis := os.Getenv("REDIS_URL"); redis != "" {
+		config.Backlog = seedgen.QueueBacklog(redis)
+	}
+	result, err := seedgen.Run(ctx, config)
 	_ = executor.Close()
 	printResult(stdout, result)
 	printSeeded(stdout, checkpoint)
@@ -198,6 +205,13 @@ func printResult(w io.Writer, result seedgen.Result) {
 	_, _ = fmt.Fprintf(w, "sent %d actions and %d cells (%d spans, %d logs, %d metric points) in %s; drained in %s\n",
 		result.Actions, result.Cells, result.Spans, result.Logs, result.MetricPoints, result.Sent.Round(1e6),
 		result.Drained.Round(1e6))
+	if result.SkippedCells > 0 {
+		_, _ = fmt.Fprintf(w, "skipped %d cells: their projects were made, and filled, by an earlier run\n", result.SkippedCells)
+	}
+	if result.Deferred > 0 {
+		_, _ = fmt.Fprintf(w, "%d of the seed's jobs are deferred past %s (trace origin's fallback); they run later\n",
+			result.Deferred, seedgen.DrainHorizon)
+	}
 	if total := (result.Sent + result.Drained).Seconds(); total > 0 {
 		_, _ = fmt.Fprintf(w, "rate: %.0f spans/s sent, %.0f spans/s sent and drained, %.1f actions/s\n",
 			float64(result.Spans)/result.Sent.Seconds(), float64(result.Spans)/total, float64(result.Actions)/result.Sent.Seconds())
