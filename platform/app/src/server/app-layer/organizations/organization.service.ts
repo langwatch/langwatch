@@ -30,7 +30,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../../api/enterprise";
-import { getApp } from "../app";
+import { getApp, tryGetApp } from "../app";
 import { grantsService } from "../authz/runtime";
 import type { PlanProviderUser } from "../subscription/plan-provider";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
@@ -624,6 +624,13 @@ export class OrganizationService {
       organizationId: params.organizationId,
       userId: params.userId,
     });
+    // ADR-144 block E: offboarding archived the member's personal project,
+    // which no aggregate may read any more. After the offboard has committed,
+    // and never failing it: the member is gone either way, and each
+    // aggregate's nightly sweep is the retry.
+    await tryGetApp()?.projects.aggregateReconciler?.reconcileOrganizationOrLog(
+      { organizationId: params.organizationId, trigger: "member-offboarded" },
+    );
   }
 
   /**

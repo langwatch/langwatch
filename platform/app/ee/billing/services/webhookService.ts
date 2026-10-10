@@ -19,6 +19,7 @@ import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
 import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
+import { fireSubscriptionStartedAnalytics } from "../subscriptionStarted.analytics";
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
@@ -780,44 +781,10 @@ export class EEWebhookService implements WebhookService {
       const shouldNotify =
         existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
 
-      let tracesQuantity: number | null = null;
-      let usersQuantity: number | null = null;
-
-      for (const item of subscription.items.data) {
-        if (isGrowthSeatPrice(item.price.id)) {
-          usersQuantity = item.quantity ?? 0;
-        } else if (isGrowthEventsPrice(item.price.id)) {
-          // Events price exists on the subscription; traces limit comes from plan limits
-        } else if (
-          item.price.id === this.itemCalculator.prices.LAUNCH_USERS ||
-          item.price.id === this.itemCalculator.prices.ACCELERATE_USERS ||
-          item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_USERS ||
-          item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_USERS
-        ) {
-          const calculateQuantity =
-            this.itemCalculator.calculateQuantityForPrice({
-              priceId: item.price.id,
-              quantity: item.quantity ?? 0,
-              plan: existingSubForUpdate.plan,
-            });
-          usersQuantity = calculateQuantity;
-        } else if (
-          item.price.id === this.itemCalculator.prices.ACCELERATE_TRACES_100K ||
-          item.price.id === this.itemCalculator.prices.LAUNCH_TRACES_10K ||
-          item.price.id ===
-            this.itemCalculator.prices.LAUNCH_ANNUAL_TRACES_10K ||
-          item.price.id ===
-            this.itemCalculator.prices.ACCELERATE_ANNUAL_TRACES_100K
-        ) {
-          const calculateQuantity =
-            this.itemCalculator.calculateQuantityForPrice({
-              priceId: item.price.id,
-              quantity: item.quantity ?? 0,
-              plan: existingSubForUpdate.plan,
-            });
-          tracesQuantity = calculateQuantity;
-        }
-      }
+      const { usersQuantity, tracesQuantity } = this.quantitiesFromStripeItems({
+        subscription,
+        plan: existingSubForUpdate.plan,
+      });
 
       const updatedSubscription =
         await this.subscriptionRepository.updateQuantities({
@@ -836,21 +803,7 @@ export class EEWebhookService implements WebhookService {
       );
 
       if (shouldNotify) {
-        await bestEffort({
-          label: "subscription confirmed notification",
-          context: { subscriptionId: updatedSubscription.id },
-          run: () =>
-            getApp().notifications.sendSlackSubscriptionEvent({
-              type: "confirmed",
-              organizationId: updatedSubscription.organizationId,
-              organizationName: updatedSubscription.organization.name,
-              plan: updatedSubscription.plan,
-              subscriptionId: updatedSubscription.id,
-              startDate: updatedSubscription.startDate,
-              maxMembers: updatedSubscription.maxMembers,
-              maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
-            }),
-        });
+        await this.announceSubscriptionStarted(updatedSubscription);
       }
     }
   }
@@ -954,27 +907,93 @@ export class EEWebhookService implements WebhookService {
         await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
       }
 
-      await bestEffort({
-        label: "subscription confirmed notification",
-        context: { subscriptionId: updatedSubscription.id },
-        run: () =>
-          getApp().notifications.sendSlackSubscriptionEvent({
-            type: "confirmed",
-            organizationId: updatedSubscription.organizationId,
-            organizationName: updatedSubscription.organization.name,
-            plan: updatedSubscription.plan,
-            subscriptionId: updatedSubscription.id,
-            startDate: updatedSubscription.startDate,
-            maxMembers: updatedSubscription.maxMembers,
-            maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
-          }),
-      });
+      await this.announceSubscriptionStarted(updatedSubscription);
 
       fireSubscriptionSyncNurturing({
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
       });
     }
+  }
+
+  /**
+   * Member and trace limits implied by the Stripe subscription items. Either
+   * is null when no item of the subscription sets it.
+   */
+  private quantitiesFromStripeItems({
+    subscription,
+    plan,
+  }: {
+    subscription: Stripe.Subscription;
+    plan: SubscriptionWithOrg["plan"];
+  }): { usersQuantity: number | null; tracesQuantity: number | null } {
+    const { prices } = this.itemCalculator;
+    const tieredUserPrices = [
+      prices.LAUNCH_USERS,
+      prices.ACCELERATE_USERS,
+      prices.LAUNCH_ANNUAL_USERS,
+      prices.ACCELERATE_ANNUAL_USERS,
+    ];
+    const tieredTracePrices = [
+      prices.ACCELERATE_TRACES_100K,
+      prices.LAUNCH_TRACES_10K,
+      prices.LAUNCH_ANNUAL_TRACES_10K,
+      prices.ACCELERATE_ANNUAL_TRACES_100K,
+    ];
+    const tieredQuantity = (item: Stripe.SubscriptionItem) =>
+      this.itemCalculator.calculateQuantityForPrice({
+        priceId: item.price.id,
+        quantity: item.quantity ?? 0,
+        plan,
+      });
+
+    let tracesQuantity: number | null = null;
+    let usersQuantity: number | null = null;
+
+    for (const item of subscription.items.data) {
+      const priceId = item.price.id;
+      if (isGrowthSeatPrice(priceId)) {
+        usersQuantity = item.quantity ?? 0;
+      } else if (isGrowthEventsPrice(priceId)) {
+        // Events price exists on the subscription; traces limit comes from plan limits
+      } else if (tieredUserPrices.includes(priceId)) {
+        usersQuantity = tieredQuantity(item);
+      } else if (tieredTracePrices.includes(priceId)) {
+        tracesQuantity = tieredQuantity(item);
+      }
+    }
+
+    return { usersQuantity, tracesQuantity };
+  }
+
+  /**
+   * Reports a subscription that just became active: the Slack confirmation
+   * and the subscription_started analytics event. Callers gate this on the
+   * transition to active, so a renewal reports nothing.
+   */
+  private async announceSubscriptionStarted(
+    subscription: SubscriptionWithOrg,
+  ): Promise<void> {
+    await bestEffort({
+      label: "subscription confirmed notification",
+      context: { subscriptionId: subscription.id },
+      run: () =>
+        getApp().notifications.sendSlackSubscriptionEvent({
+          type: "confirmed",
+          organizationId: subscription.organizationId,
+          organizationName: subscription.organization.name,
+          plan: subscription.plan,
+          subscriptionId: subscription.id,
+          startDate: subscription.startDate,
+          maxMembers: subscription.maxMembers,
+          maxMessagesPerMonth: subscription.maxMessagesPerMonth,
+        }),
+    });
+
+    fireSubscriptionStartedAnalytics({
+      organizationId: subscription.organizationId,
+      plan: subscription.plan,
+    });
   }
 
   /**

@@ -22,7 +22,10 @@ import type { AccessListingRepository } from "~/server/app-layer/authz/repositor
 // anchor in specs/groups/groups-rest-api.feature held on one path only.
 import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import {
+  DeveloperSeatNoSharedAccessError,
+  LiteMemberViewerOnlyError,
+} from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isBindingRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
@@ -270,8 +273,12 @@ export class RoleBindingService {
    * enforced when access is written, the same way `updateTeamMemberRole`
    * enforces it. Group bindings are never checked here: a group has no seat,
    * and what the seat does to group-granted access is decided at resolution.
+   *
+   * A Developer seat (ADR-143) is stricter still: it holds no stored row on
+   * anything shared at all, so any row this method is asked about is refused.
+   * (The personal team is refused earlier, by `assertNoPersonalTeamScope`.)
    */
-  private async assertRowsWithinLiteMemberSeat({
+  private async assertRowsWithinSeat({
     organizationRole,
     organizationId,
     bindings,
@@ -285,6 +292,17 @@ export class RoleBindingService {
       scopeId: string;
     }>;
   }): Promise<void> {
+    if (organizationRole === OrganizationUserRole.DEVELOPER) {
+      const [first] = bindings;
+      if (!first) return;
+      const { scopeNames } = await this.resolveScopes({
+        bindings: [first],
+        organizationId,
+      });
+      throw new DeveloperSeatNoSharedAccessError(
+        scopeNames.get(first.scopeId) ?? null,
+      );
+    }
     if (organizationRole !== OrganizationUserRole.EXTERNAL) return;
 
     const offending = bindings.find(
@@ -630,7 +648,7 @@ export class RoleBindingService {
       organizationId,
       bindings: [{ role, customRoleId, scopeType }],
     });
-    await this.assertRowsWithinLiteMemberSeat({
+    await this.assertRowsWithinSeat({
       organizationRole,
       organizationId,
       bindings: [{ role, scopeType, scopeId }],
@@ -700,7 +718,7 @@ export class RoleBindingService {
       // A row can outlive its member (historical data); with nobody on a seat
       // there is no ceiling to hold the edit against.
       if (membership) {
-        await this.assertRowsWithinLiteMemberSeat({
+        await this.assertRowsWithinSeat({
           organizationRole: membership.role,
           organizationId,
           bindings: [
@@ -805,7 +823,7 @@ export class RoleBindingService {
     });
     // The dialog applies the seat before this batch, so the ceiling is held
     // against the seat the member is on by the time the rows would be written.
-    await this.assertRowsWithinLiteMemberSeat({
+    await this.assertRowsWithinSeat({
       organizationRole,
       organizationId,
       bindings: bindingsToCreate,

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { createSearchRouter } from "../route-search";
-import { deps, input, NoModel, RANGE } from "./harness";
+import { deps, input, NoModel, PROOF, RANGE } from "./harness";
 
 describe("given no classifier", () => {
   describe("when the model routes", () => {
@@ -28,6 +28,7 @@ describe("given no classifier", () => {
       });
       expect(d.routeWithModel).toHaveBeenCalledWith({
         projectId: "project-1",
+        authorization: PROOF,
         text: "failing calls",
         timeRange: RANGE,
         target: "traces",

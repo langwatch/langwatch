@@ -48,7 +48,7 @@ function hookFor(email: string) {
       (method) => method.connectionId !== null,
     );
     return selected?.connectionId
-      ? { connectionId: selected.connectionId }
+      ? { connectionId: selected.connectionId, methodId: selected.id }
       : null;
   });
   return fixture.hooks;

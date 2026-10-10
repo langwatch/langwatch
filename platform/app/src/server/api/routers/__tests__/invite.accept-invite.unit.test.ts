@@ -59,6 +59,7 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // legacy session-email comparison — the default here so the pre-identifier
 // tests exercise exactly the legacy branch.
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+const provenAddressesMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   // Read at module load by the better-auth request hooks on this router's
   // import graph (GAC-09). Locks nobody: these suites assert nothing about
@@ -71,6 +72,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
   clearSignUpConfirmationPending: async () => void 0,
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  provenAddresses: () => ({ addressesOf: provenAddressesMock }),
   // The credential boundary asks this before it lets a password through; no
   // organization routes this suite's addresses.
   addressRoutesToConnection: async () => false,
@@ -369,6 +371,62 @@ describe("invite.acceptInvite", () => {
         code: "BAD_REQUEST",
         message: INVITE_ALREADY_ACCEPTED_MESSAGE,
       });
+    });
+  });
+});
+
+/**
+ * The welcome screen's invitation offer (ADR-143 v6). What this hands back
+ * includes the invitation code, which is the secret from the mail, so only
+ * addresses the account has PROVED may be asked about. The session address
+ * is softer than that and is never used, not even as a fall-back.
+ *
+ * Spec: specs/identity/join-before-create.feature
+ */
+describe("invite.pendingForMe", () => {
+  let findFirstMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findFirstMock = vi.fn().mockResolvedValue(null);
+    provenAddressesMock.mockResolvedValue([]);
+  });
+
+  function createCaller(email = "sam@acme.com") {
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: "user-1", name: "Sam", email },
+        expires: "2099-01-01",
+      },
+    });
+    (ctx as any).prisma = {
+      $connect: vi.fn(),
+      organizationInvite: { findFirst: findFirstMock },
+    };
+    return inviteRouter.createCaller(ctx);
+  }
+
+  describe("when the session address has an invitation but is not yet proved", () => {
+    /** @scenario An invitation is only offered to somebody who proved the address */
+    it("answers nothing and asks the database nothing", async () => {
+      // The only address known is the session's, and it is not proven.
+      provenAddressesMock.mockResolvedValueOnce([]);
+
+      await expect(createCaller().pendingForMe({})).resolves.toEqual([]);
+
+      expect(provenAddressesMock).toHaveBeenCalledWith({ userId: "user-1" });
+      expect(findFirstMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An invitation is only offered to somebody who proved the address */
+    it("asks only about the proved addresses, never the session's", async () => {
+      provenAddressesMock.mockResolvedValueOnce(["ana@acme.com"]);
+
+      await createCaller("sam@acme.com").pendingForMe({});
+
+      const where = findFirstMock.mock.calls[0]?.[0]?.where;
+      expect(JSON.stringify(where)).toContain("ana@acme.com");
+      expect(JSON.stringify(where)).not.toContain("sam@acme.com");
     });
   });
 });

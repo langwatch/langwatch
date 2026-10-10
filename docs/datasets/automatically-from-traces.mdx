@@ -21,7 +21,7 @@ An automation with the **Add to dataset** action appends a row for every trace t
   </Frame>
 </div>
 
-3. Pick **Add to dataset** as the action, choose the dataset, and map the trace fields to its columns. Columns named `input`, `output`, `expected_output`, `contexts`, `total_cost`, `spans`, `trace_id` and `timestamp` are mapped for you; any other column maps to the metadata key with the same name until you change it.
+3. Pick **Add to dataset** as the action and choose the dataset. Its columns are mapped to trace fields for you, as described in [The column mapping](#the-column-mapping).
 
 <Frame caption="Add To Dataset">
 <img
@@ -32,5 +32,49 @@ An automation with the **Add to dataset** action appends a row for every trace t
 </Frame>
 
 4. Save. From then on, every trace that matches the filter adds one row to the dataset.
+
+## The column mapping
+
+When you pick a dataset, LangWatch builds the mapping from the dataset's column names:
+
+| Column name | Filled from |
+|-------------|-------------|
+| `input`, `question`, `user_input` | The trace input |
+| `output`, `answer`, `response`, `result`, `expected_output` | The trace output |
+| `contexts` | The retrieved contexts, as a list of strings |
+| `total_cost` | The trace's total cost |
+| `spans` | The trace's spans |
+| `trace_id`, `timestamp` | The trace id and its timestamp |
+| Any other name | The trace **metadata key with the same name** as the column |
+
+So a column named `customer_tier` is filled from the trace's `customer_tier` metadata. A trace without that key leaves the cell empty.
+
+The mapping is stored on the automation as `actionParams.datasetMapping`. Each column maps to a `{ source, key, subkey }` entry: `source` is the trace field, `key` narrows a keyed source (the metadata key for `metadata`, for example), and `subkey` narrows it further (one field of an evaluation, for example).
+
+```json
+{
+  "datasetId": "<datasetId>",
+  "datasetMapping": {
+    "mapping": {
+      "input": { "source": "input", "key": "", "subkey": "" },
+      "output": { "source": "output", "key": "", "subkey": "" },
+      "customer_tier": { "source": "metadata", "key": "customer_tier", "subkey": "" }
+    },
+    "expansions": []
+  }
+}
+```
+
+A `source` is one of `trace_id`, `thread_id`, `timestamp`, `input`, `output`, `contexts`, `contexts.string_list`, `metrics.total_cost`, `metrics.first_token_ms`, `metrics.total_time_ms`, `metrics.prompt_tokens`, `metrics.completion_tokens`, `metrics.total_tokens`, `spans`, `spans.llm.input`, `spans.llm.output`, `metadata`, `evaluations`, `annotations` or `events`.
+
+### Changing the mapping later
+
+The automation drawer has no per-column mapping editor: it derives the mapping from the dataset's columns, and choosing the dataset again derives it again. To map a column to a different source after the automation exists, update the automation's delivery configuration with the whole mapping you want, with the CLI:
+
+```bash
+langwatch trigger update <automationId> --action-params '{"datasetId":"<datasetId>","datasetMapping":{"mapping":{"input":{"source":"input"},"customer_tier":{"source":"metadata","key":"tier"}},"expansions":[]}}'
+```
+
+or with `PATCH /api/triggers/{id}` and the same `actionParams`. `actionParams` replaces the stored configuration as a whole, so send every column, not only the one you change. See the [Triggers API](/api-reference/triggers/overview).
 
 **Also check:** [Automations](/features/automations) for the delivery options and the automation history, and [Datasets](/datasets/overview) for the full list of trace fields a column can map to.

@@ -15,6 +15,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -50,8 +52,10 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
+import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,
@@ -63,6 +67,10 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
+import {
+  isAggregateProjectKind,
+  NON_DESTINATION_PROJECT_KINDS,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -931,6 +939,27 @@ secured
       return noAccessResponse();
     }
 
+    // The code carries the project's base key, so a project that holds no
+    // credential gets none (ADR-144 decision 7). The aggregate is refused
+    // with its registered code, still in the OAuth wire format above; the
+    // hidden governance project reads as not reachable, as everywhere else.
+    if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
+      if (!isAggregateProjectKind(project.kind)) return noAccessResponse();
+      const refusal = new AggregateProjectHasNoCredentialError();
+      return c.json(
+        {
+          error: "access_denied",
+          error_description: refusal.message,
+          code: refusal.code,
+          redirect: errorRedirect({
+            error: "access_denied",
+            description: refusal.message,
+          }),
+        },
+        403,
+      );
+    }
+
     const code = randomUUID();
 
     const redis = tryGetApp()?.redis ?? null;
@@ -1201,28 +1230,62 @@ const filterSchema = z
   )
   .default({});
 
-const slackTriggerBodySchema = z.object({
-  slack_webhook: z
-    .string()
-    .url()
-    .describe("Incoming webhook URL the alert is posted to"),
-  name: z.string().describe("How the trigger is listed in the app"),
-  message: z
-    .string()
-    .optional()
-    .describe("Extra line included with each alert"),
-  filters: filterSchema.describe(
-    "Which traces the trigger fires on. An empty object fires on all of them.",
-  ),
-  alert_type: z.nativeEnum(AlertType),
-});
+const slackTriggerBodySchema = z
+  .object({
+    slack_webhook: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        "Incoming webhook URL the alert is posted to. It is stored as a Slack " +
+          "connection this project can use (an existing one holding the same " +
+          "URL, else a new project connection). Send this or " +
+          "`slack_connection_id`, not both.",
+      ),
+    slack_connection_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The Slack connection the alert posts through: an organization " +
+          "connection or one of this project's, as `GET /api/slack-connections` " +
+          "and `langwatch slack-connection list` list them. Send this or " +
+          "`slack_webhook`, not both.",
+      ),
+    slack_channel_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The channel a bot connection posts in; required with one. Invite " +
+          "the LangWatch app to it first.",
+      ),
+    name: z.string().describe("How the trigger is listed in the app"),
+    message: z
+      .string()
+      .optional()
+      .describe("Extra line included with each alert"),
+    filters: filterSchema.describe(
+      "Which traces the trigger fires on. An empty object fires on all of them.",
+    ),
+    alert_type: z.nativeEnum(AlertType),
+  })
+  .refine(
+    (body) =>
+      (body.slack_webhook === undefined) !==
+      (body.slack_connection_id === undefined),
+    {
+      message: "Send exactly one of slack_webhook or slack_connection_id.",
+      path: ["slack_connection_id"],
+    },
+  );
 
 secured.access(triggersManageAuth).post(
   "/trigger/slack",
   describeRoute({
     summary: "Create a Slack alert trigger",
     description:
-      "Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
+      "Create a trigger that posts to Slack when traces match its filters, through a Slack connection (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
     tags: ["Triggers"],
     requestBody: {
       required: true,
@@ -1271,6 +1334,15 @@ secured.access(triggersManageAuth).post(
           },
         },
       },
+      422: {
+        description:
+          "The connection is not one this project can use (`slack_integration_missing`), or a bot connection was named without `slack_channel_id` (`invalid_action_params`)",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
     },
   }),
   authMiddleware,
@@ -1287,6 +1359,23 @@ secured.access(triggersManageAuth).post(
 
     try {
       const validatedData = slackTriggerBodySchema.parse(body);
+      // ADR-093 §5a: a named connection must be usable by the project; a URL
+      // is stored once, as a connection. Either way the automation keeps only
+      // its id. The actor follows the governance API's fallback.
+      const keyUser = c.get("apiKeyUserId");
+      const actionParams = await createSlackIntegrationService({
+        prisma,
+      }).connectActionParams({
+        projectId: project.id,
+        actorId: typeof keyUser === "string" ? keyUser : `svc_${project.id}`,
+        actionParams: validatedData.slack_connection_id
+          ? {
+              slackIntegrationId: validatedData.slack_connection_id,
+              slackChannelId: validatedData.slack_channel_id,
+            }
+          : { slackWebhook: validatedData.slack_webhook },
+      });
+      const storedParams = slackActionParamsSchema.parse(actionParams);
 
       await prisma.trigger.create({
         data: {
@@ -1295,7 +1384,7 @@ secured.access(triggersManageAuth).post(
           name: validatedData.name,
           message: validatedData.message,
           filters: JSON.stringify(validatedData.filters),
-          actionParams: { slackWebhook: validatedData.slack_webhook },
+          actionParams: storedParams,
           alertType: validatedData.alert_type,
         },
       });
@@ -1308,6 +1397,9 @@ secured.access(triggersManageAuth).post(
           400,
         );
       }
+      // A refusal the save path names (an unusable connection, a bot
+      // connection with no channel) reaches the app's error handler as is.
+      if (error instanceof HandledError) throw error;
 
       logger.error({ error }, "Error creating trigger");
       return c.json({ message: "Error creating trigger" }, 500);

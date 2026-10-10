@@ -46,9 +46,9 @@ interface GraphCardAlertButtonProps {
   defaultSeriesName?: string;
 }
 
-// Add-alert / edit-alert entry points for a graph.
+// Add-automation / edit-automation entry points for a graph.
 //
-// Both buttons open the automations drawer (the unified alert-authoring
+// Both buttons open the automations drawer (the unified authoring
 // flow introduced in Phase 5.1 of ADR-034) pre-filled with this chart's
 // graphId + series; the bell additionally passes `automationId` so the
 // drawer hydrates the existing trigger row in edit mode. The legacy
@@ -61,7 +61,7 @@ function GraphCardAlertButton({
 }: GraphCardAlertButtonProps) {
   const { openDrawer } = useDrawer();
 
-  const openEditAlert = () => {
+  const openEditAutomation = () => {
     if (!trigger) return;
     openDrawer("automation", {
       automationId: trigger.id,
@@ -73,26 +73,26 @@ function GraphCardAlertButton({
   if (trigger?.active) {
     return (
       <Tooltip
-        content="Edit alert"
+        content="Edit automation"
         positioning={{ placement: "top" }}
         showArrow
       >
         <Box
           role="button"
-          aria-label="Edit alert"
+          aria-label="Edit automation"
           tabIndex={0}
           padding={1}
           cursor="pointer"
           color="fg"
           onClick={(e) => {
             e.stopPropagation();
-            openEditAlert();
+            openEditAutomation();
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               e.stopPropagation();
-              openEditAlert();
+              openEditAutomation();
             }
           }}
         >
@@ -116,7 +116,7 @@ function GraphCardAlertButton({
       }}
     >
       <Bell width={16} />
-      Add alert
+      Add automation
     </Button>
   );
 }

@@ -15,12 +15,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { SpanInsertData } from "../../types";
-import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
+import type { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
 import { MAX_EVENT_NAMES_PER_TRACE } from "../span-storage.repository";
 
 const tenantId = `test-span-fetch-${nanoid()}`;
@@ -99,7 +102,7 @@ async function insertRows(rows: ReturnType<typeof makeSpanRow>[]) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new SpanStorageClickHouseRepository(async () => ch);
+  repo = spanStorageRepositoryFor(async () => ch);
 
   const rows = Array.from({ length: TOTAL_SPANS }, (_, i) => makeSpanRow(i));
   await insertRows(rows);
@@ -187,7 +190,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
   describe("when reading a trace under the per-query memory cap", () => {
     it("returns the earliest `limit` spans ordered by StartTime", async () => {
       const spans = await repo.getNormalizedSpansByTraceId({
-        tenantId,
+        authorization: ownProof({ projectId: tenantId }),
         traceId,
       });
 
@@ -203,7 +206,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     it("returns the latest version of a duplicated span, not the stale one", async () => {
       const spans = await repo.getNormalizedSpansByTraceId({
-        tenantId,
+        authorization: ownProof({ projectId: tenantId }),
         traceId,
       });
 
@@ -216,7 +219,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     it("preserves the full heavy SpanAttributes payload", async () => {
       const spans = await repo.getNormalizedSpansByTraceId({
-        tenantId,
+        authorization: ownProof({ projectId: tenantId }),
         traceId,
       });
 
@@ -273,7 +276,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     it("getTraceEventsByTraceId returns all events incl. exceptions in event_timestamp ASC order, latest span version only", async () => {
       const events = await repo.getTraceEventsByTraceId({
-        tenantId: eventsTenantId,
+        authorization: ownProof({ projectId: eventsTenantId }),
         traceId: eventsTraceId,
       });
 
@@ -289,7 +292,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     it("getEventsByTraceId filters out exception events and orders by event_timestamp DESC, latest span version only", async () => {
       const events = await repo.getEventsByTraceId({
-        tenantId: eventsTenantId,
+        authorization: ownProof({ projectId: eventsTenantId }),
         traceId: eventsTraceId,
       });
 
@@ -321,6 +324,9 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       from: rollupBase.getTime() - 60_000,
       to: rollupBase.getTime() + 60_000,
     };
+    /** Where this suite's tenant finds a trace's rollup in the result. */
+    const rollupKey = (traceId: string) =>
+      listedTraceKey({ projectId: rollupTenantId, traceId });
 
     /**
      * A span of this suite's own tenant. Every row goes to `rollupTenantId`
@@ -432,12 +438,12 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     /** @scenario A trace with events shows a badge per event name */
     it("returns one entry per event name for a trace", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [feedbackTraceId],
         timeRange,
       });
 
-      expect(rollups[feedbackTraceId]).toEqual({
+      expect(rollups[rollupKey(feedbackTraceId)]).toEqual({
         names: [
           {
             name: "thumbs_up_down",
@@ -454,12 +460,12 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     /** @scenario Badges are ordered by when the event first occurred */
     it("collapses repeats by name, ordered by first occurrence, latest span version only", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [chattyTraceId],
         timeRange,
       });
 
-      expect(rollups[chattyTraceId]).toEqual({
+      expect(rollups[rollupKey(chattyTraceId)]).toEqual({
         names: [
           {
             name: "gen_ai.request.attempt",
@@ -475,38 +481,38 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     });
 
     /** @scenario Events are shown for the traces currently on screen */
-    it("answers a whole page in one call, keyed by trace id", async () => {
+    it("answers a whole page in one call, keyed by project and trace id", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [feedbackTraceId, chattyTraceId, quietTraceId],
         timeRange,
       });
 
       expect(Object.keys(rollups).sort()).toEqual(
-        [feedbackTraceId, chattyTraceId].sort(),
+        [feedbackTraceId, chattyTraceId].map(rollupKey).sort(),
       );
     });
 
     /** @scenario A trace with no events shows the empty marker */
     it("omits a trace that recorded no events", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [quietTraceId],
         timeRange,
       });
 
-      expect(rollups[quietTraceId]).toBeUndefined();
+      expect(rollups[rollupKey(quietTraceId)]).toBeUndefined();
     });
 
     /** @scenario A trace with a very large number of events stays bounded */
     it("trims to the badge cap while still reporting the true totals", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [noisyTraceId],
         timeRange,
       });
 
-      const rollup = rollups[noisyTraceId]!;
+      const rollup = rollups[rollupKey(noisyTraceId)]!;
       expect(rollup.names).toHaveLength(MAX_EVENT_NAMES_PER_TRACE);
       expect(rollup.distinctCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
       expect(rollup.totalCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
@@ -517,14 +523,14 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     /** @scenario Only the caller's project is read */
     it("leaves out the neighbour's events on a trace id both tenants used", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [otherTenantTraceId],
         timeRange,
       });
 
       // Both tenants recorded against this id, so the read returning nothing
       // would pass a "does not contain" check without proving anything.
-      expect(rollups[otherTenantTraceId]).toEqual({
+      expect(rollups[rollupKey(otherTenantTraceId)]).toEqual({
         names: [
           {
             name: "thumbs_up_down",
@@ -541,7 +547,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     it("returns nothing when the page's time range excludes the spans", async () => {
       const longAgo = rollupBase.getTime() - 400 * 24 * 60 * 60 * 1000;
       const rollups = await repo.getTraceEventRollupsByTraceIds({
-        tenantId: rollupTenantId,
+        authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [feedbackTraceId],
         timeRange: { from: longAgo, to: longAgo + 60_000 },
       });
@@ -551,13 +557,13 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     /** @scenario A page with no traces on it shows no events */
     it("issues no query for an empty page", async () => {
-      const failingRepo = new SpanStorageClickHouseRepository(async () => {
+      const failingRepo = spanStorageRepositoryFor(async () => {
         throw new Error("resolveClient must not be called");
       });
 
       await expect(
         failingRepo.getTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: ownProof({ projectId: rollupTenantId }),
           traceIds: [],
           timeRange,
         }),
@@ -631,7 +637,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     describe("when the trace's occurrence time is recorded in trace_summaries", () => {
       it("resolves the partition window from trace_summaries and still returns the events", async () => {
         const events = await repo.getTraceEventsByTraceId({
-          tenantId: hintlessTenantId,
+          authorization: ownProof({ projectId: hintlessTenantId }),
           traceId: withEventsTraceId,
         });
 
@@ -660,12 +666,12 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
             return Reflect.get(target, prop, receiver);
           },
         }) as ClickHouseClient;
-        const recordingRepo = new SpanStorageClickHouseRepository(
+        const recordingRepo = spanStorageRepositoryFor(
           async () => recordingClient,
         );
 
         const events = await recordingRepo.getTraceEventsByTraceId({
-          tenantId: hintlessTenantId,
+          authorization: ownProof({ projectId: hintlessTenantId }),
           traceId: noEventsTraceId,
         });
 
@@ -753,7 +759,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     it("resolves the partition window from trace_summaries and still returns the spans", async () => {
       const spans = await repo.getNormalizedSpansByTraceId({
-        tenantId: hintlessTenantId,
+        authorization: ownProof({ projectId: hintlessTenantId }),
         traceId: withSpansTraceId,
       });
 
@@ -778,12 +784,12 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
+      const recordingRepo = spanStorageRepositoryFor(
         async () => recordingClient,
       );
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
-        tenantId: hintlessTenantId,
+        authorization: ownProof({ projectId: hintlessTenantId }),
         traceId: emptyTraceId,
       });
 
@@ -815,12 +821,12 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
+      const recordingRepo = spanStorageRepositoryFor(
         async () => recordingClient,
       );
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
-        tenantId: hintlessTenantId,
+        authorization: ownProof({ projectId: hintlessTenantId }),
         traceId: outOfWindowTraceId,
       });
 
@@ -850,12 +856,12 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
+      const recordingRepo = spanStorageRepositoryFor(
         async () => recordingClient,
       );
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
-        tenantId: hintlessTenantId,
+        authorization: ownProof({ projectId: hintlessTenantId }),
         traceId: orphanTraceId,
       });
 
@@ -913,7 +919,7 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
 
   beforeAll(async () => {
     const containers = await startTestContainers();
-    costRepo = new SpanStorageClickHouseRepository(
+    costRepo = spanStorageRepositoryFor(
       async () => containers.clickHouseClient,
     );
 
@@ -937,7 +943,7 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
   describe("when a billed span is stored", () => {
     it("round-trips its Cost with no non-billed portion", async () => {
       const spans = await costRepo.getNormalizedSpansByTraceId({
-        tenantId: costTenantId,
+        authorization: ownProof({ projectId: costTenantId }),
         traceId: costTraceId,
         occurredAtMs: base,
       });
@@ -952,7 +958,7 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
   describe("when a non-billable span is stored", () => {
     it("round-trips Cost and NonBilledCost as the full bundled amount", async () => {
       const spans = await costRepo.getNormalizedSpansByTraceId({
-        tenantId: costTenantId,
+        authorization: ownProof({ projectId: costTenantId }),
         traceId: costTraceId,
         occurredAtMs: base,
       });
@@ -967,7 +973,7 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
   describe("when a span without costable usage is stored", () => {
     it("round-trips null Cost and NonBilledCost", async () => {
       const spans = await costRepo.getNormalizedSpansByTraceId({
-        tenantId: costTenantId,
+        authorization: ownProof({ projectId: costTenantId }),
         traceId: costTraceId,
         occurredAtMs: base,
       });
@@ -1012,7 +1018,7 @@ async function walkSpanSummaries(pageTraceId: string, limit: number) {
   let cursor: { startTimeMs: number; spanId: string } | undefined;
   for (;;) {
     const page = await repo.findSpanSummariesPage({
-      tenantId: pageTenantId,
+      authorization: ownProof({ projectId: pageTenantId }),
       traceId: pageTraceId,
       limit,
       cursor,
@@ -1136,7 +1142,7 @@ describe("SpanStorageClickHouseRepository langwatch signals read (integration)",
   describe("when a trace has spans carrying langwatch signal attributes", () => {
     it("executes the capped, ordered scan and returns the signal buckets per span", async () => {
       const rows = await repo.findLangwatchSignalsByTraceId({
-        tenantId: pageTenantId,
+        authorization: ownProof({ projectId: pageTenantId }),
         traceId: signalsTraceId,
         occurredAtMs: base,
       });
@@ -1248,7 +1254,7 @@ describe("SpanStorageClickHouseRepository lone-surrogate span insert (integratio
         ).resolves.toBeUndefined();
 
         const spans = await repo.getNormalizedSpansByTraceId({
-          tenantId: surrogateTenantId,
+          authorization: ownProof({ projectId: surrogateTenantId }),
           traceId,
         });
         const stored = spans.find((s) => s.spanId === "surrogate-bulk");
@@ -1271,7 +1277,7 @@ describe("SpanStorageClickHouseRepository lone-surrogate span insert (integratio
         ).resolves.toBeUndefined();
 
         const spans = await repo.getNormalizedSpansByTraceId({
-          tenantId: surrogateTenantId,
+          authorization: ownProof({ projectId: surrogateTenantId }),
           traceId,
         });
         const stored = spans.find((s) => s.spanId === "surrogate-single");

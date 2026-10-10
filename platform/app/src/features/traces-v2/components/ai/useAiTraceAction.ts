@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { readHandledError } from "~/features/errors";
+import { type AppErrorCode, readHandledError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import type {
   AiActionError,
   AiActionErrorDetails,
+  AiActionResult,
 } from "~/server/app-layer/traces/ai-query";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
@@ -42,6 +44,20 @@ function readAiErrorDetails(
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
+const READ_ONLY_CODE: AppErrorCode = "aggregate_project_is_read_only";
+
+/**
+ * The answer to a lens the model asked for on an aggregate project, which
+ * keeps no lenses of its own (ADR-144). The store refuses the create without
+ * a word, so the action says so itself, under the same code and canonical
+ * envelope the server refuses any write on an aggregate with, so the composer
+ * renders the registry's copy for it.
+ */
+const LENS_REFUSED_ON_AGGREGATE: AiActionError = {
+  code: READ_ONLY_CODE,
+  cause: { error: { code: READ_ONLY_CODE }, httpStatus: 403 },
+};
+
 export type AiTraceActionMode =
   /** Filter-only: applies a query, never creates a lens. */
   | "filter"
@@ -49,6 +65,21 @@ export type AiTraceActionMode =
   | "lens"
   /** Either: the model picks based on the user's intent. */
   | "auto";
+
+/**
+ * The name of the lens this answer should create, or null when it creates
+ * none: `lens` mode always makes one, `auto` only when the model asked.
+ */
+function lensNameFor({
+  mode,
+  result,
+}: {
+  mode: AiTraceActionMode;
+  result: AiActionResult;
+}): string | null {
+  if (result.kind === "create_lens" && mode !== "filter") return result.name;
+  return mode === "lens" ? "Untitled lens" : null;
+}
 
 interface UseAiTraceActionOptions {
   /** Which kinds of actions this caller is willing to perform. */
@@ -91,6 +122,7 @@ export function useAiTraceAction({
   const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const recordAiTranslation = useExplorerStore((s) => s.recordAiTranslation);
   const createLens = useExplorerStore((s) => s.createLens);
+  const projectAcceptsWrites = useProjectAcceptsWrites();
   const [error, setError] = useState<AiActionError | null>(null);
   // Track the prompt across the async boundary so onSuccess can save it
   // alongside the model's response — no plumbing through the mutation
@@ -131,13 +163,15 @@ export function useAiTraceAction({
           query: result.query,
         });
       }
-      const shouldCreateLens =
-        mode === "lens" || (mode === "auto" && result.kind === "create_lens");
-      if (shouldCreateLens) {
-        const lensName =
-          result.kind === "create_lens" ? result.name : "Untitled lens";
-        createLens(lensName);
+      const lensName = lensNameFor({ mode, result });
+      // The query above still applies, since reading is allowed; only the
+      // lens is refused. The composer stays open with the refusal, rather
+      // than closing as if the lens had been saved.
+      if (lensName !== null && !projectAcceptsWrites) {
+        setError(LENS_REFUSED_ON_AGGREGATE);
+        return;
       }
+      if (lensName !== null) createLens(lensName);
       onDone?.();
     },
     onError: (e) => {

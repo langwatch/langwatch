@@ -7,6 +7,7 @@ import {
   SimpleGrid,
   VStack,
 } from "@chakra-ui/react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { ChartCard } from "~/components/analytics/ChartCard";
 import {
   CustomGraph,
@@ -274,4 +275,6 @@ function UsersContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view")(UsersContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("Users", UsersContent),
+);

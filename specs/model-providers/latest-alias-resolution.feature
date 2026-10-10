@@ -189,3 +189,31 @@ Feature: Latest-alias model resolution
       When a Vercel AI model is requested for the explicit model "openai/latest"
       Then the LiteLLM params are prepared for the model the alias resolves to
       And the provider is read from the resolved model
+
+  Rule: The platform fallback model is the OpenAI latest alias
+
+    A surface that has no configured default to read, or reads it before
+    the cascade answers, falls back to one platform constant. That
+    constant is read through the same tier grammar as "openai/latest", so
+    a fresh install never shows GPT-5.5 in one place and GPT-5.6 Terra in
+    another.
+
+    @unit
+    Scenario: The platform fallback model equals what OpenAI latest resolves to
+      Given the committed catalog
+      When the platform fallback model is read
+      Then it equals the model "openai/latest" resolves to
+      And it is not GPT-5.5
+
+    @integration
+    Scenario: A new evaluator waits for the configured default before filling its model
+      Given a project whose configured default model is still loading
+      When a new LLM-as-a-Judge evaluator form opens
+      Then the model field is filled with the configured default once it loads
+      And it is not left on the platform fallback model
+
+    @integration
+    Scenario: A first prompt created before the configured default loads uses it
+      Given a project whose configured default model has not loaded yet
+      When the user creates their first prompt in the playground
+      Then the new prompt uses the configured default model

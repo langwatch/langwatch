@@ -41,11 +41,17 @@ if [[ "$NODE_ENV" = "development" ]]; then
   # LANGWATCH_ENDPOINT is the address the app hands out as itself (the Langy
   # worker callback, scenario child processes, setup snippets), so it follows
   # the same port for the same reason.
+  # Only a plain http://localhost address is realigned, the rule
+  # alignDevAuthUrlsToPort applies, so a hostname a proxy serves (haven) stays.
   if [ -n "$PORT" ]; then
-    export BASE_HOST="http://localhost:${PORT}"
-    export NEXTAUTH_URL="http://localhost:${PORT}"
-    export LANGWATCH_ENDPOINT="http://localhost:${PORT}"
-    echo "  ✓ BASE_HOST=NEXTAUTH_URL=LANGWATCH_ENDPOINT=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+    for _var in BASE_HOST NEXTAUTH_URL LANGWATCH_ENDPOINT; do
+      eval "_val=\${$_var:-}"
+      case "$_val" in
+        ""|http://localhost|http://localhost:*|http://localhost/*)
+          export "$_var=http://localhost:${PORT}" ;;
+      esac
+    done
+    echo "  ✓ BASE_HOST=${BASE_HOST} (localhost addresses aligned to PORT=${PORT})"
   fi
 
   # AI Gateway port + URL auto-derivation. Default layout:

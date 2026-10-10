@@ -160,9 +160,9 @@ async function bootRealtimeSessionPoller(
 }
 
 // Every worker with no VOICE_PUBLIC_BASE_URL configured and the tunnel
-// fallback left on (VOICE_TUNNEL, default enabled) discovers its own public
-// origin by opening a free cloudflared quick tunnel to the media listener's
-// port. Runs BEFORE the scenario processor boots: it must set
+// fallback on (VOICE_TUNNEL; on by default only for SaaS and development)
+// discovers its own public origin by opening a free cloudflared quick tunnel
+// to the media listener's port. Runs BEFORE the scenario processor boots: it must set
 // process.env.VOICE_PUBLIC_BASE_URL before any scenario child spawns, since
 // child-environment.ts forwards that var verbatim and phone.transport.ts
 // reads it straight from process.env, with no other plumbing needed. A noop

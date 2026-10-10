@@ -14,15 +14,15 @@ interface UseLicenseActionsOptions {
  * code lands in the same place as pasting a license, LangWatch signs one and
  * this install stores it, so both say the same thing.
  *
- * The SSO license gate is decided once per process (ADR-027), so a license
- * activated on a running self-hosted server only enables SSO after a restart.
+ * The SSO license gate re-reads a deny within a minute (ADR-027), so a license
+ * activated on a running self-hosted server turns SSO on without a restart.
  */
 function activationToast(isSaas: boolean) {
   return {
     title: "License activated",
     description: isSaas
       ? "Your license has been successfully activated."
-      : "Your license has been successfully activated. If your deployment uses SSO, restart the server to enable it.",
+      : "Your license has been successfully activated. If your deployment uses SSO, it turns on within a minute, no restart needed.",
     type: "success" as const,
   };
 }
@@ -34,7 +34,7 @@ export function useLicenseActions({
 }: UseLicenseActionsOptions) {
   const publicEnv = usePublicEnv();
   // Only a confirmed `true` means Cloud: while the environment is still
-  // resolving, showing the restart line is the harmless reading, and omitting
+  // resolving, showing the SSO line is the harmless reading, and omitting
   // it on a self-hosted deployment is not.
   const isSaas = publicEnv.data?.IS_SAAS === true;
 
@@ -42,7 +42,7 @@ export function useLicenseActions({
   // reads: navigation, feature gates, limit copy. Invalidating every query is
   // the blunt instrument that catches all of them, and it is what replaced a
   // `window.location.reload()` here. The reload refreshed the same state, and
-  // destroyed the toast on its way: the restart instruction is the one thing an
+  // destroyed the toast on its way: the SSO line is the one thing an
   // operator has to read, and it was being torn off the screen milliseconds
   // after it appeared.
   const trpc = api.useUtils();

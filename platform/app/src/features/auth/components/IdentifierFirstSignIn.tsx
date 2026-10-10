@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { SignInError } from "~/pages/auth/error";
 import { api } from "~/utils/api";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
@@ -31,6 +32,10 @@ import { shouldStartPasskeyOnArrival } from "../logic/methodRanking";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import { JOIN_BEFORE_CREATE_PATH } from "../logic/signUpDestination";
+import {
+  rememberSoleConnectionAutoDial,
+  soleConnectionAutoDialAllowed,
+} from "../logic/soleConnectionAutoDial";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
 import { AuthFinePrint } from "./AuthFinePrint";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
@@ -97,6 +102,8 @@ export function IdentifierFirstSignIn() {
     readonly SignInMethod[]
   >([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  // Read once per mount, before this page dials anything itself.
+  const [soleAutoDialAllowed] = useState(() => soleConnectionAutoDialAllowed());
   /**
    * Whether an expired session of this browser's explains the arrival.
    *
@@ -323,13 +330,26 @@ export function IdentifierFirstSignIn() {
   }
 
   if (decision?.outcome === "redirect_to_connection") {
+    // A typed address always dials. With no address, only the self-hosted
+    // sole connection does, and only if this tab has not just been sent
+    // there: a round trip that came back without a session shows the button
+    // rather than looping.
+    const soleConnection =
+      submittedIdentifier === null &&
+      decision.reasonCode === "sole_active_connection";
     return (
       <RoutedToConnection
         decision={decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
         loginHint={submittedIdentifier?.trim() || undefined}
-        autoStart={submittedIdentifier !== null}
+        autoStart={
+          submittedIdentifier !== null ||
+          (soleConnection && soleAutoDialAllowed)
+        }
+        onAutoStart={
+          soleConnection ? () => rememberSoleConnectionAutoDial() : undefined
+        }
       />
     );
   }
@@ -530,6 +550,14 @@ function signInGreeting(recoveredEmail: string | null): {
   };
 }
 
+/** What the log-in door says about an unknown address where no confirmation
+ *  link can be sent. */
+const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
+  title: "There is no account for that email address yet",
+  describe:
+    "This installation cannot send email, so it cannot confirm a new address. Ask an administrator to set up an email provider, or sign in with single sign-on once your organization has it.",
+} as const;
+
 /**
  * The address routed to no account (ADR-117, revision 2026-08-25).
  *
@@ -545,6 +573,9 @@ function signInGreeting(recoveredEmail: string | null): {
  *
  * It sends the same confirmation link as the sign-up door. No password or
  * passkey control is mounted until that link returns its single-use proof.
+ *
+ * An installation with no email provider cannot send that link, so there the
+ * card offers nothing it cannot do and says what is missing instead.
  */
 function NoAccountYet({
   email,
@@ -565,6 +596,28 @@ function NoAccountYet({
 }) {
   const guidance = reasonCode ? signInRoutingReasonCopy(reasonCode) : null;
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
+  // Only an explicit false: the read may still be on its way, and until it
+  // says otherwise the installation is assumed to send email as most do.
+  const cannotSendEmail = usePublicEnv().data?.HAS_EMAIL_PROVIDER_KEY === false;
+
+  if (cannotSendEmail) {
+    return (
+      <AuthCard
+        title={NO_ACCOUNT_WITHOUT_EMAIL_COPY.title}
+        intro={NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe}
+        finePrint={<AuthFinePrint />}
+      >
+        <VStack width="full" align="stretch" gap="14px">
+          <div data-testid="unknown-identifier" hidden>
+            {email}
+          </div>
+          <AuthSecondaryButton onClick={onUseDifferentEmail}>
+            Use a different email
+          </AuthSecondaryButton>
+        </VStack>
+      </AuthCard>
+    );
+  }
 
   const beginSignUp = async () => {
     try {
@@ -640,10 +693,13 @@ export function RoutedToConnection({
   title = "Log in to LangWatch",
   footer,
   autoStart = true,
+  onAutoStart,
 }: {
   decision: RoutingDecision;
-  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  /** Whether the hand-off starts on its own or waits for the button. */
   autoStart?: boolean;
+  /** Called once, when the hand-off starts on its own. */
+  onAutoStart?: () => void;
   onContinue: (method: SignInMethod) => void;
   callbackUrl?: string;
   /** The address that routed here, handed to the provider as the OIDC
@@ -666,8 +722,9 @@ export function RoutedToConnection({
     // presses: without it the people routed by their address, who sign in
     // this way every day, are the ones the landing never badges.
     rememberPendingMethod(method);
+    onAutoStart?.();
     void signIn(method.id, { callbackUrl, loginHint });
-  }, [autoStart, method, callbackUrl, loginHint]);
+  }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
@@ -714,6 +771,12 @@ function SignUpLink({
   email?: string | null;
   label: string;
 }) {
+  // An invite-only installation offers no general sign-up. An invited address
+  // still gets in: the invitation's own link, or the sign-in screen's
+  // "send confirmation link" step for an address with no account.
+  const inviteOnly = usePublicEnv().data?.SIGN_UP_MODE === "invite_only";
+  if (inviteOnly) return null;
+
   // The address rides in the FRAGMENT, which is the half of a URL the browser
   // does not send: it reaches no access log and no `Referer` on the way to the
   // other screen. See `signUpHref`.

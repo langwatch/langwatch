@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction } from "~/generated/prisma/client";
+import { SeriesPercentageUnsupportedError } from "~/server/analytics/errors";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
@@ -14,6 +15,7 @@ import {
   graphAlertIncidentKey,
   type OpenGraphTriggerSent,
 } from "../repositories/trigger.repository";
+import { slackDestinationResolver } from "../slack-integration/slack-destination-resolver";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";
@@ -231,6 +233,10 @@ function makeHarness({
     triggerSent,
     updateLastRunAt,
     notifier: { dispatch },
+    // No connection resolves, so only a trigger's own legacy secret delivers.
+    resolveSlackDestination: slackDestinationResolver({
+      connections: { findUsableSecret: async () => null },
+    }),
     baseHost: "https://app.langwatch.test",
     now: () => NOW,
   };
@@ -270,11 +276,83 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
-  describe("given a graph whose grouped result exceeds the row ceiling", () => {
-    // The failure this replaces was not an error at all: the result was
-    // materialised until the process died, so the job neither completed nor
-    // failed. Three of those in a row poison-parked the tenant's whole
-    // graph-trigger lane and silently stopped every alert in the project.
+  describe("given a grouped graph whose series is an average", () => {
+    const AVG_KEY = "0/performance.completion_time/avg";
+
+    function groupedAverageHarness() {
+      const h = makeHarness({
+        trigger: makeTrigger({
+          actionParams: {
+            threshold: 250,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: "0/performance.completion_time/avg",
+            members: ["a@example.com"],
+          },
+        } as Partial<Trigger>),
+        graph: makeGraph({
+          graph: {
+            series: [
+              {
+                name: "Average completion time",
+                metric: "performance.completion_time",
+                aggregation: "avg",
+                colorSet: "blueTones",
+              },
+            ],
+            groupBy: "traces.trace_name",
+            timeScale: 60,
+          },
+        } as unknown as Partial<CustomGraph>),
+        series: timeseries(null),
+      });
+      // Two groups averaging 100 ms and 200 ms; across every trace the series
+      // averages 150 ms. Only an ungrouped read can give the latter.
+      h.getTimeseries.mockImplementation(async (input: { groupBy?: string }) =>
+        input.groupBy
+          ? ({
+              currentPeriod: [
+                {
+                  date: "2026-06-20T11:00:00Z",
+                  "traces.trace_name": {
+                    checkout: { [AVG_KEY]: 100 },
+                    search: { [AVG_KEY]: 200 },
+                  },
+                },
+              ],
+              previousPeriod: [],
+            } as unknown as TimeseriesResult)
+          : ({
+              currentPeriod: [{ date: "2026-06-20T11:00:00Z", [AVG_KEY]: 150 }],
+              previousPeriod: [],
+            } as unknown as TimeseriesResult),
+      );
+      return h;
+    }
+
+    it("compares the series' own value with the threshold, not the groups added together", async () => {
+      const grouped = groupedAverageHarness();
+
+      const result = await evaluateGraphTrigger({
+        deps: grouped.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.value).toBe(150);
+      expect(result.status).toBe("not_breached");
+      expect(grouped.getTimeseries.mock.calls[0]![0].groupBy).toBeUndefined();
+    });
+  });
+
+  describe("given a timeseries read that exceeds the row ceiling", () => {
+    // The read no longer groups, so this is the backstop for any read that
+    // still fans out. The failure it replaced was not an error at all: a
+    // grouped result was materialised until the process died, so the job
+    // neither completed nor failed. Three of those in a row poison-parked the
+    // tenant's whole graph-trigger lane and silently stopped every alert in
+    // the project.
     function tooLarge() {
       const error = new Error(
         "Limit for result exceeded: TOO_MANY_ROWS_OR_BYTES",
@@ -314,6 +392,56 @@ describe("evaluateGraphTrigger", () => {
 
     it("never fires an alert on a result it could not read", async () => {
       harness.getTimeseries.mockRejectedValue(tooLarge());
+
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(harness.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a series the query builder refuses to express as a percentage", () => {
+    // #6718 added a handled refusal for "percentage of a per-entity
+    // measurement", which the composer still lets an author save. The builder
+    // raises it on EVERY evaluation of such a trigger, and a rethrow here is a
+    // redelivery — the same poison-pill shape the row ceiling above documents.
+    function percentageUnsupported() {
+      return new SeriesPercentageUnsupportedError();
+    }
+
+    /** @scenario "An alert on a series the query refuses is skipped, not retried forever" */
+    it("skips that trigger instead of failing the evaluation", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("skipped");
+    });
+
+    it("does not throw, so one bad series cannot quarantine the tenant's lane", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).resolves.toMatchObject({ status: "skipped" });
+    });
+
+    it("never fires an alert on a result it could not read", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
 
       await evaluateGraphTrigger({
         deps: harness.deps,
@@ -832,6 +960,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach whose dispatch throws a typed DispatchError", () => {
+    /** @scenario "A terminally failing endpoint is not re-posted every evaluation" */
     it("keeps the claim when the failure is terminal (retryable: false), so a dead endpoint is not re-posted every evaluation", async () => {
       harness.dispatch.mockRejectedValue(
         new DispatchError({ message: "webhook revoked", retryable: false }),
@@ -904,6 +1033,7 @@ describe("evaluateGraphTrigger", () => {
   // branch. Bot params carry no `slackWebhook`, so the dispatcher logged "no
   // Slack webhook configured" and returned didSend false — a silent hole.
   describe("given a bot-delivery Slack alert whose connection cannot be resolved", () => {
+    /** @scenario "A connection outside the automation's reach fails with a named cause" */
     it("throws rather than falling through to the webhook branch", async () => {
       harness = makeHarness({
         trigger: makeTrigger({
@@ -914,7 +1044,9 @@ describe("evaluateGraphTrigger", () => {
             timePeriod: 60,
             seriesName: "0/metadata.trace_id/cardinality",
             slackDelivery: "bot",
-            // No slackBotToken, no slackChannelId — and no slackWebhook either.
+            // A deleted connection; no legacy token and no webhook either.
+            slackIntegrationId: "conn-deleted",
+            slackChannelId: "C0123",
           },
         }),
         series: timeseries(15),
@@ -927,7 +1059,7 @@ describe("evaluateGraphTrigger", () => {
           projectId: PROJECT_ID,
           reason: "real-time",
         }),
-      ).rejects.toThrow(/missing its token or channel/);
+      ).rejects.toThrow(/has no usable connection/);
 
       expect(harness.dispatch).not.toHaveBeenCalled();
       // The throw happens during bot-destination resolution, which runs BEFORE

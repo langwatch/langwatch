@@ -14,6 +14,7 @@ import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -68,6 +69,7 @@ import {
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   type SetArrivalPolicyCommandData,
+  SSO_IDP_EDITABLE_STATES,
   SsoConnectionActivationBlockedError,
   SsoConnectionAlreadyRegisteredError,
   type SsoConnectionCommandType,
@@ -88,6 +90,8 @@ import {
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SuspendConnectionCommandData,
   TEARDOWN_REQUESTED_EVENT_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
@@ -243,6 +247,9 @@ const ALLOWED_FROM: Record<
     "SUSPENDED",
     "TEARDOWN_PENDING",
   ],
+  // Shared with the settings card, so the Edit control and this guard
+  // cannot disagree about where it works.
+  [UPDATE_CONNECTION_IDP_COMMAND_TYPE]: SSO_IDP_EDITABLE_STATES,
 };
 
 export interface SsoConnectionGuardsDeps {
@@ -738,28 +745,34 @@ export class SsoConnectionGuards {
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, REQUEST_VERIFICATION_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    // A record may be asked for against an approved claim, or against one
-    // still waiting — the record is what will decide the waiting one. Only
-    // the PUBLISHED-record ceremony may stand in for a decision: a licence
-    // speaks for an installation and has already decided at the claim, so
-    // asking for it here against an undecided claim would be a second,
-    // unwitnessed way to approve one.
+    // A proof may be asked for against an approved claim, or against one
+    // still waiting: the published record, or on a self-hosted installation
+    // the licence, is what will decide the waiting one when it lands. The
+    // licence is checked below and again when the proof lands.
     const decided = state.approvedDomains.includes(domain);
     const waiting = domainClaimFor({ state, domain })?.state === "WAITING";
-    if (!decided && !(waiting && data.method === "dns-txt")) {
+    if (!decided && !waiting) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: domain ${domain} has no claim a ${data.method} ceremony may prove`,
       );
     }
-    // The licence-bound ceremony exists because a self-hosted customer has
-    // nobody to publish a record for. Asked of the port rather than of the
-    // command, so a hosted organization naming the method gets the same
-    // refusal an unlicensed installation does, and neither of them can talk
-    // its way past a DNS record it simply has to publish.
+    // The licence-bound ceremony is for a self-hosted installation, where
+    // whoever runs it already decides who has an account on it. Asked of the
+    // port rather than of the command, so a hosted organization naming the
+    // method gets the same refusal an unlicensed installation does, and
+    // neither of them can talk its way past a record it has to publish. On
+    // an installation with several organizations the licence speaks only
+    // through a platform operator.
     if (data.method === "license-token") {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${data.connectionId}: a license proves entitlement, not control of ${domain}; use DNS proof or operator attestation`,
-      );
+      if (!(await this.licenseAuthority.licenseAuthorizesDomainClaims())) {
+        throw new SsoDomainProofNotFoundError(
+          `connection ${data.connectionId}: no license on this deployment proves ${domain}; publish the DNS record or file`,
+        );
+      }
+      await this.requireLicenseSpeaksFor({
+        actor: data.actor,
+        act: `prove ${domain} with the installation's license`,
+      });
     }
     await this.refuseIfDomainOwnedElsewhere({
       domain,
@@ -896,6 +909,9 @@ export class SsoConnectionGuards {
    * a caller that names it, so the only way that authority reaches a fact is
    * through this method, on a ceremony this method has just checked.
    *
+   * A licence ceremony decides a waiting claim the same way, under the
+   * authority `license`, after the licence gate is asked again.
+   *
    * Ownership is re-checked either way: the ceremony is not instantaneous,
    * and another organization's connection may have gone ACTIVE on the same
    * domain while this one was waiting for DNS. That refusal is what keeps a
@@ -936,11 +952,12 @@ export class SsoConnectionGuards {
     }
     const method = data.channel ?? pending.method;
     const undecided = state.claimedDomains.includes(domain);
-    if (undecided && pending.method !== "dns-txt") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: a ${pending.method} ceremony cannot decide the claim on ${domain}`,
-      );
-    }
+    const authority = await this.authorityDecidingClaim({
+      data,
+      domain,
+      ceremony: pending.method,
+      undecided,
+    });
     return [
       ...(undecided
         ? [
@@ -950,7 +967,7 @@ export class SsoConnectionGuards {
                 connectionId: data.connectionId,
                 domain,
                 actor: data.actor,
-                authority: "dns-proof" as const,
+                authority,
                 source: data.source,
               },
             } satisfies SsoConnectionFactInput,
@@ -971,6 +988,41 @@ export class SsoConnectionGuards {
         },
       },
     ];
+  }
+
+  /**
+   * Which authority a landing ceremony decides a waiting claim under. Two
+   * ceremonies may decide one: a published record, and a self-hosted
+   * installation's licence. The licence is asked again here, at the moment
+   * it decides, rather than trusted from the request.
+   */
+  private async authorityDecidingClaim({
+    data,
+    domain,
+    ceremony,
+    undecided,
+  }: {
+    data: VerifyDomainCommandData;
+    domain: string;
+    ceremony: string;
+    undecided: boolean;
+  }): Promise<"license" | "dns-proof"> {
+    if (ceremony === "license-token") {
+      if (undecided) {
+        await this.requireClaimAuthority({
+          authority: "license",
+          actor: data.actor,
+          act: `approve the claim on ${domain}`,
+        });
+      }
+      return "license";
+    }
+    if (undecided && ceremony !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${ceremony} ceremony cannot decide the claim on ${domain}`,
+      );
+    }
+    return "dns-proof";
   }
 
   /**
@@ -1258,6 +1310,68 @@ export class SsoConnectionGuards {
     ];
   }
 
+  /**
+   * The identity provider's dialing information, replaced on the same
+   * connection id, so the redirect address registered at the provider, the
+   * domains and their proofs, the arrival policy and the linked accounts all
+   * stay.
+   *
+   * The new values were already checked (discovery, metadata) and stored by
+   * the caller; this decides only whether the connection may take them.
+   * A grandfathered connection is refused: it dials the deployment's legacy
+   * provider and has no settings of its own to replace. The protocol cannot
+   * change either, because the engine row, the service provider details the
+   * customer copied and the sign-in path all depend on it.
+   *
+   * Settings identical to the current ones cost no fact.
+   */
+  async updateConnectionIdp(
+    data: UpdateConnectionIdpCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(data, UPDATE_CONNECTION_IDP_COMMAND_TYPE);
+    if (state.source !== "self-serve") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} is grandfathered and has no identity provider settings to replace`,
+      );
+    }
+    const { idp } = data;
+    const fitsProtocol =
+      state.type === "oidc"
+        ? idp.issuer !== null &&
+          idp.clientIdRef !== null &&
+          idp.secretRef !== null &&
+          idp.certRefs.length === 0
+        : idp.clientIdRef === null &&
+          idp.secretRef === null &&
+          idp.certRefs.length === 1;
+    if (!fitsProtocol) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
+      );
+    }
+    const current = state.idpMetadata;
+    if (
+      current.issuer === idp.issuer &&
+      current.clientIdRef === idp.clientIdRef &&
+      current.secretRef === idp.secretRef &&
+      current.certRefs.length === idp.certRefs.length &&
+      current.certRefs.every((ref, index) => ref === idp.certRefs[index])
+    ) {
+      return [];
+    }
+    return [
+      {
+        type: CONNECTION_IDP_UPDATED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          idp,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
   async resumeConnection(
     data: ResumeConnectionCommandData,
   ): Promise<SsoConnectionFactInput[]> {
@@ -1536,10 +1650,29 @@ export class SsoConnectionGuards {
     }
     const licensed =
       await this.licenseAuthority.licenseAuthorizesDomainClaims();
-    if (licensed) return;
-    throw new SsoLicenseRequiredError(
-      `no licence on this deployment authorizes ${act}`,
-    );
+    if (!licensed) {
+      throw new SsoLicenseRequiredError(
+        `no license on this deployment authorizes ${act}`,
+      );
+    }
+    await this.requireLicenseSpeaksFor({ actor, act });
+  }
+
+  /**
+   * Who the licence speaks for. With one organization on the installation,
+   * its administrator is the person who runs it. With several, an
+   * organization administrator is not, so only a platform operator may use
+   * the licence in place of a published proof.
+   */
+  private async requireLicenseSpeaksFor({
+    actor,
+    act,
+  }: {
+    actor: IdentityActor;
+    act: string;
+  }): Promise<void> {
+    if (await this.licenseAuthority.hostsSingleOrganization()) return;
+    await this.requirePlatformOperator({ actor, act });
   }
 
   private requireClaimed({
