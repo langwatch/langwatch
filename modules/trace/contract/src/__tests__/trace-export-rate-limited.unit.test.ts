@@ -9,6 +9,7 @@ import { TraceExportRateLimitedError } from "../features/export/trace-export.err
 
 describe("TraceExportRateLimitedError", () => {
   describe("when the rate window is full", () => {
+    /** @scenario "A refused export tells the caller how long to wait" */
     it("is a 429 that carries the wait in milliseconds", () => {
       const error = new TraceExportRateLimitedError({ reason: "rate", retryAfterSeconds: 42 });
 

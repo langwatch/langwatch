@@ -144,7 +144,7 @@ Feature: Settings shell
     Then there is no API Keys entry and no Secrets entry
 
   @integration
-  Scenario: The top bar shows a static Settings title
+  Scenario: The top bar keeps a static Settings label
     Given I open Settings in the product-switcher mode
     Then the top bar shows "Settings" with no product dropdown
     And the organization control stays in the top bar

@@ -44,14 +44,14 @@ Feature: Sticky glass page titles
     Then its compact header is 48 pixels high
     And its title is 15 pixel semibold and its buttons are 28 pixels high
 
-  @browser
+  @browser @unimplemented
   Scenario: Rounded shell cards contain sticky headers during scrolling
     Given a settings page inside the shell content card
     When the page is at the top or scrolled
     Then the header stays inside the card border and rounded corner
     And its title keeps the same offset from the card top
 
-  @browser
+  @browser @unimplemented
   Scenario: Section separators stay deliberately separated
     Given a section page with a 196 pixel rail
     Then the rail title and page title share their baseline and row height

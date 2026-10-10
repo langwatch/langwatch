@@ -157,6 +157,17 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
+  describe("when the reader has no ops access", () => {
+    /** @scenario "A reader without ops access sees no ops groups" */
+    it("shows no Health, Tools, Instance or Cloud group", () => {
+      renderSettingsSidebar({ hasOpsAccess: false });
+
+      for (const label of ["Health", "Tools", "Instance", "Cloud"]) {
+        expect(screen.queryByText(label)).not.toBeInTheDocument();
+      }
+    });
+  });
+
   describe("when the settings menu renders in a v2 mode", () => {
     /** @scenario The settings menu is grouped with its gates kept */
     it("shows the groups with the current addresses", () => {

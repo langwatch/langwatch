@@ -3,7 +3,7 @@ import { Box } from "@chakra-ui/react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PageLayout } from "../src/components/layout/page-layout.tsx";
+import { PageHeaderSizeProvider, PageLayout } from "../src/components/layout/page-layout.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
@@ -77,5 +77,47 @@ describe("sticky page header", () => {
     scrollPage(40);
     expect(screen.getByTestId("header").getAttribute("data-scrolled")).toBe("true");
     expect(getComputedStyle(screen.getByTestId("header")).borderBottomWidth).toBe("0px");
+  });
+});
+
+describe("header geometry", () => {
+  const headerWith = ({ actions = 0, requested }: { actions?: number; requested?: "lg" | "sm" }) =>
+    renderWithDesignSystem(
+      <PageHeaderSizeProvider size="lg">
+        <PageLayout.Header
+          size={requested}
+          data-testid="header"
+          actions={Array.from({ length: actions }, (_, index) => (
+            <button key={index} type="button" className="chakra-button">
+              Action {index}
+            </button>
+          ))}
+        >
+          <PageLayout.Heading>Annotations</PageLayout.Heading>
+        </PageLayout.Header>
+      </PageHeaderSizeProvider>,
+    );
+
+  /** @scenario The area pins header geometry independently of actions */
+  it("keeps the large header whatever the actions or the requested size", () => {
+    for (const actions of [0, 1, 3]) {
+      headerWith({ actions, requested: "sm" });
+      const header = screen.getByTestId("header");
+      expect(header.getAttribute("data-header-size")).toBe("lg");
+      expect(getComputedStyle(header).height).toBe("var(--chakra-sizes-page-header-lg)");
+      cleanup();
+    }
+  });
+
+  /** @scenario Full-screen tools may use compact headers */
+  it("gives a standalone header the compact size when it asks for it", () => {
+    renderWithDesignSystem(
+      <PageLayout.Header size="sm" data-testid="header">
+        <PageLayout.Heading>Studio</PageLayout.Heading>
+      </PageLayout.Header>,
+    );
+    const header = screen.getByTestId("header");
+    expect(header.getAttribute("data-header-size")).toBe("sm");
+    expect(getComputedStyle(header).height).toBe("var(--chakra-sizes-page-header-sm)");
   });
 });
