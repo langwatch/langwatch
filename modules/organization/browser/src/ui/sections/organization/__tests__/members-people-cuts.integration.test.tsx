@@ -303,6 +303,22 @@ describe("given the directory's people tab", () => {
       expect(screen.queryByRole("button", { name: /^Waiting to join/ })).not.toBeInTheDocument();
       expect(cut(/^Everybody/)).toHaveAttribute("aria-pressed", "true");
     });
+
+    /** @scenario A cut that is waiting on somebody says how many */
+    it("still shows the cut for a request a sign-on arrival queued", () => {
+      state.requests = [
+        {
+          joinRequestId: "jreq_sso",
+          name: "Rex Ford",
+          domain: "acme.com",
+          requestedAt: "2026-08-20T09:00:00.000Z",
+          expiresAt: null,
+        },
+      ];
+      renderPeople({ people: "waiting" }, new Set());
+
+      expect(cut(/^Waiting to join, 1 person/)).toHaveAttribute("aria-pressed", "true");
+    });
   });
 
   describe("when nothing is waiting", () => {
