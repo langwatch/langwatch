@@ -51,3 +51,11 @@ Feature: The workflow studio shows one quiet connection status
     Then no run toast is raised
     And no running node is stopped
     And the connection status moves to reconnecting
+
+  @integration
+  Scenario: Run in the expanded input panel waits for the engine
+    Given the studio's engine connection is not up
+    When the user opens a node's expanded input panel
+    Then its Run button is disabled with the tooltip "Waiting for the engine to connect"
+    And "Reconnecting…" shows beside the button
+    And no toast is raised
