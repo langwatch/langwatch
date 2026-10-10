@@ -445,7 +445,7 @@ function BillingEventsPage() {
   return (
     <AiGatewayLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Billing Events</PageLayout.Heading>
+        <PageLayout.Heading>Billing events</PageLayout.Heading>
       </PageLayout.Header>
 
       <PageLayout.Container>

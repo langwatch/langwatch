@@ -8,7 +8,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   HStack,
   Spacer,
   Table,
@@ -117,7 +116,7 @@ function VirtualKeysHeader({
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
+        <PageLayout.Heading>Virtual keys</PageLayout.Heading>
         <Spacer />
         {canCreate && (
           <PageLayout.HeaderButton
@@ -289,76 +288,58 @@ function VirtualKeysPage() {
                 </Tabs.List>
               </Tabs.Root>
               {rows.length === 0 ? (
-                <Card.Root variant="showcase" width="full">
-                  <Card.Body>
-                    <NoDataInfoBlock
-                      icon={<KeyRound />}
-                      title={`No ${statusTab} keys.`}
-                      description="Keys with this status will appear here."
-                    />
-                  </Card.Body>
-                </Card.Root>
+                <NoDataInfoBlock
+                  icon={<KeyRound />}
+                  title={`No ${statusTab} keys.`}
+                  description="Keys with this status will appear here."
+                />
               ) : (
-                <Card.Root variant="showcase" width="full" overflow="hidden">
-                  {/* The card clips; the body scrolls. Without this the
-                      right-hand columns are simply unreachable on a narrow
-                      window instead of scrolling into view. Focusable so the
-                      scroll is reachable from the keyboard alone. */}
-                  <Card.Body
-                    paddingY={0}
-                    paddingX={0}
-                    overflowX="auto"
-                    as="section"
-                    tabIndex={0}
-                    aria-label="Virtual keys table"
+                <Box as="section" overflowX="auto" tabIndex={0} aria-label="Virtual keys table">
+                  <ListTable
+                    containerProps={{ overflowX: "auto", maxWidth: "full" }}
+                    size="md"
+                    width="full"
                   >
-                    <ListTable
-                      containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                      variant="line"
-                      size="md"
-                      width="full"
-                    >
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                          <Table.ColumnHeader>Status</Table.ColumnHeader>
-                          <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-                          <Table.ColumnHeader>Routing</Table.ColumnHeader>
-                          <Table.ColumnHeader>
-                            <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
-                              <Text as="span">Spent this month</Text>
-                            </Tooltip>
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                          <Table.ColumnHeader></Table.ColumnHeader>
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {rows.map((vk) => (
-                          <VirtualKeyTableRow
-                            key={vk.id}
-                            vk={vk}
-                            scopes={scopeEntriesWithNames(vk.scopes)}
-                            policyNameById={policyNameById}
-                            spend={spendByKeyId.get(vk.id)}
-                            spendIsLoading={spendQuery.isLoading}
-                            spendIsError={spendQuery.isError}
-                            budget={budgetByKeyId.get(vk.id)}
-                            traceHref={traceHrefByKeyId.get(vk.id)}
-                            canUpdate={canUpdate}
-                            canRotate={canRotate}
-                            canRevoke={canRevoke}
-                            onNavigate={(href) => router.push(href)}
-                            onEdit={() => setEditing(vk)}
-                            onRotate={() => setRotating({ id: vk.id, name: vk.name })}
-                            onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
-                          />
-                        ))}
-                      </Table.Body>
-                    </ListTable>
-                  </Card.Body>
-                </Card.Root>
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader>Name</Table.ColumnHeader>
+                        <Table.ColumnHeader>Prefix</Table.ColumnHeader>
+                        <Table.ColumnHeader>Status</Table.ColumnHeader>
+                        <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+                        <Table.ColumnHeader>Routing</Table.ColumnHeader>
+                        <Table.ColumnHeader>
+                          <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
+                            <Text as="span">Spent this month</Text>
+                          </Tooltip>
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader>Last used</Table.ColumnHeader>
+                        <Table.ColumnHeader></Table.ColumnHeader>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {rows.map((vk) => (
+                        <VirtualKeyTableRow
+                          key={vk.id}
+                          vk={vk}
+                          scopes={scopeEntriesWithNames(vk.scopes)}
+                          policyNameById={policyNameById}
+                          spend={spendByKeyId.get(vk.id)}
+                          spendIsLoading={spendQuery.isLoading}
+                          spendIsError={spendQuery.isError}
+                          budget={budgetByKeyId.get(vk.id)}
+                          traceHref={traceHrefByKeyId.get(vk.id)}
+                          canUpdate={canUpdate}
+                          canRotate={canRotate}
+                          canRevoke={canRevoke}
+                          onNavigate={(href) => router.push(href)}
+                          onEdit={() => setEditing(vk)}
+                          onRotate={() => setRotating({ id: vk.id, name: vk.name })}
+                          onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
+                        />
+                      ))}
+                    </Table.Body>
+                  </ListTable>
+                </Box>
               )}
             </VStack>
           )}

@@ -110,7 +110,7 @@ function CacheRulesPage() {
     <AiGatewayLayout>
       <>
         <PageLayout.Header>
-          <PageLayout.Heading>Cache Rules</PageLayout.Heading>
+          <PageLayout.Heading>Cache rules</PageLayout.Heading>
           <Spacer />
           {canCreate && !showRulesEmpty && (
             <PageLayout.HeaderButton primary onClick={() => setCreateOpen(true)}>

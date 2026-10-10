@@ -399,8 +399,8 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-settings-model-providers",
-    label: "Model Providers",
-    description: "Settings → Model Providers",
+    label: "Model providers",
+    description: "Settings → Model providers",
     icon: Key,
     category: "navigation",
     keywords: ["api", "key", "openai", "anthropic", "provider", "llm"],

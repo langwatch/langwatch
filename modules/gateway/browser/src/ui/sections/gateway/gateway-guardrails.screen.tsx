@@ -7,7 +7,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Card,
+  Box,
   Field,
   HStack,
   Input,
@@ -254,13 +254,8 @@ function GuardrailsTable({
   onArchive: (row: GuardrailRow) => void;
 }) {
   return (
-    <Card.Root variant="showcase" width="full" overflowX="auto">
-      <ListTable
-        containerProps={{ overflowX: "auto", maxWidth: "full" }}
-        size="md"
-        variant="line"
-        width="full"
-      >
+    <Box as="section" overflowX="auto" tabIndex={0} aria-label="Guardrails table">
+      <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="md" width="full">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -345,7 +340,7 @@ function GuardrailsTable({
           })}
         </Table.Body>
       </ListTable>
-    </Card.Root>
+    </Box>
   );
 }
 
