@@ -10,6 +10,14 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./formatted-number": {
+      "types": "./dist/components/display/formatted-number.d.ts",
+      "default": "./src/components/display/formatted-number.tsx"
+    },
+    "./formatted-date": {
+      "types": "./dist/components/display/formatted-date.d.ts",
+      "default": "./src/components/display/formatted-date.tsx"
+    },
     "./format-money-display": {
       "types": "./dist/components/display/format-money-display.d.ts",
       "default": "./src/components/display/format-money-display.tsx"
