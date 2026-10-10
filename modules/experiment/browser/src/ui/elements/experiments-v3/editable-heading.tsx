@@ -88,18 +88,20 @@ export function EditableHeading({
       data-testid="experiment-name-edit"
       onClick={handleStartEdit}
       minWidth={0}
-      _hover={{ "& .edit-icon": { opacity: 1 } }}
+      _hover={{ "& .edit-icon": { color: "fg" } }}
     >
       <PageLayout.Heading color={value ? undefined : "fg.subtle"}>
         {value || placeholder || ""}
       </PageLayout.Heading>
+      {/* Always shown, so the title reads as renameable at a glance. */}
       <Box
         className="edit-icon"
-        opacity={value ? 0 : 1}
-        transition="opacity 0.2s"
-        color="fg.subtle"
+        display="flex"
+        transition="color 0.15s"
+        color="fg.muted"
+        aria-hidden
       >
-        <Edit2 size={14} />
+        <Edit2 size={16} />
       </Box>
     </HStack>
   );

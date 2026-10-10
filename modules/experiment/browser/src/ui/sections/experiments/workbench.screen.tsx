@@ -227,7 +227,7 @@ export default function ExperimentsWorkbenchPage() {
           }
         >
           <EditableHeading
-            value={name === slug ? "" : name}
+            value={name}
             placeholder="Untitled experiment"
             onSave={setName}
             isLoading={isLoadingExperiment}
