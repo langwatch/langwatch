@@ -3,7 +3,7 @@
  * guard's own reasoning read forwards, said while there is still time to act.
  */
 
-import { providerDisplayName } from "./sign-in-methods.ts";
+import { isSsoConnectionProvider, providerDisplayName } from "./sign-in-methods.ts";
 
 export type LastWayInWarning = {
   /** Which way in is the only one. */
@@ -44,6 +44,15 @@ export function lastWayInWarningFor({
   }
   const only = linked[0];
   if (!only) return null;
+  // A passkey or password beside an organization's SSO is refused at sign-in
+  // (specs/identity/sso-credential-enforcement.feature), so none is offered.
+  if (isSsoConnectionProvider(only.provider)) {
+    return {
+      id: "only-linked",
+      message:
+        "Your organization's single sign-on is the only way into this account. If that access ends, ask an administrator of your organization to restore it.",
+    };
+  }
   const name = providerDisplayName(only.provider, only.providerAccountId);
 
   return {

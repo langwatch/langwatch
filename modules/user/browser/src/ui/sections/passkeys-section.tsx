@@ -25,6 +25,7 @@ import { readableDate } from "@langwatch/time";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { api } from "../../behavior/personal-workspace-api.ts";
 import { useLastWayInWarning } from "../../behavior/use-last-way-in-warning.ts";
 import {
   usePersonalWorkspaceHost,
@@ -276,10 +277,13 @@ export function PasskeysSection() {
     }
   }, [host]);
 
+  // The account-security nudge creates passkeys too, outside this card; its
+  // offer is re-read after each one, so a fresh offer means a fresh list.
+  const nudgeReadAt = api.user.secureAccountNudge.useQuery({}).dataUpdatedAt;
   useEffect(() => {
     if (!passkeysEnabled) return;
     void reload();
-  }, [passkeysEnabled, reload]);
+  }, [passkeysEnabled, reload, nudgeReadAt]);
 
   /**
    * Says what happened, and says nothing at all about a decision. A

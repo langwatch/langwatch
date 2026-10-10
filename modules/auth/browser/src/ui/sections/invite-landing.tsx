@@ -244,6 +244,12 @@ function ConfirmAndJoin({
   // Signed in as somebody else is the one failure with a way out rather than
   // a retry, so it replaces the join button instead of sitting above it.
   const wrongAccount = readHandledError(accept.error)?.code === "invite_wrong_account";
+  // Already spent (an SSO sign-in applies a matching invitation itself) is
+  // the outcome they wanted: go in, as a fresh join would.
+  const alreadyAccepted = readHandledError(accept.error)?.code === "invite_already_accepted";
+  useEffect(() => {
+    if (alreadyAccepted) hardRedirect("/");
+  }, [alreadyAccepted]);
 
   // Sign out without logout's own redirect, then come back here: the
   // invitation is the thing they were doing.
@@ -269,7 +275,7 @@ function ConfirmAndJoin({
         inviterName={inviterName}
         testId={wrongAccount ? undefined : "invite-confirm"}
       />
-      {accept.error ? (
+      {accept.error && !alreadyAccepted ? (
         <HandledErrorAlert error={accept.error} fallbackTitle="Couldn't accept the invitation" />
       ) : null}
       {wrongAccount ? (

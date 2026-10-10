@@ -48,6 +48,9 @@ describe("given an account linked through Auth0", () => {
     it("title-cases the strategy rather than showing the raw id", () => {
       expect(providerDisplayName("auth0", "okta-workforce|abc")).toBe("Okta Workforce");
       expect(providerDisplayName("auth0", "")).toBe("Unknown");
+      expect(providerDisplayName("ssoc_0003TdmygUVipom1qhj9TfyNq5bVo", "sub-1")).toBe(
+        "Single sign-on",
+      );
     });
   });
 });

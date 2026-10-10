@@ -207,6 +207,18 @@ describe("given an invitation link", () => {
         expect(hardRedirectMock).toHaveBeenCalledWith(`/invite/accept?inviteCode=${INVITE_CODE}`),
       );
     });
+
+    it("goes in instead of raising an alarm when the invitation was already spent", async () => {
+      sessionRef.current = { data: { user: { id: "u1" } } };
+      acceptStateRef.current = {
+        error: handled("invite_already_accepted", 400),
+        isPending: false,
+      };
+      renderLanding();
+
+      await vi.waitFor(() => expect(hardRedirectMock).toHaveBeenCalledWith("/"));
+      expect(screen.queryByText("Couldn't accept the invitation")).toBeNull();
+    });
   });
 
   describe("when the invitation has expired", () => {
