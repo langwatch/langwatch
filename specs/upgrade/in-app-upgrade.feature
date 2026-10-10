@@ -118,10 +118,18 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
 
   @unimplemented
   Scenario: The upgrading frame names the upgrade's phase and its progress
-    Given the worker is applying the second of five blocking steps
+    Given a self-hosted install whose worker is applying the second of five blocking steps
     When a signed-in browser opens any page other than sign-in and Upgrades
     Then the upgrading frame names the phase and "2 of 5"
     And it names no tenant, error, hostname or version
+
+  # UPGRADE-FACE (Alex, 2026-10-10): cloud never says it is upgrading.
+  @unimplemented
+  Scenario: A cloud browser waiting on an upgrade sees only the branded page
+    Given a cloud install whose worker is applying a blocking step
+    When a browser opens a page whose reads answer upgrade_in_progress
+    Then it shows the LangWatch logo on the gradient page, with at most one light line
+    And it shows no loader, phase, step count, version or the word "upgrade"
 
   @integration
   Scenario: The Upgrades page opens once its grant read settles, even when no feature flag answers

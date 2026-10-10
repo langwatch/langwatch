@@ -1415,7 +1415,10 @@ transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, 
 tRPC and SSE), and the browser's query client keeps retrying it with backoff. Ingestion is
 unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
 table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
-not ready until the ledger is current. A failed step of either store shows on Ops > Upgrades with
+not ready until the ledger is current. What a waiting browser sees splits by deployment (Alex,
+2026-10-10, UPGRADE-FACE): self-hosted shows the upgrading frame with phase and progress; cloud
+names no upgrade at all, only the branded logo-on-gradient page, at most with one light line
+("Migrating the vibes, back soon"), no loader, step count or version. A failed step of either store shows on Ops > Upgrades with
 Retry; only a failed first install, which nobody can sign in to follow, opens the api's token
 console. A blocking step never touches a table the sign-in or ingest doors read or write
 (auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
