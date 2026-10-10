@@ -12,6 +12,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -68,7 +69,7 @@ function scopeLabel({
 /** Colour by how much the role can do, not by which one it happens to be. */
 function roleTone(role: string): string {
   if (role === "ADMIN") return "red";
-  if (role === "MEMBER") return "blue";
+  if (role === "MEMBER") return "accent";
   if (role === "VIEWER") return "gray";
   return "purple";
 }
@@ -189,7 +190,7 @@ export function MemberAccessEditor({
             Organization role
           </Text>
           {isCurrentUser ? (
-            <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+            <Text fontSize="sm" color="fg.muted">
               You cannot change your own organization role.
             </Text>
           ) : (
@@ -249,7 +250,7 @@ export function MemberAccessEditor({
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="accent"
             disabled={!editor.hasChanges}
             loading={editor.isSaving}
             onClick={() => void editor.handleSave()}
@@ -324,7 +325,7 @@ function DirectAssignments({
   const held = directGrants.data ?? [];
   if (held.length === 0 && staged.length === 0) {
     return (
-      <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+      <Text fontSize="sm" color="fg.muted">
         No role assigned.
       </Text>
     );
@@ -338,10 +339,11 @@ function DirectAssignments({
         return (
           <HStack
             key={b.id}
-            px={3}
-            py={2}
-            bg="bg.muted"
-            borderRadius="md"
+            px={4}
+            py={3}
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="lg"
             fontSize="sm"
             opacity={marked ? 0.4 : 1}
             transition="opacity 0.15s"
@@ -352,7 +354,7 @@ function DirectAssignments({
               <Button
                 size="xs"
                 variant="ghost"
-                color={marked ? "blue.500" : "fg.muted"}
+                color={marked ? "accent.fg" : "fg.muted"}
                 aria-label={marked ? "Undo removal" : "Remove assignment"}
                 onClick={() => onToggle(b.id)}
               >
@@ -365,10 +367,11 @@ function DirectAssignments({
       {staged.map((b, i) => (
         <HStack
           key={grantKey(b)}
-          px={3}
-          py={2}
-          bg="bg.muted"
-          borderRadius="md"
+          px={4}
+          py={3}
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="lg"
           fontSize="sm"
           opacity={0.7}
         >
@@ -405,7 +408,7 @@ function MemberGroups({
   if (memberGroups.isLoading) return <Spinner size="sm" />;
   if (!memberGroups.data?.length) {
     return (
-      <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+      <Text fontSize="sm" color="fg.muted">
         They are in no group.
       </Text>
     );
@@ -414,15 +417,7 @@ function MemberGroups({
     <VStack gap={2} align="stretch">
       {memberGroups.data.map((group) =>
         group.grants.length === 0 ? (
-          <HStack
-            key={group.id}
-            px={3}
-            py={2}
-            bg="bg.muted"
-            borderRadius="md"
-            fontSize="sm"
-            justifyContent="space-between"
-          >
+          <SettingsSectionRow key={group.id}>
             <HStack gap={2}>
               <Text fontSize="sm" color="fg.muted">
                 {group.name}
@@ -434,13 +429,14 @@ function MemberGroups({
                 />
               ) : null}
             </HStack>
-            <Link href="/settings/directory?tab=groups" fontSize="xs" color="blue.400">
+            <Spacer />
+            <Link href="/settings/directory?tab=groups" fontSize="xs" color="accent.fg">
               No role assigned
             </Link>
-          </HStack>
+          </SettingsSectionRow>
         ) : (
           group.grants.map((b) => (
-            <HStack key={b.id} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
+            <SettingsSectionRow key={b.id}>
               <AssignmentBadges {...b} />
               {appliesAsViewer({ role: b.role, organizationRole: pendingRole }) && (
                 <Text fontSize="xs" color="fg.muted">
@@ -451,7 +447,7 @@ function MemberGroups({
               <Text fontSize="xs" color="fg.muted">
                 through {group.name}
               </Text>
-            </HStack>
+            </SettingsSectionRow>
           ))
         ),
       )}

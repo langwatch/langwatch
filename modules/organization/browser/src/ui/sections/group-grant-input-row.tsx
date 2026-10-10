@@ -16,7 +16,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Search, X } from "lucide-react";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
@@ -245,21 +245,10 @@ export const GrantInputRow = forwardRef<
   const teams = useOrganizationTeams({ organizationId });
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const roleItems = useMemo(
-    () =>
-      roleItemsForSeat({
-        customRoles: customRoles.data ?? [],
-        organizationRole,
-      }),
-    [customRoles.data, organizationRole],
-  );
-  const roleCollection = useMemo(() => createListCollection({ items: roleItems }), [roleItems]);
-
-  const scopeTypeItems = useMemo(() => scopeTypeItemsForSeat(organizationRole), [organizationRole]);
-  const scopeTypeCollection = useMemo(
-    () => createListCollection({ items: scopeTypeItems }),
-    [scopeTypeItems],
-  );
+  const roleItems = roleItemsForSeat({ customRoles: customRoles.data ?? [], organizationRole });
+  const roleCollection = createListCollection({ items: roleItems });
+  const scopeTypeItems = scopeTypeItemsForSeat(organizationRole);
+  const scopeTypeCollection = createListCollection({ items: scopeTypeItems });
 
   useEffect(() => {
     const snap = pickerSnapForSeat({
@@ -278,49 +267,20 @@ export const GrantInputRow = forwardRef<
     }
   }, [organizationRole, roleValue, customRoleId, scopeType]);
 
-  const allTeamItems = useMemo(
-    () => (teams ?? []).map((t) => ({ label: t.name, value: t.id })),
-    [teams],
-  );
-  const teamItems = useMemo(
-    () => filterByLabel({ items: allTeamItems, search: teamSearch }),
-    [allTeamItems, teamSearch],
-  );
-  const teamCollection = useMemo(() => createListCollection({ items: teamItems }), [teamItems]);
-
-  // For project cascade: teams that have at least one project
-  const allProjectTeamItems = useMemo(
-    () =>
-      (teams ?? [])
-        .filter((t) => t.projects.length > 0)
-        .map((t) => ({ label: t.name, value: t.id })),
-    [teams],
-  );
-  const projectTeamItems = useMemo(
-    () => filterByLabel({ items: allProjectTeamItems, search: projectTeamSearch }),
-    [allProjectTeamItems, projectTeamSearch],
-  );
-  const projectTeamCollection = useMemo(
-    () => createListCollection({ items: projectTeamItems }),
-    [projectTeamItems],
-  );
-
-  // Projects filtered to the selected team
-  const allProjectItems = useMemo(
-    () =>
-      (teams ?? [])
-        .find((t) => t.id === projectTeamId)
-        ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [],
-    [teams, projectTeamId],
-  );
-  const projectItems = useMemo(
-    () => filterByLabel({ items: allProjectItems, search: projectSearch }),
-    [allProjectItems, projectSearch],
-  );
-  const projectCollection = useMemo(
-    () => createListCollection({ items: projectItems }),
-    [projectItems],
-  );
+  const allTeamItems = (teams ?? []).map((t) => ({ label: t.name, value: t.id }));
+  const teamItems = filterByLabel({ items: allTeamItems, search: teamSearch });
+  const teamCollection = createListCollection({ items: teamItems });
+  const allProjectTeamItems = (teams ?? [])
+    .filter((t) => t.projects.length > 0)
+    .map((t) => ({ label: t.name, value: t.id }));
+  const projectTeamItems = filterByLabel({ items: allProjectTeamItems, search: projectTeamSearch });
+  const projectTeamCollection = createListCollection({ items: projectTeamItems });
+  const allProjectItems =
+    (teams ?? [])
+      .find((t) => t.id === projectTeamId)
+      ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [];
+  const projectItems = filterByLabel({ items: allProjectItems, search: projectSearch });
+  const projectCollection = createListCollection({ items: projectItems });
 
   const isReady = isDirty && (scopeId !== "" || scopeType === GrantScopeTier.ORGANIZATION);
 
@@ -543,7 +503,8 @@ export const GrantInputRow = forwardRef<
 
       <Button
         size="sm"
-        colorPalette={isReady ? "blue" : undefined}
+        colorPalette="accent"
+        height="9"
         disabled={!isReady}
         loading={isPending}
         onClick={handleAdd}
