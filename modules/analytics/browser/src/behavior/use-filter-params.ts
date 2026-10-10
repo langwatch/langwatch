@@ -5,6 +5,7 @@
  */
 
 import { readUiStorage } from "@langwatch/browser-host/storage";
+import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
@@ -142,6 +143,8 @@ export function useFilterParams() {
       startDate: startDate.epochMilliseconds,
       endDate: endDate.epochMilliseconds,
       filters,
+      // Langy's own turns are not the customer's traffic; the Explorer hides them too.
+      excludeOrigins: [LANGY_TRACE_ORIGIN],
       ...(typeof queryParams.query === "string" ? { query: queryParams.query } : {}),
       ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
     }),

@@ -60,6 +60,7 @@ export type AnalyticsReadScope = ProjectScope & {
   query?: string;
   traceIds?: string[];
   negateFilters?: boolean;
+  excludeOrigins?: string[];
 };
 
 /** One stored builder chart: Graph plus kind discriminator. */
