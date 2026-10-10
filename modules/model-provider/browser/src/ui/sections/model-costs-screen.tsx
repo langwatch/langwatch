@@ -4,7 +4,7 @@
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -59,7 +59,7 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
             fontVariantNumeric="tabular-nums"
             color={isCustom ? "green.fg" : undefined}
           >
-            {formatMoney({ amount: rate * 1_000_000, currency: "USD" })}
+            {formatCurrency({ amount: rate * 1_000_000, currency: "USD" })}
             <Text as="span" color="fg.muted" textStyle="xs">
               {" "}
               / 1M

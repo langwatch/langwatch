@@ -30,10 +30,6 @@
       "types": "./dist/unified-diff.d.ts",
       "default": "./src/unified-diff.ts"
     },
-    "./format-money-display": {
-      "types": "./dist/components/values/format-money-display.d.ts",
-      "default": "./src/components/values/format-money-display.tsx"
-    },
     "./code-preview": {
       "types": "./dist/components/display/code-preview.d.ts",
       "default": "./src/components/display/code-preview.tsx"
@@ -117,10 +113,6 @@
     "./external-image": {
       "types": "./dist/components/display/external-image.d.ts",
       "default": "./src/components/display/external-image.tsx"
-    },
-    "./format-money": {
-      "types": "./dist/format-money.d.ts",
-      "default": "./src/format-money.ts"
     },
     "./format-currency": {
       "types": "./dist/format-currency.d.ts",

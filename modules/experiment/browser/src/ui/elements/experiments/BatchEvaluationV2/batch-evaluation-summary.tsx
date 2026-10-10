@@ -1,6 +1,6 @@
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { FormatMoney } from "@langwatch/design-system/format-money-display";
+import { Money } from "@langwatch/design-system/money";
 import {
   Box,
   Button,
@@ -86,36 +86,29 @@ export function BatchEvaluationV2EvaluationSummary({
             Mean Cost
           </HoverableBigText>
           <Box lineClamp={1} whiteSpace="nowrap">
-            <FormatMoney
+            <Money
               amount={
                 (run.summary.datasetAverageCost ?? 0) + (run.summary.evaluationsAverageCost ?? 0)
               }
               currency="USD"
-              format="$0.00[00]"
               tooltip={
                 <VStack align="start" gap={0}>
                   <Text>
                     Prediction mean cost:{" "}
                     {run.summary.datasetAverageCost
-                      ? formatMoney(
-                          {
-                            amount: run.summary.datasetAverageCost,
-                            currency: "USD",
-                          },
-                          "$0.00[00]",
-                        )
+                      ? formatCurrency({
+                          amount: run.summary.datasetAverageCost,
+                          currency: "USD",
+                        })
                       : "-"}
                   </Text>
                   <Text>
                     Evaluation mean cost:{" "}
                     {run.summary.evaluationsAverageCost
-                      ? formatMoney(
-                          {
-                            amount: run.summary.evaluationsAverageCost,
-                            currency: "USD",
-                          },
-                          "$0.00[00]",
-                        )
+                      ? formatCurrency({
+                          amount: run.summary.evaluationsAverageCost,
+                          currency: "USD",
+                        })
                       : "-"}
                   </Text>
                 </VStack>
@@ -161,34 +154,27 @@ export function BatchEvaluationV2EvaluationSummary({
             Total Cost
           </HoverableBigText>
           <Box lineClamp={1} whiteSpace="nowrap">
-            <FormatMoney
+            <Money
               amount={(run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0)}
               currency="USD"
-              format="$0.00[00]"
               tooltip={
                 <VStack align="start" gap={0}>
                   <Text>
                     Prediction cost:{" "}
                     {run.summary.datasetCost
-                      ? formatMoney(
-                          {
-                            amount: run.summary.datasetCost,
-                            currency: "USD",
-                          },
-                          "$0.00[00]",
-                        )
+                      ? formatCurrency({
+                          amount: run.summary.datasetCost,
+                          currency: "USD",
+                        })
                       : "-"}
                   </Text>
                   <Text>
                     Evaluation cost:{" "}
                     {run.summary.evaluationsCost
-                      ? formatMoney(
-                          {
-                            amount: run.summary.evaluationsCost,
-                            currency: "USD",
-                          },
-                          "$0.00[00]",
-                        )
+                      ? formatCurrency({
+                          amount: run.summary.evaluationsCost,
+                          currency: "USD",
+                        })
                       : "-"}
                   </Text>
                 </VStack>

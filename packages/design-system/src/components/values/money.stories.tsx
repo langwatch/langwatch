@@ -9,7 +9,7 @@ const meta = {
     usage: {
       use: "Any money amount: cost, price, balance, spend. The currency's own decimals, the reader's locale, fractions of a cent kept, the exact figure on hover.",
       avoid:
-        "`toFixed`, a hand-written `$`, or `formatMoney` (USD and EUR only, ignores the locale). A count or ratio: use Formatted number.",
+        "`toFixed` or a hand-written `$`. A count or ratio: use Formatted number.",
     },
   },
   component: Money,

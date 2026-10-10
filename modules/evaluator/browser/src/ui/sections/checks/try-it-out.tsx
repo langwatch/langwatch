@@ -3,7 +3,7 @@ import { PeriodSelector, usePeriodSelector } from "@langwatch/browser-host/perio
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Alert,
@@ -441,7 +441,7 @@ function detailsCellFor(runningResult: RunningResult): React.ReactNode {
 
 function costCellFor(runningResult: RunningResult): React.ReactNode {
   if (runningResult.status === "processed") {
-    return formatMoney((runningResult.cost as Money) ?? { amount: 0, currency: "USD" });
+    return formatCurrency((runningResult.cost as Money) ?? { amount: 0, currency: "USD" });
   }
   return runningResult.status === "loading" ? "" : "-";
 }
@@ -581,7 +581,7 @@ function totalCostText(
       result.status === "processed" && !!result.cost,
   );
   const currency = costed?.cost?.currency === "EUR" ? "EUR" : "USD";
-  return formatMoney({ amount: totalCost, currency });
+  return formatCurrency({ amount: totalCost, currency });
 }
 
 type SampleTraceRow = Pick<

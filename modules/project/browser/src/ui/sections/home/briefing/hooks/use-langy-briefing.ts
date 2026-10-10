@@ -4,8 +4,8 @@ import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 // drift from how the app-layer writes the value. Pure helper; safe client-side.
 import { buildSeriesName } from "@langwatch/analytics-contract";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
-import { formatMoney } from "@langwatch/design-system/format-money";
 import { nowInstant } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -243,7 +243,7 @@ function buildAnalyticsCells({
       percentDelta(cost, previousCost) ?? developmentMockDelta("Cost / 24h", isDevelopment);
     cells.push({
       label: "Cost / 24h",
-      value: formatMoney({ amount: cost, currency: "USD" }),
+      value: formatCurrency({ amount: cost, currency: "USD" }),
       tone: "vanity",
       delta,
       deltaTone: costLikeTone(delta),

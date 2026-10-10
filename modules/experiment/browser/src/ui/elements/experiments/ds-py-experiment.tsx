@@ -1,8 +1,8 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { FormatMoney } from "@langwatch/design-system/format-money-display";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { Money } from "@langwatch/design-system/money";
 import {
   Alert,
   Box,
@@ -613,7 +613,7 @@ function LoadedRunSummary({
           {runCost && (
             <>
               <Text>·</Text>
-              <Text>{formatMoney({ amount: runCost, currency: "USD" }, "$0.00[0]")}</Text>
+              <Text>{formatCurrency({ amount: runCost, currency: "USD" })}</Text>
             </>
           )}
         </HStack>
@@ -627,7 +627,7 @@ type DSPyExample = DSPyStep["examples"][number];
 type DSPyLLMCall = DSPyStep["llm_calls"][number];
 
 const stepCostOf = (summary: DSPyStepSummary) =>
-  formatMoney({ amount: summary.llm_calls_summary.total_cost, currency: "USD" }, "$0.00[00]");
+  formatCurrency({ amount: summary.llm_calls_summary.total_cost, currency: "USD" });
 
 const stepTokensOf = (summary: DSPyStepSummary) =>
   numeral(summary.llm_calls_summary.total_tokens).format("0a");
@@ -773,7 +773,7 @@ const LLMCallRow = ({ index, llmCall }: { index: number; llmCall: DSPyLLMCall })
       </Table.Cell>
       <Table.Cell>
         {llmCall.cost ? (
-          formatMoney({ amount: llmCall.cost, currency: "USD" }, "$0.00[0000]")
+          formatCurrency({ amount: llmCall.cost, currency: "USD" })
         ) : (
           <ZeroCallCost cached={!!llmCall.response.cached} />
         )}
@@ -1515,11 +1515,7 @@ export function DSPyExperimentSummary({
           Total Cost
         </Text>
         <Text lineClamp={1} whiteSpace="nowrap">
-          {run && totalCost ? (
-            <FormatMoney amount={totalCost} currency="USD" format="$0.00[00]" />
-          ) : (
-            "-"
-          )}
+          {run && totalCost ? <Money amount={totalCost} currency="USD" /> : "-"}
         </Text>
       </VStack>
       <Spacer />

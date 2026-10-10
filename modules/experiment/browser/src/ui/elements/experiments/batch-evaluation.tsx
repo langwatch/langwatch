@@ -1,6 +1,6 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { formatCurrency } from "@langwatch/design-system/format-currency";
 import {
   Box,
   Button,
@@ -231,7 +231,7 @@ const EvaluationRow = ({
       </Table.Cell>
     )}
     <Table.Cell>
-      {evaluation.cost ? formatMoney({ amount: evaluation.cost, currency: "USD" }) : "-"}
+      {evaluation.cost ? formatCurrency({ amount: evaluation.cost, currency: "USD" }) : "-"}
     </Table.Cell>
     <Table.Cell>{readableDate(evaluation.createdAt).toLocaleString()}</Table.Cell>
   </Table.Row>
@@ -348,7 +348,7 @@ export default function BatchEvaluation({
         ))}
         <StatCard
           title="Evaluations Cost"
-          value={totalCost ? formatMoney({ amount: totalCost, currency: "USD" }) : "-"}
+          value={totalCost ? formatCurrency({ amount: totalCost, currency: "USD" }) : "-"}
         />
         <StatCard
           title="Runtime"
