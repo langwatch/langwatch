@@ -260,7 +260,7 @@ function OrbButton({
       display="grid"
       placeItems="center"
       borderRadius="full"
-      bg="bg.surface"
+      bg="bg.card"
       borderWidth="1px"
       borderColor="border.emphasized"
       boxShadow="md"
