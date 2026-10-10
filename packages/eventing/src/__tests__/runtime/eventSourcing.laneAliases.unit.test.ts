@@ -319,8 +319,8 @@ describe("a successor lane's aliases", () => {
   });
 
   describe("given a job under a key no alias names", () => {
-    /** @scenario "A job under a key no alias names still retries and blocks" */
-    it("rejects it for retry, and blocks its group once spent", async () => {
+    /** @scenario "A job under a key no alias names is retried, then dead-lettered" */
+    it("rejects it for retry, and dead-letters it once spent", async () => {
       const { eventSourcing, spanSync, onExhausted } = runtime({ aliases: splitAliases });
       const body = { ...span, __pipelineName: "owner", __jobType: "subscriber", __jobName: "gone" };
 
@@ -330,9 +330,12 @@ describe("a successor lane's aliases", () => {
           key: "owner:subscriber:gone",
           body: { ...span },
         }),
-      ).rejects.toMatchObject({ name: "QueueError" });
+      ).rejects.toMatchObject({
+        name: "UnroutableQueuedJobError",
+        jobPath: "owner:subscriber:gone",
+      });
       expect(spanSync).not.toHaveBeenCalled();
-      expect(onExhausted()?.(body)).toBe("block");
+      expect(onExhausted()?.(body)).toBe("dead-letter");
       await eventSourcing.close();
     });
   });

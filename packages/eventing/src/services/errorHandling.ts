@@ -244,6 +244,35 @@ export class UndeclaredQueuedEventTypeError extends RecoverableError {
 }
 
 /**
+ * A dequeued job no registration, drain or alias on this worker routes. Retryable, so the queue's
+ * retry budget is the window in which a worker that routes it takes the job; once spent it is
+ * dead-lettered and its group drains on (Alex, 2026-10-10).
+ */
+export class UnroutableQueuedJobError extends RecoverableError {
+  override readonly name = "UnroutableQueuedJobError";
+  readonly queueName: string;
+  readonly jobPath: string;
+
+  constructor({
+    queueName,
+    jobPath,
+    context,
+  }: {
+    queueName: string;
+    jobPath: string;
+    context: Record<string, unknown>;
+  }) {
+    super(
+      `Queued job "${jobPath}" on ${queueName}: job routing key is not registered in this worker; ` +
+        "retrying, then dead-lettering it once its attempts are spent",
+      { ...context, queueName, jobPath },
+    );
+    this.queueName = queueName;
+    this.jobPath = jobPath;
+  }
+}
+
+/**
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {
