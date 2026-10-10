@@ -20,10 +20,11 @@ import type {
   UiSessionSnapshot,
 } from "@langwatch/browser-host/session";
 import { setUiStorageReader } from "@langwatch/browser-host/storage";
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect } from "react";
 
 import {
+  keepAnsweredReaderOnFailedReread,
   readUiActor,
   uiAuthClient,
   UI_SESSION_QUERY_KEY,
@@ -148,9 +149,14 @@ export function useUiSessionReading({
 }): UiSessionReading {
   const address = useUiAddress();
 
+  const queryClient = useQueryClient();
   const session = useQuery({
     queryKey: UI_SESSION_QUERY_KEY,
-    queryFn: () => readUiActor(authClient ?? uiAuthClient()),
+    queryFn: async () =>
+      keepAnsweredReaderOnFailedReread({
+        reading: await readUiActor(authClient ?? uiAuthClient()),
+        previous: queryClient.getQueryData<UiSessionResponse>(UI_SESSION_QUERY_KEY),
+      }),
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,

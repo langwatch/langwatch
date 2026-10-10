@@ -26,6 +26,14 @@ Feature: A refused session read degrades to signed out
     Then nobody is signed in
     And the session is settled, so the screens render rather than wait
 
+  @unit
+  Scenario: A failed re-read keeps the reader who was already signed in
+    Given the session already answered who is here
+    And a read elsewhere is refused with 403, so the session is read again
+    When that re-read fails
+    Then the reader stays signed in as before, as main's session cache did
+    And they are not sent to sign in, so an authorization refusal never reads as a session failure
+
   @integration
   Scenario: A refused session read is reported through the handled-error path
     Given the session endpoint refuses the read

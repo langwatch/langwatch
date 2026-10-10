@@ -193,3 +193,19 @@ export async function readUiActor(
     return refused(error);
   }
 }
+
+/**
+ * A re-read that fails keeps the reader who was already answered, as main's
+ * session cache did (`if (!res.ok) return _cachedSession`): a 403 elsewhere
+ * re-reads the session, and a hiccup on that re-read must not sign them out.
+ */
+export function keepAnsweredReaderOnFailedReread({
+  reading,
+  previous,
+}: {
+  reading: UiSessionReading;
+  previous: UiSessionReading | undefined;
+}): UiSessionReading {
+  if (reading.failure === null || !previous?.actor) return reading;
+  return previous;
+}
