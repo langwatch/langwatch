@@ -20,7 +20,7 @@ export default function SecurityScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Security</PageLayout.Heading>
       </PageLayout.Header>
-      <Box paddingTop={4} width="full" maxWidth="820px">
+      <Box paddingTop={4} width="full">
         <Text color="fg.muted" paddingBottom={SETTINGS_BAND_PADDING_Y}>
           The ways you sign in, and how you would get back in if you lost one of them.
         </Text>

@@ -23,7 +23,7 @@ export default function CheckupScreen() {
           <PageLayout.Heading>Checkup</PageLayout.Heading>
         </VStack>
       </PageLayout.Header>
-      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+      <PageLayout.Subtitle paddingTop={3}>
         Whether this install is correctly wired, what is broken and how to fix it, and exactly what
         it sends to LangWatch.
       </PageLayout.Subtitle>

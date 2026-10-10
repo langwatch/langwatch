@@ -350,11 +350,11 @@ function SettingsForm({
   };
 
   return (
-    <Box width="full" css={{ "--page-inset": "var(--chakra-spacing-8)" }}>
+    <Box width="full">
       <PageLayout.Header>
         <PageLayout.Heading>Organization settings</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" maxWidth="820px" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
         <Text color="fg.muted">
           How your organization is named, where members land, and what they can share.
         </Text>

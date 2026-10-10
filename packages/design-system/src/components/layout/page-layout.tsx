@@ -26,6 +26,9 @@ import {
   type Ref,
 } from "react";
 
+/** The one left and right edge a page's header and body share; the shell area may set it. */
+const PAGE_INSET = "var(--page-inset, var(--chakra-spacing-6))";
+
 // Container component
 interface ContainerProps extends ChakraContainerProps {
   sidebarWidth?: number;
@@ -43,7 +46,7 @@ function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren
     <ChakraContainer
       data-page-container
       maxW={`calc(100vw - ${sidebarWidth}px)`}
-      paddingX={6}
+      paddingX={PAGE_INSET}
       paddingY={3}
       {...props}
     >
@@ -139,7 +142,7 @@ function Header({
         height={`pageHeader.${size}`}
         minHeight={`pageHeader.${size}`}
         maxHeight={`pageHeader.${size}`}
-        paddingX={6}
+        paddingX={PAGE_INSET}
         paddingTop={withBorder ? "1px" : 0}
         paddingBottom={0}
         flexWrap="nowrap"

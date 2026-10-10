@@ -83,29 +83,13 @@ function readerMayOpenThePage({
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
-/** Sparse pages (forms, a few rows, an empty state) read narrow; tables keep the wider measure. */
-const FORM_PAGES = [
-  "/settings",
-  "/settings/profile",
-  "/settings/security",
-  "/settings/checkup",
-  "/settings/data-privacy",
-  "/settings/license",
-  "/settings/connect",
-  "/settings/integrations",
-];
-const FORM_MEASURE = "820px";
-/** Your own account pages sit at the left, as on main, behind a fixed margin. */
-const LEFT_ALIGNED_PAGES = ["/settings/profile", "/settings/security"];
-const TABLE_MEASURE = "1280px";
-
-/** Forms read narrow, tables wide. */
-function measureOf(pathname: string): string {
-  return FORM_PAGES.includes(pathname) ? FORM_MEASURE : TABLE_MEASURE;
-}
+/** Every page's header and body share this one edge; the design system reads it. */
+const PAGE_INSET = "var(--chakra-spacing-6)";
+/** Settings-style pages read at one width, left-aligned under the title. */
+const SETTINGS_MEASURE = "960px";
 
 /**
- * Settings and gateway pages are read at a centred measure, as main's SettingsLayout framed them;
+ * Settings, gateway, instance and Cloud admin pages read at the settings measure, under the title;
  * authentication's section rail takes the full width, as main's fullBleed did.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
@@ -116,26 +100,20 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
     isPathUnder({ pathname, base: "/gateway" }) ||
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
-  const measure = measureOf(pathname);
-  const isLeftAligned = LEFT_ALIGNED_PAGES.includes(pathname);
-  const inset = isLeftAligned
-    ? "var(--chakra-spacing-8)"
-    : `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`;
   return (
     <Box
-      data-page-measure={measure}
-      data-page-align={isLeftAligned ? "start" : "center"}
+      data-page-measure={SETTINGS_MEASURE}
       flex={1}
       minHeight={0}
       overflowY="auto"
       paddingBottom={16}
-      // Bodies retain their reading measure; every header keeps the same inset.
+      // The body starts at the header's inset and stops at the measure.
       // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
       css={{
-        "--page-inset": inset,
         "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
-          width: "calc(100% - 2 * var(--page-inset))",
-          marginInline: "var(--page-inset)",
+          width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
+          marginInlineStart: "var(--page-inset)",
+          marginInlineEnd: "auto",
         },
         "& [data-page-container]": { paddingInline: 0 },
       }}
@@ -233,6 +211,7 @@ export const ShellPageBody = ({
         display="flex"
         flexDirection="column"
         overflowY="auto"
+        css={{ "--page-inset": PAGE_INSET }}
       >
         <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
           <PageHeaderSizeProvider size="lg">

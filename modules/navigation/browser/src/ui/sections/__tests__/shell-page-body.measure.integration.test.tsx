@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Settings form pages read at one narrow measure; list and table pages at the wider one.
+ * Settings pages read at one measure, left-aligned under the title, forms and tables alike.
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -38,41 +38,18 @@ function measureAt({ pathname }: { pathname: string }): string {
 }
 
 describe("given a settings page", () => {
-  describe("when it is a form page", () => {
+  describe("when it is a form, list or table page", () => {
     it.each([
       "/settings",
       "/settings/profile",
       "/settings/security",
       "/settings/checkup",
-      "/settings/data-privacy",
-      "/settings/license",
-      "/settings/connect",
       "/settings/integrations",
-    ])("frames %s at the form measure", (pathname) => {
-      expect(measureAt({ pathname })).toBe("820px");
-    });
-  });
-
-  describe("when it is your own account page", () => {
-    it.each(["/settings/profile", "/settings/security"])("aligns %s to the left", (pathname) => {
-      expect(frameAt({ pathname }).pageAlign).toBe("start");
-    });
-
-    it("centres the organization's settings", () => {
-      expect(frameAt({ pathname: "/settings" }).pageAlign).toBe("center");
-    });
-  });
-
-  describe("when it is a list or table page", () => {
-    it.each([
       "/settings/api-keys",
-      "/settings/secrets",
-      "/settings/data-retention",
       "/settings/audit-log",
-      "/settings/subscription",
       "/settings/model-providers",
-    ])("frames %s at the table measure", (pathname) => {
-      expect(measureAt({ pathname })).toBe("1280px");
+    ])("frames %s at the one settings measure", (pathname) => {
+      expect(measureAt({ pathname })).toBe("960px");
     });
   });
 
