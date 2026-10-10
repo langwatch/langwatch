@@ -5,6 +5,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
   LangWatchQLBusyError,
+  LangWatchQLParameterInvalidError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
@@ -24,6 +25,8 @@ import {
   LangWatchQLExecutorRepository,
 } from "../langwatch-ql-executor.repository.ts";
 import {
+  extractBadQueryParameter,
+  isClickHouseBadQueryParameterError,
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
   isClickHouseResultTooLargeError,
@@ -77,6 +80,13 @@ function refusalFor({
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({
       identifier: extractUnknownIdentifier(error),
+      reasons: [toError(error)],
+    });
+  }
+
+  if (isClickHouseBadQueryParameterError(error)) {
+    return new LangWatchQLParameterInvalidError({
+      parameter: extractBadQueryParameter(error),
       reasons: [toError(error)],
     });
   }

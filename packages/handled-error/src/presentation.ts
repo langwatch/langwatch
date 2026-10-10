@@ -454,6 +454,15 @@ const presentations = {
     describe: () =>
       "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
   },
+  lwql_parameter_invalid: {
+    title: "A parameter value doesn't fit its type",
+    describe: (error) => {
+      const parameter = str(error, "parameter", "");
+      return parameter
+        ? `The value given for "${parameter}" can't be read as the type the query declares. Fix the value or the type and try again.`
+        : "A value can't be read as the type the query declares for it. Fix the value or the type and try again.";
+    },
+  },
   lwql_parameter_missing: {
     title: "This query is missing a value",
     describe: () =>

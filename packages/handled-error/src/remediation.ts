@@ -108,6 +108,12 @@ const registry = {
       "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
     ],
   },
+  lwql_parameter_invalid: {
+    tips: [
+      "Read `meta.parameter`; it names the placeholder whose value could not be read as its declared type",
+      "A `DateTime` or `DateTime64` placeholder takes `YYYY-MM-DD HH:MM:SS[.fff]` with no `T` or `Z`; send UTC in that form",
+    ],
+  },
   lwql_parameter_missing: {
     tips: [
       "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",

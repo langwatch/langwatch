@@ -107,3 +107,41 @@ describe("given the LangWatchQL identity is running as many statements as it may
     });
   });
 });
+
+describe("given a bound parameter whose value does not fit its declared type", () => {
+  describe("when the server refuses it as BAD_QUERY_PARAMETER", () => {
+    /** @scenario "A parameter value that does not fit its declared type is refused with the parameter named" */
+    it("refuses with lwql_parameter_invalid, a customer 400 naming only the parameter", async () => {
+      queryMock.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            "Value 2026-09-10T00:00:00.000Z cannot be parsed as DateTime64(3) for query parameter 'start' because it isn't parsed completely: only 23 of 24 bytes was parsed: 2026-09-10T00:00:00.000.",
+          ),
+          { code: "457", type: "BAD_QUERY_PARAMETER" },
+        ),
+      );
+
+      const refusal = await executor
+        .execute({
+          sql: "SELECT count() FROM analytics.traces WHERE OccurredAt >= {start:DateTime64(3)}",
+          tenantCapability: "tenant-a",
+        })
+        .then(
+          () => null,
+          (error: { code?: string; fault?: string; httpStatus?: number; meta?: unknown }) => ({
+            code: error.code,
+            fault: error.fault,
+            httpStatus: error.httpStatus,
+            meta: error.meta,
+          }),
+        );
+
+      expect(refusal).toEqual({
+        code: "lwql_parameter_invalid",
+        fault: "customer",
+        httpStatus: 400,
+        meta: { parameter: "start" },
+      });
+    });
+  });
+});

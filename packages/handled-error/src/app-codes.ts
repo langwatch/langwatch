@@ -489,6 +489,7 @@ export const APP_ERROR_CODES = [
   "lwql_granularity_too_fine",
   "lwql_not_enabled",
   "lwql_not_permitted",
+  "lwql_parameter_invalid",
   "lwql_parameter_missing",
   "lwql_provisioning_incomplete",
   "lwql_rate_limited",
