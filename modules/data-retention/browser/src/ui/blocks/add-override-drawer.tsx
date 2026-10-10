@@ -208,7 +208,7 @@ export function AddOverrideDrawer({
         if (!isOpen) onClose();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <Drawer.Title>
             {isEditing ? "Edit retention policy" : "Add retention policy"}

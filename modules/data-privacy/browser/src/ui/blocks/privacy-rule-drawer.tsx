@@ -109,7 +109,7 @@ export function PrivacyRuleDrawer({
         if (!isOpen) onClose();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <Drawer.Title>{editingRule ? "Edit privacy rule" : "Add privacy rule"}</Drawer.Title>
           <Drawer.CloseTrigger />
