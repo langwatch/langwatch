@@ -274,6 +274,24 @@ describe("given an organization that was never offered", () => {
   });
 });
 
+describe("given a signed-in member whose shell reads the offer on every page", () => {
+  describe("when the lookup limiter is spent", () => {
+    /** @scenario Moving between pages does not ask for the offer again */
+    it("still answers the offer", async () => {
+      rateLimitMock.mockResolvedValue({ allowed: false, resetAt: Date.now() + 90_000 });
+      const { service } = harness({ candidates: [acme] });
+
+      const decision = await service.offerForSignedInUser({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      expect(decision.outcome).toBe("ask");
+      expect(rateLimitMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given somebody asking too often", () => {
   describe("when the limiter refuses", () => {
     /** @scenario Asking is rate limited the way signing in is */

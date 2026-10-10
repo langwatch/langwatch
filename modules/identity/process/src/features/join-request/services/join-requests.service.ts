@@ -65,9 +65,11 @@ export class JoinRequestsService {
   async lookup({
     userId,
     verifiedEmail,
+    throttled = true,
   }: {
     userId: string;
     verifiedEmail: string | null;
+    throttled?: boolean;
   }): Promise<JoinLookupDecision> {
     if (!verifiedEmail) {
       return { outcome: "none" };
@@ -78,7 +80,7 @@ export class JoinRequestsService {
       return { outcome: "none" };
     }
 
-    await this.guards.assertNotLooking({ userId });
+    if (throttled) await this.guards.assertNotLooking({ userId });
 
     const matched = await this.deps.candidates.findCandidateOrganizations({ domain });
     // Never the ones they are already in: being offered the organization you
@@ -132,7 +134,8 @@ export class JoinRequestsService {
       return { outcome: "none" };
     }
 
-    return this.lookup({ userId, verifiedEmail });
+    // Read on page loads for the caller's own address only; not the throttled sign-up probe.
+    return this.lookup({ userId, verifiedEmail, throttled: false });
   }
 
   /** "No thanks", remembered for that domain and no other. */
