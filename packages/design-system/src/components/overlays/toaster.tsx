@@ -102,7 +102,7 @@ function LifetimeBar({ lifetime }: { lifetime: number }) {
       inset="-1px"
       borderRadius="inherit"
       borderBottom="2px solid currentColor"
-      opacity={0.6}
+      opacity={0.9}
       pointerEvents="none"
       css={{
         "--toast-lifetime": `${lifetime}ms`,
