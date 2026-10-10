@@ -265,49 +265,6 @@ export function ReportRunCells({
   );
 }
 
-/** Bordered table frame that scrolls horizontally instead of squishing
- *  columns on narrow viewports. The `css` block is the one place the three
- *  automation tables get their shared polish — a quiet uppercase header on a
- *  tinted strip, generous row height, and a soft hover — so no per-page table
- *  markup has to repeat it. */
-export function TableShell({ children }: { children: React.ReactNode }) {
-  return (
-    <Box border="1px solid" borderColor="border" borderRadius="lg" overflow="hidden" bg="bg.panel">
-      <Box
-        overflowX="auto"
-        css={{
-          // Percentage widths only bind under a fixed layout above a floor;
-          // without one the Name column collapses to its longest word. 880px is
-          // what a 1440px laptop leaves beside the sidebar; below it, scroll.
-          // A two-word header wraps rather than spilling into its neighbour.
-          "& table": { tableLayout: "fixed", minWidth: "880px" },
-          "& thead th": {
-            backgroundColor: "var(--chakra-colors-bg-subtle)",
-            fontSize: "11px",
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--chakra-colors-fg-muted)",
-            verticalAlign: "bottom",
-            paddingTop: "0.6rem",
-            paddingBottom: "0.6rem",
-            borderBottomColor: "var(--chakra-colors-border)",
-          },
-          "& tbody td": {
-            paddingTop: "0.85rem",
-            paddingBottom: "0.85rem",
-            verticalAlign: "middle",
-            borderColor: "var(--chakra-colors-border-muted)",
-          },
-          "& tbody tr:last-of-type td": { borderBottom: "none" },
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
-  );
-}
-
 /** Muted one-liner shown in place of a table when a section is empty and has
  *  no dedicated use-case strip. */
 export function EmptyHint({ children }: { children: React.ReactNode }) {
