@@ -57,7 +57,7 @@ const COMPACT_BODY = {
 
 /** The window's frame: a full title bar, or a detail panel's quiet 28px strip. */
 const WINDOW_CHROME = {
-  root: { borderRadius: "xl", borderColor: "border.emphasized" },
+  root: { borderRadius: "xl", borderColor: "border.nested" },
   strip: { paddingY: 1, borderBottomWidth: "1px" },
   title: {},
   copy: {},
@@ -164,7 +164,7 @@ export function CodePreview({
   return (
     <Box
       border="1px solid"
-      bg="bg.panel/60"
+      bg="bg.nested"
       {...chrome.root}
       overflow="hidden"
       width="full"
@@ -428,9 +428,8 @@ export function SnippetPreview({
             transition="all 0.3s ease"
             borderRadius="xl"
             border="1px solid"
-            borderColor="border.emphasized"
-            bg="bg.panel/60"
-            backdropFilter="blur(20px) saturate(1.3)"
+            borderColor="border.nested"
+            bg="bg.nested"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             {...layout.root}
             overflow="hidden"
@@ -438,7 +437,7 @@ export function SnippetPreview({
             <CodeBlock.Header
               display="flex"
               justifyContent="space-between"
-              borderColor="gray.200"
+              borderColor="border.nested"
               {...layout.header}
             >
               <CodeBlock.Title fontSize="xs" paddingTop={2}>

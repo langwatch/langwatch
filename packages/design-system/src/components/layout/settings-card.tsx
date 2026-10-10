@@ -161,7 +161,7 @@ export const SettingItem = chakra("div", {
     borderRadius: "sm",
     "&:is(button, a)": {
       cursor: "pointer",
-      _hover: { background: "bg.nested" },
+      _hover: { background: "bg.hover" },
       _focusVisible: {
         outline: "2px solid",
         outlineColor: "blue.fg",

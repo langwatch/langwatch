@@ -6,7 +6,7 @@ const COMPACT_HEADER = {
   height: "36px",
   paddingY: "0",
   paddingX: "3",
-  bg: "bg.subtle",
+  bg: "transparent",
   textTransform: "none",
   letterSpacing: "normal",
   fontSize: "xs",
@@ -38,7 +38,8 @@ export function ListTable({
   return (
     <Box
       borderWidth="1px"
-      borderColor="border.emphasized"
+      bg="bg.card"
+      borderColor="border.card"
       borderRadius="md"
       overflow="hidden"
       {...containerProps}

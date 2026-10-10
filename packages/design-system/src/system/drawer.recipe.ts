@@ -18,11 +18,9 @@ export const drawerSlotRecipe = defineSlotRecipe({
   base: {
     content: {
       maxWidth: "70%",
-      background:
-        "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
-      backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
+      background: "bg.overlay",
       border: "1px solid",
-      borderColor: "border.muted",
+      borderColor: "border.card",
       borderRadius: "lg",
     },
     header: {
@@ -32,7 +30,7 @@ export const drawerSlotRecipe = defineSlotRecipe({
       gap: 1,
       flexShrink: 0,
       borderBottomWidth: "1px",
-      borderColor: "border.muted",
+      borderColor: "border.card",
     },
     title: {
       textStyle: "md",
@@ -58,7 +56,7 @@ export const drawerSlotRecipe = defineSlotRecipe({
       flexShrink: 0,
       justifyContent: "flex-end",
       borderTopWidth: "1px",
-      borderColor: "border.muted",
+      borderColor: "border.card",
     },
   },
   variants: {

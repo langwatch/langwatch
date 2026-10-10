@@ -45,8 +45,6 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
             margin={2}
             pointerEvents="auto"
             borderRadius="lg"
-            background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
-            backdropFilter="var(--lw-backdrop-blur, blur(25px))"
             marginTop={marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)}
             marginEnd={inset > 0 ? `${inset}px` : undefined}
             {...contentProps}

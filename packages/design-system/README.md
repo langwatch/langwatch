@@ -52,6 +52,31 @@ a row in `colour.stories.tsx`, never a literal at the call site. Code that must
 hand a library a string uses Chakra's `useToken` or `system.token.var` (a CSS
 variable), or `getRawColorValue` / `useColorRawValue` for a literal in the current mode.
 
+### Which surface for which region
+
+**One ground, one card, one overlay: levels lift toward the reader only for a
+real container or control. Separate regions with a hairline before colour;
+chrome belongs to the ground it frames, and interaction is a quiet tint.**
+
+| Region                                               | Surface                                | Edge / state                                                   |
+| ---------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| Body, global sidebar, top bar                        | `bg.page`                              | `border.card` where needed                                     |
+| Content, section rail, page title                    | `bg.surface`                           | hairline; sticky header adds it after scrolling                |
+| Card, bordered ListTable                             | `bg.card`                              | `border.card`                                                  |
+| Table header and body rows, EmptyState               | transparent; container owns the ground | `bg.hover`, `bg.selected`, `bg.stripe` tints                   |
+| Well, grouped content inside a card, code block      | `bg.nested`                            | `border.nested`                                                |
+| Input, select, textarea, checkbox, chip, inline code | `bg.control`                           | `border.control`; checked/status meaning retains palette roles |
+| Drawer, dialog, menu, popover, tooltip, select menu  | opaque `bg.overlay` (= card)           | `border.card`; headers/footers share the overlay               |
+| Tabs / segmented control                             | transparent / `bg.control` track       | quiet selected tint; no new content ground                     |
+
+A table is not a stack of wells: its header, ordinary rows and empty state
+stay on its container. Hover is a 4% foreground tint, selection 8%, stripes 2%;
+none introduces a new elevation. Status badges retain their semantic palette
+fill; colour communicates meaning there, not depth. A neutral badge uses the
+control ground. Prefer removing a call-site background override to adding one.
+The sticky page title is the intentional glass exception: it samples the same
+content ground, with the reduced-graphics switch restoring opacity.
+
 ### Surface ladder
 
 The dark material is blue ink: OKLCH hue **250°**, with chroma tapering from

@@ -45,7 +45,7 @@ const ACCENT = {
   verticalAlign: "baseline",
   paddingX: "1",
   borderRadius: "xs",
-  bg: "blue.subtle",
+  bg: "bg.control",
   color: "blue.fg",
   fontSize: "0.875em",
 } as const;
@@ -58,7 +58,7 @@ const NEUTRAL = {
   paddingY: "1px",
   borderRadius: "2px",
   borderWidth: 0,
-  bg: "bg.muted",
+  bg: "bg.control",
   color: "fg",
   fontSize: "12px",
   lineHeight: "16px",

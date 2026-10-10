@@ -27,7 +27,7 @@ export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
           }}
         >
           <OverlayDepthContext.Provider value={depth}>
-            <ChakraMenu.Content ref={ref} borderRadius="lg" background="bg.panel" {...rest} />
+            <ChakraMenu.Content ref={ref} borderRadius="lg" background="bg.overlay" {...rest} />
           </OverlayDepthContext.Provider>
         </ChakraMenu.Positioner>
       </Portal>

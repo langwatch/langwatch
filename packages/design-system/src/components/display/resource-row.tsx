@@ -13,7 +13,13 @@ export interface ResourceRowProps {
 /** A compact resource identity and its provenance; no fetching or implicit interaction. */
 export function ResourceRow({ icon, name, status, description, meta }: ResourceRowProps) {
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="lg" padding={3.5}>
+    <Box
+      borderWidth="1px"
+      bg="bg.nested"
+      borderColor="border.nested"
+      borderRadius="lg"
+      padding={3.5}
+    >
       <HStack justify="space-between" gap={2} align="start" flexWrap="wrap">
         <HStack gap={2} minWidth={0}>
           {icon != null && (

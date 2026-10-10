@@ -150,7 +150,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.800}", _dark: "{colors.zinc.100}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.800}" },
+            value: { _light: "{colors.bg.control}", _dark: "{colors.bg.control}" },
           },
           muted: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
@@ -537,6 +537,10 @@ export const designSystemConfig = defineConfig({
             },
           },
           surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
+          overlay: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
+          hover: { value: "color-mix(in srgb, {colors.fg} 4%, transparent)" },
+          selected: { value: "color-mix(in srgb, {colors.fg} 8%, transparent)" },
+          stripe: { value: "color-mix(in srgb, {colors.fg} 2%, transparent)" },
           panel: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
           raised: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
           muted: { value: { _light: "{colors.bg.nested}", _dark: "{colors.bg.nested}" } },
@@ -657,20 +661,20 @@ export const designSystemConfig = defineConfig({
               borderColor: "border.emphasized",
               color: "fg",
               _hover: {
-                backgroundColor: "bg.subtle",
+                backgroundColor: "bg.hover",
                 boxShadow: "inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)",
               },
               _expanded: {
-                backgroundColor: "bg.subtle",
+                backgroundColor: "bg.hover",
               },
             },
             ghost: {
               color: "fg",
               _hover: {
-                backgroundColor: "bg.emphasized",
+                backgroundColor: "bg.hover",
               },
               _expanded: {
-                backgroundColor: "bg.emphasized",
+                backgroundColor: "bg.hover",
               },
             },
           },
@@ -735,11 +739,14 @@ export const designSystemConfig = defineConfig({
         },
         variants: {
           variant: {
+            subtle: { bg: "bg.control", borderColor: "border.control" },
             outline: {
-              bg: "bg.surface/65",
+              bg: "bg.control",
+              borderColor: "border.control",
             },
             flushed: {
               borderRadius: "none",
+              borderBottomColor: "border.control",
             },
           },
           size: {
@@ -758,17 +765,21 @@ export const designSystemConfig = defineConfig({
         },
         variants: {
           variant: {
+            subtle: { bg: "bg.control", borderColor: "border.control" },
             outline: {
-              bg: "bg.surface/65",
+              bg: "bg.control",
+              borderColor: "border.control",
             },
           },
         },
       }),
       radio: defineRecipe({
         base: {
-          backgroundColor: "bg.surface/65",
+          bg: "bg.control",
+          borderColor: "border.control",
           "& .dot": {
-            backgroundColor: "bg.surface/65",
+            bg: "bg.control",
+            borderColor: "border.control",
           },
         },
       }),
@@ -787,11 +798,10 @@ export const designSystemConfig = defineConfig({
         slots: ["content", "arrow", "arrowTip"],
         base: {
           content: {
-            bg: "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 85%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
+            bg: "bg.overlay",
             color: "fg",
             border: "1px solid",
-            borderColor: "border",
+            borderColor: "border.card",
             borderRadius: "md",
             boxShadow: "lg",
             px: "3",
@@ -799,10 +809,10 @@ export const designSystemConfig = defineConfig({
             textStyle: "xs",
           },
           arrow: {
-            "--arrow-background": "colors.bg.panel",
+            "--arrow-background": "colors.bg.overlay",
           },
           arrowTip: {
-            borderColor: "colors.bg.panel",
+            borderColor: "colors.bg.overlay",
           },
         },
       }),
@@ -835,11 +845,17 @@ export const designSystemConfig = defineConfig({
               },
             },
             subtle: {
-              root: { background: "bg.nested", border: "1px solid", borderColor: "border.nested" },
+              root: {
+                background: "bg.nested",
+                borderWidth: "1px",
+                borderStyle: "solid",
+                borderColor: "border.nested",
+              },
             },
             outline: {
               root: {
-                border: "1px solid",
+                borderWidth: "1px",
+                borderStyle: "solid",
                 boxShadow: "2xs",
               },
             },
@@ -847,7 +863,8 @@ export const designSystemConfig = defineConfig({
             // governance figures use. A clickable card adds its own hover lift.
             elevated: {
               root: {
-                border: "1px solid",
+                borderWidth: "1px",
+                borderStyle: "solid",
                 borderColor: "border.card",
                 boxShadow: "md",
               },
@@ -871,7 +888,8 @@ export const designSystemConfig = defineConfig({
           control: {
             borderWidth: "1px",
             cursor: "pointer",
-            backgroundColor: "bg.surface/65",
+            bg: "bg.control",
+            borderColor: "border.control",
           },
           label: {
             fontWeight: "normal",
@@ -882,7 +900,7 @@ export const designSystemConfig = defineConfig({
           variant: {
             solid: {
               control: {
-                borderColor: "border.emphasized",
+                borderColor: "border.control",
                 "&:is([data-state=checked], [data-state=indeterminate])": {
                   bg: "blue.500",
                   color: "white",
@@ -901,6 +919,7 @@ export const designSystemConfig = defineConfig({
       tabs: defineSlotRecipe({
         slots: ["root", "list", "trigger"],
         base: {
+          root: { "--tabs-indicator-bg": "colors.bg.selected" },
           trigger: {
             height: "auto",
           },
@@ -919,18 +938,23 @@ export const designSystemConfig = defineConfig({
                 borderBottom: "none",
               },
               trigger: {
+                _selected: { bg: "bg.selected" },
                 borderRadius: "lg",
               },
             },
             enclosed: {
               list: {
+                bg: "bg.control",
+                borderWidth: "1px",
+                borderColor: "border.control",
                 borderRadius: "lg",
                 gap: 1,
               },
               trigger: {
                 borderRadius: "lg",
                 _selected: {
-                  boxShadow: "sm",
+                  bg: "bg.selected",
+                  boxShadow: "none",
                 },
               },
             },
@@ -968,13 +992,14 @@ export const designSystemConfig = defineConfig({
         slots: ["item", "content"],
         base: {
           content: {
-            background: "bg.panel",
+            background: "bg.overlay",
             border: "1px solid",
-            borderColor: "border",
+            borderColor: "border.card",
             borderRadius: "lg",
             boxShadow: "lg",
           },
           item: {
+            _highlighted: { bg: "bg.hover" },
             cursor: "pointer",
           },
         },
@@ -995,19 +1020,14 @@ export const designSystemConfig = defineConfig({
         },
       }),
       table: defineSlotRecipe({
-        slots: ["root", "row", "cell", "columnHeader"],
+        slots: ["root", "row", "cell", "columnHeader", "header", "body"],
         base: {
-          // Deliberately NO borderRadius and NO background on root. With
-          // border-collapse: collapse, a rounded root clips its square
-          // header/row paints, and an opaque background covers the card's
-          // rounded corners (cards don't clip children). Rounding is the container's job.
-          root: {
-            background: "transparent",
-          },
+          // The container owns the ground, including rounded corners.
+          root: { background: "transparent" },
           row: {
-            _hover: {
-              background: "bg.muted",
-            },
+            bg: "transparent",
+            _hover: { bg: "bg.hover" },
+            _selected: { bg: "bg.selected", _hover: { bg: "bg.selected" } },
           },
           columnHeader: {
             fontWeight: "bold",
@@ -1018,6 +1038,14 @@ export const designSystemConfig = defineConfig({
           },
         },
         variants: {
+          interactive: {
+            true: {
+              body: { "& tr": { _hover: { bg: "bg.hover" }, _selected: { bg: "bg.selected" } } },
+            },
+          },
+          striped: {
+            true: { row: { "&:nth-of-type(odd) td": { bg: "bg.stripe" } } },
+          },
           variant: {
             // add grid variant following previous pattern
             grid: {
@@ -1027,7 +1055,7 @@ export const designSystemConfig = defineConfig({
               columnHeader: {
                 border: "1px solid",
                 borderColor: "border",
-                background: "bg.subtle",
+                bg: "transparent",
               },
               cell: {
                 border: "1px solid",
@@ -1050,7 +1078,7 @@ export const designSystemConfig = defineConfig({
               },
               columnHeader: {
                 borderColor: "border",
-                background: "bg.subtle",
+                bg: "transparent",
               },
               cell: {
                 borderColor: "border",
@@ -1061,7 +1089,7 @@ export const designSystemConfig = defineConfig({
                 background: "transparent",
               },
               header: {
-                background: "none",
+                bg: "transparent",
               },
             },
             ghost: {
@@ -1160,9 +1188,9 @@ export const designSystemConfig = defineConfig({
           },
           // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
           content: {
-            background: "bg.panel",
+            background: "bg.overlay",
             border: "1px solid",
-            borderColor: "border",
+            borderColor: "border.card",
             borderRadius: "lg",
             boxShadow: "lg",
             "& button[data-variant=solid], & button[data-variant=outline]": {
@@ -1190,22 +1218,27 @@ export const designSystemConfig = defineConfig({
           trigger: {
             cursor: "pointer",
             borderRadius: "lg",
-            background: "bg.surface/65",
+            bg: "bg.control",
+            borderColor: "border.control",
           },
           content: {
-            background:
-              "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 75%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
+            background: "bg.overlay",
             border: "1px solid",
-            borderColor: "border",
+            borderColor: "border.card",
             borderRadius: "lg",
             boxShadow: "lg",
           },
           item: {
+            _highlighted: { bg: "bg.hover" },
             borderRadius: "lg",
           },
         },
         variants: {
+          variant: {
+            outline: { trigger: { bg: "bg.control", borderColor: "border.control" } },
+            subtle: { trigger: { bg: "bg.control", borderColor: "border.control" } },
+            ghost: { trigger: { bg: "transparent", _expanded: { bg: "bg.hover" } } },
+          },
           size: {
             xs: {
               content: {
@@ -1246,9 +1279,9 @@ export const designSystemConfig = defineConfig({
         slots: ["content"],
         base: {
           content: {
-            background: "bg.panel",
+            background: "bg.overlay",
             border: "1px solid",
-            borderColor: "border",
+            borderColor: "border.card",
             borderRadius: "lg",
             boxShadow: "lg",
           },
@@ -1258,13 +1291,26 @@ export const designSystemConfig = defineConfig({
         slots: [],
         variants: {
           variant: {
+            subtle: { field: { bg: "bg.control", borderColor: "border.control" } },
             outline: {
               field: {
                 borderRadius: "lg",
-                background: "bg.surface/65",
+                bg: "bg.control",
+                borderColor: "border.control",
               },
             },
           },
+        },
+      }),
+      codeBlock: defineSlotRecipe({
+        slots: ["root", "header"],
+        base: {
+          root: {
+            bg: "bg.nested",
+            borderColor: "border.nested",
+            "--code-block-bg": "colors.bg.nested",
+          },
+          header: { borderColor: "border.nested" },
         },
       }),
       drawer: drawerSlotRecipe,
@@ -1339,7 +1385,8 @@ export const designSystemConfig = defineConfig({
         slots: ["itemControl"],
         base: {
           itemControl: {
-            backgroundColor: "bg.surface/65",
+            bg: "bg.control",
+            borderColor: "border.control",
           },
         },
       }),

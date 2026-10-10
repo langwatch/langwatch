@@ -27,17 +27,17 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
         ref={ref}
         padding="2px"
         borderWidth="1px"
-        borderColor="border.muted"
+        borderColor="border.control"
         borderRadius="lg"
-        background="bg.subtle"
+        background="bg.control"
         css={{ "--segment-radius": "radii.md" }}
         {...rest}
       >
         <SegmentGroup.Indicator
-          background="bg.panel"
+          background="bg.selected"
           borderWidth="1px"
-          borderColor="border.emphasized"
-          boxShadow="sm"
+          borderColor="border.control"
+          boxShadow="none"
         />
         {data.map((item) => (
           <SegmentGroup.Item

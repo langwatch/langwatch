@@ -369,46 +369,95 @@ function InkSwatches() {
 
 export const DarkInk: Story = { render: () => <InkSwatches /> };
 
+const SURFACE_ROLES = [
+  ["App sidebar / top bar", "bg.page", "border.card"],
+  ["Content / section nav / title", "bg.surface", "hairline after scroll"],
+  ["Card / ListTable container", "bg.card", "border.card"],
+  ["Table header / row / empty state", "container ground", "quiet state tint"],
+  ["Well / code block", "bg.nested", "border.nested"],
+  ["Input / chip / inline code", "bg.control", "border.control"],
+  ["Drawer / menu / dialog / tooltip", "bg.overlay = card", "border.card"],
+] as const;
+
 function NestedSurfaces() {
   return (
-    <Stack bg="bg.page" color="fg" padding={5} gap={4} borderRadius="xl">
-      <Text fontSize="sm">Page · bg.page</Text>
-      <Card.Root variant="outline">
-        <Card.Body gap={4}>
-          <Text>Card · bg.card / border.card</Text>
-          <Stack
-            bg="bg.nested"
-            borderWidth="1px"
-            borderColor="border.nested"
-            borderRadius="lg"
-            padding={4}
-            gap={3}
-          >
-            <Text fontSize="sm">Connection row · bg.nested / border.nested</Text>
-            <Box
-              bg="bg.control"
-              borderWidth="1px"
-              borderColor="border.control"
-              borderRadius="md"
-              padding={3}
-            >
-              <Text fontSize="sm">Chip / input · bg.control / border.control</Text>
-              <Text color="fg.subtle" fontSize="xs">
-                Secondary text remains AA at this brightest dark level.
-              </Text>
-            </Box>
-          </Stack>
-        </Card.Body>
-      </Card.Root>
-      <Grid templateColumns="repeat(3, minmax(0, 1fr))" gap={3}>
-        {(["outline", "elevated", "subtle"] as const).map((variant) => (
-          <Card.Root key={variant} variant={variant}>
-            <Card.Body padding={3}>
-              <Text fontSize="xs">{variant}</Text>
+    <Stack bg="bg.page" color="fg" padding={4} gap={4} borderRadius="xl">
+      <Text fontSize="sm">App frame · bg.page</Text>
+      <Stack
+        bg="bg.surface"
+        borderWidth="1px"
+        borderColor="border.card"
+        borderRadius="lg"
+        gap={0}
+        overflow="hidden"
+      >
+        <HStack padding={3} borderBottomWidth="1px" borderColor="border.card">
+          <Text fontSize="sm">Section nav</Text>
+          <Text fontSize="sm">Page title · same content ground</Text>
+        </HStack>
+        <Stack padding={4} gap={4}>
+          <Card.Root variant="outline">
+            <Card.Body gap={3}>
+              <Text>Card · bg.card / border.card</Text>
+              <Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Region</Table.ColumnHeader>
+                    <Table.ColumnHeader>Surface</Table.ColumnHeader>
+                    <Table.ColumnHeader>Separation</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {SURFACE_ROLES.map(([region, surface, edge]) => (
+                    <Table.Row key={region}>
+                      <Table.Cell>{region}</Table.Cell>
+                      <Table.Cell>{surface}</Table.Cell>
+                      <Table.Cell>{edge}</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+              <Stack
+                bg="bg.nested"
+                borderWidth="1px"
+                borderColor="border.nested"
+                borderRadius="lg"
+                padding={3}
+              >
+                <Text fontSize="sm">Nested well · bg.nested</Text>
+                <Box
+                  bg="bg.control"
+                  borderWidth="1px"
+                  borderColor="border.control"
+                  borderRadius="md"
+                  padding={2}
+                >
+                  <Text fontSize="sm">Small control · bg.control</Text>
+                  <Text color="fg.subtle" fontSize="xs">
+                    Secondary text remains AA here.
+                  </Text>
+                </Box>
+              </Stack>
             </Card.Body>
           </Card.Root>
-        ))}
-      </Grid>
+          <Stack
+            bg="bg.overlay"
+            borderWidth="1px"
+            borderColor="border.card"
+            borderRadius="lg"
+            padding={3}
+            boxShadow="lg"
+          >
+            <Text fontSize="sm">Drawer / menu · one opaque overlay</Text>
+            <Box borderTopWidth="1px" borderColor="border.card" paddingTop={2}>
+              <Text fontSize="sm">Header, body and footer share this ground.</Text>
+              <Box bg="bg.hover" padding={2} borderRadius="sm">
+                Hovered menu item · 4% tint
+              </Box>
+            </Box>
+          </Stack>
+        </Stack>
+      </Stack>
     </Stack>
   );
 }
@@ -417,8 +466,8 @@ export const SurfaceLadder: Story = {
   render: () => (
     <Stack gap={4}>
       <Text>
-        Page → card → nested well → small control. One blue-ink hue; each dark step remains at least
-        8 CIELAB L* apart.
+        One ground, one card, one overlay. Lift only real containers toward the reader; separate
+        with a hairline before colour.
       </Text>
       <InkSwatches />
       <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>

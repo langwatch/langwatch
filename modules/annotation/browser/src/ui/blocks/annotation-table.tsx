@@ -137,8 +137,6 @@ export function AnnotationTable({
             <Table.Row
               key={row.id}
               cursor="pointer"
-              backgroundColor={row.doneAt ? "bg.subtle" : "bg.panel"}
-              _hover={{ backgroundColor: "bg.emphasized" }}
               onClick={() => onRowClick(row)}
               data-testid="annotation-row"
             >

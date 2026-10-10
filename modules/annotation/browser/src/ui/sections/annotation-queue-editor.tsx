@@ -196,7 +196,7 @@ export function AnnotationQueueEditor({
         if (!open) onClose();
       }}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <HStack>
             <Drawer.CloseTrigger onClick={onClose} />
