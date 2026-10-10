@@ -30,6 +30,16 @@ describe("the observability owner's declaration", () => {
     });
   });
 
+  describe("given a Pyroscope address in the environment", () => {
+    /** @scenario "A Pyroscope address reaches the telemetry settings" */
+    it("carries it to the telemetry settings, and nothing when blank", () => {
+      expect(
+        parse({ PYROSCOPE_SERVER_ADDRESS: "http://pyroscope:4040" }).profilingServerAddress,
+      ).toBe("http://pyroscope:4040");
+      expect(parse({ PYROSCOPE_SERVER_ADDRESS: "" }).profilingServerAddress).toBeUndefined();
+    });
+  });
+
   describe("given no metrics mode in the environment", () => {
     /** @scenario "No metrics mode is configured" */
     it("pushes over OTLP, which is cheaper than a scrape at our cardinality", () => {
