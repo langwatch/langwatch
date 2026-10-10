@@ -41,7 +41,7 @@ export function DejaViewManagerPanel({
       </Box>
       {errorMessage ? (
         <Box paddingX={3} paddingY={4}>
-          <Text textStyle="xs" color="red.500">
+          <Text textStyle="xs" color="red.fg">
             {errorMessage}
           </Text>
         </Box>
