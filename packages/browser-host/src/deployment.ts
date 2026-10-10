@@ -61,3 +61,15 @@ export function deriveUiDeployment({
     ...(gatewayBaseUrl ? { gatewayBaseUrl } : {}),
   };
 }
+
+/** Where the app runs: LangWatch's cloud, a customer's own install, or a developer's machine. */
+export type Hosting = "cloud" | "self-hosted" | "local";
+
+/** A development build is local whatever it claims to be; haven stacks run SaaS-shaped. */
+export function hostingOf({
+  isDevelopment,
+  isSaaS,
+}: Pick<UiDeployment, "isDevelopment" | "isSaaS">): Hosting {
+  if (isDevelopment) return "local";
+  return isSaaS ? "cloud" : "self-hosted";
+}

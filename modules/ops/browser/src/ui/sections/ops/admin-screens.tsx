@@ -28,7 +28,16 @@ export {
 
 /** Renders its children only where ops's cloud-ops capability is on; elsewhere an unknown page. */
 export function CloudOnly({ children }: { children: ReactNode }) {
-  if (useOpsHost().cloudOps()) return <>{children}</>;
+  return <ShownOnly when={useOpsHost().cloudOps()}>{children}</ShownOnly>;
+}
+
+/** Renders its children where Feature Flags is offered; elsewhere an unknown page. */
+export function FeatureFlagsOnly({ children }: { children: ReactNode }) {
+  return <ShownOnly when={useOpsHost().offersFeatureFlags()}>{children}</ShownOnly>;
+}
+
+function ShownOnly({ when, children }: { when: boolean; children: ReactNode }) {
+  if (when) return <>{children}</>;
   return (
     <NoDataInfoBlock
       title="Page not found"

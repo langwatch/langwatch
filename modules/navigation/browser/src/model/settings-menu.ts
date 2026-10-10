@@ -1,5 +1,6 @@
 /** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
+import type { Hosting } from "@langwatch/browser-host/deployment";
 import {
   Activity,
   Anvil,
@@ -89,6 +90,7 @@ export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
   isSaaS: boolean;
   hasCloudOps: boolean;
+  hosting: Hosting;
   showEnterpriseNav: boolean;
   isLiteMember: boolean;
   hasOpsAccess: boolean;
@@ -291,7 +293,8 @@ export const OPS_ATTENTION_HREF = "/ops";
  */
 export function opsGroup({
   hasCloudOps,
-}: Pick<SettingsMenuGates, "hasCloudOps">): SettingsMenuGroup {
+  hosting,
+}: Pick<SettingsMenuGates, "hasCloudOps" | "hosting">): SettingsMenuGroup {
   return {
     id: "settings-ops",
     label: "Ops",
@@ -320,8 +323,10 @@ export function opsGroup({
       // already only a drawer opened from the projections section, so its
       // entry here pointed at a redirect.
       { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
-      // Flags are the cloud's gradual-rollout switch; the env override still applies everywhere.
-      ...(hasCloudOps ? [{ label: "Feature Flags", href: "/ops/feature-flags", icon: Flag }] : []),
+      // The cloud's gradual-rollout switch, also on a developer's machine; never self-hosted.
+      ...(hasCloudOps || hosting === "local"
+        ? [{ label: "Feature Flags", href: "/ops/feature-flags", icon: Flag }]
+        : []),
       { label: "Upgrades", href: "/ops/upgrades", icon: RefreshCw },
     ],
   };

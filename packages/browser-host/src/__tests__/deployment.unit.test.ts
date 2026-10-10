@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveUiDeployment, type UiDeploymentSlices } from "../deployment.ts";
+import { deriveUiDeployment, hostingOf, type UiDeploymentSlices } from "../deployment.ts";
 
 /** Whole slices, so a field the reading stops using fails here rather than being cast away. */
 function slicesWith(overrides: Partial<UiDeploymentSlices>): UiDeploymentSlices {
@@ -139,5 +139,18 @@ describe("deriveUiDeployment", () => {
     it("omits the slug", () => {
       expect("demoProjectSlug" in deriveUiDeployment(slicesWith({}))).toBe(false);
     });
+  });
+});
+
+/** @scenario "Cloud, self-hosted and local development are told apart" */
+describe("hostingOf", () => {
+  it("reads a development build as local, even when it runs SaaS-shaped", () => {
+    expect(hostingOf({ isDevelopment: true, isSaaS: true })).toBe("local");
+    expect(hostingOf({ isDevelopment: true, isSaaS: false })).toBe("local");
+  });
+
+  it("reads a production build as cloud on SaaS and self-hosted elsewhere", () => {
+    expect(hostingOf({ isDevelopment: false, isSaaS: true })).toBe("cloud");
+    expect(hostingOf({ isDevelopment: false, isSaaS: false })).toBe("self-hosted");
   });
 });

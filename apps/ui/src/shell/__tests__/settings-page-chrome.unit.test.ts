@@ -53,6 +53,7 @@ const everythingOpen = {
   hasPermission: () => true,
   isSaaS: true,
   hasCloudOps: true,
+  hosting: "cloud" as const,
   showEnterpriseNav: true,
   isLiteMember: false,
   hasOpsAccess: true,

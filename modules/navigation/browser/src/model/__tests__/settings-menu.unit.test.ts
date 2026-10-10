@@ -12,6 +12,7 @@ const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
   isSaaS: false,
   hasCloudOps: false,
+  hosting: "self-hosted",
   showEnterpriseNav: false,
   isLiteMember: false,
   hasOpsAccess: false,
@@ -161,6 +162,11 @@ describe("given an operator", () => {
     it("offers Feature Flags only where ops offers cloud ops", () => {
       expect(hrefsIn({ hasOpsAccess: true })).not.toContain("/ops/feature-flags");
       expect(hrefsIn({ hasOpsAccess: true, hasCloudOps: true })).toContain("/ops/feature-flags");
+    });
+
+    /** @scenario "A developer's local stack offers the Feature Flags page" */
+    it("offers Feature Flags on a local development stack without cloud ops", () => {
+      expect(hrefsIn({ hasOpsAccess: true, hosting: "local" })).toContain("/ops/feature-flags");
     });
 
     it("offers instance administration only to a platform administrator", () => {
