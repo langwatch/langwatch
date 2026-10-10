@@ -5,6 +5,7 @@ export {
   type SsoOperator,
 } from "./sso.api.ts";
 export { ssoConnectionTrpc } from "./sso-connection.trpc.ts";
+export { SsoReplacementImportToken, type SsoReplacementImportProps } from "./sso-lent.ts";
 export { ssoSetupTrpc } from "./sso-setup.trpc.ts";
 export {
   ssoBreakGlassBindingInputSchema,
