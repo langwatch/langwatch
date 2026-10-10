@@ -180,9 +180,16 @@ function SignedOutInvite({
         className="lw-front-door-alert"
       />
       <Text data-testid="invite-inviter">
-        {inviterName
-          ? `${inviterName} invited you to ${organizationName} on LangWatch.`
-          : `You have been invited to ${organizationName} on LangWatch.`}
+        {inviterName ? (
+          <>
+            <strong>{inviterName}</strong> invited you to <strong>{organizationName}</strong> on
+            LangWatch.
+          </>
+        ) : (
+          <>
+            You have been invited to <strong>{organizationName}</strong> on LangWatch.
+          </>
+        )}
       </Text>
       {decision ? (
         <SignInMethodPicker
