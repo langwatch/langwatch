@@ -12,6 +12,7 @@ import {
   datasetDisplayRecordCount,
   type DatasetSummaryWire,
 } from "@langwatch/dataset-contract";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -27,7 +28,6 @@ import {
   Table,
   Text,
   useDisclosure,
-  VStack,
 } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyGate } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -163,9 +163,12 @@ function DatasetTableBody({
           </Table.Cell>
           <Table.Cell>{datasetDisplayRecordCount(dataset)}</Table.Cell>
           <Table.Cell>
-            {readableDate(dataset.updatedAt ?? dataset.createdAt).toLocaleString()}
+            <FormattedDate
+              value={readableDate(dataset.updatedAt ?? dataset.createdAt).getTime()}
+              display="datetime"
+            />
           </Table.Cell>
-          <Table.Cell>
+          <ListTable.ActionCell>
             <Menu.Root>
               <Menu.Trigger asChild>
                 <Button
@@ -221,7 +224,7 @@ function DatasetTableBody({
                 )}
               </Menu.Content>
             </Menu.Root>
-          </Table.Cell>
+          </ListTable.ActionCell>
         </Table.Row>
       ))}
     </>
@@ -342,26 +345,30 @@ export default function DatasetsScreen() {
     addEditDatasetDrawer.onOpen();
   };
 
+  const hasDatasets = (datasets.data?.length ?? 0) > 0;
+
   return (
     <>
       <PageLayout.Header>
         <PageLayout.Heading>Datasets</PageLayout.Heading>
         <Spacer />
-        <InputGroup maxWidth="280px" startElement={<Search size={14} />}>
-          <Input
-            size="sm"
-            placeholder="Search datasets"
-            data-testid="datasets-search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </InputGroup>
+        {hasDatasets && (
+          <InputGroup maxWidth="280px" startElement={<Search size={14} />}>
+            <Input
+              size="sm"
+              placeholder="Search datasets"
+              data-testid="datasets-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </InputGroup>
+        )}
         {!projectIsAggregate && (
           <UploadOrCreateDatasetMenu
             onUpload={() => bulkUploadModal.onOpen()}
             onCreate={openCreateDrawer}
           >
-            <Button variant="outline" size="sm" data-testid="upload-or-create-dataset">
+            <Button colorPalette="orange" size="sm" data-testid="upload-or-create-dataset">
               <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create dataset{" "}
               <ChevronDown size={16} />
             </Button>
@@ -375,36 +382,7 @@ export default function DatasetsScreen() {
             <NoDataInfoBlock
               title="No datasets yet"
               description="Upload or create datasets on your messages to do further analysis or to train your own models."
-              docsInfo={
-                <VStack gap={3}>
-                  <HStack gap={2}>
-                    <UploadOrCreateDatasetMenu
-                      onUpload={() => bulkUploadModal.onOpen()}
-                      onCreate={openCreateDrawer}
-                    >
-                      <Button
-                        size="sm"
-                        colorPalette="orange"
-                        data-testid="empty-state-create-dataset"
-                      >
-                        <Upload size={16} /> Upload or create dataset <ChevronDown size={16} />
-                      </Button>
-                    </UploadOrCreateDatasetMenu>
-                  </HStack>
-                  <Text>
-                    To learn more about datasets, please visit our{" "}
-                    <a
-                      href="https://docs.langwatch.ai/datasets/overview"
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: "inherit", textDecoration: "underline" }}
-                    >
-                      documentation
-                    </a>
-                    .
-                  </Text>
-                </VStack>
-              }
+              docsHref="https://docs.langwatch.ai/datasets/overview"
               icon={<TableIcon size={24} />}
             />
           ) : (
@@ -414,8 +392,8 @@ export default function DatasetsScreen() {
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Columns</Table.ColumnHeader>
                   <Table.ColumnHeader>Entries</Table.ColumnHeader>
-                  <Table.ColumnHeader width={240}>Last Update</Table.ColumnHeader>
-                  <Table.ColumnHeader width={20}></Table.ColumnHeader>
+                  <Table.ColumnHeader width={240}>Last updated</Table.ColumnHeader>
+                  <ListTable.ActionHeader />
                 </Table.Row>
               </Table.Header>
               <Table.Body>

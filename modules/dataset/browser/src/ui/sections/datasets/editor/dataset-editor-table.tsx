@@ -532,9 +532,7 @@ function buildTableColumns({
         header: () => (
           <HStack gap={1}>
             <ColumnTypeIcon type={column.type} />
-            <Text fontSize="13px" fontWeight="medium">
-              {column.name}
-            </Text>
+            <Text textStyle="label">{column.name}</Text>
           </HStack>
         ),
         cell: (info) => info.getValue(),
@@ -1210,7 +1208,7 @@ function SearchNotices({
   if (hasSearchFailed) {
     return (
       <Text
-        fontSize="13px"
+        textStyle="bodySm"
         color="fg.muted"
         paddingX={3}
         paddingY={4}
@@ -1223,7 +1221,7 @@ function SearchNotices({
   if (!isSettled || rowCount > 0) return null;
   return (
     <Text
-      fontSize="13px"
+      textStyle="bodySm"
       color="fg.muted"
       paddingX={3}
       paddingY={4}
@@ -1439,7 +1437,7 @@ function EditorToolbar({
   const heading = <EditorTableHeading datasetName={datasetName} title={title} />;
   const counts = (
     <>
-      <Text fontSize="13px" flexShrink={0} color="fg.muted" data-testid="dataset-row-count">
+      <Text textStyle="bodySm" flexShrink={0} color="fg.muted" data-testid="dataset-row-count">
         {/* With no match count to report (see `isMatchCountKnown`), the count
           on hand describes unsearched rows, so reporting it as the result
           of the search would be false. Report the dataset's own size
@@ -1569,7 +1567,7 @@ export function SaveStatusChip({ state, error }: { state: AutosaveState; error?:
     return (
       <HStack gap={1} color="fg.muted" data-testid="save-status-saving">
         <Spinner size="xs" />
-        <Text fontSize="12px">Saving…</Text>
+        <Text textStyle="caption">Saving…</Text>
       </HStack>
     );
   }
@@ -1577,7 +1575,7 @@ export function SaveStatusChip({ state, error }: { state: AutosaveState; error?:
     return (
       <HStack gap={1} color="green.fg" data-testid="save-status-saved">
         <Check size={13} />
-        <Text fontSize="12px">Saved</Text>
+        <Text textStyle="caption">Saved</Text>
       </HStack>
     );
   }
@@ -1586,7 +1584,7 @@ export function SaveStatusChip({ state, error }: { state: AutosaveState; error?:
       <Tooltip content={error ?? "Unknown error"}>
         <HStack gap={1} color="red.fg" data-testid="save-status-error">
           <X size={13} />
-          <Text fontSize="12px">Failed to save</Text>
+          <Text textStyle="caption">Failed to save</Text>
         </HStack>
       </Tooltip>
     );

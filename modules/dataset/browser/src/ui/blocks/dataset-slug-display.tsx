@@ -13,7 +13,6 @@ import {
 } from "@langwatch/design-system/primitives";
 
 import type { SlugValidation } from "../../model/dataset-slug-validation.ts";
-import { CopyValueButton } from "../elements/copy-value-button.tsx";
 import { SlugChangeWarningAlert } from "../elements/slug-change-warning-alert.tsx";
 import { SlugConflictAlert } from "../elements/slug-conflict-alert.tsx";
 
@@ -45,32 +44,29 @@ export function DatasetSlugDisplay({
     <Box {...boxProps}>
       <Field.HelperText>
         <VStack align="start">
-          <HStack>
-            <Text
-              className="slug-text"
-              fontSize="2xs"
-              color="fg.muted"
-              textAlign="left"
-              transition="opacity 0.2s"
-              minWidth={0}
-            >
-              slug:{" "}
-              {slugWillChange ? (
-                <>
-                  <Text as="span" textDecoration="line-through">
-                    {dbSlug}
-                  </Text>
-                  {" -> "}
-                  <b> {displaySlug}</b>
-                </>
-              ) : (
-                displaySlug
-              )}
-            </Text>
-            {!slugWillChange && displaySlug && (
-              <CopyValueButton value={displaySlug} label="Dataset slug" />
-            )}
-          </HStack>
+          {slugWillChange && (
+            <HStack>
+              <Text
+                className="slug-text"
+                textStyle="micro"
+                color="fg.muted"
+                textAlign="left"
+                transition="opacity 0.2s"
+                minWidth={0}
+              >
+                slug:{" "}
+                {
+                  <>
+                    <Text as="span" textDecoration="line-through">
+                      {dbSlug}
+                    </Text>
+                    {" -> "}
+                    <b> {displaySlug}</b>
+                  </>
+                }
+              </Text>
+            </HStack>
+          )}
           {alert}
         </VStack>
       </Field.HelperText>

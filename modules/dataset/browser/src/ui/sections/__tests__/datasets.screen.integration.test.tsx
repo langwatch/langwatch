@@ -111,8 +111,8 @@ describe("Datasets list screen", () => {
       expect(screen.getByText("12")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
       // Last update uses updatedAt, not createdAt.
-      const expected = new Date("2026-02-02T10:00:00Z").toLocaleString();
-      expect(screen.getAllByText(expected)).toHaveLength(2);
+      expect(screen.getAllByText(/Feb/)).toHaveLength(2);
+      expect(screen.queryByText(/Jan/)).not.toBeInTheDocument();
     });
 
     describe("when the reader searches", () => {
@@ -175,23 +175,23 @@ describe("Datasets list screen", () => {
     });
 
     /** @scenario Empty project shows a helpful empty state */
-    it("shows the empty state with an upload-or-create CTA", async () => {
+    it("shows the empty state, with upload-or-create in the header", async () => {
       const user = userEvent.setup();
       renderWithDatasetHost(<DatasetsScreen />);
 
       expect(screen.getByText("No datasets yet")).toBeInTheDocument();
-      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      await user.click(screen.getByTestId("upload-or-create-dataset"));
       // The CTA is a dropdown: "Create empty dataset" opens the create drawer.
       await user.click(await screen.findByText("Create empty dataset"));
       expect(await screen.findByTestId("add-edit-dataset-drawer")).toBeInTheDocument();
     });
 
     /** @scenario Empty-state CTA can launch the bulk upload flow */
-    it("opens the bulk upload drawer from the empty-state CTA", async () => {
+    it("opens the bulk upload drawer from the header action", async () => {
       const user = userEvent.setup();
       renderWithDatasetHost(<DatasetsScreen />);
 
-      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      await user.click(screen.getByTestId("upload-or-create-dataset"));
       await user.click(await screen.findByText("Upload datasets"));
       expect(await screen.findByTestId("bulk-upload-drawer")).toBeInTheDocument();
     });

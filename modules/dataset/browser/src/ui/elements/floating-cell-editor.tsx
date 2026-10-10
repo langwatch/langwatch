@@ -166,7 +166,7 @@ export function FloatingCellEditor({
           resize="vertical"
           border="none"
           borderRadius="0"
-          fontSize="13px"
+          textStyle="bodySm"
           padding={2}
           _focus={{ outline: "none", boxShadow: "none" }}
         />
@@ -329,7 +329,7 @@ function EditorFooter({
     <Box
       paddingX={2}
       paddingY={1}
-      fontSize="10px"
+      textStyle="micro"
       color={validationError ? "red.fg" : "fg.muted"}
       borderTop="1px solid"
       borderColor={validationError ? "red.muted" : "border.muted"}

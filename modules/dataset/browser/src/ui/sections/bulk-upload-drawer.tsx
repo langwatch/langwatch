@@ -413,7 +413,7 @@ function RowTrailing({
         <HStack
           as="button"
           gap={1}
-          fontSize="13px"
+          textStyle="bodySm"
           color="blue.fg"
           cursor="pointer"
           aria-label={`Confirm columns for ${file.name}`}
@@ -425,7 +425,7 @@ function RowTrailing({
       );
     case "queued":
       return (
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           Queued
         </Text>
       );
@@ -433,7 +433,7 @@ function RowTrailing({
       return (
         <HStack gap={1.5}>
           <Spinner size="xs" color="blue.fg" />
-          <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+          <Text textStyle="label" css={RAINBOW_TEXT_CSS}>
             Uploading…
           </Text>
         </HStack>
@@ -442,14 +442,14 @@ function RowTrailing({
       return (
         <HStack gap={1.5}>
           <Spinner size="xs" color="blue.fg" />
-          <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+          <Text textStyle="label" css={RAINBOW_TEXT_CSS}>
             Preparing…
           </Text>
         </HStack>
       );
     case "ready":
       return (
-        <HStack gap={1} color="fg.success" fontSize="13px">
+        <HStack gap={1} color="fg.success" textStyle="bodySm">
           <CheckCircle size={14} />
           <Text>Ready</Text>
         </HStack>
@@ -457,13 +457,13 @@ function RowTrailing({
     case "failed":
     case "rejected":
       return (
-        <Text fontSize="13px" color="fg.error">
+        <Text textStyle="bodySm" color="fg.error">
           {rejectionText(file)}
         </Text>
       );
     case "cancelled":
       return (
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           Cancelled
         </Text>
       );
@@ -706,7 +706,7 @@ export function BulkUploadDrawer({
             </Box>
 
             {bulk.counts.total > 0 && (
-              <HStack fontSize="13px" color="fg.muted" gap={3} data-testid="bulk-summary">
+              <HStack textStyle="bodySm" color="fg.muted" gap={3} data-testid="bulk-summary">
                 <Text>{bulk.counts.total} files</Text>
                 {bulk.counts.ready > 0 && <Text color="fg.success">{bulk.counts.ready} ready</Text>}
                 {bulk.counts.preparing > 0 && (
