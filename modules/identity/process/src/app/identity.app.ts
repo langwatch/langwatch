@@ -14,7 +14,6 @@ import {
   type IdentityEmailResolution,
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
-  SSO_CONNECTION_PIPELINE_NAME,
   type IdentityLookupAnswer,
   type IdentityLookupApi,
   type IdentityLookupOperator,
@@ -131,7 +130,6 @@ import {
   composeSsoConnectionGraph,
   type SsoConnectionPipeline,
 } from "../features/sso-connection/eventing/sso-connection.pipeline.ts";
-import { EventingSsoConnectionHistoryRepository } from "../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
 import { newSsoBreakGlassBindingId } from "../features/sso-connection/rules/sso-connection-id.rules.ts";
 import { OrganizationSsoConnectionsService } from "../features/sso-connection/services/organization-sso-connections.service.ts";
 import { SsoConnectionAdminService } from "../features/sso-connection/services/sso-connection-admin.service.ts";
@@ -595,12 +593,8 @@ export class IdentityModule
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
-    // Answered only once sso_connection is built here (see ssoConnectionHistory()): an absent
-    // log refuses by name rather than reading as a connection nothing ever happened to.
     const ssoConnectionHistory = SsoConnectionHistoryService.create({
-      history: EventingSsoConnectionHistoryRepository.create({
-        eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
-      }),
+      history: setup.repositories.ssoConnectionHistory,
     });
     const ssoAdmin = ssoConnections
       ? SsoConnectionAdminService.create({
@@ -1189,22 +1183,14 @@ export class IdentityModule
   }
 
   ssoAdmin(): SsoConnectionAdminService {
-    if (!this.#parts.ssoAdmin || !this.#holdsSsoConnectionLog()) {
+    if (!this.#parts.ssoAdmin) {
       throw new IdentityCapabilityUnavailableError("SSO connection admin");
     }
     return this.#parts.ssoAdmin;
   }
 
   ssoConnectionHistory(): SsoConnectionHistoryService {
-    if (!this.#holdsSsoConnectionLog()) {
-      throw new IdentityCapabilityUnavailableError("SSO connection history");
-    }
     return this.#parts.ssoConnectionHistory;
-  }
-
-  /** Whether this process built sso_connection over a store: without it there is no log to read. */
-  #holdsSsoConnectionLog(): boolean {
-    return this.#parts.pipelines.stores.holds({ pipeline: SSO_CONNECTION_PIPELINE_NAME });
   }
 
   ssoConnectionReads(): OrganizationSsoConnectionsService {

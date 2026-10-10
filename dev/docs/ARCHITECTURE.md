@@ -1633,7 +1633,10 @@ Eventing exposes a retention operation, which data-retention calls instead of re
 tables, and declares its own LWQL catalogue entries for the event-table views, which analytics
 composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's offloaded fields) is
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
-window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
+window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209). The
+same seat answers one aggregate's stream of one tenant, for a history the api serves that is the log
+itself (identity's SSO connection history); the seat appends nothing and the producer's own event
+store still refuses every read (2026-10-10, `packages/eventing/specs/event-read-seat.feature`).
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`

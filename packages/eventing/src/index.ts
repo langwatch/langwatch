@@ -159,6 +159,7 @@ export {
   EventLogReadSeat,
   eventReadWindow,
   type EventReadSeat,
+  type EventStreamReadInput,
 } from "./stores/eventReadSeat.ts";
 export type {
   ProjectionStore,

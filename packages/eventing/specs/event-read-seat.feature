@@ -6,12 +6,18 @@
 # (Q209, 2026-10-06). So the single-event read is a separate, narrow seat
 # beside the store: one event, inside its tenant's aggregate stream, inside
 # main's two-day window around the time its KSUID carries.
+#
+# The api also serves a module's own aggregate history (an SSO connection's
+# event log card), which is the log itself and has no projection to read. The
+# seat answers that too: one aggregate's stream, named by its whole key inside
+# one tenant. It appends nothing, and the store beside it still refuses.
 
 @event-sourcing
-Feature: One event is read by id through a narrow seat beside the event store
+Feature: Events are read through a narrow seat beside the event store
   As a LangWatch process that serves reads but appends nothing
-  I want to read one event of a tenant's stream by its id
-  So that an offloaded value can be recalled without the process owning an event log
+  I want to read one event, or one aggregate's stream, of a tenant
+  So that an offloaded value or an aggregate's history can be recalled without
+  the process owning an event log
 
   Rule: The seat answers one event of one tenant's stream, inside the window
 
@@ -57,6 +63,44 @@ Feature: One event is read by id through a narrow seat beside the event store
       Then the statement names the tenant first and the whole stream key
       And it keeps rows with no occurred time and rows within two days either side of the id's time
 
+  Rule: The seat answers one aggregate's stream of one tenant
+
+    @unit
+    Scenario: An aggregate's events are answered oldest first
+      Given an aggregate holding three events in one tenant's stream
+      When the seat is asked for that aggregate's events by tenant and stream
+      Then the three events are answered oldest first, with their data
+
+    @unit
+    Scenario: An aggregate nothing happened to answers no events
+      Given a tenant whose stream holds no event for an aggregate
+      When the seat is asked for that aggregate's events
+      Then no events are answered, and the read does not fail
+
+    @unit
+    Scenario: Another tenant's stream is never answered
+      Given an aggregate holding events in one tenant's stream
+      When another tenant asks the seat for the same aggregate type and id
+      Then no events are answered
+
+    @unit
+    Scenario: Another aggregate type under the same id is never answered
+      Given two aggregate types holding events under the same tenant and aggregate id
+      When the seat is asked for one aggregate type's events
+      Then none of the other aggregate type's events are answered
+
+    @unit
+    Scenario: A stream read without an aggregate id is refused
+      When the seat is asked for the events of an empty aggregate id
+      Then the read is refused as invalid before anything is queried
+
+    @unit
+    Scenario: The event log stream read names the tenant first and the whole stream key
+      Given the seat composed over the ClickHouse event log
+      When it is asked for one aggregate's events
+      Then the statement names the tenant first, then the aggregate type and id
+      And it reads no other tenant's rows
+
   Rule: A producer composes the seat beside its refusing store
 
     @integration
@@ -64,4 +108,11 @@ Feature: One event is read by id through a narrow seat beside the event store
       Given the API process composed its Eventing runtime with a read seat over the event log
       When something in that process asks the seat for an event the log holds
       Then the event is answered
+      And the process's event store still refuses every read by name
+
+    @integration
+    Scenario: The API process answers one aggregate's events through its read seat
+      Given the API process composed its Eventing runtime with a read seat over the event log
+      When something in that process asks the seat for an aggregate's events the log holds
+      Then those events are answered
       And the process's event store still refuses every read by name

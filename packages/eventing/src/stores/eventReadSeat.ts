@@ -4,7 +4,7 @@ import type { Event } from "../domain/types.ts";
 import { ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type { EventStoreEventReadInput } from "./eventStore.types.ts";
-import { recordToEvent } from "./eventStoreUtils.ts";
+import { deduplicateEvents, recordToEvent } from "./eventStoreUtils.ts";
 import type {
   EventOccurredAtWindow,
   EventRepository,
@@ -16,24 +16,49 @@ import type {
  */
 export const EVENT_READ_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
+/** One aggregate's stream inside one tenant: the whole key, so a read is never a scan. */
+export type EventStreamReadInput = Omit<EventStoreEventReadInput, "eventId">;
+
+/** The two reads the seat takes off the event log. */
+type EventReadRepository = Pick<EventRepository, "getEventRecord" | "getEventRecords">;
+
 /**
- * One event by id, beside a store that may refuse every read (Q209, 2026-10-06): a producer
- * reads one event of a tenant's stream here and still owns no event log.
+ * Reads beside a store that may refuse every read (Q209, 2026-10-06): a producer reads one
+ * event by id, or one aggregate's stream, of one tenant here and still owns no event log.
  * Spec: packages/eventing/specs/event-read-seat.feature.
  */
 export interface EventReadSeat<EventType extends Event = Event> {
   getEvent(input: EventStoreEventReadInput): Promise<EventType>;
+  /** One aggregate's events, oldest first; an aggregate nothing happened to answers none. */
+  getEvents(input: EventStreamReadInput): Promise<readonly EventType[]>;
 }
 
-/** The seat over an event repository, bounded to the window around the id's KSUID time. */
+/** The seat over an event repository; a by-id read is bounded around the id's KSUID time. */
 export class EventLogReadSeat<EventType extends Event = Event> implements EventReadSeat<EventType> {
   static create<EventType extends Event = Event>(options: {
-    repository: Pick<EventRepository, "getEventRecord">;
+    repository: EventReadRepository;
   }): EventLogReadSeat<EventType> {
     return new EventLogReadSeat<EventType>(options.repository);
   }
 
-  private constructor(private readonly repository: Pick<EventRepository, "getEventRecord">) {}
+  private constructor(private readonly repository: EventReadRepository) {}
+
+  async getEvents(input: EventStreamReadInput): Promise<readonly EventType[]> {
+    const { tenantId, aggregateType, aggregateId } = input;
+    EventUtils.validateTenantId({ tenantId }, "EventLogReadSeat.getEvents");
+    if (String(aggregateId).trim().length === 0) {
+      throw new ValidationError({
+        reason: "An event stream read requires a non-empty aggregateId",
+        field: "aggregateId",
+        value: aggregateId,
+      });
+    }
+
+    const records = await this.repository.getEventRecords({ tenantId, aggregateType, aggregateId });
+    return deduplicateEvents(
+      records.map((record) => recordToEvent<EventType>(record, aggregateId)),
+    );
+  }
 
   async getEvent(input: EventStoreEventReadInput): Promise<EventType> {
     const { eventId, tenantId, aggregateType, aggregateId } = input;

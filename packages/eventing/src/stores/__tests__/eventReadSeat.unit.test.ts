@@ -121,3 +121,107 @@ describe("EventLogReadSeat", () => {
     });
   });
 });
+
+const ORGANIZATION = createTenantId("organization-1");
+const STREAM = { aggregateType: "sso_connection", aggregateId: "connection-1" } as const;
+
+/** One stored row of a stream, at a time that orders it. */
+function streamRecord({
+  eventId,
+  at,
+  tenantId = ORGANIZATION,
+  aggregateType = STREAM.aggregateType,
+}: {
+  eventId: string;
+  at: number;
+  tenantId?: string;
+  aggregateType?: string;
+}) {
+  return {
+    TenantId: tenantId,
+    AggregateType: aggregateType,
+    AggregateId: STREAM.aggregateId,
+    EventId: eventId,
+    EventTimestamp: at,
+    EventOccurredAt: at,
+    EventType: "lw.identity.connection_registered",
+    EventVersion: "2026-01-01",
+    EventPayload: { step: eventId },
+    ProcessingTraceparent: "",
+    IdempotencyKey: eventId,
+  };
+}
+
+/** A seat over a memory log holding the given rows. */
+async function seatOver(records: ReturnType<typeof streamRecord>[]) {
+  const repository = EventRepositoryMemory.createForTesting();
+  await repository.insertEventRecords(records);
+  return EventLogReadSeat.create({ repository });
+}
+
+describe("EventLogReadSeat stream reads", () => {
+  describe("given an aggregate holding three events in one tenant's stream", () => {
+    /** @scenario "An aggregate's events are answered oldest first" */
+    it("answers them oldest first with their data", async () => {
+      const seat = await seatOver([
+        streamRecord({ eventId: "evt-1", at: 1_000 }),
+        streamRecord({ eventId: "evt-2", at: 2_000 }),
+        streamRecord({ eventId: "evt-3", at: 3_000 }),
+      ]);
+
+      const events = await seat.getEvents({ tenantId: ORGANIZATION, ...STREAM });
+
+      expect(events.map((event) => event.id)).toEqual(["evt-1", "evt-2", "evt-3"]);
+      expect(events[0]).toMatchObject({ occurredAt: 1_000, data: { step: "evt-1" } });
+    });
+  });
+
+  describe("given a tenant whose stream holds no event for the aggregate", () => {
+    /** @scenario "An aggregate nothing happened to answers no events" */
+    it("answers no events", async () => {
+      const seat = await seatOver([]);
+
+      await expect(seat.getEvents({ tenantId: ORGANIZATION, ...STREAM })).resolves.toEqual([]);
+    });
+  });
+
+  describe("given an aggregate holding events in one tenant's stream", () => {
+    /** @scenario "Another tenant's stream is never answered" */
+    it("answers another tenant nothing", async () => {
+      const seat = await seatOver([streamRecord({ eventId: "evt-1", at: 1_000 })]);
+
+      await expect(
+        seat.getEvents({ tenantId: createTenantId("organization-2"), ...STREAM }),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe("given two aggregate types under the same tenant and aggregate id", () => {
+    /** @scenario "Another aggregate type under the same id is never answered" */
+    it("answers only the asked aggregate type's events", async () => {
+      const seat = await seatOver([
+        streamRecord({ eventId: "evt-own", at: 1_000 }),
+        streamRecord({ eventId: "evt-other", at: 2_000, aggregateType: "scim_sync" }),
+      ]);
+
+      const events = await seat.getEvents({ tenantId: ORGANIZATION, ...STREAM });
+
+      expect(events.map((event) => event.id)).toEqual(["evt-own"]);
+    });
+  });
+
+  describe("when the aggregate id is empty", () => {
+    /** @scenario "A stream read without an aggregate id is refused" */
+    it("refuses as invalid", async () => {
+      const seat = await seatOver([]);
+
+      await expect(
+        seat.getEvents({
+          tenantId: ORGANIZATION,
+          aggregateType: "sso_connection",
+          aggregateId: " ",
+        }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+});

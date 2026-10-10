@@ -17,6 +17,7 @@ import type { SsoBreakGlassRepository } from "../features/sso-arrival/repositori
 import type { SsoMigrationEvidenceRepository } from "../features/sso-arrival/repositories/sso-migration-evidence.repository.ts";
 import type { SsoConnectionFoldState } from "../features/sso-connection/eventing/sso-connection-state.projection.ts";
 import type { SsoConnectionAdminRepository } from "../features/sso-connection/repositories/sso-connection-admin.repository.ts";
+import type { SsoConnectionHistoryRepository } from "../features/sso-connection/repositories/sso-connection-history.repository.ts";
 import type { SsoConnectionRegistrationRepository } from "../features/sso-connection/repositories/sso-connection-registration.repository.ts";
 import type { SsoConnectionRoutingRepository } from "../features/sso-connection/repositories/sso-connection-routing.repository.ts";
 import type {
@@ -79,6 +80,8 @@ export interface IdentityRepositories {
   /** The per-organization registration slots a new connection claims first. */
   readonly ssoRegistrationSlots: SsoConnectionRegistrationRepository;
   readonly ssoAdmin: SsoConnectionAdminRepository;
+  /** What happened to a connection, read off the event log in every role. */
+  readonly ssoConnectionHistory: SsoConnectionHistoryRepository;
   /** Which proved domains are due a re-read, and the look itself (ADR-123). */
   readonly ssoReproofTargets: SsoDomainReproofTargetRepository;
   /** Where a connection's identity-provider credentials are kept (D09). */

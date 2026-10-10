@@ -3,13 +3,22 @@
  * The SSO connection log, read: newest first, scoped to the caller's tenant.
  * Corresponds to specs/identity/sso-connection-history.feature.
  */
-import { type OwnEventStore, createTenantId } from "@langwatch/eventing";
+import {
+  createTenantId,
+  EventLogReadSeat,
+  type EventReadSeat,
+  EventStoreProducerOnly,
+  eventToRecord,
+  PipelineEventStore,
+} from "@langwatch/eventing";
+import { EventRepositoryMemory } from "@langwatch/eventing/testing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_EVENT_VERSION_LATEST,
+  SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
@@ -86,21 +95,42 @@ function repositoryOver(eventsByTenant: Record<string, SsoConnectionEvent[]>): {
   requestedTenants: string[];
 } {
   const requestedTenants: string[] = [];
-  // A real store filters by BOTH the tenant and the aggregate id; so does
+  // A real seat filters by BOTH the tenant and the aggregate id; so does
   // this one, or a connection id belonging to nobody in this tenant would
   // "find" another connection's events purely by sharing a bucket.
-  const read: OwnEventStore["read"] = async ({ tenantId, aggregateId, accepts }) => {
+  const getEvents: EventReadSeat["getEvents"] = async ({ tenantId, aggregateId }) => {
     requestedTenants.push(tenantId);
-    const events: readonly unknown[] = (eventsByTenant[tenantId] ?? []).filter(
-      (event) => event.aggregateId === aggregateId,
-    );
-    return events.filter(accepts);
+    return (eventsByTenant[tenantId] ?? []).filter((event) => event.aggregateId === aggregateId);
   };
   return {
     repository: EventingSsoConnectionHistoryRepository.create({
-      eventStore: { read },
+      eventReadSeat: { getEvents },
     }),
     requestedTenants,
+  };
+}
+
+const API_PROCESS = "langwatch-api";
+
+function isAnyEvent(_event: unknown): _event is unknown {
+  return true;
+}
+
+/** What the api composes: a store refusing every read, and a read seat over the same log. */
+async function apiProcessOver(events: SsoConnectionEvent[]) {
+  const log = EventRepositoryMemory.createForTesting();
+  await log.insertEventRecords(events.map((event) => eventToRecord(event)));
+  const refusingStore = EventStoreProducerOnly.create({ processName: API_PROCESS });
+  const ownStore = PipelineEventStore.create({
+    pipeline: SSO_CONNECTION_PIPELINE_NAME,
+    log: () => refusingStore,
+  });
+  ownStore.bindTo({ aggregate: { type: SSO_CONNECTION_AGGREGATE_TYPE } });
+  return {
+    ownStore,
+    repository: EventingSsoConnectionHistoryRepository.create({
+      eventReadSeat: EventLogReadSeat.create({ repository: log }),
+    }),
   };
 }
 
@@ -179,6 +209,40 @@ describe("given a connection with a history of facts", () => {
       // The tenant asked for is the caller's own, never widened to scan for
       // the connection across every tenant.
       expect(requestedTenants).toEqual([ACME]);
+      expect(history).toEqual([]);
+    });
+  });
+
+  describe("when it is read in a process that only sends commands", () => {
+    /** @scenario "The connection history is readable from a process that only sends commands" */
+    it("lists the facts newest first while the process's own store refuses the read", async () => {
+      const { repository, ownStore } = await apiProcessOver(events);
+
+      const history = await repository.findHistory({
+        organizationId: ACME,
+        connectionId: CONNECTION,
+        limit: 10,
+      });
+
+      expect(history.map((entry) => entry.eventId)).toEqual(["evt_3", "evt_2", "evt_1"]);
+      expect(history[1]).toMatchObject({ domain: "acme.com", occurredAtMs: T0 + 1000 });
+      await expect(
+        ownStore.read({ tenantId: ACME, aggregateId: CONNECTION, accepts: isAnyEvent }),
+      ).rejects.toMatchObject({
+        name: "ConfigurationError",
+        context: { processName: API_PROCESS, operation: "getEvents" },
+      });
+    });
+
+    it("finds nothing for a connection named under another organization's tenant", async () => {
+      const { repository } = await apiProcessOver(events);
+
+      const history = await repository.findHistory({
+        organizationId: "org_globex",
+        connectionId: CONNECTION,
+        limit: 10,
+      });
+
       expect(history).toEqual([]);
     });
   });

@@ -1,6 +1,8 @@
+import type { EventReadSeat } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
 
+import { EventingSsoConnectionHistoryRepository } from "../../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
 import { PrismaSsoConnectionAdminRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-admin.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-projection.repository.ts";
 import {
@@ -47,15 +49,16 @@ import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.reposito
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
 import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verification.repository.ts";
 
-/** The live tier: every identity row over the one Prisma client. */
+/** The live tier: every identity row over the one Prisma client, history over the read seat. */
 export class PostgresIdentityRepositories {
-  static readonly requires = ["prisma", "encryption", "rateLimiter"] as const;
+  static readonly requires = ["prisma", "encryption", "rateLimiter", "eventReadSeat"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
       encryption: Encryption;
       rateLimiter: RateLimiter;
+      eventReadSeat: Pick<EventReadSeat, "getEvents">;
     }>,
   ): IdentityRepositories {
     const database = members.prisma;
@@ -86,6 +89,9 @@ export class PostgresIdentityRepositories {
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoRegistrationSlots: PrismaSsoConnectionRegistrationRepository.create(database),
       ssoAdmin: PrismaSsoConnectionAdminRepository.create(database),
+      ssoConnectionHistory: EventingSsoConnectionHistoryRepository.create({
+        eventReadSeat: members.eventReadSeat,
+      }),
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
       ssoEngineProviders: PrismaSsoEngineProviderRepository.create(database, members.encryption),

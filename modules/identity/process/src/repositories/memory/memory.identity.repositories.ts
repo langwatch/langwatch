@@ -1,6 +1,7 @@
 import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
 import type { MfaFoldState } from "../../features/mfa/eventing/mfa-enrollment-state.projection.ts";
 import type { SsoConnectionFoldState } from "../../features/sso-connection/eventing/sso-connection-state.projection.ts";
+import { MemorySsoConnectionHistoryRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-history.repository.ts";
 import { MemorySsoConnectionRegistrationRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-registration.repository.ts";
 import { MemorySsoConnectionRoutingRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-routing.repository.ts";
 import {
@@ -87,6 +88,7 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
     ssoRegistrationSlots: MemorySsoConnectionRegistrationRepository.create(store),
     ssoAdmin: MemorySsoConnectionAdminRepository.create(store),
+    ssoConnectionHistory: MemorySsoConnectionHistoryRepository.create(),
     ssoReproofTargets: MemorySsoDomainReproofTargetRepository.create(store),
     ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
     ssoCredentials: MemorySsoCredentialRepository.create(store),

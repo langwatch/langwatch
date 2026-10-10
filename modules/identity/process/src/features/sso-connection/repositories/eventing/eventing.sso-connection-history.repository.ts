@@ -1,6 +1,7 @@
-import type { OwnEventStore } from "@langwatch/eventing";
+import { createTenantId, type EventReadSeat } from "@langwatch/eventing";
 import {
   CONNECTION_IDP_UPDATED_EVENT_TYPE,
+  SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_EVENT_TYPES,
   type SsoConnectionSource,
   ssoConnectionSourceSchema,
@@ -27,8 +28,8 @@ interface SsoConnectionPayloadShape {
   source?: unknown;
 }
 
-/** The one read this repository takes off the sso_connection pipeline's own store. */
-type SsoConnectionEventReads = Pick<OwnEventStore, "read">;
+/** The one read this repository takes off eventing's read seat. */
+type SsoConnectionEventReads = Pick<EventReadSeat, "getEvents">;
 
 const SSO_CONNECTION_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SSO_CONNECTION_EVENT_TYPES);
 
@@ -45,17 +46,18 @@ function sourceOf(value: unknown): SsoConnectionSource {
 }
 
 /**
- * The connection log itself, read through the sso_connection pipeline's own store. The events
- * ARE the panel, so it is rebuildable for free and shows nothing the log cannot re-derive.
+ * The connection log itself, read through eventing's read seat, which answers in a process
+ * that only sends commands too. The events ARE the panel, so it shows nothing the log cannot
+ * re-derive. Spec: specs/identity/sso-connection-history.feature.
  */
 export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistoryRepository {
   static create(deps: {
-    eventStore: SsoConnectionEventReads;
+    eventReadSeat: SsoConnectionEventReads;
   }): EventingSsoConnectionHistoryRepository {
-    return new EventingSsoConnectionHistoryRepository(deps.eventStore);
+    return new EventingSsoConnectionHistoryRepository(deps.eventReadSeat);
   }
 
-  private constructor(private readonly eventStore: SsoConnectionEventReads) {
+  private constructor(private readonly eventReadSeat: SsoConnectionEventReads) {
     super();
   }
 
@@ -68,12 +70,16 @@ export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistory
     connectionId: string;
     limit: number;
   }): Promise<readonly SsoConnectionHistoryEntry[]> {
-    const events = await this.eventStore.read({
-      tenantId: organizationId,
+    const events: readonly unknown[] = await this.eventReadSeat.getEvents({
+      tenantId: createTenantId(organizationId),
+      aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
       aggregateId: connectionId,
-      accepts: isSsoConnectionEvent,
     });
-    return events.map(toHistoryEntry).toSorted(newestFirst).slice(0, limit);
+    return events
+      .filter(isSsoConnectionEvent)
+      .map(toHistoryEntry)
+      .toSorted(newestFirst)
+      .slice(0, limit);
   }
 }
 

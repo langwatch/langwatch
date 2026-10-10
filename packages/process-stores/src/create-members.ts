@@ -244,15 +244,14 @@ function eventingMember({
 
 /** A role whose eventing reads no event log still hands a seat: only a read through it refuses. */
 function refusingEventReadSeat(): EventReadSeat {
-  return {
-    getEvent: () =>
-      Promise.reject(
-        new MemberNotConfiguredError(
-          "eventReadSeat",
-          "give this role's eventing the event log (set CLICKHOUSE_URL)",
-        ),
+  const refuse = () =>
+    Promise.reject(
+      new MemberNotConfiguredError(
+        "eventReadSeat",
+        "give this role's eventing the event log (set CLICKHOUSE_URL)",
       ),
-  };
+    );
+  return { getEvent: refuse, getEvents: refuse };
 }
 
 /** Eventing's seat where this role's eventing reads the event log; a refusing one otherwise. */
