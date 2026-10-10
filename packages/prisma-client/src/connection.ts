@@ -24,6 +24,9 @@ function prismaLoggerLevel(level: Prisma.LogLevel): "error" | "warn" | "info" | 
   return level === "query" ? "debug" : level;
 }
 
+/** P2021/P2022 and Postgres wording: the schema is behind mid-upgrade, which is expected. */
+const SCHEMA_BEHIND_MESSAGE = /P2021|P2022|(table|column) .*does not exist/i;
+
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
   return "query" in event ? event.query : event.message;
@@ -39,8 +42,11 @@ export function forwardPrismaEvent({
   level: Prisma.LogLevel;
   event: Prisma.LogEvent | Prisma.QueryEvent;
 }): void {
-  logger[prismaLoggerLevel(level)](
-    { target: event.target, message: prismaEventMessage(event), timestamp: event.timestamp },
+  const message = prismaEventMessage(event);
+  const loggerLevel =
+    level === "error" && SCHEMA_BEHIND_MESSAGE.test(message) ? "warn" : prismaLoggerLevel(level);
+  logger[loggerLevel](
+    { target: event.target, message, timestamp: event.timestamp },
     PRISMA_EVENT_MESSAGE[level],
   );
 }

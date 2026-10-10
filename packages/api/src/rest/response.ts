@@ -931,7 +931,7 @@ export function createCanonicalFamilyErrorHandler(options: {
   return async (error, c) => {
     const { status, body } = mapError(error, c);
 
-    logger.error(
+    logger[body.code === "upgrade_in_progress" ? "warn" : "error"](
       {
         path: c.req.path,
         method: c.req.method,

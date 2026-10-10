@@ -314,6 +314,24 @@ describe("explicit Prisma lifecycle", () => {
       expect(logger.debug).not.toHaveBeenCalled();
     });
 
+    it("lands a missing-table error event at warn while the schema is behind", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message: "P2021: The table `public.OrganizationLicense` does not exist",
+          timestamp,
+        },
+      });
+
+      expect(logger.warn).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {
       const logger = fakeLogger();
       const timestamp = new Date("2026-09-09T00:00:00.000Z");
