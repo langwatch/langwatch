@@ -12,12 +12,12 @@ export const SampleAgentsApi = moduleApi<SampleAgentsApi>()("sample-agents");
 /** Main's door read no body; a bodiless call arrives as this empty object. */
 export const hotelBotRequestSchema = z.object({});
 
-/** The caller's project key, forwarded unread to the collector, which authenticates it. */
-export const hotelBotHeadersSchema = z.object({
-  "x-auth-token": z.string().optional(),
+/** The project the API-key door verified, and the key that started the run, which caps it. */
+export const hotelBotRunInputSchema = z.object({
+  projectId: z.string(),
+  startedByApiKeyId: z.string().nullable(),
+  startedByUserId: z.string().nullable(),
 });
-
-export const hotelBotRunInputSchema = z.object({ authToken: z.string().optional() });
 
 export type HotelBotRunInput = z.infer<typeof hotelBotRunInputSchema>;
 

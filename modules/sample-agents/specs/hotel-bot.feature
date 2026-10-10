@@ -1,31 +1,27 @@
 Feature: The demo hotel bot fills a project with traces
 
   The hotel bot runs a scripted hotel concierge on the platform's own OpenAI
-  key and posts each conversation to the collector with the caller's project
-  key, so the project shows real traces. About half the calls are turned away
-  on purpose, so the project shows failures too.
+  key and posts each conversation to the collector with a short-lived ingest
+  key minted for the caller's project, so the project shows real traces. About
+  half the calls are turned away on purpose, so the project shows failures too.
 
-  It is for LangWatch staff only: `POST /api/demo/hotel_bot` answers behind the
-  browser door, asked `ops:manage` at the platform tier, and hides itself from
-  everyone else (ruling 2026-10-05).
+  `POST /api/demo/hotel_bot` answers behind the project API-key door, asked
+  `traces:create`; the bot mints a run key for that project holding only
+  `traces:create`, with the run-key default life, capped by the calling key
+  as a key-started run is (ARCHITECTURE.md §8; Alex 2026-10-10 W02-HOTEL-BOT,
+  HOTEL-BOT-KEY).
 
   @unit
-  Scenario: The hotel bot is mounted behind the platform-operator door
+  Scenario: The hotel bot is mounted behind the project API-key door
     When the sample agents module is installed
     Then it mounts the hotel bot's route
 
   @unit
-  Scenario: The hotel bot's door hides the bot from anyone who is not a platform operator
-    Given a caller with no session, or a signed-in user without ops:manage at the platform
-    When the hotel bot door is called with an X-Auth-Token
-    Then the door answers 404 not_found
+  Scenario: The hotel bot's door refuses a caller without a key that may record traces
+    Given a caller with no key, an unknown key, or a key without traces:create
+    When the hotel bot door is called
+    Then the door answers 401 for a missing or unknown key and 403 for a key without the permission
     And the bot never runs, so no model call is made
-
-  @unit
-  Scenario: A call without a project key is refused before any model call
-    When the hotel bot is called without an X-Auth-Token
-    Then the call is refused as missing credentials
-    And no model call is made
 
   @unit
   Scenario: The bot turns away an even first roll without calling the model
@@ -39,7 +35,8 @@ Feature: The demo hotel bot fills a project with traces
     Given the first roll is odd and the second roll is odd
     When the hotel bot is called with a project key
     Then four completions are asked for on the demo model
-    And two traces are posted to the collector with the caller's key
+    And one ingest key is minted for the project, holding only traces:create, capped by the calling key
+    And two traces are posted to the collector with that key
     And the answer says the traces were sent
 
   @unit
@@ -56,6 +53,14 @@ Feature: The demo hotel bot fills a project with traces
     When the hotel bot is called with a project key
     Then the answer says the traces were sent
     And the lost trace is logged as a warning
+
+  @unit
+  Scenario: An unminted ingest key still answers that the traces were sent
+    Given no ingest key can be minted for the project
+    When the hotel bot is called with a project key
+    Then nothing is posted to the collector
+    And the answer says the traces were sent
+    And the missing key is logged as a warning
 
   @unit
   Scenario: A failing model call fails the run as an unknown error
@@ -83,7 +88,7 @@ Feature: The demo hotel bot fills a project with traces
     Then it fails
 
   @unit
-  Scenario: The collector channel posts to this deployment's collector with the caller's key
+  Scenario: The collector channel posts to this deployment's collector with the minted key
     When the collector channel posts a trace
     Then it posts the trace to the deployment's own collector with the caller's X-Auth-Token
 
@@ -94,15 +99,15 @@ Feature: The demo hotel bot fills a project with traces
     Then it fails
 
   @unit
-  Scenario: The door hands a platform operator's X-Auth-Token to the hotel bot
-    Given a platform operator holding ops:manage
-    When the hotel bot door is called with an X-Auth-Token
-    Then the hotel bot runs with that key
+  Scenario: The door hands the key's project to the hotel bot
+    Given a key holding traces:create
+    When the hotel bot door is called with it
+    Then the hotel bot runs in the key's project
     And the door answers the bot's reply
 
   @unit
   Scenario: The door answers a declined run with its code
-    Given a platform operator holding ops:manage
+    Given a key holding traces:create
     And the hotel bot declines the run
-    When the hotel bot door is called with an X-Auth-Token
+    When the hotel bot door is called with it
     Then the door answers 401 with the code demo_bot_declined

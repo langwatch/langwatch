@@ -349,6 +349,21 @@ describe("given a door credential that declares a session", () => {
   });
 });
 
+describe("given a key door route that declares it reads the key", () => {
+  it("accepts key from withCredential(door, { key: true }) and reports it otherwise", () => {
+    expect(
+      located(
+        '  .post("/widgets/run", "runWidget")',
+        '  .withCredential("project", { key: true })',
+        "  .handle(async ({ app, key }) => app.runWidget(key))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withCredential("project")',
+        "  .handle(async ({ app, key }) => app.ownWidget(key))",
+      ),
+    ).toEqual([["rawContextField", "key", 8, 24]]);
+  });
+});
+
 describe("given a handler taking a producer its route did not declare", () => {
   /** @scenario "A handler taking a producer its own route did not declare is reported at the field" */
   it("reports raw without withRawBody, request on a bytes route and files without withMultipart", () => {
