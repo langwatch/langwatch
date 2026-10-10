@@ -8,6 +8,7 @@ import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
+import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -487,6 +488,12 @@ export const designSystemConfig = defineConfig({
           bgActive: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
           },
+          bgSelected: {
+            value: {
+              _light: "color-mix(in srgb, {colors.accent.solid} 16%, {colors.bg.panel})",
+              _dark: "color-mix(in srgb, {colors.accent.solid} 24%, {colors.bg.panel})",
+            },
+          },
           bgHover: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },
           },
@@ -602,6 +609,7 @@ export const designSystemConfig = defineConfig({
       },
     },
     recipes: {
+      sectionNavigationRail: sectionNavigationRailRecipe,
       skeleton: defineRecipe({
         base: {
           "--skeleton-from": "{colors.gray.100}",

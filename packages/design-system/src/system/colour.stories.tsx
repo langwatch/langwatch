@@ -20,6 +20,7 @@ const foundationColours = [
 const semanticColours = [
   "bg",
   "bg.panel",
+  "nav.bgSelected",
   "bg.raised",
   "bg.muted",
   "bg.subtle",

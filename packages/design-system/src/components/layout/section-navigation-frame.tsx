@@ -3,7 +3,7 @@
  * the page hands it `onNavigate`, so a plain click routes in place. Render it as the page's
  * root: it fills the card by flex, the rail stretches, and the content column scrolls.
  */
-import { Box, chakra, HStack, Link, Stack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Link, Stack, Text, useRecipe } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 
@@ -43,20 +43,8 @@ export type SectionNavigationGroup = {
 const mix = (token: string, alpha: string) =>
   `color-mix(in srgb, var(--chakra-colors-${token}) ${alpha}, transparent)`;
 
-/** Tinted glass separates the rail from the page and keeps the selected fill distinct. */
-const RAIL_GLASS = {
-  background: {
-    _light: `linear-gradient(135deg, ${mix("bg-panel", "65%")}, transparent 45%), linear-gradient(180deg, ${mix("nav-bg-active", "55%")}, ${mix("nav-bg-active", "20%")}), ${mix("bg-page", "var(--lw-panel-alpha, 85%)")}`,
-    _dark: `linear-gradient(180deg, ${mix("fg", "4%")}, ${mix("fg", "1%")}), ${mix("bg-muted", "var(--lw-panel-alpha, 70%)")}`,
-  },
-  border: "border",
-  shadow: {
-    _light: `inset 0 1px 0 ${mix("bg-panel", "90%")}, inset 1px 0 0 ${mix("bg-panel", "70%")}`,
-    _dark: `inset 0 1px 0 ${mix("fg", "6%")}`,
-  },
-};
-/** The current link wears the main sidebar's active fill; hover is a lighter step of it. */
-const LINK_ACTIVE = { background: "nav.bgActive", color: "fg" };
+/** An opaque brand tint keeps the current link distinct from the textured rail. */
+const LINK_ACTIVE = { background: "nav.bgSelected", color: "fg" };
 const LINK_HOVER = { background: mix("nav-bg-active", "55%"), color: "fg" };
 
 /** One rail entry; exported for a list a page owns in a group's `extra`, so it reads the same. */
@@ -191,6 +179,7 @@ export function SectionNavigationRail({
   const runs: readonly SectionNavigationGroup[] = [{ links }, ...groups].filter(
     (run) => run.links.length > 0 || (!collapsed && (run.extra !== void 0 || run.add !== void 0)),
   );
+  const glass = useRecipe({ key: "sectionNavigationRail" });
   const width = collapsed ? SECTION_RAIL_COLLAPSED_WIDTH : SECTION_RAIL_WIDTH;
   return (
     <Box
@@ -202,13 +191,10 @@ export function SectionNavigationRail({
       width={{ base: "full", md: `${width}px` }}
       minWidth={{ base: 0, md: `${width}px` }}
       flexShrink={0}
-      background={RAIL_GLASS.background}
-      boxShadow={RAIL_GLASS.shadow}
-      backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(1.35))"
+      css={glass()}
+      minHeight={0}
       borderRightWidth={{ base: 0, md: "1px" }}
-      borderRightColor={RAIL_GLASS.border}
       borderBottomWidth={{ base: "1px", md: 0 }}
-      borderBottomColor={RAIL_GLASS.border}
       paddingX={2}
       paddingTop={{ base: 2, md: 0 }}
       paddingBottom={2}
@@ -308,6 +294,7 @@ export function SectionNavigationFrame({
   return (
     <Stack
       data-section-frame
+      overflow="hidden"
       data-testid="section-navigation-layout"
       direction={{ base: "column", md: "row" }}
       alignItems="stretch"

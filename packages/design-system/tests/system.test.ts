@@ -21,6 +21,9 @@ describe("LangWatch design system", () => {
     expect(light["--chakra-colors-bg-surface"]).toBeDefined();
     expect(dark["--chakra-colors-bg-surface"]).toBeDefined();
     expect(system._config.theme?.recipes?.button).toBeDefined();
+    expect(system.getRecipe("sectionNavigationRail")).toBeDefined();
+    expect(light["--chakra-colors-nav-bg-selected"]).toContain("--chakra-colors-accent-solid");
+    expect(dark["--chakra-colors-nav-bg-selected"]).toContain("--chakra-colors-accent-solid");
     expect(system._config.theme?.slotRecipes?.toast).toBeDefined();
   });
 
