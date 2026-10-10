@@ -9,9 +9,8 @@ import { useAgentManagementHost } from "../model/agent-management-host.ts";
 import { agentApi } from "./agent-api.ts";
 import type { HttpAgentEditorOptions } from "./use-http-agent-editor.ts";
 
-const explainTestError: HttpTestErrorExplanation = ({ error }) => ({
+const explainTestError: HttpTestErrorExplanation = () => ({
   title: "The test request failed",
-  ...(error ? { description: error } : {}),
 });
 
 /**
