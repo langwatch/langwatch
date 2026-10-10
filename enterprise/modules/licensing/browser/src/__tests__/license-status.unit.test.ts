@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cappedLiteSeatsOf,
   formatFileSize,
   formatLicenseDate,
+  formatLicenseDateShort,
   formatLimitOrUnlimited,
   hasLicenseMetadata,
   isCorruptedLicense,
@@ -229,6 +231,32 @@ describe("formatLimitOrUnlimited", () => {
   });
 });
 
+describe("cappedLiteSeatsOf", () => {
+  describe("when the license carries a finite Lite seat limit", () => {
+    /** @scenario "A finite Lite seat limit is shown next to the seats" */
+    it("answers the Lite seats in use against the limit", () => {
+      expect(cappedLiteSeatsOf({ currentMembersLite: 3, maxMembersLite: 50 })).toEqual({
+        current: 3,
+        max: 50,
+      });
+    });
+
+    it("answers a limit of zero as a limit", () => {
+      expect(cappedLiteSeatsOf({ currentMembersLite: 0, maxMembersLite: 0 })).toEqual({
+        current: 0,
+        max: 0,
+      });
+    });
+  });
+
+  describe("when the license does not cap Lite seats", () => {
+    /** @scenario "Unlimited Lite seats are not shown" */
+    it.each([1_000_000, Number.MAX_SAFE_INTEGER, Infinity])("answers null for %s", (max) => {
+      expect(cappedLiteSeatsOf({ currentMembersLite: 3, maxMembersLite: max })).toBeNull();
+    });
+  });
+});
+
 describe("formatLicenseDate", () => {
   it("formats ISO date string to human-readable format", () => {
     expect(formatLicenseDate("2025-12-31")).toBe("December 31, 2025");
@@ -241,6 +269,28 @@ describe("formatLicenseDate", () => {
 
   it("returns original string for invalid date", () => {
     expect(formatLicenseDate("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatLicenseDateShort", () => {
+  describe("when the month has a long name", () => {
+    /** @scenario "The expiry date fits its tile and keeps the full date on hover" */
+    it.each([
+      { iso: "2026-11-09T00:00:00Z", short: "Nov 9, 2026" },
+      { iso: "2027-09-30T00:00:00Z", short: "Sep 30, 2027" },
+    ])("formats $iso as $short", ({ iso, short }) => {
+      expect(formatLicenseDateShort(iso)).toBe(short);
+    });
+
+    it("stays within the 14 characters a quarter-width tile shows", () => {
+      const longest = ["2027-09-30", "2027-12-31", "2027-11-30"].map(formatLicenseDateShort);
+
+      expect(Math.max(...longest.map((date) => date.length))).toBeLessThanOrEqual(14);
+    });
+  });
+
+  it("returns the original string for an invalid date", () => {
+    expect(formatLicenseDateShort("not-a-date")).toBe("not-a-date");
   });
 });
 

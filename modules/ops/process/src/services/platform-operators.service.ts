@@ -56,6 +56,8 @@ type PlatformOperatorsServiceOptions = Readonly<{
   >;
   users: Pick<UserApi, "findByEmail" | "findById" | "countUsage">;
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
+  /** No email at all: no account here can verify its address, so the seed cannot ask for it. */
+  emailIsUnconfigured: () => Promise<boolean>;
 }>;
 
 /**
@@ -183,7 +185,7 @@ export class PlatformOperatorsService {
   }): Promise<number> {
     if (settings.cloud || settings.adminEmails.length === 0) return 0;
     if ((await this.options.authz.listPlatformOperators()).length > 0) return 0;
-    const named = await this.#verifiedUsersNamed(settings.adminEmails);
+    const named = await this.#seedableUsersNamed(settings.adminEmails);
     if (!dryRun && named.length > 0)
       await this.grantSeeded({ via: "admin-emails", userIds: named });
     return named.length;
@@ -205,7 +207,7 @@ export class PlatformOperatorsService {
     }
 
     if (adminEmails.length > 0) {
-      const named = await this.#verifiedUsersNamed(adminEmails);
+      const named = await this.#seedableUsersNamed(adminEmails);
       if (named.length > 0) {
         return { via: "admin-emails", userIds: named, reason: "the users ADMIN_EMAILS names" };
       }
@@ -242,13 +244,20 @@ export class PlatformOperatorsService {
     return Object.values(emailDomains).some((count) => count > 0);
   }
 
-  async #verifiedUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
-    const ids = new Set<string>();
+  /**
+   * The active users the list names whose address is verified. Where no email is configured an
+   * unverified one counts too: sign-up could never have proved it (ADR-117, revision 2026-09-25).
+   */
+  async #seedableUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
+    const active: UserProfile[] = [];
     for (const email of adminEmails) {
       const user = await this.#namedUser(email);
-      if (user && user.emailVerified && user.deactivatedAt === null) ids.add(user.id);
+      if (user && user.deactivatedAt === null) active.push(user);
     }
-    return [...ids];
+    const unverifiedCounts =
+      active.some((user) => !user.emailVerified) && (await this.options.emailIsUnconfigured());
+    const seedable = active.filter((user) => user.emailVerified || unverifiedCounts);
+    return [...new Set(seedable.map((user) => user.id))];
   }
 
   /** An address several case-variant accounts share names nobody: the seed never guesses. */

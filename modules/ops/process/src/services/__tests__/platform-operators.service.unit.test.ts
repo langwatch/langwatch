@@ -57,11 +57,13 @@ function world({
   users = [],
   organizations = [],
   administrators = [],
+  emailIsUnconfigured = false,
 }: {
   holders?: PlatformOperator[];
   users?: UserProfile[];
   organizations?: string[];
   administrators?: string[];
+  emailIsUnconfigured?: boolean;
 } = {}) {
   const granted: AuthzGrantPlatformOperatorInput[] = [];
   const authz: Pick<
@@ -103,6 +105,7 @@ function world({
     authz,
     users: directory,
     organizations: organizationDirectory,
+    emailIsUnconfigured: async () => emailIsUnconfigured,
   });
   return { service, granted, authz };
 }
@@ -228,6 +231,51 @@ describe("PlatformOperatorsService", () => {
         });
 
         const outcome = await service.seedOnce({ adminEmails: ["ghost@acme.com"], cloud: false });
+
+        expect(outcome.via).toBe("waiting");
+        expect(record).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given the install has no email configured and the named user is unverified", () => {
+      const unverified = {
+        users: [user("stranger"), user("ana", { emailVerified: false })],
+        organizations: ["org_1"],
+        administrators: ["stranger"],
+        emailIsUnconfigured: true,
+      };
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("decides the named user, and never the organization's admin", async () => {
+        const { service, record } = seeding(unverified);
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome.via).toBe("admin-emails");
+        expect(record).toHaveBeenCalledWith({ via: "admin-emails", userIds: ["ana"] });
+      });
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("grants them through the upgrade step too", async () => {
+        const { service, granted } = world(unverified);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(1);
+        expect(granted.map((grant) => grant.principal)).toEqual([{ type: "user", id: "ana" }]);
+      });
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("still skips a deactivated named user", async () => {
+        const { service, record } = seeding({
+          ...unverified,
+          users: [user("ana", { emailVerified: false, deactivatedAt: new Date() })],
+        });
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
 
         expect(outcome.via).toBe("waiting");
         expect(record).not.toHaveBeenCalled();

@@ -884,6 +884,10 @@ export class OpsModule implements OpsApi {
       authz: dependencies.authz,
       users: dependencies.users,
       organizations: dependencies.organizations,
+      emailIsUnconfigured: async () => {
+        const mail = await dependencies.notifications.getMailDelivery();
+        return mail.provider === undefined && !mail.misconfigured;
+      },
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
