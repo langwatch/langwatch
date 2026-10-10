@@ -181,9 +181,12 @@ image runs. So:
   `<newest contained release>+<short commit>`, never "unreleased". History imported from before
   upgrade tracking reads "3.18.1 and earlier"; the seed run is "Imported history", raw JSON only
   behind a details toggle.
-- **Organizations, not tenants.** Tenant steps are called organisations on every deployment, and
-  all the tooling (run a pass, run for an organisation, roll back, enrol) shows on cloud and
-  self-hosted alike.
+- **Organizations, not tenants.** Tenant steps are called organisations on every deployment. Run a
+  pass, run for an organisation and roll back show everywhere; enrolment is cloud only, since a
+  self-hosted pass already admits every organisation.
+- **Action needed, not a Done button.** Most upgrades need nothing from anyone. When an operator
+  step of the running version is unfinished, Home shows an "Action needed for updates" bar inside
+  its card, in the slot pending join requests use, to whoever holds `ops:view`.
 
 ## Alternatives considered
 
