@@ -42,7 +42,7 @@ export function SuiteContextMenu({
       position="fixed"
       left={`${x}px`}
       top={`${y}px`}
-      bg="bg.surface"
+      bg="bg.card"
       border="1px solid"
       borderColor="border"
       borderRadius="md"

@@ -15,7 +15,7 @@ describe("<SimulationCard /> completion colors", () => {
   afterEach(cleanup);
 
   /** @scenario Light mode restores the full-card completion wash */
-  it("renders a completed card title in white above the status wash", () => {
+  it("renders a completed card title in the theme foreground above the subtle status wash", () => {
     renderWithDesignSystem(
       <SimulationCard title="Completed scenario" status={ScenarioRunStatus.SUCCESS}>
         <Text>Conversation preview</Text>
@@ -23,7 +23,7 @@ describe("<SimulationCard /> completion colors", () => {
     );
 
     expect(screen.getByText("Completed scenario")).toHaveStyle({
-      color: "var(--chakra-colors-white)",
+      color: "var(--chakra-colors-fg)",
     });
   });
 
@@ -34,8 +34,8 @@ describe("<SimulationCard /> completion colors", () => {
       </SimulationCard>,
     );
 
-    expect(screen.getByText("Running scenario")).not.toHaveStyle({
-      color: "var(--chakra-colors-white)",
+    expect(screen.getByText("Running scenario")).toHaveStyle({
+      color: "var(--chakra-colors-fg)",
     });
   });
 });

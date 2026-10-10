@@ -92,7 +92,7 @@ function ClassicScenarioRunDetailDrawer({ open }: UiScenarioRunDetailDrawerProps
           borderRadius="lg"
         >
           {!scenarioState && open && (
-            <Drawer.Body bg={{ base: "bg.surface", _dark: "bg.panel" }}>
+            <Drawer.Body bg={"bg.card"}>
               <RunDetailLoadState error={runStateError} />
             </Drawer.Body>
           )}
@@ -104,7 +104,7 @@ function ClassicScenarioRunDetailDrawer({ open }: UiScenarioRunDetailDrawerProps
               display="flex"
               flexDirection="column"
               width="full"
-              bg={{ base: "bg.surface", _dark: "bg.panel" }}
+              bg={"bg.card"}
             >
               <RunDetailView
                 detail={detail}

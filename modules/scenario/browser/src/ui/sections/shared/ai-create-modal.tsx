@@ -153,7 +153,11 @@ export function AICreateModal({
         borderColor={assistant ? CARD.border : undefined}
         // A plain deep shadow — no purple "AI" glow. LangWatch's chrome is a
         // hairline and one warm accent, not a spectrum.
-        boxShadow={assistant ? "0 28px 90px -32px rgba(2, 6, 23, 0.62)" : undefined}
+        boxShadow={
+          assistant
+            ? "0 28px 90px -32px color-mix(in srgb, var(--chakra-colors-bg-scrim) 62%, transparent)"
+            : undefined
+        }
       >
         {assistant && <LangyMarkGradientDefs />}
         {showCloseButton && <Dialog.CloseTrigger />}
@@ -250,7 +254,7 @@ function CreateModalHeader({
             borderRadius="12px"
             borderWidth="1px"
             borderColor="border.muted"
-            bg="bg.surface"
+            bg="bg.card"
           >
             <LangyMark size={27} />
           </Box>
@@ -472,7 +476,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
           borderRadius="16px"
           borderWidth="1px"
           borderColor="border"
-          bg="bg.surface"
+          bg="bg.card"
           position="relative"
         >
           <LangyMark size={32} />
@@ -631,8 +635,12 @@ function StartModeButton({
       cursor="pointer"
       transition="color 120ms ease, background 120ms ease, box-shadow 120ms ease"
       color={active ? activeColor : "fg.muted"}
-      bg={active ? "bg.surface" : "transparent"}
-      boxShadow={active ? "0 1px 2px rgba(2, 6, 23, 0.12)" : "none"}
+      bg={active ? "bg.card" : "transparent"}
+      boxShadow={
+        active
+          ? "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 12%, transparent)"
+          : "none"
+      }
       _hover={active ? undefined : { color: "fg" }}
     >
       {children}
@@ -643,7 +651,7 @@ function StartModeButton({
 /** The manual path body: a plain, un-accented "you're in control" panel. */
 function ManualStartState({ assistantName }: { assistantName: string }) {
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="xl" bg="bg.surface" padding={5}>
+    <Box borderWidth="1px" borderColor="border" borderRadius="xl" bg="bg.card" padding={5}>
       <HStack align="start" gap={3}>
         <Box
           display="grid"

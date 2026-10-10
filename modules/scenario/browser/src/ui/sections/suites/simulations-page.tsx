@@ -310,7 +310,7 @@ export default function SimulationsPage() {
               height="full"
               width="full"
               borderRadius="lg"
-              boxShadow="0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"
+              boxShadow="0 4px 6px -1px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent), 0 2px 4px -2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent), 0 10px 15px -3px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
               border="1px solid"
               borderColor="border.muted"
               background="bg.panel"

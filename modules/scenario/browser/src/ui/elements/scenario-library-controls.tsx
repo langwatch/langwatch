@@ -91,7 +91,7 @@ export function ScenarioBatchActionBar({
       transform="translateX(-50%)"
       backgroundColor="bg.panel"
       border="1px solid #ccc"
-      boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+      boxShadow="0 0 15px color-mix(in srgb, var(--chakra-colors-bg-scrim) 20%, transparent)"
       borderRadius="md"
       padding="8px"
       paddingX="16px"

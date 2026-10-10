@@ -195,7 +195,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 placeItems="center"
                 width="34px"
                 height="34px"
-                bg="bg.surface"
+                bg="bg.card"
                 borderWidth="1px"
                 borderColor="border"
                 borderRadius="10px"
@@ -245,7 +245,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               borderWidth="1px"
               borderColor="border.subtle"
               borderRadius="md"
-              bg="bg.surface"
+              bg="bg.card"
               padding={2.5}
             >
               <Text
@@ -415,7 +415,7 @@ function ScenarioGenerationPrompt({
               placeItems="center"
               width="34px"
               height="34px"
-              bg="bg.surface"
+              bg="bg.card"
               borderWidth="1px"
               borderColor="border"
               borderRadius="10px"

@@ -74,7 +74,7 @@ function TableCard({ children, ...rest }: React.ComponentProps<typeof Box>) {
       borderRadius="xl"
       background="bg.panel"
       overflow="hidden"
-      boxShadow="0 1px 2px rgb(16 16 32 / 0.04)"
+      boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
       {...rest}
     >
       {children}
