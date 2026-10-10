@@ -92,6 +92,13 @@ Feature: Prompt service
     And no write reaches Postgres, which would answer 22021 as a 500
 
   @unit
+  Scenario: Updating a prompt mints the new version's id as a strict KSUID
+    Given a prompt with a version
+    When an update writes its next version
+    Then the new version's id is a fresh promptversion KSUID, as on create and restore
+    And it is never left to a database default or derived from another id
+
+  @unit
   Scenario: The deploy dialog names a refused tag in words, never the code
     Given a tag name that is already in use
     When the deploy dialog is refused with prompt_tag_conflict

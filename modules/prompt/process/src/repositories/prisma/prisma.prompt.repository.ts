@@ -617,6 +617,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       const createdVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...versionData,
+          id: this.versions.generateVersionId(),
           configData: configData as Prisma.InputJsonValue,
           runtimeParameters: runtimeParameters as Prisma.InputJsonValue,
         },
