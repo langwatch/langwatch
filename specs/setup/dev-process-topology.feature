@@ -342,21 +342,40 @@ Feature: The local development process topology
 
   # --- A built UI serves the production bundle from the api (2026-10-10) ---
 
-  # `haven up --ui=built` sticks for the stack: one backend-only Node lane, no
-  # Vite; the api serves apps/ui/dist/client. `haven reload ui` rebuilds it.
+  # The built UI is haven's default (2026-10-10): one backend-only Node lane, no
+  # Vite dev server; the api serves apps/ui/dist/client. `--ui=dev` and
+  # `--ui=bundled` opt out and stick; `--ui=built` returns to the default.
   @unit
-  Scenario: A built UI stack runs no Vite and routes the app hostname to the api
-    Given a stack started with "haven up --ui=built"
+  Scenario: A fresh stack serves the built UI and rebuilds it on a change
+    Given a worktree with no UI mode chosen
+    When haven plans the Node lanes of a watching stack
+    Then one backend-only host runs, building the bundle only when none exists
+    And a ui lane keeps Vite's build --watch warm
+    And each finished rebuild is swapped in whole and logged with its duration
+    And a failed rebuild leaves the last good bundle serving
+    And a backend change reloads the host in place, as on any watching stack
+
+  @unit
+  Scenario: A held built UI stack runs no Vite and routes the app hostname to the api
+    Given a stack started with "haven up --watch=false"
     When haven plans the Node lanes
-    Then one backend-only host runs with no Vite server
+    Then one backend-only host runs after a fresh build, with no Vite server and no ui lane
     And the app hostname routes to the api port
+    And only "haven reload ui" rebuilds the bundle
+
+  @unit
+  Scenario: A stack chosen as dev before built became the default stays dev
+    Given a .haven.json that names "--ui=dev"
+    When haven reads the selection
+    Then the Vite dev server serves the UI
+    And a file that only says "built-ui" serves the built UI
 
   @unit
   Scenario: A bundled UI stack runs Vite on bundled output and leaves the other modes
     Given a stack started with "haven up --ui=bundled"
     When haven plans the Node lanes
     Then the app lane runs with LANGWATCH_UI_BUNDLED=1 and keeps its Vite server
-    And choosing "--ui=bundled" replaces "--ui=built" and an unknown value is refused
+    And choosing "--ui=bundled" replaces "--ui=dev", "--ui=built" returns to the default, and an unknown value is refused
 
   @unit
   Scenario: A built UI is rebuilt beside the served one and swapped in
@@ -372,14 +391,17 @@ Feature: The local development process topology
   # binary that serves them; `haven install --build` and each simulator lane build
   # them through nx (tag haven-console). The design system's Storybook is built
   # with `storybook build` and served by haven's own binary on the design-system
-  # lane. The mail studio is the one exception until its live renderer is ruled on.
+  # lane; the mail studio is pre-rendered by `build:studio` and served on the
+  # mail-room lane, read-only (Alex 2026-10-10: built or bundled, never dev).
   @unit
   Scenario: Every haven console is served built, never by a dev server
-    Given a stack that selected every simulator and the design system
+    Given a stack that selected every simulator, the design system and the mail room
     When haven plans its lanes
     Then every simulator console is the built bundle its Go binary embeds
     And the design-system lane builds the Storybook when its output is missing or stale
     And serves the built files with haven's own static server
     And no lane runs "storybook dev", "vite" or HMR for a console
     And the ui lane frames that built Storybook at "/design-system" instead of starting one
+    And the mail-room lane renders every fixture at build time and serves the files with haven's own static server
+    And the ui lane never starts the mail studio's dev server
 

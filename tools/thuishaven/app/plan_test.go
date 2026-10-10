@@ -30,7 +30,7 @@ func TestEveryLaneCarriesItsOwnName(t *testing.T) {
 	}
 	children := o.planChildren(st, PlanOptions{
 		RepoRoot: repo,
-		Selection: domain.Selection{
+		Selection: domain.Selection{DevUI: true,
 			Gateway: true, NLP: true, IDP: true,
 			DesignSystem: true, MailRoom: true, Langy: true,
 		},
@@ -63,7 +63,7 @@ func TestNoLaneIsRed(t *testing.T) {
 
 	children := o.planChildren(
 		domain.Stack{Slug: "test"},
-		PlanOptions{Selection: domain.Selection{Gateway: true, NLP: true}},
+		PlanOptions{Selection: domain.Selection{DevUI: true, Gateway: true, NLP: true}},
 		t.TempDir(),
 	)
 
@@ -107,7 +107,7 @@ func (stubProxy) Version() string                    { return domain.PortlessVer
 func TestTheTwoNodeLanesAlwaysRun(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	repo := t.TempDir()
-	children := o.planChildren(domain.Stack{Slug: "test"}, PlanOptions{Selection: domain.Selection{}}, repo)
+	children := o.planChildren(domain.Stack{Slug: "test"}, PlanOptions{Selection: domain.Selection{DevUI: true}}, repo)
 
 	find := func(name string) (Child, bool) {
 		for _, c := range children {
@@ -153,7 +153,7 @@ func TestTheTwoNodeLanesAlwaysRun(t *testing.T) {
 // @scenario "The ui lane is not held back by the API"
 func TestTheUILaneStartsWithoutWaitingForTheAPI(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
-	children := o.planChildren(domain.Stack{Slug: "test"}, PlanOptions{Selection: domain.Selection{}}, t.TempDir())
+	children := o.planChildren(domain.Stack{Slug: "test"}, PlanOptions{Selection: domain.Selection{DevUI: true}}, t.TempDir())
 
 	for _, c := range children {
 		if c.Name != "ui" {
@@ -175,7 +175,7 @@ func TestTheUILaneStartsWithoutWaitingForTheAPI(t *testing.T) {
 func TestTheBackendLaneBindsTheRoutedAPIPort(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", APIPort: 41001}
-	children := o.planChildren(st, PlanOptions{Selection: domain.Selection{}}, t.TempDir())
+	children := o.planChildren(st, PlanOptions{Selection: domain.Selection{DevUI: true}}, t.TempDir())
 
 	for lane, want := range map[string]string{APILane: "API_PORT=41001", "ui": "LANGWATCH_API_PORT=41001"} {
 		child, ok := findChild(children, lane)
@@ -202,7 +202,7 @@ func TestTheGoServicesSharePlanOneLane(t *testing.T) {
 	}}
 	children := o.planChildren(st, PlanOptions{
 		RepoRoot:  repo,
-		Selection: domain.Selection{Gateway: true, NLP: true},
+		Selection: domain.Selection{DevUI: true, Gateway: true, NLP: true},
 	}, repo)
 
 	var lane *Child
@@ -246,7 +246,7 @@ func TestTheGoLaneHostsOnlyWhatWasSelected(t *testing.T) {
 	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: "gateway", Port: 44003}}}
 	children := o.planChildren(st, PlanOptions{
 		RepoRoot:  repo,
-		Selection: domain.Selection{Gateway: true},
+		Selection: domain.Selection{DevUI: true, Gateway: true},
 	}, repo)
 
 	for _, c := range children {

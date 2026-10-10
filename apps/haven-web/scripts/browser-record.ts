@@ -139,7 +139,7 @@ export async function recordLocator({
   const matches = locatorOf({ page, spec });
   if ((await matches.count()) > 1) {
     const handle = await target.elementHandle();
-    spec.nth = await matches.evaluateAll((els, el) => els.indexOf(el as Element), handle);
+    spec.nth = await matches.evaluateAll((els, el) => els.findIndex((e) => e === el), handle);
   }
   return { spec, described };
 }

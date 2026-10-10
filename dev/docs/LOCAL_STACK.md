@@ -261,12 +261,14 @@ stack (`haven up --watch -f` lifts it). `haven reload [app|api|worker]` then re-
 backend in place on demand (SIGUSR2; the UI and sessions stay up) and returns when the host
 logs `backend reload finished`. A changed env still needs `haven up -f`.
 
-**Serving the built UI.** `haven up --ui=built -f` builds `apps/ui` (its `build` script) and
-runs the backend host without Vite; the api serves `apps/ui/dist/client` the way production
-does, at the same `app.<slug>` URL, so sessions, cookies and routes are unchanged. It sticks
-(`haven up --ui=dev -f` returns to Vite). There is no HMR: `haven reload ui` rebuilds beside
-the served bundle, swaps it in and returns once the swap is done (old hashed chunks are kept,
-so an open page still loads); `haven reload app` still reloads the backend. Use it for test
+**Serving the built UI (the default).** `haven up` runs the backend host without Vite; the api
+serves `apps/ui/dist/client` the way production does, at the same `app.<slug>` URL, so sessions,
+cookies and routes are unchanged. `--ui=dev` or `--ui=bundled` opts out and sticks
+(`--ui=built` returns). There is no HMR. A watching stack runs a `ui` lane that keeps Vite's
+`build --watch` warm and swaps each finished rebuild in (`haven logs ui` shows the durations);
+a held one builds at start and `haven reload ui` rebuilds beside the served bundle, swaps it in
+and returns once the swap is done (old hashed chunks are kept, so an open page still loads);
+`haven reload app` still reloads the backend. Use it for test
 drives and shared headless browsers: measured on `/governance`, a signed-in page costs about
 400 MB of browser RSS instead of 710 MB, with a quarter of the requests.
 

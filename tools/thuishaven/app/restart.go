@@ -297,10 +297,10 @@ func (o *Orchestrator) ResolveUI(worktreeDir string, sel domain.Selection, ui st
 	if ui != "dev" && ui != "bundled" && ui != "built" {
 		return sel, fmt.Errorf("--ui takes dev, bundled or built, not %q", ui)
 	}
-	if sel.BuiltUI == (ui == "built") && sel.BundledUI == (ui == "bundled") {
+	if sel.DevUI == (ui == "dev") && sel.BundledUI == (ui == "bundled") {
 		return sel, nil
 	}
-	sel.BuiltUI, sel.BundledUI = ui == "built", ui == "bundled"
+	sel.DevUI, sel.BundledUI = ui == "dev", ui == "bundled"
 	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
 		return sel, fmt.Errorf("saving the ui mode: %w", err)
 	}

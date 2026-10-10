@@ -150,11 +150,9 @@ func (s Stack) OverlayEnv() []string {
 	} else {
 		env = append(env, "LANGWATCH_SKIP_STORYBOOK=1")
 	}
-	// The ui lane holds the mail studio's port and starts it on the first visit
-	// (apps/ui/vite/dormant-dev-tool.ts), behind mail-room.<slug>.
-	if mr := s.svc(MailRoomService); mr.Port != 0 {
-		env = append(env, fmt.Sprintf("LANGWATCH_MAIL_PREVIEW_PORT=%d", mr.Port))
-	}
+	// Haven serves the mail studio rendered at build time (the mail-room lane), so
+	// the ui lane never starts its dev server, whatever the UI mode.
+	env = append(env, "LANGWATCH_SKIP_MAIL_PREVIEW=1")
 	// The evaluator service, when this stack runs one (or falls back to a
 	// baseline's). Without it the app keeps .env's value, where nothing listens.
 	if lev := s.svc(LangevalsService); lev.Port != 0 {

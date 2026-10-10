@@ -103,7 +103,7 @@ waiting for a change`: the old one is drained and the next change retries. Fix t
   - Most of the heap is loaded code. The module runner keeps each backend module's transformed code with an inline base64 source map, Vite's module graph keeps the map as well, and V8 holds its own copy.
   - `modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js` is 8 MB on disk and evaluates as a 41M-char script.
   - The other big ones: sass, the prisma client, `@clickhouse/parser`, `model-catalog.json` and `lwql-prisma-manifest.generated.json`.
-- `haven up --ui=built` takes the UI's Vite server out of the process altogether.
+- The built UI, haven's default, takes the UI's Vite server out of the process altogether.
 
 ## Where to read next
 

@@ -244,7 +244,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			svc.DNSPort = ports[nSvc+2]
 		}
 		// --ui=built: no Vite, the api serves the bundle, so the app hostname is the API port.
-		if r.Name == "app" && opts.Selection.BuiltUI && !st.Layout.IsMonolith() {
+		if r.Name == "app" && opts.Selection.IsBuiltUI() && !st.Layout.IsMonolith() {
 			svc.Port = st.APIPort
 		}
 		if r.Name == domain.MailService {

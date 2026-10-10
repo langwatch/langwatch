@@ -7,6 +7,7 @@ import (
 )
 
 func llmProviderSeedEnv(t *testing.T, sel domain.Selection) (baseURL, key string) {
+	sel.DevUI = true // the split lanes these tests name
 	t.Helper()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	repo := simulatorCheckout(t)

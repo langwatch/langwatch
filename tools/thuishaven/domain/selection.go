@@ -17,11 +17,11 @@ type Selection struct {
 	// Held is sticky `haven up --watch=false`: the Node host does not reload on
 	// a file change (LANGWATCH_DEV_WATCH=0); `haven reload` applies changes.
 	Held bool `json:"held,omitempty"`
-	// BuiltUI is sticky `haven up --ui=built`: app.<slug> is the api serving a
-	// production build of apps/ui, as production does; no Vite. `haven reload ui` rebuilds.
-	BuiltUI bool `json:"built-ui,omitempty"`
+	// DevUI is sticky `haven up --ui=dev`: the Vite dev server serves apps/ui.
+	// Neither DevUI nor BundledUI is the default, the built UI (IsBuiltUI).
+	DevUI bool `json:"dev-ui,omitempty"`
 	// BundledUI is sticky `haven up --ui=bundled`: Vite serves incrementally
-	// rebuilt bundles from memory (LANGWATCH_UI_BUNDLED=1); HMR stays. Not with BuiltUI.
+	// rebuilt bundles from memory (LANGWATCH_UI_BUNDLED=1); HMR stays. Not with DevUI.
 	BundledUI bool `json:"bundled-ui,omitempty"`
 	Gateway   bool `json:"gateway"`
 	NLP       bool `json:"nlp"`
@@ -87,6 +87,11 @@ type Selection struct {
 	// always routed. Worktrees that don't want it say `haven up -telemetry`.
 	Telemetry bool `json:"telemetry"`
 }
+
+// IsBuiltUI is the default UI mode: app.<slug> is the api serving a production
+// build of apps/ui, as production does; no Vite. A watching stack rebuilds it on
+// a change, a held one on `haven reload ui`.
+func (s Selection) IsBuiltUI() bool { return !s.DevUI && !s.BundledUI }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
 // gateway, nlp, the idp, mail, storage, payment and telemetry simulators — no

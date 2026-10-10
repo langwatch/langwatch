@@ -522,7 +522,7 @@ async function describeStep({
     return { verb: "type", text: focus?.secret ? REDACTED : body.text };
   }
   if (verb === "drag") return describeDrag({ page, body });
-  if (["click", "hover", "fill", "select"].includes(verb))
+  if (verb === "click" || verb === "hover" || verb === "fill" || verb === "select")
     return describeTarget({ page, verb, body });
   return undefined;
 }

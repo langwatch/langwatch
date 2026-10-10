@@ -32,7 +32,7 @@ func runStatic(ctx context.Context, _ deps, inv invocation) error {
 	}
 	go func() {
 		<-ctx.Done()
-		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(sctx)
 	}()

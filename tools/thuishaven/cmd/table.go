@@ -239,11 +239,11 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change (the default). --watch=false holds the stack: no Go rebuilds, no Node reloads, sticks; `haven reload` applies changes"},
+			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change (the default): Go rebuilds, Node reloads, and the built UI rebuilds in a warm Vite. --watch=false holds the stack, sticks; `haven reload` applies changes"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
-			{long: "--ui", takesValue: true, value: "<dev|bundled|built>", summary: "bundled runs Vite on incrementally rebuilt bundles with HMR (edit and look); built serves a production build of apps/ui from the api, no Vite; sticks; `haven reload ui` rebuilds"},
+			{long: "--ui", takesValue: true, value: "<built|bundled|dev>", summary: "built (the default) serves a production build of apps/ui from the api, no Vite, rebuilt on a change; bundled runs Vite on incrementally rebuilt bundles with HMR; dev is the Vite dev server; sticks"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 		},
@@ -348,7 +348,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "reload",
-		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready; ui rebuilds a --ui=built stack's bundle and swaps it in",
+		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready; ui rebuilds a built-UI stack's bundle and swaps it in",
 		args:    "[app|api|worker|ui]",
 		maxArgs: 1,
 		run: func(ctx context.Context, d deps, inv invocation) error {

@@ -71,8 +71,8 @@ func (o *Orchestrator) Reload(ctx context.Context, p UpParams, name string) erro
 // reloadUI rebuilds a --ui=built stack's bundle and swaps it in; it returns once
 // the swap is done, so the next page load is the new build.
 func (o *Orchestrator) reloadUI(ctx context.Context, st domain.Stack) error {
-	if sel, _ := o.store.ReadSelection(st.WorktreeDir); !sel.BuiltUI {
-		return fmt.Errorf("stack %q serves the UI from Vite, which reloads itself — `haven up --ui=built` to serve a build", st.Slug)
+	if sel, _ := o.store.ReadSelection(st.WorktreeDir); !sel.IsBuiltUI() {
+		return fmt.Errorf("stack %q serves the UI from Vite, which reloads itself — `haven up --ui=built` serves a build", st.Slug)
 	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", UIBuildShell)
 	cmd.Dir, cmd.Stdout, cmd.Stderr = st.WorktreeDir, os.Stdout, os.Stderr

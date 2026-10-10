@@ -10,6 +10,7 @@ import (
 )
 
 func langevalsPlan(t *testing.T, sel domain.Selection, repo string) []Child {
+	sel.DevUI = true // the split lanes these tests name
 	t.Helper()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: domain.LangevalsService, Port: 45562}}}

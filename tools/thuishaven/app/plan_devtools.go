@@ -33,6 +33,31 @@ func (p *childPlan) designSystemChild() Child {
 	}
 }
 
+// mailRoomDir is the mail studio's `build:studio` output: the studio with every
+// fixture rendered at build time, through the call the product sends with.
+const mailRoomDir = "packages/mail/preview/dist"
+
+// mailRoomBuildShell rebuilds the studio when its output is missing or older
+// than a template, fixture or studio file. It takes seconds.
+const mailRoomBuildShell = "if ! test -f " + mailRoomDir + "/index.html || " +
+	"test -n \"$(find packages/mail/src packages/mail/preview -path " + mailRoomDir + " -prune -o -type f " +
+	"-newer " + mailRoomDir + "/index.html -print 2>/dev/null | head -1)\"; " +
+	"then pnpm --silent --filter @langwatch/mail build:studio; fi"
+
+// mailRoomChild is the mail-room lane: the studio pre-rendered to static files
+// and served by this haven binary, never a Vite dev server. Props are read-only.
+func (p *childPlan) mailRoomChild() Child {
+	port := p.port(domain.MailRoomService)
+	serve := fmt.Sprintf("exec %s static %s %s %d", shQuote(p.o.havenExecutable()),
+		domain.MailRoomService, shQuote(filepath.Join(p.repoDir, mailRoomDir)), port)
+	return Child{
+		Name: domain.MailRoomService, Dir: p.repoDir, Color: palette[9],
+		LogPath: p.logPath(domain.MailRoomService),
+		Shell:   mailRoomBuildShell + " || echo 'the mail studio did not build; its page names the fix'; " + serve,
+		Env:     append(append([]string{}, p.base...), domain.LaneEnv(domain.MailRoomService)),
+	}
+}
+
 // havenExecutable is this haven binary, the first word of the simulator command.
 func (o *Orchestrator) havenExecutable() string {
 	if len(o.cfg.SimulatorArgv) == 0 {

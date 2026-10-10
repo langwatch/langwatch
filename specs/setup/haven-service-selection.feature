@@ -163,7 +163,7 @@ Feature: haven service selection
     Scenario: Adding both developer tools is one command and it sticks
       When the developer runs "haven up +design-system +mail-room"
       Then both developer-tool hostnames are routed for this stack
-      And the Storybook is built and served by haven, and the mail studio waits for its first visit
+      And the Storybook and the mail studio are each built and served by haven
       And a later plain "haven up" in this worktree still routes both
 
     # The lanes used to be called "storybook" and "mail"; the old names are
@@ -176,15 +176,16 @@ Feature: haven service selection
       Then the command is refused, naming "+mail-room" as the replacement
 
     # The Storybook is haven's design-system lane: built with `storybook build`
-    # and served as static files by haven's own binary. The mail studio still
-    # runs in the ui lane's dev server, which holds its port and starts it on the
-    # first visit (specs/setup/dev-process-topology.feature).
+    # and served as static files by haven's own binary. The mail studio is the
+    # mail-room lane the same way: `build:studio` renders every fixture to static
+    # files at build time, and its props panel is read-only (2026-10-10).
     Scenario: A selected developer tool is reached by hostname
       Given a worktree that selected both developer tools
       Then the Storybook is served at "design-system.<slug>.langwatch.localhost"
       And the mail studio is served at "mail-room.<slug>.langwatch.localhost"
       And each is healthy once its root answers
       And the Storybook's output appears in "haven logs design-system"
+      And the mail studio's output appears in "haven logs mail-room"
 
     # Haven hands the ui lane the routed URL of the built Storybook, so the
     # hostname and the application's /design-system reach the same Storybook.

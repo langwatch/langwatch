@@ -80,15 +80,22 @@ haven logs api -t                 # follow one service
 haven logs go --since 5m --level error
 haven restart sims                # bounce one lane; nothing else restarts
 haven restart api                 # restart the whole lane
-haven up --watch=false -f         # hold the stack (sticky): no backend reload on a file change
+haven up                          # the default: built UI served by the api, no Vite; --watch (the default) rebuilds what changed
+haven up --watch=false -f         # hold the stack (sticky): no Go rebuild, no backend reload, no UI rebuild on a change
 haven reload [app|api|worker]     # apply changes to a held stack in place; waits for "reload finished"
-haven up --ui=built -f            # testing without changing code (Haiku testers): production build served by the api, no Vite (sticky)
+haven reload ui                   # built UI: rebuild the bundle and swap it in; returns once swapped
 haven up --ui=bundled -f          # editing and testing visually: Vite 8 bundled dev, in-memory bundles, HMR kept (sticky)
-haven up --ui=dev -f              # almost never: unbundled Vite, thousands of requests per page
-haven reload ui                   # --ui=built: rebuild the bundle and swap it in; returns once swapped
+haven up --ui=dev -f              # almost never: unbundled Vite, thousands of requests per page (sticky)
+haven up --ui=built -f            # back to the default from dev or bundled
 ```
 
-What `--ui=built` changes, measured on /governance with a signed-in headless page, dev vs built:
+Watching (the default), a built stack runs a `ui` lane: Vite's `build --watch` kept warm, each
+finished rebuild swapped in whole, so the next page load is the new UI (no HMR). `haven logs ui`
+shows each rebuild's `built in <ms>` and `ui bundle swapped in`; a failed rebuild keeps the last
+good bundle. A backend change reloads the app lane in place, as on any watching stack. On a fresh
+checkout the first `haven up` builds the bundle once before the api serves it.
+
+What the built UI changes, measured on /governance with a signed-in headless page, dev vs built:
 
 | | dev | built |
 |---|---|---|
@@ -154,7 +161,7 @@ Every haven web console is a build served by Go; none runs Vite, Storybook dev o
 | Hub, stack home, seed console | `hub.langwatch.localhost`, `<slug>.langwatch.localhost` | the haven daemon (`apps/haven-web`, embedded) |
 | Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost` | the sim's Go binary in the `go` lane (`apps/<sim>sim-web`, embedded) |
 | Design system Storybook (`+design-system`) | `design-system.<slug>` (or `ds.<slug>`), and `/design-system` in the app | the `design-system` lane: `storybook build`, then `haven static` |
-| Mail studio (`+mail-room`) | `mail-room.<slug>` | still the ui lane's dev server, started on first visit; nothing serves it under `--ui=built` |
+| Mail studio (`+mail-room`) | `mail-room.<slug>` | the `mail-room` lane: `build:studio` renders every fixture at build time, then `haven static`; props are read-only (`pnpm --filter @langwatch/mail dev` edits live) |
 
 - `haven install --build` builds the hub and every simulator console (nx tag `haven-console`); each
   simulator lane rebuilds its console through the nx cache on start. A console missing its build

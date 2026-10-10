@@ -436,16 +436,21 @@ func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
 	}
 }
 
-// The sticky stack modes (--watch=false, --ui=built|bundled) survive a write and a read.
+// @scenario "A stack chosen as dev before built became the default stays dev"
+// The sticky stack modes (--watch=false, --ui=dev|bundled) survive a write and a read.
 func TestSelectionKeepsTheStickyModes(t *testing.T) {
 	s, dir := New(t.TempDir()), t.TempDir()
 	want := domain.DefaultSelection()
-	want.Held, want.BuiltUI = true, true
+	want.Held, want.DevUI = true, true
 	if err := s.WriteSelection(dir, want); err != nil {
 		t.Fatalf("WriteSelection: %v", err)
 	}
 	got, ok := s.ReadSelection(dir)
-	if !ok || !got.Held || !got.BuiltUI || got.BundledUI {
-		t.Fatalf("read back held=%v built=%v bundled=%v ok=%v", got.Held, got.BuiltUI, got.BundledUI, ok)
+	if !ok || !got.Held || !got.DevUI || got.BundledUI || got.IsBuiltUI() {
+		t.Fatalf("read back held=%v dev=%v bundled=%v ok=%v", got.Held, got.DevUI, got.BundledUI, ok)
+	}
+	writeSelectionJSON(t, dir, `{"built-ui":true,"services":{}}`)
+	if got, _ := s.ReadSelection(dir); !got.IsBuiltUI() {
+		t.Error("a file from before built was the default stopped serving the built UI")
 	}
 }

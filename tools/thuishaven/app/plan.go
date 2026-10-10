@@ -149,14 +149,20 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		Stack: st, Opts: opts, RepoDir: repoDir, Base: p.base,
 		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
-	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.BuiltUI)
+	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.IsBuiltUI())
 	out := []Child{p.frontChild(mono, isOneProcess)}
+	if isOneProcess && opts.Selection.IsBuiltUI() && !opts.Selection.Held {
+		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui")))
+	}
 	out = append(out, p.goLanes(mono)...)
 	if opts.Selection.Langevals {
 		out = append(out, p.langevalsChild())
 	}
 	if opts.Selection.DesignSystem && !st.Layout.IsMonolith() && p.port(domain.DesignSystemService) != 0 {
 		out = append(out, p.designSystemChild())
+	}
+	if opts.Selection.MailRoom && !st.Layout.IsMonolith() && p.port(domain.MailRoomService) != 0 {
+		out = append(out, p.mailRoomChild())
 	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, p.base, p.port("langyagent"), opts.langyDockerHost)
@@ -283,8 +289,8 @@ func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
 	switch {
 	case p.st.Layout.IsMonolith():
 		return mono.appChild()
-	case isOneProcess && p.opts.Selection.BuiltUI:
-		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
+	case isOneProcess && p.opts.Selection.IsBuiltUI():
+		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane), p.opts.Selection.Held)
 	case isOneProcess:
 		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}
@@ -473,15 +479,26 @@ func oneProcessChild(repoDir string, env []string, logPath string) Child {
 	}
 }
 
-// builtUIChild is `haven up --ui=built`: build apps/ui, then the api and worker
-// with no Vite (`dev`, --backend-only). The api serves apps/ui/dist/client as
-// production does, and app.<slug> routes to the API port (see provision).
-func builtUIChild(repoDir string, env []string, logPath string) Child {
+// builtUIChild is the default UI mode: the api and worker with no Vite (`dev`,
+// --backend-only), serving apps/ui/dist/client as production does; app.<slug>
+// routes to the API port (see provision). A held stack builds first; a watching
+// one builds only a missing bundle and leaves the rest to the ui lane.
+func builtUIChild(repoDir string, env []string, logPath string, held bool) Child {
+	build := UIBuildShell + " && "
+	if !held {
+		build = "test -f " + UIDirRel + "/dist/client/index.html || (" + UIBuildShell + "); "
+	}
 	return Child{
 		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
-		Shell: UIBuildShell + " && pnpm --silent --filter " + BackendPackage + " dev",
+		Shell: build + "pnpm --silent --filter " + BackendPackage + " dev",
 		Env:   env,
 	}
+}
+
+// uiWatchChild is a watching built-UI stack's ui lane: Vite's build --watch kept
+// warm, each finished rebuild swapped in whole. Vite logs each one's duration.
+func uiWatchChild(repoDir string, env []string, logPath string) Child {
+	return Child{Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath, Shell: UIWatchShell, Env: env}
 }
 
 // UIBuildShell builds apps/ui beside the served bundle and swaps it in with
@@ -489,10 +506,22 @@ func builtUIChild(repoDir string, env []string, logPath string) Child {
 // assets are carried over: an open page still loads its lazy chunks.
 // shortcut: assets accumulate across reloads, `rm -rf apps/ui/dist` when it matters.
 const UIBuildShell = "set -e; d=" + UIDirRel + "/dist; rm -rf $d/client.next $d/client.old; " +
-	"pnpm --silent --filter " + UIPackage + " build --outDir dist/client.next; " +
-	"if [ -d $d/client/assets ]; then cp -Rn $d/client/assets/. $d/client.next/assets/ || true; fi; " +
+	"pnpm --silent --filter " + UIPackage + " build --outDir dist/client.next; " + uiSwapShell
+
+// uiSwapShell moves $d/client.next over the served bundle, carrying old assets.
+const uiSwapShell = "if [ -d $d/client/assets ]; then cp -Rn $d/client/assets/. $d/client.next/assets/ || true; fi; " +
 	"if [ -d $d/client ]; then mv $d/client $d/client.old; fi; " +
 	"mv $d/client.next $d/client; rm -rf $d/client.old"
+
+// UIWatchShell waits for the app lane's first bundle, then runs Vite's build
+// --watch into client.watch and swaps a copy in after each "built in" line; a
+// failed rebuild prints no such line, so the last good bundle keeps serving.
+// shortcut: the whole bundle is copied per swap, fine at tens of MB.
+const UIWatchShell = "d=" + UIDirRel + "/dist; until test -f $d/client/index.html; do sleep 2; done; " +
+	"rm -rf $d/client.watch; pnpm --silent --filter " + UIPackage + " build --watch --outDir dist/client.watch 2>&1 | " +
+	"while IFS= read -r line; do printf '%s\\n' \"$line\"; case $line in *'built in '*) " +
+	"rm -rf $d/client.next $d/client.old; cp -R $d/client.watch $d/client.next && (" + uiSwapShell + ") && echo 'ui bundle swapped in';; esac; done; " +
+	"echo 'vite build --watch ended'; exit 1"
 
 // The Node lanes a stack supervises, by workspace package name. planChildren
 // runs each with `pnpm --filter <pkg> dev` from the workspace root, so the lane

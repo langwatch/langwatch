@@ -95,29 +95,87 @@ func TestBundledUISetsTheViteEnvAndIsExclusiveWithBuilt(t *testing.T) {
 	if !ok || !slices.Contains(child.Env, "LANGWATCH_UI_BUNDLED=1") {
 		t.Fatalf("want LANGWATCH_UI_BUNDLED=1 on the app lane, got %+v", child)
 	}
-	sel.BuiltUI = true
+	sel.DevUI = true
 	sel, err := o.ResolveUI(repo, sel, "bundled")
-	if err != nil || !sel.BundledUI || sel.BuiltUI {
-		t.Fatalf("bundled should replace built: %+v, %v", sel, err)
+	if err != nil || !sel.BundledUI || sel.DevUI || sel.IsBuiltUI() {
+		t.Fatalf("bundled should replace dev: %+v, %v", sel, err)
+	}
+	if sel, err = o.ResolveUI(repo, sel, "built"); err != nil || !sel.IsBuiltUI() {
+		t.Fatalf("--ui=built should return to the default: %+v, %v", sel, err)
 	}
 	if _, err := o.ResolveUI(repo, sel, "turbo"); err == nil {
 		t.Fatal("an unknown --ui value should be refused")
 	}
 }
 
-// @scenario "A built UI stack runs no Vite and routes the app hostname to the api"
-func TestBuiltUIPlansTheBackendOnlyHost(t *testing.T) {
+// @scenario "A fresh stack serves the built UI and rebuilds it on a change"
+func TestBuiltUIIsTheDefaultAndWatchesWithAWarmViteBuild(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
 	sel := domain.DefaultSelection()
-	sel.BuiltUI = true
+	if !sel.IsBuiltUI() {
+		t.Fatal("a fresh worktree should serve the built UI")
+	}
+	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
+	child, ok := findChild(children, AppLane)
+	if !ok || !strings.HasPrefix(child.Shell, "test -f apps/ui/dist/client/index.html || (") || !strings.HasSuffix(child.Shell, BackendPackage+" dev") {
+		t.Fatalf("want build-if-missing then the backend-only host, got %+v", child)
+	}
+	if ui, ok := findChild(children, "ui"); !ok || ui.Shell != UIWatchShell {
+		t.Fatalf("a watching built stack needs the warm Vite build lane, got %+v", ui)
+	}
+	if _, ok := findChild(children, APILane); ok {
+		t.Fatal("a built UI stack runs one Node host, not a separate api lane")
+	}
+}
+
+// @scenario "A held built UI stack runs no Vite and routes the app hostname to the api"
+func TestHeldBuiltUIPlansTheBackendOnlyHost(t *testing.T) {
+	repo := t.TempDir()
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
+	sel := domain.DefaultSelection()
+	sel.Held = true
 	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	child, ok := findChild(children, AppLane)
 	if !ok || !strings.HasPrefix(child.Shell, UIBuildShell) || !strings.HasSuffix(child.Shell, BackendPackage+" dev") {
 		t.Fatalf("want build then the backend-only host, got %+v", child)
 	}
-	if _, ok := findChild(children, APILane); ok {
-		t.Fatal("a built UI stack runs one Node host, not a separate api lane")
+	if _, ok := findChild(children, "ui"); ok {
+		t.Fatal("a held stack rebuilds the UI only on `haven reload ui`")
+	}
+}
+
+// @scenario "A fresh stack serves the built UI and rebuilds it on a change"
+func TestUIWatchShellSwapsEachFinishedRebuild(t *testing.T) {
+	repo := t.TempDir()
+	served := filepath.Join(repo, "apps", "ui", "dist", "client")
+	if err := os.MkdirAll(filepath.Join(served, "assets"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"index.html": "v0", "assets/old.js": "old"} {
+		if err := os.WriteFile(filepath.Join(served, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A stand-in for Vite's build --watch: a good build, a failed one, a good one.
+	fake := "pnpm() { for a; do case $prev in --outDir) out=apps/ui/$a;; esac; prev=$a; done; " +
+		"mkdir -p $out/assets; echo v1 > $out/index.html; echo 'built in 5ms.'; sleep 0.3; " +
+		"echo 'error: does not compile'; sleep 0.3; echo v2 > $out/index.html; echo 'built in 7ms.'; sleep 0.3; }\n"
+	cmd := exec.Command("sh", "-c", fake+UIWatchShell)
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "vite build --watch ended") {
+		t.Fatalf("a watch that ends must fail the lane so it restarts: %v\n%s", err, out)
+	}
+	if n := strings.Count(string(out), "ui bundle swapped in"); n != 2 || !strings.Contains(string(out), "built in 7ms.") {
+		t.Fatalf("want two swaps and Vite's durations logged, got:\n%s", out)
+	}
+	if b, _ := os.ReadFile(filepath.Join(served, "index.html")); strings.TrimSpace(string(b)) != "v2" {
+		t.Fatalf("served index.html = %q, want the last good build", b)
+	}
+	if _, err := os.Stat(filepath.Join(served, "assets", "old.js")); err != nil {
+		t.Fatalf("an open page's old chunk was dropped: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 // the lanes have something to bind, under the given selection.
 func devToolsPlan(t *testing.T, sel domain.Selection) []Child {
 	t.Helper()
+	sel.DevUI = true // the split lanes these tests name
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.DesignSystemService, Port: 46006},
@@ -38,31 +40,34 @@ func TestDeveloperToolLanesAreNotPlannedByDefault(t *testing.T) {
 	}
 }
 
-// The design system is haven's own lane: its Storybook built to static files and
-// served by this binary, never `storybook dev`. The mail studio still lives in the
-// ui lane's dev server (apps/ui/vite/mail-preview.ts), so haven plans no lane for it.
+// Both developer tools are haven's own lanes: the Storybook and the mail studio
+// built to static files and served by this binary, never a dev server.
 //
 // @scenario "Adding both developer tools is one command and it sticks"
 // @scenario "Every haven console is served built, never by a dev server"
-func TestSelectedStorybookIsServedBuiltByHaven(t *testing.T) {
+func TestSelectedDeveloperToolsAreServedBuiltByHaven(t *testing.T) {
 	sel := domain.DefaultSelection()
 	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
-
-	ds, ok := findChild(children, "design-system")
-	if !ok {
-		t.Fatal("no design-system lane was planned for a worktree that selected it")
-	}
-	for _, want := range []string{"build:storybook", "storybook-static", " static design-system ", "46006"} {
-		if !strings.Contains(ds.Shell, want) {
-			t.Errorf("design-system lane runs %q, want it to contain %q", ds.Shell, want)
+	for lane, wants := range map[string][]string{
+		"design-system": {"build:storybook", "storybook-static", " static design-system ", "46006"},
+		"mail-room":     {"build:studio", "packages/mail/preview/dist", " static mail-room ", "45566"},
+	} {
+		child, ok := findChild(children, lane)
+		if !ok {
+			t.Fatalf("no %s lane was planned for a worktree that selected it", lane)
+		}
+		for _, want := range wants {
+			if !strings.Contains(child.Shell, want) {
+				t.Errorf("%s lane runs %q, want it to contain %q", lane, child.Shell, want)
+			}
+		}
+		if strings.Contains(child.Shell, "storybook dev") || strings.Contains(child.Shell, "--filter @langwatch/mail dev") {
+			t.Errorf("%s lane runs a dev server: %q", lane, child.Shell)
 		}
 	}
-	if strings.Contains(ds.Shell, "storybook dev") || strings.Contains(ds.Shell, " storybook --port") {
-		t.Errorf("design-system lane runs a dev server: %q", ds.Shell)
-	}
-	if child, ok := findChild(children, "mail-room"); ok {
-		t.Errorf("haven planned a mail-room lane running %q; the ui lane's dev server owns the studio", child.Shell)
+	if !slices.Contains(domain.Stack{Slug: "test"}.OverlayEnv(), "LANGWATCH_SKIP_MAIL_PREVIEW=1") {
+		t.Error("the ui lane would start the mail studio's dev server beside haven's lane")
 	}
 }
 
