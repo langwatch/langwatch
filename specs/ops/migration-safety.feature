@@ -9,9 +9,9 @@
 #   packages/prisma-client/src/__tests__/migration-safety.{rules.ts,unit.test.ts}
 #   packages/clickhouse-migrations/src/__tests__/migration-safety.{rules.ts,unit.test.ts}
 #
-# A retirement note is checked against the LTS floor in
-# packages/upgrade/releases/lts-floor.json (ADR-155 amendment, plan S9): the drop may ship
-# only once every release the window still serves has stopped reading the thing.
+# A drop or contract carries a retirement note and waits until old writers are gone
+# (needsOldWritersGone); there is no upgrade floor (Alex, 2026-10-11), and the step that
+# drops is kept, like every step.
 #
 # Teaching: .claude/skills/postgres-migration, .claude/skills/clickhouse-migration.
 # Ruling: dev/docs/adr/155-migrations-are-never-breaking.md.
@@ -69,16 +69,8 @@ Feature: Migration safety
     Then the scanner reports nothing
 
   @unit
-  Scenario: A retirement note above the LTS floor is refused by name
-    Given the LTS floor is a release in packages/upgrade/releases/lts-floor.json
-    When a drop or a ClickHouse type change carries a note naming a release above the floor
-    Then the scanner names the migration, the object, the note's release and the floor
-    And the fix names the first release the drop may ship in
-    And a note that names no release is refused the same way
-
-  @unit
-  Scenario: A retirement note at or below the LTS floor is accepted
-    When a drop carries a note naming the floor itself or an older release
+  Scenario: A drop under a retirement note naming any release is accepted
+    When a drop carries a retirement note naming a release
     Then the scanner reports nothing
 
   @unit

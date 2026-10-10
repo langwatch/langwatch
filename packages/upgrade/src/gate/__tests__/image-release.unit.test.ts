@@ -111,25 +111,4 @@ describe("imageRelease() over the release baseline", () => {
       );
     });
   });
-
-  describe("when that image meets a ledger upgraded with floor 3.20.1", () => {
-    /** @scenario "An image whose stamped steps name a release below the installation's floor is refused" */
-    it("is refused below the floor by the gate and by the planner", () => {
-      const release = imageRelease({ manifests: [], tree: baselineTree, baseline: real.baseline });
-      const verdict = assertCurrent({
-        ledger: { steps: [] },
-        image: { release, blockingSteps: [] },
-        floor: "3.20.1",
-      });
-      expect(verdict).toMatchObject({ admitted: false, outcome: "below-floor", release: "3.18.1" });
-      const plan = planUpgrade({
-        installed: "3.20.1",
-        image: { release, steps: [] },
-        floor: real.floor,
-        manifests: [],
-        ledger: { floor: "3.20.1", steps: [] },
-      });
-      expect(plan).toMatchObject({ outcome: "refused", code: "image_below_ledger_floor" });
-    });
-  });
 });

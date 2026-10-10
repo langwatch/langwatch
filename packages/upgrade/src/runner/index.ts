@@ -1,8 +1,4 @@
-export {
-  type InstalledRelease,
-  highestRecordedFloor,
-  inferInstalledRelease,
-} from "./installed-release.ts";
+export { type InstalledRelease, inferInstalledRelease } from "./installed-release.ts";
 export { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
 export {
   DEFAULT_LEASE_TIMING,

@@ -66,7 +66,6 @@ const MAIN_ORIGIN_LANE_ALIASES: readonly LaneAlias[] = [
   {
     from: "trace_processing:reactor:originGate",
     to: { jobType: "reactor", lane: DEFERRED_ORIGIN_SUBSCRIBER_NAME },
-    removeAfter: "3.21.0",
   },
   {
     from: "trace_processing:job:deferredOriginResolution",
@@ -81,7 +80,6 @@ const MAIN_ORIGIN_LANE_ALIASES: readonly LaneAlias[] = [
         occurredAt: nowInstant().epochMilliseconds,
       };
     },
-    removeAfter: "3.21.0",
   },
 ];
 

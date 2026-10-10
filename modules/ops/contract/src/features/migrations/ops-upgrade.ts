@@ -42,7 +42,6 @@ const opsUpgradeRunSummarySchemaDefinition = z.object({
   id: z.string(),
   kind: z.string(),
   release: z.string().nullable(),
-  floor: z.string().nullable(),
   startedAt: isoInstant,
   finishedAt: isoInstant.nullable(),
   outcome: z.string().nullable(),
@@ -118,8 +117,6 @@ const opsUpgradeStatusSchemaDefinition = z.object({
   installed: z.string().nullable(),
   origin: z.string(),
   image: z.string(),
-  floor: z.string().nullable(),
-  ledgerFloor: z.string().nullable(),
   lease: opsUpgradeLeaseSchema.nullable(),
   lastRun: opsUpgradeRunSummarySchema.nullable(),
   counts: countsSchema,
@@ -330,11 +327,28 @@ export const opsUpgradeTargetSummarySchema: OpsUpgradeTargetSummarySchema =
   opsUpgradeTargetSummarySchemaDefinition;
 export type OpsUpgradeTargetSummary = z.infer<typeof opsUpgradeTargetSummarySchema>;
 
+/** Whether every signed-in user is told the last upgrade needs attention (Alex, 2026-10-11). */
+const opsUpgradeAttentionNoticeSchemaDefinition = z.object({ show: z.boolean() });
+export interface OpsUpgradeAttentionNoticeSchema extends Named<
+  typeof opsUpgradeAttentionNoticeSchemaDefinition
+> {}
+export const opsUpgradeAttentionNoticeSchema: OpsUpgradeAttentionNoticeSchema =
+  opsUpgradeAttentionNoticeSchemaDefinition;
+export type OpsUpgradeAttentionNotice = z.infer<typeof opsUpgradeAttentionNoticeSchema>;
+
 export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
-  /** Where the installation stands: installed, image and floor releases, lease and last run. */
+  /** Where the installation stands: installed and image releases, lease and last run. */
   .query("status")
   .withInput(z.void())
   .withOutput(opsUpgradeStatusSchema)
+
+  /**
+   * Self-hosted only: true while a step, target or run failed, so the shell tells every
+   * signed-in user to contact their operator. Held organizations stay operator-only.
+   */
+  .query("attentionNotice")
+  .withInput(z.void())
+  .withOutput(opsUpgradeAttentionNoticeSchema)
 
   /** Every release the ledger or the image knows, with its step counts. */
   .query("listReleases")

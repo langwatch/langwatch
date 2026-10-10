@@ -163,12 +163,10 @@ describe("main's trace-side governance lanes", () => {
         {
           from: "trace_processing:reactor:governanceKpisSync",
           tombstone: expect.stringContaining(GOVERNANCE_TRACE_FACTS_PROCESS_NAME),
-          removeAfter: "3.21.0",
         },
         {
           from: "trace_processing:reactor:governanceOcsfEventsSync",
           tombstone: expect.stringContaining(GOVERNANCE_TRACE_FACTS_PROCESS_NAME),
-          removeAfter: "3.21.0",
         },
       ]);
     });

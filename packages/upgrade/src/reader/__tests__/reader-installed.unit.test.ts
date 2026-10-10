@@ -14,7 +14,6 @@ const developmentUpgrade: LedgerRunRow = {
   id: "run_up",
   kind: "upgrade",
   release: null,
-  floor: "3.20.1",
   started_at: "2026-10-05T10:00:00Z",
   finished_at: "2026-10-05T10:01:00Z",
   outcome: "succeeded",
@@ -25,9 +24,7 @@ const developmentUpgrade: LedgerRunRow = {
 const settled: InstallationFacts = {
   imageRelease: "3.21.0",
   imageSteps: [],
-  floor: "3.20.1",
   installed: "3.21.0",
-  ledgerFloor: "3.20.1",
   ledgerHoldsRecords: true,
   steps: [],
   failedTargets: 0,
@@ -38,7 +35,7 @@ const settled: InstallationFacts = {
 describe("pickInstalled", () => {
   describe("when the newest succeeded run is an upgrade by a development build", () => {
     /** @scenario "An upgrade by a development build reads as installed past every release" */
-    it("reads past every release, not a settled step's release below the floor", () => {
+    it("reads past every release, not a settled step's older release", () => {
       const picked = pickInstalled({
         succeededRun: developmentUpgrade,
         stepFacts: [

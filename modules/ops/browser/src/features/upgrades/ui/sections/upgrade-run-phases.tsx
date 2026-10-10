@@ -144,7 +144,6 @@ function RunLog({ run }: { run: UpgradeRunDetailView }) {
           <SummaryListItem label="Finished">
             {run.finishedAt ? <FormattedDate value={run.finishedAt} /> : "Not yet"}
           </SummaryListItem>
-          <SummaryListItem label="Floor">{run.floor ?? "Not named"}</SummaryListItem>
           <SummaryListItem label="Errors">
             {errors.length === 0 ? "None recorded" : `${errors.length}`}
           </SummaryListItem>

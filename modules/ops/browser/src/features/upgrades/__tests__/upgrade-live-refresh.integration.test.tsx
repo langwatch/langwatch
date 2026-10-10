@@ -102,7 +102,6 @@ function runWith(outcome: string | null): UpgradeRunDetailView {
     id: "run_1",
     kind: "upgrade",
     release: "3.23.0",
-    floor: "3.20.1",
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: outcome === null ? null : "2026-10-06T10:01:00.000Z",
     outcome,

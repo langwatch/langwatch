@@ -47,13 +47,6 @@ export type ServingVerdict =
     }>
   | Readonly<{
       admitted: false;
-      outcome: "below-floor";
-      release: string;
-      floor: string;
-      refusal: string;
-    }>
-  | Readonly<{
-      admitted: false;
       outcome: "first-install";
       command: typeof UPGRADE_COMMAND;
       refusal: string;
@@ -62,46 +55,18 @@ export type ServingVerdict =
   /** No ledger, and this role may not create one (Alex, 2026-10-10, option a). */
   | Readonly<{ admitted: false; outcome: "ledger-not-creatable"; refusal: string }>;
 
-/** The highest floor any upgrade run recorded, or null when none did (plan 3.2). */
-export function ledgerFloor({
-  runs,
-}: {
-  runs: readonly Pick<UpgradeRun, "floor">[];
-}): string | null {
-  let highest: string | null = null;
-  for (const { floor } of runs) {
-    if (floor === null) continue;
-    if (highest === null || compareReleases({ left: floor, right: highest }) > 0) highest = floor;
-  }
-  return highest;
-}
-
 /**
- * Whether this image may serve on this ledger: a release below the floor refuses first, then
- * every blocking step the image declares must be done or not-needed (plan 3.1, Q-U5 1). An
- * unreleased build is newer than every release, so it is never below a floor.
+ * Whether this image may serve on this ledger: every blocking step the image declares must be
+ * done or not-needed (plan 3.1, Q-U5 1).
  */
 export function assertCurrent({
   ledger,
   image,
-  floor,
 }: {
   ledger: { steps: readonly Pick<UpgradeStep, "id" | "status">[] };
   image: ServingImage;
-  floor: string | null;
 }): ServingVerdict {
-  const { release, blockingSteps } = servingImageSchema.parse(image);
-  if (release !== null && floor !== null && compareReleases({ left: release, right: floor }) < 0) {
-    return {
-      admitted: false,
-      outcome: "below-floor",
-      release,
-      floor,
-      refusal:
-        `release ${release} is below the installation's floor ${floor}: an upgrade at that floor ` +
-        `may have removed what this release reads; run release ${floor} or newer.`,
-    };
-  }
+  const { blockingSteps } = servingImageSchema.parse(image);
   const status = new Map(ledger.steps.map((step) => [step.id, step.status]));
   const outstanding = blockingSteps.filter((id) => {
     const recorded = status.get(id);

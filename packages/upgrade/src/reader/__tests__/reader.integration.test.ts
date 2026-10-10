@@ -19,7 +19,6 @@ const scratchName = () => `upgrade_reader_${Date.now().toString(36)}_${sequence+
 const widen = ({ ledger }: { ledger: string }) => [
   `ALTER TABLE "${ledger}"."_langwatch_upgrade_step" ADD COLUMN IF NOT EXISTS "owner" TEXT`,
   `ALTER TABLE "${ledger}"."_langwatch_upgrade_step" ADD COLUMN IF NOT EXISTS "description" TEXT`,
-  `ALTER TABLE "${ledger}"."_langwatch_upgrade_run" ADD COLUMN IF NOT EXISTS "floor" TEXT`,
   `CREATE TABLE IF NOT EXISTS "${ledger}"."_langwatch_upgrade_target" (
     "step_id" TEXT NOT NULL, "target" TEXT NOT NULL, "status" TEXT NOT NULL, "version" TEXT,
     "last_error" TEXT, "updated_at" TIMESTAMP(3) NOT NULL, PRIMARY KEY ("step_id", "target"))`,
@@ -64,7 +63,6 @@ async function openScratch(): Promise<Scratch> {
 }
 
 const IMAGE: UpgradeImage = { release: "3.21.0", steps: [] };
-const FLOOR = { release: "3.20.1" };
 
 function readerOver({
   scratch,
@@ -73,7 +71,7 @@ function readerOver({
   scratch: Scratch;
   image?: UpgradeImage;
 }): UpgradeReader {
-  return createUpgradeReader({ postgres: scratch.postgres, image, floor: FLOOR });
+  return createUpgradeReader({ postgres: scratch.postgres, image });
 }
 
 const insertLease = ({ scratch, offset }: { scratch: Scratch; offset: string }) =>
@@ -93,7 +91,6 @@ async function insertRun({
   startedAt,
   outcome = "succeeded",
   finished = true,
-  floor,
   plan,
   report,
 }: {
@@ -104,7 +101,6 @@ async function insertRun({
   startedAt: string;
   outcome?: string | null;
   finished?: boolean;
-  floor?: string;
   plan?: object;
   report?: object;
 }) {
@@ -122,12 +118,6 @@ async function insertRun({
       report ? JSON.stringify(report) : null,
     ],
   );
-  if (floor) {
-    await scratch.postgres.query(
-      `UPDATE "_langwatch_upgrade_run" SET "floor" = $2 WHERE "id" = $1`,
-      [id, floor],
-    );
-  }
 }
 
 async function insertStep({
@@ -358,24 +348,6 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
         state: "needs-attention",
         reason: "failed-target",
         failedTargets: 1,
-      });
-    });
-
-    /** @scenario "An image below the floor the ledger recorded reads as unsupported" */
-    it("reads an image below the floor a run recorded as unsupported", async () => {
-      await scratch.widen();
-      await insertRun({
-        scratch,
-        id: "run_up",
-        release: "3.21.0",
-        startedAt: "2026-10-05 10:00:00",
-        floor: "3.20.1",
-      });
-      const reader = readerOver({ scratch, image: { release: "3.19.0", steps: [] } });
-      expect(await reader.status()).toMatchObject({
-        state: "unsupported",
-        reason: "image-below-ledger-floor",
-        ledgerFloor: "3.20.1",
       });
     });
   });
@@ -662,15 +634,14 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       const preview = await createUpgradeReader({
         postgres: scratch.postgres,
         image: IMAGE,
-        floor: FLOOR,
         planning: {
           image: { release: "3.21.0", steps: [] },
-          releases: { manifests: [], floor: { release: "3.20.1", namedAt: "2026-09-01" } },
+          releases: { manifests: [] },
         },
       }).preview({ to: "3.21.0" });
       expect(preview.installed).toBeNull();
       expect(preview.plan.outcome).toBe("planned");
-      expect(preview.preflight.map((row) => row.id)).toContain("floor");
+      expect(preview.preflight.map((row) => row.id)).toContain("failed-steps");
     });
 
     const step = (id: string) => ({
@@ -688,15 +659,14 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       createUpgradeReader({
         postgres: scratch.postgres,
         image: IMAGE,
-        floor: FLOOR,
         planning: {
           image: { release: "3.22.0", steps: manifests.flatMap((manifest) => manifest.steps) },
-          releases: { manifests, floor: { release: "3.21.0", namedAt: "2026-10-01" } },
+          releases: { manifests },
         },
       }).preview({ to: "3.22.0" });
 
     /** @scenario "The preview plans a cut first install as fresh, as the runner does" */
-    it("plans a first install cut below the floor as fresh rather than refusing", async () => {
+    it("plans a cut first install as fresh", async () => {
       await insertRun({
         scratch,
         id: "run_seed",

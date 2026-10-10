@@ -148,7 +148,6 @@ describe("experiment_run_processing's alias of main's trace metrics lane", () =>
           from: "trace_processing:reactor:experimentMetricsSync",
           to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
           eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-          removeAfter: "3.21.0",
         },
       ]);
     });

@@ -675,8 +675,8 @@ export function codeStepOf(step: MigrationStep | TenantMigrationStep): ManifestS
 
 /**
  * `pnpm task upgrade [status | plan [--to <release>]] [--json]`
- * (specs/upgrade/upgrade-command.feature). Exit codes: 0 done, 1 failed, 2 refused below the
- * floor, 3 lease not acquired. The installed modules' code steps are booted first.
+ * (specs/upgrade/upgrade-command.feature). Exit codes: 0 done, 1 failed, 3 lease not acquired.
+ * The installed modules' code steps are booted first.
  */
 export async function runUpgradeCommand({
   args,

@@ -8,11 +8,19 @@ import { OpsApi, opsUpgradeTrpc } from "@langwatch/ops-contract";
 
 import { opsOperatorContext } from "#transport/ops-operator.trpc";
 
+/** Alex, 2026-10-11: on self-hosted every signed-in user is told to contact their operator. */
+const EVERY_MEMBER_IS_TOLD =
+  "answers one boolean, whether the last upgrade needs attention, so every signed-in user can be told to contact their operator; it names no step, error or organization";
+
 export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUpgradeTrpc> =
   defineTrpcRouter(OpsApi, opsUpgradeTrpc)
     .procedure("status")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.getUpgradeStatus())
+
+    .procedure("attentionNotice")
+    .noPermission({ reason: EVERY_MEMBER_IS_TOLD })
+    .handle(({ app }) => app.getUpgradeAttentionNotice())
 
     .procedure("listReleases")
     .withPermission("ops:view", { at: "platform" })

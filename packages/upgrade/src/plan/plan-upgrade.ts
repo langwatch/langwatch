@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { UpgradeStep } from "../ledger.ts";
 import { compareReleases, releaseVersionSchema, SCHEMA_STEP_KINDS } from "../manifest/manifest.ts";
-import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 
 /** One release the upgrade steps through; the virtual one (no version) holds unreleased steps. */
 export const plannedReleaseSchema = z.object({
@@ -16,23 +16,12 @@ export const plannedReleaseSchema = z.object({
 });
 export type PlannedRelease = z.infer<typeof plannedReleaseSchema>;
 
-export const upgradeRefusalCodeSchema = z.enum(["below_lts_floor", "image_below_ledger_floor"]);
-export type UpgradeRefusalCode = z.infer<typeof upgradeRefusalCodeSchema>;
-
-export const upgradePlanSchema = z.discriminatedUnion("outcome", [
-  z.object({
-    outcome: z.literal("planned"),
-    fresh: z.boolean(),
-    releases: z.array(plannedReleaseSchema),
-    notNeeded: z.array(z.string()),
-  }),
-  z.object({
-    outcome: z.literal("refused"),
-    code: upgradeRefusalCodeSchema,
-    stopAt: releaseVersionSchema.nullable(),
-    message: z.string(),
-  }),
-]);
+export const upgradePlanSchema = z.object({
+  outcome: z.literal("planned"),
+  fresh: z.boolean(),
+  releases: z.array(plannedReleaseSchema),
+  notNeeded: z.array(z.string()),
+});
 export type UpgradePlan = z.infer<typeof upgradePlanSchema>;
 
 /** The kinds a fresh install has nothing to move for (rethink 6.4). */
@@ -63,44 +52,21 @@ function plannedRelease({
 }
 
 /**
- * Plans from the ledger and the manifests (rethink 6.4): refusals, then each release above
+ * Plans from the ledger and the manifests (rethink 6.4): each release above
  * `installed` or with a schema or blocking step open, then unreleased steps as one virtual one.
  * Specs: specs/upgrade/release-manifests.feature, packages/upgrade/specs/unfinished-steps.feature.
  */
 export function planUpgrade({
   installed,
   image,
-  floor,
   manifests,
   ledger,
 }: {
   installed: string | null;
   image: { release: string | null; steps: readonly ManifestStep[] };
-  floor: LtsFloor;
   manifests: readonly ReleaseManifest[];
-  ledger: { floor: string | null; steps: readonly Pick<UpgradeStep, "id" | "status">[] };
+  ledger: { steps: readonly Pick<UpgradeStep, "id" | "status">[] };
 }): UpgradePlan {
-  if (
-    image.release &&
-    ledger.floor &&
-    compareReleases({ left: image.release, right: ledger.floor }) < 0
-  ) {
-    return {
-      outcome: "refused",
-      code: "image_below_ledger_floor",
-      stopAt: null,
-      message: `this image is ${image.release}; the database was upgraded with LTS floor ${ledger.floor}, so it needs an image of ${ledger.floor} or newer`,
-    };
-  }
-  if (installed && compareReleases({ left: installed, right: floor.release }) < 0) {
-    return {
-      outcome: "refused",
-      code: "below_lts_floor",
-      stopAt: floor.release,
-      message: `this installation is on ${installed}; upgrade to ${floor.release} (LTS) first, then to this image`,
-    };
-  }
-
   const settled = new Set(
     ledger.steps
       .filter((step) => step.status === "done" || step.status === "not-needed")

@@ -6,7 +6,6 @@ import { z } from "zod";
  * unknown value is shown raw, never thrown on. The labels and tones are in `labels.ts`.
  */
 export const installationStateSchema = z.enum([
-  "unsupported",
   "needs-attention",
   "upgrading",
   "never-upgraded",
@@ -21,8 +20,6 @@ export const installationToneSchema = z.enum(["neutral", "info", "warning", "dan
 export type InstallationTone = z.infer<typeof installationToneSchema>;
 
 export const installationReasonSchema = z.enum([
-  "installed-below-floor",
-  "image-below-ledger-floor",
   "failed-step",
   "failed-target",
   "failed-run",
@@ -128,7 +125,6 @@ export const upgradeRunSummarySchema = z.object({
   id: z.string(),
   kind: z.string(),
   release: z.string().nullable(),
-  floor: z.string().nullable(),
   startedAt: isoInstant,
   finishedAt: isoInstant.nullable(),
   outcome: z.string().nullable(),
@@ -173,8 +169,6 @@ export const upgradeStatusSchema = z.object({
   installed: z.string().nullable(),
   origin: installedOriginSchema,
   image: z.string(),
-  floor: z.string().nullable(),
-  ledgerFloor: z.string().nullable(),
   lease: upgradeLeaseViewSchema.nullable(),
   lastRun: upgradeRunSummarySchema.nullable(),
   counts: countsSchema,
@@ -226,12 +220,6 @@ export const upgradeImageSchema = z.object({
   steps: z.array(upgradeImageStepSchema),
 });
 export type UpgradeImage = z.infer<typeof upgradeImageSchema>;
-
-export const upgradeFloorSchema = z.object({
-  release: z.string(),
-  namedAt: z.string().optional(),
-});
-export type UpgradeFloor = z.infer<typeof upgradeFloorSchema>;
 
 export const listStepsFilterSchema = z.object({
   release: z.string().nullable().optional(),

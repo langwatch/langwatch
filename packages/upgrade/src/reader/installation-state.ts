@@ -8,9 +8,7 @@ export interface InstallationFacts {
   /** How a summary names the image: its release, or "Development build <release>+<commit>". */
   imageName?: string;
   imageSteps: readonly { id: string; mode: string }[];
-  floor: string | null;
   installed: string | null;
-  ledgerFloor: string | null;
   ledgerHoldsRecords: boolean;
   steps: readonly { id: string; status: string }[];
   failedTargets: number;
@@ -34,26 +32,6 @@ export function imageNameOf({ imageRelease, imageName }: InstallationFacts): str
 
 function plural({ count, one, many }: { count: number; one: string; many: string }): string {
   return `${count} ${count === 1 ? one : many}`;
-}
-
-function checkUnsupported(facts: InstallationFacts): InstallationVerdict | null {
-  const { imageRelease, installed, floor, ledgerFloor } = facts;
-  const image = imageNameOf(facts);
-  if (floor && installed && orderReleases({ left: installed, right: floor }) === "older") {
-    return {
-      state: "unsupported",
-      reason: "installed-below-floor",
-      summary: `Installed release ${installed} is below the supported floor ${floor}. Upgrade to ${floor} first.`,
-    };
-  }
-  if (ledgerFloor && orderReleases({ left: imageRelease, right: ledgerFloor }) === "older") {
-    return {
-      state: "unsupported",
-      reason: "image-below-ledger-floor",
-      summary: `This image (${image}) is older than the floor ${ledgerFloor} this installation was upgraded with.`,
-    };
-  }
-  return null;
 }
 
 function checkNeedsAttention(facts: InstallationFacts): InstallationVerdict | null {
@@ -140,12 +118,11 @@ function checkFinishing(facts: InstallationFacts): InstallationVerdict | null {
 
 /**
  * The installation state of the UI plan's section 4. The first match wins, in the order of
- * `INSTALLATION_STATES`: Unsupported, Needs attention, Upgrading, Never upgraded, Behind, Rolled
+ * `INSTALLATION_STATES`: Needs attention, Upgrading, Never upgraded, Behind, Rolled
  * back, Finishing in background, Up to date. Pure: it is handed the ledger's facts.
  */
 export function computeInstallationState(facts: InstallationFacts): InstallationVerdict {
   return (
-    checkUnsupported(facts) ??
     checkNeedsAttention(facts) ??
     checkUpgrading(facts) ??
     checkNeverUpgraded(facts) ??

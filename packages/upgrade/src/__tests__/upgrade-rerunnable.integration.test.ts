@@ -27,7 +27,6 @@ const NOTE_SQL = `CREATE TABLE IF NOT EXISTS "AlphaNote" ("id" TEXT PRIMARY KEY)
 ALTER TABLE "Alpha" ADD COLUMN IF NOT EXISTS "note" TEXT;`;
 const NEWER = "29990101000000_alpha_note";
 const OLDER = "20260102000000_alpha_note";
-const FLOOR = { release: "3.20.1", namedAt: "2026-10-06" };
 
 type Line = { level: "info" | "warn"; message: string; fields: Record<string, unknown> };
 
@@ -180,7 +179,7 @@ function runnerFor({
   return createUpgradeRunner({
     postgres: scratch.postgres,
     image: { release, steps: shipped },
-    releases: { manifests: all, floor: FLOOR },
+    releases: { manifests: all },
     applier,
     identity: { image: release, host: "pod-a" },
     log: {
@@ -197,10 +196,10 @@ function runnerFor({
 const run = (runner: ReturnType<typeof createUpgradeRunner>) =>
   runner.run({ signal: new AbortController().signal });
 
-/** Brings the scratch database to the floor, then holds an exclusive lock on "Alpha". */
-async function atFloorWithLockedAlpha({ next }: { next: string }) {
-  const floor = await realApplier({ next });
-  const outcome = await run(runnerFor({ release: "3.20.1", next, applier: floor.applier }));
+/** Brings the scratch database to 3.20.1, then holds an exclusive lock on "Alpha". */
+async function atBaseWithLockedAlpha({ next }: { next: string }) {
+  const base = await realApplier({ next });
+  const outcome = await run(runnerFor({ release: "3.20.1", next, applier: base.applier }));
   expect(outcome, outcome.message).toMatchObject({ code: "done" });
   const holder: PoolClient = await scratch.postgres.connect();
   await holder.query("BEGIN");
@@ -227,7 +226,7 @@ describe.skipIf(!DB_URL)(
 
     /** @scenario "A re-runnable migration cancelled by lock_timeout mid-way is resolved and completes" */
     it("marks it rolled back, retries after the backoff and completes", async () => {
-      const lock = await atFloorWithLockedAlpha({ next: NEWER });
+      const lock = await atBaseWithLockedAlpha({ next: NEWER });
       const { applier, attempts, resolves } = await realApplier({ next: NEWER });
       const lines: Line[] = [];
       const log = {
@@ -266,7 +265,7 @@ describe.skipIf(!DB_URL)(
 
     /** @scenario "A migration at or below the marker still stops by name" */
     it("stops after one attempt naming the resolve command, and leaves the row failed", async () => {
-      const lock = await atFloorWithLockedAlpha({ next: OLDER });
+      const lock = await atBaseWithLockedAlpha({ next: OLDER });
       const { applier, attempts, resolves } = await realApplier({ next: OLDER });
       const outcome = await run(runnerFor({ release: "3.21.0", next: OLDER, applier }));
       await lock.release();
@@ -283,7 +282,7 @@ describe.skipIf(!DB_URL)(
 
     /** @scenario "A re-runnable migration still failing after the last attempt names what to fix" */
     it("retries up to the last attempt, then names the migration and that the next run resolves it", async () => {
-      const lock = await atFloorWithLockedAlpha({ next: NEWER });
+      const lock = await atBaseWithLockedAlpha({ next: NEWER });
       const { applier, attempts, resolves } = await realApplier({ next: NEWER });
       const lines: Line[] = [];
       const outcome = await run(runnerFor({ release: "3.21.0", next: NEWER, applier, lines }));
@@ -308,7 +307,7 @@ describe.skipIf(!DB_URL)(
 
     /** @scenario "A failed re-runnable migration left by an earlier run is resolved before the schema is applied" */
     it("resolves the earlier run's failed row at preflight, logs it by name and completes", async () => {
-      const lock = await atFloorWithLockedAlpha({ next: NEWER });
+      const lock = await atBaseWithLockedAlpha({ next: NEWER });
       const first = await realApplier({ next: NEWER });
       const once = { attempts: 1, backoffMs: 1 };
       const failed = await run(
@@ -346,8 +345,8 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario "A failed re-runnable migration the image does not ship stops by name" */
       it("stops before the applier runs when the image does not ship the migration", async () => {
-        const floor = await realApplier({ next: NEWER });
-        await run(runnerFor({ release: "3.20.1", next: NEWER, applier: floor.applier }));
+        const base = await realApplier({ next: NEWER });
+        await run(runnerFor({ release: "3.20.1", next: NEWER, applier: base.applier }));
         const ghost = "29990202000000_ghost";
         await failedRow(ghost);
         const { applier, attempts, resolves } = await realApplier({ next: NEWER });
@@ -362,8 +361,8 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario "An applier that cannot resolve keeps the conservative behaviour" */
       it("stops naming the resolve command when the applier cannot resolve", async () => {
-        const floor = await realApplier({ next: NEWER });
-        await run(runnerFor({ release: "3.20.1", next: NEWER, applier: floor.applier }));
+        const base = await realApplier({ next: NEWER });
+        await run(runnerFor({ release: "3.20.1", next: NEWER, applier: base.applier }));
         await failedRow(NEWER);
         const { applier, attempts } = await realApplier({ next: NEWER });
         const outcome = await run(
@@ -382,8 +381,8 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario "A resolve that fails stops the run naming the resolve command and the error" */
       it("stops naming the resolve error and the command when the resolve fails", async () => {
-        const floor = await realApplier({ next: NEWER });
-        await run(runnerFor({ release: "3.20.1", next: NEWER, applier: floor.applier }));
+        const base = await realApplier({ next: NEWER });
+        await run(runnerFor({ release: "3.20.1", next: NEWER, applier: base.applier }));
         await failedRow(NEWER);
         const { applier, attempts } = await realApplier({ next: NEWER });
         const refusing: UpgradeSchemaApplier = {

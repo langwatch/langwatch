@@ -48,7 +48,6 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
         createUpgradeReader({
           postgres: { query: async () => ({ rows: [] }) },
           image: { release: UNRELEASED_IMAGE, steps },
-          floor: null,
         }),
       deprecations,
       version,

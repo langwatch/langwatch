@@ -1,4 +1,5 @@
 import type {
+  OpsUpgradeAttentionNotice,
   OpsUpgradeDeprecation,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
@@ -37,9 +38,12 @@ import type { CloudLatestRelease } from "../repositories/cloud-latest-release.re
 import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
 import type { UsageReportService } from "./usage-report.service.ts";
 
+/** The reader's state for a failed step, target or run: Ops › Upgrades' "Needs attention". */
+const NEEDS_ATTENTION = "needs-attention";
+
 function runSummaryOf(run: UpgradeRunSummary): OpsUpgradeRunSummary {
-  const { id, kind, release, floor, startedAt, finishedAt, outcome } = run;
-  return { id, kind, release, floor, startedAt, finishedAt, outcome };
+  const { id, kind, release, startedAt, finishedAt, outcome } = run;
+  return { id, kind, release, startedAt, finishedAt, outcome };
 }
 
 function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
@@ -60,8 +64,6 @@ function statusOf(
     installed: status.installed,
     origin: status.origin,
     image: status.image,
-    floor: status.floor,
-    ledgerFloor: status.ledgerFloor,
     lease: lease && {
       name: lease.name,
       owner: lease.owner,
@@ -167,18 +169,29 @@ export class OpsUpgradeService {
   static create({
     ledger,
     cloudReleases,
+    isSaas,
   }: {
     ledger: UpgradeLedgerRepository;
+    /** Cloud tells no member about its upgrades; only ops:view holders see them. */
+    isSaas: boolean;
     /** The usage report's held reply; a process without one names no latest release. */
     cloudReleases?: Pick<UsageReportService, "findLatestRelease">;
   }): OpsUpgradeService {
-    return new OpsUpgradeService(ledger, cloudReleases);
+    return new OpsUpgradeService(ledger, cloudReleases, isSaas);
   }
 
   private constructor(
     private readonly ledger: UpgradeLedgerRepository,
     private readonly cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined,
+    private readonly isSaas: boolean,
   ) {}
+
+  /** A failed step, target or run on self-hosted; held organizations leave the state up to date. */
+  async getAttentionNotice(): Promise<OpsUpgradeAttentionNotice> {
+    if (this.isSaas) return { show: false };
+    const status = await this.ledger.findStatus();
+    return { show: status.state === NEEDS_ATTENTION };
+  }
 
   async getStatus(): Promise<OpsUpgradeStatus> {
     const deprecations = this.ledger.findDeprecations().map(deprecationOf);

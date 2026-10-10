@@ -431,3 +431,49 @@ Feature: Ops shows an installation's release upgrades, read-only
     Given a self-hosted installation and a step that is not enrolled automatically
     When an operator holding ops:manage enrols an organization, enrols a cohort or withdraws one
     Then each action is recorded and none is refused for being self-hosted
+
+  # Upgrade attention notice (Alex, 2026-10-11): on self-hosted every signed-in user is told when
+  # the last upgrade needs attention. Errors are a failed step, target or run; held organizations
+  # stay operator-only, and cloud shows members nothing.
+
+  @unit
+  Scenario: Any signed-in member may ask whether the last upgrade needs attention
+    Given the ops.upgrade.attentionNotice read
+    Then the door asks no permission of a signed-in caller beyond being signed in
+    And a member without ops:view gets an answer, not a refusal
+
+  @unit
+  Scenario: A self-hosted installation with a failed step shows members the upgrade notice
+    Given a self-hosted installation whose upgrade status is needs attention with a failed step
+    When a signed-in member reads the upgrade attention notice
+    Then it answers show
+
+  @unit
+  Scenario: Held organizations alone show members no upgrade notice
+    Given a self-hosted installation that is up to date with an organization held by a tenant step
+    When a signed-in member reads the upgrade attention notice
+    Then it answers do not show
+
+  @unit
+  Scenario: On cloud a failed step shows members no upgrade notice
+    Given the cloud installation whose upgrade status is needs attention with a failed step
+    When a signed-in member reads the upgrade attention notice
+    Then it answers do not show
+
+  @integration
+  Scenario: The shell's upgrade notice tells a member to contact their operator
+    Given the upgrade attention notice answers show
+    When a signed-in member without ops:view opens any page
+    Then the shell shows a warning banner reading "LangWatch's last update needs attention. Contact your LangWatch operator."
+    And it offers no link
+
+  @integration
+  Scenario: An operator's upgrade notice links to Ops › Upgrades
+    Given the upgrade attention notice answers show
+    When a signed-in operator holding ops:view opens any page
+    Then the banner links to /ops/upgrades
+
+  @integration
+  Scenario: The upgrade notice shows nothing while it loads
+    Given the upgrade attention notice has not answered yet
+    Then the shell shows no banner and no error

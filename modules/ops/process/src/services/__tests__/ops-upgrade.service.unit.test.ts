@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import type { CloudLatestRelease } from "../../repositories/cloud-latest-release.repository.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { OpsUpgradeService } from "../ops-upgrade.service.ts";
-import { statusOf, stepOf } from "./support/upgrade-ledger.ts";
+import { ledgerOf, statusOf, stepOf } from "./support/upgrade-ledger.ts";
 
 const AT = "2026-10-06T10:00:00.000Z";
 const PLAN: Extract<UpgradePreview["plan"], { outcome: "planned" }> = {
@@ -49,7 +49,6 @@ const RUN_SUMMARY = {
   id: "run_1",
   kind: "upgrade",
   release: "3.23.0",
-  floor: "3.20.1",
   startedAt: AT,
   finishedAt: null,
   outcome: null,
@@ -95,6 +94,7 @@ function service({
   targets?: UpgradeTargetSummary[];
 } = {}) {
   return OpsUpgradeService.create({
+    isSaas: false,
     ...(held ? { cloudReleases: { findLatestRelease: async () => held } } : {}),
     ledger: MemoryUpgradeLedgerRepository.create({
       ...(version ? { version } : {}),
@@ -122,6 +122,7 @@ describe("OpsUpgradeService", () => {
   describe("given an image that ships a deprecation without a successor", () => {
     it("adds the register to the status read, a missing successor as null", async () => {
       const upgrades = OpsUpgradeService.create({
+        isSaas: false,
         ledger: MemoryUpgradeLedgerRepository.create({
           deprecations: [
             {
@@ -260,6 +261,60 @@ describe("OpsUpgradeService.getStatus version and latest release", () => {
         held: [],
       }).getStatus();
       expect(status.latestRelease).toBeNull();
+    });
+  });
+});
+
+describe("OpsUpgradeService.getAttentionNotice", () => {
+  const FAILED_STEP = statusOf({
+    state: "needs-attention",
+    reason: "failed-step",
+    failedStepIds: ["clickhouse:00042"],
+  });
+
+  function noticeOf({ isSaas, status }: { isSaas: boolean; status: ReturnType<typeof statusOf> }) {
+    const reader = { ...ledgerOf([], status) };
+    return OpsUpgradeService.create({
+      isSaas,
+      ledger: MemoryUpgradeLedgerRepository.create({
+        reader: {
+          ...reader,
+          listReleases: async () => ({ items: [], cursor: null }),
+          getStep: async () => STEP_DETAIL,
+          listRuns: async () => ({ items: [], cursor: null }),
+          getRun: async () => RUN,
+          preflight: async () => [],
+          preview: async () => ({ installed: null, plan: PLAN, preflight: [] }),
+          listTargets: async () => [],
+        },
+      }),
+    }).getAttentionNotice();
+  }
+
+  describe("given a self-hosted installation with a failed step", () => {
+    /** @scenario "A self-hosted installation with a failed step shows members the upgrade notice" */
+    it("answers show", async () => {
+      await expect(noticeOf({ isSaas: false, status: FAILED_STEP })).resolves.toEqual({
+        show: true,
+      });
+    });
+  });
+
+  describe("given a self-hosted installation up to date with only held organizations", () => {
+    /** @scenario "Held organizations alone show members no upgrade notice" */
+    it("answers do not show", async () => {
+      await expect(noticeOf({ isSaas: false, status: statusOf() })).resolves.toEqual({
+        show: false,
+      });
+    });
+  });
+
+  describe("given the cloud installation with a failed step", () => {
+    /** @scenario "On cloud a failed step shows members no upgrade notice" */
+    it("answers do not show", async () => {
+      await expect(noticeOf({ isSaas: true, status: FAILED_STEP })).resolves.toEqual({
+        show: false,
+      });
     });
   });
 });

@@ -89,24 +89,20 @@ function mainSimulationLaneAliases({
     {
       from: "simulation_processing:subscriber:scenarioEvaluations",
       to: { jobType: "subscriber", lane: `pm:${evaluationsProcess}` },
-      removeAfter: "3.21.0",
     },
     {
       from: "simulation_processing:job:scenarioEvaluations",
       tombstone:
         "grading is an intent of the scenario_evaluations process; a job has no finished event to open it",
-      removeAfter: "3.21.0",
     },
     {
       from: "simulation_processing:job:deferredComputeRunMetrics",
       to: { jobType: "command", lane: "computeRunMetrics" },
-      removeAfter: "3.21.0",
     },
     {
       from: "trace_processing:reactor:simulationMetricsSync",
       to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-      removeAfter: "3.21.0",
     },
   ];
 }

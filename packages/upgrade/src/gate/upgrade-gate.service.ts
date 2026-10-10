@@ -10,7 +10,6 @@ import {
   apiPhaseVerdict,
   assertCurrent,
   firstInstallVerdict,
-  ledgerFloor,
   servingImageSchema,
   servingRoleSchema,
   type ServingImage,
@@ -21,7 +20,7 @@ import {
 /** What the gate reads; `UpgradeLedgerRepository` answers it as it stands. */
 export interface ServingGateLedger {
   findSteps(): Promise<readonly (Pick<UpgradeStep, "id" | "status"> & RollbackLedgerStep)[]>;
-  findRuns(): Promise<readonly (Pick<UpgradeRun, "floor"> & RollbackLedgerRun)[]>;
+  findRuns(): Promise<readonly RollbackLedgerRun[]>;
   /** The steps the ledger seed would infer from the stores' own history (T0-F5). */
   findSeedSteps?(): Promise<readonly Pick<InferredStep, "id" | "status">[]>;
 }
@@ -48,8 +47,8 @@ export interface UpgradeGate {
 }
 
 /**
- * One serving process's gate (plan D5): `admit` reads the ledger, refuses by name when behind or
- * below the floor, and records its roster entry only once admitted; `release` removes it at a
+ * One serving process's gate (plan D5): `admit` reads the ledger, refuses by name when behind,
+ * and records its roster entry only once admitted; `release` removes it at a
  * graceful stop. Spec: specs/upgrade/serving-gate.feature.
  */
 export function createUpgradeGate({
@@ -84,7 +83,6 @@ export function createUpgradeGate({
       const verdict = assertCurrent({
         ledger: { steps },
         image: { release, blockingSteps: [...blockingSteps, ...unregistered] },
-        floor: ledgerFloor({ runs }),
       });
       if (verdict.outcome === "behind") {
         if (gatedRole === "api") {

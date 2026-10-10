@@ -38,8 +38,6 @@ function status(overrides: Partial<UpgradeStatus> = {}): UpgradeStatus {
     installed: "3.21.0",
     origin: "recorded",
     image: "3.21.0",
-    floor: "3.20.1",
-    ledgerFloor: null,
     lease: null,
     lastRun: null,
     counts: { done: 4 },
@@ -79,13 +77,13 @@ describe("previewUpgradeTo()", () => {
 });
 
 describe("preflightFrom()", () => {
-  describe("when the installation is below the floor, a step failed and a lease is held", () => {
-    /** @scenario "The preflight refuses an installation below the floor, a failed step and a live lease, naming each fix" */
-    it("refuses the floor, failed-step and lease rows, each with a fix", () => {
+  describe("when a step failed and a lease is held", () => {
+    /** @scenario "The preflight refuses a failed step and a live lease, naming each fix" */
+    it("refuses the failed-step and lease rows, each with a fix", () => {
       const rows = preflightFrom({
         status: status({
-          state: "unsupported",
-          reason: "installed-below-floor",
+          state: "needs-attention",
+          reason: "failed-step",
           installed: "3.16.0",
           failedStepIds: ["dataset:copy-keys"],
           lease: {
@@ -99,9 +97,9 @@ describe("preflightFrom()", () => {
         }),
       });
       const refused = rows.filter((row) => row.outcome === "refused");
-      expect(refused.map((row) => row.id)).toEqual(["floor", "failed-steps", "lease"]);
+      expect(refused.map((row) => row.id)).toEqual(["failed-steps", "lease"]);
       for (const row of refused) expect(row.fix).toBeTruthy();
-      expect(refused[1]?.detail).toContain("dataset:copy-keys");
+      expect(refused[0]?.detail).toContain("dataset:copy-keys");
     });
   });
 
@@ -110,7 +108,6 @@ describe("preflightFrom()", () => {
     it("verifies every row but the backup, which is unchecked and names the upgrade docs", () => {
       const rows = preflightFrom({ status: status() });
       expect(rows.map((row) => [row.id, row.outcome])).toEqual([
-        ["floor", "verified"],
         ["failed-steps", "verified"],
         ["lease", "verified"],
         ["backup", "unchecked"],

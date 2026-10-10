@@ -237,6 +237,7 @@ import {
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
   type OpsUpgradeListTenantsInput,
+  type OpsUpgradeAttentionNotice,
   type OpsUpgradeReleasePage,
   type OpsUpgradeRun,
   type OpsUpgradeRunPage,
@@ -951,6 +952,8 @@ export class OpsModule implements OpsApi {
       checkup: setup.checkup,
       upgrades: OpsUpgradeService.create({
         ledger: repositories.upgradeLedger,
+        // A process without the checkup cannot tell self-hosted apart, so it tells no member.
+        isSaas: setup.checkup?.isSaas ?? true,
         ...(setup.checkup ? { cloudReleases: setup.checkup.usageReports } : {}),
       }),
       anomalies: setup.anomalies,
@@ -1945,6 +1948,10 @@ export class OpsModule implements OpsApi {
   /** A project key has no person behind it, so it reads its organization's verdicts only. */
   getUpgradeStatus(): Promise<OpsUpgradeStatus> {
     return this.#dependencies.upgrades.getStatus();
+  }
+
+  getUpgradeAttentionNotice(): Promise<OpsUpgradeAttentionNotice> {
+    return this.#dependencies.upgrades.getAttentionNotice();
   }
 
   listUpgradeReleases(): Promise<OpsUpgradeReleasePage> {

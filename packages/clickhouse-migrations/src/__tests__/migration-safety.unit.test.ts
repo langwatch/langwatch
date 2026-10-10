@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
@@ -15,16 +15,6 @@ import {
 } from "./migration-safety.rules.ts";
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, "../../migrations");
-const FLOOR_FILE = resolve(import.meta.dirname, "../../../upgrade/releases/lts-floor.json");
-
-/** The fixture floor the rule tests use, so they hold whatever the real floor becomes. */
-const FIXTURE_FLOOR = "3.20.1";
-
-/** The LTS floor in the tree; the fixture floor until `lts-floor.json` exists. */
-const treeFloor: string = existsSync(FLOOR_FILE)
-  ? (JSON.parse(readFileSync(FLOOR_FILE, "utf8")) as { release: string }).release
-  : FIXTURE_FLOOR;
-
 /**
  * The newest migration the baseline was recorded from. goose names sort by
  * sequence number, so anything written after the freeze sorts above this —
@@ -91,17 +81,16 @@ const migrations: MigrationSource[] = readdirSync(MIGRATIONS_DIR)
 
 const unshipped = migrations.filter((migration) => !baseline.includes(migration.name));
 
-/** What the tree scan reports for one file, with the graceful rules only above the floor. */
+/** What the tree scan reports for one file, with the graceful rules only above the marker. */
 function scanTree(migration: MigrationSource) {
-  return scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
+  return scanClickHouseMigration({ ...migration, steps: STEPS }).filter(
     (finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule),
   );
 }
 
 const FIXTURE_STEPS: ReadonlySet<string> = new Set(["trace:track-index"]);
-const scanWith = (sql: string, floor: string) =>
-  scanClickHouseMigration({ name: "00999_fixture.sql", sql, floor, steps: FIXTURE_STEPS });
-const scan = (sql: string) => scanWith(sql, FIXTURE_FLOOR);
+const scan = (sql: string) =>
+  scanClickHouseMigration({ name: "00999_fixture.sql", sql, steps: FIXTURE_STEPS });
 const rules = (sql: string) => scan(sql).map((finding) => finding.rule);
 
 describe("ClickHouse migration safety", () => {
@@ -186,29 +175,12 @@ describe("ClickHouse migration safety", () => {
       expect(rules(commented)).toEqual([]);
     });
 
-    /** @scenario "A retirement note above the LTS floor is refused by name" */
-    it("refuses a drop whose note names a release above the floor, naming both", () => {
-      const findings = scan(
-        "-- +goose Up\n-- contract: retired in 3.21.0\nDROP TABLE IF EXISTS old_spans;\n",
-      );
-      expect(findings.map((finding) => finding.rule)).toEqual(["retirement-note-above-floor"]);
-      expect(findings[0]?.problem).toContain("3.21.0");
-      expect(findings[0]?.problem).toContain(FIXTURE_FLOOR);
-      expect(findings[0]?.fix).toContain("lts-floor.json names 3.21.0 or later");
-      const typed = scan(
-        "-- +goose Up\n-- contract: retired in 3.21.0\nALTER TABLE t MODIFY COLUMN IF EXISTS c Float64;\n",
-      );
-      expect(typed.map((finding) => finding.rule)).toEqual(["retirement-note-above-floor"]);
-    });
-
-    /** @scenario "A retirement note at or below the LTS floor is accepted" */
-    it("accepts a note naming the floor itself or an older release", () => {
+    /** @scenario "A drop under a retirement note naming any release is accepted" */
+    it("accepts a note naming any release", () => {
       const drop = "DROP TABLE IF EXISTS old_spans;";
       expect(rules(`-- +goose Up\n-- contract: retired in 3.20.1\n${drop}\n`)).toEqual([]);
       expect(rules(`-- +goose Up\n-- contract: retired in 2.0.0\n${drop}\n`)).toEqual([]);
-      expect(scanWith(`-- +goose Up\n-- contract: retired in 3.21.0\n${drop}\n`, "3.21.0")).toEqual(
-        [],
-      );
+      expect(scan(`-- +goose Up\n-- contract: retired in 3.21.0\n${drop}\n`)).toEqual([]);
       expect(parseRelease("v3.20.1")).toEqual([3, 20, 1]);
     });
 
@@ -369,8 +341,8 @@ describe("ClickHouse migration safety", () => {
       expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
       const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
       const graceful = history.flatMap((migration) =>
-        scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
-          (finding) => GRACEFUL_RULES.has(finding.rule),
+        scanClickHouseMigration({ ...migration, steps: STEPS }).filter((finding) =>
+          GRACEFUL_RULES.has(finding.rule),
         ),
       );
       expect(graceful.length).toBeGreaterThan(0);

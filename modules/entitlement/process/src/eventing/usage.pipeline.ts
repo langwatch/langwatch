@@ -103,7 +103,7 @@ export function buildUsagePipeline({
           to: USAGE_LIMIT_CLEARED_EVENT_TYPE,
         },
       ],
-      drain: { pipeline: "usage", removeAfter: "3.21.0" },
+      drain: { pipeline: "usage" },
     })
     .withCommandInstance({
       name: "countMonth",
@@ -145,7 +145,6 @@ export function buildUsagePipeline({
         {
           from: "global:reactor:billingMeterDispatch",
           to: { jobType: "reactor", lane: "usageMeterCount" },
-          removeAfter: "3.21.0",
         },
       ])
       .build()

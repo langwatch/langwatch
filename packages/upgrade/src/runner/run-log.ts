@@ -16,8 +16,6 @@ const WAIT = `nothing to do: wait for the run to finish; ${STATUS} shows its pro
 /** What an operator does after each outcome; every failure names a command or a setting. */
 export const UPGRADE_NEXT_ACTION: Readonly<Record<UpgradeOutcomeCode, string>> = {
   done: `start or restart the api and worker; ${STATUS} shows every step and run`,
-  refused_below_floor: `run the LTS release the message names with ${RUN} first, then this image`,
-  refused_image_below_floor: `deploy an image at or above the installation's floor, then run ${RUN}`,
   lease_not_acquired: `wait for the holder's run to finish (${STATUS}), then run ${RUN} again; a dead holder's lease expires by itself`,
   lease_lost: `run ${RUN} again: it resumes from the ledger`,
   failed_prisma_migration: `run the \`prisma migrate resolve\` command the message names (DATABASE_URL), then ${RUN} again`,

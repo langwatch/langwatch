@@ -111,12 +111,10 @@ export const MAIN_TRACE_GOVERNANCE_LANE_TOMBSTONES: readonly LaneAlias[] = [
   {
     from: "trace_processing:reactor:governanceKpisSync",
     tombstone: PULLED_TRACE_FACTS,
-    removeAfter: "3.21.0",
   },
   {
     from: "trace_processing:reactor:governanceOcsfEventsSync",
     tombstone: PULLED_TRACE_FACTS,
-    removeAfter: "3.21.0",
   },
 ];
 

@@ -136,7 +136,6 @@ export const MAIN_TRACE_METRICS_LANE_ALIASES: readonly LaneAlias[] = [
     from: "trace_processing:reactor:experimentMetricsSync",
     to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    removeAfter: "3.21.0",
   },
 ];
 

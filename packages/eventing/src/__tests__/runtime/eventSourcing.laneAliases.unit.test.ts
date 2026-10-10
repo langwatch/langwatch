@@ -18,7 +18,6 @@ import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 import {
   type LaneAlias,
-  laneAliasesPastWindow,
   laneAliasTargetKeys,
   type RoutedLaneAlias,
 } from "../../upcast/laneAlias.ts";
@@ -67,9 +66,9 @@ class NoteCommand implements CommandHandler<
 
 function alias(
   overrides: Pick<RoutedLaneAlias, "from" | "to"> &
-    Partial<Pick<RoutedLaneAlias, "eventTypes" | "data" | "removeAfter">>,
+    Partial<Pick<RoutedLaneAlias, "eventTypes" | "data">>,
 ): RoutedLaneAlias {
-  return { removeAfter: "3.21.0", ...overrides };
+  return { ...overrides };
 }
 
 function runtime({ aliases }: { aliases: readonly LaneAlias[] }) {
@@ -287,7 +286,6 @@ describe("a successor lane's aliases", () => {
           {
             from: "owner:job:deferredSync",
             tombstone: "the successor grades through its process manager",
-            removeAfter: "3.21.0",
           },
         ],
       });
@@ -367,31 +365,6 @@ describe("a successor lane's aliases", () => {
       expect(
         build([splitAliases[0]!, { ...splitAliases[1]!, eventTypes: [SPAN_RECEIVED] }]),
       ).toThrow(/twice for the event type "lw.owner.span_received"/);
-    });
-
-    /** @scenario "An alias that could never apply is refused when the pipeline is built" */
-    it("refuses an alias with no release that ends it", () => {
-      expect(build([{ ...splitAliases[0]!, removeAfter: "next" }])).toThrow(
-        /no release that ends it/,
-      );
-    });
-  });
-
-  describe("given an alias that ends after release 3.21.0", () => {
-    const declared = [{ pipeline: "successor", aliases: splitAliases.slice(0, 1) }];
-
-    /** @scenario "An alias past its release is refused so it gets removed" */
-    it("names it once 3.21.0 or later has been cut", () => {
-      for (const newestRelease of ["3.21.0", "3.21.1", "4.0.0"]) {
-        expect(laneAliasesPastWindow({ declared, newestRelease })).toEqual([
-          { pipeline: "successor", from: "owner:reactor:triggerMatch", removeAfter: "3.21.0" },
-        ]);
-      }
-    });
-
-    /** @scenario "An alias past its release is refused so it gets removed" */
-    it("names nothing before that release", () => {
-      expect(laneAliasesPastWindow({ declared, newestRelease: "3.20.1" })).toEqual([]);
     });
   });
 });

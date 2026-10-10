@@ -60,7 +60,6 @@ const MANIFESTS: ReleaseManifest[] = [
     steps: [step("trace:reindex", "data", "background")],
   },
 ];
-const FLOOR = { release: "3.20.1", namedAt: "2026-10-06" };
 
 let sequence = 0;
 let scratch: { name: string; postgres: Pool; admin: Pool };
@@ -156,7 +155,7 @@ function runnerFor({
   return createUpgradeRunner({
     postgres: scratch.postgres,
     image: { release, steps: shippedUpTo(release) },
-    releases: { manifests: MANIFESTS, floor: FLOOR },
+    releases: { manifests: MANIFESTS },
     applier,
     identity: { image: release, host: "pod-b" },
     log: { info: () => {}, warn: () => {} },
@@ -344,9 +343,9 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
     });
   });
 
-  describe("when the installation is below the LTS floor", () => {
-    /** @scenario "An installation below the LTS floor is refused before any schema change" */
-    it("exits 2 naming the LTS to stop at, and never calls the applier", async () => {
+  describe("when the installation is on a release older than every manifest", () => {
+    /** @scenario "An installation on any older release rolls through every step to the image" */
+    it("exits 0 and applies every shipped release up to the image", async () => {
       await createLedgerTables({ postgres: scratch.postgres });
       const old = await ledger().startRun({ kind: "upgrade" });
       await UpgradeRunnerRepository.create({ postgres: scratch.postgres }).recordRunPlan({
@@ -357,12 +356,8 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
       const applier = fakeApplier({ release: "3.21.0" });
       const outcome = await run(runnerFor({ release: "3.21.0", applier }));
-      expect(outcome).toMatchObject({
-        exitCode: 2,
-        code: "refused_below_floor",
-        detail: { stopAt: "3.20.1" },
-      });
-      expect(applier.calls).toEqual([]);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(applier.calls).toContain("3.21.0");
     });
   });
 
@@ -386,7 +381,6 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect((await ledger().findRuns()).at(-1)).toMatchObject({
         outcome: "succeeded",
         release: "3.21.0",
-        floor: "3.20.1",
       });
     });
   });
@@ -537,7 +531,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
           release: "3.22.0",
           applier,
           image: { release: "3.22.0", steps: manifests.flatMap((m) => m.steps) },
-          releases: { manifests, floor: FLOOR },
+          releases: { manifests },
           codeSteps: [blocking("dataset:copy-keys"), blocking("trace:rekey")],
         }),
       );
@@ -760,24 +754,6 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect(phases.some((phase) => phase.name === "reconcile")).toBe(false);
     });
 
-    /** @scenario "A refused upgrade is recorded as a failed run whose report names the refusal" */
-    it("records the refusal as a failed run with one failed preflight", async () => {
-      await createLedgerTables({ postgres: scratch.postgres });
-      const old = await ledger().startRun({ kind: "upgrade" });
-      const runner = UpgradeRunnerRepository.create({ postgres: scratch.postgres });
-      await runner.recordRunPlan({ runId: old.id, release: "3.16.0", plan: {} });
-      await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
-      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
-      const refused = (await ledger().findRuns()).at(-1);
-      expect(refused).toMatchObject({
-        outcome: "failed",
-        report: { refused: "below_lts_floor" },
-      });
-      expect((await phasesOf()).map(({ name, outcome }) => ({ name, outcome }))).toEqual([
-        { name: "preflight", outcome: "failed" },
-      ]);
-    });
-
     /** @scenario "A read hint is published at each phase change and at the finish" */
     it("publishes a hint as each phase starts and ends, then once at the finish", async () => {
       const hints: UpgradeReadHint[] = [];
@@ -862,7 +838,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
             release,
             steps: manifests.filter((m) => m.release <= release).flatMap((m) => m.steps),
           },
-          releases: { manifests, floor: FLOOR },
+          releases: { manifests },
           contracts: new Map([["prisma:20261003000000_drop_old", []]]),
           codeSteps: [
             defineMigrationStep({
@@ -950,7 +926,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
           release: "3.22.0",
           applier: dropping(order),
           image: { release: "3.22.0", steps: ARCHIVE_MANIFESTS.flatMap((m) => m.steps) },
-          releases: { manifests: ARCHIVE_MANIFESTS, floor: FLOOR },
+          releases: { manifests: ARCHIVE_MANIFESTS },
           contracts: new Map([[ARCHIVE_DROP, []]]),
           archives: new Map([[ARCHIVE_DROP, [table]]]),
         }),
@@ -1049,45 +1025,6 @@ describe.skipIf(!DB_URL)("the upgrade runner on an unfinished or stale ledger", 
       expect(await statusOf("clickhouse:00001")).not.toBe("done");
       const upgrades = (await ledger().findRuns()).filter((r) => r.kind === "upgrade");
       expect(upgrades.map((r) => r.outcome)).toEqual(["failed"]);
-    });
-  });
-
-  describe("when a refused install upgrades with an image older than the ledger and retries", () => {
-    /** @scenario "A refused install that upgrades to the stop-at release and retries is admitted" */
-    it("re-reads the seeded rows and admits it instead of refusing for good", async () => {
-      await scratch.postgres.query(
-        `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at") VALUES ($1, now())`,
-        ["20200101000000_ancient"],
-      );
-      let gooseVersions = `[]`;
-      const goose: UpgradeClickHouse = {
-        queryRows: async (sql) =>
-          JSON.parse(sql.includes("system.tables") ? `[{"present":1}]` : gooseVersions),
-      };
-      const applier = fakeApplier({ release: "3.21.0" });
-      const refused = await run(runnerFor({ release: "3.21.0", applier, clickhouse: goose }));
-      expect(refused).toMatchObject({ code: "refused_below_floor", detail: { stopAt: "3.20.1" } });
-
-      await scratch.postgres.query(
-        `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at") VALUES ($1, now())`,
-        ["20261001000000_base"],
-      );
-      gooseVersions = `[{"version_id":1,"is_applied":1}]`;
-      const copyKeys: MigrationStep = defineMigrationStep({
-        id: "dataset:copy-keys",
-        kind: "data",
-        mode: "blocking",
-        description: "copies the keys",
-        run: async () => ({ copied: 0 }),
-      });
-      const admitted = await run(
-        runnerFor({ release: "3.21.0", applier, clickhouse: goose, codeSteps: [copyKeys] }),
-      );
-      expect(admitted.code).toBe("done");
-      expect(applier.calls).toEqual(["3.21.0"]);
-      expect(await statusOf("prisma:20261002000000_add")).toBe("done");
-      const seeds = (await ledger().findRuns()).filter((r) => r.kind === "seed");
-      expect(seeds).toHaveLength(1);
     });
   });
 });

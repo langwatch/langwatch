@@ -314,7 +314,7 @@ describe("entitlement's stored names for the usage facts", () => {
         "upcast:entitlement:lw.usage.limit_reached",
         "upcast:entitlement:lw.usage.limit_cleared",
       ]);
-      expect(upcasts?.drain).toEqual({ pipeline: "usage", removeAfter: "3.21.0" });
+      expect(upcasts?.drain).toEqual({ pipeline: "usage" });
     });
   });
 });

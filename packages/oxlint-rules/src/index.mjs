@@ -20,8 +20,8 @@ import {
   isCommentScannedPath,
 } from "./rules/comment-block-size.rule.mjs";
 import { conditionShapeRule } from "./rules/condition-shape.rule.mjs";
-import { contractSchemaNamedRule } from "./rules/contract-schema-named.rule.mjs";
 import { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mjs";
+import { contractSchemaNamedRule } from "./rules/contract-schema-named.rule.mjs";
 import { effectDerivesStateRule } from "./rules/effect-derives-state.rule.mjs";
 import { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
 import { enterpriseLicenseHeaderRule } from "./rules/enterprise-license-header.rule.mjs";
@@ -81,7 +81,6 @@ import {
   resetUnresolvedImportCache,
   unresolvedRelativeImportRule,
 } from "./rules/unresolved-relative-import.rule.mjs";
-import { upcastDrainWindowRule } from "./rules/upcast-drain-window.rule.mjs";
 import { webImportsServerShapedValueRule } from "./rules/web-imports-server-shaped-value.rule.mjs";
 import { zodInternalsRule } from "./rules/zod-internals.rule.mjs";
 import { zodObjectCompositionRule } from "./rules/zod-object-composition.rule.mjs";
@@ -153,7 +152,6 @@ const HOUSE_RULES = [
   testDescriptionIsAnActionRule,
   unboundedLoopRule,
   unitTestDoesNotRenderRule,
-  upcastDrainWindowRule,
   webImportsServerShapedValueRule,
   zodInternalsRule,
   zodObjectCompositionRule,
@@ -254,7 +252,6 @@ export {
   testDescriptionIsAnActionRule,
   unboundedLoopRule,
   unitTestDoesNotRenderRule,
-  upcastDrainWindowRule,
   webImportsServerShapedValueRule,
   zodInternalsRule,
   zodObjectCompositionRule,

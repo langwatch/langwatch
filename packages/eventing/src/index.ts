@@ -32,7 +32,6 @@ export {
   type LaneAlias,
   type LaneTombstone,
   type RoutedLaneAlias,
-  laneAliasesPastWindow,
   type PipelineLaneAliases,
 } from "./upcast/laneAlias.ts";
 export { pipelineUpcastsOf, upcastReplayEventSource } from "./upcast/upcastReplayEventSource.ts";

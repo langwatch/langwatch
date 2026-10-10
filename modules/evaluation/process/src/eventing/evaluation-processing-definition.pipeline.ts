@@ -104,19 +104,16 @@ export const MAIN_TRACE_REACTION_LANE_ALIASES: readonly LaneAlias[] = [
     from: "trace_processing:reactor:evaluationTrigger",
     to: { jobType: "subscriber", lane: "traceEvaluationTrigger" },
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    removeAfter: "3.21.0",
   },
   {
     from: "trace_processing:reactor:evaluationTrigger",
     to: { jobType: "subscriber", lane: "traceOriginEvaluationTrigger" },
     eventTypes: [ORIGIN_RESOLVED_EVENT_TYPE],
-    removeAfter: "3.21.0",
   },
   {
     from: "trace_processing:reactor:customEvaluationSync",
     to: { jobType: "subscriber", lane: "traceCustomEvaluationSync" },
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    removeAfter: "3.21.0",
   },
 ];
 

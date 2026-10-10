@@ -23,13 +23,12 @@ const manifests = [
 ];
 const planning = {
   image: { release: "3.22.0", steps: manifests.flatMap((release) => release.steps) },
-  releases: { manifests, floor: { release: "3.21.0", namedAt: "2026-10-01" } },
+  releases: { manifests },
 };
 const upgradeTo = (release: string) => ({
   kind: "upgrade" as const,
   outcome: "succeeded" as const,
   release,
-  floor: "3.21.0",
   startedAt: new Date("2026-10-07T00:00:00Z"),
 });
 
@@ -47,14 +46,14 @@ describe("planInstallation()", () => {
   });
 
   describe("when the ledger records settled schema no manifest names", () => {
-    it("refuses below the LTS floor", () => {
+    it("plans every shipped release from the one before the oldest manifest", () => {
       const { installed, plan } = planInstallation({
         ...planning,
         steps: [{ id: "prisma:20200101000000_ancient", status: "done" }],
         runs: [],
       });
-      expect(installed).toBeNull();
-      expect(plan).toMatchObject({ outcome: "refused", code: "below_lts_floor", stopAt: "3.21.0" });
+      expect(installed).toBe("3.20.1");
+      expect(plan.releases.map((release) => release.release)).toEqual(["3.21.0", "3.22.0"]);
     });
   });
 

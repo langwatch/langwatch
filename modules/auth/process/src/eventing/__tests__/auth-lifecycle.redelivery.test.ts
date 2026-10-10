@@ -138,7 +138,6 @@ describe("auth's member-disabled session lane", () => {
         {
           from: "global:subscriber:user_lifecycle.revokeDisabledMemberSessions",
           to: { jobType: "subscriber", lane: "revokeDisabledMemberSessions" },
-          removeAfter: "3.21.0",
         },
       ]);
     });

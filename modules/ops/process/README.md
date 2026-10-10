@@ -2251,7 +2251,6 @@ interface Output {
     id: string;
     kind: string;
     release: string | null;
-    floor: string | null;
     startedAt: string;
     finishedAt: string | null;
     outcome: string | null;

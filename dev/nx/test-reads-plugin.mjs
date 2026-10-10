@@ -71,8 +71,6 @@ export const reads = {
   "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.native.jsonc"],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
-  "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/lts-floor.json"],
-  "@langwatch/prisma-client": ["packages/upgrade/releases/lts-floor.json"],
   "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*"],
   "@langwatch/evaluator-contract": [
     "skills/**/*",

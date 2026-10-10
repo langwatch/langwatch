@@ -176,26 +176,22 @@ export const MAIN_NURTURING_LANE_ALIASES: readonly LaneAlias[] = [
   {
     from: "simulation_processing:subscriber:scenarioRunMilestones",
     to: { jobType: "subscriber", lane: "scenarioRunSucceeded" },
-    removeAfter: "3.21.0",
   },
   {
     from: "simulation_processing:reactor:customerIoSimulationSync",
     to: { jobType: "subscriber", lane: "simulationRunFinished" },
     eventTypes: [SIMULATION_RUN_EVENT_TYPES.FINISHED],
-    removeAfter: "3.21.0",
   },
   {
     from: "evaluation_processing:reactor:customerIoEvaluationSync",
     to: { jobType: "subscriber", lane: "evaluationCompleted" },
     eventTypes: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
     data: mainEvaluationSyncAsLifecycleCompleted,
-    removeAfter: "3.21.0",
   },
   {
     from: "trace_processing:reactor:customerIoTraceSync",
     tombstone:
       "trace's projectMetadata job, queued beside it, records the first-trace and trace-received facts nurturing sends",
-    removeAfter: "3.21.0",
   },
 ];
 

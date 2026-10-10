@@ -35,17 +35,16 @@ const settledThrough = (release: string) =>
   manifests
     .filter((manifest) => manifest.release <= release)
     .flatMap((manifest) => manifest.steps.map(({ id }) => ({ id, status: "done" as const })));
-const noLedger = { floor: null, steps: [] };
+const noLedger = { steps: [] };
 
 describe("planUpgrade()", () => {
-  describe("when 3.20.1 upgrades to a 3.23.0 image over a 3.19.0 floor", () => {
+  describe("when 3.20.1 upgrades to a 3.23.0 image", () => {
     /** @scenario "An upgrade across several releases steps release by release" */
     it("plans 3.21.0, 3.22.0 and 3.23.0, each from its own manifest", () => {
       expect(
         planUpgrade({
           installed: "3.20.1",
           image: { release: "3.23.0", steps: imageSteps },
-          floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests: manifests.toReversed(),
           ledger: noLedger,
         }),
@@ -89,10 +88,8 @@ describe("planUpgrade()", () => {
       const plan = planUpgrade({
         installed: "3.22.0",
         image: { release: "3.23.0", steps: imageSteps },
-        floor: { release: "3.19.0", namedAt: "2026-10-06" },
         manifests,
         ledger: {
-          floor: "3.19.0",
           steps: [
             ...settledThrough("3.22.0"),
             { id: "prisma:20270101000000_drop_legacy_key", status: "done" },
@@ -113,38 +110,6 @@ describe("planUpgrade()", () => {
     });
   });
 
-  describe("when the installation is below the LTS floor", () => {
-    /** @scenario "An installation below the LTS floor is refused by the name of the LTS to stop at" */
-    it("refuses with below_lts_floor and names 3.20.1 as the stop", () => {
-      const plan = planUpgrade({
-        installed: "3.16.0",
-        image: { release: "3.23.0", steps: imageSteps },
-        floor: { release: "3.20.1", namedAt: "2026-10-06" },
-        manifests,
-        ledger: noLedger,
-      });
-
-      expect(plan).toMatchObject({ outcome: "refused", code: "below_lts_floor", stopAt: "3.20.1" });
-      expect(plan.outcome === "refused" && plan.message).toContain("upgrade to 3.20.1 (LTS) first");
-    });
-  });
-
-  describe("when the image is older than the floor the ledger records", () => {
-    /** @scenario "An image below the ledger's floor is refused" */
-    it("refuses with image_below_ledger_floor, naming both releases", () => {
-      const plan = planUpgrade({
-        installed: "3.22.0",
-        image: { release: "3.21.0", steps: imageSteps },
-        floor: { release: "3.19.0", namedAt: "2026-10-06" },
-        manifests,
-        ledger: { floor: "3.22.0", steps: [] },
-      });
-
-      expect(plan).toMatchObject({ outcome: "refused", code: "image_below_ledger_floor" });
-      expect(plan.outcome === "refused" && plan.message).toMatch(/3\.21\.0.*3\.22\.0/);
-    });
-  });
-
   describe("when the database has no installed release", () => {
     /** @scenario "A fresh install applies all schema at once and needs no data, tenant or procedure step" */
     it("plans one release of every schema id and marks every data and tenant step not needed", () => {
@@ -152,7 +117,6 @@ describe("planUpgrade()", () => {
         planUpgrade({
           installed: null,
           image: { release: "3.23.0", steps: imageSteps },
-          floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests,
           ledger: noLedger,
         }),
@@ -195,9 +159,8 @@ describe("planUpgrade()", () => {
         planUpgrade({
           installed: "3.23.0",
           image: { release: null, steps: [...imageSteps, ...unreleased] },
-          floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests,
-          ledger: { floor: "3.19.0", steps: settledThrough("3.23.0") },
+          ledger: { steps: settledThrough("3.23.0") },
         }),
       ).toEqual({
         outcome: "planned",
@@ -228,7 +191,6 @@ describe("inlineBeforeContracts()", () => {
     const plan = planUpgrade({
       installed: "3.20.1",
       image: { release: "3.23.0", steps: imageSteps },
-      floor: { release: "3.19.0", namedAt: "2026-10-06" },
       manifests,
       ledger: noLedger,
     });

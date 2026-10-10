@@ -10,7 +10,7 @@ import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
 import { compareReleases } from "../manifest/manifest.ts";
-import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import { planInstallation } from "../plan/plan-installation.ts";
 import {
   inlineBeforeContracts,
@@ -52,7 +52,7 @@ export interface UpgradeRunnerOptions {
   clickhouse?: UpgradeClickHouse;
   /** The image's release (its newest manifest) and every step its tree declares. */
   image: { release: string | null; steps: readonly ManifestStep[] };
-  releases: { manifests: readonly ReleaseManifest[]; floor: LtsFloor };
+  releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
   /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
@@ -215,7 +215,7 @@ function rerunnableFailure({
 
 /**
  * `pnpm task upgrade` (rethink 6.4, 6.7, 6.11; blitz 3.2, D4): under the runner lease, seeds an
- * empty ledger, plans, refuses below the floor, applies release by release, records each target,
+ * empty ledger, plans, applies release by release from wherever it is, records each target,
  * runs blocking steps, then the reconcilers. specs/upgrade/upgrade-command.feature.
  */
 export class UpgradeRunnerService {
@@ -323,7 +323,6 @@ export class UpgradeRunnerService {
     return createUpgradeReader({
       postgres: this.options.postgres,
       image: { release: this.options.image.release ?? "unreleased", steps: this.shipped },
-      floor: this.options.releases.floor,
     }).status();
   }
 
@@ -401,10 +400,7 @@ export class UpgradeRunnerService {
     await this.seedOrReinfer();
     const before = { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
     const { installed, plan } = this.planFrom({ ...before, fresh });
-    if (plan.outcome === "refused") return this.refuse({ plan });
-
-    const floor = this.options.releases.floor.release;
-    const run = await this.ledger.startRun({ kind: "upgrade", floor });
+    const run = await this.ledger.startRun({ kind: "upgrade" });
     await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
     this.narrate.planned({ runId: run.id, installed, plan });
     const phases = this.phasesOf({ runId: run.id });
@@ -484,28 +480,6 @@ export class UpgradeRunnerService {
     }
   }
 
-  private async refuse({ plan }: { plan: Extract<UpgradePlan, { outcome: "refused" }> }) {
-    const run = await this.ledger.startRun({ kind: "upgrade" });
-    await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
-    const phases = this.phasesOf({ runId: run.id });
-    await phases.start({ name: "preflight" });
-    await phases.finish({ outcome: "failed" });
-    await this.finishRun({
-      runId: run.id,
-      outcome: "failed",
-      report: { refused: plan.code },
-      phases,
-    });
-    const code =
-      plan.code === "below_lts_floor" ? "refused_below_floor" : "refused_image_below_floor";
-    return upgradeOutcome({
-      code,
-      message: plan.message,
-      runId: run.id,
-      detail: { stopAt: plan.stopAt },
-    });
-  }
-
   private async applyPlan({
     plan,
     before,
@@ -513,7 +487,7 @@ export class UpgradeRunnerService {
     signal,
     phases,
   }: {
-    plan: Extract<UpgradePlan, { outcome: "planned" }>;
+    plan: UpgradePlan;
     before: { steps: UpgradeStep[]; runs: UpgradeRun[] };
     runId: string;
     signal: AbortSignal;
@@ -888,11 +862,7 @@ export class UpgradeRunnerService {
   }
 
   /** Per planned release, the unfinished background steps its contract steps wait for. */
-  private async inlineBeforeContracts({
-    plan,
-  }: {
-    plan: Extract<UpgradePlan, { outcome: "planned" }>;
-  }): Promise<string[][]> {
+  private async inlineBeforeContracts({ plan }: { plan: UpgradePlan }): Promise<string[][]> {
     const settled = (await this.ledger.findSteps())
       .filter((step) => step.status === "done" || step.status === "not-needed")
       .map((step) => step.id);

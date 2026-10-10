@@ -61,6 +61,7 @@ import type {
   OpsMigrationTargetedRunResult,
 } from "./features/migrations/ops-system-migration.ts";
 import type {
+  OpsUpgradeAttentionNotice,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
@@ -690,6 +691,8 @@ export interface OpsApi {
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
   // -- Ops, Upgrades: the upgrade ledger through UpgradeReader, read only (round 8, U2-API) ---
   getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+  /** Self-hosted: whether every signed-in user sees the upgrade needs attention. */
+  getUpgradeAttentionNotice(): Promise<OpsUpgradeAttentionNotice>;
   listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
   listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
   /** Refuses with `upgrade_not_found` when the ledger and the image hold no such step. */

@@ -43,7 +43,6 @@ export function previewUpgradeTo({
         `connection (for example \`docker run --rm <image>:${to} pnpm task upgrade plan --to ${to}\`)`,
     };
   }
-  if (plan.outcome === "refused") return plan;
   const keepUnreleased = image.release === null || image.release === to;
   const releases = plan.releases.filter((release) =>
     release.release === null

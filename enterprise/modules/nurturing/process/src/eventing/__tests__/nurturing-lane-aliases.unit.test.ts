@@ -65,7 +65,6 @@ describe("nurturing's aliases of main's Customer.io sync lanes", () => {
           from: "simulation_processing:reactor:customerIoSimulationSync",
           to: { jobType: "subscriber", lane: "simulationRunFinished" },
           eventTypes: [SIMULATION_RUN_EVENT_TYPES.FINISHED],
-          removeAfter: "3.21.0",
         },
       ]);
     });
@@ -76,7 +75,6 @@ describe("nurturing's aliases of main's Customer.io sync lanes", () => {
         {
           from: "trace_processing:reactor:customerIoTraceSync",
           tombstone: expect.stringContaining("projectMetadata"),
-          removeAfter: "3.21.0",
         },
       ]);
     });
@@ -91,7 +89,6 @@ describe("nurturing's aliases of main's Customer.io sync lanes", () => {
           to: { jobType: "subscriber", lane: "evaluationCompleted" },
           eventTypes: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
           data: mainEvaluationSyncAsLifecycleCompleted,
-          removeAfter: "3.21.0",
         },
       ]);
     });

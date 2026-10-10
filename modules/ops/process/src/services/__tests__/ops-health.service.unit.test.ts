@@ -168,8 +168,6 @@ const UPGRADE: OpsUpgradeStatus = {
   installed: "3.21.0",
   origin: "3.20.1",
   image: "3.21.0",
-  floor: "3.20.1",
-  ledgerFloor: "3.20.1",
   lease: null,
   lastRun: null,
   counts: { done: 4, failed: 1 },
@@ -218,7 +216,6 @@ describe("given an install with a backlog, dead letters, a blocked group and a p
         upgrade: {
           state: "needs_attention",
           release: "3.21.0",
-          floor: "3.20.1",
           failed_steps: 1,
           failed_targets: 2,
           held_tenants: 2,
@@ -234,7 +231,6 @@ describe("given an install with a backlog, dead letters, a blocked group and a p
       expect(answer.upgrade).toEqual({
         state: "needs_attention",
         release: "3.21.0",
-        floor: "3.20.1",
         failed_steps: 1,
         failed_targets: 2,
         held_tenants: 2,

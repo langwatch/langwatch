@@ -73,49 +73,6 @@ export function parseRelease(text: string): [number, number, number] | null {
   return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
 }
 
-function releaseAtOrBelow({ release, floor }: { release: string; floor: string }): boolean {
-  const note = parseRelease(release);
-  const bound = parseRelease(floor);
-  if (!note || !bound) return false;
-  for (const [index, part] of note.entries()) {
-    if (part !== bound[index]) return part < bound[index]!;
-  }
-  return true;
-}
-
-/** The finding for a note that names a release the floor has not reached, or none. */
-function noteAboveFloor({
-  sql,
-  offset,
-  what,
-  floor,
-}: {
-  sql: string;
-  offset: number;
-  what: string;
-  floor: string;
-}): Finding[] {
-  const release = [...sql.matchAll(RETIREMENT_MARKER)]
-    .filter((match) => match.index < offset)
-    .at(-1)?.[1];
-  if (release === undefined || releaseAtOrBelow({ release, floor })) return [];
-  const unparsed = parseRelease(release) === null;
-  return [
-    {
-      rule: "retirement-note-above-floor",
-      problem: unparsed
-        ? `${what} under a note naming "${release}", which is not a release`
-        : `${what} under a note naming ${release}, above the LTS floor ${floor}`,
-      fix: unparsed
-        ? "name the release that stopped using it as MAJOR.MINOR.PATCH, for example `-- contract: retired in 3.21.0`."
-        : `an installation on ${floor} still reads it, and the floor is the oldest release the ` +
-          `window promises to serve. Keep it until packages/upgrade/releases/lts-floor.json names ` +
-          `${release} or later; the first release cut after the floor reaches ${release} is the ` +
-          `first one this change may ship in.`,
-    },
-  ];
-}
-
 /** A table or view name with backticks, the database prefix and goose placeholders removed. */
 function bareName(identifier: string): string {
   return identifier.replaceAll("`", "").split(".").at(-1)!.trim().toLowerCase();
@@ -135,20 +92,12 @@ function statementsIn(liveSql: string): string[] {
     .filter((statement) => statement.length > 0);
 }
 
-function dropFindings({
-  up,
-  liveUp,
-  floor,
-}: {
-  up: string;
-  liveUp: string;
-  floor: string;
-}): Finding[] {
+function dropFindings({ up, liveUp }: { up: string; liveUp: string }): Finding[] {
   const pattern = /\bDROP\s+(COLUMN|TABLE|VIEW|DICTIONARY)\s+(?:IF\s+EXISTS\s+)?`?([\w.${}]+)`?/gi;
   return [...liveUp.matchAll(pattern)].flatMap((match): Finding[] => {
     const what = `drops ${match[1]!.toLowerCase()} ${match[2]}`;
     if (retiredBefore(up, match.index)) {
-      return noteAboveFloor({ sql: up, offset: match.index, what, floor });
+      return [];
     }
     return [
       {
@@ -160,15 +109,7 @@ function dropFindings({
   });
 }
 
-function typeChangeFindings({
-  up,
-  liveUp,
-  floor,
-}: {
-  up: string;
-  liveUp: string;
-  floor: string;
-}): Finding[] {
+function typeChangeFindings({ up, liveUp }: { up: string; liveUp: string }): Finding[] {
   const pattern = /\bMODIFY\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?\s+(\S+)/gi;
   return [...liveUp.matchAll(pattern)]
     .filter(
@@ -177,7 +118,7 @@ function typeChangeFindings({
     .flatMap((match): Finding[] => {
       const what = `changes the type of column ${match[1]} to ${match[2]}`;
       if (retiredBefore(up, match.index)) {
-        return noteAboveFloor({ sql: up, offset: match.index, what, floor });
+        return [];
       }
       return [
         {
@@ -431,21 +372,19 @@ function blockingRewriteFindings(liveUp: string): Finding[] {
 }
 
 /**
- * Every rule the ClickHouse scanner applies to one goose migration file. `floor` is the LTS
- * floor release: a retirement note must name a release at or below it. `steps` are the
+ * Every rule the ClickHouse scanner applies to one goose migration file. `steps` are the
  * code-step ids a `-- background step:` note may name.
  */
 export function scanClickHouseMigration({
   name,
   sql,
-  floor,
   steps = new Set(),
-}: MigrationSource & { floor: string; steps?: ReadonlySet<string> }): MigrationFinding[] {
+}: MigrationSource & { steps?: ReadonlySet<string> }): MigrationFinding[] {
   const { up, down } = gooseHalves(sql);
   const liveUp = maskComments(up);
   return [
-    ...dropFindings({ up, liveUp, floor }),
-    ...typeChangeFindings({ up, liveUp, floor }),
+    ...dropFindings({ up, liveUp }),
+    ...typeChangeFindings({ up, liveUp }),
     ...variableSizeFindings(liveUp),
     ...blockFindings(up),
     ...downFindings(down),

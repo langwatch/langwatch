@@ -1,7 +1,6 @@
 export {
   assertCurrent,
   firstInstallVerdict,
-  ledgerFloor,
   servingImageSchema,
   servingRoleSchema,
   UPGRADE_COMMAND,

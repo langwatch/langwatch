@@ -71,7 +71,7 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
     needsOldWritersGone?: ReadonlySet<string>;
   }): PrismaUpgradeLedgerRepository {
     const releases = loadReleases();
-    const { manifests, floor } = releases;
+    const { manifests } = releases;
     const release = imageRelease({ manifests, tree: servingImageTree() }) ?? undefined;
     const shipped = imageSteps({ release: release ?? "0.0.0" });
     const version = imageVersionOf({
@@ -92,7 +92,6 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
           name: imageVersionName(version),
           steps: steps ?? shipped,
         },
-        floor,
         needsOldWritersGone,
         planning: { image: { release: release ?? null, steps: shipped }, releases },
       }),

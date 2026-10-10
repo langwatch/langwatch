@@ -42,7 +42,6 @@ const RUN_SUMMARY = {
   id: "run_1",
   kind: "upgrade",
   release: "3.23.0",
-  floor: "3.20.1",
   startedAt: "2026-10-06T10:00:00.000Z",
   finishedAt: "2026-10-06T10:01:00.000Z",
   outcome: "succeeded",
@@ -167,7 +166,10 @@ describe("the ops.upgrade reads", () => {
   it("declares each of the eight reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
-        ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
+        ([name]) =>
+          !MIGRATION_PROCEDURE_NAMES.includes(name) &&
+          name !== "ops.upgrade.retryStep" &&
+          name !== "ops.upgrade.attentionNotice",
       ),
     );
 
@@ -180,6 +182,19 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getRun": "permission-platform:ops:view",
       "ops.upgrade.listTargets": "permission-platform:ops:view",
       "ops.upgrade.listTenants": "permission-platform:ops:view",
+    });
+  });
+
+  /** @scenario "Any signed-in member may ask whether the last upgrade needs attention" */
+  it("declares the attention notice with no permission beyond being signed in", () => {
+    expect(boundAccess()["ops.upgrade.attentionNotice"]).toBe("no-permission");
+  });
+
+  describe("given a signed-in member without ops:view", () => {
+    it("answers the attention notice instead of refusing", async () => {
+      const { outsider } = mount({ reader: readerOfOneRelease() });
+
+      await expect(outsider.attentionNotice()).resolves.toEqual({ show: false });
     });
   });
 

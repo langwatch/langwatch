@@ -45,7 +45,7 @@ describe("admitAfterFirstInstall", () => {
     it("says the installation is behind, naming the step, before running the upgrade", async () => {
       const said: { message: string; fields?: Record<string, unknown> }[] = [];
       const answers: ServingVerdict[] = [
-        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
         { admitted: true, outcome: "current" },
       ];
       const verdict = await admitAfterFirstInstall({
@@ -73,7 +73,7 @@ describe("admitAfterFirstInstall", () => {
     it("says the installation is current and it takes jobs, after the upgrade's lines", async () => {
       const said: string[] = [];
       const answers: ServingVerdict[] = [
-        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
         { admitted: true, outcome: "current" },
       ];
       await admitAfterFirstInstall({
@@ -109,8 +109,8 @@ describe("admitAfterFirstInstall", () => {
         const said: string[] = [];
         const exits = [3, 0];
         const answers: ServingVerdict[] = [
-          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
-          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
+          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
           { admitted: true, outcome: "current" },
         ];
         const verdict = await admitAfterFirstInstall({
@@ -128,28 +128,7 @@ describe("admitAfterFirstInstall", () => {
     });
   });
 
-  describe("given a worker whose release is below the ledger's floor", () => {
-    /** @scenario "An image below the installation's floor runs nothing and refuses" */
-    it("runs no upgrade and refuses naming the floor", async () => {
-      let runs = 0;
-      const verdict = await admitAfterFirstInstall({
-        gate: {
-          admit: async () =>
-            assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: "3.22.0" }),
-        },
-        firstInstall: async () => {
-          runs += 1;
-          return { exitCode: 0, logTail: [] };
-        },
-        warn: () => undefined,
-      });
-
-      expect(runs).toBe(0);
-      expect(verdict).toMatchObject({ admitted: false, outcome: "below-floor", floor: "3.22.0" });
-    });
-  });
-
-  const behind = () => assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null });
+  const behind = () => assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE });
   const current: ServingVerdict = { admitted: true, outcome: "current" };
 
   describe("given another runner holding the upgrade lease", () => {
@@ -221,55 +200,6 @@ describe("admitAfterFirstInstall", () => {
       expect(verdict).toEqual(current);
       expect(runs).toBe(1);
       expect(waitedForRetry).toBe(3);
-    });
-  });
-
-  describe("given a worker whose upgrade refuses below the LTS floor", () => {
-    /** @scenario "A worker whose upgrade refuses below the floor runs it once and refuses by name" */
-    it("runs it once, never backs off, and refuses naming the code and the release to stop at", async () => {
-      const said: string[] = [];
-      const waits: number[] = [];
-      let runs = 0;
-      const refusal: ServingVerdict = {
-        admitted: false,
-        outcome: "below-floor",
-        release: "3.22.0",
-        floor: "3.20.1",
-        refusal:
-          "`pnpm task upgrade` refused (refused_below_floor): this installation is on 3.15.0; upgrade to 3.20.1 (LTS) first, then to this image",
-      };
-      const verdict = await admitAfterFirstInstall({
-        gate: { admit: async () => behind() },
-        firstInstall: async () => {
-          runs += 1;
-          return { exitCode: 2, logTail: ["upgrade stopped (refused_below_floor)"] };
-        },
-        findRefusal: async () => refusal,
-        warn: (message) => void said.push(message),
-        wait: async (ms) => void waits.push(ms),
-      });
-
-      expect(runs).toBe(1);
-      expect(waits).toEqual([]);
-      expect(verdict).toEqual(refusal);
-      expect(said.filter((line) => line.includes("refused_below_floor"))).toHaveLength(1);
-      expect(said.find((line) => line.includes("refused_below_floor"))).toContain("3.20.1");
-    });
-
-    it("backs off as before when the ledger recorded no refusal for the exit", async () => {
-      const waits: number[] = [];
-      const exits = [2, 0];
-      const answers = [behind(), behind(), current];
-      const verdict = await admitAfterFirstInstall({
-        gate: { admit: async () => answers.shift() ?? current },
-        firstInstall: async () => ({ exitCode: exits.shift() ?? 0, logTail: [] }),
-        findRefusal: async () => null,
-        warn: () => undefined,
-        wait: async (ms) => void waits.push(ms),
-      });
-
-      expect(verdict).toEqual(current);
-      expect(waits).toEqual([10_000]);
     });
   });
 
