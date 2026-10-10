@@ -5,7 +5,7 @@ import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Pagination } from "@langwatch/design-system/pagination";
-import { Button, Stack, Table, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, Stack, Table, Text } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
@@ -108,7 +108,12 @@ function InstancesTable({
   onOpen: (row: ProcessInstanceRow) => void;
 }) {
   return (
-    <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
+    <ListTable
+      density="compact"
+      columnRules={false}
+      whiteSpace="nowrap"
+      containerProps={{ overflowX: "auto" }}
+    >
       <Table.Header>
         <Table.Row>
           {showProcess && <Table.ColumnHeader>Process</Table.ColumnHeader>}
@@ -237,19 +242,25 @@ export function ProcessInstancesDrawer({ processName, onClose, onOpenInstance }:
                   showProcess={allProcesses}
                   onOpen={(row) => onOpenInstance(row)}
                 />
-                <Pagination
-                  page={page}
-                  pageSize={PAGE_SIZE}
-                  totalCount={total}
-                  visibleCount={rows.length}
-                  unitLabel="instances"
-                  isLoading={query.isPending}
-                  onPageChange={setPage}
-                />
               </>
             )}
           </Stack>
         </Drawer.Body>
+        <Drawer.Footer>
+          <Box width="full">
+            {!query.isError && (
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                totalCount={total}
+                visibleCount={rows.length}
+                unitLabel="instances"
+                isLoading={query.isPending}
+                onPageChange={setPage}
+              />
+            )}
+          </Box>
+        </Drawer.Footer>
         <Drawer.CloseTrigger />
       </Drawer.Content>
     </Drawer.Root>
