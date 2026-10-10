@@ -41,7 +41,7 @@ const MESH = {
 export type MeshLevel = keyof typeof MESH;
 
 /** The background, mesh and hairline of a status surface at `level`, in the palette it carries. */
-export const statusMesh = (level: MeshLevel) => {
+export const statusMesh = (level: MeshLevel, darkGround = "bg-card") => {
   const { base, spot, rim } = MESH[level];
   const edge = (amount: number) =>
     `color-mix(in srgb, var(--chakra-colors-color-palette-solid) ${amount}%, var(--chakra-colors-border-muted))`;
@@ -55,7 +55,7 @@ export const statusMesh = (level: MeshLevel) => {
   return {
     bg: {
       _light: statusTint({ color: "color-palette-solid", ground: "bg-card", amount: base[0] }),
-      _dark: statusTint({ color: "color-palette-solid", ground: "bg-card", amount: base[1] }),
+      _dark: statusTint({ color: "color-palette-solid", ground: darkGround, amount: base[1] }),
     },
     backgroundImage: { _light: image(spot[0]), _dark: image(spot[1]) },
     borderColor: { _light: edge(rim[0]), _dark: edge(rim[1]) },
@@ -110,13 +110,13 @@ export const alertSlotRecipe = defineSlotRecipe({
     },
     variant: {
       outline: {
-        root: { ...statusMesh("outline"), color: "fg", shadow: "none" },
+        root: { ...statusMesh("outline", "bg-surface"), color: "fg", shadow: "none" },
       },
       subtle: {
-        root: { ...statusMesh("subtle"), color: "fg" },
+        root: { ...statusMesh("subtle", "bg-surface"), color: "fg" },
       },
       surface: {
-        root: { ...statusMesh("surface"), color: "fg", shadow: "xs" },
+        root: { ...statusMesh("surface", "bg-surface"), color: "fg", shadow: "xs" },
       },
       // Chakra's own fill fails AA for white on orange and red; this one
       // passes in both modes.

@@ -83,6 +83,8 @@ export function InlineCode({
     maxWidth: "full",
     whiteSpace: "nowrap",
     fontFamily: "mono",
+    fontVariantNumeric: "normal",
+    letterSpacing: "normal",
     css: selectOnClick ? SELECT_ALL : undefined,
     ...(variant === "neutral" ? NEUTRAL : ACCENT),
   } as const;

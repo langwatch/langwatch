@@ -833,7 +833,7 @@ function SelectionSummary({
 }) {
   return (
     <Box>
-      <Text fontSize="xs" color="gray.600">
+      <Text fontSize="xs" color="fg.muted">
         {summariseSelection({ scopes, subjectNoun })}
       </Text>
     </Box>
@@ -1070,10 +1070,13 @@ function QuickPickRow({
   return (
     <Wrap
       as="fieldset"
-      gap={2}
-      border={0}
+      gap={1}
+      borderWidth="1px"
+      borderColor="border.control"
+      borderRadius="lg"
+      background="bg.control"
       margin={0}
-      padding={0}
+      padding={1}
       minWidth={0}
       aria-label="Quick scope"
     >
@@ -1084,7 +1087,10 @@ function QuickPickRow({
             key={`${pick.scope.scopeType}:${pick.scope.scopeId}`}
             type="button"
             size="xs"
-            variant={active ? "solid" : "outline"}
+            variant="ghost"
+            bg={active ? "bg.panel" : "transparent"}
+            color={active ? "fg" : "fg.muted"}
+            boxShadow={active ? "xs" : "none"}
             aria-pressed={active}
             onClick={() => onPick(pick.scope)}
             data-testid={`quick-scope-${pick.scope.scopeType.toLowerCase()}`}
@@ -1100,7 +1106,10 @@ function QuickPickRow({
         <Button
           type="button"
           size="xs"
-          variant={multipleMode ? "solid" : "outline"}
+          variant="ghost"
+          bg={multipleMode ? "bg.panel" : "transparent"}
+          color={multipleMode ? "fg" : "fg.muted"}
+          boxShadow={multipleMode ? "xs" : "none"}
           aria-pressed={multipleMode}
           onClick={onMultiple}
           data-testid="quick-scope-multiple"

@@ -836,6 +836,26 @@ export const designSystemConfig = defineConfig({
     },
     slotRecipes: {
       segmentGroup: segmentGroupSlotRecipe,
+      radioCard: defineSlotRecipe({
+        slots: ["item", "itemDescription"],
+        base: {
+          item: { borderColor: "border.control" },
+          itemDescription: { color: "fg.muted", opacity: 1 },
+        },
+        variants: {
+          variant: {
+            outline: {
+              item: {
+                _checked: {
+                  bg: "bg.selected",
+                  borderColor: "colorPalette.fg",
+                  boxShadowColor: "colorPalette.fg",
+                },
+              },
+            },
+          },
+        },
+      }),
       tooltip: defineSlotRecipe({
         slots: ["content", "arrow", "arrowTip"],
         base: {
@@ -1060,6 +1080,7 @@ export const designSystemConfig = defineConfig({
             overflow: "clip",
             borderCollapse: "separate",
             borderSpacing: 0,
+            fontVariantNumeric: "normal",
           },
           row: {
             bg: "transparent",

@@ -198,7 +198,7 @@ export function CodePreview({
   return (
     <Box
       border="1px solid"
-      bg="bg.nested"
+      bg={{ base: "bg.nested", _dark: "bg.surface" }}
       {...chrome.root}
       overflow="hidden"
       width="full"
@@ -455,7 +455,7 @@ export function SnippetPreview({
             borderRadius="xl"
             border="1px solid"
             borderColor="border.nested"
-            bg="bg.nested"
+            bg={{ base: "bg.nested", _dark: "bg.surface" }}
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             {...layout.root}
             overflow="hidden"
