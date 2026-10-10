@@ -37,9 +37,12 @@ The React Compiler (Oxc's Rust port, `react({ compiler })` in
 `apps/ui/vite.config.ts`) memoises components and hooks for you. Don't write
 `useMemo`, `useCallback` or `React.memo`; remove them in files you touch. If the
 dev log says the compiler skipped a component (a ref read during render, a
-suppressed hooks rule), fix that cause. Before writing any component, check
-`packages/design-system/src/components/` (the `design-system` skill) and reuse
-it; a component another module would want is built there.
+suppressed hooks rule), fix that cause.
+
+The design system is the source of truth for components. Every banner or
+alert, dialog, drawer, empty state, menu, picker and table comes from
+`@langwatch/design-system` (the `design-system` skill lists which); never
+hand-roll one in a module. A missing need is added to the design system first.
 
 ## A module's browser half (record §3.4)
 
