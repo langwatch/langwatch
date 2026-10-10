@@ -5,6 +5,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -15,7 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { LucideIcon } from "lucide-react";
-import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
+import { ExternalLink, FileClock, KeyRound, Users } from "lucide-react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
@@ -131,44 +132,35 @@ function SsoConfiguredButNotInUseNotice() {
   const unlicensed = !gate.licensed;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="orange.emphasized"
-      backgroundColor="orange.subtle"
-      borderRadius="lg"
-      padding={4}
+    <Alert.Root
+      status="warning"
       width="full"
       data-testid={unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"}
-      _dark={{ backgroundColor: "orange.subtle", borderColor: "orange.emphasized" }}
     >
-      <HStack align="start" gap={3}>
-        <Box color="orange.fg" paddingTop={0.5}>
-          <TriangleAlert size={18} />
-        </Box>
-        <VStack align="start" gap={1}>
-          <Text fontWeight="medium">
-            {unlicensed
-              ? "Single sign-on is configured but not licensed on this deployment"
-              : "Single sign-on is configured but could not be started"}
-          </Text>
-          <Text color="fg.muted" fontSize="sm">
-            This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
-            {unlicensed ? (
-              <>
-                so everyone is signing in by email until a license is activated. Activate one and
-                single sign-on turns on within a minute, no restart needed.
-              </>
-            ) : (
-              <>
-                but it could not be started, so everyone is signing in by email. Check that the
-                provider name is one LangWatch supports and that its client credentials are set,
-                then restart the server.
-              </>
-            )}
-          </Text>
-        </VStack>
-      </HStack>
-    </Box>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {unlicensed
+            ? "Single sign-on is configured but not licensed on this deployment"
+            : "Single sign-on is configured but could not be started"}
+        </Alert.Title>
+        <Alert.Description>
+          This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
+          {unlicensed ? (
+            <>
+              so everyone is signing in by email until a license is activated. Activate one and
+              single sign-on turns on within a minute, no restart needed.
+            </>
+          ) : (
+            <>
+              but it could not be started, so everyone is signing in by email. Check that the
+              provider name is one LangWatch supports and that its client credentials are set, then
+              restart the server.
+            </>
+          )}
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Code,
@@ -165,44 +166,30 @@ export function ModelProviderTile({
       </HStack>
 
       {expanded && !providerConfigured && (
-        <Box
-          marginTop={4}
-          padding={3}
-          borderWidth="1px"
-          borderColor="orange.emphasized"
-          borderRadius="sm"
-          backgroundColor="orange.subtle"
-        >
-          <Text fontSize="sm" color="orange.fg" marginBottom={2}>
-            Your organization doesn&apos;t have {articleFor(displayName)} {displayName} credential
-            configured yet, so issuing a key here would mint a VK that fails on first call with{" "}
-            <Code fontSize="xs" backgroundColor="transparent">
-              provider_error
-            </Code>
-            .
-          </Text>
-          <Text fontSize="xs" color="orange.fg">
-            Ask your organization admin to add {articleFor(displayName)} {displayName} provider in{" "}
-            <Link
-              href="/settings/model-providers"
-              color="orange.fg"
-              fontWeight="medium"
-              textDecoration="underline"
-            >
-              Settings → Model Providers
-            </Link>
-            . They&apos;ll also need to bind it into the{" "}
-            <Link
-              href="/gateway/routing-policies"
-              color="orange.fg"
-              fontWeight="medium"
-              textDecoration="underline"
-            >
-              default routing policy
-            </Link>{" "}
-            so personal keys can route to it.
-          </Text>
-        </Box>
+        <Alert.Root status="warning" size="sm" marginTop={4}>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              Your organization doesn&apos;t have {articleFor(displayName)} {displayName} credential
+              configured yet, so issuing a key here would mint a VK that fails on first call with{" "}
+              <Code fontSize="xs" backgroundColor="transparent">
+                provider_error
+              </Code>
+              .
+            </Alert.Title>
+            <Alert.Description>
+              Ask your organization admin to add {articleFor(displayName)} {displayName} provider in{" "}
+              <Link href="/settings/model-providers" fontWeight="medium">
+                Settings → Model Providers
+              </Link>
+              . They&apos;ll also need to bind it into the{" "}
+              <Link href="/gateway/routing-policies" fontWeight="medium">
+                default routing policy
+              </Link>{" "}
+              so personal keys can route to it.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
 
       {expanded && providerConfigured && !issued && (
@@ -253,17 +240,12 @@ export function ModelProviderTile({
             </Text>
           )}
           {errorMessage && (
-            <Box
-              padding={2}
-              borderWidth="1px"
-              borderColor="red.emphasized"
-              borderRadius="sm"
-              backgroundColor="red.subtle"
-            >
-              <Text fontSize="xs" color="red.fg">
-                {errorMessage}
-              </Text>
-            </Box>
+            <Alert.Root status="error" size="sm">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>{errorMessage}</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           )}
         </VStack>
       )}
