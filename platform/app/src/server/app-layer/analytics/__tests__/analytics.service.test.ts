@@ -174,6 +174,39 @@ describe("AnalyticsService", () => {
         expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
       });
 
+      /** @scenario The evaluations summary reads the slim evaluation table */
+      it("dispatches the evaluations summary, which sends an empty evaluator key, to the slim evaluation table", async () => {
+        const { deps, spies } = makeDeps();
+        await new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "evaluations.evaluation_runs" as const,
+              aggregation: "cardinality" as const,
+              key: "",
+            },
+          ],
+          groupBy: "evaluations.evaluation_passed",
+          timeScale: "full",
+        } as never);
+
+        expect(spies.runEvalSlimTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).not.toHaveBeenCalled();
+        const [{ series }] = spies.runEvalSlimTimeseries.mock.calls[0]!;
+        expect(series[0].key).toBeUndefined();
+      });
+
+      it("dispatches the error trend, grouped by error state, to the slim table", async () => {
+        const { deps, spies } = makeDeps();
+        await new AnalyticsService(deps).getTimeseries({
+          ...input,
+          groupBy: "error.has_error",
+        });
+
+        expect(spies.runSlimTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).not.toHaveBeenCalled();
+      });
+
       it("still uses the legacy shim for a shape neither table can serve", async () => {
         const { deps, spies } = makeDeps();
         await new AnalyticsService(deps).getTimeseries({

@@ -45,6 +45,11 @@ import {
 export interface ErrorPresentation {
   title: string;
   /**
+   * A headline for one variant of the code, when a single code covers
+   * failures with different fixes. Returning nothing keeps `title`.
+   */
+  titleFor?: (error: HandledErrorShape) => string | undefined;
+  /**
    * Optional body copy. Receives the error so it can use `meta` — but only
    * where this registry knows the shape of that meta, which is the whole
    * point: `meta` is a contract per code, not a bag to rummage through.
@@ -173,6 +178,13 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
   membersLite: "Lite Member seats",
 };
 
+/** Creation caps the cloud Free plan sets, named as the pricing page does. */
+const CREATION_LIMIT_LABELS: Record<string, string> = {
+  scenarios: "scenarios",
+  scenarioSets: "simulations",
+  evaluators: "custom evaluators",
+};
+
 /**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
@@ -234,6 +246,20 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * What a provider slot is missing when the gateway answers
+ * `provider_config_invalid`, as `meta.problem` (ConfigProblem in
+ * services/aigateway/domain/errors.go). A closed set: the sentence is picked
+ * by matching it, and a value outside it reads as the remainder.
+ */
+export const PROVIDER_CONFIG_PROBLEMS: ReadonlySet<string> = new Set([
+  "api_key_missing",
+  "endpoint_missing",
+  "deployment_missing",
+  "operation_unsupported",
+  "model_not_served",
+]);
+
+/**
  * The upstream-HTTP-status fallback reasons (llmproxy.go's
  * upstreamReasonCodes), used when the provider's own body carried no
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
@@ -253,6 +279,15 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "permission_error",
   "invalid_api_key",
   "AccessDeniedException",
+  // A wrong AWS secret, an unknown or expired AWS access key.
+  "InvalidSignatureException",
+  "UnrecognizedClientException",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "SignatureDoesNotMatch",
+  // Google's statuses for the same two refusals.
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
 ]);
 
 /**
@@ -547,8 +582,10 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: () =>
-      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+    describe: (error) =>
+      error.meta.deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",
@@ -1426,6 +1463,39 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_project_admin_only: {
+    // Reached from the new-project flow or the rule editor by someone whose
+    // role lets them manage projects but who is not an organisation admin.
+    // Nothing was written, so the copy says who can do it.
+    title: "Only organization admins can do this",
+    describe: () =>
+      "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
+  },
+  aggregate_project_has_no_credential: {
+    // Reached by an SDK or exporter pointed at the aggregate, so the answer is
+    // where the traces should go instead. The key is not the problem.
+    title: "This project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and accepts no API key of its own. Send traces to one of its member projects instead.",
+  },
+  aggregate_project_is_read_only: {
+    // Reached from any save, create or edit aimed at an aggregate, often a
+    // form opened before the project was switched, so the copy says where
+    // the change belongs rather than what went wrong. Renaming, archiving
+    // and editing its rule still work, so the title names data, not the
+    // project.
+    title: "Data can't be added to this project",
+    describe: () =>
+      "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
+  },
+  aggregate_rule_outside_organization: {
+    // Raised before anything is written, so the form is still open with the
+    // rule in it: the copy says what to change there. One answer for a
+    // foreign id and a missing one, on purpose.
+    title: "That rule names something outside this organization",
+    describe: () =>
+      "An aggregate project can only read projects and departments of this organization. Remove the project or department that isn't listed here, then create it again.",
+  },
   project_not_found: {
     title: "Project not found",
     describe: () =>
@@ -2228,7 +2298,14 @@ const presentations = {
     // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
     // and it says the same thing.
     describe: (error) => {
-      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      const limitType = str(error, "limitType", "");
+      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      if (creationLabel) {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
+        return `Your plan includes ${included}. Upgrade to create more. Everything you already have keeps working.`;
+      }
+      const label = SEAT_LIMIT_LABELS[limitType];
       if (!label) return "Upgrade your plan to raise it.";
       return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
     },
@@ -4340,8 +4417,37 @@ const presentations = {
   },
   provider_config_invalid: {
     title: "This provider is not set up to serve that model",
+    // The body names the gap, so the headline has to name the same one.
+    titleFor: (error) => {
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This provider has no API key saved";
+        case "endpoint_missing":
+          return "This provider has no endpoint URL saved";
+        case "deployment_missing":
+          return "This provider has no deployment for that model";
+        case "operation_unsupported":
+          return "This provider does not support this kind of request";
+      }
+      return undefined;
+    },
     describe: (error) => {
       const model = str(error, "model", "");
+      // One code, several different things to change. Telling a customer whose
+      // provider was saved with no API key to "add the model" sends them to the
+      // wrong field, so the gateway names the gap and each gets its sentence.
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.";
+        case "endpoint_missing":
+          return "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.";
+        case "deployment_missing":
+          return model
+            ? `This model provider has no deployment mapped for ${model}. Add the deployment mapping in Settings → Model Providers.`
+            : "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.";
+        case "operation_unsupported":
+          return "This model provider does not support this kind of request. Pick a model from a provider that does.";
+      }
       if (model) {
         return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
@@ -4540,6 +4646,13 @@ const presentations = {
         : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
   },
+  gateway_trace_project_not_a_destination: {
+    // The form is still open with the aggregate picked, so the copy says
+    // what to pick instead.
+    title: "That project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and has none of its own. Pick one of the projects it reads as this key's destination.",
+  },
   gateway_trace_project_unknown: {
     // Says the destination is the problem, not the key, because the form
     // shows a picker and the natural reading of a refusal there is that the
@@ -4727,6 +4840,11 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
+    // A refused key has one fix, so the headline names it like the body does.
+    titleFor: (error) =>
+      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+        ? "This provider rejected the API key"
+        : undefined,
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
@@ -5178,7 +5296,7 @@ export function explainHandledError(
   }
 
   return {
-    title: presentation.title,
+    title: presentation.titleFor?.(error) ?? presentation.title,
     description: presentation.describe?.(error) ?? "",
     isRegistered: true,
   };

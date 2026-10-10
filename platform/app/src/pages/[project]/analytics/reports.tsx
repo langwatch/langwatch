@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
 import {
   DashboardRefreshedAtContext,
@@ -29,8 +30,13 @@ import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
-function ReportsContent() {
-  const { project, organization } = useOrganizationTeamProject();
+/** Exported for the test that renders the body past the aggregate gate. */
+export function ReportsContent() {
+  const { project, organization, hasPermission } = useOrganizationTeamProject();
+  // The writes this page offers, each refused where the server refuses it:
+  // on an aggregate project (ADR-144) and for a member without the grant.
+  const canAddChart = hasPermission("analytics:create");
+  const canRenameDashboard = hasPermission("analytics:update");
   const { showFilters } = useFilterToggle();
   const router = useRouter();
   const projectId = project?.id ?? "";
@@ -194,7 +200,7 @@ function ReportsContent() {
     <GraphsLayout
       title={dashboardTitle}
       analyticsHeaderProps={{
-        isEditable: true,
+        isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
       extraHeaderButtons={
@@ -203,7 +209,7 @@ function ReportsContent() {
             option={autoRefresh.option}
             onChange={autoRefresh.setOption}
           />
-          {project ? (
+          {project && canAddChart ? (
             customChartPlaygroundEnabled ? (
               <Button
                 colorPalette="orange"
@@ -229,7 +235,7 @@ function ReportsContent() {
           there would hit a Save button that always fails. This drawer is
           the one "create a new chart" path that still works, and it lands
           the new widget on this dashboard directly. */}
-      {project && customChartPlaygroundEnabled && (
+      {project && canAddChart && customChartPlaygroundEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
@@ -239,7 +245,8 @@ function ReportsContent() {
         />
       )}
 
-      {/* Empty state */}
+      {/* Empty state: shown to every member, inviting only those who can
+          add a chart to click the button they can see. */}
       {hasNoGraphs && (
         <Alert.Root
           status="info"
@@ -249,11 +256,16 @@ function ReportsContent() {
         >
           <Alert.Indicator alignSelf="start" />
           <VStack align="start">
-            <Alert.Title>Add your custom graphs here</Alert.Title>
+            <Alert.Title>
+              {canAddChart
+                ? "Add your custom graphs here"
+                : "No custom graphs yet"}
+            </Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart
-                to get started.
+                {canAddChart
+                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+                  : "Nobody has added a custom graph to this dashboard yet."}
               </Text>
             </Alert.Description>
           </VStack>
@@ -290,4 +302,6 @@ function ReportsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view")(ReportsContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("Reports", ReportsContent),
+);

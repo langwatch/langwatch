@@ -16,6 +16,7 @@ import {
   extractReferencedEvaluationColumns,
   extractReferencedSpanColumns,
   extractReferencedTraceColumns,
+  narrowMapColumnProjection,
   narrowSpanAttributesColumns,
   spanAttributesNarrowProjection,
   TRACE_ANALYTICS_COLUMNS,
@@ -23,6 +24,10 @@ import {
   tableAliases,
 } from "./field-mappings";
 import { translateAllFilters } from "./filter-translator";
+import {
+  latestVersionSubquery,
+  parseLatestVersionColumn,
+} from "./latest-version-dedup";
 import {
   buildMetricAlias,
   type MetricTranslation,
@@ -128,34 +133,49 @@ const EVAL_TIME_FILTER_START_END =
  * Returns a deduped FROM-clause expression for trace_summaries.
  *
  * trace_summaries uses ReplacingMergeTree(UpdatedAt) which can return
- * multiple versions of the same trace between merges. This wraps the table
- * in a subquery that uses the IN-tuple dedup pattern: a lightweight inner
- * GROUP BY resolves the latest version per TraceId using only key columns,
- * then the outer query reads the full column set only for matched rows.
+ * multiple versions of the same trace between merges, so every read keeps
+ * only the latest version of each trace. Two forms:
  *
- * The TenantId filter is pushed into both the outer and inner subqueries
- * so ClickHouse can prune data early. When a dateFilter is provided, it is
- * also pushed into both subqueries to enable partition pruning on
- * toYearWeek(OccurredAt).
+ *   - Narrow column list (every caller that passes `columns` without the whole
+ *     `Attributes` map): the spillable `argMax` collapse of
+ *     {@link latestVersionSubquery}. Analytics reads aggregate over every
+ *     trace in range, and the IN-tuple form's hash set (one entry per trace,
+ *     never spilled) is what drove those reads into MEMORY_LIMIT_EXCEEDED on
+ *     high-volume tenants.
+ *   - Wide rows (no column list, or the whole map): the IN-tuple form, whose
+ *     outer read streams the wide columns instead of buffering one row per
+ *     trace.
+ *
+ * The TenantId filter and the dateFilter apply to every version row before
+ * the collapse, which enables partition pruning on toYearWeek(OccurredAt).
  *
  * @param alias - Table alias (e.g., "ts")
  * @param columns - Optional explicit column list. When omitted, selects all
- *   analytics columns (still excludes ComputedInput/ComputedOutput).
+ *   analytics columns (still excludes ComputedInput/ComputedOutput). Entries
+ *   may be aliased projections (`map(...) AS Attributes`).
  * @param dateFilter - Optional SQL fragment for date range filtering
- *   (e.g., DATE_FILTER_CURRENT). Pushed into both outer and inner subqueries
- *   for partition pruning.
+ *   (e.g., DATE_FILTER_CURRENT).
  *
- * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
+ * @see dev/docs/best_practices/clickhouse-queries.md "Whole-range aggregates"
  */
 function dedupedTraceSummaries(
   alias: string,
   columns?: readonly string[],
   dateFilter?: string,
 ): string {
+  const dateClause = dateFilter ?? "";
+  if (columns && !columns.includes("Attributes")) {
+    return latestVersionSubquery({
+      table: "trace_summaries",
+      alias,
+      keyColumns: ["TenantId", "TraceId"],
+      columns: columns.map(parseLatestVersionColumn),
+      where: `TenantId = {tenantId:String} ${dateClause}`,
+    });
+  }
   const columnList = columns
     ? Array.from(columns).join(", ")
     : TRACE_ANALYTICS_COLUMNS.join(", ");
-  const dateClause = dateFilter ?? "";
   return `(
     SELECT ${columnList} FROM trace_summaries
     WHERE TenantId = {tenantId:String}
@@ -210,13 +230,21 @@ function referencedTraceColumns(
     }
     return exprs;
   });
-  return [
+  const expressions = [...metricExpressions, ...extraExpressions];
+  const columns = [
     ...TRACE_IDENTITY_COLUMNS,
-    ...extractReferencedTraceColumns([
-      ...metricExpressions,
-      ...extraExpressions,
-    ]),
+    ...extractReferencedTraceColumns(expressions),
   ];
+  // A map read by literal keys only is carried as a map of those keys, which
+  // keeps the deduped row narrow (see dedupedTraceSummaries).
+  const narrowedAttributes = columns.includes("Attributes")
+    ? narrowMapColumnProjection({ column: "Attributes", expressions })
+    : null;
+  return narrowedAttributes
+    ? columns.map((column) =>
+        column === "Attributes" ? narrowedAttributes : column,
+      )
+    : columns;
 }
 
 /**
@@ -773,46 +801,75 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
   const smd = SPAN_MODEL_ALIAS;
   const contribution = (expr: string) =>
     `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
-  // TraceSpanCount = spans of the trace visible to THIS scan, computed as a
-  // window over the per-bucket groups BEFORE the zero-suppression filter (a
-  // suppressed model-less bucket still holds real spans, e.g. the root).
+  // TraceSpanCount = spans of the trace visible to THIS scan, summed over the
+  // per-bucket groups BEFORE the zero-suppression filter (a suppressed
+  // model-less bucket still holds real spans, e.g. the root).
   // spanModelPartitionMissExpr compares it against ts.SpanCount to detect an
   // incomplete scan (spans outside the StartTime envelope) and fall back to
   // whole-trace attribution instead of shipping a partial partition.
+  //
+  // The per-trace total comes from a second GROUP BY that collects the
+  // trace's buckets and ARRAY JOINs them back out, not from a window over the
+  // buckets: a window buffers every bucket row of the scan in memory, while
+  // both aggregations here spill to disk past
+  // max_bytes_before_external_group_by.
+  const bucketColumns = [
+    "SpanModelCost",
+    "SpanModelNonBilledCost",
+    "SpanModelPromptTokens",
+    "SpanModelCompletionTokens",
+    "SpanModelCacheReadTokens",
+    "SpanModelCacheWriteTokens",
+    "SpanModelReasoningTokens",
+  ];
   return `LEFT JOIN (
-        SELECT *
+        SELECT
+          TenantId,
+          TraceId,
+          TraceSpanCount,
+          bucket.1 AS SpanModelKey,
+          ${bucketColumns.map((column, index) => `bucket.${index + 2} AS ${column}`).join(",\n          ")}
         FROM (
           SELECT
             TenantId,
             TraceId,
-            SpanModelKey,
-            sum(SpanCost) AS SpanModelCost,
-            sum(SpanNonBilledCost) AS SpanModelNonBilledCost,
-            sum(SpanPromptTokens) AS SpanModelPromptTokens,
-            sum(SpanCompletionTokens) AS SpanModelCompletionTokens,
-            sum(SpanCacheReadTokens) AS SpanModelCacheReadTokens,
-            sum(SpanCacheWriteTokens) AS SpanModelCacheWriteTokens,
-            sum(SpanReasoningTokens) AS SpanModelReasoningTokens,
-            sum(count()) OVER (PARTITION BY TenantId, TraceId) AS TraceSpanCount
+            sum(BucketSpanCount) AS TraceSpanCount,
+            groupArray(tuple(SpanModelKey, ${bucketColumns.join(", ")})) AS buckets
           FROM (
             SELECT
               TenantId,
               TraceId,
-              SpanId,
-              ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
-              ${contribution("coalesce(Cost, 0)")} AS SpanCost,
-              ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
-              ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
-              ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
-              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
-              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
-              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
-            FROM stored_spans
-            WHERE TenantId = {tenantId:String} ${spanTimeFilter}
-            GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+              SpanModelKey,
+              count() AS BucketSpanCount,
+              sum(SpanCost) AS SpanModelCost,
+              sum(SpanNonBilledCost) AS SpanModelNonBilledCost,
+              sum(SpanPromptTokens) AS SpanModelPromptTokens,
+              sum(SpanCompletionTokens) AS SpanModelCompletionTokens,
+              sum(SpanCacheReadTokens) AS SpanModelCacheReadTokens,
+              sum(SpanCacheWriteTokens) AS SpanModelCacheWriteTokens,
+              sum(SpanReasoningTokens) AS SpanModelReasoningTokens
+            FROM (
+              SELECT
+                TenantId,
+                TraceId,
+                SpanId,
+                ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
+                ${contribution("coalesce(Cost, 0)")} AS SpanCost,
+                ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
+                ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
+                ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
+                ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
+                ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
+                ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
+              FROM stored_spans
+              WHERE TenantId = {tenantId:String} ${spanTimeFilter}
+              GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+            )
+            GROUP BY TenantId, TraceId, SpanModelKey
           )
-          GROUP BY TenantId, TraceId, SpanModelKey
+          GROUP BY TenantId, TraceId
         )
+        ARRAY JOIN buckets AS bucket
         WHERE SpanModelKey != 'unknown'
           OR SpanModelCost > 0
           OR SpanModelNonBilledCost > 0
@@ -1032,7 +1089,27 @@ export interface TimeseriesQueryInput {
 export interface BuiltQuery {
   sql: string;
   params: Record<string, unknown>;
+  /**
+   * ClickHouse settings this query shape needs on top of the analytics
+   * defaults. Callers merge them into `clickhouse_settings` after the defaults.
+   */
+  settings?: Record<string, string | number>;
 }
+
+/**
+ * Settings for a model-grouped query, which joins the deduped traces to the
+ * span-model partition: one row per trace and model on the hash side, so a
+ * plain hash join holds memory in proportion to the traces in range and
+ * cannot spill. A grace hash join splits that side into buckets on disk past
+ * `max_bytes_in_join`. Fewer threads bound the merge of the spilled span
+ * aggregation, which takes memory per thread; the panel runs slower (about
+ * 5s to 9s at 3M traces in range) instead of failing.
+ */
+export const SPAN_MODEL_PARTITION_SETTINGS = {
+  join_algorithm: "grace_hash",
+  max_bytes_in_join: 200_000_000,
+  max_threads: 4,
+} as const;
 
 /**
  * Build the HAVING clause for group_key filtering.
@@ -2237,13 +2314,25 @@ function buildArrayJoinTimeseriesQuery({
       ? "HAVING group_key != ''"
       : "";
 
+  // Drop the per-trace passthroughs (trace_total_cost, trace_duration_ms, ...)
+  // that no outer expression reads. They are constant per trace and group key,
+  // so the CTE's DISTINCT / GROUP BY collapses the same rows without them, and
+  // carrying them widens the dedup state and the span partition join for a
+  // panel that only counts traces.
+  const cteSelectList = cteSelectExprs.filter((expr) => {
+    const alias = /\sAS\s+(trace_[a-z_]+)$/.exec(expr)?.[1];
+    if (!alias || alias === "trace_id") return true;
+    return outerSelectExprs.some((outer) =>
+      new RegExp(`\\b${alias}\\b`).test(outer),
+    );
+  });
+
   // Columns the dedup subquery must expose: everything the CTE's SELECT list
-  // (which hardcodes per-trace passthroughs like ts.NonBilledCost regardless of
-  // the requested metrics) and the filter reference. Derived from the assembled
-  // expressions rather than the metric list so no referenced column is pruned.
+  // and the filter reference. Derived from the assembled expressions rather
+  // than the metric list so no referenced column is pruned.
   const traceColumns = referencedTraceColumns(
     [],
-    [...cteSelectExprs, filterWhere, joinClauses],
+    [...cteSelectList, filterWhere, joinClauses],
   );
 
   // The span-model partition join fans each trace out into one row per model
@@ -2263,7 +2352,7 @@ function buildArrayJoinTimeseriesQuery({
     if (dateTrunc) cteGroupByCols.push("date");
     cteBody = `
       SELECT
-        ${cteSelectExprs.join(",\n        ")}
+        ${cteSelectList.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
       ${cteJoinClauses}
       WHERE ${baseWhere}
@@ -2273,7 +2362,7 @@ function buildArrayJoinTimeseriesQuery({
   } else {
     cteBody = `
       SELECT DISTINCT
-        ${cteSelectExprs.join(",\n        ")}
+        ${cteSelectList.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
       ${cteJoinClauses}
       WHERE ${baseWhere}
@@ -2322,6 +2411,9 @@ function buildArrayJoinTimeseriesQuery({
       ...groupKeyFilterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
+    ...(spanModelPartitioned
+      ? { settings: SPAN_MODEL_PARTITION_SETTINGS }
+      : {}),
   };
 }
 
@@ -3632,6 +3724,9 @@ export function buildDataForFilterQuery(
   };
 }
 
+/** The span attribute RAG spans record their retrieved documents in. */
+const RAG_CONTEXTS_ATTRIBUTE = "langwatch.rag.contexts";
+
 /**
  * Build a query for top used documents (RAG analytics)
  */
@@ -3676,16 +3771,22 @@ export function buildTopDocumentsQuery(
     ]),
   );
 
-  // Prune the stored_spans JOIN to the identity columns plus SpanAttributes
-  // (all the ARRAY JOIN and rag.contexts filter need), and push the StartTime
-  // window into the subquery, instead of joining the full analytics column set
-  // and materialising the heavy Attributes map (#2551 / #2605 pattern).
+  // The JOIN's right side is hashed into memory, so it carries only what the
+  // ARRAY JOIN reads: the rag.contexts value, as a one-key map so the outer
+  // `ss.SpanAttributes[...]` access is unchanged, and only for the spans that
+  // have one. Selecting the whole SpanAttributes map buffered every span's
+  // attributes in range (inputs, outputs, prompts) on the join side.
   const spanJoin = buildJoinClause({
     table: "stored_spans",
-    requiredColumns: new Set(["SpanAttributes"]),
-    spanTimeFilter: SPAN_TIME_FILTER_START_END,
+    requiredColumns: new Set([
+      spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE]),
+    ]),
+    spanTimeFilter: `${SPAN_TIME_FILTER_START_END} AND SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'] != ''`,
   });
 
+  // One statement: the top documents and the distinct-document total come
+  // from the same grouping (`count() OVER ()` counts the groups before the
+  // LIMIT), so the scan and the join run once instead of once per figure.
   const sql = `
     WITH document_refs AS (
       SELECT
@@ -3694,18 +3795,18 @@ export function buildTopDocumentsQuery(
         toString(context.content) AS content
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
       ${spanJoin}
-      ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
+      ARRAY JOIN JSONExtract(${ss}.SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'], 'Array(JSON)') AS context
       WHERE ${ts}.TenantId = {tenantId:String}
         AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
         AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-        AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
         ${filterWhere}
     )
     SELECT
       document_id AS documentId,
       count() AS count,
       any(TraceId) AS traceId,
-      any(content) AS content
+      any(content) AS content,
+      count() OVER () AS total
     FROM document_refs
     WHERE document_id != ''
     GROUP BY document_id
@@ -3713,20 +3814,8 @@ export function buildTopDocumentsQuery(
     LIMIT 10
   `;
 
-  const totalSql = `
-    SELECT uniq(toString(context.document_id)) AS total
-    FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
-    ${spanJoin}
-    ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
-    WHERE ${ts}.TenantId = {tenantId:String}
-      AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
-      AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-      AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
-      ${filterWhere}
-  `;
-
   return {
-    sql: `${sql}; ${totalSql}`,
+    sql,
     params: {
       tenantId: projectId,
       startDate,

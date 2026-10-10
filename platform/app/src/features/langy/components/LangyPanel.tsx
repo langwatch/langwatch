@@ -205,7 +205,7 @@ import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
-import { LangyError } from "./LangyError";
+import { LangyError, MODEL_PROVIDERS_SETTINGS_HREF } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyLocalPermissionCard } from "./LangyLocalPermissionCard";
 import { LangyLocalWorkspaceChip } from "./LangyLocalWorkspaceChip";
@@ -2118,9 +2118,18 @@ function LangyPanel({
   // `!isBusy` so a question that lands mid-stream waits for the current turn to
   // settle instead of being dropped by send()'s busy guard; the effect re-runs
   // when isBusy flips false and sends then. Consuming the prompt first makes it
-  // fire exactly once.
+  // fire exactly once. A project with no model waits on the setup card with the
+  // question still queued, and sends once a model resolves: sending earlier is
+  // refused by the server and loses the question.
   useEffect(() => {
-    if (!pendingPrompt || !projectId || isBusy) return;
+    if (
+      !pendingPrompt ||
+      !projectId ||
+      isBusy ||
+      !modelQueriesSettled ||
+      langyNeedsModel
+    )
+      return;
     const prompt = pendingPrompt;
     consumePendingPrompt();
     resetChatEngine({ clearMessages: true });
@@ -2129,7 +2138,7 @@ function LangyPanel({
     // guard makes the body a no-op once consumed, so they are deliberately not
     // deps (matching this file's other one-shot effects).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingPrompt, projectId, isBusy]);
+  }, [pendingPrompt, projectId, isBusy, modelQueriesSettled, langyNeedsModel]);
 
   // The guided onboarding kickoff, drained like `pendingPrompt`: consumed
   // first so it sends once, gated on an idle panel with a model to run on
@@ -2339,6 +2348,13 @@ function LangyPanel({
     ) => {
       if (kind === "reconnect-codex") {
         setReconnectCodex(true);
+        return;
+      }
+      if (kind === "configure-model") {
+        // router.push, never window.location: the panel stays mounted across
+        // the move, so the failed turn is still on screen when the provider
+        // is fixed and the customer comes back to retry it.
+        void routerRef.current.push(MODEL_PROVIDERS_SETTINGS_HREF);
         return;
       }
       if (kind !== "retry") return;
@@ -3667,6 +3683,21 @@ function LangyPanel({
                             paddingX="18px"
                             paddingTop="18px"
                           >
+                            {pendingPrompt && !reconnectCodex ? (
+                              <VStack align="stretch" gap={1} paddingBottom={2}>
+                                <QueuedPrompt
+                                  prompt={pendingPrompt}
+                                  reduceMotion={reduceMotion}
+                                />
+                                <Text
+                                  alignSelf="flex-end"
+                                  textStyle="xs"
+                                  color="fg.muted"
+                                >
+                                  Langy sends this once a model is set up.
+                                </Text>
+                              </VStack>
+                            ) : null}
                             <Text fontSize="sm" fontWeight="semibold">
                               {reconnectCodex
                                 ? "Sign in to Codex again"

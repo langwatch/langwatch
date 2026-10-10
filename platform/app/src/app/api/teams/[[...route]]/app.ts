@@ -4,11 +4,14 @@ import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { type Organization, TeamUserRole } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { credentialOwnerRole } from "~/server/api-key/credential-owner-role";
+import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { appFromContext } from "../../middleware/app-context";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
 import { handleTeamError } from "./error-handler";
@@ -172,6 +175,12 @@ secured.access(requires("team:manage")).delete(
       id,
       organizationId: organization.id,
     });
+    // ADR-144: the team's aggregates stop and its projects leave every
+    // aggregate, as archiving each project would do.
+    await appFromContext(c).projects.afterTeamArchive({
+      teamId: team.id,
+      organizationId: organization.id,
+    });
 
     return c.json({
       id: team.id,
@@ -276,7 +285,13 @@ secured
       });
       if (!team) throw new TeamNotFoundError(id);
 
-      const projects = await service.listProjects({ teamId: id });
+      const projects = await service.listProjects({
+        teamId: id,
+        callerOrganizationRole: await credentialOwnerRole({
+          resolved: c.get("orgResolvedToken") as OrgResolvedToken,
+          organizationId: organization.id,
+        }),
+      });
 
       return c.json({ data: projects });
     },

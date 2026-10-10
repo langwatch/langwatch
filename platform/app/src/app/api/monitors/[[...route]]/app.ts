@@ -12,6 +12,7 @@ import {
   MonitorEvaluatorRequiredError,
   MonitorParametersUnusedError,
 } from "~/server/app-layer/monitors/errors";
+import { assertProjectKindRunsMonitors } from "~/server/app-layer/monitors/monitor-project-guard";
 import { prisma } from "~/server/db";
 import { resolveEvaluatorSettingsWithSource } from "~/server/event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
@@ -268,6 +269,8 @@ secured.access(requires("evaluations:create")).post(
     const project = c.get("project");
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating monitor");
+
+    assertProjectKindRunsMonitors(project.kind);
 
     // A monitor without an evaluator sits enabled but evaluates nothing —
     // the edit drawer shows an empty evaluator selection and no evaluation

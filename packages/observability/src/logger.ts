@@ -3,8 +3,7 @@ import pino, {
   type LoggerOptions,
   type Logger as PinoLogger,
 } from "pino";
-import type SuperJSON from "superjson";
-import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
+import { DEFAULT_SERVICE_NAME, ERROR_SUMMARY, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -12,17 +11,6 @@ const isNodeRuntime =
   typeof process !== "undefined" && typeof process.versions?.node === "string";
 
 let logContextProvider: LogContextProvider | undefined;
-let sharedSuperjson: typeof SuperJSON | undefined;
-
-function getSuperjson(): typeof SuperJSON {
-  if (!sharedSuperjson) {
-    const { createRequire } = process.getBuiltinModule("node:module");
-    const loadModule = createRequire(import.meta.url);
-    sharedSuperjson = loadModule("superjson") as typeof SuperJSON;
-  }
-
-  return sharedSuperjson;
-}
 
 /**
  * Registers the server context provider used by every logger mixin.
@@ -36,20 +24,24 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
 }
 
 /**
- * Custom Error serializer using superjson.
- * Avoids expensive manual stack trace formatting while preserving metadata.
+ * Error serializer for every cause key. A branded error summary (see
+ * `ERROR_SUMMARY`, produced by request logging) passes through untouched, since
+ * pino's err serializer would relabel it `type: "Object"`. Every `Error` gets
+ * its full redacted pino serialization; anything else, including an unbranded
+ * plain object, goes to pino's err serializer.
  */
-const superjsonErrorSerializer = (error: unknown) => {
-  if (!(error instanceof Error)) {
-    return pino.stdSerializers.err(error as Error);
+const errorSerializer = (error: unknown) => {
+  if (error instanceof Error) {
+    return redactCommandCredentials(pino.stdSerializers.err(error));
   }
-
-  const serialized = getSuperjson().serialize(error);
-
-  return redactCommandCredentials({
-    ...pino.stdSerializers.err(error),
-    _superjson: serialized.meta,
-  });
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    (error as Record<symbol, unknown>)[ERROR_SUMMARY] === true
+  ) {
+    return error;
+  }
+  return pino.stdSerializers.err(error as Error);
 };
 
 /** Redis commands whose arguments carry a password. */
@@ -99,7 +91,7 @@ function maskValues(text: unknown, values: string[]): unknown {
  * serialized error with those values replaced; every other error passes
  * through unchanged.
  */
-function redactCommandCredentials<T extends object>(serialized: T): T {
+export function redactCommandCredentials<T extends object>(serialized: T): T {
   const command = (serialized as { command?: unknown }).command;
   if (!command || typeof command !== "object") return serialized;
   const { name, args } = command as { name?: unknown; args?: unknown };
@@ -133,9 +125,9 @@ function redactCommandCredentials<T extends object>(serialized: T): T {
  * process-level unhandled-rejection record.
  */
 export const NODE_LOG_SERIALIZERS = {
-  error: superjsonErrorSerializer,
-  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
-  reason: superjsonErrorSerializer,
+  error: errorSerializer,
+  [REQUEST_CAUSE_FIELD]: errorSerializer,
+  reason: errorSerializer,
 } as const;
 
 export interface CreateLoggerOptions {

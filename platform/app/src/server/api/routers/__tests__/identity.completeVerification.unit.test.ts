@@ -109,6 +109,7 @@ vi.mock(
     deploymentOffersPasskeys: () => true,
     resolveSignInMethodPolicy: async () => ({}),
     priorSession: () => ({}),
+    provenAddresses: () => ({}),
     signInRouter: () => ({}),
     decideLocalSignUp: async () => ({}),
     localSignUpDecision: async () => ({}),

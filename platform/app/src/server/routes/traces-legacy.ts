@@ -13,7 +13,11 @@ import type { AuthzPermission as Permission } from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import {
+  getAllForProjectInput,
+  MAX_TRACE_LIST_PAGE_SIZE,
+  publicTraceSearchPageSizeInput,
+} from "~/server/api/routers/traces.schemas";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
@@ -236,6 +240,7 @@ const paramsSchema = getAllForProjectInput
         message: "Invalid date format for endDate",
       }),
     ]),
+    pageSize: publicTraceSearchPageSizeInput,
     scrollId: z.string().optional().nullable(),
     format: z.enum(["digest", "json"]).optional(),
     llmMode: z.boolean().optional().default(false),
@@ -270,7 +275,10 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
   c.header("Deprecation", "true");
   c.header("Link", `</api/traces/search>; rel="successor-version"`);
 
-  const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+  const pageSize = Math.min(
+    params.pageSize ?? MAX_TRACE_LIST_PAGE_SIZE,
+    MAX_TRACE_LIST_PAGE_SIZE,
+  );
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });

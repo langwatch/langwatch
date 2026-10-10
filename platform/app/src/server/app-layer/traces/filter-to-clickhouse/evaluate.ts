@@ -53,10 +53,7 @@ export function evaluateQueryInMemory(
   // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
   let compiled: { sql: string; params: Record<string, unknown> } | null;
   try {
-    compiled = translateFilterToClickHouse(queryText, "__in_memory__", {
-      from: 0,
-      to: 0,
-    });
+    compiled = translateFilterToClickHouse(queryText, { from: 0, to: 0 });
   } catch {
     return false;
   }

@@ -340,6 +340,32 @@ describe("authz audit trail subscriber", () => {
     });
   });
 
+  describe("when a shared project read is attached by the reconciler", () => {
+    it("records the read's window alongside the grant", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        attached({
+          principal: { type: "project", id: "project_aggregate" },
+          roleKey: "project-reader",
+          scope: { type: "PROJECT", id: "project_member" },
+          source: "aggregate-reconciler",
+          condition: { type: "trace", from: "2026-10-07T10:00:00.000Z" },
+          actor: { type: "system", id: SYSTEM_ACTORS.aggregateReconciler },
+        }),
+      );
+
+      expect(store.inserts[0]!.metadata).toEqual({
+        grantId: "grant_1",
+        principal: { type: "project", id: "project_aggregate" },
+        roleKey: "project-reader",
+        scope: { type: "PROJECT", id: "project_member" },
+        source: "aggregate-reconciler",
+        condition: { type: "trace", from: "2026-10-07T10:00:00.000Z" },
+      });
+    });
+  });
+
   describe("when the event carries a field the audit row does not name", () => {
     /** A deny-list published every future field by default; the resource
      *  tier's `token` IS a credential and rides `grant_attached`. */
