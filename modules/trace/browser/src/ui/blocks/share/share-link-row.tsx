@@ -49,14 +49,22 @@ export function ShareLinkRow({
     >
       <VStack align="start" gap={0.5} flex="1" minWidth={0}>
         <Text
+          as="code"
+          title={url}
           fontFamily="mono"
           fontSize="xs"
           color="fg"
+          bg="bg.muted"
+          borderRadius="sm"
+          paddingX={1.5}
+          maxWidth="full"
           truncate
-          width="full"
           data-testid="share-link-url"
         >
-          {url}
+          <Text as="span" color="fg.muted">
+            …/share/
+          </Text>
+          {link.token}
         </Text>
         <HStack gap={1.5} color="fg.muted" fontSize="xs">
           <Icon as={audience.icon} boxSize={3} />
