@@ -53,7 +53,7 @@ function TagDot({ assigned }: { assigned: boolean }) {
       width="10px"
       height="10px"
       borderRadius="full"
-      bg={assigned ? "green.400" : "gray.300"}
+      bg={assigned ? "green.solid" : "bg.emphasized"}
       flexShrink={0}
     />
   );
@@ -306,7 +306,7 @@ export function DeployPromptDialog({
               <AddTagControl addTag={tags.addTag} />
 
               {tags.addTag.addTagError && (
-                <Text fontSize="sm" color="red.500">
+                <Text fontSize="sm" color="red.fg">
                   {tags.addTag.addTagError}
                 </Text>
               )}

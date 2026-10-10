@@ -159,7 +159,7 @@ function EditorTitle({
           openDelay={0}
           showArrow
         >
-          <Circle size="10px" bg="orange.400" data-testid="unsaved-changes-indicator" />
+          <Circle size="10px" bg="orange.solid" data-testid="unsaved-changes-indicator" />
         </Tooltip>
       )}
     </>

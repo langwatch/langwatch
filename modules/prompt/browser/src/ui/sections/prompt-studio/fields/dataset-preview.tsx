@@ -43,7 +43,7 @@ export function DatasetPreview({
           left={0}
           width="100%"
           height="100%"
-          background="rgba(0, 0, 0, 0.2)"
+          background="bg.scrim/40"
           zIndex={10}
           opacity={0}
           cursor="pointer"
@@ -57,8 +57,8 @@ export function DatasetPreview({
               gap={2}
               fontSize="18px"
               fontWeight="bold"
-              color="white"
-              background="rgba(0, 0, 0, .5)"
+              color="fg"
+              background="bg.emphasized"
               paddingY={2}
               paddingX={4}
               borderRadius="6px"
