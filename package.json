@@ -31,6 +31,7 @@
     "test:cli": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx run-many -t test -p @langwatch/server",
     "test:sdk": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx run-many -t test -p langwatch",
     "typecheck": "GOMAXPROCS=2 FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx typecheck --outputStyle=static",
+    "typecheck:src": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx run workspace:typecheck:src --outputStyle=static",
     "sync:references": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx sync",
     "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/scripts/upgrade-rehearsal/__tests__/*.unit.test.mjs",
     "lint": "node dev/nx/lint.mjs",

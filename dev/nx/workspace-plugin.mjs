@@ -97,8 +97,14 @@ export const createNodes = [
           ),
         ],
       };
+      // Local default: the same root build without the test programs; CI runs `typecheck`.
+      const sourceTypecheck = {
+        ...typecheck,
+        options: { cwd: "{workspaceRoot}", command: "node dev/scripts/typecheck-src.mjs" },
+      };
       const targets = {
         typecheck,
+        "typecheck:src": sourceTypecheck,
         "build:types": target,
         "lint:rules": make("lint-rules-run", "uvx --version", everything),
         "test:scripts": make("test-scripts-run", "bats --version", [
