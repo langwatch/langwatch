@@ -1,7 +1,6 @@
 # Stuck states in the serving gate, the background runner and the reader (stuck-states review,
 # section B). Each scenario is a way an upgrade could stop moving with nobody told what to do.
-# Rulings: ARCHITECTURE.md section 7, "No stuck states" (STUCK-STATES). The B4 deadline scenario
-# is built by another lane and stays @unimplemented here.
+# Rulings: ARCHITECTURE.md section 7, "No stuck states" (STUCK-STATES).
 
 Feature: An upgrade never sticks in the gate, the background runner or the status
   As an operator upgrading a LangWatch installation
@@ -60,14 +59,29 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
     And each line says it retries, in how long, and the run's last line of output
     And no line says it waits for a Retry
 
-  # B4: ruled (15-minute deadline); built by another lane.
-  @unimplemented
+  # B4: a background step run has a 15-minute deadline (ARCHITECTURE.md §7, Alex 2026-10-10).
+  @unit
   Scenario: A background step that never returns does not starve the steps after it
     Given a background step whose run neither finishes nor fails
     And a pending background step declared after it
     When the worker sweeps its background steps
     Then the later step still runs
     And the stuck step is reported once it passes its deadline
+    And the stuck step is pending again with the checkpoint it saved before the deadline
+    And a checkpoint the cut run saves after its deadline is refused
+
+  @unit
+  Scenario: A background step stops its compare-and-swap retries when its run is aborted
+    Given the anomaly webhook destination migration retrying a rule edited on every write
+    When its run is aborted
+    Then it stops retrying and saves no page past the last completed one
+    And it archives no endpoint, so a rerun reuses them by their keys
+
+  @unit
+  Scenario: A background step aborted before it polls starts no ClickHouse mutation
+    Given the trace index materialisation step with no mutation recorded
+    When its run is aborted before the first poll
+    Then it starts no mutation and saves no progress
 
   # Follow-up to the planner fixes (stuck-states A): the Ops preview plans as the runner does.
   @integration

@@ -141,4 +141,19 @@ describe("TraceIndexMaterialisationService", () => {
     expect(result).toEqual({ mutationId: "mutation_7.txt", partsToDo: 3 });
     expect(saved).toHaveLength(1);
   });
+
+  /** @scenario "A background step aborted before it polls starts no ClickHouse mutation" */
+  it("starts no build and saves nothing when aborted before the first poll", async () => {
+    const mutations = MemoryTraceIndexMaterialisationRepository.create();
+    const { saved, run } = harness({ mutations });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(run({ signal: controller.signal })).resolves.toEqual({
+      mutationId: null,
+      partsToDo: 0,
+    });
+    expect(mutations.issued()).toBe(0);
+    expect(saved).toEqual([]);
+  });
 });

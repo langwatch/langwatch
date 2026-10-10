@@ -431,6 +431,103 @@ describe("BackgroundStepsService runs", () => {
   });
 });
 
+describe("BackgroundStepsService deadline", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given a step whose run neither finishes nor fails, before a pending step", () => {
+    /** @scenario "A background step that never returns does not starve the steps after it" */
+    it("cuts the stuck run at its deadline, keeps its checkpoint pending and runs the next step", async () => {
+      const rows = new Map<string, Row>(
+        ["trace:stuck", "trace:later"].map((id) => [
+          id,
+          { id, status: "pending", report: null, lastError: null },
+        ]),
+      );
+      const update = (id: string, changes: Partial<Row>) => {
+        const row = rows.get(id);
+        if (row) rows.set(id, { ...row, ...changes });
+      };
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () => [...rows.values()],
+        acquireLease: async () => ({}),
+        renewLease: async () => ({}),
+        releaseLease: async () => true,
+        markRunning: async ({ id }) => update(id, { status: "running" }),
+        setStatus: async ({ ids, status, lastError, report }) => {
+          for (const id of ids)
+            update(id, { status, lastError: lastError ?? null, ...(report ? { report } : {}) });
+        },
+        saveReport: async ({ id, report }) => update(id, { report }),
+      };
+      let lateSave: Promise<string> | undefined;
+      const stuck = defineMigrationStep({
+        id: "trace:stuck",
+        kind: "data",
+        mode: "background",
+        description: "Waits on a mutation that never ends, ignoring its signal.",
+        run: async ({ checkpoint }) => {
+          await checkpoint.save({ report: { cursor: "part_4" } });
+          await new Promise((resolve) => setTimeout(resolve, 10_000));
+          lateSave = checkpoint.save({ report: { cursor: "part_5" } }).then(
+            () => "saved",
+            (error: unknown) => String(error),
+          );
+          return new Promise<never>(() => undefined);
+        },
+      });
+      const later = defineMigrationStep({
+        id: "trace:later",
+        kind: "data",
+        mode: "background",
+        description: "Runs after the stuck step.",
+        run: async () => ({ done: true }),
+      });
+      const warnings: string[] = [];
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [stuck, later],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: (level, message) => void (level === "warn" && warnings.push(message)),
+        deadlineMs: 5_000,
+      });
+
+      const pass = service.sweep({ signal: new AbortController().signal });
+      await vi.advanceTimersByTimeAsync(5_000);
+      const sweep = await pass;
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(sweep).toMatchObject({ ran: ["trace:later"], failed: [], retrying: [] });
+      expect(rows.get("trace:stuck")).toMatchObject({
+        status: "pending",
+        report: { cursor: "part_4" },
+        lastError: expect.stringContaining("deadline"),
+      });
+      expect(rows.get("trace:later")?.status).toBe("done");
+      await expect(lateSave).resolves.toMatch(/passed its deadline; checkpoint refused/);
+      expect(rows.get("trace:stuck")?.report).toEqual({ cursor: "part_4" });
+      expect(warnings).toContain("background step passed its deadline; stopping the step");
+    });
+  });
+
+  describe("given a step that ends inside its deadline", () => {
+    it("records it done and leaves no deadline behind", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const service = serviceOver({ ledger, run: async () => ({ done: true }) });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+      expect(vi.getTimerCount()).toBe(0);
+      expect(ledger.row).toMatchObject({ status: "done", lastError: null });
+    });
+  });
+});
+
 describe("BackgroundStepsService.runNow()", () => {
   const id = "identity:reopen-unproven-accounts";
   const reopen = (run: MigrationStepRun) =>
