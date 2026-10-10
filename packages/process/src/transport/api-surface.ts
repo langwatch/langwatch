@@ -402,7 +402,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
     };
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
-      req: request,
+      req: bodylessAsNoInput(request),
       router: trpc.router,
       createContext,
       allowBatching: false,
@@ -430,4 +430,13 @@ function trpcLanes(trpc: TrpcHost): Hono {
   app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
 
   return app;
+}
+
+/** httpLink posts a no-input mutation with no body; tRPC would parse it as JSON and refuse. */
+function bodylessAsNoInput(request: Request): Request {
+  const bodyless = request.body === null || request.headers.get("content-length") === "0";
+  if (request.method !== "POST" || !bodyless) return request;
+  const { url, method, headers, signal } = request;
+  const copy = new Request(url, { method, headers, signal });
+  return Object.defineProperty(copy, "json", { value: async () => undefined });
 }
