@@ -75,6 +75,8 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 `dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
 `reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
 
+- SAML sign-in (redirect binding) with no `login_hint` lands on the same account picker as OIDC;
+  scripts skip it with `login_hint=<email>` on the SSO URL. A POST-binding request without a hint still asserts the first active user.
 - Legacy SSO: `haven sim idp legacy provider <t> auth0|okta|cognito|onelogin|azure|show`, then
   `haven sim idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
   `azure` is Entra: the product's authority host is hard-wired, so resolve

@@ -145,6 +145,12 @@ Feature: Local IdP simulator (idpsim)
     And the response's assertion is signed by the tenant's certificate
     And the assertion names the seeded user
 
+  @unit
+  Scenario: A SAML authentication request without a login hint offers the tenant's users
+    When a service provider redirects a person to the tenant's SSO endpoint with no login hint
+    Then the response is the account picker listing the tenant's seeded users, as for authorize
+    And choosing one repeats the same request with the hint and asserts that person, not the first user
+
   # --- SCIM -------------------------------------------------------------
 
   @unit
