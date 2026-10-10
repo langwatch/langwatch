@@ -13,7 +13,7 @@ const EVERYTHING_CLOSED: SettingsMenuGates = {
   isSaaS: false,
   hasCloudOps: false,
   hosting: "self-hosted",
-  showEnterpriseNav: false,
+  enterprisePlan: "pending",
   isLiteMember: false,
   hasOpsAccess: false,
   isPlatformAdmin: false,
@@ -101,14 +101,14 @@ describe("given a lite member", () => {
 describe("given an enterprise plan", () => {
   describe("when the menu is built with the enterprise entries shown", () => {
     it("offers the enterprise access entries", () => {
-      const hrefs = hrefsIn({ showEnterpriseNav: true });
+      const hrefs = hrefsIn({ enterprisePlan: "included" });
       expect(hrefs).toContain("/settings/roles");
       expect(hrefs).not.toContain("/settings/role-bindings");
     });
 
     it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
-      for (const showEnterpriseNav of [false, true]) {
-        const hrefs = hrefsIn({ showEnterpriseNav });
+      for (const enterprisePlan of ["pending", "locked", "included"] as const) {
+        const hrefs = hrefsIn({ enterprisePlan });
         expect(hrefs).toContain("/settings/directory");
         for (const old of [
           "/settings/members",
@@ -122,20 +122,62 @@ describe("given an enterprise plan", () => {
     });
 
     it("offers Authentication only to a reader who may see single sign-on", () => {
-      expect(hrefsIn({ showEnterpriseNav: true })).not.toContain("/settings/authentication");
+      expect(hrefsIn({ enterprisePlan: "included" })).not.toContain("/settings/authentication");
       expect(
-        hrefsIn({ showEnterpriseNav: true, hasPermission: (p) => p === "sso:view" }),
+        hrefsIn({ enterprisePlan: "included", hasPermission: (p) => p === "sso:view" }),
       ).toContain("/settings/authentication");
       expect(hrefsIn({ hasPermission: (p) => p === "sso:view" })).not.toContain(
         "/settings/authentication",
       );
     });
 
+    it("marks none of them locked", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasPermission: () => true,
+        enterprisePlan: "included",
+      }).flatMap((group) => group.items);
+      expect(items.filter((item) => item.isLocked)).toEqual([]);
+    });
+
     it("still withholds the audit log without the grant that reads it", () => {
-      expect(hrefsIn({ showEnterpriseNav: true })).not.toContain("/settings/audit-log");
+      expect(hrefsIn({ enterprisePlan: "included" })).not.toContain("/settings/audit-log");
       expect(
-        hrefsIn({ showEnterpriseNav: true, hasPermission: (p) => p === "auditLog:view" }),
+        hrefsIn({ enterprisePlan: "included", hasPermission: (p) => p === "auditLog:view" }),
       ).toContain("/settings/audit-log");
+    });
+  });
+});
+
+describe("given a plan that lacks Enterprise", () => {
+  function lockedHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
+    return settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "locked", ...gates })
+      .flatMap((group) => group.items)
+      .filter((item) => item.isLocked)
+      .map((item) => item.href);
+  }
+
+  describe("when the menu is built", () => {
+    /** @scenario "A plan without Enterprise sees its entries locked" */
+    it("offers the enterprise entries locked", () => {
+      expect(lockedHrefsIn({ hasPermission: () => true })).toEqual([
+        "/settings/audit-log",
+        "/settings/authentication",
+        "/settings/roles",
+      ]);
+    });
+
+    /** @scenario "A plan without Enterprise sees its entries locked" */
+    it("still hides an entry the reader lacks the permission for", () => {
+      expect(lockedHrefsIn({})).toEqual(["/settings/roles"]);
+      expect(lockedHrefsIn({ hasPermission: (p) => p === "sso:view" })).toEqual([
+        "/settings/authentication",
+        "/settings/roles",
+      ]);
+    });
+
+    it("hides them from a lite member", () => {
+      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([]);
     });
   });
 });
@@ -214,7 +256,7 @@ describe("given every Settings entry", () => {
     const icons = settingsMenu({
       ...EVERYTHING_CLOSED,
       hasPermission: () => true,
-      showEnterpriseNav: true,
+      enterprisePlan: "included",
     }).flatMap((group) => group.items.map((item) => item.icon));
     expect(new Set(icons).size).toBe(icons.length);
   });

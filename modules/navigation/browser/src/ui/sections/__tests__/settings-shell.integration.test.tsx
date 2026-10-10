@@ -257,6 +257,27 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
+    /** @scenario "A plan without Enterprise sees its entries locked" */
+    it("shows the enterprise entries with a lock on a plan that lacks them", () => {
+      renderSettingsSidebar({ isEnterprise: false });
+
+      for (const name of [/^Roles/, /^Audit log/, /^Authentication/]) {
+        const link = screen.getByRole("link", { name });
+        expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
+      }
+      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
+      const directory = screen.getByRole("link", { name: "Directory" });
+      expect(within(directory).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A plan without Enterprise sees its entries locked" */
+    it("still hides a locked entry from a reader without its permission", () => {
+      renderSettingsSidebar({ isEnterprise: false, permissions: ["organization:view"] });
+
+      expect(screen.queryByRole("link", { name: /^Audit log/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^Authentication/ })).not.toBeInTheDocument();
+    });
+
     /** @scenario "Settings groups read in sentence case" */
     it("labels its groups in sentence case", () => {
       renderSettingsSidebar();

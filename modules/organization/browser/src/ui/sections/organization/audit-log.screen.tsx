@@ -1,5 +1,4 @@
 import type { WireOf } from "@langwatch/api/web";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
 /**
  * The organization's audit trail, at `/settings/audit-log`. ONE TABLE OVER TWO WRITE SHAPES.
  */
@@ -25,7 +24,7 @@ import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/orga
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import { currentTimeZone, nowInstant, toDate, type Instant } from "@langwatch/time";
-import { ArrowLeft, Download, ScrollText, Search } from "lucide-react";
+import { ArrowLeft, Download, Lock, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
 import { useState } from "react";
 
@@ -243,16 +242,23 @@ export default function AuditLogScreen() {
 
   if (!isEnterprise) {
     return (
-      <VStack gap={6} width="full" align="start">
-        <UpgradeRequired
-          feature="Audit logs"
-          actions={
+      <>
+        <PageLayout.Header>
+          <PageLayout.Heading>Audit log</PageLayout.Heading>
+        </PageLayout.Header>
+        <NoDataInfoBlock
+          size="page"
+          icon={<Lock />}
+          title="Audit log is included in Enterprise"
+          description="See who changed what across your organization, and when, in a trail you can search and export."
+          testId="audit-log-enterprise-upsell"
+          primaryAction={
             <Button asChild colorPalette="orange" size="sm">
-              <Link href="/settings/plans">Compare plans</Link>
+              <Link href="/settings/plans">See plans</Link>
             </Button>
           }
         />
-      </VStack>
+      </>
     );
   }
 

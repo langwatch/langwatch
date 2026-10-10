@@ -60,10 +60,10 @@ export interface SettingsMenuItem {
   alsoActiveAt?: string[];
   icon: LucideIcon;
   /**
-   * Enterprise-plan entry. It is offered only on a plan that includes it, so the sidebar marks
-   * nothing; a lock with "Included in Enterprise" is for an entry offered to a plan that lacks it.
+   * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
+   * in Enterprise", and the page opens on its upsell. A plan that includes it marks nothing.
    */
-  isEnterprise?: boolean;
+  isLocked?: boolean;
 }
 
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
@@ -101,10 +101,38 @@ export interface SettingsMenuGates {
   isSaaS: boolean;
   hasCloudOps: boolean;
   hosting: Hosting;
-  showEnterpriseNav: boolean;
+  /** Enterprise entries: shown, shown locked, or hidden while the plan has not answered. */
+  enterprisePlan: EnterprisePlanGate;
   isLiteMember: boolean;
   hasOpsAccess: boolean;
   isPlatformAdmin: boolean;
+}
+
+export type EnterprisePlanGate = "included" | "locked" | "pending";
+
+/** A plan still in flight offers no Enterprise entry, so none flickers from locked to open. */
+export function enterprisePlanGate({
+  isEnterprise,
+  isLoading,
+}: {
+  isEnterprise: boolean;
+  isLoading: boolean;
+}): EnterprisePlanGate {
+  if (isEnterprise) return "included";
+  if (isLoading) return "pending";
+  return "locked";
+}
+
+/** An Enterprise entry under the plan gate; permission and lite-member gates stay the caller's. */
+function enterpriseEntry({
+  item,
+  enterprisePlan,
+}: {
+  item: SettingsMenuItem;
+  enterprisePlan: EnterprisePlanGate;
+}): SettingsMenuItem[] {
+  if (enterprisePlan === "pending") return [];
+  return [enterprisePlan === "locked" ? { ...item, isLocked: true } : item];
 }
 
 /**
@@ -125,7 +153,7 @@ function youGroup(): SettingsMenuGroup {
 function organizationGroup({
   hasPermission,
   isSaaS,
-  showEnterpriseNav,
+  enterprisePlan,
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
@@ -142,27 +170,19 @@ function organizationGroup({
       // came first and left a page most readers use at the bottom of a group
       // they cannot open.
       ...(!isLiteMember ? [{ label: "API keys", href: "/settings/api-keys", icon: KeyRound }] : []),
-      ...(showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view")
-        ? [
-            {
-              label: "Audit log",
-              href: "/settings/audit-log",
-              icon: ScrollText,
-              isEnterprise: true,
-            },
-          ]
+      ...(!isLiteMember && hasPermission("auditLog:view")
+        ? enterpriseEntry({
+            item: { label: "Audit log", href: "/settings/audit-log", icon: ScrollText },
+            enterprisePlan,
+          })
         : []),
       // How the organization signs in; one entry lit on the provider and connectors pages too.
       // Offered only to a reader who may see single sign-on; the page refuses the address as well.
-      ...(showEnterpriseNav && !isLiteMember && hasPermission("sso:view")
-        ? [
-            {
-              label: "Authentication",
-              href: "/settings/authentication",
-              icon: LogIn,
-              isEnterprise: true,
-            },
-          ]
+      ...(!isLiteMember && hasPermission("sso:view")
+        ? enterpriseEntry({
+            item: { label: "Authentication", href: "/settings/authentication", icon: LogIn },
+            enterprisePlan,
+          })
         : []),
       ...(!isLiteMember
         ? [{ label: "Usage & billing", href: "/settings/usage", icon: Gauge }]
@@ -187,7 +207,7 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -207,22 +227,20 @@ function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): Se
           "/settings/access",
         ],
       },
-      ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
+      ...(!isLiteMember
+        ? enterpriseEntry({
+            // Definitions and their assignments are two tabs of one page.
+            item: {
+              label: "Roles & access",
+              href: "/settings/roles",
+              icon: ShieldCheck,
+              alsoActiveAt: ["/settings/role-bindings"],
+            },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
-}
-
-function enterpriseAccessItems(): SettingsMenuItem[] {
-  return [
-    {
-      // Definitions and their assignments are two tabs of one page.
-      label: "Roles & access",
-      href: "/settings/roles",
-      icon: ShieldCheck,
-      alsoActiveAt: ["/settings/role-bindings"],
-      isEnterprise: true,
-    },
-  ];
 }
 
 function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {

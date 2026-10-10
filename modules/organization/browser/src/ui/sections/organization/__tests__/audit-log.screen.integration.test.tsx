@@ -126,8 +126,9 @@ describe("given an organization below the Enterprise plan", () => {
       state.planType = "LAUNCH";
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("Audit logs on Enterprise")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+      expect(screen.getByRole("heading", { name: "Audit log" })).toBeInTheDocument();
+      expect(screen.getByText("Audit log is included in Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
         "href",
         "/settings/plans",
       );

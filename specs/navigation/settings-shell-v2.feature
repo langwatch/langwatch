@@ -9,9 +9,9 @@ Feature: Settings shell
   then a back entry that returns to the product the user came from,
   then the settings menu regrouped with icons: YOU, ORGANIZATION,
   PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
-  BACKOFFICE groups with their current gates. Enterprise-plan entries
-  carry a quiet grey pill, since it marks a plan rather than asking to
-  be read first. Every visibility gate keeps its current condition. The
+  BACKOFFICE groups with their current gates. A plan without Enterprise
+  sees its entries with a quiet lock rather than not at all, and the page
+  opens on an upsell; a missing permission still hides an entry. The
   search and back entries sit above the scroll region. No divider separates
   them from the groups: the group labels provide that separation.
 
@@ -73,10 +73,18 @@ Feature: Settings shell
 
   @integration
   Scenario: Enterprise entries are marked only where the plan lacks them
-    Given my plan shows the enterprise settings entries
+    Given my plan includes Enterprise
     When the settings sidebar renders
     Then no entry carries an "ENT" pill or a lock
-    And a plan without them is offered no enterprise entry at all
+
+  @integration
+  Scenario: A plan without Enterprise sees its entries locked
+    Given my organization's plan has answered and lacks Enterprise
+    When the settings sidebar renders
+    Then Audit log, Authentication and Roles are offered with a small lock
+    And the lock reads "Included in Enterprise"
+    And an entry I lack the permission for stays hidden
+    And opening a locked entry shows its page title and an Enterprise upsell, never the feature
 
   @integration
   Scenario: Settings groups read in sentence case
@@ -94,7 +102,7 @@ Feature: Settings shell
     Given my organization's plan has not answered yet
     When the settings menu is built
     Then the enterprise entries are hidden
-    And they appear only once the plan answers Enterprise
+    And they appear once the plan answers, locked where it lacks Enterprise
 
   @integration
   Scenario: The settings groups fold, and start open

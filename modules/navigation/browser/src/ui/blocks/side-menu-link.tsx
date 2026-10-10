@@ -2,6 +2,7 @@
 
 import { Badge, Box, chakra, HStack, Link, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Lock } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 
@@ -24,7 +25,11 @@ export type SideMenuItemProps = {
   betaLabel?: string;
   legacy?: string | boolean;
   legacyLabel?: string;
+  /** The plan lacks this entry: a lock and "Included in Enterprise" beside the label. */
+  isLocked?: boolean;
 };
+
+const ENTERPRISE_LOCK_MESSAGE = "Included in Enterprise";
 
 const DEFAULT_BETA_MESSAGE = "This feature is in beta";
 const DEFAULT_LEGACY_MESSAGE =
@@ -64,6 +69,7 @@ export const SideMenuItem = ({
   betaLabel,
   legacy,
   legacyLabel,
+  isLocked = false,
 }: SideMenuItemProps) => {
   const betaPill = beta ? (
     <BetaPill
@@ -78,6 +84,13 @@ export const SideMenuItem = ({
         <Text fontSize="sm">{typeof legacy === "string" ? legacy : DEFAULT_LEGACY_MESSAGE}</Text>
       }
     />
+  ) : null;
+  const lock = isLocked ? (
+    <Tooltip content={ENTERPRISE_LOCK_MESSAGE} positioning={{ placement: "right" }} showArrow>
+      <Box as="span" display="inline-flex" flexShrink={0} color="fg.subtle">
+        <Lock size={14} aria-label={ENTERPRISE_LOCK_MESSAGE} />
+      </Box>
+    </Tooltip>
   ) : null;
   const badge =
     badgeNumber && badgeNumber > 0 ? (
@@ -140,6 +153,7 @@ export const SideMenuItem = ({
           {badge}
           {betaPill}
           {legacyPill}
+          {lock}
           {rightElement}
         </>
       )}
@@ -179,6 +193,7 @@ export const SideMenuLink = ({
   isExternal,
   unavailableReason,
   tourId,
+  isLocked,
 }: SideMenuLinkProps) => {
   const linkRef = useRef<HTMLAnchorElement>(null);
   // A page opened by its address can have its entry below the visible
@@ -257,6 +272,7 @@ export const SideMenuLink = ({
           betaLabel={betaLabel}
           legacy={legacy}
           legacyLabel={legacyLabel}
+          isLocked={isLocked}
         />
       </NavigationLink>
     </Link>

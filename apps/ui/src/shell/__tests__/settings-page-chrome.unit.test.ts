@@ -54,7 +54,7 @@ const everythingOpen = {
   isSaaS: true,
   hasCloudOps: true,
   hosting: "cloud" as const,
-  showEnterpriseNav: true,
+  enterprisePlan: "included" as const,
   isLiteMember: false,
   hasOpsAccess: true,
   isPlatformAdmin: true,

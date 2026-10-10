@@ -195,6 +195,7 @@ function DetourMenuBody({
               isActive={isSettingsMenuItemActive({ item, pathname })}
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
+              isLocked={item.isLocked}
             />
           ))}
         </SidebarSection>
