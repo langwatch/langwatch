@@ -409,7 +409,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.cyan.500}", _dark: "{colors.cyan.700}" },
           },
           fg: {
-            value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
+            value: { _light: "{colors.cyan.800}", _dark: "{colors.cyan.200}" },
           },
           focusRing: { value: "{colors.blue.500}" },
         },
@@ -512,6 +512,10 @@ export const designSystemConfig = defineConfig({
           surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
           // Cards and panels - float above surface
           panel: { value: { _light: "white", _dark: "{colors.zinc.800}" } },
+          // Raised cards and floating controls above a panel.
+          raised: {
+            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.750}" },
+          },
           // Muted background for hover states, selections
           muted: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
@@ -566,8 +570,8 @@ export const designSystemConfig = defineConfig({
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Status text, one per meaning.
           error: { value: { _light: "{colors.red.600}", _dark: "{colors.red.300}" } },
-          success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
-          warning: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.300}" } },
+          success: { value: { _light: "{colors.green.700}", _dark: "{colors.green.300}" } },
+          warning: { value: { _light: "{colors.yellow.700}", _dark: "{colors.yellow.300}" } },
           info: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.300}" } },
         },
 
@@ -584,6 +588,10 @@ export const designSystemConfig = defineConfig({
           },
           emphasized: {
             value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.500}" },
+          },
+          // Outlines that must remain distinct from the surrounding ground.
+          strong: {
+            value: { _light: "{colors.gray.450}", _dark: "{colors.gray.450}" },
           },
           // Status borders, one per meaning.
           error: { value: { _light: "{colors.red.300}", _dark: "{colors.red.700}" } },

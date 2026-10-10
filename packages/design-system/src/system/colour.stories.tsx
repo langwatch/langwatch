@@ -20,6 +20,7 @@ const foundationColours = [
 const semanticColours = [
   "bg",
   "bg.panel",
+  "bg.raised",
   "bg.muted",
   "bg.subtle",
   "fg",
@@ -28,6 +29,8 @@ const semanticColours = [
   "border",
   "border.muted",
   "border.subtle",
+  "border.emphasized",
+  "border.strong",
   "orange.solid",
   "green.solid",
   "red.solid",

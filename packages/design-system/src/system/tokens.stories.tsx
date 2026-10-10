@@ -145,12 +145,12 @@ const SEMANTIC_GROUPS: { title: string; note: string; matches: (name: string) =>
   },
   {
     title: "Background",
-    note: "Surfaces, from the page to a scrim.",
+    note: "Surfaces, including bg.raised for cards above a panel.",
     matches: (n) => n === "bg" || n.startsWith("bg."),
   },
   {
     title: "Border",
-    note: "Hairlines and outlines.",
+    note: "Hairlines and outlines; border.strong distinguishes controls from their ground.",
     matches: (n) => n === "border" || n.startsWith("border."),
   },
   {
