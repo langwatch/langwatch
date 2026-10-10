@@ -305,7 +305,7 @@ Feature: Ops shows an installation's release upgrades, read-only
 
   @integration
   Scenario: The dataplanes tab is hidden when no private target exists
-    Given the ledger records no per-target rows
+    Given the ledger records no per-target rows, or only the shared ClickHouse target
     When an operator opens Ops, Upgrades
     Then no Dataplanes tab is offered
 

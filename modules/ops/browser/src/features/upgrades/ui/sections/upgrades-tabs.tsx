@@ -8,6 +8,16 @@ import { UpgradeErrorSummary } from "../elements/upgrade-error-summary.tsx";
 /** The query key naming the open tab; the overview is the bare address. */
 export const UPGRADES_TAB_PARAM = "tab";
 
+/** The ledger's name for the shared ClickHouse target, which is not a dataplane. */
+const SHARED_TARGET = "shared";
+
+/** The targets that are private dataplanes: every one but the shared target. */
+export function privateTargetsOf(
+  targets: readonly UpgradeTargetSummaryView[],
+): UpgradeTargetSummaryView[] {
+  return targets.filter((target) => target.target !== SHARED_TARGET);
+}
+
 export type UpgradesTab = "overview" | "runs" | "steps" | "organizations" | "dataplanes";
 
 /** The tab an address names; anything unknown, or Dataplanes with no target, opens the overview. */
@@ -61,9 +71,9 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[
   );
 }
 
-/** Overview, Runs, Steps and Organizations, plus Dataplanes when the ledger records a target. */
+/** Overview, Runs, Steps and Organizations, plus Dataplanes when a private target exists. */
 export function UpgradesTabs({
-  targets,
+  targets: allTargets,
   overview,
   runs,
   steps,
@@ -80,6 +90,7 @@ export function UpgradesTabs({
   tab?: UpgradesTab;
   onSelectTab?: (next: UpgradesTab) => void;
 }) {
+  const targets = privateTargetsOf(allTargets);
   return (
     <Tabs.Root
       {...(tab ? { value: tab } : { defaultValue: "overview" })}

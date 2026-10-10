@@ -613,6 +613,14 @@ export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.Poo
   };
 }
 
+/** An idle gate connection lost to Postgres is reported, not thrown; silent once the pool ends. */
+export function guardGatePool({ pool, warn }: { pool: pg.Pool; warn: ServingGateWarn }): pg.Pool {
+  pool.on("error", (error) => {
+    if (!pool.ending) warn("gate connection lost while idle", { error: messageOf(error) });
+  });
+  return pool;
+}
+
 /** The tree both serving roles gate on: the schema it ships and the tasks process's code steps. */
 export function servingImageTree({
   codeStepsFile = IMAGE_CODE_STEPS_FILE,
@@ -642,7 +650,10 @@ export async function servingUpgradeGate({
         withCredentialKeys(secrets, (credentialKeys) => {
           if (!database?.trim()) return NO_LEDGER_GATE;
           if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
-          const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
+          const pool = guardGatePool({
+            pool: new pg.Pool(gatePoolConfig({ databaseUrl: database })),
+            warn: warn ?? emitWarning,
+          });
           return upgradeGateOver({
             role,
             postgres: pool,

@@ -37,6 +37,15 @@ describe("UpgradesTabs", () => {
     });
   });
 
+  describe("given only the shared ClickHouse target", () => {
+    /** @scenario "The dataplanes tab is hidden when no private target exists" */
+    it("offers no Dataplanes tab", () => {
+      renderTabs([{ target: "shared", version: "00042", outstanding: 0, lastError: null }]);
+
+      expect(screen.queryByRole("tab", { name: "Dataplanes" })).toBeNull();
+    });
+  });
+
   describe("given two private targets, one with a failed step", () => {
     it("lists each target's version, outstanding steps and the failed one's last error", async () => {
       renderTabs([

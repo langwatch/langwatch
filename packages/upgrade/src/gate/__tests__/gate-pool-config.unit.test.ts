@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import pg from "pg";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   GATE_QUERY_TIMEOUT_MS,
   GATE_STATEMENT_TIMEOUT_MS,
   gatePoolConfig,
+  guardGatePool,
 } from "../serving-upgrade-gate.ts";
 
 describe("gatePoolConfig", () => {
@@ -25,5 +27,18 @@ describe("gatePoolConfig", () => {
       query_timeout: GATE_QUERY_TIMEOUT_MS,
     });
     expect(GATE_QUERY_TIMEOUT_MS).toBeGreaterThan(GATE_STATEMENT_TIMEOUT_MS);
+  });
+
+  /** @scenario "The gate's connection survives Postgres terminating it while idle" */
+  it("reports an idle connection loss as a warning instead of throwing", () => {
+    const warn = vi.fn();
+    const pool = guardGatePool({ pool: new pg.Pool(), warn });
+
+    expect(() =>
+      pool.emit("error", new Error("terminating connection due to administrator command")),
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith("gate connection lost while idle", {
+      error: "terminating connection due to administrator command",
+    });
   });
 });

@@ -152,3 +152,9 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
     Given an api whose gate answered that the installation is upgrading
     When a later ask is refused or cannot read the ledger
     Then the gate keeps its connection, so the api's next ask can still read the ledger
+
+  @unit
+  Scenario: The gate's connection survives Postgres terminating it while idle
+    Given the gate's own Postgres connection
+    When Postgres terminates it with "terminating connection due to administrator command"
+    Then the loss is reported as a warning and the process does not crash

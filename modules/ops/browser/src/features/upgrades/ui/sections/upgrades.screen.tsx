@@ -18,6 +18,7 @@ import { UpgradeTenantMigrations } from "./upgrade-tenant-migrations.tsx";
 import { UpgradesOverview } from "./upgrades-overview.tsx";
 import {
   parseUpgradesTab,
+  privateTargetsOf,
   UPGRADES_TAB_PARAM,
   type UpgradesTab,
   UpgradesTabs,
@@ -43,7 +44,7 @@ export default function UpgradesScreen() {
   const onRetryStep = canManage ? retryStep : void 0;
   const tab = parseUpgradesTab({
     value: router.query[UPGRADES_TAB_PARAM],
-    hasTargets: (targets.data ?? []).length > 0,
+    hasTargets: privateTargetsOf(targets.data ?? []).length > 0,
   });
   const selectTab = (next: UpgradesTab) =>
     router.replace({
