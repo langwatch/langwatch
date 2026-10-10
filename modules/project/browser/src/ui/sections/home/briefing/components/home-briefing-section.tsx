@@ -118,15 +118,7 @@ function BriefingHeadlineSkeleton() {
     <LangyPanelSurface accent fill borderRadius="14px" padding={{ base: 4, md: 4 }}>
       <VStack align="stretch" gap={3} flex={1} minHeight={0}>
         {/* The eyebrow is real — the label never needs to load. */}
-        <Text
-          fontFamily="mono"
-          fontSize="11px"
-          fontWeight="500"
-          letterSpacing="0.04em"
-          textTransform="uppercase"
-          color="orange.fg"
-          opacity={0.7}
-        >
+        <Text textStyle="eyebrow" color="orange.fg" opacity={0.7}>
           Agentic signals
         </Text>
 

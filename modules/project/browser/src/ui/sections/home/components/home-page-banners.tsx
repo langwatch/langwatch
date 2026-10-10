@@ -704,7 +704,7 @@ function isMacKeyboard(): boolean {
 
 function BriefingCtaIcon({ showKeyboard }: { showKeyboard: boolean }) {
   if (!showKeyboard) return <Icon as={LuArrowRight} boxSize={3.5} />;
-  return <RawKbd fontSize="0.6875rem">{isMacKeyboard() ? "⌘I" : "Ctrl+I"}</RawKbd>;
+  return <RawKbd textStyle="micro">{isMacKeyboard() ? "⌘I" : "Ctrl+I"}</RawKbd>;
 }
 
 function AnimatedBannerOnly({ children, lowPerf }: { children: ReactNode; lowPerf: boolean }) {
@@ -851,12 +851,12 @@ function LanternBanner({
                   {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
                 </Box>
                 {slide.badge ? (
-                  <chakra.span flexShrink={0} fontSize="11px" fontWeight="600" color="accent.fg">
+                  <chakra.span flexShrink={0} textStyle="micro" fontWeight="600" color="accent.fg">
                     {slide.badge}
                   </chakra.span>
                 ) : null}
                 <Text
-                  fontSize="12.5px"
+                  textStyle="bodySm"
                   color="fg.muted"
                   truncate
                   /* A flex child's min-width is `auto`, so without this it
@@ -872,7 +872,7 @@ function LanternBanner({
                   aria-hidden
                   flexShrink={0}
                   color="fg.subtle"
-                  fontSize="12px"
+                  textStyle="caption"
                   lineHeight="1"
                   transition="transform 130ms ease, color 130ms ease"
                 >
@@ -1378,7 +1378,7 @@ function BriefingBanner({
                         // briefing above it.
                         fontFamily={SERIF}
                         fontWeight="500"
-                        fontSize="15px"
+                        textStyle="body"
                         letterSpacing="-0.01em"
                         lineHeight={1.3}
                         color="fg"
@@ -1394,8 +1394,7 @@ function BriefingBanner({
                           flexShrink={0}
                         >
                           <Text
-                            fontFamily="mono"
-                            fontSize="9.5px"
+                            textStyle="micro"
                             fontWeight="600"
                             color="orange.fg"
                             letterSpacing="0.08em"
@@ -1407,7 +1406,7 @@ function BriefingBanner({
                         </Box>
                       ) : null}
                     </HStack>
-                    <Text fontSize="12.5px" color="fg.muted" lineHeight={1.5}>
+                    <Text textStyle="bodySm" color="fg.muted" lineHeight={1.5}>
                       {s.subtitle}
                     </Text>
                     {s.extra ? (
@@ -1424,8 +1423,7 @@ function BriefingBanner({
                       alignItems="center"
                       gap={1}
                       marginTop={1.5}
-                      fontFamily="mono"
-                      fontSize="11.5px"
+                      textStyle="caption"
                       whiteSpace="nowrap"
                       cursor="pointer"
                       // Wears the same orange as the "New" pill beside the

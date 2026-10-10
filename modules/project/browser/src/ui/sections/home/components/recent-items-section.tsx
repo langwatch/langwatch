@@ -75,16 +75,15 @@ function RecentItemRow({ item }: { item: HomeRecentItem }) {
           >
             {getIconForType(item.type)}
           </Box>
-          <Text fontSize="13px" color="fg" flex={1} minWidth={0} lineClamp={1} title={item.name}>
+          <Text textStyle="bodySm" color="fg" flex={1} minWidth={0} lineClamp={1} title={item.name}>
             {item.name}
           </Text>
-          <Text fontFamily="mono" fontSize="11px" color="fg.subtle" flexShrink={0}>
+          <Text textStyle="micro" color="fg.subtle" flexShrink={0}>
             {getLabelForType(item.type)}
           </Text>
           {timeAgo ? (
             <Text
-              fontFamily="mono"
-              fontSize="11px"
+              textStyle="monoSm"
               color="fg.subtle"
               flexShrink={0}
               minWidth="56px"

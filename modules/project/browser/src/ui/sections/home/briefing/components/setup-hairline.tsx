@@ -78,10 +78,10 @@ export function SetupHairline() {
               >
                 <Box height="full" width={`${percentage}%`} background="orange.solid" />
               </Box>
-              <Text fontFamily="mono" fontSize="12.5px" color="fg.muted">
+              <Text textStyle="caption" color="fg.muted">
                 Setup · {done} of {steps.length} done
               </Text>
-              <Text marginLeft="auto" fontFamily="mono" fontSize="12.5px" color="orange.fg">
+              <Text marginLeft="auto" textStyle="caption" color="orange.fg">
                 {open ? "Hide" : "Finish setup"}
               </Text>
               <Box
@@ -119,7 +119,7 @@ export function SetupHairline() {
               {done > 0 ? (
                 <HStack gap={2} paddingX={2} paddingY={1.5} color="fg.subtle">
                   <LuCheck size={12} />
-                  <Text fontSize="12px">{done} already done</Text>
+                  <Text textStyle="caption">{done} already done</Text>
                 </HStack>
               ) : null}
             </VStack>
@@ -188,7 +188,7 @@ function SetupStepRow({
       >
         <Icon size={11} />
       </Box>
-      <Text position="relative" fontSize="13px" color="fg" flex={1}>
+      <Text position="relative" textStyle="bodySm" color="fg" flex={1}>
         {title}
       </Text>
     </chakra.button>

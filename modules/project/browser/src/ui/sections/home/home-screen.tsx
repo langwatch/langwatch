@@ -117,7 +117,7 @@ function ConsideringLangWatch() {
   return (
     <HStack gap={2.5} align="center">
       <chakra.span
-        fontSize="12px"
+        textStyle="caption"
         color="fg.subtle"
         whiteSpace="nowrap"
         display={{ base: "none", md: "inline" }}
@@ -131,8 +131,7 @@ function ConsideringLangWatch() {
         display="inline-flex"
         alignItems="center"
         gap={1.5}
-        fontFamily="mono"
-        fontSize="11.5px"
+        textStyle="caption"
         whiteSpace="nowrap"
         color="fg.muted"
         borderWidth="1px"

@@ -150,7 +150,7 @@ export function QuietHeadline() {
       <Text
         fontFamily={SERIF}
         fontWeight="400"
-        fontSize={{ base: "16px", md: "18px" }}
+        textStyle="sectionTitle"
         lineHeight="1.3"
         letterSpacing="-0.01em"
         color="fg"
@@ -168,8 +168,7 @@ export function QuietHeadline() {
           display="inline-flex"
           alignItems="center"
           gap={1.5}
-          fontFamily="mono"
-          fontSize="12.5px"
+          textStyle="bodySm"
           fontWeight="600"
           whiteSpace="nowrap"
           color="orange.contrast"
@@ -198,7 +197,7 @@ export function QuietHeadline() {
 
       {/* Secondary: the other first steps, as the typed rotation. */}
       <HStack gap={1.5} marginTop={3.5} align="baseline" wrap="wrap">
-        <Text fontFamily="mono" fontSize="12px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           Or
         </Text>
         {/* The typed phrase IS a control: clicking it hands the current
@@ -207,8 +206,7 @@ export function QuietHeadline() {
           type="button"
           onClick={onPhrase}
           aria-label={canAsk ? `Ask Langy: ${action.phrase}` : `Learn more: ${action.phrase}`}
-          fontFamily="mono"
-          fontSize="12px"
+          textStyle="caption"
           color="orange.fg"
           cursor="pointer"
           textAlign="left"
@@ -233,8 +231,7 @@ export function QuietHeadline() {
         <chakra.a
           href={project ? action.href(project.slug) : undefined}
           onClick={onLearnMore}
-          fontFamily="mono"
-          fontSize="12px"
+          textStyle="caption"
           color="fg.muted"
           cursor="pointer"
           whiteSpace="nowrap"
@@ -272,8 +269,7 @@ function LangyHandOff({
       display="inline-flex"
       alignItems="center"
       gap={1}
-      fontFamily="mono"
-      fontSize="12px"
+      textStyle="caption"
       color="orange.fg"
       cursor="pointer"
       whiteSpace="nowrap"

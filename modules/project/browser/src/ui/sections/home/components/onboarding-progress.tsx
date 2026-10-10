@@ -1,6 +1,6 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { Box, Grid, HStack, Progress, Text, VStack } from "@langwatch/design-system/primitives";
-import { useEffect } from "react";
+import { Box, Button, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import {
   LuCheck,
@@ -119,7 +119,7 @@ export const buildOnboardingSteps = (
     },
     {
       key: "setupModelProviders",
-      title: "Setup your model providers",
+      title: "Set up your model providers",
       href: `/settings/model-providers`,
       complete: (data.modelProviders ?? 0) > 0,
     },
@@ -188,15 +188,11 @@ function StepItem({ step, onClick }: StepItemProps) {
         padding={1}
         borderRadius="full"
         background={step.complete ? "green.subtle" : "bg.muted"}
-        color={step.complete ? "green.solid" : "fg.muted"}
+        color={step.complete ? "green.fg" : "fg.muted"}
       >
         {step.complete ? <LuCheck size={10} /> : getIconForStep(step.key)}
       </Box>
-      <Text
-        fontSize="13px"
-        color={step.complete ? "fg.muted" : "fg"}
-        textDecoration={step.complete ? "line-through" : "none"}
-      >
+      <Text textStyle="bodySm" color={step.complete ? "fg.muted" : "fg"}>
         {step.title}
       </Text>
     </HStack>
@@ -212,6 +208,7 @@ export function OnboardingProgress() {
   const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());
   const project = useProjectHomeHost().project();
   const analytics = useUiAnalytics();
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const { data: checkStatus, isLoading } = homeApi.integrationsChecks.getCheckStatus.useQuery(
     { projectId: project?.id ?? "" },
@@ -289,31 +286,21 @@ export function OnboardingProgress() {
     navigate(step.href);
   };
 
-  // Split into columns of 3 max
+  const shownSteps = showCompleted ? steps : steps.filter((s) => !s.complete);
   const columns: OnboardingStep[][] = [];
-  for (let i = 0; i < steps.length; i += 3) {
-    columns.push(steps.slice(i, i + 3));
+  for (let i = 0; i < shownSteps.length; i += 3) {
+    columns.push(shownSteps.slice(i, i + 3));
   }
 
   return (
-    <HomeCard
-      cursor="default"
-      width="full"
-      padding={HOME_SECTION_PADDING}
-      gap={HOME_SECTION_GAP}
-      _hover={{ boxShadow: "xs" }}
-    >
+    <HomeCard cursor="default" width="full" padding={HOME_SECTION_PADDING} gap={HOME_SECTION_GAP}>
       <HomeSectionHeader
         title="Get started with LangWatch"
-        qualifier={`${completionPercentage}% done`}
+        qualifier={`${steps.filter((s) => s.complete).length} of ${steps.length}`}
       >
-        <Box width="80px">
-          <Progress.Root value={completionPercentage} colorPalette="orange" size="sm">
-            <Progress.Track borderRadius="full">
-              <Progress.Range />
-            </Progress.Track>
-          </Progress.Root>
-        </Box>
+        <Button size="xs" variant="ghost" onClick={() => setShowCompleted(!showCompleted)}>
+          {showCompleted ? "Hide completed" : "Show completed"}
+        </Button>
       </HomeSectionHeader>
 
       {/* Steps in columns */}

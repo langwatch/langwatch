@@ -64,14 +64,7 @@ export function HomeOverviewCard({
       <HStack justify="space-between" align="baseline" gap={3} wrap="wrap">
         <HStack gap={2.5} align="baseline">
           {bare ? (
-            <Text
-              fontFamily="mono"
-              fontSize="10px"
-              fontWeight="500"
-              letterSpacing="0.03em"
-              textTransform="uppercase"
-              color="fg.muted"
-            >
+            <Text textStyle="eyebrow" color="fg.muted">
               {title}
               {rangeLabel ? ` · ${rangeLabel}` : null}
             </Text>
@@ -79,7 +72,7 @@ export function HomeOverviewCard({
             <>
               <Text
                 fontFamily={SERIF}
-                fontSize="18px"
+                textStyle="body"
                 fontWeight="500"
                 letterSpacing="-0.01em"
                 color="fg"
@@ -87,7 +80,7 @@ export function HomeOverviewCard({
                 {title}
               </Text>
               {rangeLabel ? (
-                <Text fontFamily="mono" fontSize="11px" letterSpacing="0.02em" color="fg.subtle">
+                <Text textStyle="micro" letterSpacing="0.02em" color="fg.subtle">
                   {rangeLabel}
                 </Text>
               ) : null}
@@ -119,8 +112,7 @@ export function HomeOverviewCard({
           <chakra.a
             href={dashboardsHref}
             onClick={onDashboards}
-            fontFamily="mono"
-            fontSize="12px"
+            textStyle="caption"
             color="orange.fg"
             whiteSpace="nowrap"
             borderBottomWidth="1px"
@@ -216,7 +208,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
         {dot ? (
           <Box width="6px" height="6px" borderRadius="full" background={dot} flexShrink={0} />
         ) : null}
-        <Text fontFamily="mono" fontSize="11.5px" letterSpacing="0.02em" color="fg.muted">
+        <Text textStyle="caption" letterSpacing="0.02em" color="fg.muted">
           {cell.label}
         </Text>
       </HStack>
@@ -240,15 +232,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
           }
           transition={{ duration: PULSE_MS / 1000, ease: "easeOut" }}
         >
-          <Text
-            fontFamily="mono"
-            fontSize={vanity ? "20px" : "26px"}
-            fontWeight={vanity ? "400" : "500"}
-            letterSpacing="-0.02em"
-            lineHeight="1"
-            fontVariantNumeric="tabular-nums"
-            color={valueColor}
-          >
+          <Text textStyle="metric" fontWeight={vanity ? "400" : "600"} color={valueColor}>
             {cell.value}
           </Text>
         </motion.span>
@@ -256,8 +240,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
           // Direction spelled three ways at once — arrow, sign, colour — so
           // the period-over-period change reads at a glance.
           <Text
-            fontFamily="mono"
-            fontSize="11px"
+            textStyle="micro"
             fontWeight="600"
             fontVariantNumeric="tabular-nums"
             whiteSpace="nowrap"

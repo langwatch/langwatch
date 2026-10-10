@@ -72,14 +72,7 @@ export function WelcomeHeader() {
   return (
     // The page's serif display voice: the greeting is the home's one big line,
     // so it speaks in the same face as the briefing headline below it.
-    <Heading
-      as="h1"
-      fontFamily={SERIF}
-      fontWeight="500"
-      fontSize="26px"
-      letterSpacing="-0.01em"
-      lineHeight="1.2"
-    >
+    <Heading as="h1" fontFamily={SERIF} textStyle="pageTitle" fontWeight="500">
       {getGreeting({ timeOfDay, name: greetingName })}
     </Heading>
   );

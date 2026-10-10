@@ -203,7 +203,6 @@ export function TracesOverview({
       // starts at a different inset from its neighbours is exactly the
       // inconsistency this padding constant exists to remove.
       padding={HOME_SECTION_PADDING}
-      _hover={{ boxShadow: "2xs" }}
     >
       <HomeSectionHeader title="Traces overview" qualifier={periodLabel}>
         <HStack gap={2} align="center">

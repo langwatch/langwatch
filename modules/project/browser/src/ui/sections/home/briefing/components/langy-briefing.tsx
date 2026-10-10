@@ -74,18 +74,11 @@ export function LangyBriefing({
           {/* The sheet is LANGWATCH's read of the project — Langy is the AI you
               hand a signal to, not the byline. So the eyebrow names the
               content, not the assistant. */}
-          <Text
-            fontFamily="mono"
-            fontSize="11px"
-            fontWeight="500"
-            letterSpacing="0.04em"
-            textTransform="uppercase"
-            color="orange.fg"
-          >
+          <Text textStyle="eyebrow" color="orange.fg">
             Agentic signals · {data.since}
           </Text>
           {data.loop ? (
-            <Text fontFamily="mono" fontSize="11.5px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               {data.loop}
             </Text>
           ) : null}
@@ -98,7 +91,7 @@ export function LangyBriefing({
           <Text
             fontFamily={SERIF}
             fontWeight="400"
-            fontSize={{ base: "16px", md: "18px" }}
+            textStyle="sectionTitle"
             lineHeight="1.3"
             letterSpacing="-0.01em"
             color="fg"
@@ -124,14 +117,7 @@ export function LangyBriefing({
         {data.bars && data.bars.length > 0 ? (
           <VStack align="stretch" gap={2}>
             {data.scenariosLabel ? (
-              <Text
-                fontFamily="mono"
-                fontSize="10px"
-                fontWeight="500"
-                letterSpacing="0.03em"
-                textTransform="uppercase"
-                color="fg.muted"
-              >
+              <Text textStyle="eyebrow" color="fg.muted">
                 {data.scenariosLabel}
               </Text>
             ) : null}
@@ -139,7 +125,7 @@ export function LangyBriefing({
               <ScenarioRow key={bar.id} bar={bar} />
             ))}
             {data.barsMore ? (
-              <Text fontFamily="mono" fontSize="12px" color="fg.muted">
+              <Text textStyle="caption" color="fg.muted">
                 {data.barsMore}
               </Text>
             ) : null}
@@ -159,7 +145,7 @@ export function LangyBriefing({
             borderRadius="10px"
             background="bg.panel"
           >
-            <Text fontFamily="mono" fontSize="12px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               JudgeAgent ·{" "}
               <Text as="span" color="green.fg">
                 {data.judge.pass} pass
@@ -174,14 +160,7 @@ export function LangyBriefing({
               ) : null}
             </Text>
             {data.judge.note ? (
-              <Text
-                fontFamily="mono"
-                fontSize="10px"
-                fontWeight="500"
-                letterSpacing="0.03em"
-                textTransform="uppercase"
-                color="fg.muted"
-              >
+              <Text textStyle="eyebrow" color="fg.muted">
                 {data.judge.note}
               </Text>
             ) : null}
@@ -202,10 +181,10 @@ export function LangyBriefing({
               <GitPullRequest size={15} />
             </Box>
             <VStack align="start" gap={0.5} flex={1} minWidth={0}>
-              <Text fontFamily="mono" fontSize="13px" color="fg" lineClamp={1}>
+              <Text textStyle="bodySm" color="fg" lineClamp={1}>
                 {data.draftedPr.title}
               </Text>
-              <Text fontFamily="mono" fontSize="12px" color="fg.muted">
+              <Text textStyle="caption" color="fg.muted">
                 {data.draftedPr.meta}
                 {data.draftedPr.added != null ? (
                   <>
@@ -256,22 +235,14 @@ function ReceiptsSection({
     <VStack align="stretch" gap={2}>
       {data.receiptsLabel ? (
         <HStack justify="space-between" align="center" gap={3}>
-          <Text
-            fontFamily="mono"
-            fontSize="10px"
-            fontWeight="500"
-            letterSpacing="0.03em"
-            textTransform="uppercase"
-            color="fg.muted"
-          >
+          <Text textStyle="eyebrow" color="fg.muted">
             {data.receiptsLabel}
           </Text>
           {onFeedback ? (
             <chakra.button
               type="button"
               onClick={onFeedback}
-              fontFamily="mono"
-              fontSize="10.5px"
+              textStyle="micro"
               color="fg.subtle"
               cursor="pointer"
               transition="color 130ms ease"
@@ -327,8 +298,7 @@ function BriefingActions({
             display="inline-flex"
             alignItems="center"
             gap={2}
-            fontFamily="mono"
-            fontSize="12.5px"
+            textStyle="bodySm"
             color="fg.muted"
             cursor="pointer"
             _hover={{ color: "fg" }}
@@ -342,7 +312,7 @@ function BriefingActions({
               borderRadius="6px"
               paddingX="6px"
               paddingY="1px"
-              fontSize="10.5px"
+              textStyle="micro"
               color="fg.subtle"
             >
               ⌘I
@@ -355,8 +325,7 @@ function BriefingActions({
                 key={question}
                 type="button"
                 onClick={() => onAskSubmit(question)}
-                fontFamily="mono"
-                fontSize="11.5px"
+                textStyle="caption"
                 color="fg.muted"
                 borderWidth="1px"
                 borderColor="border.muted"
@@ -455,9 +424,9 @@ function ReceiptRow({
           marginTop="-1px"
           background={RECEIPT_DOT[receipt.severity]}
         />
-        <Text fontSize="13px" color="fg.muted" flex={1} minWidth={0} lineHeight="1.5">
+        <Text textStyle="bodySm" color="fg.muted" flex={1} minWidth={0} lineHeight="1.5">
           {receipt.subject ? (
-            <Text as="span" fontFamily="mono" fontSize="12.5px" fontWeight="600" color="fg">
+            <Text as="span" textStyle="bodySm" fontWeight="600" color="fg">
               {receipt.subject}{" "}
             </Text>
           ) : null}
@@ -466,8 +435,7 @@ function ReceiptRow({
         <HStack gap={2.5} flexShrink={0} align="center">
           {receipt.metric ? (
             <Text
-              fontFamily="mono"
-              fontSize="12px"
+              textStyle="monoSm"
               whiteSpace="nowrap"
               color={METRIC_COLOR[receipt.metric.tone]}
               fontVariantNumeric="tabular-nums"
@@ -484,8 +452,7 @@ function ReceiptRow({
               className="receipt-chevron"
               as="span"
               color="fg.muted"
-              fontFamily="mono"
-              fontSize="11px"
+              textStyle="micro"
               whiteSpace="nowrap"
               textDecoration="underline"
               textUnderlineOffset="3px"
@@ -508,8 +475,7 @@ function ReceiptRow({
                 display="inline-flex"
                 alignItems="center"
                 gap={1}
-                fontFamily="mono"
-                fontSize="11px"
+                textStyle="micro"
                 color="orange.fg"
                 borderWidth="1px"
                 borderColor="orange.emphasized"
@@ -546,7 +512,7 @@ function ScenarioRow({ bar }: { bar: ScenarioBar }) {
       display="grid"
       gridTemplateColumns={{ base: "1fr", md: "minmax(0, 200px) 1fr 92px" }}
     >
-      <Text fontFamily="mono" fontSize="12px" color="fg.muted" lineClamp={1} minWidth={0}>
+      <Text textStyle="caption" color="fg.muted" lineClamp={1} minWidth={0}>
         {bar.label}
       </Text>
       <Box height="8px" borderRadius="5px" background="langy.barTrack" overflow="hidden">
@@ -558,8 +524,7 @@ function ScenarioRow({ bar }: { bar: ScenarioBar }) {
         />
       </Box>
       <Text
-        fontFamily="mono"
-        fontSize="12px"
+        textStyle="monoSm"
         textAlign={{ base: "left", md: "right" }}
         color={STAT_COLOR[bar.status]}
         fontVariantNumeric="tabular-nums"
@@ -603,8 +568,7 @@ function BriefingLink({
       <chakra.a
         {...linkProps}
         flexShrink={0}
-        fontFamily="mono"
-        fontSize="12.5px"
+        textStyle="bodySm"
         whiteSpace="nowrap"
         cursor="pointer"
         color="fg"
@@ -625,8 +589,7 @@ function BriefingLink({
     <chakra.a
       {...linkProps}
       flexShrink={0}
-      fontFamily="mono"
-      fontSize="12.5px"
+      textStyle="bodySm"
       whiteSpace="nowrap"
       cursor="pointer"
       color="orange.fg"

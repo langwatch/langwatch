@@ -33,7 +33,7 @@ export function ContinueLine({ onContinue }: { onContinue: () => void }) {
     >
       <LangyMark size={16} />
       <VStack align="start" gap={0.5} minWidth={0}>
-        <Text fontFamily="mono" fontSize="13px" color="fg" lineHeight="1.3">
+        <Text textStyle="bodySm" color="fg">
           Continue your conversation
         </Text>
         <Text

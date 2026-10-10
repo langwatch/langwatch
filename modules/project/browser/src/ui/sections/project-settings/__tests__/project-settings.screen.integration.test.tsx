@@ -106,7 +106,7 @@ describe("when the reader may only view the organization", () => {
   it("never shows the object-storage credentials", () => {
     renderWithProjectHost(<ProjectSettingsScreen />, viewer());
 
-    expect(screen.queryByPlaceholderText("Secret Access Key")).toBeNull();
+    expect(screen.queryByPlaceholderText("Secret access key")).toBeNull();
     expect(screen.getByText(/only visible to organization managers/i)).toBeTruthy();
   });
 });

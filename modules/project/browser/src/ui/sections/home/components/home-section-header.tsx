@@ -23,20 +23,12 @@ export function HomeSectionHeader({
 }) {
   return (
     <HStack width="full" gap={2.5} align="center" wrap="wrap">
-      <Heading
-        as="h2"
-        fontWeight="600"
-        fontSize="15px"
-        letterSpacing="-0.01em"
-        color="fg"
-        lineHeight="1.3"
-      >
+      <Heading as="h2" textStyle="sectionTitle" color="fg">
         {title}
       </Heading>
       {qualifier ? (
         <Text
-          fontFamily="mono"
-          fontSize="11px"
+          textStyle="caption"
           color="fg.muted"
           borderWidth="1px"
           borderColor="border.muted"

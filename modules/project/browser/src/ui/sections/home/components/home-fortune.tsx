@@ -41,13 +41,7 @@ export function HomeFortune() {
     <HomeCard cursor="default" padding={4} height="full" width="full">
       <VStack align="stretch" gap={2} width="full" height="full">
         <HStack justify="space-between" align="center" gap={3}>
-          <Text
-            fontFamily="mono"
-            fontSize="10.5px"
-            letterSpacing="0.1em"
-            textTransform="uppercase"
-            color="fg.subtle"
-          >
+          <Text textStyle="eyebrow" color="fg.subtle">
             Fortune
           </Text>
           <chakra.button
@@ -83,7 +77,7 @@ export function HomeFortune() {
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.35, ease: "easeOut" }}
         >
-          <Text fontFamily="mono" fontSize="12px" color="fg.muted" lineHeight="1.6">
+          <Text textStyle="caption" color="fg.muted">
             {FORTUNES[index]}
           </Text>
         </motion.div>
