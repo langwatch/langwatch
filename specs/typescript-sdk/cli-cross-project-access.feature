@@ -124,6 +124,13 @@ Feature: CLI cross-project access with the user-scoped login key
       Then the resolver receives "checkout-agent" as the project selector
 
     @unit
+    Scenario: a command that builds its own request carries the resolved project
+      Given a command that sends its own request, such as `simulation-run list`
+      When the user runs it with a login key and `--project checkout-agent`
+      Then the request is scoped to the project the resolver chose
+      And the server never answers project_required for it
+
+    @unit
     Scenario: a command with its own --project keeps its own meaning
       Given `langwatch login --project <slug>`, which writes that project's key to .env
       When the user runs it
