@@ -1,8 +1,17 @@
-import { Box, Button, Center, Heading, Skeleton, Stack, Text, VStack } from "@chakra-ui/react";
-import { Lock } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  Box,
+  Button,
+  Center,
+  HStack,
+  Heading,
+  Skeleton,
+  Stack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Check, Copy, Lock } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
-import { bannerGlass, bannerRim } from "../../system/status-glass.ts";
 import { InlineCode } from "../display/inline-code.tsx";
 import { toaster } from "../overlays/toaster.tsx";
 
@@ -48,7 +57,7 @@ function Placeholder() {
   );
 }
 
-/** Restricted content: the page blurred behind a glass card naming the grant, with a way to ask. */
+/** Restricted content: the page blurred behind a plain dialog naming the grant and how to ask. */
 export function RestrictedAccess({
   permission,
   area = "this page",
@@ -56,6 +65,7 @@ export function RestrictedAccess({
   backdrop,
   "data-testid": testId,
 }: RestrictedAccessProps) {
+  const [copied, setCopied] = useState(false);
   const copyRequest = () => {
     const text = accessRequestText({
       permission,
@@ -64,43 +74,57 @@ export function RestrictedAccess({
       ...(requesterName ? { requesterName } : {}),
     });
     void navigator.clipboard.writeText(text).then(
-      () => toaster.create({ type: "success", title: "Access request copied" }),
+      () => {
+        setCopied(true);
+        toaster.create({ type: "success", title: "Access request copied" });
+      },
       () => toaster.create({ type: "error", title: "Could not copy the request" }),
     );
   };
 
   return (
     <Box position="relative" minHeight="60vh" overflow="hidden" data-testid={testId}>
-      <Box filter="blur(8px)" opacity={0.6} pointerEvents="none" userSelect="none" aria-hidden>
+      <Box filter="blur(6px)" opacity={0.5} pointerEvents="none" userSelect="none" aria-hidden>
         {backdrop ?? <Placeholder />}
       </Box>
       <Center position="absolute" inset={0} padding={6}>
         <Stack
           role="note"
-          gap={3}
-          align="center"
-          textAlign="center"
-          maxWidth="440px"
-          paddingX={8}
-          paddingY={6}
-          borderRadius="2xl"
+          gap={4}
+          width="full"
+          maxWidth="420px"
+          padding={6}
+          borderRadius="l3"
           borderWidth="1px"
-          borderColor={bannerRim("orange")}
-          backdropFilter="blur(16px)"
+          borderColor="border.muted"
+          background="bg.panel"
           boxShadow="lg"
-          {...bannerGlass("orange")}
         >
-          <Box color={{ _light: "orange.600", _dark: "orange.300" }}>
-            <Lock size={22} aria-hidden />
-          </Box>
-          <Heading size="md">You need access to {area}</Heading>
-          <Text fontSize="sm" color="fg.muted">
-            Ask an organization admin to grant you
+          <HStack gap={3} align="center">
+            <Center
+              boxSize={9}
+              flexShrink={0}
+              borderRadius="l2"
+              background="bg.muted"
+              color="fg.muted"
+            >
+              <Lock size={16} aria-hidden />
+            </Center>
+            <Heading size="md">You need access to {area}</Heading>
+          </HStack>
+          <Text fontSize="sm" color="fg.muted" lineHeight="1.6">
+            Your role doesn't include <InlineCode>{permission}</InlineCode>. Copy a request and send
+            it to an organization admin, who can grant it.
           </Text>
-          <InlineCode>{permission}</InlineCode>
-          <Button size="sm" colorPalette="orange" onClick={copyRequest}>
-            Copy access request
-          </Button>
+          <HStack justify="end" gap={2} paddingTop={1}>
+            <Button size="sm" variant="ghost" onClick={() => window.history.back()}>
+              Go back
+            </Button>
+            <Button size="sm" variant="outline" onClick={copyRequest}>
+              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied ? "Copied" : "Copy access request"}
+            </Button>
+          </HStack>
         </Stack>
       </Center>
     </Box>
