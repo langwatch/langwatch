@@ -43,3 +43,10 @@ Feature: Customer-authored templates cannot read files
       Given an automation notification template that renders a file path
       When the notification is rendered
       Then rendering fails and no file content reaches the notification
+
+    # Go side: services/nlpgo/app/engine/template/template_file_tags_test.go
+    @unit @unimplemented
+    Scenario: An LLM node's instructions template cannot inline a file
+      Given a workflow LLM node whose instructions include or render a file path
+      When nlpgo renders the instructions with full Liquid
+      Then rendering fails with a template error and no file content reaches the model
