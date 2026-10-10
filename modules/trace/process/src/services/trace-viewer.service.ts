@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   type Trace,
   TraceViewerService,
@@ -40,6 +41,8 @@ export interface TraceLegacyRead {
       scrollId?: string | null;
       /** The v1 REST search's compiled query-language filter, ANDed into the read. */
       filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
+      authorization?: Authorization;
     },
   ): Promise<TracesForProjectResult>;
 
