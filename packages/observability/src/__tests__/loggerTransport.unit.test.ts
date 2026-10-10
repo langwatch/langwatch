@@ -42,6 +42,7 @@ describe("configured Node logger transports", () => {
     pinoMock.transport.mockImplementation(fakeTransport);
   });
 
+  /** @scenario The console honours its own level when no export is configured */
   it("uses the configured pretty console target without OTel when export is disabled", () => {
     createLoggerFactory({
       environment: "production",
@@ -59,6 +60,7 @@ describe("configured Node logger transports", () => {
         }),
       ],
     });
+    expect(pinoMock.multistream).toHaveBeenCalledWith([expect.objectContaining({ level: "warn" })]);
   });
 
   it("uses JSON console and the legacy fixed OTel logger name when export is enabled", () => {
@@ -111,7 +113,7 @@ describe("configured Node logger transports", () => {
     const printed = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     createLoggerFactory({ environment: "production" }).createLogger("transport-late-failure");
-    const [, stream] = pinoMock.pino.mock.lastCall ?? [];
+    const stream = pinoMock.multistream.mock.lastCall?.[0][0]?.stream;
     failing.fail(new Error("the worker has exited"));
     stream?.write("after the failure\n");
 
@@ -135,7 +137,7 @@ describe("configured Node logger transports", () => {
     const printed = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     createLoggerFactory({ environment: "production" }).createLogger("transport-resume");
-    const [, stream] = pinoMock.pino.mock.lastCall ?? [];
+    const stream = pinoMock.multistream.mock.lastCall?.[0][0]?.stream;
     first.fail(new Error("the worker has exited"));
     first.fail(new Error("the worker has exited"));
     stream?.write("while down\n");

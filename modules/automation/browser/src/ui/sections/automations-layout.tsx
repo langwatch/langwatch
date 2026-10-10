@@ -5,7 +5,6 @@
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -53,20 +52,18 @@ export function AutomationsLayout({
   const active = AUTOMATION_SECTIONS.find((item) => item.section === section);
 
   return (
-    <Box width="full" data-testid="section-navigation-layout">
-      <SectionNavigationFrame
-        label="Automations"
-        header={
-          <PageLayout.Header>
-            <PageLayout.Heading>{title}</PageLayout.Heading>
-          </PageLayout.Header>
-        }
-        links={links}
-        activeHref={`${basePath}${active?.suffix ?? ""}`}
-        onNavigate={(href) => host.navigate(href)}
-      >
-        <Box data-testid="section-navigation-content">{children}</Box>
-      </SectionNavigationFrame>
-    </Box>
+    <SectionNavigationFrame
+      label="Automations"
+      header={
+        <PageLayout.Header>
+          <PageLayout.Heading>{title}</PageLayout.Heading>
+        </PageLayout.Header>
+      }
+      links={links}
+      activeHref={`${basePath}${active?.suffix ?? ""}`}
+      onNavigate={(href) => host.navigate(href)}
+    >
+      {children}
+    </SectionNavigationFrame>
   );
 }
