@@ -119,19 +119,12 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
               border="1px solid"
               borderColor={accentChipBorder}
               transition="all 0.25s ease"
-              // The hover wash brightens the chip by one step. Written as raw
-              // custom properties because it rides a `button:hover` selector,
-              // so it needs its own dark-mode branch — `_dark` cannot reach
-              // inside a nested `css` selector.
+              // Semantic variables keep the nested hover selector mode-aware.
               css={{
                 "button:hover &": {
                   background: "var(--chakra-colors-accent-muted)",
-                  borderColor: "var(--chakra-colors-orange-200)",
+                  borderColor: "var(--chakra-colors-orange-emphasized)",
                   transform: "scale(1.05)",
-                },
-                ".dark button:hover &": {
-                  background: "var(--chakra-colors-orange-900)",
-                  borderColor: "var(--chakra-colors-orange-800)",
                 },
               }}
             >
