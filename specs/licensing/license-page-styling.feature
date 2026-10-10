@@ -16,6 +16,12 @@ Feature: The License page says where a license stands
       And the license is called valid
 
     @integration
+    Scenario: The expiry date fits its tile and keeps the full date on hover
+      Given a valid license that expires on 30 September 2099
+      Then the expiry tile reads "Sep 30, 2099", never cut short
+      And hovering it shows "September 30, 2099"
+
+    @integration
     Scenario: Seats in use are drawn against the seats bought
       Given a valid license covering 100 seats with 4 in use
       Then the seats tile draws a meter filled to 4 percent

@@ -52,13 +52,28 @@ export function licenseMetersSeats(
  * Returns the original string if parsing fails.
  */
 export function formatLicenseDate(isoDate: string): string {
+  return formatLicenseDateWith({ isoDate, month: "long" });
+}
+
+/** The same date with a three-letter month ("Nov 9, 2026"): at most 12 characters, for a tile. */
+export function formatLicenseDateShort(isoDate: string): string {
+  return formatLicenseDateWith({ isoDate, month: "short" });
+}
+
+function formatLicenseDateWith({
+  isoDate,
+  month,
+}: {
+  isoDate: string;
+  month: "long" | "short";
+}): string {
   const epochMilliseconds = toEpochMs(isoDate);
   if (isNaN(epochMilliseconds)) {
     return isoDate;
   }
   return readableDate(epochMilliseconds).toLocaleDateString("en-US", {
     year: "numeric",
-    month: "long",
+    month,
     day: "numeric",
     timeZone: "UTC",
   });

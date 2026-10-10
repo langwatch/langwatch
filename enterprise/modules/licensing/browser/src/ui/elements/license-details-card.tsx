@@ -12,6 +12,7 @@ import { Building2, CalendarClock, Layers, UserRound, Users } from "lucide-react
 import {
   cappedLiteSeatsOf,
   formatLicenseDate,
+  formatLicenseDateShort,
   formatLimitOrUnlimited,
   hasLicenseMetadata,
   isCappedLimit,
@@ -197,9 +198,9 @@ export function LicenseDetailsCard({
           </StatTile>
         ) : null}
         <StatTile label="Expires" icon={<CalendarClock size={14} />} data-testid="license-expires">
-          <StatTileFigure>
+          <StatTileFigure title={formatLicenseDate(status.expiresAt)}>
             <Text as="span" color={isExpired ? "orange.fg" : void 0}>
-              {formatLicenseDate(status.expiresAt)}
+              {formatLicenseDateShort(status.expiresAt)}
             </Text>
           </StatTileFigure>
         </StatTile>

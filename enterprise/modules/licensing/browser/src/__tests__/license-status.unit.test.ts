@@ -4,6 +4,7 @@ import {
   cappedLiteSeatsOf,
   formatFileSize,
   formatLicenseDate,
+  formatLicenseDateShort,
   formatLimitOrUnlimited,
   hasLicenseMetadata,
   isCorruptedLicense,
@@ -268,6 +269,28 @@ describe("formatLicenseDate", () => {
 
   it("returns original string for invalid date", () => {
     expect(formatLicenseDate("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatLicenseDateShort", () => {
+  describe("when the month has a long name", () => {
+    /** @scenario "The expiry date fits its tile and keeps the full date on hover" */
+    it.each([
+      { iso: "2026-11-09T00:00:00Z", short: "Nov 9, 2026" },
+      { iso: "2027-09-30T00:00:00Z", short: "Sep 30, 2027" },
+    ])("formats $iso as $short", ({ iso, short }) => {
+      expect(formatLicenseDateShort(iso)).toBe(short);
+    });
+
+    it("stays within the 14 characters a quarter-width tile shows", () => {
+      const longest = ["2027-09-30", "2027-12-31", "2027-11-30"].map(formatLicenseDateShort);
+
+      expect(Math.max(...longest.map((date) => date.length))).toBeLessThanOrEqual(14);
+    });
+  });
+
+  it("returns the original string for an invalid date", () => {
+    expect(formatLicenseDateShort("not-a-date")).toBe("not-a-date");
   });
 });
 

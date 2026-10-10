@@ -103,6 +103,14 @@ describe("the License page", () => {
       expect(screen.getByText("Valid")).toBeDefined();
     });
 
+    /** @scenario "The expiry date fits its tile and keeps the full date on hover" */
+    it("shows the expiry with a short month and the full date as its title", () => {
+      renderCard(valid);
+
+      const figure = within(screen.getByTestId("license-expires")).getByTitle("September 30, 2099");
+      expect(figure.textContent).toBe("Sep 30, 2099");
+    });
+
     /** @scenario Seats in use are drawn against the seats bought */
     it("fills the seat meter with the share of seats in use", () => {
       renderCard(valid);
