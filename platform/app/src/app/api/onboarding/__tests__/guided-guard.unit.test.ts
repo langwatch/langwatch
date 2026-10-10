@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Permission } from "~/server/api/rbac";
+import type { Permission } from "~/server/app-layer/authz/permission-adapters";
 import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
 
 const ROUTE_FILE = path.resolve(__dirname, "../[[...route]]/app.ts");

@@ -28,9 +28,9 @@ export class DispatchError extends Error {
   /**
    * The remediation sentence, written for a customer, when this rejection has
    * one — a provider saying "the bot isn't in that channel" is worth relaying
-   * verbatim. Absent for transport failures: `message` there is assembled from
-   * an undici string, a DNS result and a label naming how the feature is built,
-   * none of which is prose for a person. Only this field is lifted onto
+   * verbatim. A transport failure never relays `message` (an undici string, a
+   * DNS result, an internal label); at most fixed copy naming its kind is set
+   * (`describeTransportFailure`). Only this field is lifted onto
    * `meta.message`; `message` stays the full diagnostic for the log line.
    */
   readonly customerMessage?: string;
@@ -142,7 +142,8 @@ export function toDispatchError(
   {
     message,
     retryable: retryableOverride,
-  }: { message: string; retryable?: boolean },
+    customerMessage,
+  }: { message: string; retryable?: boolean; customerMessage?: string },
 ): DispatchError {
   if (isDispatchError(error)) return error;
   if (retryableOverride !== undefined) {
@@ -150,9 +151,15 @@ export function toDispatchError(
       message,
       retryable: retryableOverride,
       cause: error,
+      customerMessage,
     });
   }
   const status = extractHttpStatus(error);
   const retryable = status === undefined ? true : isRetryableHttpStatus(status);
-  return new DispatchError({ message, retryable, cause: error });
+  return new DispatchError({
+    message,
+    retryable,
+    cause: error,
+    customerMessage,
+  });
 }

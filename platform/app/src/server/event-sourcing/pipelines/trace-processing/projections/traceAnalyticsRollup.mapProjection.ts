@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -14,6 +15,7 @@ import {
   spanReceivedEventSchema,
 } from "../schemas/events";
 import { NormalizedStatusCode } from "../schemas/spans";
+import { isStorableSpanReceived } from "../utils/storableSpanTime";
 import { SpanCostService } from "./services/span-cost.service";
 
 /**
@@ -63,6 +65,10 @@ const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
 
 const spanCostService = new SpanCostService();
 
+const logger = createLogger(
+  "langwatch:trace-processing:trace-analytics-rollup-map",
+);
+
 const spanEvents = [spanReceivedEventSchema] as const;
 
 /** Floor a unix-ms timestamp to the minute boundary (toStartOfMinute equivalent). */
@@ -104,7 +110,17 @@ export class TraceAnalyticsRollupMapProjection
     this.store = deps.store;
   }
 
-  mapTraceSpanReceived(event: SpanReceivedEvent): TraceAnalyticsRollupRow {
+  mapTraceSpanReceived(
+    event: SpanReceivedEvent,
+  ): TraceAnalyticsRollupRow | null {
+    // Same gate as the spanStorage projection, for the same reason: normalization
+    // mints a KSUID over the span's start SECONDS and throws on a value the
+    // 48-bit field cannot hold. It would also file the row's minute bucket
+    // outside anything a read opens.
+    if (!isStorableSpanReceived({ event, logger, consumer: this.name })) {
+      return null;
+    }
+
     // Normalize the same way the trace-summary fold + spanStorage projection do,
     // so the rollup contribution matches the trace total to the cent. Reusing
     // the pipeline service guarantees we never drift from the canonical

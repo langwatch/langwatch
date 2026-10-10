@@ -22,7 +22,7 @@ import type { Span } from "./types";
 export interface BoundedSpansDigest {
   text: string;
   /** Whether anything was left out to fit the budget. */
-  truncated: boolean;
+  isTruncated: boolean;
   estimatedTokens: number;
 }
 
@@ -46,7 +46,7 @@ export async function formatSpansDigestBounded({
   const full = judgeSpanDigestFormatter.format(readableSpans);
   const fullTokens = estimateTokens(full);
   if (fullTokens <= budget) {
-    return { text: full, truncated: false, estimatedTokens: fullTokens };
+    return { text: full, isTruncated: false, estimatedTokens: fullTokens };
   }
 
   const structure = judgeSpanDigestFormatter.formatStructureOnly(readableSpans);
@@ -59,7 +59,7 @@ export async function formatSpansDigestBounded({
       text: structure,
       maxTokens: budget,
     });
-    return { text, truncated: true, estimatedTokens: estimateTokens(text) };
+    return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
   }
 
   let text = structure;
@@ -74,7 +74,7 @@ export async function formatSpansDigestBounded({
     text = candidate;
   }
 
-  return { text, truncated: true, estimatedTokens: estimateTokens(text) };
+  return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
 }
 
 /**

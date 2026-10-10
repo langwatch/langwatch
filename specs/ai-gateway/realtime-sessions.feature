@@ -150,6 +150,16 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # replay must supersede rather than add to what the trace already shows.
 
     @integration
+    Scenario: Two settlements arriving together write one span
+      Given an open session
+      When two reports close it at the same moment
+      Then the session carries the first report's close
+      And the second writes no span into the trace
+      # The second close waits on the first's row lock and re-reads the
+      # status as the first left it. The same rule keeps a release or the
+      # expiry sweep from moving a CLOSED session back to EXPIRED.
+
+    @integration
     Scenario: A session minted without a trace writes no span
       Given a session was minted with no trace context
       When the vendor's post-call report arrives

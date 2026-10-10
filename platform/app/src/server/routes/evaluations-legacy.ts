@@ -10,6 +10,7 @@
  * - src/pages/api/dataset/evaluate.ts
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -34,7 +35,6 @@ import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
 import {
   createServiceApp,
@@ -1037,7 +1037,7 @@ export const getEvaluatorIncludingCustom = async (
  * fields.
  *
  * Without this, the legacy REST route fell through to the hardcoded global
- * `DEFAULT_MODEL` (`getLatestOpenAIChatFlagship()`), bypassing the project's
+ * `DEFAULT_MODEL` (what `openai/latest` resolves to), bypassing the project's
  * model cascade entirely for every API-triggered evaluation (issue #5468).
  *
  * The feature keys match the server-side evaluator-create path in

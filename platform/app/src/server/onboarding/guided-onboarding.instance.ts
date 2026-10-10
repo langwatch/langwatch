@@ -7,7 +7,7 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 import { env } from "~/env.mjs";
-import { ensureGatewayV1BaseUrl } from "~/server/app-layer/langy/LangyCredentialService";
+import { ensureGatewayV1BaseUrl } from "~/server/app-layer/langy/gatewayBaseUrl";
 import type { GuidedOnboardingState } from "~/server/schemas/sign-up-data.schema";
 
 /** The guided state with what the kickoff brief needs from the instance. */
@@ -16,9 +16,9 @@ export type GuidedOnboardingStateView = GuidedOnboardingState & {
   gatewayUrl?: string;
 };
 
-export function withInstanceFacts(
-  state: GuidedOnboardingState,
-): GuidedOnboardingStateView {
+export function withInstanceFacts<S extends GuidedOnboardingState>(
+  state: S,
+): S & GuidedOnboardingStateView {
   const base = env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
   return base ? { ...state, gatewayUrl: ensureGatewayV1BaseUrl(base) } : state;
 }

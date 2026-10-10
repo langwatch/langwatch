@@ -101,6 +101,24 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
     ],
     docUrl: `${DOCS}/ai-gateway/rate-limits`,
   },
+  // Connected agents started in development with a personal key belong to
+  // that person. Both refusals below are what a teammate, a CI job or a
+  // service key meets when it targets such an agent by name.
+  agent_owner_only: {
+    suggestions: [
+      "Run it with the same key that registered the agent; a project or service key names no person, so it never reaches a personal agent, even one you registered yourself",
+      "This development agent belongs to the owner of the key that registered it; connect your own process to get your own copy",
+      "To share one agent with the team, start it with LANGWATCH_AGENT_ENVIRONMENT set to a shared name such as dev-shared, and target connected:<name>@dev-shared",
+    ],
+    docUrl: `${DOCS}/agent-testing/connect-your-agent`,
+  },
+  agent_environment_unresolved: {
+    suggestions: [
+      "Check `langwatch agent list`: the agent must show Online in the environment you target, and connected:<name>@<environment> names one explicitly",
+      "An agent started in development with a personal key is visible only to its owner; start it with LANGWATCH_AGENT_ENVIRONMENT set to a shared name so other keys can target it",
+    ],
+    docUrl: `${DOCS}/agent-testing/connect-your-agent`,
+  },
   network_error: {
     suggestions: [
       "Check your network connection",

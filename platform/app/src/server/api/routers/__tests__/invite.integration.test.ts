@@ -14,6 +14,7 @@ import {
   afterAll,
   afterEach,
   beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
@@ -24,6 +25,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "../../../../test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "../../../../test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
@@ -164,16 +167,14 @@ describe("Invite router integration", () => {
       },
     });
 
-    // Grant admin an org-scoped ADMIN RoleBinding so permission checks pass
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-inv-admin-${nanoid(8)}`,
-        organizationId,
-        userId: adminUserId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    // Seed the live grant and its compatibility row for permission checks.
+    await seedRoleBinding(prisma, {
+      id: `rb-inv-admin-${nanoid(8)}`,
+      organizationId,
+      userId: adminUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Add admin to team
@@ -203,16 +204,14 @@ describe("Invite router integration", () => {
       },
     });
 
-    // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-inv-member-${nanoid(8)}`,
-        organizationId,
-        userId: memberUserId,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    // Seed the live grant and its compatibility row for permission checks.
+    await seedRoleBinding(prisma, {
+      id: `rb-inv-member-${nanoid(8)}`,
+      organizationId,
+      userId: memberUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Add member to team
@@ -227,6 +226,7 @@ describe("Invite router integration", () => {
     // Set default plan mock and wire App singleton for InviteService.create()
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
@@ -254,6 +254,7 @@ describe("Invite router integration", () => {
     // Re-wire App singleton with fresh mock values
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
@@ -266,6 +267,7 @@ describe("Invite router integration", () => {
     // Cleanup all test data
     await cleanupTestRows(prisma, [
       ["organizationInvite", { organizationId }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],
@@ -453,6 +455,121 @@ describe("Invite router integration", () => {
           where: { userId: user.id, organizationId },
         });
         expect(memberships).toBe(1);
+        const orgBindings = await prisma.roleBinding.count({
+          where: {
+            userId: user.id,
+            organizationId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+          },
+        });
+        expect(orgBindings).toBe(1);
+      });
+    });
+
+    describe("when a Developer invitation is accepted (ADR-143)", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("admits them on the seat with no organisation binding and an audit row", async () => {
+        const email = `invitee-${testNamespace}-developer@acme.com`;
+        const invite = await createPendingInvite(email, {
+          role: OrganizationUserRole.DEVELOPER,
+          teamIds: "",
+          requestedBy: adminUserId,
+        });
+        const { user, caller } = await createInvitee(email);
+
+        await caller.invite.acceptInvite({ inviteCode: invite.inviteCode });
+
+        const membership = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: { userId: user.id, organizationId },
+          },
+        });
+        expect(membership?.role).toBe(OrganizationUserRole.DEVELOPER);
+        await expect(
+          prisma.roleBinding.count({
+            where: {
+              userId: user.id,
+              organizationId,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+            },
+          }),
+        ).resolves.toBe(0);
+        const audit = await prisma.auditLog.findFirst({
+          where: {
+            organizationId,
+            userId: user.id,
+            action: "organization.member.admitted",
+          },
+        });
+        expect(audit).toMatchObject({
+          actorUserId: adminUserId,
+          metadata: { seat: "DEVELOPER", via: "invite", inviteId: invite.id },
+        });
+        await prisma.auditLog.delete({ where: { id: audit!.id } });
+      });
+
+      describe("when the acceptance is retried after it landed", () => {
+        it("records the admission once", async () => {
+          const email = `invitee-${testNamespace}-developer-retry@acme.com`;
+          const invite = await createPendingInvite(email, {
+            role: OrganizationUserRole.DEVELOPER,
+            teamIds: "",
+            requestedBy: adminUserId,
+          });
+          const { user, caller } = await createInvitee(email);
+
+          await caller.invite.acceptInvite({ inviteCode: invite.inviteCode });
+          // A crash after the membership transaction re-runs the grant tail.
+          const landed = await prisma.organizationInvite.findUnique({
+            where: { id: invite.id },
+          });
+          await InviteService.create(prisma).applyInvite({
+            userId: user.id,
+            invite: landed!,
+          });
+
+          const audits = await prisma.auditLog.findMany({
+            where: {
+              organizationId,
+              userId: user.id,
+              action: "organization.member.admitted",
+            },
+            select: { id: true },
+          });
+          expect(audits).toHaveLength(1);
+          await prisma.auditLog.delete({ where: { id: audits[0]!.id } });
+        });
+      });
+    });
+
+    describe("when the organisation's joiner seat is Developer (ADR-143)", () => {
+      beforeEach(async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { joinerRole: OrganizationUserRole.DEVELOPER },
+        });
+      });
+      afterEach(async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { joinerRole: OrganizationUserRole.MEMBER },
+        });
+      });
+
+      /** @scenario The joiner seat setting never applies to invitations */
+      it("lands the invited person on the seat the invitation names", async () => {
+        const email = `invitee-${testNamespace}-invited-full@acme.com`;
+        const invite = await createPendingInvite(email);
+        const { user, caller } = await createInvitee(email);
+
+        await caller.invite.acceptInvite({ inviteCode: invite.inviteCode });
+
+        const membership = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: { userId: user.id, organizationId },
+          },
+        });
+        expect(membership?.role).toBe(OrganizationUserRole.MEMBER);
         const orgBindings = await prisma.roleBinding.count({
           where: {
             userId: user.id,
@@ -753,6 +870,45 @@ describe("Invite router integration", () => {
   // ============================================================================
 
   describe("createInvites (admin batch)", () => {
+    describe("when the plan has no Full or Lite seats left", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("refuses a Member invitation and creates a Developer one", async () => {
+        mockGetActivePlan.mockResolvedValue(
+          makeTestPlan({ maxMembers: 1, maxMembersLite: 0 }),
+        );
+
+        await expect(
+          adminCaller.invite.createInvites({
+            organizationId,
+            invites: [
+              {
+                email: `capped-member-${testNamespace}@acme.com`,
+                role: "MEMBER",
+                teamIds: teamId,
+              },
+            ],
+          }),
+        ).rejects.toThrow();
+
+        const developerEmail = `capped-developer-${testNamespace}@acme.com`;
+        const results = await adminCaller.invite.createInvites({
+          organizationId,
+          invites: [{ email: developerEmail, role: "DEVELOPER", teamIds: "" }],
+        });
+
+        expect(results).toHaveLength(1);
+        await expect(
+          prisma.organizationInvite.findFirst({
+            where: { organizationId, email: developerEmail },
+            select: { role: true, status: true },
+          }),
+        ).resolves.toEqual({
+          role: OrganizationUserRole.DEVELOPER,
+          status: "PENDING",
+        });
+      });
+    });
+
     describe("when admin invites multiple users in a single batch", () => {
       /** @scenario "Admin batch invite creates all records before sending any emails" */
       it("creates all invite records before sending any emails", async () => {
@@ -827,6 +983,47 @@ describe("Invite router integration", () => {
           (r) => r.invite.email === "ok-email@example.com",
         );
         expect(okResult?.emailNotSent).toBe(false);
+      });
+
+      /** @scenario "Organization-only member invitations persist without a team assignment" */
+      it("persists an organization-only member invite", async () => {
+        const email = `org-only-${testNamespace}@example.com`;
+
+        const results = await adminCaller.invite.createInvites({
+          organizationId,
+          invites: [{ email, role: OrganizationUserRole.MEMBER }],
+        });
+
+        expect(results).toHaveLength(1);
+        expect(results[0]?.invite.email).toBe(email);
+        expect(results[0]?.invite.role).toBe(OrganizationUserRole.MEMBER);
+        expect(
+          await prisma.organizationInvite.findFirst({
+            where: { organizationId, email },
+          }),
+        ).toMatchObject({
+          email,
+          organizationId,
+          role: OrganizationUserRole.MEMBER,
+          teamIds: "",
+        });
+      });
+
+      /** @scenario "Teamless external invitations are refused" */
+      it("does not persist a teamless external invite", async () => {
+        const email = `teamless-external-${testNamespace}@example.com`;
+
+        const results = await adminCaller.invite.createInvites({
+          organizationId,
+          invites: [{ email, role: OrganizationUserRole.EXTERNAL }],
+        });
+
+        expect(results).toEqual([]);
+        expect(
+          await prisma.organizationInvite.findFirst({
+            where: { organizationId, email },
+          }),
+        ).toBeNull();
       });
     });
   });

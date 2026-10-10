@@ -27,9 +27,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import type { EventSourcing } from "~/server/event-sourcing";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 
 // Same environment shims the app-direct suite uses: the billing plan gate
 // and the ClickHouse resolution, both pointed at the test substrate.
@@ -42,30 +46,27 @@ vi.mock("~/server/app-layer/app", async () => {
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = permissionsServiceFor(dbForPermissions);
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    // Built per call rather than once: the routes now take their ClickHouse
-    // repositories from the App, and `chClient` is only assigned once the test
-    // containers are up - after this factory runs.
-    getApp: () => ({
-      permissions,
-      planProvider: {
-        getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
-      },
-      gateway: {
-        budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
-        virtualKeySpend: new GatewayVirtualKeySpendRepository(
-          async () => chClient,
-        ),
-        spendEvents: new GatewaySpendEventsRepository(async () => chClient),
-        webhookEvents: new WebhookEventsClickHouseRepository(
-          async () => chClient,
-        ),
-      },
-    }),
-  };
+  const testApp = () => ({
+    eventSourcing,
+    redis: null,
+    permissions,
+    planProvider: {
+      getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
+    },
+    gateway: {
+      budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
+      virtualKeySpend: new GatewayVirtualKeySpendRepository(
+        async () => chClient,
+      ),
+      spendEvents: new GatewaySpendEventsRepository(async () => chClient),
+      webhookEvents: new WebhookEventsClickHouseRepository(
+        async () => chClient,
+      ),
+    },
+  });
+  return { getApp: testApp, tryGetApp: testApp };
 });
+let eventSourcing: EventSourcing;
 let chClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =
@@ -102,6 +103,8 @@ describe("end-user spend on the composed router", () => {
 
   beforeAll(async () => {
     await startTestContainers();
+    resetAuthzGrantsCommandsForTests();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     const { getTestClickHouseClient } = await import(
       "~/server/event-sourcing/__tests__/integration/testContainers"
     );
@@ -140,15 +143,13 @@ describe("end-user spend on the composed router", () => {
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
     const created = await ApiKeyService.create(prisma).create({
       name: `eusr-${suffix}`,
@@ -175,7 +176,10 @@ describe("end-user spend on the composed router", () => {
   }, 120_000);
 
   afterAll(async () => {
+    await eventSourcing?.close();
+    resetAuthzGrantsCommandsForTests();
     if (!ORG_ID) return;
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: ORG_ID },
     });

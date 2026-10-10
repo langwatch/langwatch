@@ -1,9 +1,9 @@
 /**
- * A single Postgres advisory lock that serializes the `LWQL_SELF_PROVISION`
- * convergence across concurrently-booting app pods.
+ * A single Postgres advisory lock that serializes the LangWatchQL
+ * self-provisioning convergence across concurrently-booting app pods.
  *
  * `provisionLwql`'s `selfProvisionAll` runs at boot on EVERY pod (during
- * `start:prepare:db`). On the self-provision path it drives a DESTRUCTIVE
+ * `start:prepare:db`). It drives a DESTRUCTIVE
  * convergence: PostgreSQL approved-view + reader-role statements, then
  * ClickHouse `CREATE USER OR REPLACE` / drop+recreate PostgreSQL-engine tables
  * / grants / row policies, then a key-map backfill. Run by several pods at
@@ -33,7 +33,7 @@
  * ClickHouse DDL run on other connections. Routing the ClickHouse work through
  * `tx` is impossible (different datastore) and unnecessary.
  *
- * @see ../../../tasks/provisionLwql.ts — the sole caller (`selfProvisionAll`)
+ * @see ./selfProvisionEntry.ts — the sole caller (`selfProvisionAll`)
  * @see ../../datasets/dataset-lock.ts — the canonical advisory-lock idiom
  */
 import type { PrismaClient } from "~/generated/prisma/client";

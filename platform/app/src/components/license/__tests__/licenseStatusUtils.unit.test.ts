@@ -8,7 +8,6 @@ import {
   isCorruptedLicense,
   isLicenseExpired,
   licenseMetersSeats,
-  normalizeKeyForActivation,
 } from "../licenseStatusUtils";
 
 /**
@@ -59,6 +58,7 @@ function createValidLicenseStatus(expiresAt = "2099-12-31") {
   return {
     hasLicense: true as const,
     valid: true as const,
+    connected: false,
     plan: "team",
     planName: "Team",
     expiresAt,
@@ -173,25 +173,6 @@ describe("licenseMetersSeats", () => {
       );
       expect(licenseMetersSeats(undefined)).toBe(false);
     });
-  });
-});
-
-describe("normalizeKeyForActivation", () => {
-  it("returns null for empty string", () => {
-    expect(normalizeKeyForActivation("")).toBeNull();
-  });
-
-  it("returns null for whitespace-only string", () => {
-    expect(normalizeKeyForActivation("   ")).toBeNull();
-    expect(normalizeKeyForActivation("\t\n")).toBeNull();
-  });
-
-  it("trims and returns valid key", () => {
-    expect(normalizeKeyForActivation("  abc123  ")).toBe("abc123");
-  });
-
-  it("returns key unchanged when no trimming needed", () => {
-    expect(normalizeKeyForActivation("abc123")).toBe("abc123");
   });
 });
 

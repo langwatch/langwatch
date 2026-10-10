@@ -17,11 +17,13 @@ import {
   vi,
 } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createInnerTRPCContext } from "../../../trpc";
 import { onboardingRouter } from "../onboarding.router";
@@ -89,7 +91,11 @@ describe("onboarding guided state", () => {
 
   beforeAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      // Creating an organization now appends its grants to the ledger, so the
+      // real repository needs the real command and projection path.
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
         {
@@ -138,6 +144,7 @@ describe("onboarding guided state", () => {
     }
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
   });
 
   beforeEach(() => {
@@ -155,7 +162,7 @@ describe("onboarding guided state", () => {
     /** @scenario "an organization without guided state returns the empty default" */
     it("reads the empty default before anything was recorded", async () => {
       const state = await callerFor(owner).getGuidedState({ organizationId });
-      expect(state).toEqual({ paths: [], donePaths: [] });
+      expect(state).toEqual({ variant: "guided", paths: [], donePaths: [] });
     });
   });
 
@@ -173,6 +180,11 @@ describe("onboarding guided state", () => {
 
       const signupData = await storedSignupData(result.organizationId);
       expect(signupData).toEqual({ companyType: "company" });
+
+      const state = await callerFor(classic).getGuidedState({
+        organizationId: result.organizationId,
+      });
+      expect(state.variant).toBeNull();
     });
   });
 

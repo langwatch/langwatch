@@ -2,7 +2,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { ScopeNotInOrganizationError } from "~/server/role-bindings/errors";
 import type {
@@ -18,7 +18,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     // delivery-plan PR 3 follow-up): a cut-over organization's member lists
     // are served from the ledger's own head, everyone else's from the legacy
     // tables, behind the same gate the decision fork reads.
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    private readonly accessListing: AccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
   ) {}

@@ -410,6 +410,22 @@ every project-scoped call.
 Run the harness file first: it validates the shared request builder and the
 results fold without spending a Langy turn.
 
+## The fake Explorer tab
+
+`fake-explorer-tab.ts` is the same idea for the Trace Explorer. It claims
+`explorer.*` actions off the turn stream through `executeUiAction`, runs the
+manifest's own transform over an `ExplorerState` it holds, and answers
+`explorer.getState` through `readLiveExplorer` with the count `tracesV2.list`
+returns for that state, which is the count the table shows.
+
+It does not run the page's zustand store. The store needs React and the
+browser's storage, so the commit step (`commitExplorerState`) is covered by
+`ExplorerLangyActionsMount.integration.test.tsx` instead.
+
+| File | What it covers | Model turns |
+|---|---|---|
+| `langy-find-traces.scenario.test.ts` | thumbs down exists only as `thumbs_up_down` events with a vote of -1; Langy has to find that form, apply it through `explorer.setFilter`, and answer the page's count | one agent turn |
+
 ### Rule-adherence evaluator (over Langy's own traces)
 
 The scenario judge is the primary eval. To ALSO grade Langy on live traffic,

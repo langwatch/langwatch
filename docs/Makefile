@@ -47,7 +47,7 @@ lint-prose:
 
 .PHONY: lint-prose-changed
 lint-prose-changed:
-	@base=$$(git merge-base origin/main HEAD); \
+	@base=$$(git merge-base origin/main HEAD) || { echo "cannot find the merge base with origin/main; fetch origin first" >&2; exit 2; }; \
 	files=$$(git diff --name-only --diff-filter=d "$$base" -- .. | grep '^docs/.*\.mdx$$' | sed 's|^docs/||'); \
 	if [ -z "$$files" ]; then echo "no docs pages changed against origin/main"; exit 0; fi; \
 	echo "linting:"; echo "$$files" | sed 's|^|  |'; \

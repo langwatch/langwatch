@@ -22,6 +22,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
@@ -135,14 +136,12 @@ describe.skipIf(!hasCredentialsSecret)(
           role: OrganizationUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: orgId,
-          userId: orgAdmin.id,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: orgId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: orgId,
+        userId: orgAdmin.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: orgId,
       });
     });
 
@@ -152,6 +151,7 @@ describe.skipIf(!hasCredentialsSecret)(
         // not an in-list, so one entry per organization.
         ["modelProvider", { organizationId: orgId }],
         ["modelProvider", { organizationId: otherOrgId }],
+        ["grant", { organizationId: orgId }],
         ["roleBinding", { organizationId: orgId }],
         ["organizationUser", { organizationId: { in: [orgId, otherOrgId] } }],
         [

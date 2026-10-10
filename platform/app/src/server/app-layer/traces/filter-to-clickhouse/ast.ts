@@ -6,8 +6,19 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import { FilterFieldUnknownError, FilterParseError } from "../errors";
+import {
+  FilterFieldUnknownError,
+  FilterParseError,
+  FilterTooComplexError,
+} from "../errors";
+import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
+import {
+  type AndChain,
+  andChainOf,
+  translateEvaluationScope,
+} from "./evaluation-scope";
+import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 import { boundedSubquery } from "./subqueries";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -24,8 +35,24 @@ import {
   wrap,
 } from "./value-helpers";
 
-export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
+
+/**
+ * How one dialect compiles a single `field:value` tag.
+ *
+ * The boolean structure of the language (AND, OR, NOT, parentheses, the node
+ * ceiling) is the same whatever table the result runs against, so the walk
+ * below takes the per-tag compilation as an argument. `trace_summaries` is one
+ * dialect (the rest of this file); the LangWatchQL trace view is another, and
+ * it lives with the feature that needs it.
+ *
+ * @see ~/server/app-layer/instant-evals/shorthand/filter.ts
+ */
+export type FilterTagTranslator = (
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+) => string;
 
 /**
  * `liqe`'s serializer can emit `cost:[0.01 TO 1]AND foo:bar` (no space after
@@ -47,9 +74,74 @@ export function normalizeQuery(s: string): string {
  */
 export function translateFilterToClickHouse(
   queryText: string,
-  tenantId: string,
   timeRange: { from: number; to: number },
 ): { sql: string; params: Record<string, unknown> } | null {
+  return translateFilterWithEvalRuns({ queryText, timeRange });
+}
+
+/**
+ * {@link translateFilterToClickHouse} for a query that may carry `eval` chips:
+ * each chip compiles against the Instant Eval run registered for it.
+ */
+export function translateFilterWithEvalRuns({
+  queryText,
+  timeRange,
+  evalRuns,
+}: {
+  queryText: string;
+  timeRange: { from: number; to: number };
+  /** The Instant Eval runs registered for the query's `eval` chips. */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+}): { sql: string; params: Record<string, unknown> } | null {
+  // The compiled fragment names no tenant: every subquery carries a tenant
+  // marker the authorized reader expands into the proof's fence (ADR-144
+  // block C), so the statement it lands in decides who is in scope.
+  const ctx: TranslationContext = {
+    paramCounter: 0,
+    nodeCount: 0,
+    params: {
+      timeFrom: timeRange.from,
+      timeTo: timeRange.to,
+    },
+    timeRange,
+    ...(evalRuns ? { evalRuns } : {}),
+  };
+
+  const sql = translateFilterAst({
+    queryText,
+    ctx,
+    translateTag,
+    bindEvaluations: true,
+  });
+  if (sql === null) return null;
+  return { sql, params: ctx.params };
+}
+
+/**
+ * The language's boolean structure, compiled with the tag translator given.
+ *
+ * Returns `null` for an empty query, which every caller reads as "no
+ * condition"; throws {@link FilterParseError} for syntax the language does not
+ * have and for a query past the node or parameter ceiling. The parameters land
+ * on `ctx.params`, so the caller owns both the names it seeded and the ones the
+ * walk added.
+ */
+export function translateFilterAst({
+  queryText,
+  ctx,
+  translateTag: translateTagWith,
+  bindEvaluations = false,
+}: {
+  readonly queryText: string;
+  readonly ctx: TranslationContext;
+  readonly translateTag: FilterTagTranslator;
+  /**
+   * Compile an evaluator and the result conditions beside it as one
+   * evaluation (see `evaluation-scope.ts`). Only the `trace_summaries` dialect
+   * has the evaluator fields.
+   */
+  readonly bindEvaluations?: boolean;
+}): string | null {
   const trimmed = normalizeQuery(queryText);
   if (!trimmed) return null;
 
@@ -62,25 +154,19 @@ export function translateFilterToClickHouse(
 
   if (ast.type === "EmptyExpression") return null;
 
-  const ctx: TranslationContext = {
-    paramCounter: 0,
-    nodeCount: 0,
-    params: {
-      tenantId,
-      timeFrom: timeRange.from,
-      timeTo: timeRange.to,
-    },
-    tenantId,
-    timeRange,
-  };
-
-  const sql = translateNode(ast, false, ctx);
+  const sql = translateNode({
+    node: ast,
+    negated: false,
+    ctx,
+    translateTag: translateTagWith,
+    bindEvaluations,
+  });
 
   if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
     throw new FilterParseError("Too many filter conditions");
   }
 
-  return { sql, params: ctx.params };
+  return sql;
 }
 
 /**
@@ -250,40 +336,65 @@ function freeTextTermOf(tag: TagToken, negated: boolean): string | null {
   return value.length > 0 ? value : null;
 }
 
-function translateNode(
-  node: LiqeQuery,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+/**
+ * The walk, with the per-tag compilation it was given.
+ *
+ * Named parameters rather than positional, because the tag translator is the
+ * fourth thing the walk needs and a reader at the recursive call should not
+ * have to count arguments to see which of them is the dialect.
+ */
+function translateNode({
+  node,
+  negated,
+  ctx,
+  translateTag: translateTagWith,
+  bindEvaluations,
+}: {
+  node: LiqeQuery;
+  negated: boolean;
+  ctx: TranslationContext;
+  translateTag: FilterTagTranslator;
+  bindEvaluations: boolean;
+}): string {
   ctx.nodeCount++;
-  if (ctx.nodeCount > MAX_NODE_COUNT) {
-    throw new FilterParseError("Query too complex");
+  if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+    throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
+
+  const walk = (next: LiqeQuery, nextNegated: boolean): string =>
+    translateNode({
+      node: next,
+      negated: nextNegated,
+      ctx,
+      translateTag: translateTagWith,
+      bindEvaluations,
+    });
 
   switch (node.type) {
     case "EmptyExpression":
       return "1 = 1";
 
     case "Tag":
-      return translateTag(node as TagToken, negated, ctx);
+      return translateTagWith(node as TagToken, negated, ctx);
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
-      const left = translateNode(logExpr.left, negated, ctx);
-      const right = translateNode(logExpr.right, negated, ctx);
+      const chain = bindEvaluations && !negated ? andChainOf(logExpr) : null;
+      if (chain) return translateAndChain({ chain, ctx, walk });
+      const branch = (side: LiqeQuery): string => walk(side, negated);
       const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
-      return `(${left} ${op} ${right})`;
+      return `(${branch(logExpr.left)} ${op} ${branch(logExpr.right)})`;
     }
 
     case "UnaryOperator": {
       const unary = node as UnaryOperatorToken;
       const isNeg = unary.operator === "NOT" || unary.operator === "-";
-      return translateNode(unary.operand, negated !== isNeg, ctx);
+      return walk(unary.operand, negated !== isNeg);
     }
 
     case "ParenthesizedExpression": {
       const paren = node as ParenthesizedExpressionToken;
-      return `(${translateNode(paren.expression, negated, ctx)})`;
+      return `(${walk(paren.expression, negated)})`;
     }
 
     default:
@@ -291,6 +402,36 @@ function translateNode(
         `Unsupported query syntax: ${(node as { type: string }).type}`,
       );
   }
+}
+
+/**
+ * An AND chain read once from its top: the bound evaluator group, if any, as
+ * one condition, ANDed with the chain's other operands walked as usual. The
+ * operands are folded left, the shape the parser gave the chain.
+ */
+function translateAndChain({
+  chain,
+  ctx,
+  walk,
+}: {
+  chain: AndChain;
+  ctx: TranslationContext;
+  walk: (next: LiqeQuery, negated: boolean) => string;
+}): string {
+  // The chain's own node is already counted; its nested AND nodes and the
+  // bound group are not walked, so they are counted here to keep the ceiling
+  // where the tag-by-tag walk had it.
+  ctx.nodeCount += chain.nodeCount - 1;
+  if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+    throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
+  }
+  const parts = [
+    ...(chain.scope ? [translateEvaluationScope(chain.scope, ctx)] : []),
+    ...chain.rest.map((operand) => walk(operand, false)),
+  ];
+  const [first = "1 = 1", ...others] = parts;
+  if (others.length === 0) return `(${first})`;
+  return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
 }
 
 function translateTag(

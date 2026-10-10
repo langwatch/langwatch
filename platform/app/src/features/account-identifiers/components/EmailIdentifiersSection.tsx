@@ -86,8 +86,8 @@ export function EmailIdentifiersSection({
   const sentTo = resentTo;
 
   const rows = identifiers.data ?? [];
-  const emailRows = rows.filter((row) => row.provider === "email");
   const ownAddress = confirmation.data?.email ?? null;
+  const emailRows = emailRowsOf({ rows, confirmation: confirmation.data });
 
   const refresh = useRefreshEmailIdentifiers();
 
@@ -140,7 +140,7 @@ export function EmailIdentifiersSection({
       emailRows={emailRows}
       ownAddress={ownAddress}
       ownAddressConfirmed={confirmation.data?.confirmed === true}
-      ownAddressResendable={confirmation.data?.confirmed === false}
+      ownAddressResendable={canResendOwnAddress(confirmation.data)}
       ownAddressSending={ownResend.isPending}
       sentTo={sentTo}
       lastUsedByIdentifier={lastUsed.data?.byIdentifier}
@@ -158,10 +158,46 @@ export function EmailIdentifiersSection({
       onRemove={(row) => void removeAction.remove(row)}
       draft={draft}
       adding={addAction.isPending}
+      canSendEmail={confirmation.data?.canSendConfirmation !== false}
       providerRows={providerRows}
       trailingActions={trailingActions}
     />
   );
+}
+
+type OwnAddressConfirmation = {
+  email: string | null;
+  confirmed: boolean;
+  canSendConfirmation: boolean;
+};
+
+function canResendOwnAddress(
+  confirmation: OwnAddressConfirmation | undefined,
+): boolean {
+  return (
+    confirmation?.confirmed === false &&
+    confirmation.canSendConfirmation !== false
+  );
+}
+
+/**
+ * The email rows, with every resend taken away where the installation has no
+ * email provider and so could never send a link.
+ */
+function emailRowsOf({
+  rows,
+  confirmation,
+}: {
+  rows: AccountIdentifier[];
+  confirmation: OwnAddressConfirmation | undefined;
+}): AccountIdentifier[] {
+  return rows
+    .filter((row) => row.provider === "email")
+    .map((row) =>
+      confirmation?.canSendConfirmation === false
+        ? { ...row, resendable: false }
+        : row,
+    );
 }
 
 function useRefreshEmailIdentifiers() {
@@ -228,7 +264,12 @@ function useOwnAddressResend({
   const resend = async () => {
     if (!ownAddress) return null;
     try {
-      await mutation.mutateAsync({});
+      // The same ceremony as an added address: the server picks the
+      // identifier from the session and names it back, so the verifier is
+      // filed under the id the emailed link will carry.
+      const { codeVerifier, codeChallenge } = await mintAddressCeremony();
+      const { identifierId } = await mutation.mutateAsync({ codeChallenge });
+      rememberAddressVerifier({ identifierId, codeVerifier });
       setResentTo(ownAddress);
       return null;
     } catch (error) {
@@ -259,6 +300,9 @@ interface EmailIdentifiersContentProps {
   onRemove: (row: AccountIdentifier) => void;
   draft: ReturnType<typeof useAddAddressDraft>;
   adding: boolean;
+  /** False where the installation has no email provider, so no address can
+   *  be sent the link that adding one starts. */
+  canSendEmail: boolean;
   providerRows?: ReactNode;
   trailingActions?: ReactNode;
 }
@@ -271,6 +315,7 @@ function EmailIdentifiersContent(props: EmailIdentifiersContentProps) {
     onConfirmed,
     draft,
     adding,
+    canSendEmail,
     trailingActions,
   } = props;
   return (
@@ -303,6 +348,7 @@ function EmailIdentifiersContent(props: EmailIdentifiersContentProps) {
       <IdentifierActions
         draft={draft}
         adding={adding}
+        canSendEmail={canSendEmail}
         trailingActions={trailingActions}
       />
     </VStack>
@@ -373,10 +419,12 @@ function EmailIdentifierList({
 function IdentifierActions({
   draft,
   adding,
+  canSendEmail,
   trailingActions,
 }: {
   draft: ReturnType<typeof useAddAddressDraft>;
   adding: boolean;
+  canSendEmail: boolean;
   trailingActions?: ReactNode;
 }) {
   return (
@@ -393,11 +441,15 @@ function IdentifierActions({
         justify="space-between"
         data-testid="identifier-action-row"
       >
-        <AddAddressButton
-          isOpen={draft.isOpen}
-          onOpen={draft.open}
-          onCancel={draft.close}
-        />
+        {canSendEmail ? (
+          <AddAddressButton
+            isOpen={draft.isOpen}
+            onOpen={draft.open}
+            onCancel={draft.close}
+          />
+        ) : (
+          <AddAddressUnavailable />
+        )}
         {trailingActions ? (
           <HStack gap={4} align="center" flexWrap="wrap">
             {/* Two families on one row: what this account is reached at, and
@@ -421,7 +473,7 @@ function IdentifierActions({
         ) : null}
       </HStack>
 
-      {draft.isOpen ? (
+      {draft.isOpen && canSendEmail ? (
         <AddAddressForm
           address={draft.address}
           onAddressChange={draft.setAddress}
@@ -501,6 +553,40 @@ function AddAddressButton({
       <Plus size={14} />
       Add email address
     </Button>
+  );
+}
+
+/** Why an address can be added only once email is set up. */
+const ADD_ADDRESS_NEEDS_EMAIL_COPY =
+  "Adding an address sends it a confirmation link, and this installation cannot send email yet. Ask an administrator to set up an email provider.";
+
+/**
+ * The same offer, stood down, where the installation cannot send email.
+ *
+ * Adding an address starts with a mailed link, so where no link can go out the
+ * offer would only ever end in an error. The button stays where it always is
+ * and the tooltip says what is missing, like a stood-down Remove does.
+ */
+function AddAddressUnavailable() {
+  return (
+    <Tooltip content={ADD_ADDRESS_NEEDS_EMAIL_COPY} showArrow>
+      {/* A disabled button receives no pointer events, so the wrapper is the
+          tooltip's trigger. */}
+      <Box data-testid="add-address-unavailable">
+        <Button
+          size="sm"
+          variant="outline"
+          width={SETTINGS_ACTION_BUTTON_WIDTH}
+          justifyContent="center"
+          disabled
+          aria-label={`Add email address. ${ADD_ADDRESS_NEEDS_EMAIL_COPY}`}
+          data-testid="add-address"
+        >
+          <Plus size={14} />
+          Add email address
+        </Button>
+      </Box>
+    </Tooltip>
   );
 }
 

@@ -26,9 +26,8 @@ vi.mock("../api-key-token.utils", () => ({
   INGEST_KEY_PREFIX: "ik-lw-",
 }));
 
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: () => Promise.resolve(true),
-  resolveLegacyCeiling: () => ({ grants: () => true }),
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: () => Promise.resolve(true),
   resolveApiKeyPermission: () => Promise.resolve(true),
 }));
 
@@ -97,6 +96,11 @@ function buildPrisma() {
       findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
+    },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
     teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {

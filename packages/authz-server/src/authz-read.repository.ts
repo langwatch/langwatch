@@ -2,19 +2,21 @@
  * ADR-092 — the read port. This package holds the authorization POLICIES
  * (what a snapshot means); the app holds the QUERIES, as a Prisma
  * repository implementing this interface
- * (platform/app/src/server/app-layer/authz/repositories/authz-read.prisma.repository.ts).
+ * (platform/app/src/server/app-layer/authz/repositories/authz-read.grants.repository.ts).
  * Methods return stored facts - no policy - and follow the repository
  * naming convention (findX, never getX).
  */
 import type {
   AuthzPrincipalRef,
   CollectedBinding,
-  LegacyTeamMembership,
   ShareableResourceKind,
 } from "@langwatch/authz";
 
-/** OrganizationUser.role, or null when no membership row exists. */
-export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
+/**
+ * OrganizationUser.role, or null when no membership row exists. DEVELOPER is
+ * the seat ADR-143 adds: a personal team and nothing shared.
+ */
+export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
 
 /**
  * The membership row as stored: its role, and whether an admin has disabled
@@ -105,10 +107,6 @@ export interface AuthzReadRepository extends ScopeLineageRepository {
    * carries no ceiling. `null` means the key itself is unknown.
    */
   findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null>;
-  findLegacyTeamMemberships(args: {
-    userId: string;
-    organizationId: string;
-  }): Promise<LegacyTeamMembership[]>;
   /**
    * The permission payloads for custom roles the principal's bindings
    * reference. The organization and principal are passed so the query can

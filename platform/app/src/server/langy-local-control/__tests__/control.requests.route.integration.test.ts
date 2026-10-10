@@ -23,6 +23,7 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { INSTANCE_TOKEN_HEADER } from "~/server/connected-agents/long-poll.transport";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -102,15 +103,13 @@ beforeAll(async () => {
     await prisma.teamUser.create({
       data: { userId: id, teamId: team.id, role: TeamUserRole.ADMIN },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: organization.id,
-        userId: id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: organization.id,
+      userId: id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organization.id,
     });
   }
   const project = await prisma.project.create({
@@ -170,6 +169,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await closeLocalControlRuntime();
   await cleanupTestRows(prisma, [
+    ["grant", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["customRole", { organizationId: organization.id }],
     ["apiKey", { organizationId: organization.id }],

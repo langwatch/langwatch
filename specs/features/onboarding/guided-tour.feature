@@ -149,6 +149,13 @@ Feature: Guided onboarding tour
     And the cursor stays where it was
 
   @unit
+  Scenario: the caption carries the LangWatch logo in the colour mode's own version
+    Given the llmops tour is on step 1
+    Then the caption shows the LangWatch logo
+    And on light it is the navigation's mark, white faces and navy lines
+    And on dark it is the lines alone in off-white, as the dark theme wordmark draws it
+
+  @unit
   Scenario: the step counter doubles as Back
     Given the llmops tour is on step 2
     When the user clicks the "2 of 4" counter
@@ -417,19 +424,6 @@ Feature: Guided onboarding tour
     When the trace explorer would start its first-trace coach mark
     Then no coach mark starts
     And it is not marked as shown, so it starts once the path is done
-
-  # Langy navigates to the simulations screen at the end of the llmops path,
-  # and the screen's welcome card sat on the sidebar beside the run results it
-  # had opened. The trace explorer's coach mark had the rule; this card did
-  # not. The other screens the path opens carry no coach mark of their own:
-  # the scenario editor drawer, the prompts drawers, the traces page beyond
-  # the first-trace mark, whose drawer spotlights start from it.
-  @unit
-  Scenario: the simulations welcome card stays quiet while a guided path is active
-    Given the organization is in the guided variant with a path being set up, or its tour is running
-    When the Agent Testing sidebar would pin its welcome card
-    Then no card is pinned, not even for the address parameter that brings it back
-    And nothing is snoozed or recorded, so the card shows once the path is done
 
   # ============================================================================
   # Analytics

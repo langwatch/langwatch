@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Heading,
   HStack,
   Table,
@@ -20,7 +19,7 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
 import { IdentityLookupDrawer } from "./IdentityLookupDrawer";
-import { shortenIdentifier } from "./identityLookupCopy";
+import { shortenIdentifier, waitedFor } from "./identityLookupCopy";
 import { ShortId } from "./ShortId";
 
 const COLUMN_COUNT = 4;
@@ -39,7 +38,8 @@ const COLUMN_COUNT = 4;
  *
  * There is no pagination: the input is one address, and the answer is
  * everybody who holds any part of it, which is a handful of rows or a data
- * problem.
+ * problem. The claims queue below it is the one list on this page, and it is
+ * bounded server-side.
  */
 export default function IdentityLookupView() {
   const router = useRouter();
@@ -76,7 +76,9 @@ export default function IdentityLookupView() {
         isFetching={lookup.isFetching}
         error={lookup.error}
       >
-        <VStack align="stretch" gap={6} width="full">
+        {/* The shell's card is flush because it usually holds a table. This
+            page holds sections, so it brings its own inset. */}
+        <VStack align="stretch" gap={8} width="full" padding={6}>
           {address.length === 0 && (
             <Text color="fg.muted">
               Type an email address to see how the auth screens would route it,
@@ -97,6 +99,7 @@ export default function IdentityLookupView() {
               />
             </>
           )}
+          <ClaimQueuePanel />
           <OperatorActivityPanel />
         </VStack>
       </BackofficeTable>
@@ -163,53 +166,53 @@ interface RoutingAnswer {
 function RoutingPanel({ routing }: { routing: RoutingAnswer }) {
   const guidance = signInRoutingReasonCopy(routing.reasonCode);
   return (
-    <Card.Root>
-      <Card.Body>
-        <VStack align="start" gap={2}>
-          <Heading size="sm">Routing</Heading>
-          <HStack gap={2} wrap="wrap">
-            <Badge colorPalette="blue">
-              {routing.outcome === "redirect_to_connection"
-                ? "Sent to the identity provider"
-                : "Shown the sign-in methods"}
-            </Badge>
+    <Box>
+      <Heading size="sm" paddingBottom={2}>
+        Routing
+      </Heading>
+      <VStack align="start" gap={2}>
+        <HStack gap={2} wrap="wrap">
+          <Badge colorPalette="blue">
+            {routing.outcome === "redirect_to_connection"
+              ? "Sent to the identity provider"
+              : "Shown the sign-in methods"}
+          </Badge>
+          <Text fontSize="sm" color="fg.muted">
+            because
+          </Text>
+          <Badge variant="outline" data-testid="routing-reason">
+            {routing.reasonCode}
+          </Badge>
+        </HStack>
+        {guidance ? (
+          <Box>
+            <Text fontWeight="medium">{guidance.title}</Text>
             <Text fontSize="sm" color="fg.muted">
-              because
+              {guidance.describe}
             </Text>
-            <Badge variant="outline" data-testid="routing-reason">
-              {routing.reasonCode}
-            </Badge>
-          </HStack>
-          {guidance ? (
-            <Box>
-              <Text fontWeight="medium">{guidance.title}</Text>
-              <Text fontSize="sm" color="fg.muted">
-                {guidance.describe}
-              </Text>
-            </Box>
-          ) : (
-            <Text fontSize="sm" color="fg.muted">
-              Nothing is said on screen for this decision — the person sees the
-              ordinary sign-in.
-            </Text>
-          )}
-          {routing.methods.length > 0 && (
-            <Text fontSize="sm" color="fg.muted">
-              Offered: {routing.methods.join(", ")}
-            </Text>
-          )}
-          {routing.connection && (
-            <Text fontSize="sm" data-testid="routing-connection">
-              Connection{" "}
-              {routing.connection.organizationName ??
-                shortenIdentifier(routing.connection.organizationId)}{" "}
-              ({routing.connection.providerId}) is{" "}
-              {routing.connection.state.replace(/_/g, " ").toLowerCase()}.
-            </Text>
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+          </Box>
+        ) : (
+          <Text fontSize="sm" color="fg.muted">
+            Nothing is said on screen for this decision — the person sees the
+            ordinary sign-in.
+          </Text>
+        )}
+        {routing.methods.length > 0 && (
+          <Text fontSize="sm" color="fg.muted">
+            Offered: {routing.methods.join(", ")}
+          </Text>
+        )}
+        {routing.connection && (
+          <Text fontSize="sm" data-testid="routing-connection">
+            Connection{" "}
+            {routing.connection.organizationName ??
+              shortenIdentifier(routing.connection.organizationId)}{" "}
+            ({routing.connection.providerId}) is{" "}
+            {routing.connection.state.replace(/_/g, " ").toLowerCase()}.
+          </Text>
+        )}
+      </VStack>
+    </Box>
   );
 }
 
@@ -393,6 +396,51 @@ function PersonRowActions({
         )}
       </Menu.Content>
     </Menu.Root>
+  );
+}
+
+/**
+ * Domain claims awaiting a LangWatch decision, longest wait first.
+ *
+ * The claims themselves belong to the connection aggregate; this panel only
+ * reads them and links out to the connection surface that decides them. It
+ * says how long each has waited because that is the only thing a queue is
+ * ever really asked.
+ */
+function ClaimQueuePanel() {
+  const queue = api.identityLookup.claimQueue.useQuery({}, { retry: false });
+  const nowMs = Date.now();
+
+  return (
+    <Box>
+      <Heading size="sm" paddingBottom={2}>
+        Domain claims awaiting review
+      </Heading>
+      {queue.data?.length === 0 ? (
+        <Text color="fg.muted" fontSize="sm" data-testid="claim-queue-empty">
+          Nothing is waiting.
+        </Text>
+      ) : (
+        <VStack align="stretch" gap={1}>
+          {queue.data?.map((claim) => (
+            <HStack
+              key={`${claim.connectionId}:${claim.domain}`}
+              justify="space-between"
+            >
+              <Text fontSize="sm">
+                {claim.domain} ·{" "}
+                {claim.organizationName ??
+                  shortenIdentifier(claim.organizationId)}
+              </Text>
+              <Text fontSize="sm" color="fg.muted">
+                waiting {waitedFor({ sinceMs: claim.waitingSinceMs, nowMs })} ·{" "}
+                {formatDateTime(new Date(claim.waitingSinceMs))}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+      )}
+    </Box>
   );
 }
 

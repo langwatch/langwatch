@@ -84,6 +84,7 @@ import {
   lwqlAppFunction,
   lwqlAppFunctionSignature,
 } from "../appFunctions/catalog";
+import { isEvalFunctionName } from "../appFunctions/evalCatalog";
 import type {
   LangWatchQLAppFunctionCall,
   LangWatchQLAppFunctionOption,
@@ -898,9 +899,33 @@ function directAppFunctionCall(
 // the refusal has to happen here.
 // ---------------------------------------------------------------------------
 
-const APP_FUNCTION_POSITION_MESSAGE =
-  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias. " +
+const APP_FUNCTION_POSITION_PLACE =
+  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias.";
+
+/**
+ * What to do instead, which depends on what the function returns.
+ *
+ * An extraction function hands back a value the caller can project and then
+ * filter, group or sort on. An eval function does not: its answer is decided
+ * after the query has run, so there is no column in the same statement to put
+ * in a WHERE. Telling the caller to "filter on a plain column instead" sends
+ * them looking for a column that cannot exist, so they are pointed at the two
+ * things that do work.
+ */
+const APP_FUNCTION_POSITION_EXTRACTION_ADVICE =
   "Project it there and filter, group or sort on a plain column instead.";
+
+const APP_FUNCTION_POSITION_EVAL_ADVICE =
+  "Its answer is decided after the query runs, so there is no column in this statement to filter on. " +
+  "To keep only the matches, filter the rows it returns, " +
+  "or run the statement as an Instant Eval and read `instant-eval results <run-id> --matched`.";
+
+function appFunctionPositionMessage(name: string): string {
+  const advice = isEvalFunctionName(name)
+    ? APP_FUNCTION_POSITION_EVAL_ADVICE
+    : APP_FUNCTION_POSITION_EXTRACTION_ADVICE;
+  return `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_PLACE} ${advice}`;
+}
 
 function reportAppFunctionPosition({
   name,
@@ -917,7 +942,42 @@ function reportAppFunctionPosition({
     ctx,
     frame,
     code: "APP_FUNCTION_POSITION",
-    message: `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_MESSAGE}`,
+    message: appFunctionPositionMessage(name),
+    node,
+  });
+}
+
+/**
+ * Whether the call was written in ClickHouse's parametric form,
+ * `f(params)(args)`: the parser keeps the first list under `parameters` and
+ * the second under `arguments`.
+ */
+function isParametricCall(node: SqlAstNode): boolean {
+  return Array.isArray(node.parameters);
+}
+
+/**
+ * An app function is a lambda with one argument list. The parametric form
+ * would pass validation on its `arguments` alone and then reach ClickHouse,
+ * which has no parametric UDF of that name to run, so it is refused here where
+ * the refusal can name the function.
+ */
+function reportParametricAppFunctionCall({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_ARGUMENT",
+    message: `The function "${echoIdentifier(name)}" takes one list of arguments, not a parameter list followed by one: write it as ${name}(...) rather than ${name}(...)(...).`,
     node,
   });
 }
@@ -943,6 +1003,16 @@ function walkAppFunctionCall({
   frame: Frame;
   ctx: WalkContext;
 }): void {
+  if (isParametricCall(node)) {
+    reportParametricAppFunctionCall({
+      name: definition.name,
+      node,
+      frame,
+      ctx,
+    });
+    return;
+  }
+
   const args = Array.isArray(node.arguments) ? node.arguments : [];
   const source = walkAppFunctionArguments({
     node,
@@ -1017,6 +1087,38 @@ function walkAppFunctionArguments({
 }
 
 /**
+ * Whether a nested call has the shape a source may take at all: one argument
+ * list, and an extraction rather than another eval. Reports the refusal when
+ * it does not.
+ */
+function isNestedCallAdmitted({
+  nested,
+  key,
+  frame,
+  ctx,
+}: {
+  nested: LangWatchQLAppFunctionDefinition;
+  key: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): boolean {
+  if (isParametricCall(key)) {
+    reportParametricAppFunctionCall({
+      name: nested.name,
+      node: key,
+      frame,
+      ctx,
+    });
+    return false;
+  }
+  if (nested.kind !== "extraction") {
+    reportAppFunctionPosition({ name: nested.name, node: key, frame, ctx });
+    return false;
+  }
+  return true;
+}
+
+/**
  * The extraction call an eval function reads its text from, when it has one.
  *
  * `null` means the key is not an app-function call at all, so the ordinary walk
@@ -1044,9 +1146,7 @@ function readNestedSource({
   if (typeof key.name !== "string") return null;
   const nested = lwqlAppFunction(key.name);
   if (!nested) return null;
-
-  if (nested.kind !== "extraction") {
-    reportAppFunctionPosition({ name: nested.name, node: key, frame, ctx });
+  if (!isNestedCallAdmitted({ nested, key, frame, ctx })) {
     return { source: null };
   }
 

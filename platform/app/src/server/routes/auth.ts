@@ -13,18 +13,21 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import {
-  passwordResetSessionBridge,
-  sessionCallbackEvidence,
-  sessionRevocation,
-} from "~/server/app-layer/identity/runtime";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
+import { sessionRevocation } from "~/server/app-layer/identity/runtime";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
-import { auth } from "~/server/better-auth";
+import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
+import {
+  redirectFailedSignInCallback,
+  withholdInternalSignInError,
+} from "~/server/better-auth/signin-error-redirect";
 import { prisma } from "~/server/db";
+import { handleAuthRequest } from "~/server/routes/auth-request";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -49,6 +52,11 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
 
   if (!project) {
     return c.json({ message: "Invalid auth token." }, 401);
+  }
+  // ADR-144 decision 7: an aggregate accepts no key, so an SDK must not be
+  // told its stored one is good to send traces with.
+  if (traceDestinationViolation(project.kind)) {
+    throw new AggregateProjectHasNoCredentialError();
   }
 
   return c.json({ projectSlug: project.slug });
@@ -93,19 +101,15 @@ const logoutHandler = async (c: Context) => {
     extractCookie(cookies, "better-auth.session_token");
 
   if (sessionToken) {
-    try {
-      const headers = new Headers();
-      headers.set("cookie", cookies);
-      const session = await auth.api.getSession({ headers });
+    const headers = new Headers();
+    headers.set("cookie", cookies);
+    const session = await auth.api.getSession({ headers });
 
-      if (session) {
-        await sessionRevocation().revokeOne({
-          token: session.session.token,
-          userId: session.user.id,
-        });
-      }
-    } catch {
-      // Session lookup failed — still clear cookies below
+    if (session) {
+      await sessionRevocation().revokeOne({
+        token: session.session.token,
+        userId: session.user.id,
+      });
     }
   }
 
@@ -137,11 +141,13 @@ const logoutHandler = async (c: Context) => {
       env.AUTH0_ISSUER &&
       env.AUTH0_CLIENT_ID
     ) {
-      const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
+      const returnTo = encodeURIComponent(
+        `${env.NEXTAUTH_URL}/auth/signin?signedOut=1`,
+      );
       const federatedLogoutUrl = `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
       return c.redirect(federatedLogoutUrl, 302);
     } else {
-      return c.redirect("/auth/signin", 302);
+      return c.redirect("/auth/signin?signedOut=1", 302);
     }
   } else {
     return c.json({ success: true });
@@ -158,6 +164,7 @@ const betterAuthCatchAll = async (c: Context) => {
   if (
     !isAllowedAuthOrigin({
       method: c.req.method,
+      pathname: c.req.path,
       origin: c.req.header("origin"),
       referer: c.req.header("referer"),
       baseUrl: env.NEXTAUTH_URL,
@@ -191,24 +198,39 @@ const betterAuthCatchAll = async (c: Context) => {
   // Better Auth decides its own rate-limit buckets from the request it is
   // handed, so it is handed the caller this application already resolved from
   // the connection. See `auth/caller-header.ts`.
-  const handle = () =>
-    auth.handler(
-      requestStatingCaller({
-        request: c.req.raw,
-        caller: getAuthRateLimitClientIpFromHonoContext(c),
-      }),
-    );
-  // The reset scope is opened around EVERY request rather than only the
-  // reset path: it is a per-request slot that costs nothing empty, and the
-  // path check belongs to the hook that reads it, not to the route.
-  const response = await sessionCallbackEvidence().runWithScope(() =>
-    passwordResetSessionBridge().runWithScope(handle),
-  );
+  const caller = getAuthRateLimitClientIpFromHonoContext(c);
+  const response = await handleAuthRequest({
+    request: c.req.raw,
+    handler: (request) =>
+      auth.handler(requestStatingCaller({ request, caller })),
+  });
   // better-auth's refusals speak its own vocabulary, which is neither a
   // registered code nor copy anybody wrote for a customer. This is where the
   // families we have translated join the handled-error contract; everything
   // else passes through byte for byte. See `better-auth/handled-errors.ts`.
-  return translateBetterAuthError({ response, path: c.req.path });
+  const answered = await translateBetterAuthError({
+    response,
+    path: c.req.path,
+  });
+  // AND THE SAME RULE FOR THE ANSWERS THAT ARE NOT BODIES. A sign-in that
+  // fails REDIRECTS, so its reason travels in a query string somebody can
+  // read, copy and paste into a ticket rather than in a body only code sees.
+  // The two are one doctrine — only a refusal we have written down crosses —
+  // applied to the two shapes an answer takes.
+  // See `better-auth/signin-error-redirect.ts`.
+  const traceId = c.get("traceId") as string | undefined;
+  // The two act on different statuses (a 3xx to the error page, a 5xx on a
+  // callback), so each answer passes through at most one of them.
+  return await redirectFailedSignInCallback({
+    response: withholdInternalSignInError({
+      response: answered,
+      errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
+      traceId,
+    }),
+    path: c.req.path,
+    errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
+    traceId,
+  });
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

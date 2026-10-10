@@ -12,18 +12,15 @@
  * Every case here is a denial in the router's own middleware, which runs ahead
  * of the plan check and the resolver, so no App or plan wiring is needed.
  */
-import { generate } from "@langwatch/ksuid";
+
+import { roleFactToRow } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -59,15 +56,13 @@ describe("Feature: role router caller authorization", () => {
     await prisma.organizationUser.create({
       data: { userId: user.id, organizationId: orgId, role },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: orgId,
-        userId: user.id,
-        role: bindingRole,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: orgId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `role-authz-${label}-${ns}`,
+      organizationId: orgId,
+      userId: user.id,
+      role: bindingRole,
+      scopeType: "ORGANIZATION",
+      scopeId: orgId,
     });
     return user.id;
   };
@@ -111,14 +106,27 @@ describe("Feature: role router caller authorization", () => {
       TeamUserRole.ADMIN,
     );
 
+    const permissions = ["traces:view"];
     const customRole = await prisma.customRole.create({
       data: {
         organizationId,
         name: `Role ${ns}`,
-        permissions: ["traces:view"],
+        permissions,
       },
     });
     customRoleId = customRole.id;
+    await prisma.role.create({
+      data: roleFactToRow({
+        organizationId,
+        role: {
+          roleId: customRole.id,
+          name: customRole.name,
+          permissions,
+          kind: "custom",
+          occurredAtMs: customRole.createdAt.getTime(),
+        },
+      }),
+    });
 
     adminCaller = callerFor(adminUserId);
     memberCaller = callerFor(memberUserId);
@@ -128,6 +136,12 @@ describe("Feature: role router caller authorization", () => {
   afterAll(async () => {
     for (const orgId of [organizationId, otherOrganizationId]) {
       await prisma.roleBinding
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
+      await prisma.grant
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
+      await prisma.role
         .deleteMany({ where: { organizationId: orgId } })
         .catch(() => {});
       await prisma.customRole

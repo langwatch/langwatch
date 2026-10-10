@@ -21,7 +21,9 @@ describe("parseServerFrame()", () => {
       expect(frame).toEqual({
         type: "registered",
         protocol: 1,
-        agents: [{ name: "a", environment: "development", id: "agent_1", url: "https://x/y", parameterNotes: ["n"] }],
+        // A frame with no scope is a platform that predates the field, and
+        // everything it registers is shared.
+        agents: [{ name: "a", environment: "development", id: "agent_1", url: "https://x/y", parameterNotes: ["n"], scope: { kind: "shared" } }],
         heartbeatIntervalMs: 5000,
         instanceId: "inst_1",
       });

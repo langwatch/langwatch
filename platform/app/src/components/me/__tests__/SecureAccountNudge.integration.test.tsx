@@ -31,6 +31,7 @@ const {
   cacheCalls,
   mountFetch,
   dismissal,
+  cacheCancel,
 } = vi.hoisted(() => {
   const nudgeRef = {
     current: {
@@ -54,13 +55,27 @@ const {
   // callbacks survive. One given to `useMutation` runs whatever happened to
   // the component; one given to `mutate` is dropped when the observer is
   // gone by the time the server answers.
-  type Callbacks = { onSettled?: () => void } | undefined;
+  type Callbacks =
+    | { onSettled?: () => void; trpc?: { context?: Record<string, unknown> } }
+    | undefined;
   const dismissal = {
     onMutation: undefined as Callbacks,
     onCall: undefined as Callbacks,
     settle: ({ isStillMounted }: { isStillMounted: boolean }) => {
       dismissal.onMutation?.onSettled?.();
       if (isStillMounted) dismissal.onCall?.onSettled?.();
+    },
+  };
+  // The cache's own cancel waits for a refetch that may still be in flight.
+  // Held open, it stands for the window in which a full page load carries
+  // every request the document had not sent yet away with it.
+  const cacheCancel = {
+    gate: undefined as Promise<void> | undefined,
+    hold: () => {
+      cacheCancel.gate = new Promise<void>(() => undefined);
+    },
+    release: () => {
+      cacheCancel.gate = undefined;
     },
   };
   return {
@@ -70,6 +85,7 @@ const {
     cacheCalls: [] as string[],
     mountFetch,
     dismissal,
+    cacheCancel,
   };
 });
 
@@ -85,6 +101,7 @@ vi.mock("~/utils/api", () => ({
           cancel: async () => {
             cacheCalls.push("cancel");
             mountFetch.isCancelled = true;
+            await cacheCancel.gate;
           },
           setData: (
             _input: unknown,
@@ -101,7 +118,10 @@ vi.mock("~/utils/api", () => ({
     user: {
       secureAccountNudge: { useQuery: () => ({ data: nudgeRef.current }) },
       dismissSecureAccountNudge: {
-        useMutation: (options?: { onSettled?: () => void }) => {
+        useMutation: (options?: {
+          onSettled?: () => void;
+          trpc?: { context?: Record<string, unknown> };
+        }) => {
           dismissal.onMutation = options;
           return {
             mutate: (input: unknown, perCall?: { onSettled?: () => void }) => {
@@ -154,6 +174,7 @@ describe("the secure-account offer", () => {
     mountFetch.isCancelled = false;
     dismissal.onMutation = undefined;
     dismissal.onCall = undefined;
+    cacheCancel.release();
   });
 
   afterEach(() => {
@@ -196,6 +217,35 @@ describe("the secure-account offer", () => {
 
         expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
         expect(cacheCalls).toEqual(["cancel", "setData"]);
+      });
+    });
+
+    /**
+     * The cache is gone on a full page load, so the account write is the only
+     * part of the answer the next document can read. It used to be sent LAST,
+     * behind an awaited cache cancel that waits on a refetch still in flight —
+     * and an end-to-end run caught the consequence: the request was never sent
+     * at all, the server was never told, and the offer came back as a modal
+     * over the settings page somebody had just been sent to.
+     */
+    describe("when the page goes away before the cache work finishes", () => {
+      /** @scenario "A dismissal is remembered on the next page, not just in the dialog" */
+      it("has already told the account, because the write waits for nothing", async () => {
+        cacheCancel.hold();
+        renderNudge();
+
+        fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+        await waitFor(() => {
+          expect(dismissMock).toHaveBeenCalled();
+        });
+        // Still parked inside the cancel: the write went out ahead of it.
+        expect(cacheCalls).toEqual(["cancel"]);
+        // Sent so it outlives the document as well. Being sent first is not
+        // enough on its own: the browser cancels everything still in flight
+        // when a page goes away, and an end-to-end run showed the answer lost
+        // in exactly that window, a few milliseconds wide.
+        expect(dismissal.onMutation?.trpc?.context?.keepalive).toBe(true);
       });
     });
 

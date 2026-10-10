@@ -1,9 +1,9 @@
 import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { checkOpsPermission } from "~/server/app-layer/authz/permission-adapters";
 import { signUpHealth } from "~/server/app-layer/identity/runtime";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
 import {

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useFilterStore } from "../../traces-v2/stores/filterStore";
+import { useExplorerStore } from "../../traces-v2/stores/explorerStore";
 import type { LangyContextChip } from "../stores/langyStore";
 
 /**
@@ -15,7 +15,7 @@ import type { LangyContextChip } from "../stores/langyStore";
  * singleton whose query survives navigation).
  */
 export function useLangyFilterContext(): LangyContextChip | null {
-  const queryText = useFilterStore((s) => s.queryText);
+  const queryText = useExplorerStore((s) => s.queryText);
 
   return useMemo(() => filterContextChip(queryText), [queryText]);
 }

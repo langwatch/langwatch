@@ -13,7 +13,6 @@
  *   - no key can be bound into a personal workspace the credential does
  *     not own (issue #6338, api-key half).
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -26,9 +25,9 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 wireDefaultTestApp();
@@ -134,13 +133,11 @@ describe("Feature: API keys management REST API", () => {
     // The admin holds a real org-scope ADMIN binding; the manager holds
     // organization:manage only through a CUSTOM role, which is exactly the
     // caller the escalation pin is about.
-    const manageRole = await prisma.customRole.create({
-      data: {
-        name: `manage-only-${ns}`,
-        organizationId: testOrganization.id,
-        permissions: ["organization:manage"],
-        kind: "custom",
-      },
+    const manageRole = await seedCustomRole(prisma, {
+      name: `manage-only-${ns}`,
+      organizationId: testOrganization.id,
+      permissions: ["organization:manage"],
+      kind: "custom",
     });
 
     personalTeam = await prisma.team.create({
@@ -165,44 +162,36 @@ describe("Feature: API keys management REST API", () => {
       },
     });
 
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: testOrganization.id,
-        },
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: managerUserId,
-          role: TeamUserRole.CUSTOM,
-          customRoleId: manageRole.id,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: testOrganization.id,
-        },
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: ownerUserId,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: testOrganization.id,
-        },
-        // The canonical owner binding a personal workspace is provisioned
-        // with; it is what puts the owner's own ceiling above the workspace.
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: ownerUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: personalTeam.id,
-        },
-      ],
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId: adminUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId: managerUserId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: manageRole.id,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId: ownerUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
+    });
+    // The canonical owner binding a personal workspace is provisioned with;
+    // it is what puts the owner's own ceiling above the workspace.
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId: ownerUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: personalTeam.id,
     });
 
     adminToken = (
@@ -289,6 +278,7 @@ describe("Feature: API keys management REST API", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId: testOrganization?.id }],
       ["roleBinding", { organizationId: testOrganization?.id }],
       ["apiKey", { organizationId: testOrganization?.id }],
       ["customRole", { organizationId: testOrganization?.id }],

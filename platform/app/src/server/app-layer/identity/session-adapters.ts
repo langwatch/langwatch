@@ -1,7 +1,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import {
+  identifierProviderFor,
+  LIVE_IDENTIFIER_STATES,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
+import { deriveIdentifierId } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { tryGetApp } from "~/server/app-layer/app";
 import { signInProviderForPath } from "./session-claims";
 import type {
@@ -9,7 +15,6 @@ import type {
   SessionIdentifierPort,
 } from "./session-claims.service";
 import type {
-  SessionCachePort,
   SessionRecord,
   SessionRecordsPort,
 } from "./session-inventory.service";
@@ -45,7 +50,16 @@ const VERIFIED_AMR_PROVIDERS = new Set(["auth0", "okta"]);
  * re-attach after a detach looks like in the projection.
  */
 export class PrismaSessionIdentifiers implements SessionIdentifierPort {
-  constructor(private readonly prisma: PrismaClient) {}
+  readonly #prisma: PrismaClient;
+  readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
+
+  constructor(
+    prisma: PrismaClient,
+    transactions: AsyncLocalStorage<Prisma.TransactionClient>,
+  ) {
+    this.#prisma = prisma;
+    this.#transactions = transactions;
+  }
 
   async findIdentifierIdFor({
     userId,
@@ -56,17 +70,79 @@ export class PrismaSessionIdentifiers implements SessionIdentifierPort {
     providerId: string;
     providerAccountId?: string;
   }): Promise<string | null> {
-    const identifier = await this.prisma.identifier.findFirst({
+    const transaction = this.#transactions.getStore();
+    const database = transaction ?? this.#prisma;
+    const identifier = await database.identifier.findFirst({
       where: {
         userId,
         providerId,
         ...(providerAccountId ? { providerAccountId } : {}),
         detachedAt: null,
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
       },
       orderBy: { attachedAt: "desc" },
       select: { id: true },
     });
-    return identifier?.id ?? null;
+    if (identifier) {
+      return identifier.id;
+    }
+    if (!transaction || !providerAccountId) {
+      return null;
+    }
+    return this.#unprojectedAccountIdentifier({
+      transaction,
+      userId,
+      providerId,
+      providerAccountId,
+    });
+  }
+
+  async #unprojectedAccountIdentifier({
+    transaction,
+    userId,
+    providerId,
+    providerAccountId,
+  }: {
+    transaction: Prisma.TransactionClient;
+    userId: string;
+    providerId: string;
+    providerAccountId: string;
+  }): Promise<string | null> {
+    const accounts = await transaction.account.findMany({
+      where: { userId, provider: providerId, providerAccountId },
+      select: { id: true, createdAt: true },
+      take: 2,
+    });
+    const account = accounts[0];
+    if (!account || accounts.length !== 1) {
+      return null;
+    }
+    const user = await transaction.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    if (!user?.email) {
+      return null;
+    }
+
+    // The first callback can precede its Identifier projection. The same
+    // accepted native Account derives the same ID in live attach and adoption.
+    const identifierId = deriveIdentifierId({
+      userId,
+      provider: identifierProviderFor(providerId),
+      providerAccountId,
+      normalizedValue: normalizeIdentifierValue(user.email),
+      occurredAtMs: account.createdAt.getTime(),
+    });
+    const existing = await transaction.identifier.findFirst({
+      where: {
+        OR: [{ id: identifierId }, { accountId: account.id }],
+      },
+      select: { id: true },
+    });
+    // A row that failed the live exact-account lookup is not a missing
+    // projection. Never revive a tombstone or borrow conflicting evidence.
+    return existing ? null : identifierId;
   }
 }
 
@@ -143,6 +219,37 @@ export class VerifiedCallbackProviderAssertions
       providerAccountId,
       assertedFactors,
     };
+    if (
+      current.evidence?.providerId === providerId &&
+      current.evidence.providerAccountId === providerAccountId
+    ) {
+      current.evidence = {
+        ...current.evidence,
+        assertedFactors,
+        verifiedTokenClaims: true,
+      };
+    }
+  }
+
+  /** Records the exact account accepted by the SSO plugin's resolveUser seam.
+   * Unlike account after-hooks, this runs before the plugin creates a session. */
+  recordAuthenticatedSsoAccount({
+    providerId,
+    providerAccountId,
+  }: {
+    providerId: string;
+    providerAccountId: string;
+  }): void {
+    const current = this.scope.getStore();
+    if (!current || !providerId || !providerAccountId) {
+      return;
+    }
+    current.evidence = {
+      providerId,
+      providerAccountId,
+      assertedFactors: [],
+      verifiedTokenClaims: false,
+    };
   }
 
   recordAuthenticatedCallbackAccount({
@@ -194,7 +301,9 @@ export class VerifiedCallbackProviderAssertions
 }
 
 /** The session rows themselves. */
-export class PrismaSessionRecords implements SessionRecordsPort {
+export class PrismaSessionRecords
+  implements SessionRecordsPort, SessionRevocationRecordsPort
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async listForUser({
@@ -225,10 +334,86 @@ export class PrismaSessionRecords implements SessionRecordsPort {
     });
   }
 
+  async findTokensForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly string[]> {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId },
+      select: { sessionToken: true },
+    });
+    return sessions.map((session) => session.sessionToken);
+  }
+
+  async findTokensForUserExcept({
+    userId,
+    keepSessionId,
+  }: {
+    userId: string;
+    keepSessionId: string;
+  }): Promise<readonly string[]> {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId, NOT: { id: keepSessionId } },
+      select: { sessionToken: true },
+    });
+    return sessions.map((session) => session.sessionToken);
+  }
+
+  async findTokenForSession({
+    sessionId,
+  }: {
+    sessionId: string;
+  }): Promise<string | null> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { sessionToken: true },
+    });
+    return session?.sessionToken ?? null;
+  }
+
+  async findForIdentifier({
+    userId,
+    identifierId,
+  }: {
+    userId: string;
+    identifierId: string;
+  }): Promise<readonly RevocableSession[]> {
+    const sessions = await this.listForIdentifier({ userId, identifierId });
+    return sessions.map(({ id, sessionToken }) => ({ id, sessionToken }));
+  }
+
+  async deleteAllForUser({ userId }: { userId: string }): Promise<number> {
+    const result = await this.prisma.session.deleteMany({ where: { userId } });
+    return result.count;
+  }
+
+  async deleteForUserExcept({
+    userId,
+    keepSessionId,
+  }: {
+    userId: string;
+    keepSessionId: string;
+  }): Promise<number> {
+    const result = await this.prisma.session.deleteMany({
+      where: { userId, NOT: { id: keepSessionId } },
+    });
+    return result.count;
+  }
+
   async deleteByIds({ ids }: { ids: readonly string[] }): Promise<number> {
     if (ids.length === 0) return 0;
     const result = await this.prisma.session.deleteMany({
       where: { id: { in: [...ids] } },
+    });
+    return result.count;
+  }
+
+  async deleteByToken({ token }: { token: string }): Promise<number> {
+    // `deleteMany` makes signing out twice a zero-count result rather than an
+    // exception for a row that has already gone.
+    const result = await this.prisma.session.deleteMany({
+      where: { sessionToken: token },
     });
     return result.count;
   }
@@ -264,56 +449,18 @@ const activeSessionIndexKey = ({ userId }: { userId: string }) =>
 const sessionCacheConnection = () => tryGetApp()?.redis ?? null;
 
 /**
- * better-auth's session cache, cleared for the tokens that are about to stop
- * being valid.
+ * better-auth's session cache, as revocation reads and rewrites it.
  *
- * The same keys {@link RedisSessionRevocationCache} clears, for the same
- * reason: better-auth reads the cache before the database, so a deleted row
- * alone is invisible to it for as long as thirty days.
- */
-export class RedisSessionCache implements SessionCachePort {
-  async dropTokens({
-    userId,
-    tokens,
-  }: {
-    userId: string;
-    tokens: readonly string[];
-  }): Promise<void> {
-    const redis = sessionCacheConnection();
-    if (!redis) return;
-    try {
-      for (const token of tokens) {
-        await redis.del(cachedSessionKey({ token }));
-      }
-      // The index is a write-time convenience, not the truth. Dropping it
-      // whole costs one extra database read on this person's next request and
-      // cannot leave a revoked token listed as live.
-      await redis.del(activeSessionIndexKey({ userId }));
-    } catch (error) {
-      // The rows are still going. A cache we could not clear delays the
-      // revocation; it does not fail it, and saying so is what makes the
-      // delay diagnosable rather than mysterious.
-      logger.error(
-        { error, userId, tokenCount: tokens.length },
-        "could not clear the session cache while ending sessions for one sign-in method; the rows are still being deleted",
-      );
-    }
-  }
-}
-
-/**
- * The same cache, as revocation reads and rewrites it.
- *
- * Separate from {@link RedisSessionCache} because the error policy differs and
- * not because the store does: these methods report a failure by throwing, and
- * `SessionRevocationService` is what decides that a cache it could not clear
- * delays a revocation rather than failing it.
+ * These methods report store failures by throwing. `SessionRevocationService`
+ * decides that a cache it could not clear delays a revocation rather than
+ * failing it, so the same adapter can serve personal and operator paths while
+ * their index policies remain in the service.
  *
  * A deployment with no Redis reads as an empty cache and accepts every write:
  * there is nothing cached to leave a revoked person signed in, so absence is
  * an answer here rather than a failure.
  */
-export class RedisSessionRevocationCache implements SessionRevocationCachePort {
+export class RedisSessionCache implements SessionRevocationCachePort {
   async readIndex({
     userId,
   }: {
@@ -370,110 +517,5 @@ export class RedisSessionRevocationCache implements SessionRevocationCachePort {
     for (const token of tokens) {
       await redis.del(cachedSessionKey({ token }));
     }
-  }
-}
-
-/**
- * The session rows revocation deletes, and the tokens it has to clear from the
- * cache before it does.
- *
- * Every read here is deliberately unfiltered by expiry, unlike
- * {@link PrismaSessionRecords}: a cached session outlives the row's own expiry
- * window, so a token skipped for being expired is a token better-auth would
- * keep answering from.
- */
-export class PrismaSessionRevocationRecords
-  implements SessionRevocationRecordsPort
-{
-  constructor(private readonly prisma: PrismaClient) {}
-
-  async findTokensForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<readonly string[]> {
-    const sessions = await this.prisma.session.findMany({
-      where: { userId },
-      select: { sessionToken: true },
-    });
-    return sessions.map((session) => session.sessionToken);
-  }
-
-  async findTokensForUserExcept({
-    userId,
-    keepSessionId,
-  }: {
-    userId: string;
-    keepSessionId: string;
-  }): Promise<readonly string[]> {
-    const sessions = await this.prisma.session.findMany({
-      where: { userId, NOT: { id: keepSessionId } },
-      select: { sessionToken: true },
-    });
-    return sessions.map((session) => session.sessionToken);
-  }
-
-  async findTokenForSession({
-    sessionId,
-  }: {
-    sessionId: string;
-  }): Promise<string | null> {
-    const session = await this.prisma.session.findUnique({
-      where: { id: sessionId },
-      select: { sessionToken: true },
-    });
-    return session?.sessionToken ?? null;
-  }
-
-  async findForIdentifier({
-    userId,
-    identifierId,
-  }: {
-    userId: string;
-    identifierId: string;
-  }): Promise<readonly RevocableSession[]> {
-    // The user id is part of the predicate even though the identifier already
-    // implies one: a caller that named somebody else's identifier ends
-    // nothing rather than ending their sessions.
-    return this.prisma.session.findMany({
-      where: { userId, identifierId },
-      select: { id: true, sessionToken: true },
-    });
-  }
-
-  async deleteAllForUser({ userId }: { userId: string }): Promise<number> {
-    const result = await this.prisma.session.deleteMany({ where: { userId } });
-    return result.count;
-  }
-
-  async deleteForUserExcept({
-    userId,
-    keepSessionId,
-  }: {
-    userId: string;
-    keepSessionId: string;
-  }): Promise<number> {
-    const result = await this.prisma.session.deleteMany({
-      where: { userId, NOT: { id: keepSessionId } },
-    });
-    return result.count;
-  }
-
-  async deleteByIds({ ids }: { ids: readonly string[] }): Promise<number> {
-    if (ids.length === 0) return 0;
-    const result = await this.prisma.session.deleteMany({
-      where: { id: { in: [...ids] } },
-    });
-    return result.count;
-  }
-
-  async deleteByToken({ token }: { token: string }): Promise<number> {
-    // `deleteMany` rather than `delete` so a session that has already gone —
-    // the ordinary case when somebody signs out twice — is a count of zero
-    // rather than an exception to swallow.
-    const result = await this.prisma.session.deleteMany({
-      where: { sessionToken: token },
-    });
-    return result.count;
   }
 }

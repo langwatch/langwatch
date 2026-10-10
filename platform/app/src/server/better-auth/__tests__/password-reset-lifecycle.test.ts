@@ -19,9 +19,9 @@ vi.mock("../../mailer/resetPasswordEmail", () => ({
 import { sendResetPasswordEmail } from "../../mailer/resetPasswordEmail";
 import { emailAndPassword } from "../config/email-and-password";
 import { rateLimit } from "../config/rate-limit";
-import { beforeSessionCreate } from "../hooks";
 import { PasswordResetSessionBridge } from "../password-reset-session";
 import { BetterAuthSessionMinter } from "../session-minter";
+import { createSessionGateHooks } from "./support/session-gate";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
 
@@ -96,26 +96,23 @@ function buildHarness({
             session: {
               create: {
                 before: async (session: { userId: string }) => {
-                  const permitted = await beforeSessionCreate({
-                    prisma: {
-                      user: {
-                        findUnique: async () => {
-                          const user = rows(db, "user").find(
-                            (candidate) => candidate.id === session.userId,
-                          );
-                          if (!user) return null;
+                  const permitted = await createSessionGateHooks({
+                    findUser: async (userId) => {
+                      const user = rows(db, "user").find(
+                        (candidate) => candidate.id === userId,
+                      );
+                      if (!user) return null;
 
-                          return {
-                            deactivatedAt:
-                              user.deactivatedAt instanceof Date
-                                ? user.deactivatedAt
-                                : null,
-                            signupConfirmationPending:
-                              user.signupConfirmationPending === true,
-                          };
-                        },
-                      },
+                      return {
+                        deactivatedAt:
+                          user.deactivatedAt instanceof Date
+                            ? user.deactivatedAt
+                            : null,
+                        signupConfirmationPending:
+                          user.signupConfirmationPending === true,
+                      };
                     },
+                  }).beforeSessionCreate({
                     session: { userId: session.userId },
                   });
                   return permitted === false ? false : void 0;

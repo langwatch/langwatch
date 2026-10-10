@@ -93,7 +93,7 @@ export default defineConfig({
       "**/*.integration.test.{ts,tsx}",
       "**/*.stress.test.{ts,tsx}",
       "**/*.scenario.test.{ts,tsx}",
-      "**/*.browser.test.{ts,tsx}",
+      "**/*.browser.test.{ts,tsx,mjs}",
       ".next/**/*",
       ".next-saas/**/*",
       // e2e stays out of the unit run — it needs a live stack — EXCEPT for

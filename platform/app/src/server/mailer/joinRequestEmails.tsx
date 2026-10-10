@@ -1,6 +1,5 @@
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
-import { sendEmail } from "./emailSender";
 
 /**
  * The four join-request emails (D12).
@@ -62,7 +61,7 @@ const actionButton = (href: string, label: string) => (
 );
 
 /** Somebody on the company domain is waiting. Sent to every admin. */
-export const sendJoinRequestArrivedEmail = async ({
+export const renderJoinRequestArrivedEmail = async ({
   adminEmail,
   organizationName,
   requesterName,
@@ -98,15 +97,15 @@ export const sendJoinRequestArrivedEmail = async ({
       ),
     }),
   );
-  await sendEmail({
+  return {
     to: adminEmail,
     subject: `${requesterName} asked to join ${organizationName}`,
     html,
-  });
+  };
 };
 
 /** The one nudge, on the seventh day. */
-export const sendJoinRequestReminderEmail = async ({
+export const renderJoinRequestReminderEmail = async ({
   adminEmail,
   organizationName,
   requesterName,
@@ -136,15 +135,15 @@ export const sendJoinRequestReminderEmail = async ({
       ),
     }),
   );
-  await sendEmail({
+  return {
     to: adminEmail,
     subject: `${requesterName} is still waiting to join ${organizationName}`,
     html,
-  });
+  };
 };
 
 /** You are in. Sent to the requester. */
-export const sendJoinRequestApprovedEmail = async ({
+export const renderJoinRequestApprovedEmail = async ({
   requesterEmail,
   organizationName,
   organizationUrl,
@@ -168,17 +167,17 @@ export const sendJoinRequestApprovedEmail = async ({
       ),
     }),
   );
-  await sendEmail({
+  return {
     to: requesterEmail,
     subject: `You are now a member of ${organizationName}`,
     html,
-  });
+  };
 };
 
 /**
  * It was not approved. No reason, and nobody named — see the module docblock.
  */
-export const sendJoinRequestRejectedEmail = async ({
+export const renderJoinRequestRejectedEmail = async ({
   requesterEmail,
   organizationName,
 }: {
@@ -202,15 +201,15 @@ export const sendJoinRequestRejectedEmail = async ({
       ),
     }),
   );
-  await sendEmail({
+  return {
     to: requesterEmail,
     subject: `Your request to join ${organizationName} was not approved`,
     html,
-  });
+  };
 };
 
 /** Nobody answered in time. Sent to the requester, who may ask again. */
-export const sendJoinRequestExpiredEmail = async ({
+export const renderJoinRequestExpiredEmail = async ({
   requesterEmail,
   organizationName,
 }: {
@@ -232,11 +231,11 @@ export const sendJoinRequestExpiredEmail = async ({
       ),
     }),
   );
-  await sendEmail({
+  return {
     to: requesterEmail,
     subject: `Your request to join ${organizationName} lapsed`,
     html,
-  });
+  };
 };
 
 /**
@@ -245,7 +244,7 @@ export const sendJoinRequestExpiredEmail = async ({
  * moment it happens, which is the whole price of admitting somebody with
  * nobody in the loop.
  */
-export const sendDomainAutoJoinedEmail = async ({
+export const renderDomainAutoJoinedEmail = async ({
   adminEmail,
   organizationName,
   memberName,
@@ -264,9 +263,10 @@ export const sendDomainAutoJoinedEmail = async ({
       children: (
         <>
           <p>
-            <strong>{memberName}</strong> verified a <strong>{domain}</strong>{" "}
-            address and joined <strong>{organizationName}</strong> on LangWatch
-            with the organization&apos;s default role.
+            <strong>{memberName}</strong> signed in with an address on{" "}
+            <strong>{domain}</strong> and joined{" "}
+            <strong>{organizationName}</strong> on LangWatch with the
+            organization&apos;s default role.
           </p>
           <p>
             They were admitted by your automatic joining setting for that
@@ -278,9 +278,9 @@ export const sendDomainAutoJoinedEmail = async ({
       ),
     }),
   );
-  await sendEmail({
+  return {
     to: adminEmail,
     subject: `${memberName} joined ${organizationName} automatically`,
     html,
-  });
+  };
 };

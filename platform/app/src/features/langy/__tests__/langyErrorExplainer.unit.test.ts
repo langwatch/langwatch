@@ -57,6 +57,9 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
+      // A turn on an aggregate project, refused before anything is written
+      // with the shared read-only refusal.
+      "aggregate_project_is_read_only",
       // Sending faster than the per-user limit allows: without an entry here it
       // fell into the generic default, which tells a throttled user Langy is
       // broken and offers a retry into the same limit.
@@ -187,6 +190,201 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario A model the provider refuses to this key reads as a credential to check */
+      it("reads a Bedrock access_denied as the provider refusing the key, and offers the settings", () => {
+        // The chain a guided-onboarding turn on Bedrock recorded: the key had
+        // no access to the model and Bedrock answered 403 access_denied.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: {
+                  http_status: 403,
+                  provider: "bedrock",
+                  body_kind: "json",
+                },
+                reasons: [{ kind: "access_denied" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.title).toBe("This provider rejected the API key");
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("This provider rejected the API key");
+        expect(presentation.description).toBe(
+          "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A refused credential in a dialect the client does not know still reads as a credential to check */
+      it.each([
+        // A wrong AWS secret, by Bedrock's own exception name.
+        [[{ kind: "InvalidSignatureException" }]],
+        [[{ kind: "UnrecognizedClientException" }]],
+        // A discriminant no list names, with the status reason beside it.
+        [[{ kind: "SomeFutureAuthException" }, { kind: "upstream_forbidden" }]],
+        [
+          [
+            { kind: "invalid_request_error" },
+            { kind: "upstream_unauthorized" },
+          ],
+        ],
+      ])("reads %j as the provider refusing the key, and offers the settings", (reasons) => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 403, provider: "bedrock" },
+                reasons,
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A model the provider does not know reads as a model to check */
+      it("reads a model_not_found as a model to check, and offers the settings", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: {
+                  http_status: 404,
+                  provider: "openai",
+                  body_kind: "json",
+                },
+                reasons: [{ kind: "model_not_found" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider does not serve this model to this key. Check the model name, or pick a different model.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario Any failure filed under the proxy's upstream code reads as the provider's */
+      it("reads an unclassified provider code under the proxy's upstream code as the provider card", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: {
+                  http_status: 400,
+                  provider: "bedrock",
+                  body_kind: "json",
+                },
+                reasons: [{ kind: "some_new_provider_code" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      /** @scenario A request the provider refuses as invalid reads as the provider's, with another model as the way out */
+      it("reads a Bedrock ValidationException as an invalid request, and offers the settings", () => {
+        // The chain a Bedrock turn records once the gateway forwards the 400
+        // under Bedrock's own exception name.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 400, body_kind: "json" },
+                reasons: [{ kind: "ValidationException" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.description).toBe(
+          "The model provider refused the request as invalid, and it refuses the same request every time. Pick a different model, or share the trace with support.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A failure the gateway files as the provider's reads as the provider card */
+      it("reads the gateway's provider_error as the provider card", () => {
+        // The chain the guided-onboarding turn on Bedrock recorded while the
+        // gateway wrapped Bedrock's 400 in its own 502.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            httpStatus: 502,
+            reasons: [
+              {
+                kind: "provider_error",
+                meta: { http_status: 502, status: 400 },
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      /** @scenario A provider the gateway could not reach reads as the provider being down */
+      it("reads the gateway's provider_timeout as an outage", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "provider_timeout" }],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider is temporarily unavailable. Try again shortly, or pick a different model.",
+        );
+      });
+
       /** @scenario A provider outage reads as the provider being down */
       it("names an outage as the provider's, and offers another model", () => {
         const presentation = explainLangyError(
@@ -215,6 +413,93 @@ describe("explainLangyError", () => {
         );
 
         expect(presentation.kind).toBe("langy_codex_session_expired");
+      });
+    });
+  });
+
+  describe("given an agent failure the gateway stopped for an incomplete provider", () => {
+    const gatewayReason = (meta: Record<string, unknown>) =>
+      domain({
+        code: "langy_agent_errored",
+        httpStatus: 502,
+        reasons: [{ kind: "provider_config_invalid", meta }],
+      });
+
+    describe("when the provider has no API key saved", () => {
+      /** @scenario A provider with no API key saved reads as a key to add */
+      it("says so, and offers the provider settings instead of a retry", () => {
+        const presentation = explainLangyError(
+          gatewayReason({ problem: "api_key_missing", model: "gpt-5.6-terra" }),
+        );
+
+        expect(presentation.kind).toBe("provider_config_invalid");
+        expect(presentation.description).toBe(
+          "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Open model providers",
+          kind: "configure-model",
+        });
+      });
+    });
+
+    describe("when the reason carries more than the client asked for", () => {
+      /** @scenario The card never repeats what the gateway or the provider wrote */
+      it("keeps only the enumerated problem and a model id", () => {
+        const presentation = explainLangyError(
+          gatewayReason({
+            problem: "api_key_missing",
+            model: "gpt-5.6-terra",
+            message: "Incorrect API key provided: sk-proj-abc",
+            provider: "openai",
+            tips: ["anything"],
+          }),
+        );
+
+        expect(presentation.meta).toEqual({
+          problem: "api_key_missing",
+          model: "gpt-5.6-terra",
+        });
+      });
+
+      /** @scenario The card never repeats what the gateway or the provider wrote */
+      it("drops a model that does not read as a model id", () => {
+        const presentation = explainLangyError(
+          gatewayReason({
+            problem: "deployment_missing",
+            model: "gpt <script>alert(1)</script>",
+          }),
+        );
+
+        expect(presentation.meta).toEqual({ problem: "deployment_missing" });
+        expect(presentation.description).toBe(
+          "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.",
+        );
+      });
+    });
+
+    describe("when the reason sits beneath another one", () => {
+      /** @scenario A provider with no API key saved reads as a key to add */
+      it("is still found", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "chain_exhausted",
+                reasons: [
+                  {
+                    kind: "provider_config_invalid",
+                    meta: { problem: "endpoint_missing" },
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("provider_config_invalid");
+        expect(presentation.description).toContain("no endpoint URL saved");
       });
     });
   });
@@ -320,11 +605,13 @@ describe("explainLangyError", () => {
           }),
         );
 
-        expect(presentation.kind).toBe("langy_agent_errored");
-        expect(presentation.title).toBe("Langy's reply failed");
+        // A failure under the proxy's upstream code is the provider's, so it
+        // reads as the provider card, in words written here.
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
         expect(presentation.description).not.toContain("credit balance");
         expect(presentation.description).toBe(
-          "Langy hit an error while writing this reply. Your message is safe — try again.",
+          "Try again, or pick a different model.",
         );
         expect(presentation.action).toEqual({
           label: "Try again",
@@ -415,6 +702,21 @@ describe("explainLangyError", () => {
 
       expect(presentation.render).toBe("suppress");
       expect(presentation.action?.kind).toBe("connect-github");
+    });
+  });
+
+  describe("given a turn refused because the project is an aggregate", () => {
+    /** @scenario "Langy refuses to start on an aggregate with the read-only refusal" */
+    it("renders the read-only card with no retry", () => {
+      // Refused every time while the project is an aggregate, so a "Try again"
+      // could never work; the copy says where the change belongs instead.
+      const presentation = explainLangyError(
+        domain({ code: "aggregate_project_is_read_only", httpStatus: 403 }),
+      );
+
+      expect(presentation.render).toBe("card");
+      expect(presentation.title).toBe("Data can't be added to this project");
+      expect(presentation.action).toBeUndefined();
     });
   });
 

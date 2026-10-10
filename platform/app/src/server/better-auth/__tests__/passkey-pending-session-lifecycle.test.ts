@@ -5,12 +5,12 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { models } from "../config/models";
-import { beforeSessionCreate } from "../hooks";
 import {
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   type PasskeySignUpAddressHolder,
   PasskeySignUpRegistration,
 } from "../passkey-signup";
+import { createSessionGateHooks } from "./support/session-gate";
 
 vi.mock("~/env.mjs", () => ({
   env: { NEXTAUTH_SECRET: "passkey-proof-first-test-secret" },
@@ -143,6 +143,12 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
       },
     ];
     const sessions: Row[] = [];
+    const hooks = createSessionGateHooks({
+      findUser: async () => ({
+        deactivatedAt: null,
+        signupConfirmationPending: false,
+      }),
+    });
     const db: Record<string, Row[]> = {
       User: users,
       Account: [],
@@ -152,7 +158,10 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
     };
     let proofIsLive = false;
     const registration = new PasskeySignUpRegistration({
-      eligibility: { isAllowed: async () => true },
+      eligibility: {
+        isAllowed: async () => true,
+        policyAdmits: async () => true,
+      },
       directory: { findAddressHolder: async () => null },
       accounts: {
         createPasskeyUser: async () => ({ id: userId, created: true }),
@@ -175,15 +184,7 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
         session: {
           create: {
             before: async (session) => {
-              const permitted = await beforeSessionCreate({
-                prisma: {
-                  user: {
-                    findUnique: async () => ({
-                      deactivatedAt: null,
-                      signupConfirmationPending: false,
-                    }),
-                  },
-                },
+              const permitted = await hooks.beforeSessionCreate({
                 session: { userId: session.userId },
               });
               return permitted === false ? false : void 0;
@@ -291,7 +292,10 @@ describe("the taken-address guard, through the real plugin", () => {
       passkey: [],
     };
     const registration = new PasskeySignUpRegistration({
-      eligibility: { isAllowed: async () => true },
+      eligibility: {
+        isAllowed: async () => true,
+        policyAdmits: async () => true,
+      },
       directory: { findAddressHolder: async () => holder },
       accounts: {
         createPasskeyUser: async () => ({ id: "unused", created: true }),

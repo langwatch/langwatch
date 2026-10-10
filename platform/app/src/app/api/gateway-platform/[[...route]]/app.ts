@@ -705,7 +705,7 @@ function actorForRequest(c: GatewayContext): {
 function membershipForApiCaller(project: Project): MembershipSet {
   return {
     isOrgMember: true,
-    isOrgAdmin: false,
+    canViewAllScopes: false,
     teamIds: new Set([project.teamId]),
     projectIds: new Set([project.id]),
   };
@@ -864,8 +864,8 @@ async function authorizeVirtualKeyUpdate({
     ? scopesFromWire(patch.scopes, fallbackProjectId)
     : undefined;
   if (scopes) {
-    await assertActorCanManageAllScopes({ prisma, actor }, scopes);
     await assertScopesBelongToOrg(prisma, organizationId, scopes);
+    await assertActorCanManageAllScopes({ prisma, actor }, scopes);
   }
 
   if (patch.trace_project_id !== undefined) {
@@ -995,11 +995,15 @@ async function preflightVirtualKeyCreate({
   traceProjectId: string | null | undefined;
   guardrailAttachments: Parameters<typeof assertGuardrailAttachmentsAllowed>[2];
 }): Promise<void> {
+  // Integrity before permission, as the update door already does: "may you
+  // manage this scope" is not a meaningful question about a scope that is
+  // not in this organization, and answering it first turns the spec'd
+  // `gateway_scope_org_mismatch` into a generic denial.
+  await assertScopesBelongToOrg(prisma, organizationId, scopes);
   await assertActorCanCreateScopes(
     { prisma, actor },
     { scopes, callerProjectId },
   );
-  await assertScopesBelongToOrg(prisma, organizationId, scopes);
   await assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId);
   // The destination routes traces AND budget debits into that project, so
   // choosing it needs the same manage grant the old PROJECT scope enforced.

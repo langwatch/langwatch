@@ -48,6 +48,42 @@ const openToAcme: JoinLookupDecision = {
   ],
 };
 
+describe("given a join lookup that has not answered", () => {
+  afterEach(() => cleanup());
+
+  /** @scenario The step waits for its own answer before sending anybody anywhere */
+  it("waits without navigation and shows the offer when the lookup completes", async () => {
+    const callbacks = {
+      onCreateWorkspace: vi.fn(),
+      onJoinOrganization: vi.fn(),
+      onAlreadyJoined: vi.fn(),
+    };
+    const { container, rerender } = renderStep(callbacks);
+
+    expect(container.innerHTML).toBe("");
+    expect(callbacks.onCreateWorkspace).not.toHaveBeenCalled();
+    expect(callbacks.onJoinOrganization).not.toHaveBeenCalled();
+    expect(callbacks.onAlreadyJoined).not.toHaveBeenCalled();
+
+    rerender(
+      <ChakraProvider value={defaultSystem}>
+        <JoinBeforeCreateInterstitial
+          verifiedEmail="sam@acme.com"
+          lookup={openToAcme}
+          {...callbacks}
+        />
+      </ChakraProvider>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Join Acme/ }),
+    ).toBeInTheDocument();
+    expect(callbacks.onCreateWorkspace).not.toHaveBeenCalled();
+    expect(callbacks.onJoinOrganization).not.toHaveBeenCalled();
+    expect(callbacks.onAlreadyJoined).not.toHaveBeenCalled();
+  });
+});
+
 describe("given a verified address that matches no organization", () => {
   afterEach(() => cleanup());
 

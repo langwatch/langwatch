@@ -7,12 +7,14 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import {
-  MAX_NODE_COUNT,
-  normalizeQuery,
-  translateFilterToClickHouse,
-} from "./ast";
+import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
+import { normalizeQuery, translateFilterToClickHouse } from "./ast";
 import { FIELD_DEF_BY_NAME } from "./build-handlers";
+import {
+  type AndChain,
+  andChainOf,
+  evaluateEvaluationScope,
+} from "./evaluation-scope";
 import {
   type FieldNeeds,
   type InMemoryTrace,
@@ -37,7 +39,7 @@ const logger = createLogger("langwatch:traces:filter-evaluate");
  * compiler's node walk so the two agree.
  *
  * Fail-closed: the whole query returns `false` — never a false `true` — on any
- * parse error, unknown field, over-complex query (the exact MAX_NODE_COUNT /
+ * parse error, unknown field, over-complex query (the exact MAX_FILTER_NODE_COUNT /
  * MAX_PARAM_COUNT caps), or any tag that can't be positively evaluated at
  * dispatch time ({@link UNSUPPORTED}). An empty query has no constraints, so it
  * matches every trace (`true`), mirroring the compiler returning no WHERE clause.
@@ -47,14 +49,11 @@ export function evaluateQueryInMemory(
   trace: InMemoryTrace,
 ): boolean {
   // Reuse the compiler as the validation gate — it enforces the exact
-  // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
+  // MAX_FILTER_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
   // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
   let compiled: { sql: string; params: Record<string, unknown> } | null;
   try {
-    compiled = translateFilterToClickHouse(queryText, "__in_memory__", {
-      from: 0,
-      to: 0,
-    });
+    compiled = translateFilterToClickHouse(queryText, { from: 0, to: 0 });
   } catch {
     return false;
   }
@@ -105,7 +104,7 @@ function evaluateNode(
   state: WalkState,
 ): boolean | Unsupported {
   state.nodeCount++;
-  if (state.nodeCount > MAX_NODE_COUNT) return UNSUPPORTED;
+  if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
 
   switch (node.type) {
     case "EmptyExpression":
@@ -122,6 +121,10 @@ function evaluateNode(
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
+      // An AND chain is read once from its top, binding an evaluator to its
+      // result conditions exactly as `translateNode` does.
+      const chain = negated ? null : andChainOf(logExpr);
+      if (chain) return evaluateAndChain(chain, trace, state);
       // Negation threads down unchanged and the operator stays as-is — the
       // exact shape `translateNode` compiles, so both sides always agree.
       const left = evaluateNode(logExpr.left, negated, trace, state);
@@ -145,6 +148,31 @@ function evaluateNode(
     default:
       return UNSUPPORTED;
   }
+}
+
+/** Mirrors `translateAndChain`: the bound group, ANDed with the rest. */
+function evaluateAndChain(
+  chain: AndChain,
+  trace: InMemoryTrace,
+  state: WalkState,
+): boolean | Unsupported {
+  state.nodeCount += chain.nodeCount - 1;
+  if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
+  let matched = true;
+  if (chain.scope) {
+    const bound = evaluateEvaluationScope(chain.scope, trace);
+    if (bound === UNSUPPORTED) {
+      state.unsupportedFields.push("evaluator");
+      return UNSUPPORTED;
+    }
+    matched = bound;
+  }
+  for (const operand of chain.rest) {
+    const result = evaluateNode(operand, false, trace, state);
+    if (result === UNSUPPORTED) return UNSUPPORTED;
+    matched = matched && result;
+  }
+  return matched;
 }
 
 function evaluateTag(

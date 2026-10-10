@@ -4,7 +4,6 @@ import type { Project } from "~/generated/prisma/client";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
-import { useLegacySimulationsPreference } from "../hooks/useLegacySimulationsPreference";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -18,6 +17,7 @@ import {
   isExperimentsActivePath,
   isOnlineEvaluationsActivePath,
 } from "./sidebar/navigationActiveState";
+import { projectNavigation } from "./sidebar/projectKindNavigation";
 import { projectScopedDestination } from "./sidebar/projectScopedNav";
 import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
@@ -41,9 +41,10 @@ export const MainMenuSections = function MainMenuSections({
 }) {
   const router = useRouter();
   const { project, organization, hasPermission } = useOrganizationTeamProject();
+  const navigation = projectNavigation(project?.kind);
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
 
@@ -56,27 +57,38 @@ export const MainMenuSections = function MainMenuSections({
 
   return (
     <>
-      <PageMenuLink
-        path={projectRoutes.home.path}
-        icon={featureIcons.home.icon}
-        label={projectRoutes.home.title}
-        project={project}
-        isActive={
-          router.pathname === "/[project]" &&
-          !router.pathname.includes("/analytics")
-        }
-        showLabel={showExpanded}
-      />
+      {navigation.home && (
+        <PageMenuLink
+          path={projectRoutes.home.path}
+          icon={featureIcons.home.icon}
+          label={projectRoutes.home.title}
+          project={project}
+          isActive={
+            router.pathname === "/[project]" &&
+            !router.pathname.includes("/analytics")
+          }
+          showLabel={showExpanded}
+        />
+      )}
 
-      <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
-      <TestSection
+      <ObserveSection
         {...sectionProps}
-        pendingAnnotationCount={pendingItemsCount.data}
+        codingAgentLinks={codingAgentLinks}
+        showAnalytics={navigation.analytics}
+        showOnlineEvaluations={navigation.onlineEvaluations}
       />
-      <BuildSection
-        {...sectionProps}
-        canSeeAutomations={hasPermission("triggers:view")}
-      />
+      {navigation.test && (
+        <TestSection
+          {...sectionProps}
+          pendingAnnotationCount={pendingItemsCount.data}
+        />
+      )}
+      {navigation.build && (
+        <BuildSection
+          {...sectionProps}
+          canSeeAutomations={hasPermission("triggers:view")}
+        />
+      )}
     </>
   );
 };
@@ -137,7 +149,13 @@ function ObserveSection({
   project,
   pathname,
   codingAgentLinks,
-}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks }) {
+  showAnalytics,
+  showOnlineEvaluations,
+}: ProjectSectionProps & {
+  codingAgentLinks: CodingAgentLinks;
+  showAnalytics: boolean;
+  showOnlineEvaluations: boolean;
+}) {
   return (
     <SidebarSection
       id="observe"
@@ -145,14 +163,16 @@ function ObserveSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      <PageMenuLink
-        path={projectRoutes.analytics.path}
-        icon={featureIcons.analytics.icon}
-        label={projectRoutes.analytics.title}
-        project={project}
-        isActive={pathname.includes("/analytics")}
-        showLabel={showExpanded}
-      />
+      {showAnalytics && (
+        <PageMenuLink
+          path={projectRoutes.analytics.path}
+          icon={featureIcons.analytics.icon}
+          label={projectRoutes.analytics.title}
+          project={project}
+          isActive={pathname.includes("/analytics")}
+          showLabel={showExpanded}
+        />
+      )}
       <PageMenuLink
         path={projectRoutes.traces_v2.path}
         icon={featureIcons.traces_v2.icon}
@@ -161,14 +181,16 @@ function ObserveSection({
         isActive={pathname.includes("/traces")}
         showLabel={showExpanded}
       />
-      <PageMenuLink
-        path={projectRoutes.online_evaluations.path}
-        icon={featureIcons.online_evaluations.icon}
-        label="Online Evals"
-        project={project}
-        isActive={isOnlineEvaluationsActivePath(pathname)}
-        showLabel={showExpanded}
-      />
+      {showOnlineEvaluations && (
+        <PageMenuLink
+          path={projectRoutes.online_evaluations.path}
+          icon={featureIcons.online_evaluations.icon}
+          label="Online Evals"
+          project={project}
+          isActive={isOnlineEvaluationsActivePath(pathname)}
+          showLabel={showExpanded}
+        />
+      )}
       {codingAgentLinks.shouldShowSessions && (
         <PageMenuLink
           path={projectRoutes.coding_agent_sessions.path}
@@ -258,10 +280,6 @@ function TestSection({
   const agentTestingFlagLoading = workspaceLoading
     ? true
     : flagReadCanRun && flagReadLoading;
-  // A person who clicked "go back" on the new-simulations callout reads the
-  // Simulations group on this browser while the flag stays on for the rest
-  // of the project.
-  const legacyPreferred = useLegacySimulationsPreference(project?.id);
 
   return (
     <SidebarSection
@@ -270,8 +288,7 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      {agentTestingFlagLoading ? null : agentTestingEnabled &&
-        !legacyPreferred ? (
+      {agentTestingFlagLoading ? null : agentTestingEnabled ? (
         <PageMenuLink
           path={projectRoutes.agent_testing.path}
           icon={featureIcons.agent_testing.icon}

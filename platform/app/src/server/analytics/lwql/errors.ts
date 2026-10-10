@@ -538,6 +538,45 @@ export class LangWatchQLAppFunctionKeyCapError extends HandledError {
 }
 
 /**
+ * The traces the statement's app functions named hold more bytes than one
+ * hydration may read.
+ *
+ * The key cap bounds how many traces a run names; this bounds what they weigh.
+ * A thousand keys under the cap can still name a thousand multi-megabyte
+ * traces, and reading them all before the result ceiling drops the rows would
+ * hold every one of them in memory first. So the reads are chunked and stop at
+ * the budget, and the refusal names it, for the same reason the key cap is a
+ * refusal rather than a partial answer.
+ */
+export class LangWatchQLAppFunctionReadBudgetError extends HandledError {
+  declare readonly code: "lwql_app_function_read_budget";
+
+  constructor({
+    budgetBytes,
+    readBytes,
+  }: {
+    /** The budget one hydration may read, in bytes. */
+    readonly budgetBytes: number;
+    /** How many bytes had been read when the budget was passed. */
+    readonly readBytes: number;
+  }) {
+    super(
+      "lwql_app_function_read_budget",
+      "The query asks for more trace content than one run may read. Narrow it with a smaller LIMIT or run it in pages.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the budget
+        // to size its pages by. Both numbers are about the caller's own data.
+        meta: { budgetBytes, readBytes },
+        ...remediation("lwql_app_function_read_budget"),
+      },
+    );
+    this.name = "LangWatchQLAppFunctionReadBudgetError";
+  }
+}
+
+/**
  * The query ran, but the values its app functions asked for could not be read
  * or computed.
  *

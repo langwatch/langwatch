@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
@@ -15,13 +16,14 @@ import type {
   PrismaClient,
   Project,
 } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
 import { type App, getApp } from "~/server/app-layer/app";
 // A pure rule with a type-only dependency of its own, so reading it here adds
 // no module cycle back into the Langy feature.
 import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { getTokenType } from "./api-key-token.utils";
 import {
+  AggregateProjectHasNoCredentialError,
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
 } from "./errors";
@@ -903,6 +905,22 @@ export async function enforceApiKeyCeiling({
    */
   app?: App;
 }): Promise<void> {
+  // ADR-144 decision 7: an aggregate project accepts no credential at all, so
+  // this is checked before the legacy bypass below. Its own base key is the
+  // credential most likely to reach here, and it would otherwise pass every
+  // gate. Every API-key route passes through this ceiling, which is what makes
+  // it the one place the rule needs to live: ingest is refused with a 403 and
+  // the aggregate's tenant never receives a span.
+  if (isAggregateProjectKind(resolved.project.kind)) {
+    permissionLogger.warn(
+      { projectId: resolved.project.id, permission },
+      "API key presented for an aggregate project, which accepts none",
+    );
+    throw new AggregateProjectHasNoCredentialError({
+      meta: { projectId: resolved.project.id },
+    });
+  }
+
   // A legacy project key has no per-permission ceiling: it passes every gate,
   // including a `permission`-kind policy, because project keys predate RBAC and
   // carry full project access by design (decision 1: no legacy-key sunset). So
@@ -997,7 +1015,8 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
   if (
     HandledError.isHandled(error) &&
     (error.code === "api_key_permission_denied" ||
-      error.code === "api_key_permission_not_delegable")
+      error.code === "api_key_permission_not_delegable" ||
+      error.code === "aggregate_project_has_no_credential")
   ) {
     const { statusCode, body } = handledErrorResponseBody(error);
     return { status: statusCode, body, message: error.message };

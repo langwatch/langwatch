@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useInstantEvalRuns } from "./useInstantEvalRuns";
 import { useTraceListRefresh } from "./useTraceListRefresh";
 
 const FAST_MS = 5_000;
@@ -34,8 +35,8 @@ function nextBackoffInterval(
 
 export function useTraceNewCount(): TraceNewCountResult {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
   const [since, setSince] = useState(() => Date.now());
   const { refresh } = useTraceListRefresh();
 
@@ -87,6 +88,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   }, [isVisible, refresh, trpcUtils]);
 
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
+  const { evalRuns } = useInstantEvalRuns();
 
   // Aurora refresh pulse is now scoped to "trace about to appear" — fires
   // once when the count transitions from 0 to >0 in live mode, signalling
@@ -109,6 +111,11 @@ export function useTraceNewCount(): TraceNewCountResult {
     timeRange.label,
     since,
     queryText,
+    // Part of the query identity below, so a run registering behind an eval
+    // chip changes what is counted. Without it the baseline is the count from
+    // before the chip had a run, and the 0→N pulse fires or stays quiet
+    // against the wrong context.
+    evalRuns,
   ]);
 
   const query = api.tracesV2.newCount.useQuery(
@@ -121,6 +128,7 @@ export function useTraceNewCount(): TraceNewCountResult {
       },
       since,
       query: queryText || undefined,
+      ...(evalRuns ? { evalRuns } : {}),
     },
     {
       // Honour the store contract: paused = "no updates, no pill, no

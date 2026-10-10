@@ -13,8 +13,15 @@
  * `scim-offboard-postcondition.integration.test.ts`.
  */
 import { OffboardIncompleteError } from "@langwatch/authz-server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import {
+  CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
+} from "~/server/app-layer/organizations/errors";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import { ScimDeprovisionService } from "../scim-deprovision.service";
+
+type Reconcile = AggregateReconciler["reconcileOrganizationOrLog"];
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";
@@ -42,16 +49,23 @@ function createSyncLifecycle() {
 describe("ScimDeprovisionService", () => {
   let grants: ReturnType<typeof createGrants>;
   let syncLifecycle: ReturnType<typeof createSyncLifecycle>;
+  let aggregateMembers: { reconcileOrganizationOrLog: Mock<Reconcile> };
 
   beforeEach(() => {
     grants = createGrants();
     syncLifecycle = createSyncLifecycle();
+    aggregateMembers = {
+      reconcileOrganizationOrLog: vi
+        .fn<Reconcile>()
+        .mockResolvedValue(undefined),
+    };
   });
 
   function service() {
     return new ScimDeprovisionService({
       grants: grants as never,
       syncLifecycle: syncLifecycle as never,
+      aggregateMembers,
     });
   }
 
@@ -68,6 +82,20 @@ describe("ScimDeprovisionService", () => {
         actor: { type: "system", name: "scim" },
         userId: USER,
         organizationId: ORGANIZATION,
+      });
+    });
+
+    it("re-reads the organisation's aggregate projects once the removal stands", async () => {
+      await service().removeAccess({
+        userId: USER,
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        op: "delete_user",
+      });
+
+      expect(aggregateMembers.reconcileOrganizationOrLog).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        trigger: "member-offboarded",
       });
     });
   });
@@ -115,6 +143,21 @@ describe("ScimDeprovisionService", () => {
       });
     });
 
+    it("leaves the aggregate projects alone when the removal is refused", async () => {
+      await service()
+        .removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "delete_user",
+        })
+        .catch(() => undefined);
+
+      expect(
+        aggregateMembers.reconcileOrganizationOrLog,
+      ).not.toHaveBeenCalled();
+    });
+
     it("surfaces it as a dead letter naming the person and the operation", async () => {
       await service()
         .removeAccess({
@@ -153,6 +196,52 @@ describe("ScimDeprovisionService", () => {
       ];
       expect(failure.errorCode).toBe("offboard_incomplete");
       expect(failure.errorCode).not.toMatch(/\s/);
+    });
+  });
+
+  describe("when the offboard invariant protects the last administrator", () => {
+    beforeEach(() => {
+      grants.offboard = vi
+        .fn()
+        .mockRejectedValue(new CannotRemoveLastAdminError());
+    });
+
+    it("keeps deletion's cannot-remove error", async () => {
+      await expect(
+        service().removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "delete_user",
+        }),
+      ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
+
+      expect(syncLifecycle.applyFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          op: "delete_user",
+          errorCode: "cannot_remove_last_admin",
+          retryable: false,
+        }),
+      );
+    });
+
+    it("maps deactivation to cannot-disable while retaining the failure", async () => {
+      await expect(
+        service().removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "deactivate_user",
+        }),
+      ).rejects.toBeInstanceOf(CannotDisableLastAdminError);
+
+      expect(syncLifecycle.applyFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          op: "deactivate_user",
+          errorCode: "cannot_disable_last_admin",
+          retryable: false,
+        }),
+      );
     });
   });
 

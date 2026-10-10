@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
@@ -7,16 +8,12 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import {
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
-} from "~/server/api/rbac";
-import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
   type LedgerBindingAttach,
   ledgerPrincipal,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 // The SCIM-managed guard's typed refusal, shared with `group.service.ts` so
 // both paths answer the customer with the same `scim_managed_group` code.
@@ -25,7 +22,10 @@ import type { AccessListingRepository } from "~/server/app-layer/authz/repositor
 // anchor in specs/groups/groups-rest-api.feature held on one path only.
 import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import {
+  DeveloperSeatNoSharedAccessError,
+  LiteMemberViewerOnlyError,
+} from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isBindingRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
@@ -115,13 +115,14 @@ export class RoleBindingService {
   // what people see and what the engine decides from can never be different
   // heads (ADR-092, delivery-plan PR 3 follow-up).
   private readonly accessListing: AccessListingRepository;
+  private readonly canonicalAccessListing: GrantsAccessListingRepository;
 
   constructor({
     prisma,
     repo,
     roleService,
     writer = grantsLedgerWriter(),
-    accessListing = new CutoverAwareAccessListingRepository(prisma),
+    accessListing = new GrantsAccessListingRepository(prisma),
   }: {
     prisma: PrismaClient;
     repo: RoleBindingRepository;
@@ -134,29 +135,7 @@ export class RoleBindingService {
     this.roleService = roleService;
     this.writer = writer;
     this.accessListing = accessListing;
-  }
-
-  /**
-   * Whether this user's access so far derives ONLY from legacy shared-team
-   * membership: no explicit binding anywhere in the organization, but TeamUser
-   * rows on shared teams. Creating their first binding switches that fallback
-   * off (see `checkPermissionFromBindings` and the resolver's legacy ceiling),
-   * so callers can say so before it happens.
-   */
-  async wouldFirstBindingDisableLegacyAccess({
-    organizationId,
-    userId,
-  }: {
-    organizationId: string;
-    userId: string;
-  }): Promise<boolean> {
-    const [bindingCount, legacyCount] = await Promise.all([
-      this.prisma.roleBinding.count({ where: { organizationId, userId } }),
-      this.prisma.teamUser.count({
-        where: { userId, team: { organizationId, isPersonal: false } },
-      }),
-    ]);
-    return bindingCount === 0 && legacyCount > 0;
+    this.canonicalAccessListing = new GrantsAccessListingRepository(prisma);
   }
 
   /**
@@ -294,8 +273,12 @@ export class RoleBindingService {
    * enforced when access is written, the same way `updateTeamMemberRole`
    * enforces it. Group bindings are never checked here: a group has no seat,
    * and what the seat does to group-granted access is decided at resolution.
+   *
+   * A Developer seat (ADR-143) is stricter still: it holds no stored row on
+   * anything shared at all, so any row this method is asked about is refused.
+   * (The personal team is refused earlier, by `assertNoPersonalTeamScope`.)
    */
-  private async assertRowsWithinLiteMemberSeat({
+  private async assertRowsWithinSeat({
     organizationRole,
     organizationId,
     bindings,
@@ -309,6 +292,17 @@ export class RoleBindingService {
       scopeId: string;
     }>;
   }): Promise<void> {
+    if (organizationRole === OrganizationUserRole.DEVELOPER) {
+      const [first] = bindings;
+      if (!first) return;
+      const { scopeNames } = await this.resolveScopes({
+        bindings: [first],
+        organizationId,
+      });
+      throw new DeveloperSeatNoSharedAccessError(
+        scopeNames.get(first.scopeId) ?? null,
+      );
+    }
     if (organizationRole !== OrganizationUserRole.EXTERNAL) return;
 
     const offending = bindings.find(
@@ -528,44 +522,10 @@ export class RoleBindingService {
       groupIds,
     });
 
-    const orgScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
-
-    const [orgs, teams, projects] = await Promise.all([
-      orgScopeIds.length > 0
-        ? this.prisma.organization.findMany({
-            where: { id: organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      teamScopeIds.length > 0
-        ? this.prisma.team.findMany({
-            where: { id: { in: [...new Set(teamScopeIds)] }, organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      projectScopeIds.length > 0
-        ? this.prisma.project.findMany({
-            where: {
-              id: { in: [...new Set(projectScopeIds)] },
-              team: { organizationId },
-            },
-            select: { id: true, name: true },
-          })
-        : [],
-    ]);
-
-    const scopeNames = new Map<string, string>();
-    for (const o of orgs) scopeNames.set(o.id, o.name);
-    for (const t of teams) scopeNames.set(t.id, t.name);
-    for (const p of projects) scopeNames.set(p.id, p.name);
+    const { scopeNames } = await this.resolveScopes({
+      bindings: allBindings,
+      organizationId,
+    });
 
     const resolvePermissions = (
       binding: (typeof allBindings)[number],
@@ -578,18 +538,18 @@ export class RoleBindingService {
       }
       if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
         if (binding.role === TeamUserRole.ADMIN) {
-          return getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
+          return [...builtinRolePermissions("org-admin")];
         }
         if (binding.role === TeamUserRole.MEMBER) {
-          return getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
+          return [...builtinRolePermissions("org-member")];
         }
         // VIEWER or CUSTOM (with no resolvable customRole) at the ORG scope:
         // fall back to the minimal EXTERNAL permission set rather than silently
         // elevating to MEMBER. Today nothing writes these bindings, but this
         // prevents accidental promotion if that ever changes.
-        return getOrganizationRolePermissions(OrganizationUserRole.EXTERNAL);
+        return [...builtinRolePermissions("lite-member")];
       }
-      return getTeamRolePermissions(binding.role);
+      return [...builtinRolePermissions(roleKeyForTeamRole(binding.role))];
     };
 
     const toBindingSummary = (b: (typeof allBindings)[number]) => ({
@@ -626,7 +586,11 @@ export class RoleBindingService {
         name: userName,
         email: userEmail,
         orgRole: orgRole as string,
-        orgRolePermissions: getOrganizationRolePermissions(orgRole),
+        orgRolePermissions: [
+          ...builtinRolePermissions(
+            orgRole === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+          ),
+        ],
       },
       groups: groupMemberships.map((gm) => ({
         id: gm.group.id,
@@ -684,7 +648,7 @@ export class RoleBindingService {
       organizationId,
       bindings: [{ role, customRoleId, scopeType }],
     });
-    await this.assertRowsWithinLiteMemberSeat({
+    await this.assertRowsWithinSeat({
       organizationRole,
       organizationId,
       bindings: [{ role, scopeType, scopeId }],
@@ -734,8 +698,9 @@ export class RoleBindingService {
     customRoleId?: string;
     actor: LedgerActor;
   }): Promise<{ id: string }> {
-    const binding = await this.prisma.roleBinding.findFirst({
-      where: { id: bindingId, organizationId },
+    const [binding] = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
+      where: { id: bindingId },
     });
     if (!binding) {
       throw new RoleBindingNotFoundError(bindingId);
@@ -753,7 +718,7 @@ export class RoleBindingService {
       // A row can outlive its member (historical data); with nobody on a seat
       // there is no ceiling to hold the edit against.
       if (membership) {
-        await this.assertRowsWithinLiteMemberSeat({
+        await this.assertRowsWithinSeat({
           organizationRole: membership.role,
           organizationId,
           bindings: [
@@ -791,8 +756,9 @@ export class RoleBindingService {
     bindingId: string;
     actor: LedgerActor;
   }) {
-    const binding = await this.prisma.roleBinding.findFirst({
-      where: { id: bindingId, organizationId },
+    const [binding] = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
+      where: { id: bindingId },
     });
     if (!binding) {
       throw new RoleBindingNotFoundError(bindingId);
@@ -857,7 +823,7 @@ export class RoleBindingService {
     });
     // The dialog applies the seat before this batch, so the ceiling is held
     // against the seat the member is on by the time the rows would be written.
-    await this.assertRowsWithinLiteMemberSeat({
+    await this.assertRowsWithinSeat({
       organizationRole,
       organizationId,
       bindings: bindingsToCreate,
@@ -905,14 +871,13 @@ export class RoleBindingService {
     // and a row another admin removed concurrently is equally gone. Only the
     // member's own direct rows are deletable through their edit, so an id
     // resolving to another principal is skipped rather than deleted.
-    const existing = await this.prisma.roleBinding.findMany({
+    const existing = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
       where: {
         id: { in: bindingIdsToDelete },
-        organizationId,
-        userId,
-        groupId: null,
+        principalType: "USER",
+        principalId: userId,
       },
-      select: { id: true, scopeType: true, scopeId: true },
     });
     if (existing.length === 0) return;
 
@@ -1079,13 +1044,13 @@ export class RoleBindingService {
     bindingIdsToDelete: string[];
   }): Promise<string[]> {
     if (bindingIdsToDelete.length === 0) return [];
-    const existing = await this.prisma.roleBinding.findMany({
+    const existing = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
       where: {
         id: { in: bindingIdsToDelete },
-        organizationId,
-        groupId,
+        principalType: "GROUP",
+        principalId: groupId,
       },
-      select: { id: true, scopeType: true, scopeId: true },
     });
     if (existing.length === 0) return [];
     await assertNoPersonalTeamScope({ client: this.prisma, scopes: existing });

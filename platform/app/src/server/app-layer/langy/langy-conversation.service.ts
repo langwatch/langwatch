@@ -53,6 +53,10 @@ import {
 } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
+import {
+  type LatestControlRequest,
+  latestControlRequest,
+} from "~/server/langy-local-control/request-state";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationIdUnadoptableError,
@@ -747,6 +751,29 @@ export class LangyConversationService {
   }
 
   /**
+   * The latest request to share a folder this conversation recorded, and
+   * whether a folder connected through it (ADR-129). The open request lives in
+   * Redis only while a terminal can approve it; this is what is left to say
+   * why there is nothing to approve. The caller proves the conversation first.
+   */
+  async getLatestLocalControlRequest({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LatestControlRequest | null> {
+    if (!this.events) return null;
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+    return latestControlRequest(all);
+  }
+
+  /**
    * `getById`, but absence is an answer rather than an error.
    *
    * For the callers that genuinely want to tolerate "there is no fold yet" — the
@@ -1346,17 +1373,28 @@ export class LangyConversationService {
     errorCause?: HandledError;
   }): Promise<void> {
     if (status === "failed") {
-      await this.failTurn({
-        projectId,
-        conversationId,
-        turnId,
-        error: serializeLangyTurnError(
-          langyAgentErrorFromErrorFrame({
-            code: errorCode ?? "agent error",
-            ...(errorCause !== undefined ? { cause: errorCause } : {}),
-          }),
-        ),
-      });
+      const error = serializeLangyTurnError(
+        langyAgentErrorFromErrorFrame({
+          code: errorCode ?? "agent error",
+          ...(errorCause !== undefined ? { cause: errorCause } : {}),
+        }),
+      );
+      // A turn that did something before it failed (wrote a plan, ran calls,
+      // said a paragraph) keeps it as its message, so a reload or a retry
+      // still shows it. A turn with nothing to show fails without a message.
+      const parts = await this.failedTurnParts({ conversationId, turnId });
+      if (parts.length > 0) {
+        await this.finalizeTurn({
+          projectId,
+          conversationId,
+          turnId,
+          parts,
+          outcome: "failed",
+          error,
+        });
+        return;
+      }
+      await this.failTurn({ projectId, conversationId, turnId, error });
       return;
     }
     const order = await this.readTurnOrder({ conversationId, turnId });
@@ -1371,6 +1409,36 @@ export class LangyConversationService {
       }),
       outcome: "completed",
     });
+  }
+
+  /**
+   * The parts a failed turn left on its live stream. Best effort like the
+   * order read: a lapsed buffer or a failed read records the failure without
+   * a message, which is what a failed turn always recorded.
+   */
+  private async failedTurnParts(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyMessagePart[]> {
+    if (!this.turnOrder) return [];
+    try {
+      const account = await this.turnOrder.readTurnAccount(at);
+      const saidSomething = account.order.some(
+        (segment) => segment.kind === "text" && segment.text.trim() !== "",
+      );
+      if (account.toolCalls.length === 0 && !saidSomething) return [];
+      return buildFinalAssistantParts({
+        text: account.closingText,
+        toolCalls: account.toolCalls,
+        ...(account.order.length > 0 ? { order: account.order } : {}),
+      });
+    } catch (error) {
+      conversationServiceLogger.warn(
+        { ...at, error },
+        "could not read a failed turn's account; recording the failure without a message",
+      );
+      return [];
+    }
   }
 
   /**

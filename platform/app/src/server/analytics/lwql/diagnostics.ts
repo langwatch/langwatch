@@ -295,7 +295,7 @@ function appFunctionDiagnostics({
     diagnostics.push({
       code: "APP_FUNCTION_UNRESOLVED_KEYS",
       message:
-        "Some rows are null because their conversation or trace id matched nothing. Check the ids, and that the rows are inside the retention window.",
+        "Some rows are null because their conversation, trace or span key matched nothing. Check the ids, and that the rows are inside the retention window.",
       meta: { columns: appFunctions.unresolvedKeys },
     });
   }
@@ -692,26 +692,48 @@ function unboundedTimeRangeDiagnostics({
       database,
       views,
     })) {
-      const { timeColumn } = reference.view;
-      if (filtered.has(timeColumn.toLowerCase())) continue;
-      if (seen.has(reference.viewName)) continue;
-      seen.add(reference.viewName);
-
-      diagnostics.push({
-        code: "UNBOUNDED_TIME_RANGE",
-        message:
-          `${reference.viewName} was read with no condition on ${timeColumn}, so the read ` +
-          `covers the whole history this project has rather than a window of it. Add a range ` +
-          `on ${timeColumn} to bound the scan.`,
-        meta: {
-          view: reference.viewName,
-          /** Filter on this column to bound the read. */
-          timeColumn,
-        },
+      const diagnostic = buildUnboundedTimeRangeDiagnostic({
+        reference,
+        filtered,
+        seen,
       });
+      if (diagnostic) {
+        diagnostics.push(diagnostic);
+      }
     }
   }
   return diagnostics;
+}
+
+function buildUnboundedTimeRangeDiagnostic({
+  reference,
+  filtered,
+  seen,
+}: {
+  reference: ReturnType<typeof resolveTableReferences>[number];
+  filtered: Set<string>;
+  seen: Set<string>;
+}): LangWatchQLDiagnostic | undefined {
+  const { timeColumn } = reference.view;
+  // A view with no time column has nothing to bound a scan on, so there is
+  // no unbounded-range advice to give.
+  if (!timeColumn) return undefined;
+  if (filtered.has(timeColumn.toLowerCase())) return undefined;
+  if (seen.has(reference.viewName)) return undefined;
+  seen.add(reference.viewName);
+
+  return {
+    code: "UNBOUNDED_TIME_RANGE",
+    message:
+      `${reference.viewName} was read with no condition on ${timeColumn}, so the read ` +
+      `covers the whole history this project has rather than a window of it. Add a range ` +
+      `on ${timeColumn} to bound the scan.`,
+    meta: {
+      view: reference.viewName,
+      /** Filter on this column to bound the read. */
+      timeColumn,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

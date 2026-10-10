@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -10,13 +9,16 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
-wireDefaultTestApp();
+wireDefaultTestApp(() => ({
+  projects: new ProjectService(new PrismaProjectRepository(prisma)),
+}));
 
 describe("Feature: Projects REST API", () => {
   const ns = `projects-api-${nanoid(8)}`;
@@ -89,15 +91,12 @@ describe("Feature: Projects REST API", () => {
       },
     });
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const apiKeyService = ApiKeyService.create(prisma);
@@ -121,6 +120,7 @@ describe("Feature: Projects REST API", () => {
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["project", { team: { organizationId: testOrganization.id } }],
+      ["grant", { organizationId: testOrganization.id }],
       ["roleBinding", { organizationId: testOrganization.id }],
       ["apiKey", { organizationId: testOrganization.id }],
       ["teamUser", { userId }],

@@ -63,6 +63,7 @@ const PUBLIC_SURFACES = [
   // registry never saw would leave the operation on the document default,
   // which happens to be the right answer for a project app and would
   // therefore look correct while nothing enforced it.
+  { prefix: "/api/v1/instant-evals", scheme: "project_api_key" },
   { prefix: "/api/v1/run-plans", scheme: "project_api_key" },
   { prefix: "/api/v1/test-suites", scheme: "project_api_key" },
 ] as const;

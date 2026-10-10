@@ -1,5 +1,7 @@
 import {
   ALL_PERMISSIONS,
+  type AuthzPermission,
+  builtinRolePermissions,
   isRegistryPermission,
   permissionIndex,
 } from "@langwatch/authz";
@@ -9,24 +11,28 @@ import {
   getValidActionsForResource,
   orderedResources,
 } from "../../../../utils/permissionsConfig";
-import {
-  EXTERNAL_MEMBER_PERMISSIONS,
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
-  type Permission,
-} from "../../../api/rbac";
 import { PERMISSION_CATEGORIES } from "../../../api-key/permission-categories";
+
+type Permission = AuthzPermission;
 
 describe("authz registry", () => {
   describe("given the legacy vocabulary", () => {
     const legacyGrantedStrings: string[] = [
-      ...Object.values(TeamUserRole).flatMap((role) =>
-        getTeamRolePermissions(role),
-      ),
-      ...Object.values(OrganizationUserRole).flatMap((role) =>
-        getOrganizationRolePermissions(role),
-      ),
-      ...EXTERNAL_MEMBER_PERMISSIONS,
+      ...Object.values(TeamUserRole).flatMap((role) => [
+        ...builtinRolePermissions(
+          role === TeamUserRole.ADMIN
+            ? "admin"
+            : role === TeamUserRole.MEMBER
+              ? "member"
+              : "viewer",
+        ),
+      ]),
+      ...Object.values(OrganizationUserRole).flatMap((role) => [
+        ...builtinRolePermissions(
+          role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+        ),
+      ]),
+      ...[...builtinRolePermissions("lite-member")],
     ];
 
     it("contains every permission any legacy role bag grants", () => {
@@ -106,13 +112,14 @@ describe("authz registry", () => {
       // webhookEndpoints / gatewaySpend append (2026-08) moved the tail
       // without moving IT — that is the append-only contract working.
       expect(permissionIndex("aiTools:manage")).toBe(116);
+      // langy:manage was the tail at count 126; the agentCache and D05 sso
+      // appends moved the tail without moving it, which is the contract again.
       expect(permissionIndex("langy:manage")).toBe(125);
-      // agentCache:manage was the tail; the governanceCost append (ADR-128)
-      // moved the tail without moving IT.
+      // agentCache:manage was the tail; the governanceCost (ADR-128) and the
+      // D05 sso appends moved the tail without moving IT.
       expect(permissionIndex("agentCache:manage")).toBe(127);
-      expect(permissionIndex("governanceCost:view")).toBe(
-        ALL_PERMISSIONS.length - 1,
-      );
+      expect(permissionIndex("governanceCost:view")).toBe(128);
+      expect(permissionIndex("sso:manage")).toBe(ALL_PERMISSIONS.length - 1);
     });
 
     it("pins the FULL serialization order (bitset indices ship inside signed passports — edit only by appending)", () => {
@@ -252,6 +259,8 @@ describe("authz registry", () => {
         "agentCache:view",
         "agentCache:manage",
         "governanceCost:view",
+        "sso:view",
+        "sso:manage",
       ]);
     });
 

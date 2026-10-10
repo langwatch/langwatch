@@ -36,6 +36,7 @@ import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
+import type { AuthorizationService } from "./authz/authorization.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -56,6 +57,9 @@ import type { GithubInstallationsService } from "./github/github-installations.s
 import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
 import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import type { InstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
+import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
+import type { InstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
@@ -70,8 +74,10 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
+import type { ProjectKindReader } from "./permissions/aggregate-admin-gate";
 import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
+import type { AggregateReadAudit } from "./projects/aggregate-read-audit";
 import type { ProjectService } from "./projects/project.service";
 import type { ProjectRepository } from "./projects/repositories/project.repository";
 import type { ShareService } from "./share/share.service";
@@ -204,6 +210,17 @@ export interface AppDependencies {
       searchAfter?: [number, string];
       runContext?: ClusteringRunContext;
     }) => Promise<ClusteringPageOutcome>;
+  };
+  /**
+   * ADR-137: the Instant Eval stores, already bound to the composition root's
+   * ClickHouse resolver, and where a query's or a run's spend is reported.
+   * The run surface reads and writes runs and verdicts through these instead
+   * of resolving a client of its own.
+   */
+  instantEvals: {
+    runs: InstantEvalRunRepository;
+    judgments: InstantEvalJudgmentsRepository;
+    spend: InstantEvalSpendRecorder;
   };
   /**
    * The gateway's ClickHouse-backed repositories. Undefined on a deployment
@@ -371,7 +388,7 @@ export interface AppDependencies {
   };
   experiments: ExperimentService;
   triggers: TriggerService;
-  /** Wraps `testFireTrigger(deps, input)` with the composition-time
+  /** Wraps `testFireTrigger({ deps, input })` with the composition-time
    *  `{baseHost, notifier}` bag already bound — the router only needs
    *  to pass the per-call input. */
   triggerTemplates: {
@@ -387,6 +404,25 @@ export interface AppDependencies {
    * `getApp().permissions`; nothing composes its own from a client.
    */
   permissions: PermissionsService;
+  /**
+   * ADR-144 block B: the door. A `.permission()` check on a proof-bearing
+   * permission mints the sealed proof through this instance and hands it
+   * to the route as `ctx.authorization`.
+   */
+  authorization: AuthorizationService;
+  /**
+   * ADR-144 decision 9: where a read of an aggregate project is audited.
+   * The permission middleware calls it when it mints a proof that reads
+   * shared grants on an aggregate. The governance module's adapter writes
+   * the admin workspace view row; the null port records nothing.
+   */
+  aggregateReadAudit: AggregateReadAudit;
+  /**
+   * ADR-144: a project's kind by id, remembered per process. The permission
+   * middleware asks it before refusing a write under an aggregate and before
+   * auditing an aggregate read.
+   */
+  projectKinds: ProjectKindReader;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

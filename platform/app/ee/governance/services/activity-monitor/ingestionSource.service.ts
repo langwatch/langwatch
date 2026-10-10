@@ -34,10 +34,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
-import {
-  type IngestionSource,
+import type {
+  IngestionSource,
   Prisma,
-  type PrismaClient,
+  PrismaClient,
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
@@ -1224,12 +1224,18 @@ export class IngestionSourceService {
    * because pinning them would fail a routine rename for the sole reason that
    * a scheduled pull happened to land in the same second.
    *
-   * `Prisma.AnyNull` rather than `null`: the column is `Json?` and the two
-   * writers disagree about which null they store — the projection repository
-   * writes `Prisma.JsonNull` (a JSON null) while a never-written column holds
-   * SQL NULL. Both read back as JS `null`, so a pin derived from the read has
-   * to match either, or the guard's most common case — a source that has never
-   * pulled at all — would conflict with itself.
+   * The pin is SQL with the cursor condition against the table. Through
+   * `updateMany` the condition sits in a subquery, and a statement that waited
+   * on the row lock re-checks only the outer id predicate against the
+   * committed row, so a cursor the pull run wrote while this write was waiting
+   * would go unseen and the report change would land anyway.
+   *
+   * An absent cursor is matched as either null: the column is `Json?` and the
+   * two writers disagree about which null they store — the projection
+   * repository writes `Prisma.JsonNull` (the jsonb value `'null'`) while a
+   * never-written column holds SQL NULL. Both read back as JS `null`, so a pin
+   * derived from the read has to match either, or the guard's most common
+   * case — a source that has never pulled at all — would conflict with itself.
    */
   private async updateHoldingTheCursorStill({
     existing,
@@ -1239,16 +1245,22 @@ export class IngestionSourceService {
     data: Prisma.IngestionSourceUpdateInput;
   }): Promise<IngestionSource> {
     return await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.ingestionSource.updateMany({
-        where: {
-          id: existing.id,
-          pollerCursor:
-            existing.pollerCursor === null
-              ? { equals: Prisma.AnyNull }
-              : { equals: existing.pollerCursor as Prisma.InputJsonValue },
-        },
-        data: { updatedAt: new Date() },
-      });
+      const count =
+        existing.pollerCursor === null
+          ? await tx.$executeRaw`
+              UPDATE "IngestionSource"
+                 SET "updatedAt" = now()
+               WHERE "id" = ${existing.id}
+                 AND "organizationId" = ${existing.organizationId}
+                 AND ("pollerCursor" IS NULL OR "pollerCursor" = 'null'::jsonb)
+            `
+          : await tx.$executeRaw`
+              UPDATE "IngestionSource"
+                 SET "updatedAt" = now()
+               WHERE "id" = ${existing.id}
+                 AND "organizationId" = ${existing.organizationId}
+                 AND "pollerCursor" = ${JSON.stringify(existing.pollerCursor)}::jsonb
+            `;
       if (count === 0) {
         const raced =
           "This source started pulling while the change was being saved, " +

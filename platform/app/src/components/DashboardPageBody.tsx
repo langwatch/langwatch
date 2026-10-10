@@ -8,12 +8,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound } from "lucide-react";
 import numeral from "numeral";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
+import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
+import { CONTACT_SALES_URL } from "../../ee/licensing/constants";
+import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
+import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
+import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import {
   useOrganizationTeamProject,
@@ -28,7 +32,10 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
+import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
+import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
+import { projectNavigation } from "./sidebar/projectKindNavigation";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -55,11 +62,17 @@ export const DashboardPageBody = ({
 }: DashboardPageBodyProps) => {
   const router = useRouter();
   const { data: session } = useRequiredSession({ required: !publicPage });
-  const { organization, team, project, organizationRole, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    organization,
+    team,
+    project,
+    organizationRole,
+    hasPermission,
+    isLoading: isOrganizationContextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
   const usage = api.limits.getUsage.useQuery(
@@ -133,6 +146,15 @@ export const DashboardPageBody = ({
   // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
   // `project?.slug` would otherwise read as a match on any route that hasn't
   // resolved a project yet.
+  // The organization's membership condition (D06), asked on the way into ITS
+  // data and nowhere else. A personal-scope route is never held: the
+  // requirement belongs to the organization that set it, and nobody's own
+  // workspace is stranded by their employer's decision.
+  const mfaGate = useOrganizationMfaGate({
+    organizationId: organization?.id,
+    isPersonalScope: isPersonalScopeRoute,
+  });
+
   const isDemoProject =
     !!publicEnv.data?.DEMO_PROJECT_SLUG &&
     publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
@@ -154,8 +176,13 @@ export const DashboardPageBody = ({
     organizationRole === OrganizationUserRole.ADMIN;
 
   // Analytics is the last surface on the v1 saved-views bar; the Trace
-  // Explorer carries its own view system.
-  const showSavedViews = router.pathname.startsWith("/[project]/analytics");
+  // Explorer carries its own view system. A project whose navigation has no
+  // Analytics (an aggregate, ADR-144) only shows the not-available notice
+  // there and takes no writes, so it gets no bar, no Edit menu and no
+  // saved-views read. Same rule as AggregateAnalyticsGate.
+  const showSavedViews =
+    router.pathname.startsWith("/[project]/analytics") &&
+    projectNavigation(project?.kind).analytics;
 
   return (
     <VStack width="full" gap={0} {...props}>
@@ -245,6 +272,56 @@ export const DashboardPageBody = ({
               </Alert.Content>
             </Alert.Root>
           )}
+        {usage.data?.seatLimitInfo?.status === "exceeded" && (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+            data-testid="seat-limit-banner"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              {usage.data.activePlan.type === "ENTERPRISE" ? (
+                <Text>
+                  {usage.data.seatLimitInfo.message}{" "}
+                  <Link
+                    href={CONTACT_SALES_URL}
+                    textDecoration="underline"
+                    _hover={{ textDecoration: "none" }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "seats_limit_exceeded",
+                      });
+                    }}
+                  >
+                    Contact sales
+                  </Link>{" "}
+                  to add seats.
+                </Text>
+              ) : (
+                <Text>
+                  {usage.data.seatLimitInfo.message}{" "}
+                  <Link
+                    href={planManagementUrl}
+                    textDecoration="underline"
+                    _hover={{ textDecoration: "none" }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "seats_limit_exceeded",
+                      });
+                    }}
+                  >
+                    Upgrade your plan
+                  </Link>{" "}
+                  to keep everyone.
+                </Text>
+              )}
+            </Alert.Content>
+          </Alert.Root>
+        )}
         {usage.data &&
           usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
             <Alert.Root
@@ -283,6 +360,18 @@ export const DashboardPageBody = ({
 
         <AnnouncementBanner />
 
+        <JoinYourTeamTakeover
+          // Three meanings, kept apart: `undefined` while the organization
+          // read is still out (the takeover decides nothing), `null` once it
+          // has answered with no organization, and the id otherwise.
+          currentOrganizationId={
+            isOrganizationContextLoading
+              ? undefined
+              : (organization?.id ?? null)
+          }
+          fallback={publicPage ? null : <SecureAccountNudge />}
+        />
+
         {adminViewingAs && (
           <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
         )}
@@ -303,12 +392,11 @@ export const DashboardPageBody = ({
               <HStack width="full" gap={4}>
                 <VStack align="start" gap={0} flex={1}>
                   <Alert.Title fontWeight="bold">
-                    Action Required: Link your SSO account
+                    Sign in with your organization's single sign-on
                   </Alert.Title>
                   <Text fontSize="sm">
-                    Your organization requires SSO login. Please link your
-                    account by logging in via the email input box on the sign-in
-                    page.
+                    Your organization requires single sign-on. Sign out, then
+                    sign in again by entering your work email address.
                   </Text>
                 </VStack>
                 <Button
@@ -316,12 +404,9 @@ export const DashboardPageBody = ({
                   colorPalette="red"
                   flexShrink={0}
                   color="white"
-                  asChild
+                  onClick={() => void signOut()}
                 >
-                  <Link href="/settings/security">
-                    <KeyRound size={14} />
-                    Link SSO Account
-                  </Link>
+                  Sign out
                 </Button>
               </HStack>
             </Alert.Content>
@@ -350,7 +435,23 @@ export const DashboardPageBody = ({
         /[project]/traces where TracesPage already mounts it. */}
       <GlobalTraceV2DrawerMount />
 
-      {userIsPartOfTeam ? (
+      {mfaGate.outcome.held ? (
+        // The enrollment gate (D06). Here rather than in each shell because
+        // this is the one interior every shell renders, so the gate cannot be
+        // reachable through a nav mode somebody forgot to wire. It swaps the
+        // BODY and leaves the chrome: the organization switcher above it is
+        // how somebody reaches everything they are not held out of, and
+        // nothing about their session has changed.
+        <OrganizationMfaGate
+          organizationName={mfaGate.outcome.organizationName}
+          offerPasskey={mfaGate.outcome.offerPasskey}
+          onEnrolled={mfaGate.refresh}
+        />
+      ) : userIsPartOfTeam || isOrganizationContextLoading ? (
+        // A refusal is only ever drawn from an answered read: membership
+        // comes from `team` and `organizationRole`, which do not exist until
+        // the organization read lands. This gate has no loading screen of
+        // its own, so the body renders meanwhile.
         // Page body absorbs leftover vertical space inside the
         // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
         // pages that use `height="full"` interpret it as "100%
@@ -387,30 +488,10 @@ export const DashboardPageBody = ({
           </ErrorBoundary>
         </Box>
       ) : (
-        <Alert.Root
-          status="warning"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your
-                administrator to add you, or{" "}
-                <Link href="/" textDecoration="underline">
-                  go back to your home page
-                </Link>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
+        <TeamAccessWaiting
+          organizationName={organization?.name ?? "your organization"}
+          onCheckAccess={() => router.reload()}
+        />
       )}
       <GlobalUpgradeModal />
     </VStack>

@@ -448,6 +448,38 @@ describe("resolveConnectedReferences", () => {
     });
   });
 
+  describe("when only another person's personal row carries that name and environment", () => {
+    /** @scenario "A name and environment naming only another person's personal agent is refused as owner-only" */
+    it("picks it so the run is refused as owner-only, for no actor and for a teammate", async () => {
+      const foreign = {
+        findConnectedByNameAndEnvironment: vi.fn(async () => [
+          { id: "agent_theirs", ownerUserId: "u_1" },
+        ]),
+        findConnectedByName: vi.fn(async () => []),
+      } as unknown as ConnectedTargetReads;
+
+      const [withoutActor] = await resolveConnectedReferences({
+        targets: [
+          { type: "connected", referenceId: "support-agent@development" },
+        ],
+        projectId,
+        actor: undefined,
+        agents: foreign,
+      });
+      const [asTeammate] = await resolveConnectedReferences({
+        targets: [
+          { type: "connected", referenceId: "support-agent@development" },
+        ],
+        projectId,
+        actor: { id: "u_2", label: "user" },
+        agents: foreign,
+      });
+
+      expect(withoutActor?.referenceId).toBe("agent_theirs");
+      expect(asTeammate?.referenceId).toBe("agent_theirs");
+    });
+  });
+
   describe("when the reference is an id", () => {
     /** @scenario "A name with no environment that matches no connected agent is read as an id" */
     it("leaves it as written when no connected agent carries that name", async () => {
@@ -599,6 +631,70 @@ describe("resolveConnectedReferences", () => {
       expect((failure as Error).message).toContain(
         "production and development",
       );
+    });
+
+    /** @scenario "A name with no environment picks another person's personal agent only to refuse it as owner-only" */
+    it("picks another person's online personal agent when the caller may run nothing else", async () => {
+      const [withoutActor] = await resolve({
+        rows: [
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
+        ],
+        online: ["agent_theirs"],
+      });
+      const [asTeammate] = await resolve({
+        rows: [
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
+        ],
+        online: ["agent_theirs"],
+        actor: { id: "u_2", label: "user" },
+      });
+
+      expect(withoutActor?.referenceId).toBe("agent_theirs");
+      expect(asTeammate?.referenceId).toBe("agent_theirs");
+    });
+
+    /** @scenario "A name with no environment prefers a shared online agent over another person's personal one" */
+    it("prefers a shared online agent over another person's personal one", async () => {
+      const [target] = await resolve({
+        rows: [
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
+          row({ id: "agent_staging", environment: "staging" }),
+        ],
+        online: ["agent_theirs", "agent_staging"],
+      });
+
+      expect(target?.referenceId).toBe("agent_staging");
+    });
+
+    /** @scenario "A name with no environment ignores another person's personal agent that is offline" */
+    it("still refuses as unresolved when the only personal agent is offline", async () => {
+      const failure = await resolve({
+        rows: [
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
+        ],
+        online: [],
+      }).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_environment_unresolved",
+        meta: { onlineEnvironments: [] },
+      });
     });
 
     /** @scenario "A name with no environment is refused when several other environments have a process connected" */

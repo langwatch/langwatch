@@ -1,0 +1,13 @@
+from enum import Enum
+
+
+class ListInstantEvalRunsResponse200RunsItemStatus(str, Enum):
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    FINISHED = "finished"
+    PLANNING = "planning"
+    QUEUED = "queued"
+    RUNNING = "running"
+
+    def __str__(self) -> str:
+        return str(self.value)

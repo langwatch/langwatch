@@ -20,10 +20,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import {
-  dropLangWatchQLRowPolicyStatement,
-  lwqlRowPolicyStatement,
-} from "../provisioning/accessModel";
+import { dropLangWatchQLRowPolicyStatement } from "../provisioning/accessModel";
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
@@ -86,6 +83,13 @@ describe("given a LangWatchQL dataset over a project_id-keyed source table", () 
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     ]);
+    // Install the grant and project_id row policy for the registered view from
+    // the single access-model emitter (#8258) — the view statements are
+    // structural only.
+    await harness.applyAccessModel({
+      extraViews: [PROJECT_ID_VIEW],
+      sourceDatabase: database,
+    });
 
     // One row per project, keyed by project_id = the tenant id the key map
     // resolves each key hash to.
@@ -139,11 +143,6 @@ describe("given a LangWatchQL dataset over a project_id-keyed source table", () 
      */
     /** @scenario "Detaching the row policy makes the other tenant's rows visible" */
     it("exposes project B's row once the policy is detached, and hides it again", async () => {
-      const lwqlTable = {
-        table: "scratch_objects",
-        tenantColumn: "project_id",
-        database,
-      };
       await harness.applyAsAdmin([
         dropLangWatchQLRowPolicyStatement({
           names: harness.names,
@@ -158,13 +157,11 @@ describe("given a LangWatchQL dataset over a project_id-keyed source table", () 
         );
         expect(unpoliced.length).toBe(2);
       } finally {
-        await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
-            names: harness.names,
-            lwqlTable,
-            sourceDatabase: database,
-          }),
-        ]);
+        // Reconverge from the definition — restores the scratch_objects policy.
+        await harness.applyAccessModel({
+          extraViews: [PROJECT_ID_VIEW],
+          sourceDatabase: database,
+        });
       }
 
       const repoliced = await selectRows<{ TenantId: string }>(

@@ -1,11 +1,8 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";
@@ -13,7 +10,6 @@ import {
   describeAudience,
   isContentVisible,
   isContentVisibleToPublic,
-  needsAudienceFacts,
   type ViewerFacts,
 } from "~/server/data-privacy/contentVisibility";
 import {
@@ -25,11 +21,12 @@ import {
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import { policyProjectIdsOf } from "~/server/data-privacy/policyProjectIdsOf";
+import type { PrivacyPolicyRequestMemo } from "~/server/data-privacy/privacyPolicyRequestMemo";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { CategoryVisibility, Protections } from "../traces/protections";
-import { isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");
 
@@ -212,13 +209,33 @@ function restrictLabelFor(
     : null;
 }
 
+/**
+ * What this viewer may see of a project's traces.
+ *
+ * The privacy policy is the strictest across the projects the read's proof
+ * names (ADR-144 decision 9): on an aggregate that is the aggregate's own
+ * policy and every member's, and on a proof narrowed to one member it is the
+ * aggregate's and that member's. A route that narrowed its proof passes it as
+ * `authorization`; otherwise the route's own proof on the context applies,
+ * and with none at all (a share link, a REST caller) the project's own
+ * policy does, as before. Who the viewer is (groups, team role, owner) is
+ * still read on the shown project, since that is the project they opened.
+ */
 export async function getUserProtectionsForProject(
   ctx: {
     prisma: PrismaClient;
     session: Session | null;
     publiclyShared?: boolean;
+    authorization?: Authorization;
+    privacyPolicyMemo?: PrivacyPolicyRequestMemo;
   },
-  { projectId }: { projectId: string } & Record<string, unknown>,
+  {
+    projectId,
+    authorization,
+  }: { projectId: string; authorization?: Authorization } & Record<
+    string,
+    unknown
+  >,
 ): Promise<Protections> {
   // Cost visibility follows the caller's own permission, never the fact that a
   // share link was presented. An anonymous viewer of a public link sees no
@@ -236,6 +253,7 @@ export async function getUserProtectionsForProject(
     select: {
       teamId: true,
       ownerUserId: true,
+      team: { select: { organizationId: true } },
     },
   });
 
@@ -245,8 +263,12 @@ export async function getUserProtectionsForProject(
   let policy: ResolvedDataPrivacy = PLATFORM_DEFAULT_DATA_PRIVACY;
   if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT !== "off") {
     try {
-      policy = await getDataPrivacyPolicyService().getResolvedForProject({
-        projectId,
+      policy = await getDataPrivacyPolicyService().getResolvedForProjects({
+        projectIds: policyProjectIdsOf({
+          projectId,
+          authorization: authorization ?? ctx.authorization,
+        }),
+        memo: ctx.privacyPolicyMemo,
       });
     } catch (error) {
       // Fail closed: a resolver/cache/db failure must not expose content that a
@@ -323,61 +345,37 @@ export async function getUserProtectionsForProject(
   }
 
   const userId = ctx.session.user.id;
-  const teamBindings = await ctx.prisma.roleBinding.findMany({
-    where: {
-      userId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: project.teamId,
-    },
-    select: { role: true },
+  const organizationId = project.team.organizationId;
+  const memberships = await ctx.prisma.groupMembership.findMany({
+    where: { userId, group: { organizationId } },
+    select: { groupId: true },
   });
-
-  let isAdmin = teamBindings.some((b) => b.role === TeamUserRole.ADMIN);
-  let isMember = teamBindings.length > 0;
-  let isMemberRole = teamBindings.some((b) => b.role === TeamUserRole.MEMBER);
-  const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
+  const groupIds = memberships.map((membership) => membership.groupId);
+  const groupIdSet = new Set(groupIds);
+  const teamGrants = await ctx.prisma.grant.findMany({
+    where: {
+      organizationId,
+      scopeType: "TEAM",
+      scopeId: project.teamId,
+      revokedAt: null,
+      principalType: { in: ["USER", "GROUP"] },
+    },
+    select: { roleKey: true, principalType: true, principalId: true },
+  });
+  const heldTeamGrants = teamGrants.filter(
+    (grant) =>
+      (grant.principalType === "USER" && grant.principalId === userId) ||
+      (grant.principalType === "GROUP" &&
+        grant.principalId !== null &&
+        groupIdSet.has(grant.principalId)),
+  );
+  const roleKeys = new Set(heldTeamGrants.map((grant) => grant.roleKey));
+  const isAdmin = roleKeys.has("admin");
+  const isMemberRole = roleKeys.has("member");
+  const isViewer = roleKeys.has("viewer");
+  const isMember = heldTeamGrants.length > 0;
   const isProjectOwner =
     project.ownerUserId != null && project.ownerUserId === userId;
-  if (!isMember) {
-    const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
-      userId,
-      teamId: project.teamId,
-    });
-    if (orgRole === OrganizationUserRole.ADMIN) {
-      isMember = true;
-      isAdmin = true;
-    } else if (orgRole === OrganizationUserRole.MEMBER) {
-      isMember = true;
-      isMemberRole = true;
-    }
-  }
-
-  // Group membership is only needed when a restrict audience names groups; the
-  // role-group and owner audiences decide from facts already in hand, keeping
-  // the common read path free of the extra queries.
-  let organizationId: string | null = null;
-  let groupIds: string[] = [];
-  const needsFacts =
-    CONTENT_CATEGORIES.some((category) =>
-      needsAudienceFacts(policy.categories[category]),
-    ) ||
-    restrictedAttributeRules.some((rule) =>
-      needsAudienceFacts({ disposition: "restrict", audience: rule.audience }),
-    );
-  if (isMember && needsFacts) {
-    const team = await ctx.prisma.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
-    organizationId = team?.organizationId ?? null;
-    if (organizationId) {
-      const memberships = await ctx.prisma.groupMembership.findMany({
-        where: { userId, group: { organizationId } },
-        select: { groupId: true },
-      });
-      groupIds = memberships.map((m) => m.groupId);
-    }
-  }
 
   const viewer: ViewerFacts = {
     isAdmin,

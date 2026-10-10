@@ -48,7 +48,9 @@ import {
   toClassifierQuestions,
 } from "./questions";
 import {
+  estimateJudgedTextTokens,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
+  instantEvalQuestionTokens,
   instantEvalTextBudget,
   prepareInstantEvalText,
 } from "./token-budget";
@@ -79,8 +81,13 @@ const REQUEST_TIMEOUT_MS = 120_000;
 /** How much of a text is kept when the classifier refuses it as too large. */
 const TOO_LARGE_RETRY_FRACTION = 0.75;
 
-/** Connections the pool keeps to the classifier. */
-const POOL_CONNECTIONS = 48;
+/**
+ * Connections the pool keeps to the classifier.
+ *
+ * At least the classifications one page keeps in flight, or the pool queues
+ * behind itself before the limiter ever gets a say.
+ */
+const POOL_CONNECTIONS = 128;
 
 export interface JevClassifierOptions {
   readonly apiKey: string;
@@ -125,6 +132,13 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       new Pool(new URL(baseUrl).origin, {
         connections: POOL_CONNECTIONS,
         keepAliveTimeout: 30_000,
+        // HTTP/1.1 on purpose. undici negotiates HTTP/2 by default, and a
+        // cancelled page aborts every classification in flight at once: that
+        // many stream resets on one session left Node's HTTP/2 writer
+        // spinning on the main thread, and the whole process stopped
+        // answering until it was killed. One request per connection has no
+        // shared session to wedge, and the pool is already sized for it.
+        allowH2: false,
       });
     this.sleep = options.sleep ?? abortableSleep;
   }
@@ -174,12 +188,32 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       isCutForSize: false,
     };
 
+    // The questions cost the same on every attempt; the text may be cut
+    // between them, so it is measured per send. The permit is measured with
+    // the classifier's own bytes-per-token ratio, the same one the price is,
+    // so the bucket is debited what the request really carries.
+    const questionTokens = instantEvalQuestionTokens(request.questions);
+    let limiterWaitMs = 0;
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      await this.options.limiter.acquire(signal);
+      const waitedFrom = Date.now();
+      await this.options.limiter.acquire(
+        {
+          tokens:
+            estimateJudgedTextTokens({
+              text: state.text,
+              limits: this.limits,
+            }) + questionTokens,
+          tenantId: request.projectId,
+        },
+        signal,
+      );
+      limiterWaitMs += Date.now() - waitedFrom;
       const outcome = await this.send({
         text: state.text,
         request,
         isTruncated: state.isTruncated,
+        attempt,
         ...(signal ? { signal } : {}),
       });
 
@@ -188,22 +222,30 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
         state,
         isLastAttempt: attempt === MAX_ATTEMPTS,
       });
-      if (settled) return settled;
+      if (settled) return { ...settled, limiterWaitMs };
       if (outcome.kind === "retry") await this.sleep(outcome.waitMs, signal);
     }
-    return instantEvalSkipped("classifier_rate_limited");
+    return { ...instantEvalSkipped("classifier_rate_limited"), limiterWaitMs };
   }
 
-  /** One send, classified into an {@link Attempt}. */
+  /**
+   * One send, classified into an {@link Attempt}.
+   *
+   * `attempt` sizes the backoff when the API names no wait of its own, so a
+   * transport failure or a bare 5xx waits longer each time rather than the
+   * same second five times over.
+   */
   private async send({
     text,
     request,
     isTruncated,
+    attempt,
     signal,
   }: {
     text: string;
     request: InstantEvalClassifyRequest;
     isTruncated: boolean;
+    attempt: number;
     signal?: AbortSignal;
   }): Promise<Attempt> {
     const body = JSON.stringify({
@@ -229,13 +271,17 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       // A transport failure is worth another try: the reference client retries
       // these on the same backoff as a 5xx, and one dropped socket in a
       // thousand-row query should not cost that row its answer.
-      return { kind: "retry", waitMs: backoffMs(1), isRateLimited: false };
+      return {
+        kind: "retry",
+        waitMs: backoffMs(attempt),
+        isRateLimited: false,
+      };
     }
 
     if (response.status === 200) {
       return await this.readAnswer({ response, request, isTruncated });
     }
-    return await classifyFailure({ response });
+    return await classifyFailure({ response, attempt });
   }
 
   private async readAnswer({
@@ -335,8 +381,10 @@ function cutForRetry(state: AttemptState): InstantEvalJudgement | null {
 /** Reads one non-200 into an outcome. */
 async function classifyFailure({
   response,
+  attempt,
 }: {
   response: Awaited<ReturnType<typeof undiciFetch>>;
+  attempt: number;
 }): Promise<Attempt> {
   const body = await response.text().catch(() => "");
   const { status } = response;
@@ -355,7 +403,7 @@ async function classifyFailure({
     }
     return {
       kind: "retry",
-      waitMs: Math.min(waitMs ?? backoffMs(1), MAX_RETRY_AFTER_MS),
+      waitMs: Math.min(waitMs ?? backoffMs(attempt), MAX_RETRY_AFTER_MS),
       isRateLimited,
     };
   }
@@ -372,7 +420,7 @@ function retryAfterMs(header: string | null): number | null {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
 }
 
-/** Flat 1s base, which the caller caps. Kept simple: the API names its own waits. */
+/** 1s, 2s, 4s, 8s: doubles per attempt, capped, for when the API names no wait. */
 function backoffMs(attempt: number): number {
   return Math.min(1_000 * 2 ** (attempt - 1), MAX_RETRY_AFTER_MS);
 }

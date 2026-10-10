@@ -5,54 +5,42 @@
  * set, applying the same hierarchy the engine does, and it FAILS CLOSED
  * whenever it has no set to answer from.
  *
- * The loading half is the trap. This query is disabled until there is an
- * organization or a project to ask about, and a disabled query has no answer
- * (`isPending`) without being in flight — so the hook reports TanStack Query
- * v5's `isLoading` (`isPending && isFetching`), which means "a fetch this
- * hook actually started has not answered yet". The test renders the hook and
- * reads its answers; it does not assert on source text.
+ * The organization hook owns fetching and permission matching. This test
+ * keeps the adapter small: it proves `useCan` reuses that canonical answer
+ * and carries its fail-closed loading state through.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockEffectivePermissionsQuery } = vi.hoisted(() => ({
-  mockEffectivePermissionsQuery: vi.fn(),
-}));
-
-vi.mock("../../utils/api", () => ({
-  api: {
-    authz: {
-      effectivePermissions: { useQuery: mockEffectivePermissionsQuery },
-    },
+const { mockWorkspace } = vi.hoisted(() => ({
+  mockWorkspace: {
+    hasPermission: vi.fn(),
+    permissionIsLoading: false,
+    effectivePermissions: [] as string[],
   },
 }));
 
 vi.mock("../useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1" },
-    organization: { id: "org-1" },
-  }),
+  useOrganizationTeamProject: () => mockWorkspace,
 }));
 
-const { useCan } = await import("../useCan");
+import { useCan } from "../useCan";
 
-/** A TanStack Query v5 result, only the fields this hook reads. */
-const queryResult = ({
-  permissions,
-  isLoading = false,
-}: {
-  permissions?: string[];
-  isLoading?: boolean;
-}) => ({
-  data: permissions ? { permissions } : undefined,
-  // Deliberately independent of isLoading: a query with no answer is
-  // `isPending` whether or not a fetch is in flight.
-  isPending: permissions === undefined,
-  isLoading,
-});
+function answerWith(permissions: string[], isLoading = false) {
+  mockWorkspace.effectivePermissions = permissions;
+  mockWorkspace.permissionIsLoading = isLoading;
+  mockWorkspace.hasPermission.mockImplementation(
+    (permission: string) =>
+      permissions.includes(permission) ||
+      (permissions.includes("datasets:manage") &&
+        permission === "datasets:view"),
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockWorkspace.permissionIsLoading = false;
+  mockWorkspace.effectivePermissions = [];
 });
 
 afterEach(() => {
@@ -62,9 +50,7 @@ afterEach(() => {
 describe("useCan", () => {
   describe("given the server has answered with an effective set", () => {
     it("satisfies a narrower permission from a broader grant", () => {
-      mockEffectivePermissionsQuery.mockReturnValue(
-        queryResult({ permissions: ["datasets:manage"] }),
-      );
+      answerWith(["datasets:manage"]);
 
       const { result } = renderHook(() => useCan());
 
@@ -76,9 +62,7 @@ describe("useCan", () => {
     });
 
     it("does not read a grant backwards, so view never implies manage", () => {
-      mockEffectivePermissionsQuery.mockReturnValue(
-        queryResult({ permissions: ["datasets:view"] }),
-      );
+      answerWith(["datasets:view"]);
 
       const { result } = renderHook(() => useCan());
 
@@ -89,9 +73,7 @@ describe("useCan", () => {
 
   describe("given the query has not answered yet", () => {
     it("refuses everything, unlike the legacy guard that rendered during load", () => {
-      mockEffectivePermissionsQuery.mockReturnValue(
-        queryResult({ isLoading: true }),
-      );
+      answerWith([], true);
 
       const { result } = renderHook(() => useCan());
 
@@ -103,13 +85,7 @@ describe("useCan", () => {
 
   describe("given a query that is disabled rather than in flight", () => {
     it("does not report loading, so a gated screen still renders", () => {
-      // A disabled query is pending forever without fetching; isLoading is
-      // false, which is the honest answer.
-      mockEffectivePermissionsQuery.mockReturnValue({
-        data: undefined,
-        isPending: true,
-        isLoading: false,
-      });
+      answerWith([]);
 
       const { result } = renderHook(() => useCan());
 

@@ -436,9 +436,10 @@ function useWaitingDecisions() {
 /**
  * Everything waiting on a human, on one panel.
  *
- * Sign-ins awaiting confirmation and invitations with their expiry. When
- * neither has anything, the panel is ONE LINE — separate empty sections each
- * explaining their own emptiness would fill the page to say nothing.
+ * Sign-ins awaiting confirmation, invitations with their expiry, and domain
+ * claims awaiting review. When none of the three has anything, the panel is
+ * ONE LINE — three empty sections each explaining their own emptiness is a
+ * page filled up to say nothing.
  */
 function WaitingPanel({
   detail,
@@ -554,6 +555,22 @@ function WaitingPanel({
                 </Button>
               </HStack>
             )}
+          </HStack>
+        ))}
+
+        {detail.waiting.domainClaims.map((claim) => (
+          <HStack
+            key={`${claim.connectionId}:${claim.domain}`}
+            justify="space-between"
+          >
+            <Text fontSize="sm">
+              Domain claim on {claim.domain} by{" "}
+              {claim.organizationName ??
+                shortenIdentifier(claim.organizationId)}
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              waiting {waitedFor({ sinceMs: claim.waitingSinceMs, nowMs })}
+            </Text>
           </HStack>
         ))}
       </VStack>

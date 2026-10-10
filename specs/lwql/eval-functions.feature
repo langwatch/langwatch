@@ -28,6 +28,21 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: An eval function used outside the projection is told what to do instead
+    Given a statement calling eval in its WHERE clause
+    When the statement is validated
+    Then it is refused for the position the call is in
+    And the refusal does not tell the caller to filter on a plain column, because an eval answers after the query runs
+    And it says to filter the rows the statement returns, or to run it as an Instant Eval and read the matched results
+
+  @unit
+  Scenario: An extraction function used outside the projection keeps its advice
+    Given a statement calling conversation in its WHERE clause
+    When the statement is validated
+    Then it is refused for the position the call is in
+    And the refusal tells the caller to project it and filter, group or sort on a plain column
+
+  @unit
   Scenario: One question over an extracted conversation is accepted and planned
     Given a statement selecting eval(conversation(ConversationId), 'The customer sounds annoyed') AS annoyed
     When the statement is validated
@@ -252,17 +267,18 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the query fails as cancelled rather than answering with null columns
 
   @unit
-  Scenario: A query that judged nothing records no cost
+  Scenario: A query that judged nothing reports no spend
     Given a statement whose every key resolved to no text
     When it is executed
-    Then no cost row is written
+    Then no spend record is reported
 
   @unit
-  Scenario: One cost row is recorded per query
+  Scenario: One spend record is reported per query
     Given a statement that judged three conversations
     When it is executed
-    Then one cost row is written for the project with the classifier's input tokens
-    And its amount is the classifier's own cost
+    Then one spend record is reported for the project with the classifier's input tokens
+    And it names no run, because a synchronous query has none
+    And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
   # ---------------------------------------------------------------------------
@@ -281,3 +297,19 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     When it runs as the restricted identity
     Then the server's query log holds the submitted text byte for byte, comment included
     And the column carries the text the call was given, which is what the application judges
+
+  @unit
+  Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
+    Given an eval over a conversation far longer than the judge's budget
+    When the statement is hydrated
+    Then the text sent keeps the close of the conversation
+    And it keeps the opening of the conversation
+    And it names how many turns were dropped from the middle
+    And the cell reports itself truncated
+
+  @unit
+  Scenario: A conversation inside the judge's budget is sent whole and not marked truncated
+    Given an eval over a conversation smaller than the judge's budget
+    When the statement is hydrated
+    Then the whole conversation is sent
+    And the cell does not report itself truncated

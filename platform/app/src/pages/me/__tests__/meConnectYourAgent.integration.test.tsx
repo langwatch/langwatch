@@ -164,6 +164,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: undefined,
     team: undefined,
     hasPermission: () => true,
+    hasAnyPermission: () => true,
     isLoading: false,
     isFetched: true,
   }),

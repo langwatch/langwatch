@@ -60,6 +60,8 @@ type Data = {
   /** Wraps the recording ledger, for tests that need to observe or fail a
    *  send rather than only read what was sent. */
   wrapLedger?: (ledger: Ledger) => Ledger;
+  readOrder?: string[];
+  membershipReadRelease?: Promise<void>;
 };
 
 type Ledger = ConstructorParameters<typeof AuthzEngineMigration>[0]["ledger"];
@@ -74,8 +76,18 @@ function harness(data: Data = {}) {
         ? CREATED
         : data.organizationCreatedAtMs,
     findLegacyRoleRows: async () => data.roles ?? [],
-    findLegacyBindingRows: async () => data.bindings ?? [],
-    findOrganizationMembers: async () => data.members ?? [],
+    findLegacyBindingRows: async () => {
+      data.readOrder?.push("bindings");
+      return data.bindings ?? [];
+    },
+    findOrganizationMembers: async () => {
+      data.readOrder?.push("members-start");
+      if (data.membershipReadRelease !== undefined) {
+        await data.membershipReadRelease;
+      }
+      data.readOrder?.push("members-end");
+      return data.members ?? [];
+    },
     findLegacyTeamRows: async () => data.teamRows ?? [],
     findShareLinkRows: async () => data.shareLinks ?? [],
     findExternalMemberFacts: async () => data.externalMembers ?? [],
@@ -146,11 +158,18 @@ function attachedFacts(sent: Sent[]): GrantFact[] {
 function member({
   userId,
   role = "MEMBER",
+  membershipStamp = `stamp_${userId}`,
 }: {
   userId: string;
   role?: string;
+  membershipStamp?: string;
 }): OrganizationMemberFact {
-  return { userId, role, createdAtMs: CREATED };
+  return {
+    userId,
+    role,
+    createdAtMs: CREATED,
+    membershipStamp: membershipStamp ?? `stamp_${userId}`,
+  };
 }
 
 function binding(overrides: Partial<LegacyBindingRow> = {}): LegacyBindingRow {
@@ -225,7 +244,7 @@ describe("given an organization with legacy access rows", () => {
             createdAtMs: CREATED,
           },
         ],
-        bindings: [binding()],
+        bindings: [binding({ userId: "user_member" })],
         roles: [
           {
             id: "role_1",
@@ -291,6 +310,7 @@ describe("given an organization with legacy access rows", () => {
     /** @scenario "Team membership is stated directly, not promoted first" */
     it("states memberships as grants and writes no binding row", async () => {
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         teamRows: [
           {
             userId: "user_1",
@@ -313,9 +333,89 @@ describe("given an organization with legacy access rows", () => {
       expect(teamFacts[0]?.grantId).toMatch(/^grant_/);
     });
 
+    it("leaves GROUP, API_KEY, and organization facts unstamped", async () => {
+      const { migration, sent } = harness({
+        members: [member({ userId: "user_1", membershipStamp: "stamp_1" })],
+        bindings: [
+          binding({
+            id: "group_binding",
+            userId: null,
+            groupId: "group_1",
+          }),
+          binding({
+            id: "api_key_binding",
+            userId: null,
+            apiKeyId: "key_1",
+          }),
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      const facts = attachedFacts(sent);
+      expect(
+        facts.find((fact) => fact.grantId === "group_binding"),
+      ).toMatchObject({
+        principal: { type: "group", id: "group_1" },
+      });
+      expect(
+        facts.find((fact) => fact.grantId === "api_key_binding"),
+      ).toMatchObject({
+        principal: { type: "apiKey", id: "key_1" },
+      });
+      expect(
+        facts
+          .filter(
+            (fact) =>
+              fact.principal.type === "group" ||
+              fact.principal.type === "apiKey" ||
+              fact.principal.type === "organization",
+          )
+          .every((fact) => fact.membershipStamp === undefined),
+      ).toBe(true);
+    });
+
+    it("carries the current membership lifetime on imported USER facts", async () => {
+      const { migration, sent } = harness({
+        members: [member({ userId: "user_1", membershipStamp: "stamp_1" })],
+        teamRows: [
+          {
+            userId: "user_1",
+            teamId: "team_1",
+            role: "ADMIN",
+            customRoleId: null,
+            createdAtMs: CREATED,
+          },
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(attachedFacts(sent)).toContainEqual(
+        expect.objectContaining({
+          principal: { type: "user", id: "user_1" },
+          membershipStamp: "stamp_1",
+        }),
+      );
+    });
+
+    it("does not state a USER fact after its membership has disappeared", async () => {
+      const { migration, sent } = harness({
+        bindings: [binding()],
+        members: [],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(
+        attachedFacts(sent).filter((fact) => fact.principal.type === "user"),
+      ).toEqual([]);
+    });
+
     /** @scenario "Team membership is stated directly, not promoted first" */
     it("does not restate a membership a team binding already carries", async () => {
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         teamRows: [
           {
             userId: "user_1",
@@ -362,7 +462,10 @@ describe("given an organization with legacy access rows", () => {
 
     /** @scenario "An imported grant keeps the time it was originally made" */
     it("carries the legacy row's own time as the fact's business time", async () => {
-      const { migration, sent } = harness({ bindings: [binding()] });
+      const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [binding()],
+      });
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
@@ -373,16 +476,79 @@ describe("given an organization with legacy access rows", () => {
   describe("when the pass checks the projection", () => {
     /** @scenario "The migration states its facts and checks once" */
     it("reads the projection once and does not poll", async () => {
-      const { migration, reads } = harness({ bindings: [binding()] });
+      const { migration, reads } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [binding()],
+      });
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
       expect(reads).toEqual({ grantHeads: 1, roleHeads: 1, resourceRows: 1 });
     });
 
+    it("completes the membership read before legacy USER rows", async () => {
+      let releaseMembership: () => void = () => undefined;
+      const membershipReadRelease = new Promise<void>((resolve) => {
+        releaseMembership = resolve;
+      });
+      const readOrder: string[] = [];
+      const { migration } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [binding()],
+        readOrder,
+        membershipReadRelease,
+      });
+
+      const run = migration.migrateTenant({ tenantId: ORG_ID });
+      await Promise.resolve();
+      expect(readOrder).toEqual(["members-start"]);
+
+      releaseMembership();
+      await run;
+
+      expect(readOrder.slice(0, 3)).toEqual([
+        "members-start",
+        "members-end",
+        "bindings",
+      ]);
+    });
+
+    it("holds a legacy-only team membership until its grant is folded", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        members: [member({ userId: "legacy_user" })],
+        teamRows: [
+          {
+            userId: "legacy_user",
+            teamId: "legacy_team",
+            role: "MEMBER",
+            customRoleId: null,
+            createdAtMs: CREATED,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+      const teamFact = attachedFacts(sent).find(
+        (fact) => fact.scope.type === "TEAM",
+      );
+
+      expect(teamFact).toMatchObject({
+        principal: { type: "user", id: "legacy_user" },
+        roleKey: "member",
+        scope: { type: "TEAM", id: "legacy_team" },
+      });
+      expect(outcome.status).toBe("migrated");
+      expect((outcome.report as { outstanding: number }).outstanding).toBe(1);
+      expect(
+        (outcome.report as { outstandingSample: string[] }).outstandingSample,
+      ).toContain(teamFact?.grantId);
+    });
+
     /** @scenario "A projection that has not caught up holds the organization" */
     it("holds the organization with the outstanding count", async () => {
       const { migration } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [binding()],
         organizationCreatedAtMs: null,
       });
@@ -396,7 +562,10 @@ describe("given an organization with legacy access rows", () => {
 
     /** @scenario "A held organization names what is outstanding" */
     it("names the outstanding ids in the held report", async () => {
-      const { migration } = harness({ bindings: [binding()] });
+      const { migration } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [binding()],
+      });
 
       const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
 
@@ -408,6 +577,7 @@ describe("given an organization with legacy access rows", () => {
     it("does not finalize a projection that disagrees, and names the disagreement", async () => {
       const drifted = binding();
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [drifted],
         organizationCreatedAtMs: null,
         grantHeads: [
@@ -468,6 +638,7 @@ describe("given an organization with legacy access rows", () => {
         occurredAtMs: CREATED,
       };
       const { migration } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [row],
         organizationCreatedAtMs: null,
         grantHeads: [foldedHead(fact)],
@@ -511,6 +682,7 @@ describe("given an organization with legacy access rows", () => {
       const attempted: string[] = [];
       let failFirst = true;
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [binding()],
         organizationCreatedAtMs: null,
         wrapLedger: (ledger) => ({
@@ -546,10 +718,12 @@ describe("given an organization with legacy access rows", () => {
       // Content is part of the key: identity alone would let the first
       // pass's dedupe silently swallow a row edited between passes.
       const before = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [binding({ role: "MEMBER" })],
         organizationCreatedAtMs: null,
       });
       const after = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [binding({ role: "ADMIN" })],
         organizationCreatedAtMs: null,
       });
@@ -566,6 +740,7 @@ describe("given an organization with legacy access rows", () => {
         binding({ id: `binding_${index}` }),
       );
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: manyBindings,
         organizationCreatedAtMs: null,
         wrapLedger: (ledger) => ({
@@ -798,6 +973,7 @@ describe("given an organization with legacy access rows", () => {
     it("holds when a stated grant's head is revoked while legacy still holds the row", async () => {
       const row = binding();
       const { migration } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [row],
         organizationCreatedAtMs: null,
         grantHeads: [
@@ -1069,6 +1245,7 @@ describe("given an organization with legacy access rows", () => {
     it("never states a CUSTOM membership row: the legacy fallback denies that shape", async () => {
       const { migration, sent } = harness({
         organizationCreatedAtMs: null,
+        members: [member({ userId: "user_1" }), member({ userId: "user_2" })],
         teamRows: [
           {
             userId: "user_1",
@@ -1099,6 +1276,7 @@ describe("given an organization with legacy access rows", () => {
       // stated an extra admin grant legacy never answers.
       const { migration, sent } = harness({
         organizationCreatedAtMs: null,
+        members: [member({ userId: "user_1" })],
         teamRows: [
           {
             userId: "user_1",
@@ -1130,6 +1308,7 @@ describe("given an organization with legacy access rows", () => {
     it("counts a binding held through a group as suppressing too", async () => {
       const { migration, sent } = harness({
         organizationCreatedAtMs: null,
+        members: [member({ userId: "user_1" })],
         teamRows: [
           {
             userId: "user_1",
@@ -1206,6 +1385,7 @@ describe("given an organization with legacy access rows", () => {
         occurredAtMs: CREATED,
       };
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [row],
         organizationCreatedAtMs: null,
         grantHeads: [foldedHead(fact)],
@@ -1225,6 +1405,7 @@ describe("given an organization with legacy access rows", () => {
         scopeId: "project_2",
       });
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" }), member({ userId: "user_2" })],
         bindings: [folded, missing],
         organizationCreatedAtMs: null,
         grantHeads: [
@@ -1258,6 +1439,7 @@ describe("given an organization with legacy access rows", () => {
         occurredAtMs: CREATED,
       };
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [row],
         organizationCreatedAtMs: null,
         grantHeads: [{ ...foldedHead(fact), revoked: true }],
@@ -1282,6 +1464,7 @@ describe("given an organization with legacy access rows", () => {
         occurredAtMs: CREATED,
       };
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [row],
         organizationCreatedAtMs: null,
         grantHeads: [{ ...foldedHead(fact), roleKey: "viewer" }],
@@ -1410,6 +1593,7 @@ describe("given an organization with legacy access rows", () => {
         scopeId: "project_2",
       });
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" }), member({ userId: "user_2" })],
         bindings: [folded, missing],
         organizationCreatedAtMs: null,
         grantHeads: [
@@ -1441,6 +1625,7 @@ describe("given an organization with legacy access rows", () => {
     /** @scenario "A pass states only the facts the heads do not carry" */
     it("still states everything on the first pass, when the heads are empty", async () => {
       const { migration, sent } = harness({
+        members: [member({ userId: "user_1" })],
         bindings: [binding()],
         shareLinks: [shareLink()],
         organizationCreatedAtMs: null,

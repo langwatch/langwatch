@@ -50,16 +50,22 @@ vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
   buildTraceBlobResolutionDeps: mockBuildDeps,
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 vi.mock("../../utils", () => ({
   getUserProtectionsForProject: vi.fn().mockResolvedValue({

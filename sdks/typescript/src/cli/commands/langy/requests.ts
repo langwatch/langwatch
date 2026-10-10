@@ -20,7 +20,12 @@ import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
-import { resolveCredentials } from "../../utils/apiKey";
+import {
+  type LoginElsewhere,
+  loginElsewhereMessage as sessionElsewhereMessage,
+  loginMadeElsewhere,
+  resolvePersonCredentials,
+} from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import {
   askBox,
@@ -59,7 +64,15 @@ export interface ApprovedControl {
   conversation: { id: string; title: string; url: string };
 }
 
-export class ShareControlError extends Error {}
+export class ShareControlError extends Error {
+  /** The HTTP status of the refusal, when the platform answered with one. */
+  readonly status?: number;
+
+  constructor(message: string, { status }: { status?: number } = {}) {
+    super(message);
+    if (status !== undefined) this.status = status;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // The folder
@@ -253,6 +266,7 @@ export function createControlApi({
     if (!response.ok) {
       throw new ShareControlError(
         refusalText(body) ?? `LangWatch answered ${response.status} for ${urlPath}`,
+        { status: response.status },
       );
     }
     return body;
@@ -278,6 +292,25 @@ export function createControlApi({
   };
 }
 
+/**
+ * Whether the platform takes the login's key. Only a 401 says it does not:
+ * any other failure is left for the request list to report in its own words.
+ */
+export async function platformTakesTheKey(
+  credentials: PersonCredentials,
+  { fetchImpl }: { fetchImpl?: typeof fetch } = {},
+): Promise<boolean> {
+  try {
+    await createControlApi({
+      ...credentials,
+      ...(fetchImpl === undefined ? {} : { fetchImpl }),
+    }).list();
+    return true;
+  } catch (error) {
+    return !(error instanceof ShareControlError && error.status === 401);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The terminal
 // ---------------------------------------------------------------------------
@@ -291,31 +324,84 @@ export function hasDeviceSession(): boolean {
   }
 }
 
+/** What the command says when the sign-in left no login it can use. */
+export const SIGN_IN_FAILED_MESSAGE =
+  "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again.";
+
 /**
- * Signs in when the machine has no device session, then resolves the
- * credentials. The login is the standard flow, called rather than repeated.
+ * What the command says when the login belongs to another address. A project
+ * key is no way out here, since the command acts as a person.
+ */
+export const loginElsewhereMessage = (elsewhere: LoginElsewhere): string =>
+  sessionElsewhereMessage({
+    ...elsewhere,
+    outcome: ", so this folder is not shared",
+    canUseApiKey: false,
+  });
+
+export type PersonCredentials = {
+  apiKey: string;
+  endpoint: string;
+  projectId?: string;
+};
+
+/**
+ * The credentials the command acts with: the device login on this machine,
+ * and only that. A control request is addressed to the person who asked, and
+ * a `LANGWATCH_API_KEY`, in the folder's .env or in the shell, names no
+ * person the command line can see, so it is never read here and the folder's
+ * .env is never written.
  *
- * The device session comes before a key in the environment or the folder's
- * .env: a control request is addressed to the person who asked, and the
- * project key Langy writes into the folder carries no person, so it lists
- * nothing and can approve nothing. A key in the environment is still the
- * credential when the machine has no login, which is how a script signs in.
+ * With no login, or with one that cannot be used (the server refuses it, it
+ * holds no login key, or `isAccepted` says the platform turned its key down),
+ * the device login runs right away and the login is read again. The login is
+ * the standard flow, called rather than repeated. A sign-in that still leaves
+ * no usable login ends the command with `SIGN_IN_FAILED_MESSAGE`.
+ *
+ * A login made against another address than the one the command targets ends
+ * the command before any key is read: the key stays with the address that
+ * issued it, and replacing the machine's login is the person's call.
  */
 export async function ensureSignedIn({
   login,
+  isAccepted = async () => true,
 }: {
   login: (options: { device: boolean }) => Promise<void>;
-}): Promise<{ apiKey: string; endpoint: string; projectId?: string }> {
-  if (!hasDeviceSession() && !process.env.LANGWATCH_API_KEY?.trim()) {
+  /** Whether the platform takes the login's key. Defaults to yes. */
+  isAccepted?: (credentials: PersonCredentials) => Promise<boolean>;
+}): Promise<PersonCredentials> {
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) throw new ShareControlError(loginElsewhereMessage(elsewhere));
+
+  const usableLogin = async () => {
+    const found = await resolvePersonCredentials();
+    return found && (await isAccepted(found)) ? found : undefined;
+  };
+
+  const hadLogin = hasDeviceSession();
+  let credentials = await usableLogin();
+  if (!credentials) {
     console.log(
-      chalk.gray("No login on this machine yet. Signing in first."),
+      chalk.gray(
+        hadLogin
+          ? "The login on this machine can no longer be used. Signing in again."
+          : "No login on this machine yet. Signing in first.",
+      ),
     );
-    await login({ device: true });
+    try {
+      await login({ device: true });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message.trim() : "";
+      throw new ShareControlError(
+        reason === ""
+          ? SIGN_IN_FAILED_MESSAGE
+          : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
+      );
+    }
+    credentials = await usableLogin();
+    if (!credentials) throw new ShareControlError(SIGN_IN_FAILED_MESSAGE);
   }
-  const credentials = await resolveCredentials({ preferSession: true });
-  if (credentials.source === "session") {
-    console.log(chalk.gray(loginLine()));
-  }
+  console.log(chalk.gray(loginLine()));
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,

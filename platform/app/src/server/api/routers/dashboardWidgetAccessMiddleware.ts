@@ -17,7 +17,7 @@
 
 import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
 import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/dashboard-widgets/errors";
-import type { PermissionMiddleware } from "~/server/api/rbac";
+import type { PermissionMiddleware } from "~/server/app-layer/authz/permission-adapters";
 
 /**
  * Refuses unless the custom-chart-playground switch is on for this project.

@@ -5,9 +5,11 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   type CommandFeatureFlagValues,
   filterCommandsByFeatureFlags,
+  filterCommandsByProjectNavigation,
   topLevelNavigationCommands,
 } from "../command-registry";
 import type { Command } from "../types";
+import { useCommandProjectNavigation } from "./useCommandProjectNavigation";
 
 /**
  * Release flags the command list reads.
@@ -40,17 +42,22 @@ export function useCommandFeatureFlags(): CommandFeatureFlagValues {
 
 /**
  * The navigation commands offered on an empty bar, with the flagged ones
- * resolved for this person.
+ * resolved for this person and the sections this project's navigation
+ * hides left out.
  */
 export function useTopLevelNavigationCommands(): Command[] {
   const flags = useCommandFeatureFlags();
+  const navigation = useCommandProjectNavigation();
 
   return useMemo(
     () =>
-      filterCommandsByFeatureFlags({
-        commands: topLevelNavigationCommands,
-        flags,
+      filterCommandsByProjectNavigation({
+        commands: filterCommandsByFeatureFlags({
+          commands: topLevelNavigationCommands,
+          flags,
+        }),
+        navigation,
       }),
-    [flags],
+    [flags, navigation],
   );
 }

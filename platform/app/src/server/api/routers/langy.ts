@@ -40,6 +40,12 @@ import {
   LangyWaitExpiredError,
 } from "~/server/langy-local-control/errors";
 import { workspaceChannel } from "~/server/langy-local-control/keys";
+import { openControlRequest } from "~/server/langy-local-control/open-control-request";
+import {
+  requireOwnConversation,
+  requireVisibleConversation,
+} from "~/server/langy-local-control/own-conversation";
+import { controlRequestState } from "~/server/langy-local-control/request-state";
 import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
 import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
 import {
@@ -257,29 +263,41 @@ async function canWatchTurn({
 }
 
 /** The claim/complete side of the UI-action channel, on the shared app deps. */
+
 /**
- * The conversation, when it is this caller's to act on.
- *
- * A conversation the caller cannot see dies as not-found rather than as a
- * refusal, exactly like every other Langy read, so an id never confirms that
- * it exists.
+ * What became of the conversation's latest request to share a folder. The
+ * durable log is read only when no open request answers on its own.
  */
-async function requireOwnConversation({
+async function readControlRequestState({
   projectId,
   conversationId,
-  userId,
+  open,
+  connected,
 }: {
   projectId: string;
   conversationId: string;
-  userId: string;
-}): Promise<ConversationDetail> {
-  const conversation = await getApp().langy.conversations.findByIdVisible({
-    id: conversationId,
-    projectId,
-    userId,
-  });
-  if (!conversation) throw new LangyConversationNotFoundError(conversationId);
-  return conversation;
+  open: { id: string; expiresAt: number } | null;
+  connected: boolean;
+}) {
+  const now = Date.now();
+  if (open) {
+    return controlRequestState({
+      open,
+      latest: null,
+      claimed: false,
+      connected,
+      now,
+    });
+  }
+  const latest =
+    await getApp().langy.conversations.getLatestLocalControlRequest({
+      projectId,
+      conversationId,
+    });
+  const claimed = latest
+    ? await getLocalControlRuntime().requests.wasApproved(latest.requestId)
+    : false;
+  return controlRequestState({ open, latest, claimed, connected, now });
 }
 
 /**
@@ -1102,7 +1120,7 @@ export const langyRouter = createTRPCRouter({
   getLocalWorkspace: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))
     .query(async ({ input, ctx }) => {
-      const conversation = await requireOwnConversation({
+      const conversation = await requireVisibleConversation({
         projectId: input.projectId,
         conversationId: input.conversationId,
         userId: ctx.session.user.id,
@@ -1144,11 +1162,43 @@ export const langyRouter = createTRPCRouter({
         pendingRequest: pendingRequest
           ? toControlRequestWire(pendingRequest)
           : null,
+        requestState: await readControlRequestState({
+          projectId: input.projectId,
+          conversationId: input.conversationId,
+          open: pendingRequest,
+          connected: connected !== null,
+        }),
         codeAccessPreference:
           user?.langyCodeAccessPreference === "github"
             ? ("github" as const)
             : null,
       };
+    }),
+
+  /**
+   * Opens a fresh request to share a folder with this conversation, for the
+   * code access card whose request is over. Nothing is sent in the person's
+   * name and no turn starts: the request shows up in the waiting terminal, and
+   * connecting the folder starts the next turn as it does after the first ask.
+   */
+  renewLocalControlRequest: langyCreateProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .mutation(async ({ input, ctx }): Promise<{ expiresAt: string }> => {
+      const conversation = await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: input.projectId },
+        select: { id: true, name: true, slug: true },
+      });
+      const request = await openControlRequest({
+        project,
+        userId: ctx.session.user.id,
+        conversation,
+      });
+      return { expiresAt: new Date(request.expiresAt).toISOString() };
     }),
 
   /**

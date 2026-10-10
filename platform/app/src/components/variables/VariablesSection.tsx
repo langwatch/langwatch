@@ -305,6 +305,7 @@ const INPUT_TYPE_OPTIONS = [
   { value: "float", label: TYPE_LABELS.float ?? "Number" },
   { value: "bool", label: TYPE_LABELS.bool ?? "Boolean" },
   { value: "image", label: TYPE_LABELS.image ?? "Image" },
+  { value: "file", label: TYPE_LABELS.file ?? "File" },
   { value: "list", label: TYPE_LABELS.list ?? "List" },
   { value: "dict", label: TYPE_LABELS.dict ?? "Object" },
   { value: "chat_messages", label: TYPE_LABELS.chat_messages ?? "Messages" },

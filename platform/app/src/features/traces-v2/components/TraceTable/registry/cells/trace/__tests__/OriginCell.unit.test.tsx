@@ -11,7 +11,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useFilterStore } from "../../../../../../stores/filterStore";
+import { useExplorerStore } from "../../../../../../stores/explorerStore";
 import type { TraceListItem } from "../../../../../../types/trace";
 import { NO_TRACE_EVENTS } from "../../../../../../types/trace";
 import type { CellRenderContext } from "../../../types";
@@ -62,10 +62,10 @@ function renderCell(item: TraceListItem, onRowClick = vi.fn()) {
   return onRowClick;
 }
 
-const queryText = () => useFilterStore.getState().queryText;
+const queryText = () => useExplorerStore.getState().queryText;
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 afterEach(cleanup);

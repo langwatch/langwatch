@@ -48,6 +48,14 @@ describe("AuthzGrantsWriteProjection", () => {
         row: { id: "grant_1", organizationId: "org_acme" },
       });
     });
+
+    it("carries a USER membership lifetime into the guarded write", () => {
+      const write = projection.mapAuthzGrantAttached(
+        attachedEvent({ membershipStamp: "membership_1" }),
+      );
+
+      expect(write).toMatchObject({ membershipStamp: "membership_1" });
+    });
   });
 
   describe("when an imported binding is reassigned to another custom role", () => {

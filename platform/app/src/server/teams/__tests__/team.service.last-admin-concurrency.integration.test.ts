@@ -20,8 +20,12 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { TeamService } from "../team.service";
+
+wireDefaultTestApp();
 
 describe("TeamService.removeMember", () => {
   const ns = `team-last-admin-${nanoid(8)}`;
@@ -72,20 +76,21 @@ describe("TeamService.removeMember", () => {
         },
       ],
     });
-    await prisma.roleBinding.createMany({
-      data: [firstAdminId, secondAdminId].map((userId) => ({
-        organizationId,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-      })),
-    });
+    for (const binding of [firstAdminId, secondAdminId].map((userId) => ({
+      organizationId,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+    }))) {
+      await seedRoleBinding(prisma, binding);
+    }
   });
 
   afterAll(async () => {
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { teamId }],
       ["organizationUser", { organizationId }],

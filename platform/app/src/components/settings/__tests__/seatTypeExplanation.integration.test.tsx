@@ -33,14 +33,21 @@ const renderInviteForm = () =>
     </ChakraProvider>,
   );
 
+/** The invite form's seat picker, opened the way an admin opens it. */
+const openSeatPicker = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("combobox", { name: "Seat" }));
+  return screen.findByRole("option", { name: /Lite Member/ });
+};
+
 describe("the seat-type choice", () => {
   describe("when an admin invites someone", () => {
     /** @scenario The invite form explains what a lite member can do */
-    it("says a lite member can view but not change, right on the option", () => {
+    it("says a lite member can view but not change, right on the option", async () => {
+      const user = userEvent.setup();
       renderInviteForm();
 
-      const liteOption = screen.getByText("Lite Member").closest("label, div")!
-        .parentElement!;
+      const liteOption = await openSeatPicker(user);
+
       expect(
         within(liteOption).getByText(/view the work, but not change it/i),
       ).toBeDefined();
@@ -51,12 +58,13 @@ describe("the seat-type choice", () => {
       const user = userEvent.setup();
       renderInviteForm();
 
+      await openSeatPicker(user);
       await user.click(screen.getByTestId("lite-member-info"));
 
       const explanation = await screen.findByText(LITE_MEMBER_EXPLANATION);
       expect(explanation).toBeDefined();
       // Still on the form: the email field never went away.
-      expect(screen.getByText("Lite Member")).toBeDefined();
+      expect(screen.getByText("Email addresses")).toBeDefined();
     });
 
     /** @scenario The invite form explains what a lite member can do */
@@ -64,6 +72,7 @@ describe("the seat-type choice", () => {
       const user = userEvent.setup();
       renderInviteForm();
 
+      await openSeatPicker(user);
       await user.click(screen.getByTestId("lite-member-info"));
       const explanation = await screen.findByText(LITE_MEMBER_EXPLANATION);
 
@@ -95,15 +104,19 @@ describe("the seat-type choice", () => {
     });
 
     /** @scenario Reading the explanation does not choose the seat */
-    it("does not tick the lite member box on the invite form", async () => {
+    it("does not switch the invite form's seat to Lite Member", async () => {
       const user = userEvent.setup();
       renderInviteForm();
 
-      const checkbox = () => screen.getByRole("checkbox") as HTMLInputElement;
-      const before = checkbox().checked;
+      const seat = () => screen.getByRole("combobox", { name: "Seat" });
+      expect(seat().textContent).toContain("Member");
+      expect(seat().textContent).not.toContain("Lite");
+
+      await openSeatPicker(user);
       await user.click(screen.getByTestId("lite-member-info"));
 
-      expect(checkbox().checked).toBe(before);
+      expect(await screen.findByText(LITE_MEMBER_EXPLANATION)).toBeDefined();
+      expect(seat().textContent).not.toContain("Lite");
     });
   });
 

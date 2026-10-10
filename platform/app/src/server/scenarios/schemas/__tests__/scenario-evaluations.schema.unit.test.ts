@@ -171,3 +171,32 @@ describe("scenarioResultsSchema", () => {
     });
   });
 });
+
+describe("scenarioResultsSchema inconclusive criteria", () => {
+  describe("given results that name a criterion the judge could not decide", () => {
+    /** @scenario "A finished event may name inconclusive criteria" */
+    it("keeps the list beside the unmet criteria", () => {
+      const parsed = scenarioResultsSchema.parse({
+        verdict: Verdict.FAILURE,
+        metCriteria: [],
+        unmetCriteria: ["opens a ticket"],
+        inconclusiveCriteria: ["opens a ticket"],
+      });
+
+      expect(parsed.unmetCriteria).toEqual(["opens a ticket"]);
+      expect(parsed.inconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+  });
+
+  describe("given results recorded before the judge reported them", () => {
+    it("parses with the field absent", () => {
+      const parsed = scenarioResultsSchema.parse({
+        verdict: Verdict.SUCCESS,
+        metCriteria: ["stays polite"],
+        unmetCriteria: [],
+      });
+
+      expect(parsed.inconclusiveCriteria).toBeUndefined();
+    });
+  });
+});

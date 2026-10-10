@@ -82,6 +82,12 @@ const registry = {
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
+      "Keep the filter under meta.maxNodes nodes in total; every term, operator, negation and pair of parentheses counts as one",
+    ],
+  },
   filter_field_unknown: {
     tips: [
       "Use one of the fields listed in meta.knownFields",
@@ -165,7 +171,7 @@ const registry = {
   custom_graph_writes_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
-      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -202,7 +208,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -217,6 +223,12 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  instant_eval_questions_too_long: {
+    tips: [
+      "Read `meta.questionTokens` against `meta.stateTokens`; the questions alone fill the judge's state, so no text could be sent beside them",
+      "Shorten the question texts, or split them across several eval calls run as separate queries",
+    ],
+  },
   instant_eval_query_budget_exceeded: {
     tips: [
       "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
@@ -224,10 +236,78 @@ const registry = {
       "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
     ],
   },
+  instant_eval_classifier_not_configured: {
+    tips: [
+      "Instant Evals are on for this project, but the installation has no judge configured for its organization",
+      "Set JEV_API_KEY on the app and workers to judge with your own key, or connect the installation with a license that includes Instant Evals and keep hosted judging switched on for the organization",
+    ],
+    docsPath: "/self-hosting/connect",
+  },
   instant_eval_classifier_unavailable: {
     tips: [
       "The query itself was accepted and ran; judging the text it projected is what failed",
       "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
+    ],
+  },
+  instant_eval_not_enabled: {
+    tips: [
+      "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
+  },
+  instant_eval_not_found: {
+    tips: [
+      "Read `meta.runId`; no run of the authenticated project carries that id",
+      "List the project's runs to find the id you meant",
+    ],
+  },
+  instant_eval_opt_in_not_offered: {
+    tips: [
+      "Read `meta.deployment`; an enterprise organization is switched on by LangWatch rather than from the search bar, and a self-hosted install gets Instant Evals from a license that names them, or from its operator's RELEASE_INSTANT_EVALS flag when it judges with its own JEV_API_KEY",
+      "Contact support@langwatch.ai to switch them on, or to add them to the license",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
+  },
+  instant_eval_query_invalid: {
+    tips: [
+      "Read `meta.parameters`; those names are set by whichever surface shows a chart, and a job has no surface to fill them",
+      "Write the period into the statement's own WHERE clause instead of declaring the dashboard parameters",
+    ],
+  },
+  instant_eval_query_missing_columns: {
+    tips: [
+      "Read `meta.missing`; a run needs TraceId so every judgement can be tied back to its trace",
+      "Project at least one eval function, such as `eval(conversation_bounded(ConversationId, 8000, ''), '…') AS annoyed`",
+      "ThreadId, SpanId and OccurredAt are optional and are carried onto the judgements when the statement projects them",
+    ],
+  },
+  instant_eval_row_cap_exceeded: {
+    tips: [
+      "Read `meta.cap` against `meta.maxCap`; the first is what this plan judges in one run and the second is the ceiling any plan offers",
+      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on (TraceId, SpanId) where the statement projects SpanId, and on TraceId alone where it does not",
+    ],
+  },
+  instant_eval_free_budget_exhausted: {
+    tips: [
+      "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
+      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+    ],
+  },
+  instant_eval_already_finished: {
+    tips: [
+      "Read `meta.status`; the run reached that state before the cancel arrived",
+    ],
+  },
+  instant_eval_estimate_unavailable: {
+    tips: [
+      "The statement was accepted; working out how many rows it matches is what failed",
+      "Retry shortly, or start the run without an estimate and read its total once it is planned",
+    ],
+  },
+  instant_eval_stalled: {
+    tips: [
+      "The run went fifteen minutes without a judged page and was stopped",
+      "Run it again; if it stalls repeatedly, narrow the statement so each page reads less",
     ],
   },
   lwql_app_function_key_cap: {
@@ -236,6 +316,13 @@ const registry = {
       "Lower the query's LIMIT, or group more coarsely so fewer conversations, traces or spans are projected",
       "To read them all, page with a keyset predicate on the dataset's time column and trace id and run the query once per page",
       "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
+    ],
+  },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
     ],
   },
   lwql_app_function_hydration_failed: {
@@ -460,6 +547,7 @@ const registry = {
     tips: [
       "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "An agent started in development with a personal key is visible only to its owner, so other keys never find it online; set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared and start it again",
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
@@ -479,6 +567,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],
@@ -645,6 +734,13 @@ const registry = {
     ],
     docsPath: "/evaluations/evaluators/list",
   },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
 
   // ---- default models ----
   model_not_configured: {
@@ -735,6 +831,11 @@ const registry = {
   langy_ui_save_failed: {
     tips: [
       "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
+  langy_ui_page_not_ready: {
+    tips: [
+      "The page was open but still loading and never became ready; run the same action once more, and if it fails again tell the user the page did not load",
     ],
   },
   langy_ui_timeout: {

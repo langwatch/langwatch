@@ -21,6 +21,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as instantEvalsApp } from "../app/api/instant-evals/[[...route]]/app";
 import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
@@ -50,6 +51,7 @@ import {
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
 // bot, the MCP authorize step) cannot reach a public document merely by living
 // next to something that is published.
+import { app as checkupApp } from "../server/routes/checkup";
 import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
@@ -78,6 +80,7 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
+  "/api/checkup",
   "/api/agents",
   "/api/v1/agents",
   "/api/api-keys",
@@ -131,8 +134,10 @@ const APP_DERIVED_PREFIXES = [
   "/api/scenario-events",
   "/api/scenarios",
   "/api/secrets",
+  "/api/slack-connections",
   "/api/simulation-runs",
   "/api/suites",
+  "/api/v1/instant-evals",
   "/api/v1/run-plans",
   "/api/v1/test-suites",
   "/api/teams",
@@ -171,6 +176,7 @@ import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
@@ -232,6 +238,8 @@ export default async function execute() {
   const experimentsV3Spec = await generateSpecs(experimentsV3App);
   console.log("Building experiment init spec...");
   const miscSpec = await generateSpecs(miscApp);
+  console.log("Building checkup spec...");
+  const checkupSpec = await generateSpecs(checkupApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
@@ -281,6 +289,8 @@ export default async function execute() {
   const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
+  console.log("Building instant evals spec...");
+  const instantEvalsSpec = await generateSpecs(instantEvalsApp);
   console.log("Building run plans spec...");
   const runPlansSpec = await generateSpecs(runPlansApp);
   console.log("Building test suites spec...");
@@ -293,6 +303,8 @@ export default async function execute() {
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Building triggers spec...");
   const triggersSpec = await generateSpecs(triggersApp);
+  console.log("Building Slack connections spec...");
+  const slackConnectionsSpec = await generateSpecs(slackConnectionsApp);
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
   const webhooksSpec = await generateSpecs(webhooksApp);
@@ -318,6 +330,7 @@ export default async function execute() {
       evaluationsLegacySpec,
       experimentsV3Spec,
       miscSpec,
+      checkupSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
@@ -339,12 +352,14 @@ export default async function execute() {
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
+      instantEvalsSpec,
       runPlansSpec,
       testSuitesSpec,
       teamsSpec,
       groupsSpec,
       tracesSpec,
       triggersSpec,
+      slackConnectionsSpec,
       webhooksSpec,
       gatewaySpendSpec,
       workflowsSpec,

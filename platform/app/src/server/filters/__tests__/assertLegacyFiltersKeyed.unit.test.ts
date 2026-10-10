@@ -1,0 +1,141 @@
+import { describe, expect, it } from "vitest";
+import {
+  RequestValidationError,
+  type SchemaFailure,
+} from "~/server/api/validation";
+import {
+  assertLegacyFiltersKeyed,
+  legacyFiltersKeyedRefusal,
+} from "../assertLegacyFiltersKeyed";
+
+function refusalMessage(filters: Record<string, unknown>): string {
+  try {
+    assertLegacyFiltersKeyed({ filters, offersFilterString: true });
+  } catch (error) {
+    const reason = (error as RequestValidationError).reasons[0] as
+      | SchemaFailure
+      | undefined;
+    return String(reason?.meta?.message);
+  }
+  throw new Error("expected the filters to be refused");
+}
+
+describe("assertLegacyFiltersKeyed()", () => {
+  describe("when a keyed filter carries its key", () => {
+    it("accepts it", () => {
+      expect(() =>
+        assertLegacyFiltersKeyed({
+          filters: { "evaluations.passed": { "evaluator-1": ["false"] } },
+          offersFilterString: true,
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when a keyed filter is empty", () => {
+    it("accepts it, since an empty filter applies no condition", () => {
+      expect(() =>
+        assertLegacyFiltersKeyed({
+          filters: { "evaluations.passed": [], "metadata.value": {} },
+          offersFilterString: true,
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when a keyed filter is a flat list", () => {
+    it("refuses it with 422, naming the field and the filter-string form", () => {
+      let thrown: unknown;
+      try {
+        assertLegacyFiltersKeyed({
+          filters: { "evaluations.passed": ["false"] },
+          offersFilterString: true,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(RequestValidationError);
+      const error = thrown as RequestValidationError;
+      expect(error.httpStatus).toBe(422);
+      expect(error.meta?.fields).toEqual(["filters.evaluations.passed"]);
+      const reason = error.reasons[0] as SchemaFailure | undefined;
+      const message = String(reason?.meta?.message);
+      expect(message).toContain("evaluatorVerdict:fail");
+      expect(message).toContain(
+        '{"evaluations.passed":{"<monitorId>":["false"]}}',
+      );
+    });
+  });
+
+  describe("when a flat verdict list asks for passes", () => {
+    it("points at the pass verdict, not the fail one", () => {
+      const message = refusalMessage({ "evaluations.passed": ["true"] });
+      expect(message).toContain("evaluatorVerdict:pass");
+      expect(message).not.toContain("evaluatorVerdict:fail");
+    });
+  });
+
+  describe("when a flat verdict list mixes verdicts", () => {
+    it("offers no filter string, since none matches what was sent", () => {
+      const message = refusalMessage({
+        "evaluations.passed": ["true", "false"],
+      });
+      expect(message).not.toContain("evaluatorVerdict");
+    });
+  });
+
+  describe("when a filter needing a key and a subkey has only the key", () => {
+    it("refuses it", () => {
+      expect(() =>
+        assertLegacyFiltersKeyed({
+          filters: { "events.metrics.value": { thumbs_up_down: ["1", "1"] } },
+          offersFilterString: false,
+        }),
+      ).toThrow(RequestValidationError);
+    });
+  });
+
+  describe("when a filter needing a key and a subkey has both", () => {
+    it("accepts it", () => {
+      expect(() =>
+        assertLegacyFiltersKeyed({
+          filters: {
+            "events.metrics.value": { thumbs_up_down: { vote: ["1", "1"] } },
+          },
+          offersFilterString: false,
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when a filter needs no key", () => {
+    it("accepts a flat list", () => {
+      expect(() =>
+        assertLegacyFiltersKeyed({
+          filters: { "traces.error": ["true"] },
+          offersFilterString: true,
+        }),
+      ).not.toThrow();
+    });
+  });
+});
+
+describe("legacyFiltersKeyedRefusal()", () => {
+  describe("when the route has no filter string", () => {
+    it("explains the keyed shape without pointing at a filter string", () => {
+      const refusal = legacyFiltersKeyedRefusal({
+        "evaluations.passed": ["false"],
+      });
+      expect(refusal).toContain('{"evaluations.passed":{"<monitorId>":');
+      expect(refusal).not.toContain("evaluatorVerdict");
+    });
+  });
+
+  describe("when every filter is well formed", () => {
+    it("returns nothing", () => {
+      expect(
+        legacyFiltersKeyedRefusal({ "traces.error": ["true"] }),
+      ).toBeUndefined();
+    });
+  });
+});

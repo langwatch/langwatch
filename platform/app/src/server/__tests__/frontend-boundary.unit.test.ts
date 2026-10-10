@@ -610,18 +610,7 @@ describe("browser-only UI never reaches the backend", () => {
   });
 });
 
-/**
- * The same boundary, walked the other way. A handful of `src/server/` modules
- * are imported by CLIENT code for their values — the rbac vocabulary
- * (`~/server/api/rbac`) supplies role helpers to `useOrganizationTeamProject`
- * and friends — so everything they pull at module scope lands in the browser
- * bundle and in every jsdom test graph. One import from rbac.ts into the authz
- * composition root put Prisma, redis and the EE audit writer into the client
- * graph: the t3-env client guard then throws at module load, which is a white
- * screen in the browser and eleven failed-to-load jsdom suites in CI. The env
- * guard only fires where env access is live, so no import probe can catch this
- * under test config — the graph itself is the invariant.
- */
+/** Walk browser imports transitively: server-only dependencies must stay unreachable. */
 
 /** Trees the browser bundle is built from. `pages/api` and `app/api` sit
  *  inside two of them and are backends, so they are cut out. */
@@ -768,11 +757,11 @@ describe("client-imported vocabulary never reaches server-only state", () => {
     });
 
     // The derivation replaced a hand-written list; if it ever stops finding
-    // the rbac vocabulary, the guard above has quietly become a walk over
-    // nothing.
-    it("derives rbac.ts among the roots, so the guard is not walking an empty set", () => {
+    // the feature-flag targeting module, the guard has quietly become a walk
+    // over nothing.
+    it("derives a server vocabulary module among the roots", () => {
       expect(CLIENT_IMPORTED_SERVER_MODULES).toContain(
-        path.join(SRC, "server/api/rbac.ts"),
+        path.join(SRC, "server/featureFlag/targeting.ts"),
       );
     });
   });

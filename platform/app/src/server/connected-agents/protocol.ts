@@ -70,6 +70,17 @@ export const registerFrameSchema = versioned.extend({
 });
 export type RegisterFrame = z.infer<typeof registerFrameSchema>;
 
+/**
+ * Who can target the agent, as the SDK prints it at startup. The owner's user
+ * id stays off the wire: the process that registered already holds the key.
+ */
+export const registeredScopeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("shared") }),
+  z.object({ kind: z.literal("owner") }),
+  z.object({ kind: z.literal("host"), hostLabel: z.string() }),
+]);
+export type RegisteredScope = z.infer<typeof registeredScopeSchema>;
+
 export const registeredFrameSchema = versioned.extend({
   type: z.literal("registered"),
   agents: z.array(
@@ -79,6 +90,7 @@ export const registeredFrameSchema = versioned.extend({
       id: z.string(),
       url: z.string(),
       parameterNotes: z.array(z.string()),
+      scope: registeredScopeSchema,
     }),
   ),
   heartbeatIntervalMs: z.number().int().positive(),

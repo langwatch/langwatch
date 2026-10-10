@@ -13,6 +13,7 @@
  *     template at runtime (no per-org backfill), plain members never do.
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -20,13 +21,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -59,25 +60,21 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     );
   }
 
-  async function seedCustomRole(userId: string, perms: Permission[]) {
+  async function seedUserCustomRole(userId: string, perms: Permission[]) {
     const roleId = `crole-${userId}`;
-    await prisma.customRole.create({
-      data: {
-        id: roleId,
-        organizationId: ORG_ID,
-        name: roleId,
-        permissions: perms,
-      },
+    await seedCustomRole(prisma, {
+      id: roleId,
+      organizationId: ORG_ID,
+      name: roleId,
+      permissions: perms,
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: roleId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: roleId,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
   }
 
@@ -167,20 +164,18 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     });
 
     // maya: virtualKeys:view but NOT viewOtherPersonal.
-    await seedCustomRole(MAYA, ["virtualKeys:view"]);
+    await seedUserCustomRole(MAYA, ["virtualKeys:view"]);
     // sweeper: explicit viewOtherPersonal via a custom role.
-    await seedCustomRole(SWEEPER, ["virtualKeys:viewOtherPersonal"]);
+    await seedUserCustomRole(SWEEPER, ["virtualKeys:viewOtherPersonal"]);
     // org admin: an ORGANIZATION-scoped ADMIN RoleBinding, no explicit
     // viewOtherPersonal perm — proving the ADMIN template grants it at
     // runtime (the migration contract).
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: ORG_ADMIN,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: ORG_ADMIN,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
 
     // Default routing policy + provider so issuePersonal can mint.
@@ -222,7 +217,9 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
       where: { modelProviderId: MODEL_PROVIDER_ID },
     });
     await prisma.modelProvider.deleteMany({ where: { id: MODEL_PROVIDER_ID } });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.role.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: ORG_ID } },

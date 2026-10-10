@@ -6,6 +6,7 @@ import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { signIn } from "~/utils/auth-client";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { hardRedirect } from "~/utils/hardRedirect";
 import {
   useAuthAnalytics,
@@ -68,7 +69,10 @@ import {
  */
 export function VerificationFirstSignUp() {
   const query = useSearchParams();
-  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  // A redirect target that arrived on the query string, so it is held to a
+  // path on this site before anything follows it or mails it onward.
+  const callbackUrl =
+    getSafeReturnToPath(query?.get("callbackUrl")) ?? undefined;
   const verifyToken = query?.get("verify");
   // Carried in the FRAGMENT, so the address the log-in door hands over never
   // travelled on a request line. Read at first paint because the field it
@@ -103,6 +107,9 @@ export function VerificationFirstSignUp() {
   // where there was no account to mark: it rides to `user.register` so the
   // account it creates is born confirmed rather than mailed a second link.
   const [addressProof, setAddressProof] = useState<string | null>(null);
+  // False when the installation cannot send email: the proof then stands for
+  // an address nobody confirmed (ADR-117, revision 2026-09-25).
+  const [addressConfirmed, setAddressConfirmed] = useState(true);
   const [enrollmentMethods, setEnrollmentMethods] = useState<
     readonly SignInMethod[]
   >([]);
@@ -266,11 +273,26 @@ export function VerificationFirstSignUp() {
     });
   };
 
-  const sendTo = async (email: string) => {
+  const sendTo = async (
+    email: string,
+  ): Promise<"link_sent" | "unconfirmed" | null> => {
     try {
-      await requestVerification.mutateAsync({ email });
+      // The continuation rides on the emailed link, so a sign-up finished in
+      // a fresh tab still lands where this one was going; the server keeps
+      // only a path on this site.
+      const result = await requestVerification.mutateAsync({
+        email,
+        callbackUrl,
+      });
+      if (!result.sent) {
+        // No link can be mailed here, so the password step comes straight
+        // away, over an unconfirmed proof.
+        setAddressConfirmed(false);
+        await resolveEnrollment(email, result.addressProof);
+        return "unconfirmed";
+      }
       setSentTo(email);
-      return true;
+      return "link_sent";
     } catch (failure) {
       // Not a refusal, a wrong door: the address has an account, so the screen
       // turns into the way into it rather than telling somebody to start again
@@ -278,10 +300,10 @@ export function VerificationFirstSignUp() {
       if (readHandledError(failure)?.code === "email_already_registered") {
         setWelcomeBackEmail(email);
         await decide({ identifier: email });
-        return false;
+        return null;
       }
       // Anything else renders from the mutation's error, through the registry.
-      return false;
+      return null;
     }
   };
 
@@ -394,7 +416,7 @@ export function VerificationFirstSignUp() {
         isSending={requestVerification.isPending}
         callbackUrl={callbackUrl}
         onResend={async (email) => {
-          if (await sendTo(email)) {
+          if ((await sendTo(email)) !== null) {
             setProofRecoveryEmail(null);
           }
         }}
@@ -405,6 +427,7 @@ export function VerificationFirstSignUp() {
   if (postLinkRouting) {
     return (
       <PostLinkRoutingFailure
+        addressConfirmed={addressConfirmed}
         error={enrollmentError ?? routing.error}
         onRetry={() =>
           resolveEnrollment(postLinkRouting.email, postLinkRouting.addressProof)
@@ -430,6 +453,7 @@ export function VerificationFirstSignUp() {
       <MethodChoice
         verifiedEmail={verifiedEmail}
         addressProof={addressProof}
+        addressConfirmed={addressConfirmed}
         methodSet={enrollmentMethods}
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
@@ -540,7 +564,7 @@ export function VerificationFirstSignUp() {
           // the one thing the connection exists to prevent. The error is
           // rendered above; stopping here is what makes it mean something.
           if (!decision) return;
-          if (await sendTo(email)) {
+          if ((await sendTo(email)) === "link_sent") {
             report.linkSent("address_confirmation");
           }
         }}
@@ -724,14 +748,22 @@ function LinkNoLongerWorks({
 }
 
 function PostLinkRoutingFailure({
+  addressConfirmed,
   error,
   onRetry,
 }: {
+  addressConfirmed: boolean;
   error: unknown;
   onRetry: () => Promise<void>;
 }) {
   return (
-    <AuthCard title="Your email is confirmed">
+    <AuthCard
+      title={
+        addressConfirmed
+          ? "Your email is confirmed"
+          : "Create your LangWatch account"
+      }
+    >
       <HandledErrorAlert
         error={error ?? { error: "identity_routing_unavailable" }}
         fallbackTitle="Couldn't check how you should sign in"
@@ -832,6 +864,7 @@ const noPasskeyOnThisStep = () => undefined;
 function MethodChoice({
   verifiedEmail,
   addressProof,
+  addressConfirmed,
   methodSet,
   lastUsedMethodId,
   callbackUrl,
@@ -840,6 +873,8 @@ function MethodChoice({
   verifiedEmail: string;
   /** The spent link's proof, on its way to the account it will confirm. */
   addressProof: string;
+  /** False when the proof stands for an address no link confirmed. */
+  addressConfirmed: boolean;
   methodSet: readonly SignInMethod[];
   lastUsedMethodId: string | null;
   callbackUrl: string;
@@ -849,18 +884,26 @@ function MethodChoice({
 
   return (
     <AuthCard title="Choose how to sign in">
-      <HStack gap={3}>
-        <SuccessPulse label="Email address confirmed" />
-        <Text data-testid="verified-address">
-          {verifiedEmail} is confirmed.
+      {addressConfirmed ? (
+        <HStack gap={3}>
+          <SuccessPulse label="Email address confirmed" />
+          <Text data-testid="verified-address">
+            {verifiedEmail} is confirmed.
+          </Text>
+        </HStack>
+      ) : (
+        <Text data-testid="unconfirmed-address">
+          This installation does not send email, so {verifiedEmail} is not
+          confirmed. Choose a password to finish.
         </Text>
-      </HStack>
+      )}
       <HandledErrorAlert
         error={passkeyError}
         fallbackTitle="Could not create a passkey"
         className="lw-auth-alert"
       />
-      {methodSet.some((method) => method.kind === "passkey") ? (
+      {addressConfirmed &&
+      methodSet.some((method) => method.kind === "passkey") ? (
         <PasskeySignUpButton
           email={verifiedEmail}
           addressProof={addressProof}

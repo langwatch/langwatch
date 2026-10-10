@@ -8,7 +8,7 @@
  * @see specs/licensing/billing-meter-dispatch.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Command } from "../../../../";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { ReportUsageForMonthCommandData } from "../../schemas/commands";
@@ -24,12 +24,14 @@ const {
   mockSelfDispatch,
   mockCaptureException,
   mockQueryBillableEventsTotal,
+  mockQueryInstantEvalSpendTotal,
   mockLogger,
 } = vi.hoisted(() => {
   const mockReportUsageDelta = vi.fn();
   const mockSelfDispatch = vi.fn();
   const mockCaptureException = vi.fn();
   const mockQueryBillableEventsTotal = vi.fn();
+  const mockQueryInstantEvalSpendTotal = vi.fn();
 
   const createMockLogger = (): Record<string, unknown> => ({
     info: vi.fn(),
@@ -63,9 +65,13 @@ const {
     mockSelfDispatch,
     mockCaptureException,
     mockQueryBillableEventsTotal,
+    mockQueryInstantEvalSpendTotal,
     mockLogger,
   };
 });
+
+/** The checkpoint key every expectation on the events meter carries. */
+const EVENTS_METER = "langwatch_billable_events";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -123,10 +129,12 @@ function usageBilledOrg({
   id = "org-1",
   stripeCustomerId = "cus_123",
   hasSubscription = true,
+  contract = "cloud" as const,
 }: {
   id?: string;
   stripeCustomerId?: string | null;
   hasSubscription?: boolean;
+  contract?: "cloud" | "connected";
 } = {}) {
   return {
     outcome: "usage_billed" as const,
@@ -134,6 +142,7 @@ function usageBilledOrg({
       id,
       stripeCustomerId,
       subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
+      contract,
     },
   };
 }
@@ -152,9 +161,18 @@ async function createHandler() {
       getUsageSummary: vi.fn(),
     }),
     queryBillableEventsTotal: mockQueryBillableEventsTotal,
+    queryInstantEvalSpendTotal: mockQueryInstantEvalSpendTotal,
+    isInstantEvalMeterProvisioned: () => isInstantEvalMeterProvisioned,
+    connectedUsageCeiling: mockConnectedUsageCeiling,
     selfDispatch: mockSelfDispatch,
   });
 }
+
+/** What a connected contract may still report this month; null for no cap. */
+const mockConnectedUsageCeiling = vi.fn(async () => null as number | null);
+
+/** Whether the catalog maps the Instant Evals meter; cases flip it. */
+let isInstantEvalMeterProvisioned = true;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -163,6 +181,9 @@ async function createHandler() {
 describe("ReportUsageForMonthCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The Instant Evals meter is quiet unless a case says otherwise, so the
+    // events meter's cases read exactly as they did with one meter.
+    mockQueryInstantEvalSpendTotal.mockResolvedValue(0);
   });
 
   // ========================================================================
@@ -332,6 +353,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockBillingCheckpoints.writeIntent).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
+        meter: EVENTS_METER,
         lastReportedTotal: 100,
         pendingReportedTotal: 150,
       });
@@ -340,6 +362,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
+        meter: EVENTS_METER,
         lastReportedTotal: 150,
       });
 
@@ -378,6 +401,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
+        meter: EVENTS_METER,
         lastReportedTotal: 50,
       });
     });
@@ -459,6 +483,7 @@ describe("ReportUsageForMonthCommand", () => {
       ).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
+        meter: EVENTS_METER,
         consecutiveFailures: 1,
       });
 
@@ -495,6 +520,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockBillingCheckpoints.incrementFailures).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
+        meter: EVENTS_METER,
         lastReportedTotal: 0,
         pendingReportedTotal: 10,
         consecutiveFailures: 1,
@@ -565,8 +591,333 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
+        meter: EVENTS_METER,
         lastReportedTotal: 200,
       });
+    });
+  });
+
+  // ========================================================================
+  // The Instant Evals meter
+  // ========================================================================
+
+  describe("given an organization with Instant Eval spend this month", () => {
+    const INSTANT_EVAL_METER = "langwatch_instant_eval_usd";
+
+    beforeEach(() => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg(),
+      );
+      mockBillingCheckpoints.getCheckpoint.mockResolvedValue(null);
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
+      mockSelfDispatch.mockResolvedValue(undefined);
+    });
+
+    /** @scenario "The meter is named langwatch_instant_eval_usd" */
+    it("reports on the langwatch_instant_eval_usd meter", async () => {
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(123_456);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stripeCustomerId: "cus_123",
+          events: [expect.objectContaining({ eventName: INSTANT_EVAL_METER })],
+        }),
+      );
+    });
+
+    /** @scenario "The value is the month's price in dollars to four places" */
+    it("sends the month's spend as dollars to four places", async () => {
+      // 12345678900 nano-USD is 12.3456789 USD, which the meter unit truncates
+      // to 123456 ten-thousandths, so the value is 12.3456.
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(123_456);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [expect.objectContaining({ value: 12.3456 })],
+        }),
+      );
+    });
+
+    /** @scenario "A second report sends only the delta since the checkpoint" */
+    it("sends the delta since the meter's own checkpoint, named in the identifier", async () => {
+      mockBillingCheckpoints.getCheckpoint.mockImplementation(
+        async ({ meter }: { meter: string }) =>
+          meter === INSTANT_EVAL_METER
+            ? {
+                lastReportedTotal: 10_000,
+                pendingReportedTotal: null,
+                consecutiveFailures: 0,
+              }
+            : null,
+      );
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(15_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              eventName: INSTANT_EVAL_METER,
+              value: 0.5,
+              identifier: `org-1:2026-02:${INSTANT_EVAL_METER}:from:10000:to:15000`,
+            }),
+          ],
+        }),
+      );
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        meter: INSTANT_EVAL_METER,
+        lastReportedTotal: 15_000,
+      });
+    });
+
+    /** @scenario "The Instant Eval meter keeps its own checkpoint" */
+    it("keeps each meter's checkpoint under its own name and the events identifier unchanged", async () => {
+      mockQueryBillableEventsTotal.mockResolvedValue(50);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(20_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockBillingCheckpoints.writeIntent).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        meter: EVENTS_METER,
+        lastReportedTotal: 0,
+        pendingReportedTotal: 50,
+      });
+      expect(mockBillingCheckpoints.writeIntent).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        meter: INSTANT_EVAL_METER,
+        lastReportedTotal: 0,
+        pendingReportedTotal: 20_000,
+      });
+      const identifiers = (
+        mockReportUsageDelta.mock.calls as Array<
+          [{ events: Array<{ identifier: string }> }]
+        >
+      ).map(([input]) => input.events[0]!.identifier);
+      expect(identifiers).toEqual([
+        "org-1:2026-02:from:0:to:50",
+        `org-1:2026-02:${INSTANT_EVAL_METER}:from:0:to:20000`,
+      ]);
+    });
+
+    /** @scenario "The Instant Eval meter is reported only once Stripe holds it" */
+    it("leaves the month unreported and its checkpoint untouched while the meter is unmapped", async () => {
+      isInstantEvalMeterProvisioned = false;
+      try {
+        mockQueryBillableEventsTotal.mockResolvedValue(50);
+        mockQueryInstantEvalSpendTotal.mockResolvedValue(20_000);
+        const handler = await createHandler();
+
+        await handler.handle(makeCommand());
+
+        expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+        expect(mockReportUsageDelta).toHaveBeenCalledWith(
+          expect.objectContaining({
+            events: [expect.objectContaining({ eventName: EVENTS_METER })],
+          }),
+        );
+        // No intent and no read: the whole total waits for the mapping, so
+        // the first report after it lands carries the month from zero.
+        expect(mockQueryInstantEvalSpendTotal).not.toHaveBeenCalled();
+        expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalledWith(
+          expect.objectContaining({ meter: INSTANT_EVAL_METER }),
+        );
+      } finally {
+        isInstantEvalMeterProvisioned = true;
+      }
+    });
+
+    /** @scenario "A month with no Instant Eval spend reports nothing on that meter" */
+    it("sends nothing on the Instant Evals meter when the month spent nothing", async () => {
+      mockQueryBillableEventsTotal.mockResolvedValue(50);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(0);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [expect.objectContaining({ eventName: EVENTS_METER })],
+        }),
+      );
+    });
+  });
+
+  // ========================================================================
+  // A connected self-hosted customer
+  // ========================================================================
+
+  describe("given a connected self-hosted customer", () => {
+    const INSTANT_EVAL_METER = "langwatch_instant_eval_usd";
+
+    beforeEach(() => {
+      mockBillingCheckpoints.getCheckpoint.mockResolvedValue(null);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockSelfDispatch.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "Hosted usage of a connected customer reaches its metered subscription" */
+    it("reports its hosted spend against the customer its billing account names", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({
+          contract: "connected",
+          stripeCustomerId: "cus_connected",
+        }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(25_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stripeCustomerId: "cus_connected",
+          events: [
+            expect.objectContaining({
+              eventName: INSTANT_EVAL_METER,
+              value: 2.5,
+            }),
+          ],
+        }),
+      );
+    });
+
+    /** @scenario "Usage past the prepaid commit never reaches the invoice" */
+    it("reports the commit, not the few cents the gateway let through past it", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ contract: "connected" }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      // 500.80 USD spent against a 500 USD commit with overage off.
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(5_008_000);
+      mockConnectedUsageCeiling.mockResolvedValueOnce(5_000_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              eventName: INSTANT_EVAL_METER,
+              value: 500,
+            }),
+          ],
+        }),
+      );
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith(
+        expect.objectContaining({ lastReportedTotal: 5_000_000 }),
+      );
+    });
+
+    /** @scenario "A connected customer is not skipped for lacking a Cloud plan" */
+    it("is not skipped for having no Cloud plan, and is not reported as one", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ contract: "connected" }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(10_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockLogger.debug).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "organization is not on usage-based pricing, skipping usage reporting",
+      );
+    });
+
+    /** @scenario "Usage older than the meter accepts is not sent with a stale timestamp" */
+    it("dates the event inside the month it belongs to while the meter accepts it", async () => {
+      // The month ended three days ago, which is well inside the window the
+      // meter accepts, and the quarterly invoice covering it is still open.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-03-04T00:00:00.000Z"));
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ contract: "connected" }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(10_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand("org-1", "2026-02"));
+
+      const event = mockReportUsageDelta.mock.calls[0]![0].events[0];
+      expect(event.timestamp).toBe(
+        Math.floor(Date.parse("2026-03-01T00:00:00.000Z") / 1000),
+      );
+    });
+
+    /** @scenario "Usage older than the meter accepts is not sent with a stale timestamp" */
+    it("reports a month older than the meter accepts at the current time, in full", async () => {
+      // February 2026 ended more than 35 days before this tick.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-10T00:00:00.000Z"));
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ contract: "connected" }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(10_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand("org-1", "2026-02"));
+
+      const event = mockReportUsageDelta.mock.calls[0]![0].events[0];
+      expect(event.timestamp).toBe(
+        Math.floor(Date.parse("2026-06-10T00:00:00.000Z") / 1000),
+      );
+      // The amount is never trimmed to fit the window: the identifier still
+      // names February, so the line stays attributable on the invoice.
+      expect(event.value).toBe(1);
+      expect(event.identifier).toContain("2026-02");
+    });
+
+    /** @scenario "Reporting the same usage twice does not double it" */
+    it("sends nothing on a second pass when the month gained no spend", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ contract: "connected" }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(10_000);
+      mockBillingCheckpoints.getCheckpoint.mockImplementation(
+        async ({ meter }: { meter: string }) =>
+          meter === INSTANT_EVAL_METER
+            ? { lastReportedTotal: 10_000, consecutiveFailures: 0 }
+            : null,
+      );
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
     });
   });
 

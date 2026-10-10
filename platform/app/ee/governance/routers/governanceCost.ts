@@ -19,12 +19,12 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import {
   checkOrganizationPermission,
   type PermissionMiddlewareParams,
-} from "~/server/api/rbac";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+} from "~/server/app-layer/authz/permission-adapters";
 
 const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.GOVERNANCE_COST,

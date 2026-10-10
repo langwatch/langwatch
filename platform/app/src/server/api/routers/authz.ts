@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
-import { authorizeInResolver } from "../rbac";
+import { aggregatesClosedTo } from "~/server/app-layer/permissions/aggregate-admin-gate";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -33,6 +36,29 @@ export const authzRouter = createTRPCRouter({
       });
       if (!scope) {
         return { scope: null, permissions: [] as string[] };
+      }
+      // ADR-144 decision 5: only an organisation admin opens an aggregate,
+      // so anyone else is told they may do nothing there. The kind is read
+      // first (cached) so ordinary projects never pay for the role read.
+      if (
+        scope.type === "project" &&
+        isAggregateProjectKind(await getApp().projectKinds.kindOf(scope.id))
+      ) {
+        const app = getApp();
+        const closed = await aggregatesClosedTo({
+          projectIds: [scope.id],
+          organizationRole: await app.organizations.getUserOrgRole({
+            userId: ctx.session.user.id,
+            organizationId: scope.organizationId,
+          }),
+          kinds: app.projectKinds,
+        });
+        if (closed.has(scope.id)) {
+          return {
+            scope: { type: scope.type, id: scope.id },
+            permissions: [] as string[],
+          };
+        }
       }
       const permissions = await authz.effectivePermissions({
         principal: { type: "user", id: ctx.session.user.id },

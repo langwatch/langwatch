@@ -1,9 +1,7 @@
 /**
  * The grant writer's per-organization fork (ADR-092 decision 4), ledger side.
  *
- * An organization past the genesis import writes through the ledger: a
- * filtered revoke resolves the ids to revoke and hands them to the fold. The
- * legacy side lives in `ledger-write-fork.legacy.unit.test.ts`.
+ * Filtered revocation reads only live grants before enforcing their removal.
  *
  * @see specs/rbac/authz-grants.feature
  */
@@ -23,12 +21,11 @@ beforeEach(() => {
 describe("given an organization past the genesis import", () => {
   describe("when a filtered revoke names a principal with Grant-head rows the compat head does not carry", () => {
     /** @scenario "A filtered revoke reaches Grant-head rows with no compat binding" */
-    it("revokes the union of the compat ids and the translated Grant ids", async () => {
-      const { writer, db } = harness({ onLedger: true });
-      // The compat head carries one binding; the Grant head carries a second
-      // row for the same api key that has no compat binding (a roleKey-only
-      // import).
-      db.roleBinding.findMany.mockResolvedValue([{ id: "grant_compat" }]);
+    it("revokes live Grant ids without consulting the legacy table", async () => {
+      const { writer, db } = harness({});
+      db.roleBinding.findMany.mockRejectedValue(
+        new Error("Legacy runtime read"),
+      );
       db.grant.findMany.mockResolvedValue([
         { id: "grant_compat" },
         { id: "grant_no_compat" },
@@ -47,6 +44,7 @@ describe("given an organization past the genesis import", () => {
           organizationId: ORG_ID,
           principalType: "API_KEY",
           principalId: "key_1",
+          revokedAt: null,
         },
         select: { id: true },
       });
@@ -74,7 +72,7 @@ describe("given an organization past the genesis import", () => {
      *  organization kept a live Grant-only row after the role was replaced.
      *  @scenario "A filtered revoke reaches Grant-head rows with no compat binding" */
     it("translates the scope onto the Grant predicate and reaches Grant-only rows", async () => {
-      const { writer, db } = harness({ onLedger: true });
+      const { writer, db } = harness({});
       db.roleBinding.findMany.mockResolvedValue([]);
       db.grant.findMany.mockResolvedValue([{ id: "grant_no_compat" }]);
 
@@ -92,6 +90,7 @@ describe("given an organization past the genesis import", () => {
           principalId: "user_1",
           scopeType: "TEAM",
           scopeId: "team_1",
+          revokedAt: null,
         },
         select: { id: true },
       });
@@ -99,31 +98,49 @@ describe("given an organization past the genesis import", () => {
     });
   });
 
-  describe("when the filter shape is outside the translatable vocabulary", () => {
-    /** @scenario "A filter the vocabulary cannot translate falls back to the compat ids" */
-    it("does not query the Grant head and revokes only the compat ids", async () => {
-      const { writer, db } = harness({ onLedger: true });
-      db.roleBinding.findMany.mockResolvedValue([{ id: "grant_compat" }]);
+  describe("when replacing a key's selected custom roles", () => {
+    /** @scenario "A filtered revoke preserves excluded grant ids" */
+    it("restricts the revoke to that key, its selected roles, and non-retained ids", async () => {
+      const { writer, db } = harness({});
+      db.grant.findMany.mockResolvedValue([{ id: "grant_retired" }]);
 
       const count = await writer.revokeBindingsWhere({
         organizationId: ORG_ID,
-        // `role` is not in the translatable key set: a role filter has no
-        // single Grant-head predicate (roleKey vs legacyRole), so the
-        // translation bails rather than guessing one.
-        where: { role: "ADMIN" },
+        where: {
+          apiKeyId: "key_1",
+          customRoleId: { in: ["role_1", "role_2"] },
+          id: { notIn: ["grant_kept"] },
+        },
         actor: ACTOR,
-        reason: "role-filtered revoke",
       });
 
-      expect(db.grant.findMany).not.toHaveBeenCalled();
+      expect(db.grant.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "API_KEY",
+          principalId: "key_1",
+          roleKey: { in: ["custom:role_1", "custom:role_2"] },
+          id: { notIn: ["grant_kept"] },
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
       expect(count).toBe(1);
+      expect(db.grant.updateMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG_ID,
+          id: { in: ["grant_retired"] },
+          revokedAt: null,
+        },
+        data: expect.objectContaining({ revokedAt: expect.any(Date) }),
+      });
     });
   });
 
   describe("when a caller only needs the role retired", () => {
     /** @scenario "Retiring the old key's private role does not hold the answer" */
     it("appends the deletion without polling for the row's disappearance", async () => {
-      const { writer, db, sent } = harness({ onLedger: true });
+      const { writer, db, sent } = harness({});
 
       await writer.deleteRole({
         organizationId: ORG_ID,

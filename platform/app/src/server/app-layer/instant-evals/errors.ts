@@ -58,6 +58,83 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
 }
 
 /**
+ * The organization's own switch was thrown for an organization the popover does
+ * not offer it to: an enterprise plan, or a self-hosted install. A customer
+ * state and a 403; the plan or the deployment is what says no, and a word with
+ * us is the remedy.
+ *
+ * `meta.deployment` says which, because the two read differently: an
+ * enterprise plan is switched on by us, and a self-hosted install gets
+ * Instant Evals from its license, or from its operator's release flag when it
+ * judges with its own key.
+ *
+ * @see ./opt-in.ts
+ */
+export class InstantEvalOptInNotOfferedError extends HandledError {
+  declare readonly code: "instant_eval_opt_in_not_offered";
+
+  constructor({
+    deployment,
+  }: {
+    readonly deployment: "enterprise" | "self_hosted";
+  }) {
+    super(
+      "instant_eval_opt_in_not_offered",
+      deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        // Named consumer: the registry's describe, which words the refusal for
+        // the deployment the reader is on.
+        meta: { deployment },
+        ...remediation("instant_eval_opt_in_not_offered"),
+      },
+    );
+    this.name = "InstantEvalOptInNotOfferedError";
+  }
+}
+
+/**
+ * The statement's questions alone fill the judge's state, leaving no room for
+ * any text to judge.
+ *
+ * `customer` fault and a 422: the questions are the caller's, and shortening
+ * them or asking fewer at once is the whole remedy. Refused before anything
+ * is sent, because the alternative is every row skipped and the query then
+ * reported as the judge being unavailable, which it is not.
+ */
+export class InstantEvalQuestionsTooLongError extends HandledError {
+  declare readonly code: "instant_eval_questions_too_long";
+
+  constructor({
+    questionTokens,
+    stateTokens,
+  }: {
+    /** What the questions weigh, in the judge's input tokens. */
+    readonly questionTokens: number;
+    /** The judge's whole state, which the questions and the text share. */
+    readonly stateTokens: number;
+  }) {
+    super(
+      "instant_eval_questions_too_long",
+      "The questions are too long to leave room for any text to judge. Shorten them, or ask fewer of them at once.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the questions, which needs to
+        // know how far over they are. Both numbers are about the caller's own
+        // statement and the published judge limits.
+        meta: { questionTokens, stateTokens },
+        ...remediation("instant_eval_questions_too_long"),
+      },
+    );
+    this.name = "InstantEvalQuestionsTooLongError";
+  }
+}
+
+/**
  * The classifier answered nothing for the whole query.
  *
  * `provider` fault and a 503. Not `platform`, because the failing component is
@@ -84,5 +161,42 @@ export class InstantEvalClassifierUnavailableError extends HandledError {
       },
     );
     this.name = "InstantEvalClassifierUnavailableError";
+  }
+}
+
+/**
+ * The organization has spent its free Instant Evals allowance.
+ *
+ * `customer` fault and a 402: the organization has no paid plan, the
+ * allowance is spent across every project it owns, and upgrading is the one
+ * thing that lifts it. Refused before anything is judged, for both a run and
+ * a synchronous query, so the budget is a ceiling on what was spent rather
+ * than a bill that arrives after.
+ */
+export class InstantEvalFreeBudgetExhaustedError extends HandledError {
+  declare readonly code: "instant_eval_free_budget_exhausted";
+
+  constructor({
+    spentUsd,
+    budgetUsd,
+  }: {
+    /** What the organization has spent on Instant Evals, in USD. */
+    readonly spentUsd: number;
+    /** The allowance an organization without a paid plan has, in USD. */
+    readonly budgetUsd: number;
+  }) {
+    super(
+      "instant_eval_free_budget_exhausted",
+      "This organization has used its free Instant Evals allowance. Upgrade to a paid plan to keep judging.",
+      {
+        httpStatus: 402,
+        fault: "customer",
+        // Named consumer: the upgrade dialog and the CLI, which say what was
+        // spent against what the free plan allows.
+        meta: { spentUsd, budgetUsd },
+        ...remediation("instant_eval_free_budget_exhausted"),
+      },
+    );
+    this.name = "InstantEvalFreeBudgetExhaustedError";
   }
 }

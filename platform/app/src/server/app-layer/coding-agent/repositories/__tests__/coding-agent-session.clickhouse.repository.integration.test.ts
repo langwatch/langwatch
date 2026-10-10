@@ -95,6 +95,30 @@ function sessionRow(
     cacheCreationTokens: 10,
     costUsd: 1.25,
     agentReportedCostUsd: 0,
+    usageByContext: [
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "main",
+        inputTokens: 40,
+        outputTokens: 20,
+        cacheReadTokens: 4_000_000_000,
+        cacheCreationTokens: 4,
+        costUsd: 0.5,
+      },
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/session-git-context",
+        inputTokens: 60,
+        outputTokens: 30,
+        cacheReadTokens: 5_000_000_000,
+        cacheCreationTokens: 6,
+        costUsd: 0.75,
+      },
+    ],
     modelCallMs: 5000,
     toolMs: 1234,
     ttftMsTotal: 300,
@@ -531,6 +555,51 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(read!.gitBranches).toEqual([]);
     expect(read!.gitBranch).toBe("feat/one");
   });
+
+  /** @scenario The per-context usage round-trips through the session row */
+  it("writes what the session spent under each context and reads it back", async () => {
+    const row = sessionRow({ sessionId: `${tag}-usage-by-context` });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-usage-by-context`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual(row.usageByContext);
+  });
+
+  /** @scenario A session row from before the per-context usage column decodes with none */
+  it("decodes a row written before the per-context usage column with no record", async () => {
+    const sessionId = `${tag}-pre-usage-by-context`;
+    // A writer from before migration 00097 emits a JSONEachRow body with no
+    // UsageByContext field, so ClickHouse supplies the column's DEFAULT [].
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          InputTokens: "100",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual([]);
+    expect(read!.inputTokens).toBe(100);
+  });
 });
 
 describe("coding_agent_sessions by repository branch", () => {
@@ -569,6 +638,11 @@ describe("coding_agent_sessions by repository branch", () => {
     // the detail names it by.
     expect(found!.gitBranch).toBe("feat/second");
     expect(found!.title).toBe("Ship both branches");
+    // And the per-context record the split reads, selected with the row.
+    expect(found!.usageByContext.map((usage) => usage.branch)).toEqual([
+      "main",
+      "feat/session-git-context",
+    ]);
     // The whole set comes back too, which is what attribution runs the tenure
     // rule over: matched on a branch it left, the row would otherwise reach the
     // rollup knowing only a branch that pull request never had.

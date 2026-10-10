@@ -21,6 +21,7 @@ import { PasskeySignUpAddressTakenError } from "~/server/users/credential-user";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
+  PASSKEY_SIGNUP_RESTRICTED,
   PasskeySignUpRegistration,
 } from "../passkey-signup";
 
@@ -37,13 +38,17 @@ const createPasskeyUser = vi.fn();
 const validateAddressProof = vi.fn();
 const claimAddressProof = vi.fn();
 const localSignUpIsAllowed = vi.fn();
+const signUpPolicyAdmits = vi.fn();
 
 const signUpContext = (email: string, claim = "a".repeat(43)) =>
   JSON.stringify({ email, claim, addressProof: "proof-1" });
 
 const registration = () =>
   new PasskeySignUpRegistration({
-    eligibility: { isAllowed: localSignUpIsAllowed },
+    eligibility: {
+      isAllowed: localSignUpIsAllowed,
+      policyAdmits: signUpPolicyAdmits,
+    },
     directory: { findAddressHolder },
     accounts: { createPasskeyUser },
     verification: { validateAddressProof, claimAddressProof },
@@ -105,8 +110,52 @@ describe("given passkey sign-up, which creates an account with no session", () =
     validateAddressProof.mockResolvedValue(true);
     claimAddressProof.mockResolvedValue(true);
     localSignUpIsAllowed.mockResolvedValue(true);
+    signUpPolicyAdmits.mockResolvedValue(true);
     // Nobody signed in, which is the case this whole block is about.
     getSessionFromCtx.mockResolvedValue(null);
+  });
+
+  describe("when the installation's sign-up policy refuses the address", () => {
+    beforeEach(() => {
+      signUpPolicyAdmits.mockResolvedValue(false);
+    });
+
+    /** @scenario "A refused passkey sign-up creates no account" */
+    it("refuses to start the ceremony with the restricted code", async () => {
+      await expect(
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("stranger@example.com"),
+        }),
+      ).rejects.toMatchObject({
+        body: { code: PASSKEY_SIGNUP_RESTRICTED },
+      });
+      expect(signUpPolicyAdmits).toHaveBeenCalledWith("stranger@example.com");
+    });
+
+    /** @scenario "A refused passkey sign-up creates no account" */
+    it("refuses after the ceremony too, and writes no account", async () => {
+      const { ctx } = fakeContext();
+      await expect(
+        afterVerification({
+          ctx,
+          context: signUpContext("stranger@example.com"),
+        }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_RESTRICTED } });
+      expect(claimAddressProof).not.toHaveBeenCalled();
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    it("does not answer a caller holding no valid address proof", async () => {
+      validateAddressProof.mockResolvedValue(false);
+      await expect(
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("stranger@example.com"),
+        }),
+      ).rejects.toMatchObject({ body: { code: "VERIFICATION_REQUIRED" } });
+      expect(signUpPolicyAdmits).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the address already has an account", () => {
@@ -556,6 +605,48 @@ describe("given somebody who is already signed in", () => {
       await afterVerification({ ctx, context: null });
 
       expect(createSession).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The bug this closes: a sign-up ceremony run from a browser that already
+   * holds a session. The sign-up screen sends a context; the plugin then
+   * forces the credential onto the signed-in account, so the address the
+   * ceremony named never gets an account and its passkey lands on the wrong
+   * one — with no error. Refused, on the one seam the plugin runs for it.
+   */
+  describe("when they run a sign-up ceremony for a different address", () => {
+    /** @scenario "A signed-in browser cannot sign up a different address's passkey" */
+    it("refuses because a session is already open", async () => {
+      const { ctx } = fakeContext();
+
+      await expect(
+        afterVerification({ ctx, context: signUpContext("robin@corp.com") }),
+      ).rejects.toMatchObject({ body: { code: "ALREADY_SIGNED_IN" } });
+    });
+
+    /** @scenario "A signed-in browser cannot sign up a different address's passkey" */
+    it("creates no account for the address the ceremony named", async () => {
+      const { ctx } = fakeContext();
+
+      await afterVerification({
+        ctx,
+        context: signUpContext("robin@corp.com"),
+      }).catch(() => void 0);
+
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A signed-in browser cannot sign up a different address's passkey" */
+    it("spends no address proof, because nothing is being signed up", async () => {
+      const { ctx } = fakeContext();
+
+      await afterVerification({
+        ctx,
+        context: signUpContext("robin@corp.com"),
+      }).catch(() => void 0);
+
+      expect(claimAddressProof).not.toHaveBeenCalled();
     });
   });
 });

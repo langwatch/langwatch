@@ -194,8 +194,13 @@ spec:
           configMap:
             name: {{ $fullname }}-keeper-raft
 
+  # apiVersion and kind are spelled out: the API server stores them on every
+  # claim template, so a GitOps controller diffing with server-side apply
+  # reports the StatefulSet as out of sync forever when they are left off.
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: keeper-data
       spec:
         accessModes: ["ReadWriteOnce"]

@@ -27,7 +27,7 @@ const ENABLED = new Set(["project-a", "project-b"]);
 function supportWithStatedFlag() {
   const asked: string[] = [];
   const support = createLangWatchQLInstantEvalSupport({
-    recorder: { recordCost: async () => "cost-record-not-used-here" },
+    recorder: { recordSpend: async () => {} },
     isProjectEnabled: async (projectId) => {
       asked.push(projectId);
       return ENABLED.has(projectId);

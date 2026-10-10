@@ -170,6 +170,7 @@ describe("the CLI boot module graph", () => {
   describe("given the entrypoint's transitive static imports", () => {
     /** @scenario "The query family stays off the CLI's boot graph" */
     /** @scenario "the CLI boot graph does not change for the onboarding commands" */
+    /** @scenario "The command stays off the CLI boot graph" */
     it("pins the exact set of first-party modules loaded at boot", () => {
       const { local } = collectBootGraph();
 

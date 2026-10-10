@@ -21,6 +21,9 @@ const listState = vi.hoisted(() => ({
 const byIdState = vi.hoisted(() => ({
   current: { data: undefined as unknown, error: null as Error | null },
 }));
+const migrationState = vi.hoisted(() => ({
+  current: { data: null as unknown, error: null as Error | null },
+}));
 const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string>,
   replace: vi.fn(),
@@ -33,6 +36,7 @@ const mutations = vi.hoisted(() => ({
   suspend: vi.fn(),
   resume: vi.fn(),
   requestTeardown: vi.fn(),
+  startLegacyMigration: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => {
@@ -42,6 +46,14 @@ vi.mock("~/utils/api", () => {
   return {
     api: {
       useContext: () => ({ ssoConnections: { invalidate: vi.fn() } }),
+      useUtils: () => ({
+        ssoSetup: { getSetup: { invalidate: vi.fn() } },
+        ssoConnections: { invalidate: vi.fn() },
+      }),
+      ssoSetup: {
+        register: mutation("activate"),
+        startLegacyMigration: mutation("activate"),
+      },
       ssoConnections: {
         getAll: { useQuery: () => listState.current },
         getById: {
@@ -50,6 +62,15 @@ vi.mock("~/utils/api", () => {
               ? byIdState.current
               : { data: undefined, error: null },
         },
+        getHistory: {
+          useQuery: () => ({ data: [], isLoading: false, error: null }),
+        },
+        getMigrationProgress: {
+          useQuery: (_input: unknown, opts?: { enabled?: boolean }) =>
+            opts?.enabled
+              ? migrationState.current
+              : { data: null, error: null },
+        },
         approveDomainClaim: mutation("approveDomainClaim"),
         rejectDomainClaim: mutation("rejectDomainClaim"),
         attestDomain: mutation("attestDomain"),
@@ -57,6 +78,7 @@ vi.mock("~/utils/api", () => {
         suspend: mutation("suspend"),
         resume: mutation("resume"),
         requestTeardown: mutation("requestTeardown"),
+        startLegacyMigration: mutation("startLegacyMigration"),
       },
     },
   };
@@ -129,6 +151,7 @@ beforeEach(() => {
     error: null,
   };
   byIdState.current = { data: ATTESTED, error: null };
+  migrationState.current = { data: null, error: null };
 });
 
 describe("the back-office single sign-on list", () => {
@@ -321,6 +344,52 @@ describe("the back-office single sign-on list", () => {
       ];
       expect(destination.query).toEqual({ q: "acme" });
       expect(options.shallow).toBe(true);
+    });
+
+    it("offers an operator import only for a legacy connection and sends supplied provider values", async () => {
+      byIdState.current = {
+        data: {
+          ...ATTESTED,
+          source: "legacy-grandfathered",
+          providerId: "auth0",
+          issuer: "https://acme.eu.auth0.com",
+        },
+        error: null,
+      };
+      routerState.query = { connection: "ssoc_1" };
+      renderView();
+
+      await waitFor(() => {
+        expect(screen.getByText("Migration inventory")).toBeTruthy();
+      });
+      fireEvent.click(screen.getByTestId("identity-provider-okta"));
+      fireEvent.change(screen.getByLabelText("Issuer address"), {
+        target: { value: "https://login.acme.test" },
+      });
+      fireEvent.change(screen.getByLabelText("Client id"), {
+        target: { value: "client_acme" },
+      });
+      fireEvent.change(screen.getByLabelText("Client secret"), {
+        target: { value: "secret_acme" },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Import replacement" }),
+      );
+
+      expect(mutations.startLegacyMigration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_1",
+          providerId: "Okta",
+          idp: {
+            protocol: "oidc",
+            issuer: "https://login.acme.test",
+            clientId: "client_acme",
+            clientSecret: "secret_acme",
+          },
+        }),
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
     });
   });
 });

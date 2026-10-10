@@ -17,7 +17,9 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { prisma } from "~/server/db";
+import type { EventSourcing } from "~/server/event-sourcing";
 import {
   startTestContainers,
   stopTestContainers,
@@ -27,6 +29,8 @@ import {
   GatewaySpendEventsRepository,
   type SpendEventRow,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -42,6 +46,7 @@ const resolveTestClickHouseClient = async () => chClient;
 // route takes its ClickHouse-backed repositories from `getApp().gateway`
 // too, so standing in for the store means standing in for all of it.
 let planHasWebhookEndpoints = true;
+let eventSourcing: EventSourcing;
 vi.mock("~/server/app-layer/app", async () => {
   // The REST org-auth middleware decides through
   // appFromContext(c).permissions (ADR-092); the fake carries the real
@@ -51,30 +56,29 @@ vi.mock("~/server/app-layer/app", async () => {
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = permissionsServiceFor(dbForPermissions);
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: () => ({
-      permissions,
-      planProvider: {
-        getActivePlan: async () => ({
-          webhookEndpointsEnabled: planHasWebhookEndpoints,
-        }),
-      },
-      gateway: {
-        budgets: new GatewayBudgetClickHouseRepository(
-          resolveTestClickHouseClient,
-        ),
-        virtualKeySpend: undefined,
-        spendEvents: new GatewaySpendEventsRepository(
-          resolveTestClickHouseClient,
-        ),
-        webhookEvents: new WebhookEventsClickHouseRepository(
-          resolveTestClickHouseClient,
-        ),
-      },
-    }),
-  };
+  const testApp = () => ({
+    eventSourcing,
+    redis: null,
+    permissions,
+    planProvider: {
+      getActivePlan: async () => ({
+        webhookEndpointsEnabled: planHasWebhookEndpoints,
+      }),
+    },
+    gateway: {
+      budgets: new GatewayBudgetClickHouseRepository(
+        resolveTestClickHouseClient,
+      ),
+      virtualKeySpend: undefined,
+      spendEvents: new GatewaySpendEventsRepository(
+        resolveTestClickHouseClient,
+      ),
+      webhookEvents: new WebhookEventsClickHouseRepository(
+        resolveTestClickHouseClient,
+      ),
+    },
+  });
+  return { tryGetApp: testApp, getApp: testApp };
 });
 
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
@@ -255,6 +259,8 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
   }
 
   beforeAll(async () => {
+    resetAuthzGrantsCommandsForTests();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     const containers = await startTestContainers();
     chClient = containers.clickHouseClient;
     repo = new GatewaySpendEventsRepository(async () => chClient);
@@ -310,15 +316,13 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: organization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: organization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organization.id,
     });
     const apiKeyService = ApiKeyService.create(prisma);
     const created = await apiKeyService.create({
@@ -339,6 +343,8 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
   }, 120_000);
 
   afterAll(async () => {
+    await eventSourcing?.close();
+    resetAuthzGrantsCommandsForTests();
     // A failed beforeAll leaves the fixtures unset; surfacing the original
     // failure beats a TypeError from teardown.
     if (!organization?.id) return;

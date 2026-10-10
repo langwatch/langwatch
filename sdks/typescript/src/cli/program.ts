@@ -16,11 +16,18 @@
  */
 
 import { Command, Option } from "commander";
+import { setRequestedProject } from "../internal/credentialContext";
+import {
+  applyProjectOption,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+} from "./utils/projectOption";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
+import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import {
   applyOutputContext,
@@ -33,6 +40,17 @@ import {
 } from "./utils/output";
 
 declare const __CLI_VERSION__: string;
+
+/** The `langwatch <tool>` commands that run a coding tool in its own terminal. */
+export const TOOL_WRAPPER_COMMANDS = [
+  "claude",
+  "codex",
+  "copilot",
+  "code",
+  "cursor",
+  "gemini",
+  "opencode",
+] as const;
 
 /**
  * Help for the repeatable `--param key=value` flag the run commands share.
@@ -94,6 +112,9 @@ const TARGET_FLAG_HELP =
 
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
+
+const TRIGGER_FILTERS_HELP =
+  "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused";
 
 const REPEAT_FLAG_HELP =
   "How many times to run each scenario against each target, from 1 to 5.";
@@ -198,6 +219,57 @@ const trackEvaluatorFlags = (
   };
 };
 
+/**
+ * Watches an instant-eval command's question flags and answers with what was
+ * written, in the order it was written.
+ *
+ * `--ask` opens a question; `--criteria`, `--score`, `--category`,
+ * `--threshold` and `--id` describe the one before them. Commander gives no
+ * order across different options, so the order has to be read off the option
+ * events as it parses, the same way `--required` follows its `--evaluator`
+ * above. A modifier written before any `--ask` describes the question given as
+ * the positional argument, so `run "annoyed" --threshold 0.8` reads the way it
+ * looks.
+ *
+ * Defined here rather than imported so the command tree keeps its own boot
+ * cost: the reading these drafts get lives in
+ * `cli/commands/instant-evals/questionFlags.ts`, which is loaded with the
+ * command.
+ */
+const trackQuestionFlags = (command: Command): (() => QuestionDraft[]) => {
+  let drafts: QuestionDraft[] = [];
+  const current = (): QuestionDraft => {
+    const last = drafts[drafts.length - 1];
+    if (last) return last;
+    const opened: QuestionDraft = { criteria: [], categories: [] };
+    drafts.push(opened);
+    return opened;
+  };
+  command.on("option:ask", (value: string) => {
+    drafts.push({ instructions: value, criteria: [], categories: [] });
+  });
+  command.on("option:criteria", (value: string) => {
+    current().criteria.push(value);
+  });
+  command.on("option:category", (value: string) => {
+    current().categories.push(value);
+  });
+  command.on("option:score", (value: string) => {
+    current().score = value;
+  });
+  command.on("option:threshold", (value: string) => {
+    current().threshold = value;
+  });
+  command.on("option:id", (value: string) => {
+    current().id = value;
+  });
+  return () => {
+    const read = drafts;
+    drafts = [];
+    return read;
+  };
+};
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -298,6 +370,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
     await applyOutputContext(effective);
+    // The project the command line pointed this request at, published before
+    // the action runs so `resolveCredentials` reads it without the action
+    // having to accept the value and pass it on.
+    setRequestedProject(projectSelectorOf(actionCommand));
   });
 
   // Top-level commands
@@ -600,6 +676,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+
+  // A wrapper renders no result of its own, in any format: it hands the
+  // terminal to the tool it runs. Registered as such so the auto-detected
+  // agent mode (a coding agent sets CLAUDECODE in its children) prints no
+  // note about a table under a wrapper started from inside one.
+  for (const tool of TOOL_WRAPPER_COMMANDS) {
+    const wrapper = program.commands.find((command) => command.name() === tool);
+    if (wrapper) rendersOwnResult(wrapper);
+  }
 
   // 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
   // not on every `langwatch <subcommand> --help` invocation.
@@ -1348,6 +1433,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     await impl(command.optsWithGlobals());
   });
 
+  // Doctor: the checkup of a self-hosted install, the same rows and the same
+  // usage report the Settings page shows, printed from a terminal.
+  emitsResult(
+    program
+      .command("doctor")
+      .description(
+        "Check whether a self-hosted install is correctly wired, and print what it sends to LangWatch",
+      )
+      .option(
+        "--run",
+        "Also run the checks that open a connection or spend money (reach the LangWatch hosts, storage write, SMTP, model provider, canaries)",
+      )
+      .option(
+        "--scenario-run-plan-id <id>",
+        "The run plan the scenario canary launches, with --run",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { run?: boolean; scenarioRunPlanId?: string }) => {
+      const { doctorCommand: impl } = await import("./commands/doctor.js");
+      return impl(options);
+    },
+  );
+
   // Discoverability — the machine-readable catalog + compact help tree agents
   // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
   emitsResult(
@@ -1926,12 +2034,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "How long --wait-online waits before failing",
         "120",
       )
+      .option(
+        "--all",
+        "List every row, including offline rows of a name and environment that a newer row replaced",
+      )
       // No positional argument here, so a stray word is a name with a space
       // passed bare after --wait-online: the refusal says to quote it.
       .configureOutput({
         outputError: (message, write) => write(withQuotedNameHint(message)),
       }),
-    async (options: { waitOnline?: string; timeout?: string }) => {
+    async (options: { waitOnline?: string; timeout?: string; all?: boolean }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
       return impl(options);
     },
@@ -2846,10 +2958,196 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--end-date <date>", "End date (ISO string, default: now)")
       .option("--group-by <field>", "Group by field (e.g. metadata.model)")
       .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
+      .option("--include-langy", "Count Langy's own turns too (left out by default, as in the Trace Explorer)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string }) => {
+    async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string; includeLangy?: boolean }) => {
       const { queryAnalyticsCommand: impl } = await import("./commands/analytics/query.js");
+      const { includeLangy, ...rest } = options;
+      return impl({ ...rest, shouldIncludeLangy: includeLangy });
+    },
+  );
+
+  // Instant Evals. One question, asked of every trace, conversation or model
+  // call in a window. The input is a LangWatchQL statement; `--target` writes
+  // one for the caller and the run hands it back so they can edit it.
+  const instantEvalCmd = program
+    .command("instant-eval")
+    .description(
+      "Ask one question of every trace, conversation or model call you have",
+    );
+
+  const INSTANT_EVAL_ASK_HELP =
+    "The question, in your own words. Repeat it to ask several questions of the same text: one classification answers them all, so three questions cost about what one does";
+  const INSTANT_EVAL_CRITERIA_HELP =
+    "For a yes or no question: what counts as yes, then what counts as no. Write it twice, after the --ask it describes";
+  const INSTANT_EVAL_SCORE_HELP =
+    "Ask for a rating instead of a yes or no, on the whole-numbered scale given as min..max, for example 1..5";
+  const INSTANT_EVAL_CATEGORY_HELP =
+    "Ask which option fits, written name=what it means. Repeat it for each option, after the --ask it describes";
+  const INSTANT_EVAL_THRESHOLD_HELP =
+    "For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself";
+  const INSTANT_EVAL_ID_HELP =
+    "What to call the question before it, which becomes its column and the name its judgements are filed under (default: q1, q2 and so on)";
+  const INSTANT_EVAL_QUESTIONS_FILE_HELP =
+    "Read the questions from a JSON or YAML file, which is how several questions each carry their own criteria, scale or options";
+  const INSTANT_EVAL_TARGET_HELP =
+    "What one judged row is: traces, threads or llm-spans (default: traces)";
+  const INSTANT_EVAL_FILTER_HELP =
+    'Narrow the rows with a trace filter, in the language the trace explorer\'s search bar speaks, for example "service:checkout AND cost:>0.01"';
+  const INSTANT_EVAL_LAST_HELP =
+    "How far back to look, as a number and a unit: 7d, 24h, 30m, 2w (default: 7d)";
+  const INSTANT_EVAL_SQL_HELP =
+    "Run a LangWatchQL statement of your own instead of a target. It must project TraceId and at least one eval function column";
+  const INSTANT_EVAL_LIMIT_HELP =
+    "Rows the run may judge (default: 1000). Ten thousand is allowed on every plan and a hundred thousand on a plan that lifts the cap";
+  // Hidden on `run`, where waiting is the default. `status` still offers it.
+  const INSTANT_EVAL_WAIT_HELP =
+    "Wait for the run to finish, up to 45 minutes or the number of minutes given, and exit non-zero when it failed";
+  const INSTANT_EVAL_START_HELP =
+    "Oldest instant to judge (ISO-8601 or epoch ms)";
+  const INSTANT_EVAL_END_HELP =
+    "Newest instant to judge (ISO-8601 or epoch ms)";
+  const INSTANT_EVAL_PARAM_HELP =
+    "Bind one of your statement's parameters, written key=value";
+
+  const instantEvalRunCmd = instantEvalCmd
+    .command("run [question]")
+    .description(
+      "Ask your question of every row it finds, and print the matches when it is done",
+    );
+  const readInstantEvalRunQuestions = trackQuestionFlags(instantEvalRunCmd);
+
+  rendersOwnResult(
+    instantEvalRunCmd
+      .option("--ask <question>", INSTANT_EVAL_ASK_HELP, collectParam)
+      .option("--criteria <text>", INSTANT_EVAL_CRITERIA_HELP, collectParam)
+      .option("--score <min..max>", INSTANT_EVAL_SCORE_HELP)
+      .option("--category <name=description>", INSTANT_EVAL_CATEGORY_HELP, collectParam)
+      .option("--threshold <probability>", INSTANT_EVAL_THRESHOLD_HELP)
+      .option("--id <name>", INSTANT_EVAL_ID_HELP)
+      .option("--questions-file <path>", INSTANT_EVAL_QUESTIONS_FILE_HELP)
+      .option("--target <target>", INSTANT_EVAL_TARGET_HELP)
+      .option("--filter <filter>", INSTANT_EVAL_FILTER_HELP)
+      .option("--last <window>", INSTANT_EVAL_LAST_HELP)
+      .option("--start <instant>", INSTANT_EVAL_START_HELP)
+      .option("--end <instant>", INSTANT_EVAL_END_HELP)
+      .option("--sql <statement>", INSTANT_EVAL_SQL_HELP)
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <pair>", INSTANT_EVAL_PARAM_HELP, collectParam)
+      .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
+      .option("--name <name>", "What to call the run. Yours to choose")
+      .option("--estimate", "Price the run and exit without starting it")
+      .option("--detach", "Create the run and return its id instead of waiting for it")
+      .option("--show <n>", "Rows to print when the run finishes (default 20, at most 25)")
+      // A run waits by default now, so --wait asks for what already happens.
+      // Kept and hidden so a line written against the old shape still runs.
+      .addOption(new Option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP).hideHelp())
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (question: string | undefined, _options: unknown, command: Command) => {
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it. The question
+    // flags are dropped here because the tracker read them in the order they
+    // were written, which is what attaches a modifier to its own question.
+    const { ask: _ask, criteria: _criteria, category: _category, score: _score, threshold: _threshold, id: _id, ...rest } = command.optsWithGlobals();
+    const drafts = readInstantEvalRunQuestions();
+    const { runInstantEvalCommand: impl } = await import("./commands/instant-evals/run.js");
+    await impl(question, rest, drafts);
+  });
+
+  const instantEvalEstimateCmd = instantEvalCmd
+    .command("estimate [question]")
+    .description("Price a run without starting it");
+  const readInstantEvalEstimateQuestions = trackQuestionFlags(instantEvalEstimateCmd);
+
+  emitsResult(
+    instantEvalEstimateCmd
+      .option("--ask <question>", INSTANT_EVAL_ASK_HELP, collectParam)
+      .option("--criteria <text>", INSTANT_EVAL_CRITERIA_HELP, collectParam)
+      .option("--score <min..max>", INSTANT_EVAL_SCORE_HELP)
+      .option("--category <name=description>", INSTANT_EVAL_CATEGORY_HELP, collectParam)
+      .option("--threshold <probability>", INSTANT_EVAL_THRESHOLD_HELP)
+      .option("--id <name>", INSTANT_EVAL_ID_HELP)
+      .option("--questions-file <path>", INSTANT_EVAL_QUESTIONS_FILE_HELP)
+      .option("--target <target>", INSTANT_EVAL_TARGET_HELP)
+      .option("--filter <filter>", INSTANT_EVAL_FILTER_HELP)
+      .option("--last <window>", INSTANT_EVAL_LAST_HELP)
+      .option("--start <instant>", INSTANT_EVAL_START_HELP)
+      .option("--end <instant>", INSTANT_EVAL_END_HELP)
+      .option("--sql <statement>", INSTANT_EVAL_SQL_HELP)
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <pair>", INSTANT_EVAL_PARAM_HELP, collectParam)
+      .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (question: string | undefined, _options: unknown, command: Command) => {
+      const { ask: _ask, criteria: _criteria, category: _category, score: _score, threshold: _threshold, id: _id, ...rest } = command.optsWithGlobals();
+      const drafts = readInstantEvalEstimateQuestions();
+      const { estimateInstantEvalCommand: impl } = await import("./commands/instant-evals/estimate.js");
+      return impl(question, rest, drafts);
+    },
+  );
+
+  rendersOwnResult(
+    instantEvalCmd
+      .command("status <id>")
+      .description("Read one run: where it is, what it matched, what it cost")
+      .option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (id: string, _options: unknown, command: Command) => {
+    const { statusInstantEvalCommand: impl } = await import("./commands/instant-evals/status.js");
+    await impl(id, command.optsWithGlobals());
+  });
+
+  emitsResult(
+    instantEvalCmd
+      .command("list")
+      .description("List the project's runs, newest first")
+      .option("--limit <n>", "Runs to list, at most one hundred (default: 20)")
+      .option("--before <instant>", "List runs accepted before this instant (ISO-8601)")
+      .option("--before-id <id>", "The id of the last run of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { limit?: string; before?: string; beforeId?: string }) => {
+      const { listInstantEvalsCommand: impl } = await import("./commands/instant-evals/list.js");
       return impl(options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("results <id>")
+      .description("Read a page of the run's judgements")
+      .option("--question <id>", "Only this question's judgements")
+      .option("--matched", "Only judgements that matched")
+      .option("--unmatched", "Only judgements that did not match")
+      .option("--status <status>", "Only judgements in this state: judged, skipped or failed")
+      .option("--limit <n>", "Judgements per page, at most one thousand (default: 100)")
+      .option("--cursor <cursor>", "The cursor the previous page answered with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { question?: string; matched?: boolean; unmatched?: boolean; status?: string; limit?: string; cursor?: string }) => {
+      const { resultsInstantEvalCommand: impl } = await import("./commands/instant-evals/results.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("sample <id>")
+      .description("Read a few rows with the text that was judged beside the verdict")
+      .option("-n, --number <n>", "Rows to read, at most twenty five (default: 5)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { number?: string }) => {
+      const { sampleInstantEvalCommand: impl } = await import("./commands/instant-evals/sample.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("cancel <id>")
+      .description("Ask a run to stop before its next page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { cancelInstantEvalCommand: impl } = await import("./commands/instant-evals/cancel.js");
+      return impl(id);
     },
   );
 
@@ -2857,14 +3155,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   const traceCmd = program
     .command("trace")
     .description("Search and inspect traces");
-
-  /**
-   * Help for `--project`, shared by every command that reads across projects.
-   * The default is the personal project, which is where these commands pointed
-   * before the flag existed, so an existing script keeps its meaning.
-   */
-  const PROJECT_FLAG_HELP =
-    "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
   rendersOwnResult(
     traceCmd
@@ -3106,8 +3396,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("get <id>")
-      .description("Get scenario details by ID")
+      .command("get <reference>")
+      .description("Get scenario details by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
@@ -3132,8 +3422,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   const scenarioUpdateCmd = scenarioCmd
-    .command("update <id>")
-    .description("Update an existing scenario")
+    .command("update <reference>")
+    .description("Update an existing scenario, named by ID or name")
     .option("--name <name>", "New scenario name")
     .option("--situation <situation>", "New situation/context")
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
@@ -3164,8 +3454,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   rendersOwnResult(
     scenarioCmd
-      .command("run <id>")
-      .description("Run one scenario against one or more targets")
+      .command("run <reference>")
+      .description("Run one scenario, named by ID or name, against one or more targets")
       .option("--target <target>", TARGET_FLAG_HELP, collectParam)
       .option("--name <name>", RUN_NAME_FLAG_HELP)
       .option("--repeat <n>", REPEAT_FLAG_HELP)
@@ -3215,8 +3505,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a scenario")
+      .command("delete <reference>")
+      .description("Archive (soft-delete) a scenario, named by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
@@ -3818,13 +4108,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     triggerCmd
       .command("create <name>")
       .description("Create a new trigger (automation)")
-      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE")
-      .option("--filters <json>", "Trigger filter conditions as JSON")
+      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE, SEND_WEBHOOK")
+      .option("--action-params <json>", "Delivery configuration for the chosen action, as JSON")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses, e.g. status:error. Supersedes --filters")
+      .option("--custom-graph-id <id>", "Make this an alert on that graph. Needs --graph-alert and --alert-type")
+      .option("--graph-alert <json>", "The rule an alert fires by, as JSON: {\"seriesName\":\"...\",\"operator\":\"gt|gte|lt|lte|eq\",\"threshold\":0.5,\"timePeriod\":5} (minutes: 1, 5, 15, 30, 60, 1440)")
+      .option("--report <json>", "Make this a scheduled report, as JSON: {\"source\":{\"kind\":\"dashboard\",\"dashboardId\":\"...\"},\"schedule\":{\"cron\":\"0 9 * * 1\",\"timezone\":\"UTC\"}}. source.kind is dashboard, customGraph or traceQuery")
       .option("--message <text>", "Custom alert message")
       .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
-      .option("--slack-webhook <url>", "Slack webhook URL (for SEND_SLACK_MESSAGE action)")
+      .option("--slack-connection <id>", "The Slack connection to post through, for SEND_SLACK_MESSAGE. List them with `langwatch slack-connection list`")
+      .option("--slack-channel <id>", "The Slack channel to post in, e.g. C0123. Needed with a bot connection")
+      .option("--slack-webhook <url>", "Legacy: a Slack incoming webhook URL, stored as a Slack connection. Prefer --slack-connection")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { action: string; filters?: string; message?: string; alertType?: string; slackWebhook?: string }) => {
+    async (name: string, options: { action: string; actionParams?: string; filters?: string; filterQuery?: string; message?: string; alertType?: string; slackWebhook?: string; slackConnection?: string; slackChannel?: string; customGraphId?: string; graphAlert?: string; report?: string }) => {
       const { createTriggerCommand: impl } = await import("./commands/triggers/create.js");
       return impl(name, options);
     },
@@ -3838,10 +4135,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--active <boolean>", "Enable or disable the trigger (true/false)")
       .option("--message <text>", "New alert message")
       .option("--alert-type <type>", "New alert severity")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses. An empty value clears it")
+      .option("--graph-alert <json>", "The rule an alert fires by, as JSON (only for an automation that is already an alert)")
+      .option("--report <json>", "What a report renders and when, as JSON (only for an automation that is already a report)")
+      .option("--action-params <json>", "The delivery configuration this trigger should have from now on, as JSON. Replaces the stored one; send [redacted] back for a credential to keep it")
+      .option("--slack-connection <id>", "The Slack connection to post through from now on (see `langwatch slack-connection list`). Replaces the delivery configuration, so pass --slack-channel with a bot connection")
+      .option("--slack-channel <id>", "The Slack channel to post in, e.g. C0123, for a bot connection")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string }) => {
+    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; filters?: string; filterQuery?: string; actionParams?: string; slackConnection?: string; slackChannel?: string; graphAlert?: string; report?: string }) => {
       const { updateTriggerCommand: impl } = await import("./commands/triggers/update.js");
       return impl(id, options);
+    },
+  );
+
+  for (const [verb, description, active] of [
+    ["enable", "Resume a paused trigger", true],
+    ["disable", "Pause a trigger", false],
+  ] as const) {
+    emitsResult(
+      triggerCmd
+        .command(`${verb} <id>`)
+        .description(description)
+        .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+      async (id: string) => {
+        const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
+        return impl({ id, active });
+      },
+    );
+  }
+
+  emitsResult(
+    triggerCmd
+      .command("test-fire <id>")
+      .description("Send the trigger's message to the destination it is configured with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testFireTriggerCommand: impl } = await import("./commands/triggers/testFire.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("fires <id>")
+      .description("What the trigger has done, newest first")
+      .option("--limit <n>", "How many fires to read")
+      .option("--cursor <cursor>", "Read the page after this one: the next cursor a previous call printed")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { limit?: string; cursor?: string }) => {
+      const { triggerFiresCommand: impl } = await import("./commands/triggers/fires.js");
+      return impl({ id, options });
     },
   );
 
@@ -3853,6 +4197,24 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { deleteTriggerCommand: impl } = await import("./commands/triggers/delete.js");
       return impl(id);
+    },
+  );
+
+  // Add Slack connection command group
+  const slackConnectionCmd = program
+    .command("slack-connection")
+    .description("Slack connections automations post through, listed by name (never their secrets)");
+
+  emitsResult(
+    slackConnectionCmd
+      .command("list")
+      .description("List the Slack connections this project can deliver through")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSlackConnectionsCommand: impl } = await import(
+        "./commands/slack-connections/list.js"
+      );
+      return impl();
     },
   );
 
@@ -5236,6 +5598,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // command. Registered on the built tree so buildProgram() stays a pure
   // factory: no module-level state, nothing leaks between daemon requests.
   registerOutputOptions(program);
+
+  // `--project` on every command that runs inside a project, added the same
+  // way and for the same reason: a family that adopts it one at a time is a
+  // family that forgets it, which is how the whole instant-eval family shipped
+  // with no way to name a project. The two exemption lists live with the
+  // helper (utils/projectOption.ts).
+  applyProjectOption(program);
 
   return program;
 }

@@ -1,5 +1,6 @@
 import type { LedgerActor } from "@langwatch/actor";
 import type { Team, TeamUserRole } from "~/generated/prisma/client";
+import type { TeamScopedMemberBinding } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
 export interface CreateTeamInput {
   id: string;
@@ -36,7 +37,18 @@ export interface TeamRepository {
    * (`src/server/__tests__/projectFilter.invariant.integration.test.ts`) can
    * drive this listing the way it drives every other one.
    */
-  findProjectsInTeam(params: { teamId: string }): Promise<TeamProjectListing[]>;
+  findProjectsInTeam(params: {
+    teamId: string;
+    /**
+     * Leaves out the governance project always, and aggregate projects unless
+     * the caller is an organisation admin (ADR-144 decision 5).
+     */
+    callerOrganizationRole: string | null;
+  }): Promise<TeamProjectListing[]>;
+  listMembers(params: {
+    organizationId: string;
+    teamId: string;
+  }): Promise<TeamScopedMemberBinding[]>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;

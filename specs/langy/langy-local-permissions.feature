@@ -385,6 +385,22 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And the target of a redirect is still checked
 
     @unit
+    Scenario: A redirect into /dev/null is not a path outside the folder
+      When Langy runs a command that sends output to /dev/null or reads input from it, as in "git status 2>/dev/null", ">/dev/null", "&>/dev/null" or "</dev/null"
+      Then the command is not refused for leaving the folder
+      And a redirect to any other path outside the folder is still refused
+      And /dev/null given to a command as an argument, not as a redirect, is still checked as a path
+
+    @unit
+    Scenario: The script of sed or awk and the pattern of grep are not judged paths
+      When Langy runs "sed -n '/HEAD branch/s/.*: //p'", an awk program or a grep pattern that starts with a slash
+      Then the script or pattern is read as the command's own words
+      And the command is not refused for leaving the folder
+      And every file the command is given, including a sed or grep script file, is still checked
+      And when an option gives the script or pattern (-e, -f, --regexp=), no operand is read as one
+      And a redirect target is always checked as a path, except /dev/null
+
+    @unit
     Scenario: A refusal names the argument it judged a path
       When a command is refused for naming a path outside the folder
       Then the refusal names the argument it read as a path
@@ -457,3 +473,34 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Given permission checks are off for this session
       When the conversation switches to a model that is not allowed to skip
       Then the next command asks again
+
+  Rule: A shared folder answers only to the owner of its conversation
+
+    # A conversation shared with the project is readable by a teammate. The
+    # folder behind it sits on the owner's machine, so reading is all a
+    # teammate gets.
+
+    @integration
+    Scenario: A teammate reading a shared conversation cannot act on its folder
+      Given a teammate shared their conversation with the project
+      And their folder is connected with a permission card waiting
+      When I answer the card, switch the permission checks off, close the folder or ask for the folder again
+      Then the platform answers that the conversation was not found
+      And the card, the policy, the folder and the terminal's requests are untouched
+
+    # The worker's routes take a Langy key. A worker only ever runs a turn for
+    # the owner, so a key that names a teammate's conversation is not a worker
+    # doing its job.
+    @unit
+    Scenario: A key never reaches the folder of a teammate's shared conversation
+      Given a teammate shared their conversation with the project
+      When a Langy key of mine names that conversation to open a request, run a call or read a card
+      Then the platform answers that the conversation was not found
+      And the answer is the one a conversation that does not exist gets
+
+    @integration
+    Scenario: A teammate reading a shared conversation still sees its folder state
+      Given a teammate shared their conversation with the project
+      And their folder is connected
+      When I open the conversation
+      Then the panel reads the folder as connected

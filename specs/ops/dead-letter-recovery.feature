@@ -33,6 +33,16 @@ Feature: Dead-letter recovery
     And the act reports that it did not apply
 
   @integration
+  Scenario: A redrive and a discard on one dead message: only the first lands
+    Given a dead outbox message
+    When one operator redrives it and another discards it at the same moment
+    Then the message is pending, as the redrive left it
+    And the discard reports that it did not apply
+    # The discard waits on the redrive's row lock and re-reads the status as
+    # the redrive left it, rather than deciding on the row as it read it
+    # before the wait. The reverse ordering keeps the discard the same way.
+
+  @integration
   Scenario: Discarded messages leave the dead-letter count
     Given dead messages on one process
     When the operator discards one of them

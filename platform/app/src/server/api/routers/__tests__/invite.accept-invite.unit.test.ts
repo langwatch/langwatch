@@ -59,8 +59,20 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // legacy session-email comparison — the default here so the pre-identifier
 // tests exercise exactly the legacy branch.
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+const provenAddressesMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // Read at module load by the better-auth request hooks on this router's
+  // import graph (GAC-09). Locks nobody: these suites assert nothing about
+  // lock-out, and a mock that omits the export fails the whole file at
+  // collection rather than at an assertion.
+  signInLockout: () => ({
+    refuseIfLockedOut: async () => void 0,
+    recordFailure: async () => void 0,
+    recordSuccess: async () => void 0,
+  }),
+  clearSignUpConfirmationPending: async () => void 0,
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  provenAddresses: () => ({ addressesOf: provenAddressesMock }),
   // The credential boundary asks this before it lets a password through; no
   // organization routes this suite's addresses.
   addressRoutesToConnection: async () => false,
@@ -77,6 +89,10 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   PASSWORD_HASH_ROUNDS: 10,
   BACKUP_CODE_COUNT: 10,
   passkeySignUp: () => ({}),
+  ssoAssertion: () => ({}),
+  ssoProvisionedUsers: () => ({}),
+  databaseHooks: () => ({}),
+  credentialSessions: () => ({}),
   signUpConfirmationEndpoint: () => ({}),
   lastWayInGuard: () => ({}),
   twoStepAccount: () => ({}),
@@ -115,20 +131,26 @@ vi.mock("../../../app-layer/app", () => ({
   }),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-    resolveTeamPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+      resolveTeamPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 function makeInvite(overrides: Record<string, unknown> = {}) {
   return {
@@ -150,7 +172,7 @@ function makeInvite(overrides: Record<string, unknown> = {}) {
 
 describe("invite.acceptInvite", () => {
   let findUniqueMock: ReturnType<typeof vi.fn>;
-  let inviteUpdateMock: ReturnType<typeof vi.fn>;
+  let claimInviteMock: ReturnType<typeof vi.fn>;
   let createManyMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -158,7 +180,7 @@ describe("invite.acceptInvite", () => {
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindingsWhere.mockResolvedValue(0);
     findUniqueMock = vi.fn();
-    inviteUpdateMock = vi.fn().mockResolvedValue({ count: 1 });
+    claimInviteMock = vi.fn().mockResolvedValue(1);
     createManyMock = vi.fn().mockResolvedValue({ count: 1 });
   });
 
@@ -175,13 +197,14 @@ describe("invite.acceptInvite", () => {
       // this stub as the root client it stands in for. The claim runs the
       // callback form of `$transaction`, handing the stub back as `tx`.
       $connect: vi.fn(),
+      $executeRaw: claimInviteMock,
       $transaction: (arg: unknown) =>
         typeof arg === "function"
           ? (arg as (tx: unknown) => unknown)(prismaStub)
           : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
         findUnique: findUniqueMock,
-        updateMany: inviteUpdateMock,
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findFirst: vi.fn().mockResolvedValue(null),
       },
       organizationUser: { createMany: createManyMock },
@@ -212,25 +235,18 @@ describe("invite.acceptInvite", () => {
       );
       // The claim is conditional on the (status, inviteCode) pair the caller
       // read — that is what makes two racers on one PENDING invite unable to
-      // both win — and it records who accepted.
-      expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: "PENDING",
-            inviteCode: "test-code",
-          }),
-          data: {
-            status: "ACCEPTED",
-            acceptedByUserId: "user-1",
-            acceptedViaIdentifierId: null,
-          },
-        }),
-      );
+      // both win — and it records who accepted. The conditions go to the
+      // database as SQL, so an update that matches nothing is the loss.
+      expect(claimInviteMock).toHaveBeenCalledTimes(1);
+      const [statement, ...bound] = claimInviteMock.mock.calls[0]!;
+      expect(statement.join("?")).toMatch(/SET "status" = 'ACCEPTED'/);
+      expect(statement.join("?")).toMatch(/AND "status" = 'PENDING'/);
+      expect(bound).toEqual(["user-1", null, "inv-1", "org-1", "test-code"]);
       // The ACCEPTED claim rides the same transaction as the membership row,
       // and the ledger grant is emitted only once that transaction has
       // committed — so the claim must be ordered before the grant just like
       // the membership row is.
-      expect(inviteUpdateMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      expect(claimInviteMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,
       );
     });
@@ -260,13 +276,8 @@ describe("invite.acceptInvite", () => {
 
       expect(result.success).toBe(true);
       // The claim records which identifier vouched for the acceptance.
-      expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            acceptedViaIdentifierId: "idf_g",
-          }),
-        }),
-      );
+      const [, , viaIdentifierId] = claimInviteMock.mock.calls[0]!;
+      expect(viaIdentifierId).toBe("idf_g");
     });
 
     it("refuses when no verified identifier holds the invited address", async () => {
@@ -314,7 +325,7 @@ describe("invite.acceptInvite", () => {
       await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
       expect(ledger.attachBindings).not.toHaveBeenCalled();
-      expect(inviteUpdateMock).not.toHaveBeenCalled();
+      expect(claimInviteMock).not.toHaveBeenCalled();
     });
   });
 
@@ -344,7 +355,7 @@ describe("invite.acceptInvite", () => {
       await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
       expect(ledger.attachBindings).not.toHaveBeenCalled();
-      expect(inviteUpdateMock).not.toHaveBeenCalled();
+      expect(claimInviteMock).not.toHaveBeenCalled();
     });
   });
 
@@ -360,6 +371,62 @@ describe("invite.acceptInvite", () => {
         code: "BAD_REQUEST",
         message: INVITE_ALREADY_ACCEPTED_MESSAGE,
       });
+    });
+  });
+});
+
+/**
+ * The welcome screen's invitation offer (ADR-143 v6). What this hands back
+ * includes the invitation code, which is the secret from the mail, so only
+ * addresses the account has PROVED may be asked about. The session address
+ * is softer than that and is never used, not even as a fall-back.
+ *
+ * Spec: specs/identity/join-before-create.feature
+ */
+describe("invite.pendingForMe", () => {
+  let findFirstMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findFirstMock = vi.fn().mockResolvedValue(null);
+    provenAddressesMock.mockResolvedValue([]);
+  });
+
+  function createCaller(email = "sam@acme.com") {
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: "user-1", name: "Sam", email },
+        expires: "2099-01-01",
+      },
+    });
+    (ctx as any).prisma = {
+      $connect: vi.fn(),
+      organizationInvite: { findFirst: findFirstMock },
+    };
+    return inviteRouter.createCaller(ctx);
+  }
+
+  describe("when the session address has an invitation but is not yet proved", () => {
+    /** @scenario An invitation is only offered to somebody who proved the address */
+    it("answers nothing and asks the database nothing", async () => {
+      // The only address known is the session's, and it is not proven.
+      provenAddressesMock.mockResolvedValueOnce([]);
+
+      await expect(createCaller().pendingForMe({})).resolves.toEqual([]);
+
+      expect(provenAddressesMock).toHaveBeenCalledWith({ userId: "user-1" });
+      expect(findFirstMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An invitation is only offered to somebody who proved the address */
+    it("asks only about the proved addresses, never the session's", async () => {
+      provenAddressesMock.mockResolvedValueOnce(["ana@acme.com"]);
+
+      await createCaller("sam@acme.com").pendingForMe({});
+
+      const where = findFirstMock.mock.calls[0]?.[0]?.where;
+      expect(JSON.stringify(where)).toContain("ana@acme.com");
+      expect(JSON.stringify(where)).not.toContain("sam@acme.com");
     });
   });
 });

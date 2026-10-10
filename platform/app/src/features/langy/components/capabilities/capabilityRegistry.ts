@@ -184,7 +184,14 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
       )}`,
   },
   agents: { path: "agents" },
-  automations: { path: "automations" },
+  // One automation opens in its view drawer, the one a saved edit lands on.
+  automations: {
+    path: "automations",
+    resourceHref: (base, resourceId) =>
+      `${base}?drawer.open=viewAutomation&drawer.automationId=${encodeURIComponent(
+        resourceId,
+      )}`,
+  },
   workflows: { path: "workflows" },
   annotations: { path: "annotations" },
   secrets: { path: "settings", deepLink: false },
@@ -360,6 +367,7 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "observability.annotations": "annotations",
   "evaluations.experiments": "experiments",
   "evaluations.online-evaluation": "evaluations",
+  "evaluations.instant-evals": "evaluations",
   "agent-simulations.scenarios": "scenarios",
   "agent-simulations.runs": "simulations",
   "agent-simulations.test-suites": "simulations",

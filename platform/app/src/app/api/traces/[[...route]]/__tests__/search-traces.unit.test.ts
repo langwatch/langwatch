@@ -4,6 +4,17 @@ import type { Trace } from "~/server/tracer/types";
 
 const mockGetAllTracesForProject = vi.fn();
 
+vi.mock("~/server/app-layer/app", async () => {
+  const { ownProof } = await import("~/test-utils/authorizationProofs");
+  const app = () => ({
+    authorization: {
+      authorizeInternal: async ({ projectId }: { projectId: string }) =>
+        ownProof({ projectId }),
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
+
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: {
     create: () => ({
@@ -58,11 +69,14 @@ vi.mock("~/server/traces/projection", async (importOriginal) => {
 vi.mock("~/server/api/routers/traces.schemas", () => {
   const { z } = require("zod");
   return {
+    publicTraceSearchPageSizeInput: z.number().optional(),
+    MAX_TRACE_LIST_PAGE_SIZE: 1000,
     getAllForProjectInput: z.object({
       projectId: z.string(),
       startDate: z.number(),
       endDate: z.number(),
       pageSize: z.number().optional(),
+      filters: z.record(z.array(z.string())).optional(),
     }),
   };
 });
@@ -186,6 +200,7 @@ describe("POST /search", () => {
       );
     });
 
+    /** @scenario "The REST trace endpoints link with the timestamp" */
     it("includes trace metadata in each digest entry", async () => {
       const res = await searchRequest({
         startDate: 1000,
@@ -200,6 +215,7 @@ describe("POST /search", () => {
       expect(first).toHaveProperty("output");
       expect(first).toHaveProperty("timestamps");
       expect(first).toHaveProperty("metadata");
+      expect(first.platformUrl).toContain("/traces/trace-1?t=1000");
     });
   });
 
@@ -681,7 +697,23 @@ describe("POST /search with a trace filter", () => {
         filterWhere?: { sql: string; params: Record<string, unknown> };
       };
       expect(options.filterWhere?.sql).toContain("ContainsErrorStatus");
-      expect(options.filterWhere?.params.tenantId).toBe("project-123");
+      expect(options.filterWhere?.params).not.toHaveProperty("tenantId");
+    });
+
+    it("expands a span clause's tenant marker into the key's own project", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string; params: Record<string, unknown> };
+      };
+      expect(options.filterWhere?.sql).not.toContain("{{tenantScope");
+      expect(options.filterWhere?.sql).toContain("TenantId IN");
+      expect(options.filterWhere?.params.tenantScope_own).toEqual([
+        "project-123",
+      ]);
     });
 
     it("bounds the translation to the window the search asked for", async () => {
@@ -712,12 +744,14 @@ describe("POST /search with a trace filter", () => {
 
   describe("when no filter is sent", () => {
     /** @scenario "An empty filter is the same request as no filter" */
-    it("sends no condition at all", async () => {
+    it("sends no condition of the filter's own", async () => {
       await searchRequest({ startDate: 1000, endDate: 5000 });
       const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
-        filterWhere?: unknown;
+        filterWhere?: { sql: string; params: Record<string, unknown> };
       };
-      expect(options.filterWhere).toBeUndefined();
+      expect(Object.keys(options.filterWhere?.params ?? {})).toEqual([
+        "hiddenOrigins",
+      ]);
     });
   });
 
@@ -725,9 +759,64 @@ describe("POST /search with a trace filter", () => {
     it("is the same request as no filter", async () => {
       await searchRequest({ startDate: 1000, endDate: 5000, filter: "   " });
       const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
-        filterWhere?: unknown;
+        filterWhere?: { sql: string; params: Record<string, unknown> };
       };
-      expect(options.filterWhere).toBeUndefined();
+      expect(Object.keys(options.filterWhere?.params ?? {})).toEqual([
+        "hiddenOrigins",
+      ]);
+    });
+  });
+
+  // specs/langy/langy-trace-explorer-actions.feature ("Langy's search and the
+  // Explorer count the same traces").
+  describe("given the origins the Trace Explorer leaves out", () => {
+    type FilterWhere = { sql: string; params: Record<string, unknown> };
+    const filterWhereOf = () =>
+      (
+        mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+          filterWhere?: FilterWhere;
+        }
+      ).filterWhere;
+
+    describe("when the search names no origin", () => {
+      /** @scenario "A trace search that names no origin leaves out Langy's own traces" */
+      it("excludes the Langy origin, after the filter's own terms", async () => {
+        await searchRequest({
+          startDate: 1000,
+          endDate: 5000,
+          filter: "status:error",
+        });
+        const where = filterWhereOf();
+        expect(where?.params.hiddenOrigins).toEqual(["langy"]);
+        expect(where?.sql).toContain("ContainsErrorStatus");
+        expect(where?.sql).toContain("NOT IN ({hiddenOrigins:Array(String)})");
+      });
+    });
+
+    describe("when the filter names an origin", () => {
+      /** @scenario "A trace search whose filter names an origin is left as asked" */
+      it("excludes no origin", async () => {
+        await searchRequest({
+          startDate: 1000,
+          endDate: 5000,
+          filter: "origin:langy",
+        });
+        const where = filterWhereOf();
+        expect(where?.params.hiddenOrigins).toBeUndefined();
+        expect(where?.sql).not.toContain("NOT IN ({hiddenOrigins");
+      });
+    });
+
+    describe("when the origin filter names an origin", () => {
+      /** @scenario "A trace search whose origin flag names an origin is left as asked" */
+      it("excludes no origin", async () => {
+        await searchRequest({
+          startDate: 1000,
+          endDate: 5000,
+          filters: { "traces.origin": ["evaluation"] },
+        });
+        expect(filterWhereOf()).toBeUndefined();
+      });
     });
   });
 
@@ -832,6 +921,39 @@ describe("POST /search with a trace filter", () => {
       expect(reason?.received).toBe("statuz");
       expect(reason?.expected).toContain("status");
       expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a legacy filter that needs an evaluator key is sent as a flat list", () => {
+    it("answers 422 naming the filter, rather than matching nothing", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filters: { "evaluations.passed": ["false"] },
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as {
+        error: string;
+        fields: string[];
+        reasons: { meta: { type: string; message: string } }[];
+      };
+      expect(body.error).toBe("validation_error");
+      expect(body.fields).toEqual(["filters.evaluations.passed"]);
+      expect(body.reasons[0]?.meta.type).toBe("filter_key_required");
+      expect(body.reasons[0]?.meta.message).toContain("evaluatorVerdict:fail");
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a legacy filter that needs no key is sent as a flat list", () => {
+    it("searches with it", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filters: { "traces.error": ["true"] },
+      });
+      expect(res.status).toBe(200);
+      expect(mockGetAllTracesForProject).toHaveBeenCalled();
     });
   });
 });

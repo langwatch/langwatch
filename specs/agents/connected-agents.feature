@@ -84,6 +84,13 @@ Feature: Connected agents
     Then the identity key is "support-agent@production"
     And the row records no owner and no host label
 
+  @integration
+  Scenario: The registered frame reports the scope
+    Given a personal API key of user "u_1"
+    When a process registers an agent in "development"
+    Then the registered frame says the agent has scope "owner", with no user id on the wire
+    And an agent registered in "production" is reported with scope "shared"
+
   # ---------------------------------------------------------------------------
   # Owner-only refusal at scheduling
   # ---------------------------------------------------------------------------
@@ -150,6 +157,38 @@ Feature: Connected agents
     When a run targets "connected:support-agent"
     Then the run is refused with "agent_environment_unresolved"
     And the refusal names the environments that are online
+
+  @unit
+  Scenario: A name with no environment picks another person's personal agent only to refuse it as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1", with its process connected
+    When a run with no actor, or with user "u_2" as its actor, targets "connected:support-agent"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: A name with no environment prefers a shared online agent over another person's personal one
+    Given "support-agent" registered in development as the personal agent of user "u_1" and in staging as a shared agent, with a process connected in both
+    When a run with no actor targets "connected:support-agent"
+    Then the target resolves to the staging agent's id
+
+  @unit
+  Scenario: A name with no environment ignores another person's personal agent that is offline
+    Given "support-agent" registered in development as the personal agent of user "u_1", with no process connected
+    When a run with no actor targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+
+  @unit
+  Scenario: A name and environment naming only another person's personal agent is refused as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1"
+    When a run with no actor targets "connected:support-agent@development"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: The unresolved refusal says a personal development agent is visible only to its owner
+    Given a run refused with "agent_environment_unresolved"
+    Then its remediation says an agent started in development with a personal key is visible only to its owner
+    And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
 
   @unit
   Scenario: A name with no environment that matches no connected agent is read as an id

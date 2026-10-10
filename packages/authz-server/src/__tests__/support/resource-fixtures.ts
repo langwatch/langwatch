@@ -38,7 +38,6 @@ export function makeGrants({
   organizationRole = null as CollectedGrants["organizationRole"],
   isOrgMember = organizationRole != null,
   membershipDisabled = false,
-  legacyTeamMemberships = [] as CollectedGrants["legacyTeamMemberships"],
   customRolePermissions = new Map<string, readonly string[]>(),
   principal = { type: "anonymous" } as CollectedGrants["principal"],
 }: Partial<CollectedGrants> = {}): CollectedGrants {
@@ -49,7 +48,6 @@ export function makeGrants({
     isOrgMember,
     membershipDisabled,
     bindings,
-    legacyTeamMemberships,
     customRolePermissions,
   };
 }
@@ -58,8 +56,7 @@ export const binding = (
   partial: Partial<CollectedBinding> &
     Pick<CollectedBinding, "scopeType" | "scopeId">,
 ): CollectedBinding => ({
-  role: "MEMBER",
-  customRoleId: null,
+  roleKey: "member",
   viaGroupId: null,
   ...partial,
 });

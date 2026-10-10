@@ -9,6 +9,8 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
+
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
@@ -20,7 +22,6 @@ import {
   type EvaluationsV3State,
 } from "~/experiments-v3/types";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
@@ -31,6 +32,7 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -325,6 +327,14 @@ secured.access(sessionAuth).post(
       );
     }
 
+    // ADR-144 decision 8: nothing is written under an aggregate's tenant.
+    // The tRPC door refuses it for mutations; this route checks its own
+    // permission, so it asks the guard itself.
+    await assertProjectAcceptsWrites({
+      kinds: getApp().projectKinds,
+      projectId,
+    });
+
     const dataResult = await loadExecutionData({
       projectId,
       dataset: request.dataset,
@@ -532,6 +542,14 @@ secured.access(sessionAuth).post("/abort", async (c) => {
       { status: 403 },
     );
   }
+
+  // ADR-144 decision 8: nothing is written under an aggregate's tenant.
+  // The tRPC door refuses it for mutations; this route checks its own
+  // permission, so it asks the guard itself.
+  await assertProjectAcceptsWrites({
+    kinds: getApp().projectKinds,
+    projectId,
+  });
 
   // Ownership check: holding evaluations:manage on `projectId` does NOT grant
   // the right to abort a run that belongs to a different project. The runId is

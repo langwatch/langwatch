@@ -143,6 +143,9 @@ func translateWalkError(ctx context.Context, err error) error {
 //     iterated; with several simultaneous exclusions any of them is an
 //     accurate answer to "why was nothing dispatchable").
 func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
+	if err := refuseUnentitledManagedModels(ctx, call.Bundle); err != nil {
+		return nil, err
+	}
 	creds, err := routableChain(ctx, call.Bundle, call.Request)
 	if err != nil {
 		return nil, err
@@ -185,6 +188,30 @@ func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain
 		return nil, pipeline.BudgetBreachError(ctx, lastExcluded.Budget)
 	}
 	return kept, nil
+}
+
+// refuseUnentitledManagedModels stops a license token whose contract does not
+// include managed models, before anything else about the request is resolved.
+//
+// It runs ahead of provider resolution on purpose. A license without the
+// entitlement reaches no provider at all, so letting the chain resolve first
+// would answer "no model provider configured for this organization", which
+// names the wrong thing and points the operator at settings that would not
+// fix it. An ordinary virtual key carries no services claim and is untouched.
+//
+// ADR-139 section 8; spec:
+// specs/self-hosting/connected-services/managed-models-provider.feature
+func refuseUnentitledManagedModels(ctx context.Context, bundle *domain.Bundle) error {
+	if !bundle.LicenseCredential() {
+		return nil
+	}
+	if bundle.EntitledToConnectService(domain.ConnectServiceManagedModels) {
+		return nil
+	}
+	return herr.New(ctx, domain.ErrConnectServiceNotEntitled, herr.M{
+		"message": "this license does not include managed models. Ask LangWatch to add the service to your contract",
+		"fault":   "customer",
+	})
 }
 
 // errProviderNotAllowed is the terminal answer when the provider allowlist

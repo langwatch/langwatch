@@ -29,7 +29,7 @@ const LABEL_VALUES_TOP_N = 10;
  * round-trip per evaluator.
  */
 export function buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("ScheduledAt");
+  const where = buildTimeWhere("ScheduledAt", ctx);
   const prefixFilter = ctx.prefix
     ? "AND lower(ifNull(EvaluatorName, '')) ILIKE concat({prefix:String}, '%')"
     : "";

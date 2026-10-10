@@ -24,6 +24,13 @@ export const PASSKEY_SIGNUP_EMAIL_TAKEN = "EMAIL_ALREADY_REGISTERED";
 export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
 
 /**
+ * The code for a sign-up ceremony run from a browser that already holds a
+ * session. Refused so it cannot land a new address's credential on the
+ * signed-in account, which is the only thing the plugin would let it do.
+ */
+export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
+
+/**
  * Everything the taken-address guard has to weigh about one row: who it is,
  * and every credential that could sign into it. Both credential tables,
  * because a user whose backfill has finalized keeps theirs on the identity
@@ -61,9 +68,16 @@ export interface PasskeySignUpVerificationPort {
   claimAddressProof(args: { token: string; email: string }): Promise<boolean>;
 }
 
+/** The `code` a passkey sign-up the installation's sign-up policy refuses
+ *  carries; the sign-up screen renders the registry copy for it. */
+export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
+
 export interface PasskeySignUpRegistrationDeps {
   eligibility: {
     isAllowed(email: string, method: "passkey"): Promise<boolean>;
+    /** Whether the installation's sign-up policy (`SIGN_UP_MODE`,
+     *  `SIGN_UP_ALLOWED_DOMAINS`) admits a new account at this address. */
+    policyAdmits(email: string): Promise<boolean>;
   };
   directory: PasskeySignUpDirectoryPort;
   accounts: PasskeySignUpAccountsPort;
@@ -137,6 +151,23 @@ function requireSignUpContext(context: string | null | undefined): {
       .digest("base64url"),
     addressProof: carried.data.addressProof,
   };
+}
+
+/**
+ * Whether the ceremony carries a sign-up context at all — the address, claim
+ * and proof a NEW account is created from. The settings, nudge and post-reset
+ * "add a passkey" callers send none; only the sign-up screen does. It is what
+ * tells a signed-in caller adding to their own account apart from one running
+ * a sign-up they must not.
+ */
+function carriesSignUpContext(context: string | null | undefined): boolean {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(context ?? "");
+  } catch {
+    return false;
+  }
+  return signUpContextSchema.safeParse(decoded).success;
 }
 
 /** The one refusal an address that is somebody's answers with. */
@@ -214,6 +245,7 @@ export class PasskeySignUpRegistration {
         message: "Verify this email address before creating a passkey.",
       });
     }
+    await this.refuseIfPolicyRefuses(email);
     await this.refuseIfRegistered(email);
 
     return {
@@ -264,6 +296,17 @@ export class PasskeySignUpRegistration {
     // The plugin compares that id against the session immediately after, so
     // this can only ever name the account the caller already holds.
     const session = await getSessionFromCtx(ctx);
+    // A sign-up ceremony from a signed-in browser: the account it names is
+    // never created (the plugin forces the credential onto the session), so
+    // it would land the wrong account's passkey and lose the other, silently.
+    // Refused here — the only seam the plugin runs for it (specs §"A signed-in
+    // browser cannot sign up a different address's passkey").
+    if (session?.user?.id && carriesSignUpContext(context)) {
+      throw new APIError("FORBIDDEN", {
+        code: PASSKEY_SIGNUP_ALREADY_SIGNED_IN,
+        message: "Sign out before creating a new account with a passkey.",
+      });
+    }
     if (session?.user?.id) {
       return { userId: session.user.id, name: session.user.email };
     }
@@ -275,6 +318,7 @@ export class PasskeySignUpRegistration {
         message: "This address must use its organization's sign-in method.",
       });
     }
+    await this.refuseIfPolicyRefuses(email);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. This is the one that
     // answers in WORDS; the decision that actually holds is taken inside the
@@ -316,6 +360,19 @@ export class PasskeySignUpRegistration {
       // what somebody scanning a list of passkeys recognises.
       name: email,
     };
+  }
+
+  /**
+   * Refuses an address the installation's sign-up policy does not admit, with
+   * its own code rather than the organization-managed refusal: the remedy is
+   * an invitation, not another sign-in method.
+   */
+  private async refuseIfPolicyRefuses(email: string): Promise<void> {
+    if (await this.deps.eligibility.policyAdmits(email)) return;
+    throw new APIError("FORBIDDEN", {
+      code: PASSKEY_SIGNUP_RESTRICTED,
+      message: "Accounts on this installation are created by invitation.",
+    });
   }
 
   /**

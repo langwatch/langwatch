@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useExplorerStore } from "~/features/traces-v2/stores/explorerStore";
 import { getColorPaletteForString } from "~/utils/rotatingColors";
 import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";
@@ -39,7 +39,9 @@ function renderLabels({
       {labels.map((label) => (
         <FilterChip
           key={label}
-          onFilter={() => useFilterStore.getState().toggleFacet("label", label)}
+          onFilter={() =>
+            useExplorerStore.getState().toggleFacet("label", label)
+          }
           filterLabel={`Filter by label "${label}"`}
         >
           <Badge

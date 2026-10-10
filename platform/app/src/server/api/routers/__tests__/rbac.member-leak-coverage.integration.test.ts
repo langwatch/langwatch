@@ -32,6 +32,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "../../../../test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "../../../../test-utils/authz-test-event-sourcing";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
@@ -110,6 +112,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
     });
 
     // Org + 2 users + 1 regular team + 2 personal-workspace teams.
@@ -143,29 +146,22 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       },
     });
 
-    // Org-scoped RoleBindings — admin gets ADMIN, member gets MEMBER.
-    // The permission resolver consults bindings first, falls back to
-    // the OrganizationUser.role baseline. Both layers say the same
-    // thing here, so admin has organization:manage and member doesn't.
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-admin-${ns}`,
-        organizationId: ORG_ID,
-        userId: ADMIN_USER_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    // Org-scoped grants — admin gets ADMIN, member gets MEMBER.
+    await seedRoleBinding(prisma, {
+      id: `rb-admin-${ns}`,
+      organizationId: ORG_ID,
+      userId: ADMIN_USER_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-member-${ns}`,
-        organizationId: ORG_ID,
-        userId: MEMBER_USER_ID,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-member-${ns}`,
+      organizationId: ORG_ID,
+      userId: MEMBER_USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
 
     // Regular team — both members are on it. This team should appear
@@ -235,46 +231,44 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       },
     });
 
-    // TEAM-scoped RoleBindings mirroring the TeamUser rows above. These are the
-    // authoritative membership source the picker/settings reads consult since
-    // the TeamUser→RoleBinding migration (which backfilled exactly these); the
-    // TeamUser rows are kept too, matching real post-migration data.
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          id: `rb-team-admin-${ns}`,
-          organizationId: ORG_ID,
-          userId: ADMIN_USER_ID,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: REGULAR_TEAM_ID,
-        },
-        {
-          id: `rb-team-member-${ns}`,
-          organizationId: ORG_ID,
-          userId: MEMBER_USER_ID,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: REGULAR_TEAM_ID,
-        },
-        {
-          id: `rb-admin-personal-${ns}`,
-          organizationId: ORG_ID,
-          userId: ADMIN_USER_ID,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: ADMIN_PERSONAL_TEAM_ID,
-        },
-        {
-          id: `rb-member-personal-${ns}`,
-          organizationId: ORG_ID,
-          userId: MEMBER_USER_ID,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: MEMBER_PERSONAL_TEAM_ID,
-        },
-      ],
-    });
+    // Seed each team grant together with its compatibility row. TeamUser rows
+    // remain because the picker response includes their membership details.
+    for (const binding of [
+      {
+        id: `rb-team-admin-${ns}`,
+        organizationId: ORG_ID,
+        userId: ADMIN_USER_ID,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: REGULAR_TEAM_ID,
+      },
+      {
+        id: `rb-team-member-${ns}`,
+        organizationId: ORG_ID,
+        userId: MEMBER_USER_ID,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: REGULAR_TEAM_ID,
+      },
+      {
+        id: `rb-admin-personal-${ns}`,
+        organizationId: ORG_ID,
+        userId: ADMIN_USER_ID,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: ADMIN_PERSONAL_TEAM_ID,
+      },
+      {
+        id: `rb-member-personal-${ns}`,
+        organizationId: ORG_ID,
+        userId: MEMBER_USER_ID,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: MEMBER_PERSONAL_TEAM_ID,
+      },
+    ]) {
+      await seedRoleBinding(prisma, binding);
+    }
 
     // Group fixture so admin happy-path tests have something to find.
     // Group + 1 admin member; member denial tests don't depend on the
@@ -306,6 +300,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
   afterAll(async () => {
     await prisma.groupMembership.deleteMany({ where: { groupId: GROUP_ID } });
     await prisma.group.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: {

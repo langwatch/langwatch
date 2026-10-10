@@ -37,6 +37,14 @@ export interface ProjectionStoreContext {
   key?: string;
 
   /**
+   * The id of the event the executor is folding when it reads the store,
+   * when there is one: the event that anchors `readWindow`. A store whose
+   * backing read is fenced by a proof (ADR-144 block C) names it as the
+   * read's purpose. Absent on a read made outside a fold step.
+   */
+  eventId?: string;
+
+  /**
    * occurredAt (ms) of the event currently being processed, when known. It is
    * purely informational — a store that wants its backing read time-bounded
    * should rely on `readWindow` (declared on the fold definition) rather than

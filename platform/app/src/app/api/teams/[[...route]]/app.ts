@@ -1,19 +1,17 @@
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import {
-  type Organization,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { type Organization, TeamUserRole } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { credentialOwnerRole } from "~/server/api-key/credential-owner-role";
+import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
-import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { appFromContext } from "../../middleware/app-context";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
 import { handleTeamError } from "./error-handler";
@@ -177,6 +175,12 @@ secured.access(requires("team:manage")).delete(
       id,
       organizationId: organization.id,
     });
+    // ADR-144: the team's aggregates stop and its projects leave every
+    // aggregate, as archiving each project would do.
+    await appFromContext(c).projects.afterTeamArchive({
+      teamId: team.id,
+      organizationId: organization.id,
+    });
 
     return c.json({
       id: team.id,
@@ -199,29 +203,16 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({
+      const bindings = await service.listMembers({
         id,
         organizationId: organization.id,
-      });
-      if (!team) throw new TeamNotFoundError(id);
-
-      const bindings = await prisma.roleBinding.findMany({
-        where: {
-          organizationId: organization.id,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: id,
-          userId: { not: null },
-        },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-        },
       });
 
       return c.json({
         data: bindings.map((b) => ({
           userId: b.userId,
-          name: b.user?.name ?? null,
-          email: b.user?.email ?? null,
+          name: b.user.name,
+          email: b.user.email,
           role: b.role,
         })),
       });
@@ -294,7 +285,13 @@ secured
       });
       if (!team) throw new TeamNotFoundError(id);
 
-      const projects = await service.listProjects({ teamId: id });
+      const projects = await service.listProjects({
+        teamId: id,
+        callerOrganizationRole: await credentialOwnerRole({
+          resolved: c.get("orgResolvedToken") as OrgResolvedToken,
+          organizationId: organization.id,
+        }),
+      });
 
       return c.json({ data: projects });
     },

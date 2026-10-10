@@ -27,6 +27,8 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -41,6 +43,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
   let patToken: string;
   let seededGroupId: string;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${patToken}`,
@@ -49,8 +52,10 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
 
   beforeAll(async () => {
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -73,15 +78,12 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
       },
     });
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const created = await ApiKeyService.create(prisma).create({
@@ -118,6 +120,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
           "groupMembership",
           { group: { organizationId: testOrganization?.id } },
         ],
+        ["grant", { organizationId: testOrganization?.id }],
         ["roleBinding", { organizationId: testOrganization?.id }],
         ["group", { organizationId: testOrganization?.id }],
         ["apiKey", { organizationId: testOrganization?.id }],

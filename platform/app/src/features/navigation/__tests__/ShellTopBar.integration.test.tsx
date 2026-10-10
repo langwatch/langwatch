@@ -48,7 +48,7 @@ function readyState(
     currentRoute: null,
     activeProductId: null,
     isSettingsRoute: false,
-    isDevelopment: false,
+    showDevelopmentIndicator: false,
     isCompactSidebar: false,
     isMobile: false,
     menuWidth: "240px",
@@ -72,7 +72,7 @@ describe("the top bar's marks", () => {
   describe("when an admin impersonates somebody on a development build", () => {
     /** @scenario Banner coexists with dev mode indicator */
     it("shows the impersonation banner and the development badge together", () => {
-      renderTopBar(readyState({ isDevelopment: true }));
+      renderTopBar(readyState({ showDevelopmentIndicator: true }));
 
       expect(screen.getByText("Impersonating Target User")).toBeInTheDocument();
       expect(screen.getByText("DEV")).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe("the top bar's marks", () => {
     it("shows only the development badge", () => {
       renderTopBar(
         readyState({
-          isDevelopment: true,
+          showDevelopmentIndicator: true,
           user: { id: "user_1", name: "Ada", email: "ada@acme.test" },
         }),
       );

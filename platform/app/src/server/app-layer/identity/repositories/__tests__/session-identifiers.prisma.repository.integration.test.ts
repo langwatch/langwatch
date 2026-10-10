@@ -1,11 +1,14 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 import { PrismaSessionIdentifiers } from "~/server/app-layer/identity/session-adapters";
 import { prisma } from "~/server/db";
 
 const namespace = `session-identifiers-${nanoid(8)}`;
 const userId = `${namespace}-user`;
-const identifiers = new PrismaSessionIdentifiers(prisma);
+const transactions = new AsyncLocalStorage<Prisma.TransactionClient>();
+const identifiers = new PrismaSessionIdentifiers(prisma, transactions);
 
 async function addEnterpriseIdentifier({
   id,

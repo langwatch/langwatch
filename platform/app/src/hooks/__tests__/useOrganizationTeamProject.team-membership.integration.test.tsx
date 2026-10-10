@@ -44,7 +44,9 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
 vi.mock("~/utils/api", () => ({
   api: {
     organization: { getAll: { useQuery: mockOrganizationsQuery } },
+    authz: { effectivePermissions: { useQuery: idleQuery } },
     sharedTrace: { get: { useQuery: idleQuery } },
+    identity: { myTestArrival: { useQuery: idleQuery } },
     publicEnv: { useQuery: idleQuery },
     modelProvider: { getAllForProject: { useQuery: idleQuery } },
   },

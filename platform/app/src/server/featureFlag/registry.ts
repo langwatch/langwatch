@@ -191,7 +191,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Gates the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects, while they are experimental. Off by default; enable per project or organization via a targeting rule. A deployment with no classifier configured keeps them unavailable whatever this says.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals, whatever this says; one that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
     key: "release_lwql_workbench",
@@ -374,6 +374,12 @@ export const FEATURE_FLAGS = [
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
+  // `join_requests` (D12, ADR-117) was here and is retired. The feature is on
+  // for everybody: the lookup already answers the universal nothing to an
+  // unverified address, a consumer domain, an organization that turned joining
+  // off and one the caller is already in, so what the flag actually gated was
+  // an offer that had passed every one of those. It is not a rollback lever
+  // any more; the setting on the Access page is.
   {
     key: "release_ui_agent_testing_v2_enabled",
     scope: "PRODUCT",
@@ -382,23 +388,19 @@ export const FEATURE_FLAGS = [
       "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the Simulations pages and menu group exactly as they were; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default on, so a self-hosted installation reads Agent Testing with no rule; a rule keeps a project or an organization on the Simulations pages. Every simulations address redirects to Agent Testing while the flag is on.",
   },
   {
-    // D12 (ADR-117). Named `join_requests` rather than the usual
+    // D05 tier 3 (ADR-117). Named `self_serve_sso` rather than the usual
     // `release_...` prefix so its auto-derived env override is exactly
-    // `JOIN_REQUESTS`, which is the operator lever the epic names and the
-    // one thing rollback consists of.
-    key: "join_requests",
+    // `SELF_SERVE_SSO`, which is the per-organization lever the epic names
+    // and the whole of what rolling tier 3 back consists of.
+    key: "self_serve_sso",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
+      "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it. Their license is the authorization there. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=self_serve_sso, or target an organization from /ops/feature-flags.",
   },
-  {
-    key: "release_webhook_automations",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
-  },
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so there is no picker card,
+  // save route, or test-fire path left to gate.
   {
     key: "experiment_onboarding_langy_guided",
     scope: "PRODUCT",

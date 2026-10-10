@@ -111,6 +111,7 @@ function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
     Reasoning: null,
     MetCriteria: [],
     UnmetCriteria: [],
+    InconclusiveCriteria: [],
     Error: null,
     Evaluations: [],
     DurationMs: null,
@@ -244,6 +245,34 @@ describe("SimulationRunStateRepositoryClickHouse evaluations (integration)", () 
       const projection = await repo.getProjection(scenarioRunId, context);
 
       expect(projection!.data.Evaluations).toEqual([]);
+    });
+  });
+
+  describe("when a finished run names a criterion the judge could not decide", () => {
+    /** @scenario "Inconclusive criteria survive the run row" */
+    it("reads it back apart from the failed ones, and a legacy row reads none", async () => {
+      const scenarioRunId = `run-inconclusive-${nanoid()}`;
+      await storeRun({
+        ...makeStartedState(scenarioRunId),
+        Status: "FAILURE",
+        Verdict: "failure",
+        FinishedAt: now,
+        MetCriteria: ["stays polite"],
+        UnmetCriteria: ["names the refund window", "opens a ticket"],
+        InconclusiveCriteria: ["opens a ticket"],
+      });
+      const legacyRunId = `run-legacy-criteria-${nanoid()}`;
+      await insertRows(ch, [makeRow({ ScenarioRunId: legacyRunId })]);
+
+      const projection = await repo.getProjection(scenarioRunId, context);
+      const legacy = await repo.getProjection(legacyRunId, context);
+
+      expect(projection!.data.UnmetCriteria).toEqual([
+        "names the refund window",
+        "opens a ticket",
+      ]);
+      expect(projection!.data.InconclusiveCriteria).toEqual(["opens a ticket"]);
+      expect(legacy!.data.InconclusiveCriteria).toEqual([]);
     });
   });
 });

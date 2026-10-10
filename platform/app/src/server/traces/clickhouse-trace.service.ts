@@ -3,7 +3,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
 import { getApp } from "~/server/app-layer/app";
@@ -35,9 +34,8 @@ import type {
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
-import type { Event, Span, Trace } from "~/server/tracer/types";
+import type { Event, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
-import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {
   applyEventProtections,
   applyTraceProtections,
@@ -45,13 +43,15 @@ import {
   mapNormalizedSpansToSpans,
   mapTraceSummaryToTrace,
 } from "./mappers";
-import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
-import { parsePromptReference } from "./parsePromptReference";
 import {
   type EventSpanRow,
   mapEventAttrsToEvent,
 } from "./projection/event-attrs.mapper";
 import type { ProjectableTrace, ProjectedAnnotation } from "./projection/types";
+import {
+  type PromptStudioSpanRow,
+  promptStudioSpanFromTrace,
+} from "./prompt-studio-span";
 import type { ResolvedTraceSpans } from "./resolve-offloaded-traces";
 import type {
   AggregationFiltersInput,
@@ -209,6 +209,16 @@ const JOINED_SPAN_READ_SETTINGS = {
 const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
+
+/**
+ * Traces a thread read returns when the caller names no ceiling.
+ *
+ * Enough for the thread views, which ask for one conversation at a time. A
+ * caller reading many threads in one call passes its own, sized by the
+ * threads, because a ceiling below the traces they hold drops the rest
+ * without a word.
+ */
+const DEFAULT_THREAD_TRACES_LIMIT = 1_000;
 
 /**
  * How many spans the traces-with-spans OOM fallback will hold in memory before
@@ -841,6 +851,10 @@ export class ClickHouseTraceService {
    * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the eval
    *   path can read full thread IO (#4888). Customer thread views construct
    *   without a blob resolver, so this is a no-op for them.
+   * @param opts.maxTraces - Traces the read may return across every thread
+   *   asked for, a thousand unless the caller says otherwise. A caller asking
+   *   for many threads at once sizes it by the threads, because a ceiling
+   *   below the traces they hold drops the rest without a word.
    * @returns Array of Trace objects with spans
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
@@ -848,7 +862,7 @@ export class ClickHouseTraceService {
     projectId: string,
     threadIds: string[],
     protections: Protections,
-    opts?: { resolveBlobs?: boolean },
+    opts?: { resolveBlobs?: boolean; maxTraces?: number },
   ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
@@ -880,11 +894,12 @@ export class ClickHouseTraceService {
               WHERE TenantId = {tenantId:String}
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
               ORDER BY CreatedAt ASC
-              LIMIT 1000
+              LIMIT {maxTraces:UInt32}
             `,
             query_params: {
               tenantId: projectId,
               threadIds,
+              maxTraces: opts?.maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
             },
             format: "JSONEachRow",
           });
@@ -1533,13 +1548,13 @@ export class ClickHouseTraceService {
    *
    * @param projectId - The project ID
    * @param spanId - The span ID to find
-   * @param protections - Field redaction protections
+   * @param _protections - Field redaction protections (not applied here)
    * @returns PromptStudioSpanResult or null
    */
   async getSpanForPromptStudio(
     projectId: string,
     spanId: string,
-    protections: Protections,
+    _protections: Protections,
   ): Promise<PromptStudioSpanResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getSpanForPromptStudio",
@@ -1580,88 +1595,9 @@ export class ClickHouseTraceService {
             format: "JSONEachRow",
           });
 
-          const allRows = (await queryResult.json()) as Array<{
-            SpanId: string;
-            TraceId: string;
-            ParentSpanId: string | null;
-            SpanName: string;
-            SpanAttributes: Record<string, unknown>;
-            StartTime: number;
-            EndTime: number;
-            DurationMs: number;
-            StatusCode: number | null;
-            StatusMessage: string | null;
-          }>;
+          const allRows = (await queryResult.json()) as PromptStudioSpanRow[];
 
-          const requestedRow = allRows.find((r) => r.SpanId === spanId);
-          if (!requestedRow) {
-            return null;
-          }
-
-          // If the caller pointed us at a non-llm span (e.g. the user
-          // clicked "Open in Playground" from the Prompt.compile or
-          // PromptApiService.get span, or from the Prompts tab usage
-          // card), resolve to the nearest llm in the trace that the
-          // operator most likely meant: a descendant first, then a
-          // sibling that started at or after the requested span. The
-          // playground form needs an llm span's messages + llm config —
-          // anything else lands as "No prompts open".
-          const requestedType = requestedRow.SpanAttributes[
-            "langwatch.span.type"
-          ] as string | undefined;
-          const row =
-            requestedType === "llm"
-              ? requestedRow
-              : (findNearestLlm(allRows, requestedRow) ?? null);
-          if (!row) {
-            return null;
-          }
-
-          // Extract span data from attributes
-          const result = this.extractPromptStudioDataFromClickHouse(
-            row,
-            protections,
-          );
-
-          // If the LLM span itself doesn't have a prompt reference,
-          // search ancestors and their siblings to find it (SDK sets it on
-          // sibling spans like Prompt.compile or PromptApiService.get)
-          if (!result.promptHandle) {
-            const ancestorSpans = allRows.map((r) => {
-              const attributes: Record<string, unknown> = {};
-              const promptId = r.SpanAttributes["langwatch.prompt.id"];
-              if (promptId) attributes["langwatch.prompt.id"] = promptId;
-              const promptVars = r.SpanAttributes["langwatch.prompt.variables"];
-              if (promptVars)
-                attributes["langwatch.prompt.variables"] = promptVars;
-              const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
-              if (promptHandle)
-                attributes["langwatch.prompt.handle"] = promptHandle;
-              const promptVersion =
-                r.SpanAttributes["langwatch.prompt.version.number"];
-              if (promptVersion)
-                attributes["langwatch.prompt.version.number"] = promptVersion;
-              return {
-                spanId: r.SpanId,
-                parentSpanId: r.ParentSpanId ?? null,
-                startTime: r.StartTime,
-                attributes,
-              };
-            });
-
-            const ancestorRef = findPromptReferenceInAncestors({
-              targetSpanId: row.SpanId,
-              spans: ancestorSpans,
-            });
-            if (ancestorRef?.promptHandle) {
-              result.promptHandle = ancestorRef.promptHandle;
-              result.promptVersionNumber = ancestorRef.promptVersionNumber;
-              result.promptTag = ancestorRef.promptTag;
-              result.promptVariables = ancestorRef.promptVariables;
-            }
-          }
-
-          return result;
+          return promptStudioSpanFromTrace({ rows: allRows, spanId });
         } catch (error) {
           this.logger.warn(
             {
@@ -1675,114 +1611,6 @@ export class ClickHouseTraceService {
         }
       },
     );
-  }
-
-  /**
-   * Extract prompt studio data from ClickHouse span row.
-   * @internal
-   */
-  private extractPromptStudioDataFromClickHouse(
-    row: {
-      SpanId: string;
-      TraceId: string;
-      SpanName: string;
-      SpanAttributes: Record<string, unknown>;
-      StartTime: number;
-      EndTime: number;
-      DurationMs: number;
-      StatusCode: number | null;
-      StatusMessage: string | null;
-    },
-    _protections: Protections,
-  ): PromptStudioSpanResult {
-    const attrs = row.SpanAttributes;
-    // Pure extraction of input + output messages from the span's
-    // attributes. Lives in parseLLMSpanMessages.ts so the wire-shape
-    // contract — including the single-message-object form nlpgo emits
-    // for langwatch.output — is unit-testable without standing up the
-    // full service. See that file's docstring for the shape catalog.
-    const messages: PromptStudioSpanResult["messages"] =
-      parseLLMSpanMessages(attrs);
-
-    // Extract LLM config
-    const model =
-      (attrs["gen_ai.response.model"] as string) ??
-      (attrs["gen_ai.request.model"] as string) ??
-      (attrs["llm.model"] as string) ??
-      null;
-    const vendor = (attrs["gen_ai.system"] as string) ?? null;
-
-    // Build llmConfig dynamically from the parameter map
-    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
-      model,
-      systemPrompt: messages.find((m) => m.role === "system")?.content,
-      temperature: null,
-      maxTokens: null,
-      topP: null,
-      frequencyPenalty: null,
-      presencePenalty: null,
-      seed: null,
-      topK: null,
-      minP: null,
-      repetitionPenalty: null,
-      reasoning: null,
-      verbosity: null,
-      litellmParams: {},
-    };
-
-    for (const param of LLM_PARAMETER_MAP) {
-      if (param.otelAttr === null) continue;
-      const raw = attrs[param.otelAttr];
-      if (raw != null) {
-        (llmConfig as Record<string, unknown>)[param.formField] = raw;
-      }
-    }
-
-    // Extract metrics
-    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
-      | number
-      | undefined;
-    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as
-      | number
-      | undefined;
-
-    // Build error if present
-    let error: Span["error"] | null = null;
-    if (row.StatusCode === 2) {
-      error = {
-        has_error: true,
-        message: row.StatusMessage ?? "Unknown error",
-        stacktrace: [],
-      };
-    }
-
-    // Extract prompt reference from attributes
-    const promptRef = parsePromptReference(attrs);
-
-    return {
-      spanId: row.SpanId,
-      traceId: row.TraceId,
-      spanName: row.SpanName ?? null,
-      messages,
-      llmConfig,
-      vendor,
-      error,
-      timestamps: {
-        started_at: row.StartTime,
-        finished_at: row.EndTime,
-      },
-      metrics:
-        promptTokens !== undefined || completionTokens !== undefined
-          ? {
-              prompt_tokens: promptTokens,
-              completion_tokens: completionTokens,
-            }
-          : null,
-      promptHandle: promptRef.promptHandle,
-      promptVersionNumber: promptRef.promptVersionNumber,
-      promptTag: promptRef.promptTag,
-      promptVariables: promptRef.promptVariables,
-    };
   }
 
   /**
@@ -3748,13 +3576,6 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
   ss_DroppedLinksCount: number | null;
 }
 
-interface PromptStudioCandidateRow {
-  SpanId: string;
-  ParentSpanId: string | null;
-  SpanAttributes: Record<string, unknown>;
-  StartTime: number;
-}
-
 /**
  * ClickHouse refused a query because its result exceeded `max_result_rows`
  * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
@@ -3793,69 +3614,6 @@ export function isClickHouseMemoryLimitError(error: unknown): boolean {
     error.message.toLowerCase().includes("memory limit exceeded") ||
     (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
   );
-}
-
-/**
- * Given a non-llm span the operator clicked "Open in Playground" from
- * (typically `Prompt.compile` or `PromptApiService.get`), find the
- * nearest llm in the same trace to load instead. Preference order:
- *   1. Closest descendant llm under the requested span — usually a child
- *      llm call that consumed the just-compiled prompt.
- *   2. Sibling llm under the same parent that started after the
- *      requested span — the next llm call in the chain.
- *   3. First llm in the trace by start time as a last resort.
- * Returns null when the trace genuinely has no llm spans.
- */
-function findNearestLlm<T extends PromptStudioCandidateRow>(
-  rows: T[],
-  requested: T,
-): T | null {
-  const isLlm = (r: T) =>
-    (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
-
-  const llmRows = rows.filter(isLlm);
-  if (llmRows.length === 0) return null;
-
-  // 1. Descendant llm closest to the requested span (smallest depth diff).
-  const childrenByParent = new Map<string, T[]>();
-  for (const r of rows) {
-    if (!r.ParentSpanId) continue;
-    const list = childrenByParent.get(r.ParentSpanId);
-    if (list) list.push(r);
-    else childrenByParent.set(r.ParentSpanId, [r]);
-  }
-  const visited = new Set<string>();
-  const queue: T[] = [requested];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current.SpanId)) continue;
-    visited.add(current.SpanId);
-    const children = childrenByParent.get(current.SpanId) ?? [];
-    for (const child of children) {
-      if (isLlm(child)) return child;
-      queue.push(child);
-    }
-  }
-
-  // 2. Sibling llm under the same parent (or root-level peer if the
-  //    requested span has no parent) that started at/after the requested
-  //    span. Earliest qualifying sibling wins, so we land on the *next*
-  //    call rather than one further down the chain. Siblings that
-  //    started *before* the requested span do NOT count — those belong
-  //    to an earlier turn and would open an unrelated playground
-  //    context — so the search falls through to step 3 instead.
-  const siblingPool =
-    requested.ParentSpanId == null
-      ? rows.filter((r) => r.ParentSpanId == null)
-      : (childrenByParent.get(requested.ParentSpanId) ?? []);
-  const siblings = siblingPool
-    .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
-    .sort((a, b) => a.StartTime - b.StartTime);
-  const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
-  if (nextOrSame) return nextOrSame;
-
-  // 3. Earliest llm in the trace.
-  return llmRows.sort((a, b) => a.StartTime - b.StartTime)[0] ?? null;
 }
 
 /**

@@ -32,8 +32,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { IngestionKeyService } from "../ingestionKey.service";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-ik-${suffix}`;
@@ -59,14 +63,12 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     });
     // Org-scoped ADMIN RoleBinding so the user-owned-key ceiling check
     // (assertBindingsWithinCeiling) lets the caller grant traces:create.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     await prisma.team.create({
       data: {
@@ -110,6 +112,9 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
 
   afterAll(async () => {
     await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.grant
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
     await prisma.apiKey

@@ -96,7 +96,7 @@ describe("formatSpansDigestBounded", () => {
         spans: [span({ spanId: "a", name: "root", text: "small" })],
         maxTokens: 8192,
       });
-      expect(result.truncated).toBe(false);
+      expect(result.isTruncated).toBe(false);
       expect(result.text).toContain("root");
       expect(result.text).toContain("small");
       expect(result.estimatedTokens).toBeLessThanOrEqual(8192);
@@ -110,7 +110,7 @@ describe("formatSpansDigestBounded", () => {
         spans: trace,
         maxTokens: 900,
       });
-      expect(result.truncated).toBe(true);
+      expect(result.isTruncated).toBe(true);
       // Every span is still named by the skeleton, even the ones not expanded.
       expect(result.text).toContain("root-span");
       expect(result.text).toContain("slow-tool");
@@ -130,7 +130,7 @@ describe("formatSpansDigestBounded", () => {
         spans: trace,
         maxTokens: 2_500,
       });
-      expect(withExpansions.truncated).toBe(true);
+      expect(withExpansions.isTruncated).toBe(true);
       expect(withExpansions.estimatedTokens).toBeGreaterThan(
         skeletonOnly.estimatedTokens,
       );
@@ -155,7 +155,7 @@ describe("formatSpansDigestBounded", () => {
         }),
       );
       const result = await formatSpansDigestBounded({ spans, maxTokens: 120 });
-      expect(result.truncated).toBe(true);
+      expect(result.isTruncated).toBe(true);
       expect(result.estimatedTokens).toBeLessThanOrEqual(120);
     });
   });

@@ -20,7 +20,7 @@ import type {
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
-import { queryOrganizationOnAuthzEngine } from "../engine-gate";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migration-name";
 
 /** Seeds per budget statement. Four binds a row, so this sits well under
  *  Postgres' 65535-parameter ceiling. */
@@ -117,12 +117,18 @@ export class PrismaAuthzMigrationRepository
   }): Promise<OrganizationMemberFact[]> {
     const rows = await this.prisma.organizationUser.findMany({
       where: { organizationId },
-      select: { userId: true, role: true, createdAt: true },
+      select: {
+        userId: true,
+        role: true,
+        createdAt: true,
+        membershipStamp: true,
+      },
     });
     return rows.map((row) => ({
       userId: row.userId,
       role: row.role,
       createdAtMs: row.createdAt.getTime(),
+      membershipStamp: row.membershipStamp,
     }));
   }
 
@@ -564,18 +570,22 @@ export class PrismaAuthzMigrationRepository
     return rows.map((row) => row.id);
   }
 
-  /** The same query the request-path gate's own cache miss runs
-   *  (engine-gate.ts's `queryOrganizationOnAuthzEngine`) - one predicate, so the
-   *  migration awaiting its own flip and the gate serving it can never
-   *  drift onto different answers. */
+  /** The migration runner's status read. Runtime authorization does not use
+   *  migration state as a decision gate after cutover. */
   async findCutoverOnEngine({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<boolean> {
-    return queryOrganizationOnAuthzEngine({
-      prisma: this.prisma,
-      organizationId,
+    const row = await this.prisma.systemMigrationTenantState.findUnique({
+      where: {
+        migrationName_tenantId: {
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+          tenantId: organizationId,
+        },
+      },
+      select: { status: true },
     });
+    return row?.status === "finalized";
   }
 }

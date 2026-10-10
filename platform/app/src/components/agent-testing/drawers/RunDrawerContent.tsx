@@ -299,6 +299,9 @@ function ResultsSection({
           status={scenarioState.status}
           metCriteria={scenarioState.results?.metCriteria ?? []}
           unmetCriteria={scenarioState.results?.unmetCriteria ?? []}
+          inconclusiveCriteria={
+            scenarioState.results?.inconclusiveCriteria ?? []
+          }
           declaredCriteria={detail.scenarioData?.criteria ?? []}
           reasoning={scenarioState.results?.reasoning}
           error={scenarioState.results?.error}

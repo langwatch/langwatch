@@ -16,15 +16,18 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
-import type {
-  CodingAgentSessionData,
-  MetricSeriesFact,
-  SessionStep,
-  SessionTitleSource,
+import {
+  type CodingAgentSessionData,
+  contextUsageKey,
+  MAX_USAGE_CONTEXTS,
+  type MetricSeriesFact,
+  type SessionStep,
+  type SessionTitleSource,
 } from "./coding-agent-session.types";
 import {
   SESSION_CONTEXT_ATTR,
   SESSION_CONTEXT_EVENT,
+  type SessionWorkingContext,
 } from "./session-context-memo";
 
 /**
@@ -149,6 +152,17 @@ const CODEX = {
     RESPONSE_MODEL: "gen_ai.response.model",
   },
 } as const;
+
+/**
+ * The spans whose tokens the fold counts as a model call, across every
+ * span-bearing agent. The contribute command stamps exactly these with the
+ * session's declared working context, so the fold can charge their tokens
+ * to it; every other span charges nothing anywhere and rides unstamped.
+ */
+export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
+  CLAUDE.SPAN.LLM_REQUEST,
+  CODEX.SPAN.TURN,
+]);
 
 /**
  * The LangWatch vocabulary, the sibling of the {@link CLAUDE} adapter for the
@@ -331,6 +345,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     cacheCreationTokens: 0,
     costUsd: 0,
     agentReportedCostUsd: 0,
+    usageByContext: {},
 
     modelCallMs: 0,
     toolMs: 0,
@@ -661,6 +676,76 @@ function pricedFromTokens(facts: Record<string, unknown>): number {
 }
 
 /**
+ * Charge what one model call added to the session's counters to the working
+ * context the call was stamped with. The delta is read off the counters
+ * themselves, before and after the fold, so whatever a carrier counts as the
+ * call's tokens and cost is exactly what lands on its context and the record
+ * can never drift from the totals it partitions.
+ *
+ * Keyed on the contribution's own stamp, never on the state's current
+ * branch: the fold folds a late event in place (`refoldOnOutOfOrder` is off),
+ * and a sum keyed on the event commutes where one keyed on arrival order
+ * would not. An unstamped call charges nothing; the read side prices the gap
+ * between the counters and this record as the session's undeclared usage.
+ *
+ * The record is bounded like every other map on the session: a context past
+ * `MAX_USAGE_CONTEXTS` is not opened, and its calls stay in the counters
+ * alone. A record that reached the bound is therefore one whose gap no longer
+ * means "before the first declaration", and the read recognises that size and
+ * charges the gap to no pull request rather than to the first branch.
+ */
+function chargeContextUsage({
+  before,
+  after,
+  context,
+}: {
+  before: CodingAgentSessionData;
+  after: CodingAgentSessionData;
+  context: SessionWorkingContext | null;
+}): CodingAgentSessionData {
+  if (context === null) return after;
+  const key = contextUsageKey(context);
+  const existing = after.usageByContext[key];
+  if (
+    existing === undefined &&
+    Object.keys(after.usageByContext).length >= MAX_USAGE_CONTEXTS
+  ) {
+    return after;
+  }
+  const charged = existing ?? {
+    repositoryHost: context.repositoryHost,
+    repositoryOwner: context.repositoryOwner,
+    repositoryName: context.repositoryName,
+    branch: context.branch,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    costUsd: 0,
+  };
+  return {
+    ...after,
+    usageByContext: {
+      ...after.usageByContext,
+      [key]: {
+        ...charged,
+        inputTokens:
+          charged.inputTokens + (after.inputTokens - before.inputTokens),
+        outputTokens:
+          charged.outputTokens + (after.outputTokens - before.outputTokens),
+        cacheReadTokens:
+          charged.cacheReadTokens +
+          (after.cacheReadTokens - before.cacheReadTokens),
+        cacheCreationTokens:
+          charged.cacheCreationTokens +
+          (after.cacheCreationTokens - before.cacheCreationTokens),
+        costUsd: charged.costUsd + (after.costUsd - before.costUsd),
+      },
+    },
+  };
+}
+
+/**
  * A Claude Code call's tokens, respelled into the gen_ai keys
  * {@link computeSpanCost} reads. The llm_request span carries the CLI's bare
  * spellings, whose `input_tokens` is already the disjoint non-cached bucket,
@@ -728,6 +813,7 @@ export function applySpanToCodingAgentSession({
   state,
   span,
   agent,
+  context = null,
 }: {
   state: CodingAgentSessionData;
   span: SpanFactsView;
@@ -742,6 +828,12 @@ export function applySpanToCodingAgentSession({
    * gate has to be enforced on both sides, not just declared.
    */
   agent?: string;
+  /**
+   * The working context the contribution was stamped with, or null when it
+   * carries none. A model call's tokens and cost are charged to it
+   * (`chargeContextUsage`); nothing else reads it.
+   */
+  context?: SessionWorkingContext | null;
 }): CodingAgentSessionData {
   const attrs = span.attrs;
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
@@ -750,15 +842,20 @@ export function applySpanToCodingAgentSession({
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
     // Identity still rides the span; only the counted facts are the log's.
     if (isLogsOnly) return withIdentity(state, attrs);
-    const folded = foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    const before = withIdentity(state, attrs);
+    const folded = foldModelCall(before, attrs, durationMs);
     // Priced from the span's tokens with the same formula and the same
     // cache-write lifetime the trace pipeline applies to the identical span,
     // so the session and its traces state one figure. The cost the agent
     // reports about itself lands on agentReportedCostUsd instead.
-    return {
-      ...folded,
-      costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
-    };
+    return chargeContextUsage({
+      before,
+      after: {
+        ...folded,
+        costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
+      },
+      context,
+    });
   }
 
   if (span.name === CODEX.SPAN.TURN) {
@@ -769,8 +866,13 @@ export function applySpanToCodingAgentSession({
     const facts = codexTurnTokenFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
-    const folded = foldModelCall(withIdentity(state, attrs), facts, 0);
-    return { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) };
+    const before = withIdentity(state, attrs);
+    const folded = foldModelCall(before, facts, 0);
+    return chargeContextUsage({
+      before,
+      after: { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) },
+      context,
+    });
   }
 
   if (span.name === CODEX.SPAN.HELPER_REQUEST) {
@@ -926,6 +1028,7 @@ export function applyLogToCodingAgentSession({
   attributes,
   agent,
   occurredAtMs,
+  context = null,
 }: {
   state: CodingAgentSessionData;
   /** The contribution's lifted scalar facts — raw wire keys. */
@@ -938,6 +1041,12 @@ export function applyLogToCodingAgentSession({
   agent?: string;
   /** The record's own time, for step placement on logs-only folds. */
   occurredAtMs?: number;
+  /**
+   * The working context the contribution was stamped with, or null. A
+   * logs-only agent's `api_request` IS its model call, so that is where the
+   * tokens and cost are charged to it; no other record charges anything.
+   */
+  context?: SessionWorkingContext | null;
 }): CodingAgentSessionData {
   const attrs = attributes;
   // Membership rides the registry (`logsOnly` on the definition), so adding
@@ -997,11 +1106,15 @@ export function applyLogToCodingAgentSession({
       // and with no token-bearing span to compute from, the reported figure
       // is also the session's cost.
       return isLogsOnly
-        ? foldModelCall(
-            { ...withReported, costUsd: withReported.costUsd + reported },
-            attrs,
-            0,
-          )
+        ? chargeContextUsage({
+            before: withReported,
+            after: foldModelCall(
+              { ...withReported, costUsd: withReported.costUsd + reported },
+              attrs,
+              0,
+            ),
+            context,
+          })
         : withReported;
     }
 

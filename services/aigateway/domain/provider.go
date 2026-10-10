@@ -43,6 +43,13 @@ const (
 	// chat-family calls against an ElevenLabs credential surface the
 	// provider's reject directly, same policy as Anthropic embeddings.
 	ProviderElevenLabs ProviderID = "elevenlabs"
+	// ProviderLangWatch is another LangWatch gateway reached as an upstream
+	// provider: a connected self-hosted install forwarding OpenAI-compatible
+	// calls to LangWatch-managed models with its license token as the
+	// credential. Both sides speak the same wire, so the gateway proxies
+	// directly (no Bifrost enum). See adapters/providers/langwatch.go and
+	// ADR-139 section 8.
+	ProviderLangWatch ProviderID = "langwatch"
 	// OpenAICodex is the user's own ChatGPT subscription, reached through
 	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
 	// access token instead of an API key. Responses-API + SSE only; the
@@ -123,6 +130,7 @@ var knownProviderFamilies = map[string]struct{}{
 	"custom":                {},
 	"elevenlabs":            {},
 	"cloudflare":            {},
+	"langwatch":             {},
 }
 
 // KnownProviderFamily reports whether a model string's first segment names a
@@ -202,6 +210,16 @@ func (c Credential) ServesModel(model string) bool {
 // match it cannot take part in.
 func (c Credential) DeclaresCatalog() bool {
 	return len(c.Models) > 0 || len(c.DeploymentMap) > 0
+}
+
+// ServesBareModels reports whether a model name with no provider prefix may
+// be routed to this credential. The LangWatch-managed models slot is reached
+// only through an explicit "langwatch/<model>" prefix: a bare name never
+// lands there, neither by catalog match, by the no-catalog step, as the lone
+// credential, nor as a fallback, so prompts leave the install only when the
+// caller named LangWatch.
+func (c Credential) ServesBareModels() bool {
+	return c.ProviderID != ProviderLangWatch
 }
 
 // WithDeploymentSelfMap ensures Azure / Bedrock / Vertex credentials carry a

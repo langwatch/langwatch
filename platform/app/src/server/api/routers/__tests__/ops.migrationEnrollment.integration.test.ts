@@ -45,27 +45,33 @@ vi.mock("@ee/audit-log/auditLog", () => ({
  *  of passing through an allow-everything stub unnoticed. */
 const demandedPermissions = vi.hoisted(() => new Map<string, string>());
 
-vi.mock("~/server/api/rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
-  return {
-    ...actual,
-    checkOpsPermission:
-      (args: { permission: string }) =>
-      async ({
-        ctx,
-        next,
-        path,
-      }: {
-        ctx: Record<string, unknown>;
-        next: () => unknown;
-        path: string;
-      }) => {
-        demandedPermissions.set(path, args.permission);
-        ctx.opsScope = { kind: "platform" };
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      checkOpsPermission:
+        (args: { permission: string }) =>
+        async ({
+          ctx,
+          next,
+          path,
+        }: {
+          ctx: Record<string, unknown>;
+          next: () => unknown;
+          path: string;
+        }) => {
+          demandedPermissions.set(path, args.permission);
+          ctx.opsScope = { kind: "platform" };
+          return next();
+        },
+    };
+  },
+);
 
 import { opsRouter } from "../ops";
 

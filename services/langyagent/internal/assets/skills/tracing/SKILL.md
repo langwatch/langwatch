@@ -113,6 +113,8 @@ Do NOT consider the work complete without verifying. In order:
 4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
 5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
+This step only proves traces arrive. To find specific traces afterwards (a user, an error, a thumbs down), use the `find-traces` skill.
+
 ## Common Mistakes
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc

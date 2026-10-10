@@ -19,7 +19,7 @@ export const guidedOnboardingProcedures = {
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
       return withInstanceFacts(
-        await GuidedOnboardingService.create(ctx.prisma).getState({
+        await GuidedOnboardingService.create(ctx.prisma).getStateWithVariant({
           organizationId: input.organizationId,
         }),
       );

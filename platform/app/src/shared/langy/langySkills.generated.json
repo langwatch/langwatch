@@ -21,6 +21,13 @@
 		"userPrompt": "How is my agent performing?"
 	},
 	{
+		"id": "automations",
+		"label": "Automations",
+		"description": "Set up LangWatch automations, alerts and reports that deliver to Slack, email, a webhook, a dataset or an annotation queue. Use when the user wants to be told when something happens (\"alert #support-alerts when errors spike\", \"email me when a trace gets a thumbs-down\"), wants matching traces collected automatically, wants a scheduled report, or wants to pause, resume, test or review an existing automation.",
+		"category": "skill",
+		"userPrompt": "Alert me on Slack when my agent's error rate goes up"
+	},
+	{
 		"id": "code-changes",
 		"label": "Code changes",
 		"description": "Change the user's own program, on their machine or through GitHub. Use when a request needs a change to the user's code (instrument tracing, wire the SDK, fix the agent behind a failing scenario, add a run parameter to a connected agent, version a hardcoded prompt) and not when the platform alone can do it (create a scenario, an evaluation, a prompt version, read traces).",
@@ -97,6 +104,13 @@
 		"description": "Create and run LangWatch experiments for pre-deployment batch testing. Use when the user wants to test an agent against a dataset, compare prompts or models, benchmark quality, detect regressions, or add a CI quality gate. Do not use for production monitoring or guardrails.",
 		"category": "skill",
 		"userPrompt": "Set up experiments for my agent"
+	},
+	{
+		"id": "find-traces",
+		"label": "Find traces",
+		"description": "Find the traces that match what the user describes, such as thumbs down, a user, an error, an evaluator label or a phrase. Drives the Trace Explorer when finding traces is the ask, and answers with result cards and a link when traces are a step in another task. Searches every form a concept can take before reporting that nothing matches. Use when asked to find, show, filter or count traces.",
+		"category": "recipe",
+		"userPrompt": "Find the traces where users gave a thumbs down"
 	},
 	{
 		"id": "generate-rag-dataset",

@@ -11,11 +11,11 @@ import {
   type LensColumnOption,
 } from "../../lens/capabilities";
 import { isEvalColumnId, parseEvalColumnId } from "../../lens/evalColumnId";
+import { useExplorerStore } from "../../stores/explorerStore";
 import {
   type TimeColumnFormat,
   useTimeFormatStore,
 } from "../../stores/timeFormatStore";
-import { useViewStore } from "../../stores/viewStore";
 import { evalColumnLabel } from "../TraceTable/evalColumns";
 import {
   AddEvalColumnForm,
@@ -44,10 +44,10 @@ const TIME_FORMAT_OPTIONS: { value: TimeColumnFormat; label: string }[] = [
  * can be toggled and reordered here, matching the table header.
  */
 export const ColumnPickerContent: React.FC = () => {
-  const columnOrder = useViewStore((s) => s.columnOrder);
-  const toggleColumn = useViewStore((s) => s.toggleColumn);
-  const reorderColumns = useViewStore((s) => s.reorderColumns);
-  const grouping = useViewStore((s) => s.grouping);
+  const columnOrder = useExplorerStore((s) => s.columnOrder);
+  const toggleColumn = useExplorerStore((s) => s.toggleColumn);
+  const reorderColumns = useExplorerStore((s) => s.reorderColumns);
+  const grouping = useExplorerStore((s) => s.grouping);
   const { options: evaluatorOptions, nameByKey } = useEvaluatorOptions();
   const { hasPermission } = useOrganizationTeamProject();
   const canReadAnnotations = hasPermission("annotations:view");

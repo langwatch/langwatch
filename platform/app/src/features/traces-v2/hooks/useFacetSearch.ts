@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 
 const EMPTY: { value: string; label?: string; count: number }[] = [];
 
@@ -45,7 +45,7 @@ export function useFacetSearch({
   staleTimeMs?: number;
 }) {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
 
   const query = api.tracesV2.facetValues.useQuery(
     {

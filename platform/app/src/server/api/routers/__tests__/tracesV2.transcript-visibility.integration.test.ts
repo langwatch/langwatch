@@ -27,6 +27,7 @@ import {
 } from "vitest";
 import type { Project } from "~/generated/prisma/client";
 
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../../utils/testUtils";
 import type { DataPrivacyConfig } from "../../../data-privacy/dataPrivacy.types";
@@ -168,6 +169,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
       projectId: project.id,
     });
     return readCodingAgentTranscriptWithProtections({
+      authorization: ownProof({ projectId: project.id }),
       projectId: project.id,
       traceId: TRACE_ID,
       occurredAtMs: NOW,

@@ -54,6 +54,8 @@ const command = {
   joinRequestId: "jreq_1",
   commandId: "cmd_1",
   occurredAtMs: 1_699_000_000_000,
+  notifyAdmins: true,
+  origin: "web" as const,
   actor: { type: "user" as const, id: "user_ana" },
 };
 
@@ -83,6 +85,21 @@ describe("given nobody has asked yet", () => {
       // The guard folds the domain rather than trusting the caller's spelling,
       // so the fact and a later lookup compare byte for byte.
       expect(facts[0]?.data).toMatchObject({ domain: "acme.com" });
+    });
+
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("carries where the request was made onto the fact", async () => {
+      const facts = await guards.requestJoin({
+        ...command,
+        actor: { type: "user", id: "user_sam" },
+        userId: "user_sam",
+        domain: "acme.com",
+        matchedVia: "verified-identifier-domain",
+        expiresAtMs: EXPIRES_AT,
+        origin: "cli",
+      });
+
+      expect(facts[0]?.data).toMatchObject({ origin: "cli" });
     });
   });
 

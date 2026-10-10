@@ -738,6 +738,51 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire)", () => {
   });
 });
 
+describe("CodexExtractor.apply on the codex-app-server scope", () => {
+  /** @scenario "A codex app-server turn carries its model and tokens" */
+  it("lifts model and tokens off the session_task.turn span", () => {
+    const ctx = createExtractorContext(
+      {
+        model: "gpt-5.5",
+        "codex.turn.token_usage.input_tokens": "1000",
+        "codex.turn.token_usage.cached_input_tokens": "600",
+        "codex.turn.token_usage.output_tokens": "20",
+        "turn.id": "00000000-0000-7000-8000-000000000001",
+      },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex-app-server", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["gen_ai.request.model"]).toBe("gpt-5.5");
+    expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(400);
+    expect(ctx.out["gen_ai.usage.output_tokens"]).toBe(20);
+    expect(ctx.out["gen_ai.usage.cache_read.input_tokens"]).toBe(600);
+    expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+  });
+
+  /** @scenario "A codex app-server turn carries its model and tokens" */
+  it("flags the response span as the redundant token copy, as on the TUI wire", () => {
+    const ctx = createExtractorContext(
+      {
+        "gen_ai.usage.input_tokens": 1000,
+        "gen_ai.usage.output_tokens": 20,
+      },
+      {
+        name: "handle_responses",
+        instrumentationScope: { name: "codex-app-server", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+  });
+});
+
 describe("CodexExtractor turn-span cache writes", () => {
   /** @scenario "Codex cache write tokens are canonicalised from the turn span" */
   it("lifts cache_write_input_tokens onto the canonical cache creation key", () => {

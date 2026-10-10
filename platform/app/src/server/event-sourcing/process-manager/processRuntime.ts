@@ -16,7 +16,10 @@ import type {
   ProcessDefinition,
   ProcessEventEnvelope,
 } from "./processManager.types";
-import { ProcessManagerService } from "./processManagerService";
+import {
+  type HandleResult,
+  ProcessManagerService,
+} from "./processManagerService";
 import type { ProcessStore } from "./stores/processStore.types";
 import {
   ProcessWakeWorker,
@@ -84,6 +87,7 @@ export function buildIntentHandlers(
         tenantId: message.tenantId,
         messageKey: message.messageKey,
         attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
       });
     };
   }
@@ -163,6 +167,13 @@ export function buildProcessDefinition(
   };
 }
 
+/** A commit that inserted no intent left nothing new to lease. */
+function insertedIntents(result: HandleResult): boolean {
+  return (
+    result.outcome === "committed" && result.insertedMessageKeys.length > 0
+  );
+}
+
 /**
  * Owns process managers mounted on event-sourced pipelines. A generated live
  * subscriber hands committed events straight to the transactional inbox; no
@@ -235,9 +246,7 @@ export class ProcessRuntime {
               `Process manager "${definition.config.name}" revision conflict on event ${event.id}`,
             );
           }
-          if (result.outcome === "committed") {
-            registered.outboxWorker.notify();
-          }
+          if (insertedIntents(result)) registered.outboxWorker.notify();
         },
       });
     }
@@ -294,11 +303,8 @@ export class ProcessRuntime {
           store: this.store,
           managers: this.wakeManagers,
           logger: this.logger,
-          notifyOutbox: () => {
-            for (const item of this.managers.values()) {
-              item.outboxWorker.notify();
-            }
-          },
+          notifyOutbox: (processName) =>
+            this.managers.get(processName)?.outboxWorker.notify(),
         });
         if (this.consumersEnabled) this.wakeWorker.start();
       }

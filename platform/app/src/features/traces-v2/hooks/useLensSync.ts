@@ -1,11 +1,10 @@
 import { useEffect, useRef } from "react";
+import { reloadingWriteOptions } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { api } from "~/utils/api";
-import {
-  type LensConfig,
-  setLensSyncBridge,
-  useViewStore,
-} from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
+import { type LensConfig, setLensSyncBridge } from "../stores/viewSlice";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by
@@ -57,6 +56,64 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
 }
 
 /**
+ * The three lens writes the sync bridge mirrors to the server.
+ *
+ * Every lens write reloads the strip from the server once it settles. On
+ * success that picks up the saved row; on a refused rename or delete it puts
+ * back what the server kept. A refusal also tells the user, since the store
+ * wrote first and showed it as done.
+ *
+ * A refused create is taken back explicitly, not left to the reload: the
+ * reload only re-runs the hydrate effect when the list changes reference, and
+ * an empty list reloaded as an empty list does not. So the new lens leaves the
+ * strip and the user returns to the lens they were on before creating it.
+ */
+function useLensWriteMutations(projectId: string | undefined) {
+  const utils = api.useUtils();
+  const discardRefusedLens = useExplorerStore((s) => s.discardRefusedLens);
+  // New lens id -> the lens to return to if the server refuses it.
+  const fallbackLensIdsRef = useRef(new Map<string, string>());
+  const reloadLenses = () => {
+    if (projectId) {
+      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
+    }
+  };
+  const lensWriteOptions = (fallbackTitle: string) =>
+    reloadingWriteOptions({ fallbackTitle, reload: reloadLenses });
+  const createOptions = lensWriteOptions("Couldn't save the lens");
+
+  const createMutation = api.savedViews.create.useMutation({
+    onSuccess: createOptions.onSuccess,
+    onError: (error, { id: lensId }) => {
+      const fallbackLensId = lensId && fallbackLensIdsRef.current.get(lensId);
+      if (lensId && fallbackLensId) {
+        discardRefusedLens({ lensId, fallbackLensId });
+      }
+      createOptions.onError(error);
+    },
+    onSettled: (_data, _error, { id: lensId }) => {
+      if (lensId) fallbackLensIdsRef.current.delete(lensId);
+    },
+  });
+
+  return {
+    createLens: (
+      input: Parameters<typeof createMutation.mutate>[0] & { id: string },
+      fallbackLensId: string,
+    ) => {
+      fallbackLensIdsRef.current.set(input.id, fallbackLensId);
+      createMutation.mutate(input);
+    },
+    renameMutation: api.savedViews.rename.useMutation(
+      lensWriteOptions("Couldn't rename the lens"),
+    ),
+    deleteMutation: api.savedViews.delete.useMutation(
+      lensWriteOptions("Couldn't delete the lens"),
+    ),
+  };
+}
+
+/**
  * Wires the lens viewStore to the server-side SavedView table. Call
  * once at the top of TracesPage. The hook:
  *
@@ -66,7 +123,8 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
  *  - Registers a sync bridge so subsequent createLens / renameLens /
  *    deleteLens calls fire-and-forget the matching tRPC mutation —
  *    keeping the local store as a hot cache, the server as the source
- *    of truth.
+ *    of truth. The bridge also tells the store when the project takes no
+ *    lens writes (an aggregate), so the store refuses them at the source.
  *
  * Built-in lenses stay code-defined; they're not persisted server-side.
  * Drafts (per-lens local tweaks) also stay local — they're the
@@ -75,7 +133,6 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
 export function useLensSync(): void {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const utils = api.useUtils();
 
   const lensesQuery = api.savedViews.getAll.useQuery(
     { projectId: projectId ?? "", kind: KIND },
@@ -89,35 +146,19 @@ export function useLensSync(): void {
     },
   );
 
-  const createMutation = api.savedViews.create.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
-  });
-  const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
-  });
-  const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
-  });
+  const { createLens, renameMutation, deleteMutation } =
+    useLensWriteMutations(projectId);
 
   // Refs so the bridge closures stay stable across renders — `set...Bridge`
   // is called once on mount, but the mutate functions identity changes
   // every render, which would otherwise force us to re-register.
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
-  const createRef = useRef(createMutation.mutate);
-  createRef.current = createMutation.mutate;
+  const canSaveLenses = useProjectAcceptsWrites();
+  const canSaveLensesRef = useRef(canSaveLenses);
+  canSaveLensesRef.current = canSaveLenses;
+  const createRef = useRef(createLens);
+  createRef.current = createLens;
   const renameRef = useRef(renameMutation.mutate);
   renameRef.current = renameMutation.mutate;
   const deleteRef = useRef(deleteMutation.mutate);
@@ -128,21 +169,25 @@ export function useLensSync(): void {
   // to the server without each call site knowing about tRPC.
   useEffect(() => {
     setLensSyncBridge({
-      create: (lens) => {
+      acceptsWrites: () => canSaveLensesRef.current,
+      create: (lens, { fallbackLensId }) => {
         const pid = projectIdRef.current;
         if (!pid) return;
-        createRef.current({
-          projectId: pid,
-          // Client-generated id keeps the locally-active lens valid
-          // through the server refetch — without it, the server would
-          // mint a new nanoid and `setUserLenses` would orphan the
-          // local active id.
-          id: lens.id,
-          name: lens.name,
-          filters: encode(lens) as unknown as Record<string, unknown>,
-          kind: KIND,
-          scope: "project",
-        });
+        createRef.current(
+          {
+            projectId: pid,
+            // Client-generated id keeps the locally-active lens valid
+            // through the server refetch — without it, the server would
+            // mint a new nanoid and `setUserLenses` would orphan the
+            // local active id.
+            id: lens.id,
+            name: lens.name,
+            filters: encode(lens) as unknown as Record<string, unknown>,
+            kind: KIND,
+            scope: "project",
+          },
+          fallbackLensId,
+        );
       },
       rename: (lensId, name) => {
         const pid = projectIdRef.current;
@@ -161,7 +206,7 @@ export function useLensSync(): void {
   // Hydrate the store from server data. Fires once on initial query
   // resolution and on every subsequent refetch — `setUserLenses`
   // replaces the user-lens slice wholesale (preserves built-ins).
-  const setUserLenses = useViewStore((s) => s.setUserLenses);
+  const setUserLenses = useExplorerStore((s) => s.setUserLenses);
   useEffect(() => {
     const rows = lensesQuery.data;
     if (!rows) return;

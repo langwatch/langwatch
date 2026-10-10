@@ -17,8 +17,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   startTestContainers,
   stopTestContainers,
@@ -121,7 +124,13 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    // The ledger memoizes its pipeline handle for the process; a file earlier
+    // in the shared integration lane leaves it pointing at a closed queue.
+    resetAuthzGrantsCommandsForTests();
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     await prisma.organization.create({
       data: {
@@ -137,14 +146,12 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
     await prisma.organizationUser.create({
       data: { organizationId: ORG_ID, userId: USER_ID, role: "ADMIN" },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     await new PersonalWorkspaceService(prisma).ensure({
       userId: USER_ID,
@@ -154,6 +161,9 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
 
   afterAll(async () => {
     await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.grant
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
     await prisma.apiKey
@@ -180,6 +190,7 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
     // The App holds the container's Redis connection, so it is cleared before
     // that connection is closed rather than left behind holding a dead client.
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     await stopTestContainers();
   });
 

@@ -17,6 +17,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 vi.mock("~/utils/encryption", () => ({
@@ -86,23 +87,22 @@ describe("virtualKeys.create with revealOnce, then secrets.revealOnce", () => {
         },
       ],
     });
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          organizationId: ORG_ID,
-          userId: ADMIN,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: ORG_ID,
-        },
-        {
-          organizationId: OTHER_ORG_ID,
-          userId: OUTSIDER,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: OTHER_ORG_ID,
-        },
-      ],
+    // Through the seed helper, not prisma directly: a binding with no grant
+    // fact beside it is invisible to the permission engine, which answers
+    // `no-binding` for an administrator the legacy columns call ADMIN.
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: ADMIN,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: OTHER_ORG_ID,
+      userId: OUTSIDER,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: OTHER_ORG_ID,
     });
     await prisma.team.create({
       data: {
@@ -131,6 +131,9 @@ describe("virtualKeys.create with revealOnce, then secrets.revealOnce", () => {
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
     await prisma.teamUser.deleteMany({ where: { teamId: TEAM_ID } });
     await prisma.team.deleteMany({ where: { id: TEAM_ID } });
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: [ORG_ID, OTHER_ORG_ID] } },
+    });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: [ORG_ID, OTHER_ORG_ID] } },
     });

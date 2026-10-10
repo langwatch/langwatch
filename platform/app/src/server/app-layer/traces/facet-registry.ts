@@ -1,3 +1,4 @@
+import type { TenantScopeTimeColumn } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -32,11 +33,16 @@ export type FacetGroup =
   | "prompt";
 
 export interface FacetQueryContext {
-  tenantId: string;
   timeRange: { from: number; to: number };
   limit: number;
   offset: number;
   prefix?: string;
+  /**
+   * The active trace filter as a predicate on this facet's own table (see
+   * `scopeTraceFilterToTable`), AND-ed into the query's window predicate.
+   * Absent for the unfiltered discover read and for value lookups.
+   */
+  traceScope?: { sql: string; params: Record<string, unknown> };
 }
 
 export interface FacetQuery {
@@ -105,7 +111,7 @@ export type FacetDefinition =
   | RangeFacetDef
   | DynamicKeysDef;
 
-export const TABLE_TIME_COLUMNS: Record<FacetTable, string> = {
+export const TABLE_TIME_COLUMNS: Record<FacetTable, TenantScopeTimeColumn> = {
   trace_summaries: "OccurredAt",
   evaluation_runs: "ScheduledAt",
   stored_spans: "StartTime",

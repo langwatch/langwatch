@@ -1,7 +1,7 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useExplorerStore } from "~/features/traces-v2/stores/explorerStore";
 import { useDrawer } from "~/hooks/useDrawer";
 import type {
   TraceEvalResult,
@@ -68,7 +68,8 @@ function useEvalChipDecorations(): DecorateEval {
     (ev: TraceEvalResult) => {
       const evaluatorId = ev.evaluatorId?.trim();
       const onFilter = evaluatorId
-        ? () => useFilterStore.getState().toggleFacet("evaluator", evaluatorId)
+        ? () =>
+            useExplorerStore.getState().toggleFacet("evaluator", evaluatorId)
         : undefined;
       const target = evalDefinitionTarget(ev.evaluatorId);
       const onViewDefinition = target

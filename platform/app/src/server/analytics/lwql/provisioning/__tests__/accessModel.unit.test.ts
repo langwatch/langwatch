@@ -19,11 +19,14 @@ import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../../limits";
 import {
   clickHouseAccessManagementConfigXml,
   type LangWatchQLNames,
-  lwqlKeyMapRowPolicyStatement,
   lwqlKeyMapTableStatement,
-  lwqlRowPolicyStatement,
-  lwqlSettingsProfileStatement,
 } from "../accessModel";
+import {
+  lwqlKeyMapPolicyName,
+  renderLwqlAccessModelDdl,
+} from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
+import type { PostgresNamedCollection } from "../postgresMapping";
 
 const NAMES: LangWatchQLNames = {
   database: "lwql_unit",
@@ -32,6 +35,46 @@ const NAMES: LangWatchQLNames = {
   keyMapTable: "api_key_tenants",
   tenantSetting: "custom_api_key_hash",
 };
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: "lwql_unit",
+  user: "lwql_ro",
+  password: "reader-secret",
+};
+
+/**
+ * The whole access model as DDL, rendered from the one shared definition — the
+ * single source both this SQL emitter and the users.d YAML emitter read (#8258).
+ */
+function accessModelDdl(
+  names: LangWatchQLNames,
+  limits?: typeof DEFAULT_LWQL_RESOURCE_LIMITS,
+): string[] {
+  return renderLwqlAccessModelDdl(
+    buildLwqlAccessModelDefinition({
+      names,
+      passwordSha256Hex: "a".repeat(64),
+      namedCollection: NAMED_COLLECTION,
+      sourceDatabase: names.database,
+      limits,
+    }),
+  );
+}
+
+/** The settings-profile statement rendered from the definition. */
+function settingsProfileStatement(
+  names: LangWatchQLNames,
+  limits?: typeof DEFAULT_LWQL_RESOURCE_LIMITS,
+): string {
+  const profile = accessModelDdl(names, limits).find((statement) =>
+    statement.startsWith("CREATE SETTINGS PROFILE"),
+  );
+  if (!profile) throw new Error("no settings profile in rendered access DDL");
+  return profile;
+}
 
 /**
  * Deliberately unlike the shipped defaults, so an assertion cannot pass against
@@ -63,9 +106,7 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["bytes returned", "max_result_bytes = 555000 CONST"],
       ["result overflow", "result_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
-      expect(
-        lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS }),
-      ).toContain(expected);
+      expect(settingsProfileStatement(NAMES, LIMITS)).toContain(expected);
     });
 
     /**
@@ -76,10 +117,7 @@ describe("given the LangWatchQL settings profile statement", () => {
      * fail open.
      */
     it("leaves only the tenant capability changeable, defaulted to empty", () => {
-      const statement = lwqlSettingsProfileStatement({
-        names: NAMES,
-        limits: LIMITS,
-      });
+      const statement = settingsProfileStatement(NAMES, LIMITS);
 
       expect(statement).toContain(
         `${NAMES.tenantSetting} = '' CHANGEABLE_IN_READONLY`,
@@ -93,7 +131,7 @@ describe("given the LangWatchQL settings profile statement", () => {
 
   describe("when it is built from the shipped defaults", () => {
     it("bounds the shared identity's aggregate concurrency, not only each query", () => {
-      expect(lwqlSettingsProfileStatement({ names: NAMES })).toContain(
+      expect(settingsProfileStatement(NAMES)).toContain(
         `max_concurrent_queries_for_user = ${DEFAULT_LWQL_RESOURCE_LIMITS.maxConcurrentQueriesForUser} CONST`,
       );
       // A ceiling of zero is ClickHouse's "unlimited", so a default that
@@ -115,60 +153,52 @@ describe("given the LangWatchQL settings profile statement", () => {
  * none of them writes a conflicting row.
  */
 describe("given the LangWatchQL row policy", () => {
-  const LWQL_TABLE = {
-    table: "traces",
-    tenantColumn: "TenantId",
-    database: "lwql_unit",
-  };
+  // The tenant policies the definition renders all share one predicate
+  // (`lwqlTenantPredicate`), so any of them proves the refusal logic; the
+  // key-map self-policy is the `<keyMap>_self` one.
+  const rowPolicies = accessModelDdl(NAMES).filter((statement) =>
+    statement.startsWith("CREATE ROW POLICY"),
+  );
+  const tenantPolicy =
+    rowPolicies.find((statement) => statement.includes("_tenant ")) ?? "";
+  const keyMapPolicy =
+    rowPolicies.find((statement) =>
+      statement.includes(`${lwqlKeyMapPolicyName(NAMES.keyMapTable)} `),
+    ) ?? "";
 
   describe("when a key hash resolves to more than one tenant", () => {
     it("admits no tenant at all, rather than every matching one", () => {
-      const statement = lwqlRowPolicyStatement({
-        names: NAMES,
-        lwqlTable: LWQL_TABLE,
-      });
-
       // Without this the subquery yields both rows and `IN` admits both
       // tenants, so one bad row in the key map hands a caller another
       // tenant's data. With it the group is dropped and neither is admitted.
       expect(
-        statement,
+        tenantPolicy,
         "a conflicting key map must revoke access, not widen it",
       ).toContain("HAVING uniqExact(TenantId) = 1");
     });
 
     it("selects the tenant only under that single-tenant guard", () => {
-      const statement = lwqlRowPolicyStatement({
-        names: NAMES,
-        lwqlTable: LWQL_TABLE,
-      });
-
       // `any()` is only sound because the HAVING has already proven the group
       // holds exactly one distinct tenant. Asserting the order catches a
       // rewrite that keeps the aggregate but drops the guard.
-      expect(statement.indexOf("any(TenantId)")).toBeGreaterThan(-1);
+      expect(tenantPolicy.indexOf("any(TenantId)")).toBeGreaterThan(-1);
       expect(
-        statement.indexOf("HAVING uniqExact(TenantId) = 1"),
-      ).toBeGreaterThan(statement.indexOf("any(TenantId)"));
+        tenantPolicy.indexOf("HAVING uniqExact(TenantId) = 1"),
+      ).toBeGreaterThan(tenantPolicy.indexOf("any(TenantId)"));
     });
   });
 
   describe("when the caller's key-hash context is a set", () => {
     it("resolves the tenant through set membership, not a single-hash equality", () => {
-      const statement = lwqlRowPolicyStatement({
-        names: NAMES,
-        lwqlTable: LWQL_TABLE,
-      });
-
       // The pre-#8085 form was `KeyHash = getSetting(...)`, which under a
       // comma-joined set matches no row. Set membership is what lets one key
       // reach every project it can read; the empty default still reads zero
       // rows because no 64-hex hash equals the empty string.
-      expect(statement).toContain(
+      expect(tenantPolicy).toContain(
         "has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)",
       );
-      expect(statement).toContain("GROUP BY KeyHash");
-      expect(statement).not.toContain("KeyHash = getSetting");
+      expect(tenantPolicy).toContain("GROUP BY KeyHash");
+      expect(tenantPolicy).not.toContain("KeyHash = getSetting");
     });
   });
 
@@ -177,12 +207,10 @@ describe("given the LangWatchQL row policy", () => {
       // The self-policy governs the very subquery the tenant predicate runs
       // against the key map, so it must be the same set test — a single-hash
       // equality here would starve the tenant predicate of every tenant.
-      const statement = lwqlKeyMapRowPolicyStatement({ names: NAMES });
-
-      expect(statement).toContain(
+      expect(keyMapPolicy).toContain(
         "has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)",
       );
-      expect(statement).not.toContain("KeyHash = getSetting");
+      expect(keyMapPolicy).not.toContain("KeyHash = getSetting");
     });
   });
 

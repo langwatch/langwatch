@@ -19,6 +19,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -32,6 +33,7 @@ describe("Feature: SCIM tokens REST API", () => {
   const ns = `scim-tokens-${nanoid(8)}`;
 
   let seeded: ManagementTestOrg;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
   /** A token names the connection it was issued for (D08), so every mint here
    *  names this one. Which connection is setup, not the subject: what these
    *  tests are about is where the token value appears and stops working. */
@@ -49,7 +51,9 @@ describe("Feature: SCIM tokens REST API", () => {
 
   beforeAll(async () => {
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -71,6 +75,7 @@ describe("Feature: SCIM tokens REST API", () => {
       await cleanupTestRows(prisma, [
         ["scimToken", { organizationId: seeded?.organization.id }],
         ["ssoConnection", { organizationId: seeded?.organization.id }],
+        ["grant", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
         ["organizationUser", { organizationId: seeded?.organization.id }],

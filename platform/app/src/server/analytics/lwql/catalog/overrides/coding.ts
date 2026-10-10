@@ -14,7 +14,7 @@
  *   name via an alias, so a caller never has to know the storage detail.
  * - `coding_tool_results`: NOT derived — a view spanning two physical
  *   tables needs the join extension (`LangWatchQLViewJoin`), which
- *   `deriveDefaultCatalog` does not build. Hand-written and exported for the
+ *   `defineCatalogTable` does not build. Hand-written and exported for the
  *   merge step (#8085/#8116 step 6) to add to `LWQL_VIEW_CATALOG` alongside
  *   the derived entries; not registered here.
  */

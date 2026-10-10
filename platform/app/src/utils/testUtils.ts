@@ -129,6 +129,22 @@ export async function getTestUser() {
     }),
   );
 
+  await prisma.grant.upsert({
+    where: { id: `test-member-${team.id}-${user.id}` },
+    update: {},
+    create: {
+      id: `test-member-${team.id}-${user.id}`,
+      organizationId: organization.id,
+      principalType: "USER",
+      principalId: user.id,
+      roleKey: "member",
+      source: "grants-service",
+      scopeType: "TEAM",
+      scopeId: team.id,
+      occurredAt: new Date(),
+    },
+  });
+
   return user;
 }
 

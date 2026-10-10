@@ -25,8 +25,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { registerGovernanceMcpTools } from "../governance-tools";
 
@@ -107,14 +107,12 @@ describe("governance MCP tools — audit-uniform contract", () => {
     // for ADMIN-only perms like aiTools:manage. Without this, the legacy
     // OrganizationUser.role=ADMIN doesn't escalate (page-guard semantics
     // post alexis 0614a16c6).
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: ADMIN_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: ADMIN_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
     await prisma.team.create({
       data: {

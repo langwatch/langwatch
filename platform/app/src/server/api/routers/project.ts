@@ -5,27 +5,47 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { getApp } from "~/server/app-layer/app";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+} from "~/server/app-layer/authz/permission-adapters";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { aggregateRuleSchema } from "~/server/app-layer/projects/aggregate-rule";
+import { AggregateProjectAdminOnlyError } from "~/server/app-layer/projects/errors";
 import {
   governanceProjectRouteViolation,
+  ProjectNotFoundError,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
+import {
+  AGGREGATE_PROJECT_KIND,
+  APPLICATION_PROJECT_KIND,
+  aggregateProjectRouteViolation,
+  hasTracesToShow,
+  isAggregateProjectKind,
+} from "~/server/app-layer/projects/project-kinds";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
-import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 /**
  * The owner is ADMIN of their own personal team, so `project:create` passes
  * there. A personal workspace holds only the project provisioned with it.
+ *
+ * A team outside the organisation is refused as not found. The scope lineage
+ * guard already refuses a request whose team and organisation disagree before
+ * this runs; this keeps the helper from reading "no team" as "not personal"
+ * should a caller ever reach it another way.
  */
 async function assertTeamCanHoldANewProject(
   prisma: PrismaClient,
@@ -37,8 +57,11 @@ async function assertTeamCanHoldANewProject(
     where: { id: teamId, organizationId },
     select: { isPersonal: true },
   });
+  if (!destinationTeam) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+  }
   const violation = personalWorkspaceCreateViolation(
-    destinationTeam?.isPersonal ?? false,
+    destinationTeam.isPersonal,
   );
   if (violation) {
     throw new TRPCError({ code: "FORBIDDEN", message: violation });
@@ -70,6 +93,22 @@ function assertMoveStaysOutOfPersonalWorkspaces({
 }
 
 /**
+ * Whoever creates an aggregate has to be able to open it. `organization:manage`
+ * can come from a custom role, but opening an aggregate is decided on the
+ * organisation role alone (ADR-144 decision 5), so creation asks the same
+ * question rather than leaving a creator locked out of what they made.
+ */
+function assertCanOpenAggregates(
+  organizationRole: string | null | undefined,
+): void {
+  const violation = aggregateProjectRouteViolation({
+    kind: AGGREGATE_PROJECT_KIND,
+    organizationRole,
+  });
+  if (violation) throw new AggregateProjectAdminOnlyError();
+}
+
+/**
  * The hidden governance project is not a workspace, and these mutations write
  * Prisma directly rather than going through `ProjectService`, so they enforce
  * the guard themselves. The rule itself is defined once in the projects app
@@ -79,6 +118,17 @@ function assertNotGovernanceProject(kind: string | null | undefined): void {
   const violation = governanceProjectRouteViolation(kind);
   if (violation) {
     throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
+/**
+ * An aggregate owns no credential (ADR-144 decision 7): its stored base key
+ * exists because the column is required, every API-key route refuses it, and
+ * it is never shown or re-keyed.
+ */
+function assertProjectHoldsACredential(kind: string | null | undefined): void {
+  if (isAggregateProjectKind(kind)) {
+    throw new AggregateProjectHasNoCredentialError();
   }
 }
 
@@ -92,6 +142,11 @@ export const projectRouter = createTRPCRouter({
         name: z.string(),
         language: z.string(),
         framework: z.string(),
+        /** ADR-144: an aggregate reads its members and owns no traces. */
+        kind: z
+          .enum([APPLICATION_PROJECT_KIND, AGGREGATE_PROJECT_KIND])
+          .optional(),
+        aggregateRule: aggregateRuleSchema.optional(),
       }),
     )
     .use(
@@ -99,10 +154,29 @@ export const projectRouter = createTRPCRouter({
         {
           kind: "custom",
           reason:
-            "creating into an existing team asks that team; creating a team alongside asks the organization",
+            "creating into an existing team asks that team; creating a team alongside, or an aggregate project anywhere, asks the organization",
           permissions: ["project:create", "organization:manage"],
         },
-        ({ ctx, input, next }) => {
+        async ({ ctx, input, next }) => {
+          // An aggregate reads other people's personal projects, so whichever
+          // team it attaches to, only an organisation admin may create one
+          // (ADR-144 decision 5), whatever a custom role grants. A member of
+          // the organisation who is not an admin is refused as admin only,
+          // the same way the rule edit refuses; someone outside it has no
+          // role to judge and still gets the shared check.
+          if (isAggregateProjectKind(input.kind)) {
+            const organizationRole =
+              await getApp().organizations.getUserOrgRole({
+                userId: ctx.session.user.id,
+                organizationId: input.organizationId,
+              });
+            if (organizationRole) assertCanOpenAggregates(organizationRole);
+            return checkOrganizationPermission("organization:manage")({
+              ctx,
+              input,
+              next,
+            });
+          }
           if (input.teamId) {
             return checkTeamPermission("project:create")({
               ctx,
@@ -130,6 +204,15 @@ export const projectRouter = createTRPCRouter({
 
       await assertTeamCanHoldANewProject(prisma, {
         teamId: input.teamId,
+        organizationId: input.organizationId,
+      });
+
+      // The middleware refused anyone who may not open an aggregate.
+      const isAggregate = isAggregateProjectKind(input.kind);
+      // Validated before the team is created, so a refused rule writes nothing.
+      const kindFields = await getApp().projects.createKindFields({
+        kind: input.kind,
+        aggregateRule: input.aggregateRule,
         organizationId: input.organizationId,
       });
 
@@ -175,12 +258,27 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           teamId: teamId,
           apiKey: generateApiKey(),
+          ...kindFields,
         },
       });
+
+      // Best-effort and never throws: without its key-map row the project
+      // reads zero rows from LangWatchQL until the next deploy's backfill.
+      await getApp().projects.syncLwqlKeyMapRow(project);
 
       // (The eager per-project Langy service key that used to be minted here is
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly
       // what the caller holds; no long-lived project key is provisioned.)
+
+      // An aggregate owns no traces, so it gets no gateway key whose traces
+      // would land on it (ADR-144 decision 7). It does get its members, before
+      // the creator lands on it, and never at the cost of the create.
+      if (isAggregate) {
+        await getApp().projects.startAggregate({
+          aggregateProjectId: project.id,
+        });
+        return { success: true, projectSlug: project.slug };
+      }
 
       // Best-effort: mint Langy's gateway virtual key so it shows up in the
       // user's /virtual-keys list from day 1 (configurable model + fallback
@@ -206,6 +304,71 @@ export const projectRouter = createTRPCRouter({
       return { success: true, projectSlug: project.slug };
     }),
   /**
+   * ADR-144 block E: an organisation admin edits which projects an aggregate
+   * reads. The new rule is validated, written and reconciled before this
+   * answers, so a dropped project's read is revoked by the time the admin
+   * sees the result. Its own mutation rather than a field on `update`, which
+   * any project editor may call.
+   */
+  updateAggregateRule: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        aggregateRule: aggregateRuleSchema,
+      }),
+    )
+    .permission("organization:manage", { via: "projectId" })
+    .mutation(async ({ input, ctx }) => {
+      const current = await getApp().projects.getWithTeam(input.projectId);
+      if (!current || !isAggregateProjectKind(current.kind)) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      const organizationId = current.team.organizationId;
+      assertCanOpenAggregates(
+        await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId,
+        }),
+      );
+      try {
+        const { members } = await getApp().projects.updateAggregateRule({
+          projectId: input.projectId,
+          organizationId,
+          aggregateRule: input.aggregateRule,
+        });
+        return { success: true, members };
+      } catch (error) {
+        if (error instanceof ProjectNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
+    }),
+  /**
+   * ADR-144: the projects an organisation admin may pick for a new
+   * aggregate's explicit rule. Unlike `organization.getAll`, which carries the
+   * teams the caller can see, this lists every member's personal workspace
+   * and names its owner, so it is gated the same way creating the aggregate
+   * is: organisation admins only.
+   */
+  aggregateMemberCandidates: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .permission("organization:manage")
+    .query(async ({ input, ctx }) => {
+      assertCanOpenAggregates(
+        await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        }),
+      );
+      return getApp().projects.aggregateMemberCandidates({
+        organizationId: input.organizationId,
+      });
+    }),
+  /**
    * The base key grants full access to one project. Revealing it is therefore
    * an administrator action, just like rotating it.
    */
@@ -219,7 +382,7 @@ export const projectRouter = createTRPCRouter({
 
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
-        select: { apiKey: true },
+        select: { apiKey: true, kind: true },
       });
 
       if (!project) {
@@ -228,8 +391,9 @@ export const projectRouter = createTRPCRouter({
           message: "Project not found",
         });
       }
+      assertProjectHoldsACredential(project.kind);
 
-      return project;
+      return { apiKey: project.apiKey };
     }),
   getHasFirstMessage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -237,7 +401,7 @@ export const projectRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const project = await getApp().projects.getById(input.projectId);
 
-      return { firstMessage: project?.firstMessage ?? false };
+      return { firstMessage: project ? hasTracesToShow(project) : false };
     }),
   regenerateApiKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -250,6 +414,7 @@ export const projectRouter = createTRPCRouter({
         select: { kind: true },
       });
       assertNotGovernanceProject(target?.kind);
+      assertProjectHoldsACredential(target?.kind);
 
       // Generate new API key
       const newApiKey = generateApiKey();
@@ -449,7 +614,11 @@ export const projectRouter = createTRPCRouter({
 
       const target = await prisma.project.findUnique({
         where: { id: input.projectToArchiveId },
-        select: { isPersonal: true, kind: true },
+        select: {
+          isPersonal: true,
+          kind: true,
+          team: { select: { organizationId: true } },
+        },
       });
       assertNotGovernanceProject(target?.kind);
       const archiveViolation = personalWorkspaceArchiveViolation(
@@ -463,6 +632,12 @@ export const projectRouter = createTRPCRouter({
         where: { id: input.projectToArchiveId, archivedAt: null },
         data: { archivedAt: new Date() },
       });
+      if (result.count > 0 && target) {
+        await getApp().projects.afterArchive({
+          project: { id: input.projectToArchiveId, kind: target.kind },
+          organizationId: target.team.organizationId,
+        });
+      }
       return { success: true, alreadyArchived: result.count === 0 };
     }),
 
@@ -470,6 +645,14 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:update")
     .mutation(async ({ ctx, input }) => {
+      // Clustering writes topics under the project it names. It is declared
+      // under `project:update`, which the permission-level guard exempts, so
+      // it asks the guard itself, before the catch below would turn the
+      // refusal into a generic failure (ADR-144 decision 8).
+      await assertProjectAcceptsWrites({
+        kinds: getApp().projectKinds,
+        projectId: input.projectId,
+      });
       try {
         const app = getApp();
         // A request made while a run is already underway is declined by the

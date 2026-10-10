@@ -60,7 +60,7 @@ const tokenResolver = TokenResolver.create(prisma);
  * Returns either a refusal carrying the `status` and JSON `body` to answer with,
  * or the resolved project plus that raw token.
  */
-async function authenticateProject(c: {
+export async function authenticateProject(c: {
   req: { header: (name: string) => string | undefined };
 }) {
   const xAuthToken = c.req.header("x-auth-token");
@@ -91,7 +91,10 @@ async function authenticateProject(c: {
     };
   }
 
-  return { project: resolved.project, authToken };
+  // The key's owner, for a caller that acts as a person; a legacy project
+  // key belongs to no one.
+  const userId = resolved.type === "apiKey" ? resolved.userId : null;
+  return { project: resolved.project, authToken, userId };
 }
 
 // ── GET /collector ───────────────────────────────────────────────────
@@ -631,6 +634,7 @@ function canaryResultToResponse({
     {
       status: "unhealthy",
       reason: result.reason,
+      ...(result.cause && { cause: result.cause }),
       scenarioRunId: result.scenarioRunId,
       durationMs: result.durationMs,
     },
@@ -723,6 +727,7 @@ function langyCanaryResultToResponse({
     {
       status: "unhealthy",
       reason: result.reason,
+      ...(result.cause && { cause: result.cause }),
       conversationId,
       turnId,
       durationMs,

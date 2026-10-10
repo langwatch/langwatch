@@ -7,7 +7,6 @@ import Head from "../utils/compat/next-head";
 import { AppHeaderUserMenu } from "./AppHeaderUserMenu";
 import { DashboardPageBody } from "./DashboardPageBody";
 import { FullLogo } from "./icons/FullLogo";
-import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { DevBadge } from "./ui/DevBadge";
 import { Link } from "./ui/link";
 
@@ -57,12 +56,7 @@ export const DashboardLayout = (dashboardProps: DashboardLayoutProps) => {
 
 const ShellDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
   const mode = useNavigationMode();
-  return (
-    <>
-      <SecureAccountNudge />
-      <NavigationV2Shell mode={mode} {...dashboardProps} />
-    </>
-  );
+  return <NavigationV2Shell mode={mode} {...dashboardProps} />;
 };
 
 /**
@@ -100,7 +94,8 @@ const PublicPageFrame = ({
           <FullLogo width={155 * 0.7} height={38 * 0.7} />
         </Link>
         <HStack gap={2} justifyContent="flex-end">
-          {publicEnv.data?.NODE_ENV === "development" && <DevBadge />}
+          {publicEnv.data?.NODE_ENV === "development" &&
+            !publicEnv.data.HIDE_DEV_INDICATOR && <DevBadge />}
           <AppHeaderUserMenu publicPage />
         </HStack>
       </HStack>

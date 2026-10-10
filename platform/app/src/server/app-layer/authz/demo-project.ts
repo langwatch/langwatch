@@ -1,5 +1,5 @@
 /**
- * The demo project, read dynamically to match `isDemoProject()` in rbac.ts.
+ * The demo project is read dynamically for callers that configure it after boot.
  * Tests set it after module load, so capturing it once would answer the
  * wrong question.
  */

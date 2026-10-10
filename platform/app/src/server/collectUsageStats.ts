@@ -1,109 +1,44 @@
-import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+/**
+ * The composition point for the usage report.
+ *
+ * The fields themselves are declared in `usage-report/dictionary.ts` and read
+ * in `usage-report/collect.ts`, so the payload and the docs page come from one
+ * list and cannot drift. This resolves the pieces the composition root owns
+ * and hands them over.
+ */
+
 import { getApp } from "~/server/app-layer/app";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import { prisma } from "~/server/db";
+import {
+  collectUsageReport,
+  type UsageReportSwitches,
+} from "~/server/usage-report/collect";
 
 export async function collectUsageStats({
+  organizationIds,
   instanceId,
+  firstSeenAt = null,
+  switches,
   repository = getApp().usageStats.instance,
+  now,
 }: {
+  organizationIds: string[];
+  /** The identity the sender already resolved. */
   instanceId: string;
+  firstSeenAt?: Date | null;
+  switches?: UsageReportSwitches;
   /** Defaults to the repository the composition root built. */
   repository?: InstanceUsageStatsRepository;
-}) {
-  const organizationId = instanceId.split("__")[1];
-
-  if (!organizationId) {
-    throw new Error("Invalid instance ID");
-  }
-
-  const projects = await prisma.project.findMany({
-    where: {
-      team: { organizationId },
-    },
-    select: {
-      id: true,
-    },
+  now?: Date;
+}): Promise<Record<string, unknown>> {
+  return await collectUsageReport({
+    prisma,
+    organizationIds,
+    instanceId,
+    firstSeenAt,
+    repository,
+    ...(switches ? { switches } : {}),
+    ...(now ? { now } : {}),
   });
-  const projectIds = projects.map((p) => p.id);
-
-  // Get total counts for each table that has projectId
-  const [
-    annotationCount,
-    annotationQueueCount,
-    annotationQueueItemCount,
-    annotationScoreCount,
-    batchEvaluationCount,
-    customGraphCount,
-    datasetCount,
-    datasetRecordCount,
-    experimentCount,
-    triggerCount,
-    workflowCount,
-  ] = await Promise.all([
-    // Every comment, whether it is about a whole trace or about one part of it:
-    // this counts the reviewing that happened, not what was said about traces.
-    prisma.annotation.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.annotationQueue.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.annotationQueueItem.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.annotationScore.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.batchEvaluation.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    // Builder charts only, so the figure keeps meaning what it has always
-    // meant. Saved workbench charts share the table but are a different
-    // product; folding them in would show as growth in chart-builder usage.
-    prisma.customGraph.count({
-      where: { projectId: { in: projectIds }, kind: BUILDER_CHART_KIND },
-    }),
-    prisma.dataset.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.datasetRecord.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.experiment.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.trigger.count({
-      where: { projectId: { in: projectIds } },
-    }),
-    prisma.workflow.count({
-      where: { projectId: { in: projectIds } },
-    }),
-  ]);
-
-  const totalTraces = await repository.findTraceCount({
-    organizationId,
-    projectIds,
-  });
-  const totalScenarioEvents = await repository.findScenarioRunCount({
-    organizationId,
-    projectIds,
-  });
-
-  return {
-    totalTraces,
-    totalScenarioEvents,
-    annotations: annotationCount,
-    annotationQueues: annotationQueueCount,
-    annotationQueueItems: annotationQueueItemCount,
-    annotationScores: annotationScoreCount,
-    batchEvaluations: batchEvaluationCount,
-    customGraphs: customGraphCount,
-    datasets: datasetCount,
-    datasetRecords: datasetRecordCount,
-    experiments: experimentCount,
-    triggers: triggerCount,
-    workflows: workflowCount,
-    timestamp: new Date().toISOString(),
-  };
 }

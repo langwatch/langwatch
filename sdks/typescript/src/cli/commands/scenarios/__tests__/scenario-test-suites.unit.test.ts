@@ -98,13 +98,13 @@ describe("filing a scenario into a test suite from the command line", () => {
     vi.clearAllMocks();
     mockScenarioCreate = vi.fn().mockResolvedValue(makeScenario());
     mockScenarioUpdate = vi.fn().mockResolvedValue(makeScenario());
-    mockScenarioGetAll = vi.fn().mockResolvedValue([]);
+    mockScenarioGetAll = vi.fn().mockResolvedValue([makeScenario()]);
     mockSuitesList.mockResolvedValue([]);
 
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
         getAll: mockScenarioGetAll,
-        get: vi.fn(),
+        get: vi.fn(async (id: string) => makeScenario({ id })),
         create: mockScenarioCreate,
         update: mockScenarioUpdate,
         delete: vi.fn(),
@@ -170,6 +170,7 @@ describe("filing a scenario into a test suite from the command line", () => {
         .mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
       vi.mocked(ScenariosApiService).mockImplementation(function () {
         return {
+          getAll: mockScenarioGetAll,
           get: mockScenarioGet,
           update: mockScenarioUpdate,
         } as unknown as ScenariosApiService;

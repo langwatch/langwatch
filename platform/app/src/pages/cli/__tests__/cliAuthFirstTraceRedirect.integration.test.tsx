@@ -139,6 +139,11 @@ vi.mock("~/utils/api", async () => {
       sharedTrace: {
         get: { useQuery: () => ({ data: undefined, isLoading: false }) },
       },
+      identity: {
+        myTestArrival: {
+          useQuery: () => ({ data: undefined, isPending: false }),
+        },
+      },
       organization: {
         getAll: {
           useQuery: () => ({
@@ -151,6 +156,15 @@ vi.mock("~/utils/api", async () => {
       modelProvider: {
         getAllForProject: {
           useQuery: () => ({ data: undefined, isLoading: false }),
+        },
+      },
+      authz: {
+        effectivePermissions: {
+          useQuery: () => ({
+            data: { permissions: [] },
+            isLoading: false,
+            isFetched: true,
+          }),
         },
       },
       // Org admin ceiling so the device-session flow defaults to a full

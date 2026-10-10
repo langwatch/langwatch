@@ -12,8 +12,8 @@ const createMockDb = () => ({
   organization: {
     findUnique: vi.fn(),
     findUniqueOrThrow: vi.fn(),
-    updateMany: vi.fn(),
   },
+  $executeRaw: vi.fn(),
 });
 
 describe("customerService", () => {
@@ -87,7 +87,7 @@ describe("customerService", () => {
           stripeCustomerId: null,
         });
         stripe.customers.create.mockResolvedValue({ id: "cus_new" });
-        db.organization.updateMany.mockResolvedValue({ count: 1 });
+        db.$executeRaw.mockResolvedValue(1);
 
         const result = await service.getOrCreateCustomerId({
           user: { email: "test@example.com" },
@@ -99,10 +99,12 @@ describe("customerService", () => {
           email: "test@example.com",
           name: "Acme",
         });
-        expect(db.organization.updateMany).toHaveBeenCalledWith({
-          where: { id: "org_123", stripeCustomerId: null },
-          data: { stripeCustomerId: "cus_new" },
-        });
+        // The write binds the customer, then the organization it is for.
+        expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+        expect(db.$executeRaw.mock.calls[0]?.slice(1)).toEqual([
+          "cus_new",
+          "org_123",
+        ]);
       });
     });
 
@@ -114,7 +116,7 @@ describe("customerService", () => {
           stripeCustomerId: null,
         });
         stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
-        db.organization.updateMany.mockResolvedValue({ count: 0 });
+        db.$executeRaw.mockResolvedValue(0);
         stripe.customers.del.mockResolvedValue({ deleted: true });
         db.organization.findUniqueOrThrow.mockResolvedValue({
           id: "org_123",
@@ -137,7 +139,7 @@ describe("customerService", () => {
           stripeCustomerId: null,
         });
         stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
-        db.organization.updateMany.mockResolvedValue({ count: 0 });
+        db.$executeRaw.mockResolvedValue(0);
         stripe.customers.del.mockRejectedValue(new Error("Stripe API error"));
         db.organization.findUniqueOrThrow.mockResolvedValue({
           id: "org_123",
@@ -159,7 +161,7 @@ describe("customerService", () => {
           stripeCustomerId: null,
         });
         stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
-        db.organization.updateMany.mockResolvedValue({ count: 0 });
+        db.$executeRaw.mockResolvedValue(0);
         stripe.customers.del.mockResolvedValue({ deleted: true });
         db.organization.findUniqueOrThrow.mockResolvedValue({
           id: "org_123",

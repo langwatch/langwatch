@@ -37,6 +37,7 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import type { Authorization } from "@langwatch/actor";
 import type {
   AuthzPermission,
   DeclarationError,
@@ -57,6 +58,10 @@ import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { type App, getApp } from "~/server/app-layer/app";
+import type {
+  OpsScope,
+  PermissionMiddleware,
+} from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -73,9 +78,12 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "../app-layer/authz/trpc-middleware";
+import {
+  newPrivacyPolicyRequestMemo,
+  type PrivacyPolicyRequestMemo,
+} from "../data-privacy/privacyPolicyRequestMemo";
 import { rateLimit } from "../rateLimit";
 import { isAuditLogExempt } from "./auditLogExemptions";
-import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -119,8 +127,23 @@ interface CreateContextOptions {
     organizationMfa?: unknown;
   };
   permissionChecked?: boolean;
+  /**
+   * ADR-144 block B: the sealed proof a `.permission()` check on a
+   * proof-bearing permission minted for this request. A trace route hands
+   * it by name to the service and on to the store client, which applies
+   * it as the tenant fence. Absent on every other procedure.
+   */
+  authorization?: Authorization;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
+  /**
+   * ADR-144 decision 9: the privacy policies this request has already
+   * folded, so the protections asked for several times with one proof fold
+   * once. Only a factory whose context lives for one HTTP request passes
+   * one; a long-lived context (an SSE subscription) leaves it unset and
+   * resolves every time, so a rule change still reaches it.
+   */
+  privacyPolicyMemo?: PrivacyPolicyRequestMemo;
   opsScope?: OpsScope;
   /**
    * Aborts when the client goes away. Long-lived subscriptions must pass this
@@ -151,8 +174,10 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     app: opts.app,
     mfaGate: opts.mfaGate,
     permissionChecked: opts.permissionChecked ?? false,
+    authorization: opts.authorization,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
+    privacyPolicyMemo: opts.privacyPolicyMemo,
     opsScope: opts.opsScope,
     signal: opts.signal,
   };
@@ -177,6 +202,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     app: getApp(),
     permissionChecked: false,
     publiclyShared: false,
+    privacyPolicyMemo: newPrivacyPolicyRequestMemo(),
   });
 };
 
@@ -670,6 +696,16 @@ function findFirstId(value: unknown): string | undefined {
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
 /**
+ * String fields whose value is a credential on every action that carries them.
+ *
+ * A license key is one: a connected install derives the token it presents to
+ * LangWatch-hosted services from it (ADR-141), so an audit row holding the key
+ * would hold the means to mint that token. Unlike `parameters`, the name means
+ * one thing everywhere, so the rule is bound to the name.
+ */
+const CREDENTIAL_STRING_FIELDS = ["licenseKey"] as const;
+
+/**
  * Action paths whose input carries values a person typed for one run, keyed by
  * the field that holds them.
  *
@@ -737,6 +773,13 @@ function redactHeaderValues(headers: readonly unknown[]): unknown[] {
   });
 }
 
+function credentialStringFieldsIn(record: Record<string, unknown>): string[] {
+  return CREDENTIAL_STRING_FIELDS.filter((field) => {
+    const value = record[field];
+    return typeof value === "string" && value !== "";
+  });
+}
+
 /**
  * Strips credential values out of what the audit trail persists.
  *
@@ -775,6 +818,10 @@ export function redactAuditArgs({
 
   if (Array.isArray(record.extraHeaders)) {
     replace("extraHeaders", redactHeaderValues(record.extraHeaders));
+  }
+
+  for (const field of credentialStringFieldsIn(record)) {
+    replace(field, "[redacted]");
   }
 
   return redacted ?? input;

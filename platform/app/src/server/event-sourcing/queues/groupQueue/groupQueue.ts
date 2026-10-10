@@ -111,6 +111,7 @@ import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  type PreflightTargetsState,
   readBisectionSplitBudget,
   readConfirmedDeathThreshold,
   readGroupQuarantineThreshold,
@@ -150,6 +151,19 @@ export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
  */
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Renders the groups a preflight refusal is about. A boot error naming counts
+ * tells an operator nothing they can act on; the ids are the whole remedy, and
+ * the list is capped so one wide fan-out cannot turn a log line into a dump.
+ */
+function namedGroups(groupIds: readonly string[], total: number): string {
+  if (groupIds.length === 0) return `${total} group(s)`;
+  const undisclosed = total - groupIds.length;
+  return undisclosed > 0
+    ? `${groupIds.join(", ")} and ${undisclosed} more`
+    : groupIds.join(", ");
 }
 
 /**
@@ -337,6 +351,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
   private readonly dispatchGroupAllowListKey?: string;
+  private readonly preflightDrainTimeoutMs: number;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
   /**
@@ -424,6 +439,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     options?: {
       consumerEnabled?: boolean;
       dispatchGroupAllowListKey?: string;
+      preflightDrainTimeoutMs?: number;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (
         projectId: string,
@@ -468,6 +484,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
+    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
@@ -2872,32 +2889,98 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Queue has no preflight allow-list",
       );
     }
-    const deadline = Date.now() + 60_000;
+    const deadline = Date.now() + this.preflightDrainTimeoutMs;
+    let reportedHeld = false;
     while (true) {
       const state = await this.scripts.inspectPreflightTargets(key);
-      const settled = state.pending === 0 && state.active === 0;
-      if (settled) this.assertPreflightTargetsSucceeded(state);
-      if (settled && this.processingQueue.idle()) return;
-      if (Date.now() >= deadline) {
-        throw new QueueError(
-          this.queueName,
-          "waitUntilPreflightIdle",
-          "Preflight groups did not drain within 60000ms",
-        );
+      if (!reportedHeld && state.heldFromBefore > 0) {
+        reportedHeld = true;
+        this.logHeldFromBefore(state);
       }
+      if (this.preflightHasSettled(state)) return;
+      if (Date.now() >= deadline) return this.settlePastDrainTimeout(state);
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
     }
   }
 
-  private assertPreflightTargetsSucceeded(state: {
-    failed: number;
-    blocked: number;
-  }): void {
+  /**
+   * Gives up waiting for work that has not drained, rather than refusing.
+   *
+   * This barrier runs before this process consumes anything, so the work it
+   * waits on drains only if some OTHER process is already serving the queue.
+   * On a fleet booting together there is none — and a claim whose worker a
+   * previous crash-loop killed outlives it and blocks its group's head, so
+   * every boot queues more behind that head and refuses over it, which is
+   * precisely what keeps the consumer that would drain it from starting.
+   * Refusing to start fixes none of it; it is the thing sustaining it.
+   *
+   * Undrained work leaves its tenant HELD, and a held tenant already starts on
+   * the legacy path with its migration gate closed. The wait is how a pass
+   * finalizes that tenant sooner, not how it stays safe, so giving up costs a
+   * later pass rather than correctness.
+   *
+   * Work that FAILED is a different thing and still refuses: a later pass will
+   * not clear a fault, so that half of the barrier is the half worth keeping.
+   */
+  private settlePastDrainTimeout(state: PreflightTargetsState): void {
+    this.assertPreflightTargetsSucceeded(state);
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        pending: state.pending,
+        active: state.active,
+        stillWorking: namedGroups(state.pendingGroupIds, state.pendingGroups),
+        timeoutMs: this.preflightDrainTimeoutMs,
+      },
+      "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these groups are for operator triage",
+    );
+  }
+
+  /** Throws on the way past when the settled work did not all succeed. */
+  private preflightHasSettled(state: PreflightTargetsState): boolean {
+    if (state.pending > 0 || state.active > 0) return false;
+    this.assertPreflightTargetsSucceeded(state);
+    return this.processingQueue.idle();
+  }
+
+  /**
+   * A group already blocked when the preflight adopted it was wedged under the
+   * previous release: its jobs cannot dispatch, so the barrier neither waits
+   * for them nor refuses over them, and this line is how an operator learns
+   * which groups the upgrade booted past.
+   */
+  private logHeldFromBefore(state: PreflightTargetsState): void {
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        heldFromBefore: state.heldFromBefore,
+        heldFromBeforeGroupIds: state.heldFromBeforeGroupIds,
+      },
+      "Migration preflight is settling past groups that were already blocked before it started; their work is not migrated and they stay blocked for operator triage",
+    );
+  }
+
+  private assertPreflightTargetsSucceeded(state: PreflightTargetsState): void {
     if (state.failed === 0 && state.blocked === 0) return;
+    const faults: string[] = [];
+    if (state.failed > 0) {
+      faults.push(`failed: ${namedGroups(state.failedGroupIds, state.failed)}`);
+    }
+    if (state.blocked > 0) {
+      faults.push(
+        `blocked: ${namedGroups(state.blockedGroupIds, state.blocked)}`,
+      );
+    }
     throw new QueueError(
       this.queueName,
       "waitUntilPreflightIdle",
-      `Preflight queue has ${state.failed} failed and ${state.blocked} blocked target groups`,
+      `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
+      {
+        failed: state.failed,
+        blocked: state.blocked,
+        failedGroupIds: state.failedGroupIds,
+        blockedGroupIds: state.blockedGroupIds,
+      },
     );
   }
 

@@ -8,6 +8,7 @@
  * RoutingPolicy.modelProviderIds ordering. See `scopeResolver.ts` for
  * the cascade walker.
  */
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayCacheRule,
@@ -30,6 +31,7 @@ import {
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { computeConfigETag } from "./configETag";
+import { connectLangWatchProviderSlot } from "./connectManagedModels";
 import { withTierFallthrough } from "./modelTierFallthrough";
 import { declaredModelsForProvider } from "./providerModelCatalog";
 import {
@@ -37,9 +39,19 @@ import {
   scopeReachableModelProvidersForVk,
   traceProjectFor,
 } from "./scopeResolver";
+import { settleBefore } from "./settleBefore";
 import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+
+const logger = createLogger("langwatch:gateway:config-materialiser");
+
+/**
+ * How long the config endpoint waits for the ClickHouse spend read before it
+ * ships the stored spend instead. Well under the gateway's 10s config fetch
+ * timeout, so a slow replica costs budget freshness, not the key's config.
+ */
+export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 export type GuardrailWire = {
   id: string;
@@ -357,6 +369,7 @@ export class GatewayConfigMaterialiser {
       eligibleProviders,
       config.providersAllowed,
     );
+    const slots = await this.providerSlots(vk, providers);
     const policySides = resolvePolicySideOfBundle(vk, config);
     const guardrailSides = await this.resolveGuardrailSideOfBundle(
       vk,
@@ -382,9 +395,9 @@ export class GatewayConfigMaterialiser {
         vk.purpose === "LANGY" && traceProject?.id
           ? resolveLangyMirrorTier({ projectId: traceProject.id })
           : "skip",
-      providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
+      providers: slots,
       fallback: {
-        chain: providers.map((mp) => mp.id),
+        chain: slots.map((slot) => slot.id),
         // routing_mode NONE means the request never leaves the provider
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the
@@ -414,6 +427,29 @@ export class GatewayConfigMaterialiser {
       vk_tags: config.metadata?.tags ?? [],
       expires_at: expiresAtWire(vk.expiresAt),
     };
+  }
+
+  /**
+   * The dispatch chain as the gateway reads it: the organization's own
+   * providers, then, on a connected install that switched managed models on,
+   * the LangWatch gateway itself.
+   *
+   * The LangWatch slot goes last on purpose. A credential the customer
+   * configured keeps serving the models it serves, and LangWatch is reached
+   * only where the caller wrote `langwatch/...`. Its license token is read
+   * here, at materialisation, and never stored on a provider row.
+   */
+  private async providerSlots(
+    vk: VirtualKeyWithScopes,
+    providers: ModelProvider[],
+  ): Promise<ProviderSlot[]> {
+    const slots = providers.map((mp, index) => buildProviderSlot(mp, index));
+    const connectSlot = await connectLangWatchProviderSlot({
+      prisma: this.prisma,
+      organizationId: vk.organizationId,
+      slot: `fallback_${slots.length}`,
+    });
+    return connectSlot ? [...slots, connectSlot] : slots;
   }
 
   private async applicableCacheRules(
@@ -475,7 +511,8 @@ export class GatewayConfigMaterialiser {
 
   /**
    * CH spend rollup. Best-effort: falls back to PG `spentUsd` when CH
-   * isn't wired (test fixtures, deploys without CH). Tenant set = every
+   * isn't wired (test fixtures, deploys without CH) or does not answer
+   * inside CONFIG_SPEND_READ_TIMEOUT_MS. Tenant set = every
    * project under the VK's organization so ORG/TEAM/PRINCIPAL-scoped
    * budgets see ledger rows under whichever project emitted the trace.
    */
@@ -497,9 +534,10 @@ export class GatewayConfigMaterialiser {
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
       // every member's bucket, and the gateway would then cap each member
       // at what the whole group spent together.
-      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+      const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
+      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
         tenantIds,
-        budgets
+        budgets: budgets
           // Templates have no single bucket to read; their per-user spend
           // is fetched request-side through the bucket-spend endpoint.
           .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
@@ -511,13 +549,19 @@ export class GatewayConfigMaterialiser {
             match: "exact" as const,
             periodFloorMs: budgetPeriodFloorMs(r.budget),
           })),
-      );
+        signal: deadline,
+      });
+      const spends = await settleBefore({ work: read, signal: deadline });
       const out = new Map<string, string>();
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);
       }
       return out;
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: vk.id, error },
+        "gateway config spend read failed; shipping the stored spend instead",
+      );
       return new Map();
     }
   }

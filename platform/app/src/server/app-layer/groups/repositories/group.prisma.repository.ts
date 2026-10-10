@@ -10,7 +10,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type {
   AccessListingBindingRow,
   AccessListingRepository,
@@ -39,13 +39,17 @@ function attachFor(binding: CreateBindingInput) {
 }
 
 export class PrismaGroupRepository implements GroupRepository {
+  private readonly canonicalAccessListing: GrantsAccessListingRepository;
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    private readonly accessListing: AccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
-  ) {}
+  ) {
+    this.canonicalAccessListing = new GrantsAccessListingRepository(prisma);
+  }
 
   async findAllByOrganization({
     organizationId,
@@ -57,13 +61,10 @@ export class PrismaGroupRepository implements GroupRepository {
     limit: number;
   }): Promise<PaginatedResult<GroupWithDetails>> {
     const where = { organizationId };
-    const [data, total] = await Promise.all([
+    const [groups, total] = await Promise.all([
       this.prisma.group.findMany({
         where,
         include: {
-          roleBindings: {
-            include: { customRole: { select: { id: true, name: true } } },
-          },
           _count: {
             select: {
               members: {
@@ -82,6 +83,16 @@ export class PrismaGroupRepository implements GroupRepository {
       }),
       this.prisma.group.count({ where }),
     ]);
+    const bindingsByGroupId =
+      await this.canonicalAccessListing.findGroupsBindings({
+        organizationId,
+        groupIds: groups.map((group) => group.id),
+      });
+
+    const data = groups.map((group) => ({
+      ...group,
+      roleBindings: bindingsByGroupId.get(group.id) ?? [],
+    }));
     return { data, pagination: { page, limit, total } };
   }
 
@@ -92,12 +103,9 @@ export class PrismaGroupRepository implements GroupRepository {
     id: string;
     organizationId: string;
   }): Promise<GroupWithMembers | null> {
-    return this.prisma.group.findFirst({
+    const group = await this.prisma.group.findFirst({
       where: { id, organizationId },
       include: {
-        roleBindings: {
-          include: { customRole: { select: { id: true, name: true } } },
-        },
         members: {
           where: {
             user: {
@@ -110,6 +118,16 @@ export class PrismaGroupRepository implements GroupRepository {
         },
       },
     });
+    if (!group) return null;
+
+    const bindings = await this.canonicalAccessListing.findGroupBindings({
+      organizationId,
+      groupId: id,
+    });
+    return {
+      ...group,
+      roleBindings: bindings,
+    };
   }
 
   async findGroupOnly({
@@ -278,9 +296,11 @@ export class PrismaGroupRepository implements GroupRepository {
     id: string;
     organizationId: string;
   }): Promise<RoleBinding | null> {
-    return this.prisma.roleBinding.findFirst({
-      where: { id, organizationId },
+    const [binding] = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
+      where: { id },
     });
+    return binding ?? null;
   }
 
   async deleteBinding({

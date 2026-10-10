@@ -5,7 +5,10 @@ import {
   type SessionPrincipal,
 } from "~/server/app-layer/authz/principal";
 import { resolveSessionPrincipal } from "~/server/app-layer/identity/impersonation-claims";
-import { identityEmail } from "~/server/app-layer/identity/runtime";
+import {
+  identityEmail,
+  sessionBound,
+} from "~/server/app-layer/identity/runtime";
 import {
   type SignedInWith,
   signedInWithFor,
@@ -156,6 +159,17 @@ export const getServerAuthSession = async (ctx: {
         impersonationReason: true,
         impersonationExpiresAt: true,
         amr: true,
+        // GAC-10. Riding on the read that was already happening is the whole
+        // reason the bound is enforced here: a second query would tax every
+        // signed-in request in the product for a setting almost nobody has
+        // turned on.
+        sessionToken: true,
+        createdAt: true,
+        lastSeenAt: true,
+        // The stand-in for `lastSeenAt` on a session that has never had one:
+        // better-auth rolls it once a day on a session in use, so it is never
+        // EARLIER than the real last use.
+        updatedAt: true,
       },
     });
 
@@ -170,6 +184,40 @@ export const getServerAuthSession = async (ctx: {
       logger.warn(
         { sessionId: result.session.id, userId: result.user.id },
         "BetterAuth returned a cached session that no longer exists in the DB; treating it as revoked",
+      );
+      return null;
+    }
+
+    // GAC-10: the organization's own bound on how long a session lasts.
+    //
+    // HERE, and not in a page's loader, because this is the one seam every
+    // surface goes through to turn a session into an identity — the
+    // application, the API and a background request alike. A bound enforced
+    // anywhere narrower is not a session policy, it is a decoration on one
+    // route.
+    //
+    // A session past its window is ENDED, not merely refused: `enforce`
+    // destroys the row and the cached copy together, so it stops being
+    // honoured everywhere rather than only here. Returning null then takes
+    // the same path a revoked session already takes, one guard above.
+    const bound = await sessionBound().enforce({
+      session: {
+        id: result.session.id,
+        token: dbSession.sessionToken,
+        userId: dbSession.userId,
+        createdAt: dbSession.createdAt,
+        lastSeenAt: dbSession.lastSeenAt,
+        updatedAt: dbSession.updatedAt,
+      },
+    });
+    if (!bound.withinBound) {
+      logger.info(
+        {
+          sessionId: result.session.id,
+          userId: dbSession.userId,
+          reason: bound.reason,
+        },
+        "ended a session that is past its organization's window",
       );
       return null;
     }

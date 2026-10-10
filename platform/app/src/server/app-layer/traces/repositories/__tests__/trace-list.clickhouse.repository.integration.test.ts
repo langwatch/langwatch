@@ -14,6 +14,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -201,15 +203,15 @@ async function captureFindAllQueries(
     },
   }) as ClickHouseClient;
 
-  await new TraceListClickHouseRepository(async () => recordingClient).findAll(
-    query,
-  );
+  await new TraceListClickHouseRepository(
+    new AuthorizedClickHouse({ resolveClient: async () => recordingClient }),
+  ).findAll(query);
   return captured;
 }
 
 function baseQuery(): TraceListQuery {
   return {
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange: { from: base - 60_000, to: base + TOTAL_TRACES + 60_000 },
     sort: { column: "OccurredAt", direction: "desc" },
     limit: PAGE_LIMIT,
@@ -220,7 +222,9 @@ function baseQuery(): TraceListQuery {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceListClickHouseRepository(async () => ch);
+  repo = new TraceListClickHouseRepository(
+    new AuthorizedClickHouse({ resolveClient: async () => ch }),
+  );
 
   const rows = Array.from({ length: TOTAL_TRACES }, (_, i) =>
     makeTraceSummaryRow(i),
@@ -497,7 +501,7 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
 
       const page = await repo.findAll({
         ...baseQuery(),
-        tenantId: cacheTenant,
+        authorization: ownProof({ projectId: cacheTenant }),
         timeRange: { from: base - 60_000, to: base + 60_000 },
       });
 
@@ -542,7 +546,7 @@ describe("TraceListClickHouseRepository.findCount (integration)", () => {
   };
 
   const countParams = {
-    tenantId: fcTenant,
+    authorization: ownProof({ projectId: fcTenant }),
     timeRange: { from: base - 10 * DAY, to: base + DAY },
     since,
   };
@@ -664,18 +668,14 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
 
   /** The filter the sidebar compiles, so the test reads the production SQL. */
   const filterFor = (queryText: string) => {
-    const compiled = translateFilterToClickHouse(
-      queryText,
-      versionTenant,
-      timeRange,
-    );
+    const compiled = translateFilterToClickHouse(queryText, timeRange);
     if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
     return compiled;
   };
 
   const listWith = (queryText: string) =>
     repo.findAll({
-      tenantId: versionTenant,
+      authorization: ownProof({ projectId: versionTenant }),
       timeRange,
       sort: { column: "OccurredAt", direction: "desc" },
       limit: 50,
@@ -739,27 +739,34 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
       expect(page.totalHits).toBe(0);
     });
 
+    const annotationCounts = (filterWhere?: FilterWhere) =>
+      repo
+        .findBatchedFacets({
+          authorization: ownProof({ projectId: versionTenant }),
+          timeRange,
+          table: "trace_summaries",
+          timeColumn: "OccurredAt",
+          categoricalSpecs: [
+            { key: "annotation", expression: annotationFacetExpression },
+          ],
+          rangeSpecs: [],
+          topN: 10,
+          filterWhere,
+        })
+        .then((batch) => batch.categoricals.annotation?.values ?? []);
+
     /** @scenario "A filter reads only the latest version of each trace" */
     it("counts the trace exactly once, in the bucket its newest version is in", async () => {
-      const counts = await repo.findFacetCounts({
-        tenantId: versionTenant,
-        timeRange,
-        facetExpression: annotationFacetExpression,
-      });
-
-      expect(counts.values).toEqual({ annotated: 1 });
+      expect(await annotationCounts()).toEqual([
+        { value: "annotated", count: 1 },
+      ]);
     });
 
     /** @scenario "A filter reads only the latest version of each trace" */
     it("counts nothing for the bucket only its older version is in", async () => {
-      const counts = await repo.findFacetCounts({
-        tenantId: versionTenant,
-        timeRange,
-        facetExpression: annotationFacetExpression,
-        filterWhere: filterFor("annotation:unannotated"),
-      });
-
-      expect(counts.values).toEqual({});
+      expect(
+        await annotationCounts(filterFor("annotation:unannotated")),
+      ).toEqual([]);
     });
   });
 });
@@ -784,11 +791,11 @@ describe("TraceListClickHouseRepository with the explorer's hidden origins", () 
   })();
 
   const filterFor = (queryText: string) =>
-    translateFilterToClickHouse(queryText, langyTenant, timeRange) ?? undefined;
+    translateFilterToClickHouse(queryText, timeRange) ?? undefined;
 
   const listWith = (filterWhere: FilterWhere | undefined) =>
     repo.findAll({
-      tenantId: langyTenant,
+      authorization: ownProof({ projectId: langyTenant }),
       timeRange,
       sort: { column: "OccurredAt", direction: "desc" },
       limit: 50,
@@ -863,7 +870,7 @@ describe("TraceListClickHouseRepository with the explorer's hidden origins", () 
     /** @scenario "The list leaves out Langy's turns by default" */
     it("counts only the customer trace as new", async () => {
       const count = await repo.findCount({
-        tenantId: langyTenant,
+        authorization: ownProof({ projectId: langyTenant }),
         timeRange,
         since: base - 1,
         filterWhere: withHiddenOrigins(undefined, explorerHiddenOrigins("")),
@@ -874,13 +881,26 @@ describe("TraceListClickHouseRepository with the explorer's hidden origins", () 
 
     /** @scenario "The origin facet still offers Langy" */
     it("counts both origins in the origin facet when read without the exclusion", async () => {
-      const counts = await repo.findFacetCounts({
-        tenantId: langyTenant,
+      const batch = await repo.findBatchedFacets({
+        authorization: ownProof({ projectId: langyTenant }),
         timeRange,
-        facetExpression: originFacetExpression,
+        table: "trace_summaries",
+        timeColumn: "OccurredAt",
+        categoricalSpecs: [
+          { key: "origin", expression: originFacetExpression },
+        ],
+        rangeSpecs: [],
+        topN: 10,
       });
 
-      expect(counts.values).toEqual({ application: 1, langy: 1 });
+      expect(
+        [...(batch.categoricals.origin?.values ?? [])].sort((a, b) =>
+          a.value.localeCompare(b.value),
+        ),
+      ).toEqual([
+        { value: "application", count: 1 },
+        { value: "langy", count: 1 },
+      ]);
     });
   });
 });
@@ -947,7 +967,7 @@ describe("TraceListClickHouseRepository.findAll across unmerged same-version row
 
     it("returns only the version the filter matches, and agrees with its own total", async () => {
       const page = await repo.findAll({
-        tenantId: dupTenant,
+        authorization: ownProof({ projectId: dupTenant }),
         timeRange: { from: base - 60_000, to: base + 3_600_000 },
         sort: { column: "OccurredAt", direction: "desc" },
         limit: 25,

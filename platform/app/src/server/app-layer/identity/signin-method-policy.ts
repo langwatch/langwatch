@@ -4,7 +4,10 @@ import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
 import { auth0BridgeActive, auth0BridgeRailIds } from "~/utils/auth0-bridge";
-import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
+import {
+  deploymentIssuesOwnPasswords,
+  isEmailPasswordEnabled,
+} from "../../better-auth/config/email-and-password";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
@@ -14,12 +17,14 @@ import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and
  * `NEXTAUTH_PROVIDER` the provider set was fixed at boot and the `before` hook
  * was the only point that saw the legacy `/callback/auth0|okta` rewrite. Under
  * the router, *which methods exist at all* is policy, and this is where it
- * lives. Every semantic ADR-027 decided carries over unchanged:
+ * lives. Every ADR-027 semantic carries over, with the gate memo as amended
+ * in ADR-027 v9:
  *
  *   - the gate is still `platformSSOAllowed()`, still THE one gate module,
- *     still memoized once per process. Policy is evaluated per request over a
- *     FROZEN gate value, which is what startup semantics means: nothing here
- *     re-decides a license, so activating one still takes a restart.
+ *     still memoized per process. Policy is evaluated per request over the
+ *     gate's memo: nothing here re-decides a license. An allow stays; a deny
+ *     is re-read after the gate's TTL, so an activation reaches every
+ *     replica without a restart.
  *   - DENY is still email mode exactly: no federated method appears in the
  *     default set, so none can appear in a routing decision.
  *   - a provider the build never mounted still lands on email mode, via
@@ -51,8 +56,25 @@ export const PASSKEY_METHOD: SignInMethod = {
   connectionId: null,
 };
 
-/** The instance's local method set — the break-glass and fallback door. */
+/** The password door, where the deployment mounts one. */
 export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
+
+/**
+ * The instance's local method set — the break-glass and fallback door — as
+ * this deployment ACTUALLY offers it.
+ *
+ * `LOCAL_METHOD_SET` is the shape of the door, not the answer to whether one
+ * is hung. On SaaS the email/password routes mount only in native `email`
+ * mode, so an instance brokering sign-in through another provider has no
+ * local door at all — and every caller that used the constant as the answer
+ * was told there was one. The distinction is the difference between "a
+ * password would work here" and "a password works here", and break-glass is
+ * the caller that cannot afford to confuse them: a grant against a door
+ * nobody hung is a promise the deployment cannot keep.
+ */
+export function localSignInMethods(): readonly SignInMethod[] {
+  return isEmailPasswordEnabled(env) ? LOCAL_METHOD_SET : [];
+}
 
 /**
  * Whether this deployment offers two-step verification at all (D06). The
@@ -264,7 +286,7 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
     // is defined; this is the line that has to agree with it. Appending them
     // here was invisible while the plugin was behind a setting that defaulted
     // off, and would have gone live the moment it was not.
-    localMethods: LOCAL_METHOD_SET,
+    localMethods: localSignInMethods(),
     federationLicensed,
     // Only a self-hosted deployment auto-redirects on its sole connection.
     selfHosted: !env.IS_SAAS,

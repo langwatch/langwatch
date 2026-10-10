@@ -32,6 +32,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../../../db";
 import {
@@ -308,13 +309,10 @@ describe("given an organization admin editing a member's access", () => {
 
     /** @scenario The access batch refuses a custom role for a member on a Lite Member seat */
     it("refuses a custom role row", async () => {
-      const customRole = await prisma.customRole.create({
-        data: {
-          organizationId: fixture.organizationId,
-          name: `Deployer ${nanoid(6)}`,
-          permissions: ["traces:view"],
-          kind: "custom",
-        },
+      const customRole = await seedCustomRole(prisma, {
+        organizationId: fixture.organizationId,
+        name: `Deployer ${nanoid(6)}`,
+        permissions: ["traces:view"],
       });
 
       try {
@@ -333,6 +331,7 @@ describe("given an organization admin editing a member's access", () => {
           cause: { code: "lite_member_viewer_only" },
         });
       } finally {
+        await prisma.role.deleteMany({ where: { id: customRole.id } });
         await prisma.customRole.deleteMany({ where: { id: customRole.id } });
       }
     });
@@ -393,15 +392,13 @@ describe("given an organization admin editing a member's access", () => {
       await prisma.groupMembership.create({
         data: { userId: fixture.soloUserId, groupId: group.id },
       });
-      const groupBinding = await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: fixture.organizationId,
-          groupId: group.id,
-          role: TeamUserRole.VIEWER,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: fixture.onlyAdminTeamId,
-        },
+      const groupBinding = await seedRoleBinding(prisma, {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: fixture.organizationId,
+        groupId: group.id,
+        role: TeamUserRole.VIEWER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: fixture.onlyAdminTeamId,
       });
 
       try {
@@ -417,6 +414,12 @@ describe("given an organization admin editing a member's access", () => {
           },
         ]);
       } finally {
+        await prisma.grant.deleteMany({
+          where: {
+            id: groupBinding.id,
+            organizationId: fixture.organizationId,
+          },
+        });
         await prisma.roleBinding.deleteMany({ where: { id: groupBinding.id } });
         await prisma.groupMembership.deleteMany({
           where: { groupId: group.id },

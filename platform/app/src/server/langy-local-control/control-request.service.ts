@@ -226,6 +226,11 @@ export class ControlRequestService {
     return open.find((row) => row.conversationId === conversationId) ?? null;
   }
 
+  /** Whether an approval spent this request. The mark outlives the request. */
+  async wasApproved(requestId: string): Promise<boolean> {
+    return (await this.store.get(controlRequestClaimKey(requestId))) !== null;
+  }
+
   /** The conversation one minted key controls, or nothing when it controls none. */
   async readKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
     const raw = await this.store.get(sessionKeyBindingKey(apiKeyId));

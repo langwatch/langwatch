@@ -224,6 +224,24 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     Then only the most recent few folders are kept
     And the rest are deleted, because each one is hundreds of megabytes
 
+  # Registration asks for a proof from an emailed link, and a scenario has no
+  # mailbox to read. A scenario that needs a person of their own writes the
+  # account into the database of the local stack it runs against.
+  @unit
+  Scenario: A scenario's own account is seeded in the local stack's database
+    Given a scenario that needs a person of their own
+    When the harness seeds the account
+    Then it writes a verified user and a password account the sign-in accepts
+    And the two are written together, so a failure leaves neither behind
+    And it reads the database address from the environment, or from the app's own .env
+
+  @unit
+  Scenario: An account is never seeded outside this machine
+    Given the app under test or its database is not on this machine
+    When the harness seeds an account
+    Then it refuses and names the host it would not write to
+    And the refusal carries no user, password, path or query of that address
+
   # ---------------------------------------------------------------------------
   # The judge rubric grades outcomes, never the prompt restated
   # ---------------------------------------------------------------------------

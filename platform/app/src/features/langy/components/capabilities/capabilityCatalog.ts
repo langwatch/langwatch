@@ -241,6 +241,14 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "run plan", plural: "run plans" },
   },
+  // An Instant Eval run judges one LangWatchQL statement across the project's
+  // history. Its result is addressed by the run id, and it belongs to the
+  // evaluations surface: the question it asked of every row is an eval.
+  "instant-eval": {
+    surface: "evaluations",
+    digestStrategy: "id-ref",
+    noun: { singular: "instant eval run", plural: "instant eval runs" },
+  },
   prompt: {
     surface: "prompts",
     digestStrategy: "id-ref",
@@ -296,10 +304,17 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "dashboard widget", plural: "dashboard widgets" },
   },
+  // `langwatch trigger` is the CLI's word; the product's is automation.
   trigger: {
     surface: "automations",
     digestStrategy: "id-ref",
-    noun: { singular: "trigger", plural: "triggers" },
+    noun: { singular: "automation", plural: "automations" },
+  },
+  // Read-only for Langy; the list never carries a secret.
+  "slack-connection": {
+    surface: "automations",
+    digestStrategy: "reduced",
+    noun: { singular: "Slack connection", plural: "Slack connections" },
   },
   projects: {
     surface: "projects",

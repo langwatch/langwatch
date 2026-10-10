@@ -81,7 +81,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 // Mock RBAC to always allow - we're testing business logic, not permissions
-vi.mock("../../../rbac", () => ({
+vi.mock("~/server/app-layer/authz/permission-adapters", () => ({
   resolveProjectPermission: vi
     .fn()
     .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
@@ -461,20 +461,6 @@ describe("simulationRunnerRouter.run", () => {
     describe("when run is called with explicit setId", () => {
       /** @scenario "A run naming an external set is allowed" */
       it("preserves the user-provided set ID in queueRun", async () => {
-        const inputWithSetId = {
-          ...defaultInput,
-          setId: "production-tests",
-        };
-        await caller.run(inputWithSetId);
-
-        expect(mockQueueRun).toHaveBeenCalledWith(
-          expect.objectContaining({
-            scenarioSetId: "production-tests",
-          }),
-        );
-      });
-
-      it("dispatches queueRun with user-provided set ID", async () => {
         const inputWithSetId = {
           ...defaultInput,
           setId: "production-tests",

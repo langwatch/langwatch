@@ -135,15 +135,15 @@ Feature: Typed permission declarations
     And the sweep counts the procedure as declared rather than unguarded
 
   # ============================================================================
-  # One seam, decision-neutral (decision 25)
+  # The declared seam delegates to the canonical authorization app.
   # ============================================================================
 
   @unit
-  Scenario: A declared check decides exactly as the middleware it replaced
-    Given an organization not yet cut over to the engine
-    When a declared permission check runs for one of its members
-    Then the legacy resolver decides and the engine shadows it
-    And for a cut-over organization the engine decides and legacy reverse-shadows
+  Scenario: Every grant check decides through the App the request context carries
+    Given a request context carrying the canonical authorization app
+    When a declared permission check runs for its project scope
+    Then the context app decides with the validated user, permission, and scope
+    And the module-level resolver is not consulted
 
   @unit
   Scenario: A denial carries a stable code the client can present

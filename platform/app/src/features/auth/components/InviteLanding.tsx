@@ -70,7 +70,7 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
   if (!landing.data) {
     return (
       <AuthCard title="Invitation">
-        <HStack gap={3} data-testid="invite-loading">
+        <HStack gap={3} justify="center" data-testid="invite-loading">
           <Spinner size="sm" color="auth.detail" />
           <Text color="fg.muted">Looking up your invitation…</Text>
         </HStack>
@@ -113,7 +113,7 @@ function InviteDeadEnd({
 
   return (
     <AuthCard title="Invitation">
-      <Text data-testid="invite-dead-end">
+      <Text data-testid="invite-dead-end" textAlign="center">
         This invitation is no longer available.
       </Text>
     </AuthCard>
@@ -145,7 +145,11 @@ function ExpiredInvite({
           fallbackTitle="This invitation has expired"
         />
         {ask.isSuccess ? (
-          <Text data-testid="invite-refresh-asked" color="fg.muted">
+          <Text
+            data-testid="invite-refresh-asked"
+            color="fg.muted"
+            textAlign="center"
+          >
             We let the organization know. You will get a fresh invitation by
             email once somebody there sends it.
           </Text>
@@ -157,7 +161,7 @@ function ExpiredInvite({
                 fallbackTitle="Couldn't ask for a new invitation"
               />
             ) : null}
-            <HStack>
+            <HStack justify="center">
               <Button
                 {...PRIMARY_ACTION}
                 loading={ask.isPending}
@@ -227,7 +231,7 @@ function SignedOutInvite({
         fallbackTitle="Could not use a passkey"
         className="lw-auth-alert"
       />
-      <Text data-testid="invite-inviter">
+      <Text data-testid="invite-inviter" textAlign="center">
         {inviterName
           ? `${inviterName} invited you to ${organizationName} on LangWatch.`
           : `You have been invited to ${organizationName} on LangWatch.`}
@@ -253,7 +257,7 @@ function SignedOutInvite({
             void signIn(method.id, { callbackUrl })
           }
           renderLocalMethod={() => (
-            <HStack gap={4}>
+            <HStack gap={4} justify="center">
               <Box asChild>
                 <Link
                   href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
@@ -277,7 +281,7 @@ function SignedOutInvite({
         // Neither an answer nor an error yet, or an answer that never came:
         // the two links the picker would have drawn are the way on, so the
         // invitation is never a dead end.
-        <HStack gap={4}>
+        <HStack gap={4} justify="center">
           <Box asChild>
             <Link
               href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
@@ -322,13 +326,45 @@ function ConfirmAndJoin({
   const wrongAccount =
     readHandledError(accept.error)?.code === "invite_wrong_account";
 
+  const signOutAndReturn = () => {
+    void signOut({ redirect: false }).finally(() => {
+      hardRedirect(inviteCallbackUrl(inviteCode));
+    });
+  };
+
   return (
-    <AuthCard title={`Join ${organizationName}`}>
+    <AuthCard
+      title={`You’re invited to join ${organizationName}`}
+      finePrint={
+        <HStack justify="center" gap={4} fontSize="13px">
+          <Link
+            href="https://docs.langwatch.ai/"
+            target="_blank"
+            rel="noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            Read the docs
+          </Link>
+          {!wrongAccount && (
+            <Button
+              variant="plain"
+              size="sm"
+              fontSize="13px"
+              textDecoration="underline"
+              textUnderlineOffset="3px"
+              onClick={signOutAndReturn}
+              data-testid="invite-sign-out"
+            >
+              Sign out
+            </Button>
+          )}
+        </HStack>
+      }
+    >
       <VStack width="full" align="stretch" gap={4}>
         {wrongAccount ? null : (
-          <Text data-testid="invite-confirm">
-            You have been invited to {organizationName}. Joining adds your
-            account to it.
+          <Text data-testid="invite-confirm" textAlign="center">
+            Join your team on LangWatch.
           </Text>
         )}
         {accept.error ? (
@@ -337,20 +373,12 @@ function ConfirmAndJoin({
             fallbackTitle="Couldn't accept the invitation"
           />
         ) : null}
-        <HStack>
+        <HStack justify="center">
           {wrongAccount ? (
             <Button
               {...PRIMARY_ACTION}
               data-testid="invite-switch-account"
-              onClick={() => {
-                // Sign out without the endpoint's own redirect, then come
-                // back here: the invitation is the thing they were doing,
-                // and logout's default lands on a bare sign-in page that has
-                // forgotten all about it.
-                void signOut({ redirect: false }).finally(() => {
-                  hardRedirect(inviteCallbackUrl(inviteCode));
-                });
-              }}
+              onClick={signOutAndReturn}
             >
               Sign out and use that account
             </Button>
@@ -360,7 +388,7 @@ function ConfirmAndJoin({
               loading={accept.isPending}
               onClick={() => accept.mutate({ inviteCode })}
             >
-              Join {organizationName}
+              Let me in
             </Button>
           )}
         </HStack>

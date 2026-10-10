@@ -1,0 +1,305 @@
+from typing import Any
+from urllib.parse import quote
+
+import httpx
+
+from ... import errors
+from ...client import AuthenticatedClient, Client
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_body import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody,
+)
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200 import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200,
+)
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_400 import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400,
+)
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_401 import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401,
+)
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_403 import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403,
+)
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_404 import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404,
+)
+from ...models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_500 import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500,
+)
+from ...types import Response, safe_http_status
+
+
+def _get_kwargs(
+    project_id: str,
+    widget_id: str,
+    *,
+    body: PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
+    _kwargs: dict[str, Any] = {
+        "method": "post",
+        "url": "/api/v1/projects/{project_id}/analytics/dashboard-widgets/{widget_id}/dashboard".format(
+            project_id=quote(str(project_id), safe=""),
+            widget_id=quote(str(widget_id), safe=""),
+        ),
+    }
+
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+    | None
+):
+    if response.status_code == 200:
+        response_200 = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200.from_dict(
+            response.json()
+        )
+
+        return response_200
+
+    if response.status_code == 400:
+        response_400 = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400.from_dict(
+            response.json()
+        )
+
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401.from_dict(
+            response.json()
+        )
+
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403.from_dict(
+            response.json()
+        )
+
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404.from_dict(
+            response.json()
+        )
+
+        return response_404
+
+    if response.status_code == 500:
+        response_500 = PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500.from_dict(
+            response.json()
+        )
+
+        return response_500
+
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
+    return Response(
+        status_code=safe_http_status(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    project_id: str,
+    widget_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody,
+) -> Response[
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+]:
+    """Add a dashboard widget to a dashboard
+
+     Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that
+    dashboard; its size (colSpan/rowSpan) is preserved.
+
+    Args:
+        project_id (str):
+        widget_id (str):
+        body (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500]
+    """
+
+    kwargs = _get_kwargs(
+        project_id=project_id,
+        widget_id=widget_id,
+        body=body,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    project_id: str,
+    widget_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody,
+) -> (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+    | None
+):
+    """Add a dashboard widget to a dashboard
+
+     Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that
+    dashboard; its size (colSpan/rowSpan) is preserved.
+
+    Args:
+        project_id (str):
+        widget_id (str):
+        body (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+    """
+
+    return sync_detailed(
+        project_id=project_id,
+        widget_id=widget_id,
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    project_id: str,
+    widget_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody,
+) -> Response[
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+]:
+    """Add a dashboard widget to a dashboard
+
+     Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that
+    dashboard; its size (colSpan/rowSpan) is preserved.
+
+    Args:
+        project_id (str):
+        widget_id (str):
+        body (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500]
+    """
+
+    kwargs = _get_kwargs(
+        project_id=project_id,
+        widget_id=widget_id,
+        body=body,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    project_id: str,
+    widget_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody,
+) -> (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404
+    | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+    | None
+):
+    """Add a dashboard widget to a dashboard
+
+     Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that
+    dashboard; its size (colSpan/rowSpan) is preserved.
+
+    Args:
+        project_id (str):
+        widget_id (str):
+        body (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse400 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse401 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse403 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse404 | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse500
+    """
+
+    return (
+        await asyncio_detailed(
+            project_id=project_id,
+            widget_id=widget_id,
+            client=client,
+            body=body,
+        )
+    ).parsed

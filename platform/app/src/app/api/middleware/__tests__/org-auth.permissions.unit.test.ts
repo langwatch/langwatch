@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 const resolveApiKeyPermission = vi.fn();
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
   resolveApiKeyPermission: (...args: unknown[]) =>
     resolveApiKeyPermission(...args),
 }));

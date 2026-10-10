@@ -47,6 +47,7 @@ import {
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platformToolPolicy.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -56,7 +57,6 @@ import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
-import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   type CliKeySelection,
@@ -68,12 +68,16 @@ import {
   deviceLabelForSession,
   sanitizeDeviceLabel,
 } from "~/server/api-key/device-label";
-import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
+import {
+  AggregateProjectHasNoCredentialError,
+  ApiKeyScopeViolationError,
+} from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
 } from "~/server/app-layer/permissions/imperative";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import { getServerAuthSession, type Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
@@ -81,6 +85,7 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { holdsSharedAccess } from "~/utils/memberRoleConstraints";
 import {
   publishDeviceCodeSettled,
   waitForDeviceCodeSettled,
@@ -403,6 +408,54 @@ function getRedis() {
   return redisConnection;
 }
 
+/** Whether the caller holds a Developer seat in the organization this project belongs to. */
+async function isDeveloperSeat({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}): Promise<boolean> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  if (!project) return false;
+  const membership = await prisma.organizationUser.findUnique({
+    where: {
+      userId_organizationId: {
+        userId,
+        organizationId: project.team.organizationId,
+      },
+    },
+    select: { role: true },
+  });
+  return membership != null && !holdsSharedAccess(membership.role);
+}
+
+/**
+ * ADR-144 decision 7: an aggregate project receives no traces, so no key the
+ * CLI hands out (a project's base key, a minted ingestion key) may point at
+ * it. Checked before any permission, because no grant changes the answer.
+ *
+ * Answered in this router's OAuth-style envelope rather than thrown: the
+ * CLI's project-key login reads `error` and `error_description` at the top
+ * level of the body without looking for the handled-error envelope, so a
+ * thrown error would reach it as a bare status. The code is still the
+ * registered one, so every surface names this refusal the same way.
+ */
+function refuseNonDestination(
+  c: Context,
+  project: { kind: string },
+): Response | null {
+  if (!traceDestinationViolation(project.kind)) return null;
+  const refusal = new AggregateProjectHasNoCredentialError();
+  return c.json(
+    { error: refusal.code, error_description: refusal.message },
+    403,
+  );
+}
+
 /**
  * The authorization rule every endpoint that hands back a Project.apiKey
  * shares (/approve with a project pick, /project-key): a personal project is
@@ -417,15 +470,45 @@ function getRedis() {
  */
 async function refuseProjectKeyHandout(
   c: Context,
-  project: { id: string; isPersonal: boolean; ownerUserId: string | null },
+  project: {
+    id: string;
+    isPersonal: boolean;
+    ownerUserId: string | null;
+    kind: string;
+  },
   session: Session,
 ): Promise<Response | null> {
+  const notADestination = refuseNonDestination(c, project);
+  if (notADestination) return notADestination;
   if (project.isPersonal && project.ownerUserId !== session.user.id) {
     return c.json(
       {
         error: "personal_project_not_allowed",
         error_description:
           "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
+      },
+      400,
+    );
+  }
+  // ADR-143: a Developer seat works in its own personal project only. The
+  // permission probe below would refuse a shared project anyway, because a
+  // Developer holds no access there; this names the seat so the person is
+  // told what to pick instead of being told they lack a role nobody can
+  // grant them.
+  const ownsPersonalProject =
+    project.isPersonal && project.ownerUserId === session.user.id;
+  if (
+    !ownsPersonalProject &&
+    (await isDeveloperSeat({
+      userId: session.user.id,
+      projectId: project.id,
+    }))
+  ) {
+    return c.json(
+      {
+        error: "developer_seat_personal_only",
+        error_description:
+          "A Developer seat works in its own personal project only. Pick your personal workspace.",
       },
       400,
     );
@@ -2101,6 +2184,7 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
       name: true,
       isPersonal: true,
       ownerUserId: true,
+      kind: true,
     },
   });
   if (!project) {
@@ -2543,6 +2627,7 @@ async function findProjectInOrg({
     name: true,
     isPersonal: true,
     ownerUserId: true,
+    kind: true,
   } as const;
   const inOrg = { archivedAt: null, team: { organizationId } };
   return (
@@ -2596,6 +2681,9 @@ async function mintProjectIngestionKey(
       404,
     );
   }
+
+  const notADestination = refuseNonDestination(c, project);
+  if (notADestination) return notADestination;
 
   // Another user's personal workspace is theirs alone; no permission grant
   // can make a second principal's key into it legitimate.
@@ -3188,6 +3276,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
         name: true,
         isPersonal: true,
         ownerUserId: true,
+        kind: true,
       },
     });
     if (!project) {

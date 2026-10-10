@@ -106,6 +106,7 @@ function MessageContentImpl({
   onDiscard,
   isStreaming = false,
   interrupted = false,
+  isLatest = true,
   conversationId,
   showFeedback = false,
   shouldAskFeedback = false,
@@ -149,6 +150,11 @@ function MessageContentImpl({
    * emptiness was the user's own doing, and the copy should say so.
    */
   interrupted?: boolean;
+  /**
+   * This is the last message of the conversation. The empty reply row speaks
+   * only there: an empty reply with messages after it draws nothing.
+   */
+  isLatest?: boolean;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
   /**
@@ -545,6 +551,11 @@ function MessageContentImpl({
     // claim a slot in the column's gap, pushing the status line down mid
     // startup. The working lines below own the live edge until content lands.
     if (isStreaming) return null;
+    // The record keeps every reply, so a turn that ended with nothing to show
+    // and was then run again leaves an empty reply above the one that
+    // answered. Above a later message the row would read as something missing
+    // from a reply that is right there, so it draws nothing.
+    if (!isLatest) return null;
     // A settled assistant turn with nothing visible to say, either the model
     // spent the whole turn reasoning or the user stopped it before any text
     // arrived. Name the emptiness quietly rather than rendering a reply that

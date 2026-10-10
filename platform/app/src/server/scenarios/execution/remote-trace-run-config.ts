@@ -8,8 +8,9 @@
  * this configuration: enable the capability for http targets, hand the SDK
  * the project's endpoint and key (the SDK's fetcher reads them off the run
  * config's `langwatch` block, with env vars as fallback), and pass the
- * prefetcher's ingest-lag wait budget. Omitting `traceWaitTimeoutMs` leaves
- * the SDK's own default in place.
+ * prefetcher's ingest-lag wait budget, and hold a trace for a quiet period
+ * before the verdict reads it. Omitting `traceWaitTimeoutMs` leaves the SDK's
+ * own default in place.
  *
  * @see dev/docs/adr/097-scenario-remote-trace-judging.md
  * @see specs/scenarios/remote-trace-judging.feature
@@ -29,10 +30,21 @@ import type { TargetConfig } from "./types";
  */
 export const TRACE_WAIT_CAP_MS = 30_000;
 
+/**
+ * How long a trace's span set must stay unchanged, once every fetched span's
+ * parent resolved, before the judge treats the trace as complete. Parent
+ * resolution cannot see a missing leaf subtree: a tool span that ends after
+ * its parent was exported lands a second or two later, and a verdict read
+ * before it called the tool criterion inconclusive. Two seconds covers that
+ * gap at the cost of two seconds per verdict.
+ */
+export const TRACE_QUIET_PERIOD_MS = 2_000;
+
 export interface RemoteTraceRunConfig {
   fetchRemoteTraces: true;
   traceWaitTimeoutMs?: number;
   traceWaitExtensionMs: number;
+  traceQuietPeriodMs: number;
   langwatch: {
     endpoint: string;
     apiKey: string;
@@ -62,6 +74,7 @@ export function buildRemoteTraceRunConfig({
     // A measured budget can be as low as 10 seconds; the extension keeps the
     // judge's one extra wait meaningful regardless of the measured value.
     traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
+    traceQuietPeriodMs: TRACE_QUIET_PERIOD_MS,
     langwatch: {
       endpoint: langwatchEndpoint,
       apiKey: langwatchApiKey,

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertGatewaySecretsAllOrNone,
   azureBlobAuthModeSchema,
+  connectEndpointSchema,
   createEnvConfig,
   gatewaySecretsSchema,
   rumSampleRatioSchema,
@@ -398,6 +399,42 @@ describe("azureBlobAuthModeSchema", () => {
       } finally {
         errorSpy.mockRestore();
       }
+    });
+  });
+});
+
+describe("connectEndpointSchema", () => {
+  const schema = connectEndpointSchema("LANGWATCH_CONNECT_GATEWAY_ENDPOINT");
+
+  describe("given an https endpoint", () => {
+    it("accepts it", () => {
+      expect(schema.safeParse("https://gateway.langwatch.ai").success).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("given a plain http endpoint on a public host", () => {
+    /** @scenario A Connect endpoint must be https unless it is a loopback host */
+    it("refuses it naming the variable", () => {
+      const result = schema.safeParse("http://gateway.example.com");
+      expect(result.success).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toMatch(
+        /LANGWATCH_CONNECT_GATEWAY_ENDPOINT must use https/,
+      );
+    });
+  });
+
+  describe("given a plain http endpoint on a loopback host", () => {
+    it("accepts localhost and 127.0.0.1 with a port", () => {
+      expect(schema.safeParse("http://localhost:5643").success).toBe(true);
+      expect(schema.safeParse("http://127.0.0.1:5643").success).toBe(true);
+    });
+  });
+
+  describe("given no value", () => {
+    it("is optional", () => {
+      expect(schema.safeParse(undefined).success).toBe(true);
     });
   });
 });

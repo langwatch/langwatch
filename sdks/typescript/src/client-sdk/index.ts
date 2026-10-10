@@ -48,6 +48,7 @@ export { EvaluatorsApiService, EvaluatorsApiError } from "./services/evaluators"
 export { ScenariosApiService, ScenariosApiError } from "./services/scenarios";
 export { SuitesApiService, SuitesApiError } from "./services/suites";
 export { RunPlansApiService, RunPlansApiError } from "./services/run-plans";
+export { InstantEvalsApiService, InstantEvalsApiError } from "./services/instant-evals";
 export { TestSuitesApiService, TestSuitesApiError } from "./services/test-suites";
 export { WorkflowsApiService, WorkflowsApiError } from "./services/workflows/workflows-api.service";
 export { AgentsApiService, AgentsApiError } from "./services/agents/agents-api.service";
@@ -91,6 +92,7 @@ import { EvaluatorsApiService } from "./services/evaluators";
 import { ScenariosApiService } from "./services/scenarios";
 import { SuitesApiService } from "./services/suites";
 import { RunPlansApiService } from "./services/run-plans";
+import { InstantEvalsApiService } from "./services/instant-evals";
 import { TestSuitesApiService } from "./services/test-suites";
 import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
 import { AgentsApiService } from "./services/agents/agents-api.service";
@@ -173,6 +175,8 @@ export class LangWatch {
    */
   readonly suites: SuitesApiService;
   readonly runPlans: RunPlansApiService;
+  /** Judge one LangWatchQL statement across the project's history as a job. */
+  readonly instantEvals: InstantEvalsApiService;
   readonly testSuites: TestSuitesApiService;
   readonly workflows: WorkflowsApiService;
   readonly agents: AgentsApiService;
@@ -236,6 +240,7 @@ export class LangWatch {
     this.scenarios = new ScenariosApiService(this.config);
     this.suites = new SuitesApiService(this.config);
     this.runPlans = new RunPlansApiService(this.config);
+    this.instantEvals = new InstantEvalsApiService(this.config);
     this.testSuites = new TestSuitesApiService(this.config);
     this.workflows = new WorkflowsApiService(this.config);
     this.agents = new AgentsApiService(this.config);

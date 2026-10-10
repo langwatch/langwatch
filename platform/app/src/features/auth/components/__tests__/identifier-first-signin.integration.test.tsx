@@ -131,7 +131,10 @@ vi.mock("~/utils/compat/next-link", () => ({
   ),
 }));
 
-import { LAST_USED_METHOD_STORAGE_KEY } from "../../logic/lastUsedMethod";
+import {
+  LAST_USED_METHOD_STORAGE_KEY,
+  promotePendingMethod,
+} from "../../logic/lastUsedMethod";
 import { IdentifierFirstSignIn } from "../IdentifierFirstSignIn";
 
 const passwordMethod: SignInMethod = {
@@ -204,6 +207,7 @@ describe("given the identifier-first sign-in screen", () => {
     publicEnvRef.current = { IS_SAAS: true };
     priorSessionRef.current = undefined;
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => cleanup());
@@ -295,6 +299,79 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
+  describe("when a self-hosted deployment has one live connection", () => {
+    const soleConnection: RoutingDecision = {
+      outcome: "redirect_to_connection",
+      methodSet: [oktaMethod],
+      reasonCode: "sole_active_connection",
+    };
+
+    /** @scenario "A self-hosted sign-in page goes straight to the sole live connection" */
+    it("starts the provider sign-in without a click", async () => {
+      routeMock.mockResolvedValue(soleConnection);
+      renderScreen();
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledTimes(1);
+      });
+      expect(signInMock).toHaveBeenCalledWith(
+        "okta",
+        expect.objectContaining({ callbackUrl: undefined }),
+      );
+    });
+
+    /** @scenario "The sole connection is not dialed twice in a row" */
+    it("offers a button instead when it already sent this tab there moments ago", async () => {
+      routeMock.mockResolvedValue(soleConnection);
+      const first = renderScreen();
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledTimes(1);
+      });
+      first.unmount();
+      signInMock.mockClear();
+
+      renderScreen();
+      const continueButton = await screen.findByRole("button", {
+        name: /continue with okta/i,
+      });
+      expect(signInMock).not.toHaveBeenCalled();
+      await userEvent.click(continueButton);
+      expect(signInMock).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A failed sign-in return never redirects to the sole connection" */
+    it("shows the error and starts no provider sign-in", async () => {
+      searchParamsRef.current = new URLSearchParams("error=sign_in_failed");
+      routeMock.mockResolvedValue(soleConnection);
+      renderScreen();
+
+      await waitFor(() => {
+        expect(routeMock).toHaveBeenCalled();
+      });
+      expect(
+        await screen.findByRole("link", { name: /try sign in again/i }),
+      ).toBeInTheDocument();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The break-glass sign-in page never redirects to the sole connection" */
+    it("renders the local sign-in for the break-glass parameter", async () => {
+      searchParamsRef.current = new URLSearchParams("local=1");
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [passwordMethod],
+        reasonCode: "break_glass",
+      } satisfies RoutingDecision);
+      renderScreen();
+
+      expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+      expect(routeMock).toHaveBeenCalledWith(
+        expect.objectContaining({ identifier: null, breakGlass: true }),
+      );
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
     /** @scenario "The address typed on our screen rides along to the identity provider" */
@@ -320,6 +397,30 @@ describe("given the identifier-first sign-in screen", () => {
       expect(
         await screen.findByTestId("routed-to-connection"),
       ).toHaveTextContent(/okta/i);
+    });
+
+    /** @scenario "A provider my address was routed to is badged once it lets me in" */
+    it("parks the provider it dials, so the landing can badge it", async () => {
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+      await waitFor(() => expect(signInMock).toHaveBeenCalled());
+
+      // Nothing is badged by the dial itself: the provider may still refuse.
+      expect(
+        window.localStorage.getItem(LAST_USED_METHOD_STORAGE_KEY),
+      ).toBeNull();
+      // The landing is what promotes it, exactly as the session fetch does.
+      promotePendingMethod();
+      expect(window.localStorage.getItem(LAST_USED_METHOD_STORAGE_KEY)).toBe(
+        oktaMethod.id,
+      );
     });
 
     /** @scenario Wrong-method guidance points at the method my account holds */
@@ -939,6 +1040,64 @@ describe("given the identifier-first sign-in screen", () => {
 
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();
       expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+    });
+  });
+
+  describe("when no account holds the address and the installation cannot send email", () => {
+    beforeEach(() => {
+      publicEnvRef.current = { IS_SAAS: false, HAS_EMAIL_PROVIDER_KEY: false };
+      routeMock.mockResolvedValue(unknownIdentifier);
+    });
+
+    /** @scenario "An address with no account on an installation that cannot send email is told what is missing" */
+    it("says what is missing and offers no confirmation link", async () => {
+      renderScreen();
+      await enterEmail("colleague@example.com");
+
+      expect(
+        await screen.findByText(/no account for that email address yet/i),
+      ).toBeTruthy();
+      expect(screen.getByText(/set up an email provider/i)).toBeTruthy();
+      expect(screen.getByText(/single sign-on/i)).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: /send confirmation link/i }),
+      ).toBeNull();
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An address with no account on an installation that cannot send email is told what is missing" */
+    it("goes back to the address step for a mistyped address", async () => {
+      renderScreen();
+      await enterEmail("colleague@example.com");
+      await userEvent.click(
+        await screen.findByRole("button", { name: /use a different email/i }),
+      );
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+    });
+  });
+
+  describe("when the installation's sign-up is invite-only", () => {
+    it("offers no create-account link on the address step", async () => {
+      publicEnvRef.current = { IS_SAAS: false, SIGN_UP_MODE: "invite_only" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("go-to-sign-up")).toBeNull();
+    });
+  });
+
+  describe("when the installation's sign-up is open", () => {
+    it("offers the create-account link on the address step", async () => {
+      publicEnvRef.current = { IS_SAAS: false, SIGN_UP_MODE: "open" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByTestId("go-to-sign-up")).toBeTruthy();
     });
   });
 });

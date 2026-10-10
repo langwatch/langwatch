@@ -25,7 +25,6 @@
 
 import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -51,12 +50,13 @@ import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.click
 import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
 import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 const suffix = nanoid(8);
@@ -327,15 +327,12 @@ async function seedUserWithRole(args: {
       data: { userId: args.userId, teamId: args.teamId, role: args.teamRole },
     });
   }
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: args.orgId,
-      userId: args.userId,
-      role: args.bindingRole,
-      scopeType: args.bindingScope.type,
-      scopeId: args.bindingScope.id,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId: args.orgId,
+    userId: args.userId,
+    role: args.bindingRole,
+    scopeType: args.bindingScope.type,
+    scopeId: args.bindingScope.id,
   });
   const created = await ApiKeyService.create(prisma).create({
     name: `gwrest-${args.userId}`,
@@ -368,6 +365,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     // provide one or they fail with "App not initialized".
     installClickHouseTestApp({
       resolveClient: async () => getTestClickHouseClient(),
+      eventSourcing: createAuthzTestEventSourcing(prisma),
     });
     await seedTenant({
       orgId: ORG_ID,

@@ -184,6 +184,7 @@ export class CredentialAccountStorageAdapter
     name: string;
     email: string;
     passwordHash: string;
+    addressConfirmed: boolean;
   }): Promise<CreatedCredentialUser> {
     return this.deps.legacy.createCredentialUser(args);
   }

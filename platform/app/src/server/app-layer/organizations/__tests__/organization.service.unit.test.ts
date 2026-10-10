@@ -6,6 +6,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { MemberNotFoundError } from "../errors";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 
@@ -14,18 +15,26 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
-const { mockRevokeAllTraceShares, mockCheckLimit, mockInvalidateOrganization } =
-  vi.hoisted(() => ({
-    mockInvalidateOrganization: vi.fn(),
-    mockRevokeAllTraceShares: vi.fn(),
-    mockCheckLimit: vi.fn(),
-  }));
+const {
+  mockRevokeAllTraceShares,
+  mockCheckLimit,
+  mockInvalidateOrganization,
+  mockOffboard,
+  mockReconcileAggregates,
+} = vi.hoisted(() => ({
+  mockInvalidateOrganization: vi.fn(),
+  mockRevokeAllTraceShares: vi.fn(),
+  mockCheckLimit: vi.fn(),
+  mockOffboard: vi.fn(),
+  mockReconcileAggregates: vi.fn(),
+}));
 
 // Disabling a seat is not a grant write, so the service retires the
 // organization's cached authorization snapshots itself.
 vi.mock("../../authz/runtime", () => ({
   grantsService: () => ({
     invalidateOrganization: mockInvalidateOrganization,
+    offboard: mockOffboard,
   }),
 }));
 
@@ -36,12 +45,19 @@ vi.mock("~/server/license-enforcement", () => ({
 }));
 
 // The service reaches the app singleton only for cross-aggregate effects
-// (trace-share revocation, plan resolution); pin the one this suite drives.
-vi.mock("../../app", () => ({
-  getApp: () => ({
+// (trace-share revocation, re-reading aggregate projects after an offboard);
+// pin the ones this suite drives.
+vi.mock("../../app", () => {
+  const app = {
     share: { revokeAllTraceShares: mockRevokeAllTraceShares },
-  }),
-}));
+    projects: {
+      aggregateReconciler: {
+        reconcileOrganizationOrLog: mockReconcileAggregates,
+      },
+    },
+  };
+  return { getApp: () => app, tryGetApp: () => app };
+});
 
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
@@ -75,7 +91,6 @@ describe("OrganizationService", () => {
     findMemberTeamBindings: vi.fn(),
     findSettingsById: vi.fn(),
     updateSettings: vi.fn(),
-    deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),
     updateMemberRole: vi.fn(),
     updateTeamMemberRole: vi.fn(),
@@ -90,6 +105,7 @@ describe("OrganizationService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOffboard.mockReset().mockResolvedValue(undefined);
     // The flows that compose raw-client helpers ask the repository for its
     // client; the double is Prisma-backed as far as they are concerned.
     vi.mocked(mockRepo.getClient!).mockReturnValue(
@@ -226,16 +242,6 @@ describe("OrganizationService", () => {
   });
 
   describe("when removing a member", () => {
-    const membership = {
-      userId: "user-456",
-      organizationId: "org-123",
-      role: OrganizationUserRole.MEMBER,
-      disabledAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      user: { id: "user-456", name: "Member", email: "member@example.com" },
-    };
-
     describe("when the acting user removes themselves", () => {
       it("refuses with cannot_remove_self before touching the repository", async () => {
         await expect(
@@ -247,13 +253,13 @@ describe("OrganizationService", () => {
         ).rejects.toMatchObject({ code: "cannot_remove_self" });
 
         expect(mockRepo.findMembership).not.toHaveBeenCalled();
-        expect(mockRepo.deleteMember).not.toHaveBeenCalled();
+        expect(mockOffboard).not.toHaveBeenCalled();
       });
     });
 
     describe("when the membership does not exist", () => {
-      it("refuses with member_not_found", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+      it("preserves the canonical member_not_found error", async () => {
+        mockOffboard.mockRejectedValue(new MemberNotFoundError("user-456"));
 
         await expect(
           service.deleteMember({
@@ -263,14 +269,17 @@ describe("OrganizationService", () => {
           }),
         ).rejects.toMatchObject({ code: "member_not_found" });
 
-        expect(mockRepo.deleteMember).not.toHaveBeenCalled();
+        expect(mockRepo.findMembership).not.toHaveBeenCalled();
+        expect(mockOffboard).toHaveBeenCalledWith({
+          actor: { userId: "admin-789" },
+          organizationId: "org-123",
+          userId: "user-456",
+        });
       });
     });
 
     describe("when another member is removed", () => {
-      it("delegates to the repository", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(membership);
-
+      it("delegates to canonical offboarding", async () => {
         await service.deleteMember({
           organizationId: "org-123",
           userId: "user-456",
@@ -279,24 +288,42 @@ describe("OrganizationService", () => {
 
         // The acting user travels with the removal: the grant revocation it
         // emits is attributed to whoever made the decision.
-        expect(mockRepo.deleteMember).toHaveBeenCalledWith({
+        expect(mockOffboard).toHaveBeenCalledWith({
+          actor: { userId: "admin-789" },
+          organizationId: "org-123",
+          userId: "user-456",
+        });
+      });
+
+      it("re-reads the organization's aggregate projects once the member is gone", async () => {
+        await service.deleteMember({
           organizationId: "org-123",
           userId: "user-456",
           actingUserId: "admin-789",
         });
+
+        expect(mockReconcileAggregates).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          trigger: "member-offboarded",
+        });
+        expect(mockOffboard.mock.invocationCallOrder[0]).toBeLessThan(
+          mockReconcileAggregates.mock.invocationCallOrder[0]!,
+        );
       });
     });
 
     describe("when the credential acts as nobody", () => {
       it("cannot trip the self-removal guard", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(membership);
-
         await service.deleteMember({
           organizationId: "org-123",
           userId: "user-456",
         });
 
-        expect(mockRepo.deleteMember).toHaveBeenCalled();
+        expect(mockOffboard).toHaveBeenCalledWith({
+          actor: { type: "system", name: "organizationService" },
+          organizationId: "org-123",
+          userId: "user-456",
+        });
       });
     });
   });

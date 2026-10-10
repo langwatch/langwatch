@@ -160,9 +160,9 @@ async function bootRealtimeSessionPoller(
 }
 
 // Every worker with no VOICE_PUBLIC_BASE_URL configured and the tunnel
-// fallback left on (VOICE_TUNNEL, default enabled) discovers its own public
-// origin by opening a free cloudflared quick tunnel to the media listener's
-// port. Runs BEFORE the scenario processor boots: it must set
+// fallback on (VOICE_TUNNEL; on by default only for SaaS and development)
+// discovers its own public origin by opening a free cloudflared quick tunnel
+// to the media listener's port. Runs BEFORE the scenario processor boots: it must set
 // process.env.VOICE_PUBLIC_BASE_URL before any scenario child spawns, since
 // child-environment.ts forwards that var verbatim and phone.transport.ts
 // reads it straight from process.env, with no other plumbing needed. A noop
@@ -306,6 +306,34 @@ async function bootUsageStatsWorker(
   if (usageStatsWorker) {
     shutdownHandles.push(() => usageStatsWorker.stop());
     logger.info("usage stats worker ready");
+  }
+}
+
+// The daily license sync of a connected install (no-op unless an operator
+// switched Connect on).
+async function bootLicenseSyncWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startLicenseSyncWorker } = await import("~/server/licenseSyncWorker");
+  const licenseSyncWorker = startLicenseSyncWorker();
+  if (licenseSyncWorker) {
+    shutdownHandles.push(() => licenseSyncWorker.stop());
+    logger.info("license sync worker ready");
+  }
+}
+
+// The daily billing tick of a connected self-hosted customer (no-op off
+// LangWatch Cloud).
+async function bootConnectedBillingWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startConnectedBillingWorker } = await import(
+    "~/server/connectedBillingWorker"
+  );
+  const connectedBillingWorker = startConnectedBillingWorker();
+  if (connectedBillingWorker) {
+    shutdownHandles.push(() => connectedBillingWorker.stop());
+    logger.info("connected billing worker ready");
   }
 }
 
@@ -625,8 +653,9 @@ async function respondToLivenessThread(
  * Boots the background worker stack: ingestion pullers, topic clustering,
  * ClickHouse storage-stats collection, the scenario executor pool (plus its
  * NLP fetch dispatcher cleanup), the enqueue-rate anomaly detector, the
- * governance spend-spike detector, the self-hosted usage-stats telemetry,
- * and (optionally) the Prometheus metrics HTTP server.
+ * governance spend-spike detector, the self-hosted usage-stats telemetry, the
+ * daily license sync of a connected install, and (optionally) the Prometheus
+ * metrics HTTP server.
  *
  * Assumes the App has ALREADY been initialized by the caller with a
  * worker-capable role — `initializeWorkerApp()` for the standalone deployment,
@@ -695,6 +724,11 @@ export async function startWorkers(
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.
     //
+    // Break-glass expiry warnings, SSO domain re-proof and SCIM request log
+    // retention self-drive too, for the same reason: each is a scheduled
+    // process manager now, so the process wake worker and outbox own their
+    // interval and there is no boot call left for them here.
+    //
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful
@@ -718,6 +752,12 @@ export async function startWorkers(
           break;
         case "usage-stats":
           await bootUsageStatsWorker(shutdownHandles);
+          break;
+        case "license-sync":
+          await bootLicenseSyncWorker(shutdownHandles);
+          break;
+        case "connected-billing":
+          await bootConnectedBillingWorker(shutdownHandles);
           break;
         case "realtime-session-poller":
           await bootRealtimeSessionPoller(shutdownHandles);

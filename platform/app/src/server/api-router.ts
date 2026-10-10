@@ -29,6 +29,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as instantEvalsApp } from "../app/api/instant-evals/[[...route]]/app";
 import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
@@ -48,6 +49,7 @@ import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
@@ -62,7 +64,9 @@ import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
+import { app as checkupApp } from "./routes/checkup";
 import { app as collectorApp } from "./routes/collector";
+import { app as connectApp } from "./routes/connect";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
 import { app as elevenLabsApp } from "./routes/elevenlabs";
@@ -89,6 +93,7 @@ import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rootDiscoveryApp } from "./routes/root-discovery";
 import { app as rumApp } from "./routes/rum";
+import { app as scenarioExecuteSyncApp } from "./routes/scenario-execute-sync";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
@@ -120,12 +125,14 @@ export function createApiRouter() {
   api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
+  api.route("/", checkupApp); // /api/checkup, /api/checkup/run
 
   api.route("/", agentsApp); // /api/v1/agents, connect and call included
   api.route("/", agentsAliasApp); // deprecated alias: /api/agents
   api.route("/", analyticsApp);
   api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/charts/* — saved workbench charts only; the raw-LWQL routes this app used to serve were removed (issue #7565)
   api.route("/", queryApp); // /api/v1/query — LWQL query domain, REST; the only HTTP door for raw LangWatchQL
+  api.route("/", instantEvalsApp); // /api/v1/instant-evals: one LWQL statement, judged as a job
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", codingAgentV1App); // /api/v1/coding-agent/* — organization-key door
@@ -193,10 +200,12 @@ export function createApiRouter() {
   api.route("/", gatewaySpendApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
+  api.route("/", slackConnectionsApp);
   api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", gatewayInternalApp);
+  api.route("/", connectApp); // /api/connect/v1, what a connected self-hosted install calls
   api.route("/", otelApp);
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
@@ -210,6 +219,7 @@ export function createApiRouter() {
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
+  api.route("/", scenarioExecuteSyncApp); // /api/scenario/execute-sync (internal: scenario child -> this project's engine)
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 

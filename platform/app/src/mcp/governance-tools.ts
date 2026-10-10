@@ -12,8 +12,8 @@
  *
  * RBAC enforcement at the tool layer (per @governance-mcp @rbac): each tool
  * checks the caller's organization permissions BEFORE the service call and
- * returns FORBIDDEN otherwise. Mirrors `probeOrganizationPermission` from
- * src/server/api/rbac.ts. Services trust the surface for audit attribution
+ * returns FORBIDDEN otherwise through the shared authz adapter.
+ * Services trust the surface for audit attribution
  * but DO NOT gate access — gating is the entrypoint's job.
  *
  * Caller identity: governance write tools require an OAuth-authenticated MCP
@@ -51,12 +51,11 @@ type McpServerLike = {
   ): unknown;
 };
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
-
 import { auditLog } from "../../ee/audit-log/auditLog";
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
-import type { Permission } from "../server/api/rbac";
 import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
 
 const logger = createLogger("langwatch:mcp:governance-tools");

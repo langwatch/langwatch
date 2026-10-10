@@ -146,7 +146,7 @@ describe("the SDK protocol, given the platform's protocol module", () => {
         sorted(["protocol", ...keys]),
       );
       expect(sorted(sdkKeys({ source: sdk, name: "RegisteredAgent" }))).toEqual(
-        sorted(["name", "environment", "id", "url", "parameterNotes"]),
+        sorted(["name", "environment", "id", "url", "parameterNotes", "scope"]),
       );
     });
 

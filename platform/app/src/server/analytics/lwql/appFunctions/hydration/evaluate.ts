@@ -30,8 +30,17 @@ import type {
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "~/server/app-layer/instant-evals/classifier/classifier";
-import { estimateInstantEvalRequestTokens } from "~/server/app-layer/instant-evals/classifier/token-budget";
-import { InstantEvalQueryBudgetExceededError } from "~/server/app-layer/instant-evals/errors";
+import {
+  estimateInstantEvalRequestTokens,
+  estimateJudgedTextTokens,
+  instantEvalQuestionTokens,
+  instantEvalTextBudget,
+} from "~/server/app-layer/instant-evals/classifier/token-budget";
+import {
+  InstantEvalQueryBudgetExceededError,
+  InstantEvalQuestionsTooLongError,
+} from "~/server/app-layer/instant-evals/errors";
+import { lwqlAppFunction } from "../catalog";
 import { instantEvalQuestionFor, judgedCellValue } from "../evalQuestions";
 import { computeAppFunctionValue } from "./compute";
 import {
@@ -51,19 +60,31 @@ interface JudgementUnit {
   /** The calls whose cell this unit's verdicts fill. */
   readonly calls: readonly ResolvedCall[];
   readonly questions: readonly InstantEvalQuestion[];
+  /** Whether this text was cut to fit the judge before it was sent. */
+  readonly isTruncated: boolean;
 }
 
 export interface EvaluationOutcome {
   readonly values: ComputedValues;
   readonly usage: LangWatchQLEvalUsage;
+  /**
+   * Whether the caller's signal stopped the judging before every unit ran.
+   *
+   * When it did, `values` holds only the units that came back and the rest
+   * are absent rather than unresolved: they found their text and were never
+   * asked, which the caller reports as its own kind of null.
+   */
+  readonly isCancelled: boolean;
 }
 
 export async function evaluateCalls({
+  projectId,
   resolved,
   traces,
   support,
   signal,
 }: {
+  projectId: string;
   resolved: readonly ResolvedCall[];
   traces: FetchedTraces;
   support: InstantEvalHydrationSupport;
@@ -74,10 +95,18 @@ export async function evaluateCalls({
   );
   const values = emptyValues(evalCalls);
   if (evalCalls.length === 0) {
-    return { values, usage: { requests: 0, inputTokens: 0, skipped: {} } };
+    return {
+      values,
+      usage: { requests: 0, inputTokens: 0, skipped: {}, limiterWaitMs: 0 },
+      isCancelled: false,
+    };
   }
 
-  const units = await buildUnits({ evalCalls, traces });
+  const units = await buildUnits({
+    evalCalls,
+    traces,
+    limits: support.classifier.limits,
+  });
   assertQueryBudget({
     units,
     budget: support.queryTokenBudget,
@@ -91,15 +120,17 @@ export async function evaluateCalls({
     requests: 0,
     inputTokens: 0,
     skipped: {} as Record<string, number>,
+    limiterWaitMs: 0,
   };
   let failures = 0;
 
-  await inParallel({
+  const { isCancelled } = await inParallel({
     items: units,
     limit: support.maxConcurrency,
     ...(signal ? { signal } : {}),
     run: async (unit) => {
       const judgement = await judge({
+        projectId,
         unit,
         support,
         ...(signal ? { signal } : {}),
@@ -132,8 +163,10 @@ export async function evaluateCalls({
   if (failures > 0 && failures === units.length) {
     throw new ClassifierAnsweredNothingError();
   }
-  fillUnjudged({ evalCalls, values });
-  return { values, usage };
+  // A cancelled run leaves the units it never asked absent, so the caller can
+  // tell them from a key that named nothing.
+  if (!isCancelled) fillUnjudged({ evalCalls, values });
+  return { values, usage, isCancelled };
 }
 
 /**
@@ -182,13 +215,20 @@ function textSignature(entry: ResolvedCall): string {
 async function buildUnits({
   evalCalls,
   traces,
+  limits,
 }: {
   evalCalls: readonly ResolvedCall[];
   traces: FetchedTraces;
+  limits: InstantEvalClassifierLimits;
 }): Promise<JudgementUnit[]> {
   const grouped = new Map<
     string,
-    { keyId: string; text: string; calls: ResolvedCall[] }
+    {
+      keyId: string;
+      text: string;
+      calls: ResolvedCall[];
+      parts: readonly string[];
+    }
   >();
 
   for (const entry of evalCalls) {
@@ -202,23 +242,122 @@ async function buildUnits({
       }
       const text = await textFor({ entry, parts, traces });
       if (text === null || text === "") continue;
-      grouped.set(unitId, { keyId, text, calls: [entry] });
+      grouped.set(unitId, { keyId, text, calls: [entry], parts });
     }
   }
 
-  return [...grouped.values()].map((unit) => ({
-    keyId: unit.keyId,
-    text: unit.text,
-    calls: unit.calls,
-    questions: unit.calls.map((entry) =>
-      instantEvalQuestionFor({
-        definition: entry.definition,
-        options: entry.call.options,
-        column: entry.call.column,
-      }),
-    ),
-  }));
+  return await Promise.all(
+    [...grouped.values()].map(async (unit) => {
+      const questions = unit.calls.map((entry) =>
+        instantEvalQuestionFor({
+          definition: entry.definition,
+          options: entry.call.options,
+          column: entry.call.column,
+        }),
+      );
+      const fitted = await withinJudgeBudget({
+        text: unit.text,
+        entry: unit.calls[0],
+        parts: unit.parts,
+        traces,
+        questions,
+        limits,
+      });
+      return {
+        keyId: unit.keyId,
+        text: fitted.text,
+        calls: unit.calls,
+        questions,
+        isTruncated: fitted.isTruncated,
+      };
+    }),
+  );
 }
+
+/**
+ * A conversation too long for the judge, re-rendered under the judge's budget.
+ *
+ * `conversation` carries no budget of its own, so a thread longer than the
+ * classifier's state arrives here whole. Left alone the classifier cuts it by
+ * bytes, which keeps the opening, drops the close and says nothing about what
+ * went missing. The close is the part most questions are about, so the cut is
+ * made here instead, through the same renderer `conversation_bounded` uses:
+ * both ends are kept and a marker names how many turns went from the middle.
+ *
+ * Measured with the classifier's own ratio, because that is the check the
+ * classifier is about to make: a text that fits the renderer's four-bytes-a-
+ * token ruler but not the classifier's denser one would pass here and then be
+ * cut by bytes there, which is the cut this exists to avoid. The renderer is
+ * then asked for the budget in its own ruler, so what comes back fits both.
+ *
+ * Questions that leave no budget at all are refused here, once, rather than
+ * every row being skipped and the query reported as the judge being down.
+ */
+async function withinJudgeBudget({
+  text,
+  entry,
+  parts,
+  traces,
+  questions,
+  limits,
+}: {
+  text: string;
+  entry: ResolvedCall | undefined;
+  parts: readonly string[];
+  traces: FetchedTraces;
+  questions: readonly InstantEvalQuestion[];
+  limits: InstantEvalClassifierLimits;
+}): Promise<{ text: string; isTruncated: boolean }> {
+  const budget = instantEvalTextBudget({ questions, limits });
+  if (budget === null) {
+    throw new InstantEvalQuestionsTooLongError({
+      questionTokens: instantEvalQuestionTokens(questions),
+      stateTokens: limits.stateTokens,
+    });
+  }
+  if (entry?.source?.name !== "conversation") {
+    return { text, isTruncated: false };
+  }
+  if (estimateJudgedTextTokens({ text, limits }) <= budget) {
+    return { text, isTruncated: false };
+  }
+
+  const bounded = lwqlAppFunction("conversation_bounded");
+  if (!bounded) return { text, isTruncated: false };
+  const rendered = await computeAppFunctionValue({
+    definition: bounded,
+    options: [rendererBudgetFor({ budget, limits }), ""],
+    parts,
+    traces,
+  });
+  if (!rendered.isResolved || typeof rendered.value !== "string") {
+    return { text, isTruncated: false };
+  }
+  return { text: rendered.value, isTruncated: true };
+}
+
+/**
+ * The judge's budget in the renderer's ruler.
+ *
+ * `conversation_bounded` counts a token as four bytes; the classifier counts
+ * `bytesPerInputToken`. The bytes the judge will accept are the budget times
+ * its ratio, and that many bytes are the renderer's budget over four.
+ */
+function rendererBudgetFor({
+  budget,
+  limits,
+}: {
+  budget: number;
+  limits: InstantEvalClassifierLimits;
+}): number {
+  return Math.max(
+    1,
+    Math.floor((budget * limits.bytesPerInputToken) / RENDERER_BYTES_PER_TOKEN),
+  );
+}
+
+/** The ruler `conversation_bounded` and `estimateTokensFromBytes` share. */
+const RENDERER_BYTES_PER_TOKEN = 4;
 
 /**
  * The text one key judges: the nested extraction's value, or the key itself.
@@ -287,17 +426,19 @@ function assertQueryBudget({
  * result full of nulls and would let the remaining units keep spending.
  */
 async function judge({
+  projectId,
   unit,
   support,
   signal,
 }: {
+  projectId: string;
   unit: JudgementUnit;
   support: InstantEvalHydrationSupport;
   signal?: AbortSignal;
 }): Promise<InstantEvalJudgement | null> {
   try {
     return await support.classifier.classify(
-      { text: unit.text, questions: unit.questions },
+      { projectId, text: unit.text, questions: unit.questions },
       signal,
     );
   } catch (error) {
@@ -327,10 +468,15 @@ function record({
     requests: number;
     inputTokens: number;
     skipped: Record<string, number>;
+    limiterWaitMs: number;
   };
 }): void {
   usage.requests += 1;
   usage.inputTokens += judgement.inputTokens;
+  usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
+  // A unit cut to fit before it was sent is a truncated row even though the
+  // classifier had nothing left to cut.
+  const isTextTruncated = judgement.isTextTruncated || unit.isTruncated;
   if (judgement.skippedReason) {
     usage.skipped[judgement.skippedReason] =
       (usage.skipped[judgement.skippedReason] ?? 0) + 1;
@@ -351,7 +497,7 @@ function record({
     // would name one event twice under two different causes.
     values.get(entry.call.column)?.set(unit.keyId, {
       value,
-      isTruncated: judgement.isTextTruncated,
+      isTruncated: isTextTruncated,
       isResolved: true,
     });
   }
@@ -379,6 +525,12 @@ function emptyValues(evalCalls: readonly ResolvedCall[]): MutableValues {
  * A fixed ceiling rather than all at once: the global limiter already paces the
  * deployment, and firing a thousand requests at it would leave a thousand
  * promises parked on it holding their texts in memory.
+ *
+ * An abort stops the scheduling and settles what is in flight rather than
+ * throwing: a unit already answered was paid for, and throwing here would
+ * lose its verdict and its usage together. A unit whose request the abort
+ * interrupted is simply not recorded, which the caller reads off the absent
+ * cell.
  */
 async function inParallel<T>({
   items,
@@ -390,22 +542,62 @@ async function inParallel<T>({
   limit: number;
   run: (item: T) => Promise<void>;
   signal?: AbortSignal;
-}): Promise<void> {
+}): Promise<{ isCancelled: boolean }> {
   let next = 0;
+  const take = () => items[next++];
   const workers = Array.from(
     { length: Math.max(1, Math.min(limit, items.length)) },
-    async () => {
-      for (;;) {
-        // Checked between units as well as inside the request, so a query the
-        // caller walked away from stops before the next classification rather
-        // than after the last one.
-        signal?.throwIfAborted();
-        const index = next++;
-        const item = items[index];
-        if (item === undefined) return;
-        await run(item);
-      }
-    },
+    () => drain({ take, run, signal }),
   );
   await Promise.all(workers);
+  return { isCancelled: signal?.aborted === true };
+}
+
+/**
+ * One worker: takes items until there are none, or until the signal fires.
+ *
+ * Checked between units as well as inside the request, so a query the caller
+ * walked away from stops before the next classification rather than after the
+ * last one. An abort surfacing from inside a unit ends the worker the same
+ * way; any other failure is the caller's to see.
+ */
+async function drain<T>({
+  take,
+  run,
+  signal,
+}: {
+  take: () => T | undefined;
+  run: (item: T) => Promise<void>;
+  signal?: AbortSignal;
+}): Promise<void> {
+  while (!signal?.aborted) {
+    const item = take();
+    if (item === undefined) return;
+    const isStopped = await runOrStop({ item, run, signal });
+    if (isStopped) return;
+  }
+}
+
+/**
+ * Runs one unit; true when the caller's cancel ended it, which ends the
+ * worker too. Only the caller's signal is a stop: an abort or a timeout the
+ * classifier raised on its own is a failed unit, and swallowing it would turn
+ * a judge that stopped answering into a page of null verdicts.
+ */
+async function runOrStop<T>({
+  item,
+  run,
+  signal,
+}: {
+  item: T;
+  run: (item: T) => Promise<void>;
+  signal?: AbortSignal;
+}): Promise<boolean> {
+  try {
+    await run(item);
+    return false;
+  } catch (error) {
+    if (signal?.aborted) return true;
+    throw error;
+  }
 }

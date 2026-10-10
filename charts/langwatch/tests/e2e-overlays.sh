@@ -66,46 +66,6 @@ assert_not_contains() {
   fi
 }
 
-# Assert a projected-Secret volume actually resolves: extract the secretName and
-# the first item key the named volume references, then prove the Secret of that
-# name in the SAME render carries that key under data. This is the check env-var
-# assertions cannot make — an optional:true volume silently drops an unresolved
-# key, so "the env var is wired" is not "the mount resolves".
-assert_secret_key_resolves() {
-  local label="$1" haystack="$2" volume="$3"
-  local sname skey pair
-  # Anchor to the VOLUME definition, not the volumeMount of the same name: the
-  # `- name: <volume>` we want is the one followed by `secret:` (the mount is
-  # followed by mountPath). Reset on every list item so the mount block cannot
-  # bleed into the unrelated `secrets` volume's secretName that follows it.
-  # Emit "secretName firstItemKey" (the subchart lists key before path).
-  pair=$(awk -v v="$volume" '
-      $1=="-" && $2=="name:" && $3==v {inblk=1; sawsec=0; sname=""; next}
-      $1=="-" && $2=="name:" {inblk=0}
-      inblk && $1=="secret:" {sawsec=1}
-      inblk && sawsec && $1=="secretName:" {sname=$2; next}
-      inblk && sname!="" && $1=="-" && $2=="key:" {print sname, $3; exit}
-    ' <<< "$haystack")
-  sname="${pair%% *}"; skey="${pair##* }"
-  if [[ -z "$sname" || -z "$skey" || "$sname" == "$skey" ]]; then
-    fail "$label: could not locate secretName/key for volume '$volume' in render"
-    return
-  fi
-  # Walk the multi-doc render: within the Secret whose metadata.name == sname,
-  # look for a data key == skey. metadata precedes data in helm output, so name
-  # is set before the data line is seen.
-  if awk -v want="$sname" -v key="${skey}:" '
-      /^---/ {kind=""; name=""}
-      /^kind: / {kind=$2}
-      kind=="Secret" && /^  name: / {name=$2}
-      kind=="Secret" && name==want && $1==key {print "yes"; exit}
-    ' <<< "$haystack" | grep -q yes; then
-    pass "$label (Secret '$sname' carries key '$skey')"
-  else
-    fail "$label: volume '$volume' references Secret '$sname' key '$skey', but no such key in the rendered Secret"
-  fi
-}
-
 # Count occurrences of a pattern in rendered YAML
 count_matches() {
   local haystack="$1" pattern="$2"
@@ -699,6 +659,27 @@ HARDENED_WORKLOADS=(
   "templates/redis/statefulset.yaml"
   "charts/gateway/templates/deployment.yaml"
   "charts/clickhouse/templates/statefulset.yaml"
+  # The LWQL access-render Job runs the app image to write the access Secret.
+  # It reaches the Kubernetes API (like the preflight / stored-objects hooks), so
+  # it MUST mount the ServiceAccount token — see TOKEN_MOUNTING_WORKLOADS below.
+  # It renders whenever ClickHouse is chart-managed (default), including under
+  # strict-admission, so it is a hardened workload (not an exemption, which the
+  # strict overlay would have to remove and cannot: the flag that would remove it
+  # is the one that keeps the hardened ClickHouse StatefulSet rendering too). On
+  # every other axis it is fully hardened: read-only root, non-root uid 1000, all
+  # capabilities dropped, seccomp RuntimeDefault, size-bounded emptyDirs.
+  "templates/clickhouse/lwql-access-render.yaml"
+)
+
+# Hardened workloads that legitimately MOUNT the ServiceAccount token because they
+# call the Kubernetes API. For these, the sweep inverts the automount assertion:
+# the token must be mounted (automountServiceAccountToken NOT false) rather than
+# withheld. This is an honest positive requirement, not a skipped check — the
+# render Job cannot write the access Secret without its token, and it must not
+# hand-roll a projected token volume (that collides with the platform webhook's
+# own, which the helm-azure-identity guard forbids chart-wide), so it auto-mounts.
+TOKEN_MOUNTING_WORKLOADS=(
+  "templates/clickhouse/lwql-access-render.yaml"
 )
 
 # Workloads that render only behind a non-default value. They are as
@@ -785,6 +766,13 @@ assert_every_emptydir_bounded() {
 # one hit anywhere satisfies them for the whole document.
 assert_workload_hardened() {
   local tpl="$1"; shift
+  # Workloads that call the Kubernetes API must mount the token; for them the
+  # automount assertion is inverted (mounted, not withheld). See
+  # TOKEN_MOUNTING_WORKLOADS.
+  local needs_token=0 w
+  for w in "${TOKEN_MOUNTING_WORKLOADS[@]}"; do
+    [[ "$w" == "$tpl" ]] && needs_token=1
+  done
   local out report
   out=$(tmpl_only "$tpl" "$@") || {
     fail "hardening: could not render $tpl"; return
@@ -812,7 +800,13 @@ assert_workload_hardened() {
     (( nonroot == 1 ))    || missing+=" container.runAsNonRoot:true"
     (( podnonroot == 1 )) || missing+=" pod.runAsNonRoot:true"
     (( seccomp == 1 ))    || missing+=" pod.seccompProfile:RuntimeDefault"
-    (( automount == 1 ))  || missing+=" pod.automountServiceAccountToken:false"
+    if (( needs_token == 1 )); then
+      # Inverted: this workload calls the K8s API, so the token MUST be mounted
+      # (automount != false). Withholding it would break the write, not harden it.
+      (( automount == 0 )) || missing+=" pod.automountServiceAccountToken:true (workload calls the K8s API)"
+    else
+      (( automount == 1 )) || missing+=" pod.automountServiceAccountToken:false"
+    fi
     if [[ -n "$missing" ]]; then
       fail "hardening[$tpl]: ${id} container '${cname}' missing:${missing}"
       failures=$((failures + 1))
@@ -985,7 +979,7 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: infrastructure overlays — verify external DB wiring
 # ─────────────────────────────────────────────────────────────────────────────
-# @scenario "App self-provisioning is exclusive to external ClickHouse under Design C"
+# @scenario "The application self-provisions the LangWatchQL access model on every deployment"
 # @scenario "A ClickHouse mode transition rolls the application automatically"
 test_infra_overlays() {
   sep; info "Suite: infrastructure overlays"
@@ -998,9 +992,10 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-external.yaml")
   assert_not_contains "ext-ch: no CH StatefulSet" "$ch_ext" "clickhouse-serverless/templates"
   assert_contains "ext-ch: CLICKHOUSE_URL env" "$ch_ext" "name: CLICKHOUSE_URL"
-  # Design C: the chart cannot render config into a server it does not run, so
-  # the app self-provisions the LWQL access model for external ClickHouse.
-  assert_contains "ext-ch: LWQL_SELF_PROVISION on for external CH" "$ch_ext" "name: LWQL_SELF_PROVISION"
+  # Issue #8258: the app always self-provisions the LWQL access model, on
+  # every posture — no chart-rendered DDL switch exists any more.
+  assert_not_contains "ext-ch: no LWQL_SELF_PROVISION env anywhere" "$ch_ext" "name: LWQL_SELF_PROVISION"
+  assert_contains "ext-ch: app still wired with LWQL query password" "$ch_ext" "name: LWQL_CLICKHOUSE_PASSWORD"
 
   # postgres-external: DATABASE_URL from secret
   local pg_ext
@@ -1027,50 +1022,26 @@ test_infra_overlays() {
   assert_contains "repl-ch: Keeper created" "$ch_repl" "name: ${RELEASE}-clickhouse-keeper"
   assert_contains "repl-ch: CLICKHOUSE_CLUSTER env" "$ch_repl" "name: CLICKHOUSE_CLUSTER"
 
-  # Design C: chart-managed ClickHouse renders the LWQL access model as config
-  # in the subchart, so the app must NOT self-provision it — LWQL_SELF_PROVISION
-  # is absent at replicas=3.
-  assert_not_contains "repl-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_repl" "name: LWQL_SELF_PROVISION"
+  # Issue #8258: the app self-provisions the LWQL access model on every
+  # posture, chart-managed ClickHouse included — so LWQL_SELF_PROVISION never
+  # renders anywhere, and the query password is always wired.
+  assert_not_contains "repl-ch: no LWQL_SELF_PROVISION env" "$ch_repl" "name: LWQL_SELF_PROVISION"
 
-  # ...and also absent at replicas=1 (chart-managed at any replica count).
+  # ...same at replicas=1 (chart-managed at any replica count).
   local ch_single
   ch_single=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-dev.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_not_contains "single-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_single" "name: LWQL_SELF_PROVISION"
+  assert_not_contains "single-ch: no LWQL_SELF_PROVISION env" "$ch_single" "name: LWQL_SELF_PROVISION"
 
-  # Design C: with app-side provisioning DDL off for chart-managed ClickHouse,
-  # the provisioner MOVES to the subchart — it does not vanish. Three ends of
-  # that contract are assertable from the parent chart here. The vendored
-  # clickhouse-serverless-0.3.0 tarball DOES render the LWQL volume/env (checked
-  # in #3 below); only the XML config CONTENT (langwatch_lwql user, grants, row
-  # policies, lwql_postgres named collection) is written inside the container at
-  # boot by ch-config rather than by helm, so that content stays covered by the
-  # subchart's own Go render tests, not this parent-chart harness.
-  #
-  #   1. The subchart is switched ON by default. Helm cannot derive
-  #      clickhouse.lwqlAccessModel.enabled from lwql.enabled, so the parent values set it,
-  #      and langwatch.lwql.provisioningGuard fails the render if an operator
-  #      turns it off while leaving LWQL enabled — otherwise NOBODY provisions.
-  assert_render_refuses "chart-managed: guard refuses LWQL-on with subchart-off" \
-    "requires clickhouse.lwqlAccessModel.enabled=true" \
-    --set clickhouse.lwqlAccessModel.enabled=false
-  #   2. The app still gets the query-time LWQL password on the chart-managed
-  #      path: it authenticates as langwatch_lwql regardless of who provisioned,
-  #      so cutting the password (the old selfProvisionActive gate) would break
-  #      every query even though the identity exists.
+  # The app still gets the query-time LWQL password on the chart-managed path:
+  # it authenticates as langwatch_lwql regardless of ClickHouse posture.
   assert_contains "chart-managed: app still wired with LWQL query password" \
     "$ch_single" "name: LWQL_CLICKHOUSE_PASSWORD"
-  #   3. The provisioning password actually REACHES the ClickHouse pod. The
-  #      clickhouse-serverless lwql-secrets volume mounts ONE Secret by name and
-  #      projects a key from it into /mnt/secrets/lwql, and the volume is
-  #      optional:true — so a Secret/key name that does not resolve is silently
-  #      skipped, config.go skips the absent file, and the langwatch_lwql user is
-  #      never created with no error anywhere. Env-var wiring (#2) does not prove
-  #      the mount resolves. Extract the secretName + key the volume references
-  #      and assert the RESOLVED Secret in the SAME render carries that key.
-  assert_secret_key_resolves "chart-managed: lwql-secrets volume key exists in rendered Secret" \
-    "$ch_single" "lwql-secrets"
+
+  # No chart template renders any part of the access model any more.
+  assert_not_contains "chart-managed: no CLICKHOUSE_LWQL_* config rendered" \
+    "$ch_single" "CLICKHOUSE_LWQL_"
 
   # Mode transition: app Deployment env differs between replicas=1 and replicas=3
   if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then
@@ -1424,6 +1395,49 @@ load_images() {
   if docker image inspect "$ch_image" &>/dev/null 2>&1; then
     info "Loading $ch_image into Kind"
     kind load docker-image "$ch_image" --name "$CLUSTER_NAME"
+  fi
+
+  # The values-local.yaml profile (examples/values-local.yaml:16) pins
+  # images.app: { tag: local, pullPolicy: Never }, so test_install_profile_local
+  # needs langwatch/langwatch:local in the cluster. The workflow builds and
+  # kind-loads only the real app image (langwatch/langwatch:3.17.0); nothing
+  # produces :local. Under app.replicaCount=0 (values-e2e.yaml) the LWQL render
+  # Job is the first workload to need the app image, and its ClickHouse mount is
+  # now optional: false, so a missing :local blocks the whole install rather than
+  # merely leaving the app scaled to zero.
+  #
+  # $APP_IMAGE is NOT trustworthy as the source: charts/langwatch/Makefile:10 sets
+  # `APP_IMAGE := langwatch/langwatch:local`, and GNU make re-exports any variable
+  # that came from the environment with the makefile's own value. So even though
+  # the workflow exports APP_IMAGE=langwatch/langwatch:3.17.0, invoking this script
+  # via `make` runs it with APP_IMAGE=langwatch/langwatch:local — a tag nobody
+  # built. Resolve the source image without trusting APP_IMAGE alone.
+  if docker image inspect langwatch/langwatch:local &>/dev/null 2>&1; then
+    info "langwatch/langwatch:local already present; loading into Kind"
+    kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+  elif [[ -n "${APP_IMAGE:-}" && "$APP_IMAGE" != "langwatch/langwatch:local" ]] \
+    && docker image inspect "$APP_IMAGE" &>/dev/null 2>&1; then
+    info "Tagging $APP_IMAGE as langwatch/langwatch:local and loading into Kind"
+    docker tag "$APP_IMAGE" langwatch/langwatch:local
+    kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+  else
+    # Derive the chart default the same way the workflow's Resolve step does.
+    # Read helm's (multi-KB) output ONCE into a variable, then extract with
+    # here-strings: piping it straight into `awk '...exit'` makes awk close the
+    # pipe on the first match while helm is still writing, and under `pipefail`
+    # (set at the top) the SIGPIPE fails the $(...) and set -e aborts (exit 141).
+    local repo tag default_image values
+    values=$(helm show values "$CHART_DIR" 2>/dev/null) || values=""
+    repo=$(awk '/^ *repository:/{print $2; exit}' <<<"$values")
+    tag=$(awk '/^ *tag:/{print $2; exit}' <<<"$values")
+    default_image="${repo}:${tag}"
+    if [[ -n "$repo" && -n "$tag" ]] && docker image inspect "$default_image" &>/dev/null 2>&1; then
+      info "Tagging chart default $default_image as langwatch/langwatch:local and loading into Kind"
+      docker tag "$default_image" langwatch/langwatch:local
+      kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+    else
+      fail "cannot produce langwatch/langwatch:local — the values-local.yaml profile pins images.app.tag=local (pullPolicy: Never) and the LWQL render Job needs it; tried: existing :local (absent), \$APP_IMAGE='${APP_IMAGE:-}' (absent or itself :local), chart default '${default_image}' (absent). Build/load the app image before running the install suites"
+    fi
   fi
 
   pass "Images loaded"

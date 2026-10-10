@@ -10,15 +10,18 @@ import {
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import {
   getColumnSizingKey,
   useColumnSizingStore,
 } from "../../stores/columnSizingStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { type LensConfig, useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { LensConfig } from "../../stores/viewSlice";
 import type { TraceListItem } from "../../types/trace";
 import { ADD_COLUMN_ID } from "./AddColumnHeader";
+import { MEMBER_PROJECT_COLUMN_ID } from "./columns";
 import { RegistryRow } from "./registry";
 import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 
@@ -28,11 +31,16 @@ import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
  * shell a new Set and the SortableContext would treat its items as
  * having changed, kicking off unnecessary re-mounts of the header row.
  *
- * Holds the two synthetic columns that frame the data columns: the
- * leading row-select checkbox and the trailing "+" add-column affordance.
- * Both are excluded from drag-reorder and sort.
+ * Holds the synthetic columns that frame the data columns: the leading
+ * row-select checkbox, an aggregate's member project column (ADR-144), which
+ * no lens stores, and the trailing "+" add-column affordance. All are
+ * excluded from drag-reorder and sort.
  */
-const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
+const NON_REORDERABLE_COLUMN_IDS = new Set([
+  SELECT_COLUMN_ID,
+  MEMBER_PROJECT_COLUMN_ID,
+  ADD_COLUMN_ID,
+]);
 
 import type { TraceTableMeta } from "./selectColumn";
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
@@ -66,15 +74,18 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   // render exactly `pageSize` placeholders so the loading state fills
   // the same vertical space the real page will occupy — no awkward
   // half-filled table while the request is in flight.
-  const pageSize = useFilterStore((s) => s.pageSize);
+  const pageSize = useExplorerStore((s) => s.pageSize);
   const effectiveTraces = useMemo(
     () => (isLoading ? buildTracePlaceholderRows(pageSize) : traces),
     [isLoading, pageSize, traces],
   );
   const { nameByKey: evaluatorNames } = useEvaluatorOptions();
+  const { project } = useOrganizationTeamProject();
+  const showMemberProject = isAggregateProjectKind(project?.kind);
   const { columns, registry, minWidth } = useTraceLensColumns({
     logicalColumnIds: lens.columns,
     evaluatorNames,
+    showMemberProject,
   });
   const {
     selectedTraceId,
@@ -85,9 +96,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     handleKeyDown,
   } = useTraceLensKeyboard({ traces });
 
-  const sortFromStore = useViewStore((s) => s.sort);
-  const setSortInStore = useViewStore((s) => s.setSort);
-  const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
+  const sortFromStore = useExplorerStore((s) => s.sort);
+  const setSortInStore = useExplorerStore((s) => s.setSort);
+  const setVisibleColumns = useExplorerStore((s) => s.setVisibleColumns);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(
@@ -143,8 +154,13 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   // visible leaf order on every change, keeping headers and cells in
   // lockstep with the store.
   const columnOrderState = useMemo<string[]>(
-    () => [SELECT_COLUMN_ID, ...lens.columns, ADD_COLUMN_ID],
-    [lens.columns],
+    () => [
+      SELECT_COLUMN_ID,
+      ...(showMemberProject ? [MEMBER_PROJECT_COLUMN_ID] : []),
+      ...lens.columns,
+      ADD_COLUMN_ID,
+    ],
+    [lens.columns, showMemberProject],
   );
 
   // The header cells only see the table, and a placeholder row is

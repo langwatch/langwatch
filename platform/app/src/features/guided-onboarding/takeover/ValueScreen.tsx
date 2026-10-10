@@ -134,8 +134,8 @@ export function ValueScreen({
                 justify="center"
                 borderRadius="6px"
                 border="1px solid"
-                borderColor={picked ? "frontDoor.action" : "border.emphasized"}
-                bg={picked ? "frontDoor.action" : "bg.panel"}
+                borderColor={picked ? "auth.badge" : "border.emphasized"}
+                bg={picked ? "auth.badge" : "bg.panel"}
                 color={picked ? "white" : "transparent"}
                 fontSize="10.5px"
                 fontWeight="600"

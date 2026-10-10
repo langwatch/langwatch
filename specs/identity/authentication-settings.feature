@@ -103,7 +103,40 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When the sign-in addresses are listed
     Then nothing offers to send a confirmation link
 
+  # Two facts can say an address is confirmed: the account's email identifier
+  # (VERIFIED through the emailed ceremony) and `User.emailVerified`. The fold
+  # writes the column from the identifier, never the other way, and sign-in
+  # linking reads the column. An operator who confirms an address by setting
+  # the column directly, on an installation that cannot send email, moves only
+  # the column. The list follows the column for the account's own address, so
+  # the screen never calls an address unconfirmed that sign-in already trusts.
+  @unit
+  Scenario: The account's own address confirmed outside the app shows as confirmed
+    Given "sam"'s own address identifier was never verified
+    And "sam"'s account says the address is confirmed
+    When the sign-in addresses are listed
+    Then the account's own address is shown as confirmed
+    And nothing offers to send it a confirmation link
+    And another address that was never confirmed still shows as not confirmed yet
+
   # ── Adding another address ─────────────────────────────────────────────
+
+  # Adding an address is sending it a link. Where the installation has no email
+  # provider no link can go out, so the offer stands down and says what is
+  # missing, and the route refuses with a named error whatever the screen drew.
+  @integration
+  Scenario: An installation that cannot send email does not offer to add an address
+    Given the installation has no email provider configured
+    When the authentication settings are shown
+    Then adding an email address is not offered
+    And the reason given says an administrator needs to set up an email provider
+
+  @unit
+  Scenario: Adding or resending an address without a way to send email is refused with a named error
+    Given the installation has no email provider configured
+    When "sam" asks to add an address or to send an address its link again
+    Then it is refused with "auth_email_sending_unavailable"
+    And no identifier is attached and nothing is sent
 
   @integration
   Scenario: Adding a second address starts a confirmation rather than a sign-in method
@@ -132,6 +165,50 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When the link is opened in a browser that did not start the ceremony
     Then nothing is confirmed
     And the screen says to return to the window the request came from
+
+  # The account's own address runs the same ceremony. An account that exists
+  # and is unconfirmed (a password sign-up from an older release, or one made
+  # on an installation that could not send email) cannot use a sign-up link:
+  # that link refuses an address that already holds an account, because a
+  # mailed link alone must never confirm an account somebody else may have
+  # created. Confirming it marks the account's address as confirmed, which is
+  # what single sign-on reads before it links a sign-in to the account.
+  @integration
+  Scenario: An existing unconfirmed account confirms its own address from Settings
+    Given "sam" has an account whose own address was never confirmed
+    When "sam" asks from Settings for the link to be sent again
+    And "sam" opens the emailed link in the window that asked
+    Then the address is confirmed
+    And the account's address reads as confirmed everywhere, including to single sign-on
+
+  @integration
+  Scenario: The own address link opened without the window that asked confirms nothing
+    Given "sam" has an account whose own address was never confirmed
+    And a confirmation link for it went out from Settings
+    When the link is used without the proof the asking window kept
+    Then nothing is confirmed
+    And the account's address still reads as not confirmed
+
+  @integration
+  Scenario: An own address that is already confirmed is not confirmed again
+    Given "sam" has confirmed the account's own address
+    When "sam" asks from Settings for another confirmation link
+    Then no link is sent
+    And "sam" is told the address cannot be confirmed again
+
+  @integration
+  Scenario: An own address the account is not known by sends nothing
+    Given the account's own address is not one of the addresses "sam" is known by
+    When "sam" asks from Settings for the confirmation link
+    Then no link is sent
+    And "sam" is told the address was not found
+
+  @unit
+  Scenario: The own address confirmation only ever goes to the session's own address
+    Given "sam" is signed in
+    When "sam" asks for the own address confirmation
+    Then the link goes to the address "sam" is signed in as
+    And no sign-up link is sent
 
   # Attaching is not claiming. An unverified identifier blocks nobody, so
   # refusing here would buy no protection and would answer "does an account
@@ -206,6 +283,36 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the route refuses it with the code "LAST_WAY_IN"
     And the passkey still signs "sam" in
 
+  # Both last-way-in repositories decide inside a SERIALIZABLE transaction,
+  # which refuses to commit the loser of a race, and both run that transaction
+  # again when it lost (`serializable-retry.ts`), so the loser answers with the
+  # refusal the guard computed rather than a raw write conflict. Two
+  # transactions that lose to EACH OTHER restart together and lose together,
+  # though, until the four attempts are gone and the conflict reaches the
+  # person after all — seen in CI as four conflicts three milliseconds apart
+  # (#8200). A short wait drawn at random from a window that doubles each
+  # round pulls the pair apart. The race is not reproduced here; the waits are
+  # pinned directly.
+  @unit
+  Scenario: A transaction that lost a race is run again after a short random wait
+    Given a serializable transaction that loses three races before it commits
+    When it is run with retries
+    Then it is run four times and its answer is returned
+    And before each retry it waits a random draw from a window that doubles each round
+    And nothing waits after the last attempt
+
+  @unit
+  Scenario: A conflict that outlives the retry budget is thrown as it was
+    Given a serializable transaction that loses every race
+    When it is run with retries
+    Then it is run four times and the fourth conflict is thrown
+
+  @unit
+  Scenario: A failure that is not a lost race is thrown at once
+    Given a serializable transaction that fails for a reason other than a lost race
+    When it is run with retries
+    Then it is run once and the failure is thrown, with no wait
+
   # ── The password, on its own ───────────────────────────────────────────
 
   # The password and the identity providers shared one section for as long as
@@ -226,6 +333,17 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then it offers to set a first password
     And it offers nothing to remove, because there is nothing there to give up
 
+  # A self-hosted install issues its own passwords even behind an enterprise
+  # identity provider, so an administrator who only holds a passkey must still
+  # be able to set one — it is the fallback way in single sign-on go-live asks
+  # for. Keying the offer off the configured provider alone hid it (ADR-027).
+  @integration
+  Scenario: A self-hosted passkey-only administrator can still set a password
+    Given a self-hosted deployment configured with an enterprise identity provider
+    And "sam" signs in with a passkey and holds no password
+    When the password section is shown
+    Then it offers to set a first password
+
   @integration
   Scenario: Removing the password is refused before it is clicked where it is the last way in
     Given the password is the only confirmed way in "sam" holds
@@ -239,6 +357,20 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" asks to remove the password
     Then the confirmation names the ways in that stay behind
     And nothing is removed until "sam" confirms
+
+  # ── Connecting a provider ──────────────────────────────────────────────
+
+  # The Connect offers come from the deployment's sign-in policy, carried on
+  # the public settings read. An operator who removes a provider restarts the
+  # app, and a tab that was open across that restart still holds the old list.
+  # The read is kept briefly and asked again on mount and on focus, so a plain
+  # reload, or coming back to the tab, shows the deployment's current set.
+  @unit
+  Scenario: A provider the deployment stopped offering leaves the Connect offers on reload
+    Given the deployment offered "Microsoft" when "sam" opened the page
+    And the operator removed it and restarted the app
+    When "sam" reloads or comes back to the page
+    Then the deployment's settings are asked for again rather than read from a long-lived cache
 
   # ── Unlinking single sign-on ───────────────────────────────────────────
 

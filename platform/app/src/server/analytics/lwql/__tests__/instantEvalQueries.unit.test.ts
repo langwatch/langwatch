@@ -18,9 +18,10 @@ import type {
 } from "~/server/app-layer/instant-evals/classifier/classifier";
 import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
-import type { InstantEvalCostRecord } from "~/server/app-layer/instant-evals/instant-eval-cost.recorder";
+import type { InstantEvalSpendRecord } from "~/server/app-layer/instant-evals/instant-eval-spend.recorder";
 import type { Protections } from "../../../traces/protections";
 import { recordingExecutor } from "../executor.testFakes";
+import type { LangWatchQLInstantEvalSupport } from "../instantEvalSupport";
 import { LangWatchQLService } from "../lwql.service";
 import { describeLangWatchQLAppFunctions } from "../schema";
 
@@ -55,13 +56,17 @@ function classifierAnswering(
 function serviceJudgingWith({
   classifier,
   queryTokenBudget = 4_000_000,
-  costs = [],
+  spends = [],
   rows = [{ annoyed: "the agent said sorry" }],
+  reserveFreeBudget = async () => {},
+  releaseFreeBudget = async () => {},
 }: {
   classifier: InstantEvalClassifier;
   queryTokenBudget?: number;
-  costs?: InstantEvalCostRecord[];
+  spends?: InstantEvalSpendRecord[];
   rows?: Record<string, unknown>[];
+  reserveFreeBudget?: LangWatchQLInstantEvalSupport["reserveFreeBudget"];
+  releaseFreeBudget?: LangWatchQLInstantEvalSupport["releaseFreeBudget"];
 }): LangWatchQLService {
   return new LangWatchQLService({
     executor: recordingExecutor({
@@ -74,8 +79,10 @@ function serviceJudgingWith({
       classifier: () => classifier,
       maxConcurrency: 4,
       queryTokenBudget,
-      recordCost: async (record) => {
-        costs.push(record);
+      reserveFreeBudget,
+      releaseFreeBudget,
+      recordSpend: async (record) => {
+        spends.push(record);
       },
     },
   });
@@ -124,6 +131,35 @@ describe("given a statement that would judge more text than one query may", () =
   });
 });
 
+describe("given an organization that has spent its free Instant Evals budget", () => {
+  describe("when a judged statement is executed", () => {
+    /** @scenario "At the budget a synchronous judged query is refused" */
+    it("refuses it before anything is sent to the classifier", async () => {
+      const { InstantEvalFreeBudgetExhaustedError } = await import(
+        "~/server/app-layer/instant-evals/errors"
+      );
+      let classified = 0;
+      const service = serviceJudgingWith({
+        classifier: classifierAnswering(async () => {
+          classified += 1;
+          throw new Error("nothing should have been sent");
+        }),
+        reserveFreeBudget: async () => {
+          throw new InstantEvalFreeBudgetExhaustedError({
+            spentUsd: 1,
+            budgetUsd: 1,
+          });
+        },
+      });
+
+      expect(await codeOf(() => run(service))).toBe(
+        "instant_eval_free_budget_exhausted",
+      );
+      expect(classified).toBe(0);
+    });
+  });
+});
+
 describe("given a classifier that answers nothing at all", () => {
   describe("when a judged statement is executed", () => {
     /** @scenario "A classifier that fails for the whole query is a platform refusal" */
@@ -154,11 +190,11 @@ describe("given a classifier that answers nothing at all", () => {
 
 describe("given a query that judged some text", () => {
   describe("when it finishes", () => {
-    /** @scenario "One cost row is recorded per query" */
-    it("records one cost row carrying the tokens, the cost and the price", async () => {
-      const costs: InstantEvalCostRecord[] = [];
+    /** @scenario "One spend record is reported per query" */
+    it("reports one spend record carrying the tokens, the cost and the price", async () => {
+      const spends: InstantEvalSpendRecord[] = [];
       const service = serviceJudgingWith({
-        costs,
+        spends,
         rows: [{ annoyed: "one" }, { annoyed: "two" }],
         classifier: classifierAnswering(async () => ({
           verdicts: [{ questionId: "annoyed", probability: 0.5 }],
@@ -169,17 +205,19 @@ describe("given a query that judged some text", () => {
 
       await run(service);
 
-      expect(costs).toHaveLength(1);
-      expect(costs[0]).toMatchObject({
+      expect(spends).toHaveLength(1);
+      expect(spends[0]).toMatchObject({
         projectId: PROJECT.id,
         inputTokens: 1_000_000,
         requests: 2,
       });
-      expect(costs[0]?.costUsd).toBeCloseTo(
+      expect(spends[0]?.runId).toBeUndefined();
+      expect(spends[0]?.occurredAt).toBeInstanceOf(Date);
+      expect(spends[0]?.costUsd).toBeCloseTo(
         INSTANT_EVAL_PRICING.usdPerMillionInputTokens,
         10,
       );
-      expect(costs[0]?.priceUsd).toBeCloseTo(
+      expect(spends[0]?.priceUsd).toBeCloseTo(
         INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
           INSTANT_EVAL_PRICING.markup,
         10,
@@ -190,26 +228,23 @@ describe("given a query that judged some text", () => {
 
 describe("given a query whose judgements were all skipped", () => {
   describe("when it finishes", () => {
-    /** @scenario "A query that judged nothing records no cost" */
-    it("records no cost row", async () => {
-      const costs: InstantEvalCostRecord[] = [];
+    /** @scenario "A query that judged nothing reports no spend" */
+    it("reports no spend", async () => {
+      const spends: InstantEvalSpendRecord[] = [];
       const service = serviceJudgingWith({
-        costs,
-        classifier: classifierAnswering(async () => ({
-          verdicts: [],
-          skippedReason: "classifier_not_configured",
-          inputTokens: 0,
-          isTextTruncated: false,
-        })),
+        spends,
+        // The judged column carries no text, so nothing is ever classified.
+        rows: [{ annoyed: null }],
+        classifier: classifierAnswering(async () => {
+          throw new Error("nothing should have been sent");
+        }),
       });
 
       const result = await run(service);
 
-      expect(costs).toEqual([]);
+      expect(spends).toEqual([]);
       expect(result.rows).toEqual([{ annoyed: null }]);
-      expect(result.diagnostics.map((entry) => entry.code)).toContain(
-        "INSTANT_EVAL_SKIPPED",
-      );
+      expect(result.diagnostics.map((entry) => entry.code)).toEqual([]);
     });
   });
 });
@@ -270,12 +305,14 @@ describe("given a statement that calls no eval function", () => {
             gateReads += 1;
             return true;
           },
+          reserveFreeBudget: async () => {},
+          releaseFreeBudget: async () => {},
           classifier: () => {
             throw new Error("a statement that judges nothing needs no judge");
           },
           maxConcurrency: 4,
           queryTokenBudget: 4_000_000,
-          recordCost: async () => {},
+          recordSpend: async () => {},
         },
       });
 
@@ -288,6 +325,69 @@ describe("given a statement that calls no eval function", () => {
       });
 
       expect(gateReads).toBe(0);
+    });
+  });
+});
+
+describe("given a free organization under its budget", () => {
+  describe("when a judged statement is executed", () => {
+    /** @scenario "A judged query holds its ceiling while it judges" */
+    it("holds the price of the whole query token budget first and lets it go once the spend is recorded", async () => {
+      const events: string[] = [];
+      const holds: { reservationId: string; priceUsd: number }[] = [];
+      const spends: InstantEvalSpendRecord[] = [];
+      const service = serviceJudgingWith({
+        spends,
+        queryTokenBudget: 1_000_000,
+        classifier: classifierAnswering(async () => {
+          events.push("judged");
+          return {
+            verdicts: [{ questionId: "annoyed", probability: 0.5 }],
+            inputTokens: 500,
+            isTextTruncated: false,
+          };
+        }),
+        reserveFreeBudget: async ({ reservationId, priceUsd }) => {
+          events.push("held");
+          holds.push({ reservationId, priceUsd });
+        },
+        releaseFreeBudget: async ({ reservationId }) => {
+          events.push(`released ${reservationId === holds[0]?.reservationId}`);
+        },
+      });
+
+      await run(service);
+
+      expect(events).toEqual(["held", "judged", "released true"]);
+      expect(holds[0]?.priceUsd).toBeCloseTo(
+        (1_000_000 / 1_000_000) *
+          INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
+          INSTANT_EVAL_PRICING.markup,
+        9,
+      );
+      expect(spends).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a statement whose eval calls take longer than the database read", () => {
+  describe("when the query answers", () => {
+    /** @scenario "A judged query reports the time its judging took" */
+    it("reports an elapsed time that covers the judging", async () => {
+      const service = serviceJudgingWith({
+        classifier: classifierAnswering(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 60));
+          return {
+            verdicts: [{ questionId: "annoyed", probability: 0.5 }],
+            inputTokens: 500,
+            isTextTruncated: false,
+          };
+        }),
+      });
+
+      const result = await run(service);
+
+      expect(result.statistics.elapsedMs).toBeGreaterThanOrEqual(60);
     });
   });
 });

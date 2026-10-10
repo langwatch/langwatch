@@ -1,3 +1,4 @@
+import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import type {
   GraphAlertOperator,
   GraphAlertTimePeriod,
@@ -13,7 +14,22 @@ import type {
  * one place instead of three hand-maintained copies.
  */
 export interface TriggerActionParams {
+  /** The Slack connection a Slack automation delivers through (ADR-093 §5a). */
+  slackIntegrationId?: string;
   slackWebhook?: string;
+  /** How a Slack automation reaches Slack — a legacy incoming webhook, or a
+   *  Slack app bot token posting via the Web API. Absent means `"webhook"`
+   *  (back-compat for rows saved before this existed). */
+  slackDelivery?: SlackDeliveryMethod;
+  /** The bot-delivery destination channel's raw Slack id (e.g. `C0123456`).
+   *  Only the id is ever persisted — the channel NAME shown while authoring
+   *  comes from a live, bot-token-authenticated Slack API call the display
+   *  surfaces don't have. */
+  slackChannelId?: string;
+  /** Read-only echo: the row stores a Slack bot token of its own. The token
+   *  itself never reaches the browser; this flag is what the redaction hook
+   *  puts in its place. */
+  slackBotTokenSet?: boolean;
   members?: string[];
   datasetId?: string;
   annotators?: { id: string; name: string }[];

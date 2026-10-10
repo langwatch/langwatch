@@ -56,6 +56,11 @@ export const UNPUBLISHED = [
     why: "the app's own tRPC transport; its contract is the TypeScript router, not an HTTP schema",
   },
   {
+    match: "POST /api/scenario/execute-sync",
+    category: "internal",
+    why: "the scenario child process asking the control plane to run one turn on this project's own engine, because the credential that invokes it may invoke any project's",
+  },
+  {
     match: "/api/sse",
     category: "internal",
     why: "server-sent event channels the dashboard subscribes to, with no stable per-message contract to publish",
@@ -79,6 +84,11 @@ export const UNPUBLISHED = [
     match: "/api/internal",
     category: "internal",
     why: "control-plane calls from the gateway and langy workers, authenticated by an internal shared secret",
+  },
+  {
+    match: "/api/connect/v1",
+    category: "internal",
+    why: "the connect host a self-hosted install syncs its license and its anonymous statistics to; the caller is the install's own worker and the contract is ADR-141, not something a customer writes by hand",
   },
   {
     match: "/api/admin",

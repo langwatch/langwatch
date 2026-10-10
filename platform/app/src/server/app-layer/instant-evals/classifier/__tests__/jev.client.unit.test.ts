@@ -12,12 +12,21 @@
 
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
+import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
 import { InstantEvalClassifierUnavailableError } from "../../errors";
 import type { InstantEvalQuestion } from "../classifier";
-import { UnlimitedInstantEvalRateLimiter } from "../globalRateLimiter";
+import {
+  type InstantEvalPermit,
+  type InstantEvalRateLimiter,
+  UnlimitedInstantEvalRateLimiter,
+} from "../globalRateLimiter";
 import { JEV_DEFAULT_BASE_URL, JevInstantEvalClassifier } from "../jev.client";
 import { NullInstantEvalClassifier } from "../null.client";
+import {
+  estimateJudgedTextTokens,
+  instantEvalQuestionTokens,
+  instantEvalTextBudget,
+} from "../token-budget";
 
 const QUESTION: InstantEvalQuestion = {
   id: "annoyed",
@@ -36,10 +45,12 @@ const TOO_LARGE = { detail: { error_type: "max_tokens_exceeded" } };
 let agent: MockAgent;
 let waits: number[];
 
-function classifier() {
+function classifier(
+  limiter: InstantEvalRateLimiter = new UnlimitedInstantEvalRateLimiter(),
+) {
   return new JevInstantEvalClassifier({
     apiKey: "test-key",
-    limiter: new UnlimitedInstantEvalRateLimiter(),
+    limiter,
     dispatcher: agent,
     sleep: async (ms) => {
       waits.push(ms);
@@ -77,6 +88,7 @@ describe("given a classifier that answers", () => {
         });
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "the customer wrote in again",
         questions: [QUESTION],
       });
@@ -112,6 +124,7 @@ describe("given a classifier that is rate limiting", () => {
         .reply(200, ANSWER);
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "text",
         questions: [QUESTION],
       });
@@ -131,7 +144,11 @@ describe("given a classifier that is rate limiting", () => {
         .intercept({ path: "/v1/systemone", method: "POST" })
         .reply(200, ANSWER);
 
-      await classifier().classify({ text: "text", questions: [QUESTION] });
+      await classifier().classify({
+        projectId: "project-1",
+        text: "text",
+        questions: [QUESTION],
+      });
 
       expect(waits).toEqual([30_000]);
     });
@@ -150,6 +167,7 @@ describe("given a classifier that is rate limiting", () => {
         .times(5);
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "text",
         questions: [QUESTION],
       });
@@ -157,6 +175,63 @@ describe("given a classifier that is rate limiting", () => {
       expect(attempts).toBe(5);
       expect(judgement.skippedReason).toBe("classifier_rate_limited");
       expect(judgement.verdicts).toEqual([]);
+    });
+  });
+});
+
+describe("given a classifier that keeps failing with no Retry-After", () => {
+  describe("when every attempt answers 500", () => {
+    /** @scenario "A failing request backs off longer on each attempt" */
+    it("doubles the wait between attempts", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(5);
+
+      const judgement = await classifier().classify({
+        projectId: "project-1",
+        text: "text",
+        questions: [QUESTION],
+      });
+
+      expect(waits).toEqual([1_000, 2_000, 4_000, 8_000]);
+      expect(judgement.skippedReason).toBe("classifier_failed");
+    });
+  });
+});
+
+describe("given a limiter that records what each permit asks for", () => {
+  describe("when a text is classified", () => {
+    /** @scenario "A classification takes its estimated tokens from one bucket shared by every pod" */
+    it("takes the tokens the request will really carry, not the generic estimate", async () => {
+      const permits: InstantEvalPermit[] = [];
+      const limiter: InstantEvalRateLimiter = {
+        acquire: async (permit) => {
+          permits.push(permit);
+        },
+      };
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, ANSWER);
+      const text = "User: where is my order\nAssistant: let me check\n".repeat(
+        40,
+      );
+
+      await classifier(limiter).classify({
+        projectId: "project-1",
+        text,
+        questions: [QUESTION],
+      });
+
+      const expected =
+        estimateJudgedTextTokens({ text }) +
+        instantEvalQuestionTokens([QUESTION]);
+      expect(permits).toEqual([{ tokens: expected, tenantId: "project-1" }]);
+      // The generic bytes-over-four rule would have asked for about a third
+      // less, which is the undercount the permit used to carry.
+      expect(expected).toBeGreaterThan(
+        estimateTokensFromBytes(text) + instantEvalQuestionTokens([QUESTION]),
+      );
     });
   });
 });
@@ -180,6 +255,7 @@ describe("given a text the classifier refuses as too large", () => {
         });
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "x".repeat(400),
         questions: [QUESTION],
       });
@@ -199,6 +275,7 @@ describe("given a text the classifier refuses as too large", () => {
         .times(2);
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "x".repeat(400),
         questions: [QUESTION],
       });
@@ -221,7 +298,11 @@ describe("given a classifier that refuses the credential", () => {
         });
 
       await expect(
-        classifier().classify({ text: "text", questions: [QUESTION] }),
+        classifier().classify({
+          projectId: "project-1",
+          text: "text",
+          questions: [QUESTION],
+        }),
       ).rejects.toBeInstanceOf(InstantEvalClassifierUnavailableError);
       expect(attempts).toBe(1);
     });
@@ -240,6 +321,72 @@ describe("given a deployment with no classifier", () => {
         inputTokens: 0,
         isTextTruncated: false,
       });
+    });
+  });
+});
+
+describe("given an unbounded conversation larger than the judge takes", () => {
+  describe("when it is judged", () => {
+    /** @scenario "An unbounded conversation past the judge's state cap is cut to the budget and marked truncated" */
+    it("cuts it to the budget, answers, and marks the row truncated", async () => {
+      // What `--target threads` now sends: `conversation(ConversationId)` with
+      // no budget of its own, so a thread longer than the classifier's state
+      // arrives here whole and the budget is the only thing that cuts it.
+      const conversation = "a".repeat(400_000);
+      let sentState = "";
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, (options) => {
+          sentState = JSON.parse(String(options.body)).state;
+          return ANSWER;
+        });
+
+      const judgement = await classifier().classify({
+        projectId: "project-under-test",
+        text: conversation,
+        questions: [QUESTION],
+      });
+
+      // Cut rather than refused: the run judges the conversation it can see
+      // instead of losing the row.
+      expect(judgement.skippedReason).toBeUndefined();
+      expect(judgement.verdicts).toHaveLength(1);
+      expect(judgement.isTextTruncated).toBe(true);
+
+      // And the cut happened before the send, so the request is inside the cap
+      // rather than being refused by the API as max_tokens_exceeded.
+      expect(sentState.length).toBeLessThan(conversation.length);
+      expect(instantEvalTextBudget({ questions: [QUESTION] })).not.toBeNull();
+      expect(estimateTokensFromBytes(sentState)).toBeLessThanOrEqual(
+        instantEvalTextBudget({ questions: [QUESTION] }) ?? 0,
+      );
+
+      // This is the last-resort cut, for a text that reaches the classifier
+      // already over budget. A conversation never arrives here that way: the
+      // hydration stage re-renders one through the bounded renderer first,
+      // which keeps both ends and names the turns it dropped
+      // (../../../../analytics/lwql/appFunctions/hydration/evaluate.ts).
+    });
+
+    /** @scenario "A conversation inside the judge's state cap is sent whole and not marked truncated" */
+    it("sends a conversation inside the cap whole", async () => {
+      const conversation = "a".repeat(1_000);
+      let sentState = "";
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, (options) => {
+          sentState = JSON.parse(String(options.body)).state;
+          return ANSWER;
+        });
+
+      const judgement = await classifier().classify({
+        projectId: "project-under-test",
+        text: conversation,
+        questions: [QUESTION],
+      });
+
+      expect(judgement.isTextTruncated).toBe(false);
+      expect(sentState).toBe(conversation);
     });
   });
 });

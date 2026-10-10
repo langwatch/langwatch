@@ -196,7 +196,8 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Given an ACTIVE connection for "acme"
     When a suspend command is handled
     Then the connection is SUSPENDED and stops routing its domains
-    And a resume command restores ACTIVE and routing
+    And a resume command without a live break-glass binding is refused
+    And with a live binding, resume restores ACTIVE and routing
 
   @unit
   Scenario: Teardown never strands a user
@@ -205,12 +206,120 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the command is refused naming the invariant
     And once every affected user holds another verified method, teardown proceeds
 
+  @integration @regression
+  Scenario: Teardown cannot assume safety when the connection projection is missing
+    Given the connection's current projection is unavailable
+    When the connection's stranded users are checked
+    Then the check is refused with sso_connection_not_found
+
+  @integration @regression
+  Scenario: Teardown recognizes adopted native sign-in methods without a connection annotation
+    Given a member's only authentication method identifies the connection by its native provider
+    And their address has not been verified
+    When the connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: A verified local credential remains a way in after connection teardown
+    Given a member signs in through the connection and also holds a verified local password
+    When the connection's stranded users are checked
+    Then the member is not stranded by removal
+
+  @integration @regression
+  Scenario: An address or unverified method cannot make connection teardown safe
+    Given a member's only verified authentication method belongs to the connection
+    And they also hold an address or a method that is unverified or retired
+    When the connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: Another verified authentication method prevents connection stranding
+    Given a member holds a verified authentication method outside the connection
+    When the connection's stranded users are checked
+    Then the member is not stranded by removal
+
+  @integration @regression
+  Scenario: An inactive SSO connection cannot be the alternate way in
+    Given a member's alternate verified sign-in method belongs to an inactive SSO connection
+    When the active connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: An explicit missing SSO connection cannot be the alternate way in
+    Given a member's alternate verified sign-in method names a connection that no longer exists through its binding or provider ID
+    When the active connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: Another subject at the removed provider is not a fallback sign-in
+    Given a member holds multiple sign-in identities at the connection being removed
+    And no verified authentication method outside that connection
+    When the connection's stranded users are checked
+    Then the member is reported once as having no other verified way in
+
+  @integration @regression
+  Scenario: Teardown does not strand unrelated or explicitly differently associated users
+    Given a user's live authentication methods belong to other connections
+    When the connection's stranded users are checked
+    Then the unrelated user is not reported
+
+  @integration @regression
+  Scenario: Teardown recognizes adopted legacy subjects without including another organization
+    Given a member signs in through an adopted legacy broker subject
+    And another organization's member uses the same broker
+    When the legacy connection's stranded users are checked
+    Then only the member of the connection's organization is reported
+
   @unit
   Scenario: Teardown completes only after its grace period
     Given a connection in TEARDOWN_PENDING
     When the grace period elapses
     Then the connection becomes TORN_DOWN through the process manager's wake
     And its domains route nowhere
+
+  @integration
+  Scenario: An administrator removes their own connection that never went live
+    Given "acme" registered a connection that is not yet ACTIVE
+    When "ana" removes it from the setup page
+    Then the connection is discarded and the journey opens on the register step again
+    And nothing about anybody's sign-in changed, and the history keeps what was tried
+
+  @integration
+  Scenario: An administrator removes their own live connection on teardown's terms
+    Given "acme"'s connection is ACTIVE and nobody would be stranded
+    When "ana" removes it from the setup page
+    Then the removal is scheduled with teardown's own grace, not completed at once
+    And another organization's administrator naming the connection is answered as if it did not exist
+
+  # The grace gives administrators time to arrange another verified way in. A
+  # paused connection has already stopped carrying anybody, so its removal owes
+  # nobody a week.
+  @unit
+  Scenario: A removal of a connection that is carrying nobody is scheduled for now
+    Given "acme"'s connection is paused
+    When "ana" removes it from the setup page
+    Then the teardown deadline is the moment of the ask
+    And the wake completes it as soon as it fires
+
+  @unit
+  Scenario: Asking again while a removal waits brings the date forward
+    Given a connection in TEARDOWN_PENDING with days of grace left
+    When the administrator removes it again
+    Then the deadline is re-derived from the new ask
+    And the stranded-users check runs again on the way through
+
+  # One button, two removals, and the aggregate refuses each from the other's
+  # states — so which one a press is has to be read from where the connection
+  # stands. Reading it from whether the connection is ACTIVE is the same
+  # question asked wrongly: a paused connection and one already being removed
+  # are both "not active", neither can be discarded, and the screen offered
+  # both a button whose only outcome was a refusal.
+  @integration
+  Scenario: Which removal a press sends is read from where the connection stands
+    Given "acme"'s connection is paused, or already scheduled for removal
+    When "ana" removes it from the setup page
+    Then the connection is torn down on teardown's terms, never discarded
+    And a connection already being removed says so on the page, and says when
 
   @unit
   Scenario: The projection replays whole-row like every identity projection
@@ -247,14 +356,42 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When any state change is commanded
     Then the same guards apply as for a self-served connection
 
-  # ── Routing flip ───────────────────────────────────────────────────────
+  # Recording the old route is an operator's act, so there is a window where an
+  # organization is routing people through a provider and carries no connection
+  # yet. The setup screen read that window as an empty one and offered the
+  # vendor picker, and following it built a SECOND connection on a domain the
+  # live route already answers -- no predecessor named, no proof inherited, no
+  # way back. The screen has to be able to tell the two apart before it can
+  # stop offering that.
 
   @unit
-  Scenario: Shadow mode compares connection routing against string routing
-    Given the connection routing flag is in shadow
-    When any user signs in through a routed domain
-    Then both lookups run and a disagreement is logged with both answers
-    And the string-based answer keeps deciding the sign-in
+  Scenario: An organization already routing sign-in is not offered a second connection
+    Given "acme" carries legacy ssoDomain "acme.com" and a provider string
+    And no connection has been recorded for "acme" yet
+    When an administrator opens the single sign-on setup screen
+    Then the screen reports the route "acme" already signs in through
+    And it does not offer to connect an identity provider
+
+  @unit
+  Scenario: An organization with no sign-in route is offered the setup journey
+    Given "acme" carries no legacy single sign-on strings and no connection
+    When an administrator opens the single sign-on setup screen
+    Then the screen reports no existing route
+    And the setup journey is offered as before
+
+  # ── Routing flip ───────────────────────────────────────────────────────
+
+  # There is no fleet-wide flip, and the staged flag that was going to carry
+  # one was designed out rather than built. Routing asks the connection
+  # projection first and falls back to the columns per organization, so which
+  # of the two decides differs BY ORGANIZATION -- and a switch thrown for
+  # everybody could only ever have been wrong for somebody.
+  @unit
+  Scenario: Which routing decides is asked per organization, never set fleet-wide
+    Given "acme"'s connection decides its sign-in and "globex" has none
+    When a staff member edits the legacy single sign-on strings
+    Then the edit is refused for "acme", named as derived from its connection
+    And it is still accepted for "globex", whose strings still decide
 
   @unit
   Scenario: After the flip, the strings stop being written
@@ -285,3 +422,101 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And they are told to give the issuer URL their provider publishes
     And nothing in the answer describes our network back to them
 
+  # --- Except where somebody has vouched for the address --------------------
+  #
+  # Refusing every private address also refuses the two cases where dialling
+  # one is the whole point: an identity provider that lives inside the
+  # customer's own network, and the simulator a developer walks this journey
+  # against. The engine already dials both at sign-in, on the strength of
+  # SSO_TRUSTED_IDP_ORIGINS and LANGWATCH_IDPSIM_URL. Registration refused
+  # them, so an installation could sign in through a provider it was not
+  # allowed to register — the ceremony and the sign-in disagreeing about the
+  # same address.
+  #
+  # One list now answers for both, with the same rule the engine already
+  # applies: an operator's allowlist is honoured everywhere, and the
+  # simulator's address is honoured outside production only, because it signs
+  # whatever it is asked to sign.
+  #
+  # Vouching is per ORIGIN and does not travel. A redirect away from a
+  # vouched origin is judged like any other hop, so an address somebody
+  # allowed cannot become a way to reach the rest of the network.
+
+  @unit
+  Scenario: An issuer inside the network an operator vouched for is dialled
+    Given an operator registering a connection
+    And they have vouched for the origin their provider answers on
+    When the issuer they give resolves to an address inside that origin
+    Then the provider is asked whether it is one
+    And the connection registers on the answer
+
+  @unit
+  Scenario: The simulator is dialled outside production and nowhere else
+    Given a developer registering a connection against the identity provider
+    simulator
+    When the issuer they give is the simulator's own address
+    Then the provider is asked whether it is one
+    But the same address is refused on a production installation
+
+  @unit
+  Scenario: Vouching for an origin does not vouch for where it redirects
+    Given an operator registering a connection
+    And they have vouched for the origin their provider answers on
+    When that origin redirects the discovery request into our own network
+    Then the connection is not registered
+    And nothing in the answer describes our network back to them
+
+
+  # ---------------------------------------------------------------------
+  # What it is called
+  # ---------------------------------------------------------------------
+
+  # A NAME AND NOT AN IDENTIFIER, which the engine's own row already said: a
+  # sign-in reaches a connection by its CONNECTION ID, deliberately, so that
+  # two organizations can both call theirs "okta". Nothing routes on the name,
+  # nothing is keyed by it, and no saved link breaks when it changes.
+  #
+  # It was only ever collected as "provider id" at registration, and a screen
+  # showing "identity provider: lw" beside an unchangeable value made a label
+  # look like a key nobody had better touch. So it has a verb of its own, and
+  # the verb is allowed where the others are not: every other change to a
+  # connection decides who gets in, and this one decides nothing.
+
+  @unit
+  Scenario: Renaming a connection changes the name and nothing else
+    Given a connection an organization has registered
+    When an administrator gives it another name
+    Then the connection answers to the new name
+    And its identifier is unchanged
+    And who it admits is unchanged
+
+  @unit
+  Scenario: Renaming it to what it is already called is not an event
+    Given a connection an organization has registered
+    When an administrator saves the name it already has
+    Then nothing is recorded
+
+  @unit
+  Scenario: A name is required
+    Given a connection an organization has registered
+    When an administrator saves a blank name
+    Then it is refused
+
+  @unit
+  Scenario: A connection can be renamed while it is still being set up
+    Given a connection that is not live yet
+    When an administrator gives it another name
+    Then the connection answers to the new name
+
+  @unit
+  Scenario: The rename is on the connection's own history
+    Given an administrator has renamed a connection
+    When the connection's history is read
+    Then it says what the connection was renamed to
+
+  @integration
+  Scenario: The name is offered for editing on the connection's card
+    Given an administrator who may manage single sign-on
+    When they open their connection
+    Then the name is offered for editing in place
+    And a reader who may not manage it is offered no way to change it

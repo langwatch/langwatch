@@ -1,4 +1,5 @@
 import { identifierDomain, normalizeIdentifierValue } from "./identifier";
+import type { JoinRequestOrigin } from "./join-request";
 
 /**
  * Which organizations will take an address (ADR-117, D12). One question, and
@@ -25,9 +26,9 @@ import { identifierDomain, normalizeIdentifierValue } from "./identifier";
  * an organization, and every organization the product creates gets a shared
  * team — so a predicate for it could only ever be inert. The privacy it was
  * reaching for is held by the rules above instead: a consumer domain is
- * structurally excluded, automatic joining needs an admin-named domain AND two
- * verified members (which one person cannot be), and the request path ends
- * with an administrator who is free to ignore it.
+ * structurally excluded, automatic joining needs an admin-named domain AND a
+ * proof the organization controls it, and the request path ends with an
+ * administrator who is free to ignore it.
  *
  * What is left is the solo WORK organization — one person at a real company
  * domain — and offering that is the orphan-organization fix doing its job. The
@@ -53,18 +54,49 @@ export type DomainJoinSetting = (typeof DOMAIN_JOIN_SETTINGS)[number];
 export const DEFAULT_DOMAIN_JOIN_SETTING: DomainJoinSetting = "request";
 
 /**
+ * The seat a person admitted WITHOUT an invitation receives (ADR-143): a
+ * domain join, or an SSO-admitted login. `MEMBER` is a Full seat and the
+ * default, so no existing organization changes behaviour; `DEVELOPER` lands
+ * newcomers with a personal project and nothing shared. Invitations always
+ * name their own role and never read this.
+ */
+export const JOINER_ROLES = ["MEMBER", "DEVELOPER"] as const;
+export type JoinerRole = (typeof JOINER_ROLES)[number];
+export const DEFAULT_JOINER_ROLE: JoinerRole = "MEMBER";
+
+/**
+ * The stored joiner seat, narrowed to the two values the setting allows. The
+ * column is the whole organisation role enum, but a joiner is only ever a
+ * Full member or a Developer (ADR-143); anything else reads as the default.
+ */
+export function readJoinerRole(stored: string | null | undefined): JoinerRole {
+  return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
+    ? (stored as JoinerRole)
+    : DEFAULT_JOINER_ROLE;
+}
+
+/**
+ * The seat a join lands in (ADR-143 v6): the organisation's joiner seat for a
+ * request made on the web, and a Developer for one made from the terminal,
+ * whatever the joiner seat says. A pure decision, so the service can take it
+ * from the request in hand on the automatic path, where the projection row
+ * may not exist yet, and from the stored request on a later approval.
+ */
+export function seatForJoiner({
+  origin,
+  joinerRole,
+}: {
+  origin: JoinRequestOrigin;
+  joinerRole: JoinerRole;
+}): JoinerRole {
+  return origin === "cli" ? "DEVELOPER" : joinerRole;
+}
+
+/**
  * Asking to join needs ONE member holding a verified address on the domain:
  * the ask reveals nothing on its own and an admin gates the outcome.
  */
 export const JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD = 1;
-
-/**
- * Walking in automatically needs more, because nobody gates it. One colleague
- * with a personal-looking address at a small vendor is not evidence a company
- * owns a domain; the administrator naming the domain, plus corroboration from
- * a second verified member, is.
- */
-export const JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD = 2;
 
 /**
  * Consumer mail providers, which are not companies.
@@ -80,35 +112,72 @@ export const JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD = 2;
  * deliverable can produce.
  */
 export const PUBLIC_EMAIL_DOMAINS: readonly string[] = [
+  "126.com",
+  "163.com",
   "aol.com",
   "duck.com",
   "fastmail.com",
+  "free.fr",
+  "freenet.de",
   "gmail.com",
+  "gmx.at",
+  "gmx.ch",
   "gmx.com",
   "gmx.de",
   "gmx.net",
   "googlemail.com",
   "hey.com",
+  "hotmail.be",
   "hotmail.co.uk",
   "hotmail.com",
+  "hotmail.de",
+  "hotmail.es",
   "hotmail.fr",
+  "hotmail.it",
+  "hotmail.nl",
   "icloud.com",
+  "laposte.net",
+  "libero.it",
+  "live.be",
   "live.co.uk",
   "live.com",
+  "live.de",
+  "live.fr",
+  "live.it",
+  "live.nl",
   "mac.com",
   "mail.com",
   "mail.ru",
   "me.com",
   "msn.com",
+  "naver.com",
+  "orange.fr",
   "outlook.com",
+  "outlook.de",
+  "outlook.es",
+  "outlook.fr",
+  "outlook.it",
   "pm.me",
-  "prontonmail.com",
   "proton.me",
   "protonmail.com",
   "qq.com",
+  "rediffmail.com",
+  "seznam.cz",
+  "sfr.fr",
+  "t-online.de",
+  "uol.com.br",
+  "wanadoo.fr",
+  "web.de",
+  "yahoo.ca",
   "yahoo.co.jp",
   "yahoo.co.uk",
   "yahoo.com",
+  "yahoo.com.au",
+  "yahoo.com.br",
+  "yahoo.de",
+  "yahoo.es",
+  "yahoo.fr",
+  "yahoo.it",
   "yandex.com",
   "yandex.ru",
   "ymail.com",
@@ -158,6 +227,20 @@ export interface JoinCandidateOrganization {
   /** The domains an administrator named when turning automatic joining on.
    *  Empty means automatic joining admits nobody, whatever the setting says. */
   autoJoinDomains: readonly string[];
+  /**
+   * True when this organization holds a LIVE proof of the domain: the
+   * verification ceremony's published record or file still standing, an
+   * operator's attestation, or a licence — and not a proof that has lapsed
+   * (ADR-123).
+   *
+   * This is what authorizes walking in without a human in the loop. Verified
+   * members on a domain are people who RECEIVED mail there, which any two
+   * accounts on an unlisted consumer mail host can be; a proof is the
+   * organization demonstrating it CONTROLS the domain, which they cannot.
+   * Asking still runs on members, because a request ends with an
+   * administrator who decides.
+   */
+  domainProved: boolean;
 }
 
 /** What is safe to say about an organization to somebody who is not in it:
@@ -280,8 +363,16 @@ export function organizationAdmitsDomain({
 
 /**
  * Whether an organization admits a domain WITHOUT an admin clicking: the
- * setting is `auto`, an administrator named this exact domain, and a second
- * verified member corroborates that the company owns it.
+ * setting is `auto`, an administrator named this exact domain, and the
+ * organization has PROVED it controls the domain.
+ *
+ * Members' verified addresses are deliberately not enough here, however many
+ * there are. Receiving mail on a domain is something any two strangers on a
+ * consumer mail host our deny-list has not heard of can do; proving the
+ * domain — the published record or file, an operator's attestation, a
+ * licence — is something only whoever controls it can. The one path with no
+ * human in the loop runs on the one kind of evidence that cannot be
+ * accumulated by signing up.
  */
 export function organizationAdmitsDomainAutomatically({
   organization,
@@ -293,7 +384,7 @@ export function organizationAdmitsDomainAutomatically({
   if (!organizationAdmitsDomain({ organization, domain })) return false;
   if (organization.domainJoin !== "auto") return false;
   if (!organization.autoJoinDomains.includes(domain)) return false;
-  return (
-    organization.verifiedMembersOnDomain >= JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD
-  );
+  // A lapsed proof reads as no proof: the domain stopped vouching for new
+  // people when its record stayed missing through the grace (ADR-123).
+  return organization.domainProved;
 }

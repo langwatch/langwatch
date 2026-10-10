@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
@@ -14,6 +15,22 @@ const logger = createLogger("langwatch:mailer:smtp");
 
 export const isSmtpConfigured = (): boolean =>
   Boolean(env.SMTP_URL ?? env.SMTP_HOST);
+
+/**
+ * Whether the transport logs in to the relay: a user in `SMTP_URL`, or
+ * `SMTP_USER` when the discrete settings are used. Follows the same precedence
+ * as `buildSmtpTransportOptions`.
+ */
+export const smtpSendsCredentials = (): boolean => {
+  if (env.SMTP_URL) {
+    try {
+      return new URL(env.SMTP_URL).username !== "";
+    } catch {
+      return false;
+    }
+  }
+  return Boolean(env.SMTP_USER);
+};
 
 /**
  * Nodemailer's own defaults let a send hang for minutes (2m to connect, 10m of
@@ -99,6 +116,9 @@ export const smtpProvider: EmailProviderPort = {
         to: toAddresses,
         subject: content.subject,
         html: content.html,
+        ...(content.idempotencyKey && {
+          messageId: `<${createHash("sha256").update(content.idempotencyKey).digest("hex")}@notifications.langwatch.ai>`,
+        }),
         ...(bccAddresses.length > 0 && {
           envelope: { from, to: [...toAddresses, ...bccAddresses] },
         }),

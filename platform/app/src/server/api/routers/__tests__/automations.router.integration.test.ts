@@ -20,6 +20,8 @@ import {
 } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { encrypt } from "~/utils/encryption";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -55,7 +57,14 @@ const {
   mockTriggerSentFindMany,
   mockFeatureFlagIsEnabled,
   mockRateLimit,
+  mockConnectActionParams,
 } = vi.hoisted(() => ({
+  mockConnectActionParams: vi.fn(
+    async ({ actionParams }: { actionParams: Record<string, unknown> }) => ({
+      ...actionParams,
+      slackIntegrationId: actionParams.slackIntegrationId ?? "conn-test",
+    }),
+  ),
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
   mockTriggerCreate: vi.fn(),
@@ -96,19 +105,37 @@ vi.mock("~/server/license-enforcement", async (importOriginal) => {
   };
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
+
+// Slack connections have their own suites; this file pins the router's other
+// rules, so a Slack save lands on a stand-in connection here.
+vi.mock(
+  "~/server/app-layer/automations/slack-integration/slack-integration.wiring",
+  () => ({
+    createSlackIntegrationService: () => ({
+      connectActionParams: mockConnectActionParams,
+      findUsableSecret: async () => null,
+    }),
+  }),
+);
 
 import {
   _resetMemoryPersistCapStore,
@@ -190,6 +217,7 @@ describe("automationRouter", () => {
     });
     globalForApp.__langwatch_app = createTestApp({
       triggers: triggerService,
+      permissions: appPermissionsService(),
       // The cap counters this suite asserts on live on the real Redis, and
       // both the router's read and the direct consume calls take it from here.
       redis: connection,
@@ -282,6 +310,71 @@ describe("automationRouter", () => {
         message: expect.stringMatching(/Re-enter webhook header values/),
       });
     });
+
+    /** @scenario "Test fires are rate limited" */
+    it("declines a test fire once the window's allowance is spent", async () => {
+      mockRateLimit.mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + 42_000,
+      });
+
+      await expect(
+        caller.testFireTemplate({
+          projectId: "proj_123",
+          channel: "webhook",
+          trigger: { name: "Webhook", alertType: null },
+          draft: {},
+          webhook: null,
+          webhookDestination: {
+            url: "https://receiver.example/hook",
+            method: "POST",
+            headers: {},
+            bodyTemplate: null,
+          },
+          botDestination: null,
+          graphAlert: null,
+          report: null,
+        }),
+      ).rejects.toMatchObject({
+        code: "TOO_MANY_REQUESTS",
+        message: expect.stringMatching(/too many test fires/i),
+      });
+    });
+
+    // The webhook channel is no longer gated: a flag read per test fire bought
+    // nothing once every project had the channel, and leaving the call in
+    // invites the OFF branch growing back.
+    it("test-fires a webhook without asking whether the channel is enabled", async () => {
+      const error = await caller
+        .testFireTemplate({
+          projectId: "proj_123",
+          channel: "webhook",
+          trigger: { name: "Webhook", alertType: null },
+          draft: {},
+          webhook: null,
+          webhookDestination: {
+            url: "https://receiver.example/hook",
+            method: "POST",
+            headers: {},
+            bodyTemplate: null,
+          },
+          botDestination: null,
+          graphAlert: null,
+          report: null,
+        })
+        .then(
+          () => null,
+          (thrown: unknown) => thrown,
+        );
+
+      // The harness stores no proj_123 row, so the FIRE PATH refuses at
+      // project resolution — proof the call got past any channel gate and
+      // into the send. A gating or validation refusal would fail this match
+      // instead of being swallowed.
+      expect((error as Error).message).toMatch(/Project not found/);
+      expect(mockFeatureFlagIsEnabled).not.toHaveBeenCalled();
+    });
   });
 
   describe("upsert with graph-alert variant", () => {
@@ -340,7 +433,7 @@ describe("automationRouter", () => {
           // Threshold rule is merged into actionParams so the dispatcher
           // sees ONE shape regardless of which creation path was used.
           expect(createArgs.data.actionParams).toMatchObject({
-            slackWebhook: "https://hooks.slack.com/services/abc",
+            slackIntegrationId: "conn-test",
             threshold: 250,
             operator: "gt",
             timePeriod: 60,
@@ -354,7 +447,7 @@ describe("automationRouter", () => {
       });
 
       describe("on create when the saved row carries an encrypted bot token", () => {
-        it("redacts slackBotToken from the mutation response (ADR-041)", async () => {
+        it("returns no slackBotToken and no set flag in the mutation response (ADR-093 §5a)", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
           mockTriggerCreate.mockResolvedValueOnce({
             id: "trigger_new",
@@ -373,7 +466,7 @@ describe("automationRouter", () => {
           ).toBeUndefined();
           expect(
             (result.actionParams as Record<string, unknown>).slackBotTokenSet,
-          ).toBe(true);
+          ).toBeUndefined();
         });
       });
 
@@ -512,7 +605,7 @@ describe("automationRouter", () => {
         // Same builder-shaped row as the create path: threshold rule merged
         // into actionParams, filters forced to {}, name "Alert: "-prefixed.
         expect(updateArgs.data.actionParams).toMatchObject({
-          slackWebhook: "https://hooks.slack.com/services/abc",
+          slackIntegrationId: "conn-test",
           threshold: 250,
           operator: "gt",
           timePeriod: 60,
@@ -523,6 +616,52 @@ describe("automationRouter", () => {
         expect(updateArgs.data.triggerKind).toBe("ALERT");
         expect(updateArgs.data.alertType).toBe("WARNING");
         expect(updateArgs.data.customGraphId).toBe("graph_1");
+      });
+    });
+
+    describe("when a Slack alert not yet migrated is saved without its token retyped", () => {
+      /** @scenario Saving an automation not yet migrated from the dashboard moves its token into a connection */
+      it("hands the stored token to the connect step and writes no token back", async () => {
+        const token = ["xoxb", "fake", "stored"].join("-");
+        mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+        mockTriggerFindUnique.mockResolvedValue({
+          id: "trigger-legacy",
+          projectId: "proj_123",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: {
+            slackDelivery: "bot",
+            slackChannelId: "C0123",
+            slackBotToken: encrypt(token),
+          },
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "trigger-legacy",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+        });
+
+        try {
+          await caller.upsert({
+            ...baseGraphAlertInput,
+            triggerId: "trigger-legacy",
+            actionParams: { slackDelivery: "bot", slackChannelId: "C0123" },
+          } as any);
+        } finally {
+          mockTriggerFindUnique.mockReset();
+        }
+
+        expect(mockConnectActionParams).toHaveBeenCalledWith(
+          expect.objectContaining({
+            actionParams: expect.objectContaining({ slackBotToken: token }),
+          }),
+        );
+        const saved = mockTriggerUpdate.mock.calls[0]![0].data.actionParams;
+        expect(saved).toMatchObject({
+          slackIntegrationId: "conn-test",
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        });
+        expect(saved).not.toHaveProperty("slackBotToken");
+        expect(JSON.stringify(saved)).not.toContain("fake");
       });
     });
 
@@ -679,8 +818,9 @@ describe("automationRouter", () => {
         expect(createArgs.data.actionParams).toMatchObject({
           source: { kind: "traceQuery", topN: 5 },
           schedule: { cron: "0 9 * * 1", timezone: "UTC" },
-          slackWebhook: "https://hooks.slack.com/services/abc",
+          slackIntegrationId: "conn-test",
         });
+        expect(createArgs.data.actionParams).not.toHaveProperty("slackWebhook");
         expect(mockSyncReportSchedule).toHaveBeenCalledWith({
           projectId: "proj_123",
           triggerId: "report_trig",

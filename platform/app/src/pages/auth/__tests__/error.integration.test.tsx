@@ -16,6 +16,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { signIn } = vi.hoisted(() => ({ signIn: vi.fn() }));
+
 const { sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => ({
   sessionRef: { current: { data: null as unknown } },
   publicEnvRef: {
@@ -29,6 +31,7 @@ vi.mock("~/utils/auth-client", async (importOriginal) => {
   return {
     ...actual,
     useSession: () => sessionRef.current,
+    signIn,
   };
 });
 
@@ -73,12 +76,131 @@ describe("Auth error page referrer redirect", () => {
     originalReferrer = document.referrer;
     origin = window.location.origin;
     hardNavigate.mockClear();
+    signIn.mockClear();
+    // The real `signIn` is async and resolves to a result or undefined; a
+    // bare mock returns undefined synchronously, which no caller awaits.
+    signIn.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
     setReferrer(originalReferrer);
+  });
+
+  /**
+   * The native-social bounce (specs/identity/native-social-at-a-claimed-domain.feature).
+   *
+   * The refusal reaches this page as a code plus the connection that made it,
+   * and the page spends it by dialling that connection. What it must NOT do is
+   * treat the parameter as somewhere to navigate: it arrives over the wire, so
+   * anybody can write one.
+   */
+  describe("given a refusal that named the organization's connection", () => {
+    /** @scenario "The error route dials the connection the refusal named" */
+    it("sends them straight to that connection without asking anything", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_acme",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).toHaveBeenCalledWith("ssoc_acme", { callbackUrl: "/" });
+      // And no error card: they are on their way somewhere, not being told
+      // why they failed.
+      expect(
+        screen.getByText(/Taking you to your organization's sign-in/i),
+      ).toBeTruthy();
+    });
+
+    it("does not also run the countdown that would take them elsewhere", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_acme",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(hardNavigate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A bounce target that is not a connection identifier is refused" */
+    it("dials nothing when the named target is an address rather than a connection", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=https://evil.example.com",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).not.toHaveBeenCalled();
+      // The ordinary refusal instead, which is a dead end but a safe one.
+      expect(screen.getByText(/Use your organization's sign-in/i)).toBeTruthy();
+    });
+
+    /** @scenario "A dial the server refuses shows the refusal instead of waiting" */
+    it("shows the refusal when the server will not dial the named connection", async () => {
+      // The refusal lands asynchronously, so this one waits on real time.
+      vi.useRealTimers();
+      // The engine holds nothing under this id: the connection is reached
+      // through the broker, or has since gone. The dial answers 404.
+      signIn.mockResolvedValueOnce({
+        error: "No provider found for the issuer",
+        status: 404,
+        ok: false,
+      });
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_gone",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).toHaveBeenCalledWith("ssoc_gone", { callbackUrl: "/" });
+      // Not a spinner about a provider that will never answer: the stable
+      // copy for this code, which tells them what to do instead.
+      expect(
+        await screen.findByText(/Use your organization's sign-in/i),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(/Taking you to your organization's sign-in/i),
+      ).toBeNull();
+    });
+
+    /** @scenario "A dial the server refuses shows the refusal instead of waiting" */
+    it("shows the refusal when the dial itself throws", async () => {
+      vi.useRealTimers();
+      // The request never got an answer: the network dropped, or the client
+      // threw before asking. Nobody is on their way anywhere.
+      signIn.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_gone",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).toHaveBeenCalledWith("ssoc_gone", { callbackUrl: "/" });
+      expect(
+        await screen.findByText(/Use your organization's sign-in/i),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(/Taking you to your organization's sign-in/i),
+      ).toBeNull();
+    });
   });
 
   describe("given a same-origin referrer", () => {

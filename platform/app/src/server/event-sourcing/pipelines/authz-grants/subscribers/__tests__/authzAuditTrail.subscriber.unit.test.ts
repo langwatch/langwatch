@@ -139,6 +139,7 @@ describe("authz audit trail subscriber", () => {
   });
 
   describe("when the actor is a system principal", () => {
+    /** @scenario Directory-sourced membership changes stay on the customer's audit page */
     it("leaves userId null rather than inventing a person", async () => {
       const store = recordingStore();
       await deliver(
@@ -151,6 +152,8 @@ describe("authz audit trail subscriber", () => {
 
       expect(store.inserts[0]!.userId).toBeNull();
       expect(store.inserts[0]!.organizationId).toBe(ORG);
+      expect(store.inserts[0]!.action).toBe("authz.grants.attach");
+      expect(store.inserts[0]!.metadata).toMatchObject({ source: "scim" });
     });
   });
 
@@ -249,6 +252,7 @@ describe("authz audit trail subscriber", () => {
      *  is filtered by actor — a directory sync's de-enroll is a change the
      *  customer's own directory made, and it belongs on their audit page.
      *  @scenario "A revocation names the surface that made it without a source of its own" */
+    /** @scenario Directory-sourced membership changes stay on the customer's audit page */
     it("records the row, with the reason and no invented person", async () => {
       const store = recordingStore();
       await deliver(
@@ -262,6 +266,7 @@ describe("authz audit trail subscriber", () => {
 
       expect(store.inserts).toHaveLength(1);
       expect(store.inserts[0]!.action).toBe("authz.grants.revoke");
+      expect(store.inserts[0]!.organizationId).toBe(ORG);
       expect(store.inserts[0]!.userId).toBeNull();
       expect(store.inserts[0]!.metadata).toEqual({
         grantId: "grant_1",
@@ -332,6 +337,32 @@ describe("authz audit trail subscriber", () => {
         deliver(store, event("authz.grants.unmapped", { actor: USER_ACTOR })),
       ).rejects.toThrow(/no audit verb/);
       expect(store.inserts).toHaveLength(0);
+    });
+  });
+
+  describe("when a shared project read is attached by the reconciler", () => {
+    it("records the read's window alongside the grant", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        attached({
+          principal: { type: "project", id: "project_aggregate" },
+          roleKey: "project-reader",
+          scope: { type: "PROJECT", id: "project_member" },
+          source: "aggregate-reconciler",
+          condition: { type: "trace", from: "2026-10-07T10:00:00.000Z" },
+          actor: { type: "system", id: SYSTEM_ACTORS.aggregateReconciler },
+        }),
+      );
+
+      expect(store.inserts[0]!.metadata).toEqual({
+        grantId: "grant_1",
+        principal: { type: "project", id: "project_aggregate" },
+        roleKey: "project-reader",
+        scope: { type: "PROJECT", id: "project_member" },
+        source: "aggregate-reconciler",
+        condition: { type: "trace", from: "2026-10-07T10:00:00.000Z" },
+      });
     });
   });
 

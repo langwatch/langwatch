@@ -24,8 +24,14 @@ const DOCS_PATH = join(
 const VIEWS_SECTION_START = "{/* lwql-views-start */}";
 const VIEWS_SECTION_END = "{/* lwql-views-end */}";
 
-/** Every view name named in the docs' bounded table section, first column only. */
-function docsViewNames(): string[] {
+/** One row of the docs' view table: the view name and its description cell. */
+interface DocsViewRow {
+  readonly name: string;
+  readonly description: string;
+}
+
+/** Every row of the docs' bounded table section: first (name) and second (description) columns. */
+function docsViewRows(): DocsViewRow[] {
   const doc = readFileSync(DOCS_PATH, "utf-8");
   const startIndex = doc.indexOf(VIEWS_SECTION_START);
   const endIndex = doc.indexOf(VIEWS_SECTION_END);
@@ -35,12 +41,19 @@ function docsViewNames(): string[] {
   expect(endIndex, `${VIEWS_SECTION_END} marker present`).toBeGreaterThan(-1);
 
   const section = doc.slice(startIndex, endIndex);
-  const rowPattern = /^\|\s*`([a-z_][a-z0-9_]*)`\s*\|/gm;
-  const names: string[] = [];
+  // `| \`name\` | description | …`: the description is the cell between the
+  // first and second pipe after the name. A table cell carries no raw pipe.
+  const rowPattern = /^\|\s*`([a-z_][a-z0-9_]*)`\s*\|\s*([^|]*?)\s*\|/gm;
+  const rows: DocsViewRow[] = [];
   for (const match of section.matchAll(rowPattern)) {
-    names.push(match[1]!);
+    rows.push({ name: match[1]!, description: match[2]! });
   }
-  return names;
+  return rows;
+}
+
+/** Every view name named in the docs' bounded table section, first column only. */
+function docsViewNames(): string[] {
+  return docsViewRows().map((row) => row.name);
 }
 
 describe("LWQL docs-catalog parity", () => {
@@ -58,6 +71,24 @@ describe("LWQL docs-catalog parity", () => {
     expect(extraInDocs, "docs rows naming a view not in the catalog").toEqual(
       [],
     );
+  });
+
+  it("gives each view the description the catalog produces", () => {
+    const catalogDescription = new Map(
+      LWQL_VIEW_CATALOG.map((view) => [view.name, view.description]),
+    );
+    const mismatches = docsViewRows()
+      .filter((row) => catalogDescription.has(row.name))
+      .filter((row) => row.description !== catalogDescription.get(row.name))
+      .map(
+        (row) =>
+          `${row.name}\n  docs:    ${row.description}\n  catalog: ${catalogDescription.get(row.name)}`,
+      );
+
+    expect(
+      mismatches,
+      "docs rows whose description drifts from the catalog",
+    ).toEqual([]);
   });
 
   it("names each view exactly once", () => {

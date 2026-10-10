@@ -1,6 +1,7 @@
 import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
+import { displayNameFor } from "~/features/auth/logic/displayName";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -27,7 +28,10 @@ export function CreateTeamDrawer({
       members: [
         {
           userId: {
-            label: `${session?.user.name} (${session?.user.email})`,
+            label: `${displayNameFor({
+              name: session?.user.name,
+              email: session?.user.email,
+            })} (${session?.user.email})`,
             value: session?.user.id ?? "",
           },
           role: teamRolesOptions[TeamUserRole.ADMIN],

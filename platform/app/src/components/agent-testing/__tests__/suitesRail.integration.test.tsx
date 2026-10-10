@@ -55,12 +55,6 @@ vi.mock("~/utils/formatTimeAgo", () => ({
 const suiteRunDataQuery = vi.fn();
 const suitesGetAllQuery = vi.fn();
 
-// SuiteRail and RunsSidebar mount the simulations welcome card, which reads
-// whether a guided onboarding path is active; no path is in these tests.
-vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
-  useGuidedPathActive: () => false,
-}));
-
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
@@ -731,14 +725,5 @@ describe("the test suites rail", () => {
     // the tab is keyed by that window, so the cells and the runs come back for
     // the shorter period.
     expect(props.setRelativePeriod).toHaveBeenCalledWith("7d");
-  });
-
-  /** @scenario "The rail carries the new-simulations announcement" */
-  it("carries the new-simulations announcement", () => {
-    renderRail();
-
-    expect(
-      screen.getByText("Welcome to the new simulations screen"),
-    ).toBeInTheDocument();
   });
 });

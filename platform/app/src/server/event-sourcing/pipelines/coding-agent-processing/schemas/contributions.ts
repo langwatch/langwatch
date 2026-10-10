@@ -45,6 +45,23 @@ const contributionBaseSchema = z.object({
 });
 
 /**
+ * The working context active when a record happened, stamped onto the EVENT
+ * by the contribute command from the session's last `session_context`
+ * declaration (see `services/session-context-memo.ts`). Absent on the
+ * contribution the dispatcher enqueues and on events from before the stamp
+ * existed. On a log record the fact table stores absence as '' and the usage
+ * read prices those rows under the legacy whole-session rule; on a model-call
+ * span the session fold charges the call's tokens to the stamped context, so
+ * a span-only agent's session still says what it spent where.
+ */
+const workingContextStampSchema = {
+  repositoryHost: z.string().optional(),
+  repositoryOwner: z.string().optional(),
+  repositoryName: z.string().optional(),
+  branch: z.string().optional(),
+};
+
+/**
  * Facts off one coding-agent SPAN: structure, timing, tokens, finish reason.
  * The span itself stays in span storage — `traceId`/`spanId` reach it.
  */
@@ -65,6 +82,7 @@ export const spanFactsContributionSchema = contributionBaseSchema.extend({
   /** Lifted scalar span attributes (raw wire keys). */
   facts: contributionFactsSchema,
   scopeName: z.string().nullable(),
+  ...workingContextStampSchema,
 });
 export type SpanFactsContribution = z.infer<typeof spanFactsContributionSchema>;
 
@@ -84,18 +102,7 @@ export const logFactsContributionSchema = contributionBaseSchema.extend({
   scopeName: z.string().nullable(),
   /** The lifted scalar vocabulary (`CODING_AGENT_CONTRIBUTION_KEYS`). */
   facts: contributionFactsSchema,
-  /**
-   * The working context active when the record happened, stamped onto the
-   * EVENT by the contribute command from the session's last `session_context`
-   * declaration (see `services/session-context-memo.ts`). Absent on the
-   * contribution the dispatcher enqueues and on events from before the stamp
-   * existed; the fact table stores absence as '' and the usage read prices
-   * those rows under the legacy whole-session rule.
-   */
-  repositoryHost: z.string().optional(),
-  repositoryOwner: z.string().optional(),
-  repositoryName: z.string().optional(),
-  branch: z.string().optional(),
+  ...workingContextStampSchema,
 });
 export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
 

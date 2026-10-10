@@ -12,8 +12,7 @@
  */
 
 import chalk from "chalk";
-import { ProjectsApiService } from "../../../client-sdk/services/projects/projects-api.service";
-import { loginCommand } from "../login";
+import { runDeviceFlowLogin } from "../../utils/governance/login-flow";
 import {
   chooseRequest,
   createControlApi,
@@ -22,8 +21,10 @@ import {
   isGitRepository,
   resolveShareRoot,
   ShareControlError,
+  platformTakesTheKey,
   waitForRequests,
 } from "./requests";
+import { platformProjectKeyReader } from "./project-key";
 import { startLangySession } from "./session";
 import { noticeRows } from "./ui";
 
@@ -86,9 +87,12 @@ export async function langyCommand(
 
 async function shareControl(root: string): Promise<void> {
   const credentials = await ensureSignedIn({
-    login: async ({ device }) => {
-      await loginCommand({ device });
+    // The flow itself rather than `langwatch login`: a failed sign-in comes
+    // back as an error this command words, not as an exit.
+    login: async () => {
+      await runDeviceFlowLogin({ isQuiet: true });
     },
+    isAccepted: platformTakesTheKey,
   });
   const api = createControlApi(credentials);
 
@@ -144,13 +148,12 @@ async function shareControl(root: string): Promise<void> {
       id: choice.request.projectId,
       name: choice.request.projectName,
     },
-    // The developer's own login, never the session key: the platform gates
-    // the key on this person's permission on the project.
-    readProjectApiKey: (projectId) =>
-      new ProjectsApiService({
-        endpoint: credentials.endpoint,
-        apiKey: credentials.apiKey,
-      }).getApiKey(projectId),
+    // The developer's own device session, never the session key: the
+    // platform gates the key on this person's permission on the project.
+    readProjectApiKey: platformProjectKeyReader({
+      endpoint: credentials.endpoint,
+      apiKey: credentials.apiKey,
+    }),
   });
 
   const onSignal = () => session.requestShutdown();

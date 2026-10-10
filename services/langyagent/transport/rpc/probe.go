@@ -30,6 +30,10 @@ type probeRequest struct {
 	// MISS and the worker re-warms rather than being reused under the tier it
 	// booted with — the relay's mirror decision is bound at spawn.
 	MirrorTier string `json:"mirrorTier,omitempty"`
+	// DisabledSkillIds are the flag-gated skill ids the turn will send. They are
+	// part of the worker signature, so a probe without them answers "alive" for
+	// a worker the turn's Acquire then replaces with a keyless spawn.
+	DisabledSkillIds []string `json:"disabledSkillIds,omitempty"`
 }
 
 type probeResponse struct {

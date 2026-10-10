@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleCheck,
+  CircleDashed,
   CircleMinus,
   CircleX,
   TriangleAlert,
@@ -193,22 +194,41 @@ function VerdictStatusLine({
   );
 }
 
-/** One criterion row: the pass or fail icon and the plain criterion string. */
+/**
+ * How a criterion row reads: passed, failed, or inconclusive when the judge
+ * could not decide it (most often because the trace evidence never arrived).
+ */
+type CriterionTone = "passed" | "failed" | "inconclusive";
+
+const CRITERION_ROW_COLOR: Record<CriterionTone, string> = {
+  passed: "green.fg",
+  failed: "red.fg",
+  inconclusive: FG_MUTED,
+};
+
+function CriterionIcon({ tone }: { tone: CriterionTone }) {
+  switch (tone) {
+    case "passed":
+      return <CircleCheck size={14} />;
+    case "failed":
+      return <CircleX size={14} />;
+    case "inconclusive":
+      return <CircleDashed size={14} />;
+  }
+}
+
+/** One criterion row: the tone's icon and the plain criterion string. */
 function CriterionRow({
   criterion,
-  passed,
+  tone,
 }: {
   criterion: string;
-  passed: boolean;
+  tone: CriterionTone;
 }) {
   return (
     <HStack align="start" gap={2}>
-      <Box
-        marginTop="1px"
-        flexShrink={0}
-        color={passed ? "green.fg" : "red.fg"}
-      >
-        {passed ? <CircleCheck size={14} /> : <CircleX size={14} />}
+      <Box marginTop="1px" flexShrink={0} color={CRITERION_ROW_COLOR[tone]}>
+        <CriterionIcon tone={tone} />
       </Box>
       <Box minWidth={0}>
         <Text fontSize="12px" fontWeight="medium">
@@ -227,13 +247,13 @@ function CriteriaSection({
   heading,
   headingColor,
   criteria,
-  passed,
+  tone,
   testId,
 }: {
   heading: string;
   headingColor: string;
   criteria: readonly string[];
-  passed: boolean;
+  tone: CriterionTone;
   testId: string;
 }) {
   if (criteria.length === 0) return null;
@@ -245,7 +265,7 @@ function CriteriaSection({
           <CriterionRow
             key={`${criterion}-${at}`}
             criterion={criterion}
-            passed={passed}
+            tone={tone}
           />
         ))}
       </VStack>
@@ -652,6 +672,7 @@ export function RunVerdictPanel({
   status,
   metCriteria,
   unmetCriteria,
+  inconclusiveCriteria = [],
   declaredCriteria,
   reasoning,
   error,
@@ -663,6 +684,12 @@ export function RunVerdictPanel({
   metCriteria: readonly string[];
   /** The criteria the judge missed, in any order the judge returned them. */
   unmetCriteria: readonly string[];
+  /**
+   * The criteria the judge could not decide. Each is also among the unmet
+   * ones; the panel reads them apart so a missing tool span never reads as
+   * "the agent did not do it".
+   */
+  inconclusiveCriteria?: readonly string[];
   /** The criteria the scenario declares, in its own order. */
   declaredCriteria: readonly string[];
   /** What the judge said about the run as a whole, if anything. */
@@ -675,9 +702,18 @@ export function RunVerdictPanel({
   const reasoningIsError = isErrorPayload(reasoning);
   const showsReasoning =
     !!reasoning && !(!!error && restatesFailure(reasoning));
+  const inconclusive = new Set(inconclusiveCriteria);
   const orderedMet = orderCriteria(metCriteria, declaredCriteria);
-  const orderedUnmet = orderCriteria(unmetCriteria, declaredCriteria);
-  const hasAnyCriteria = orderedMet.length + orderedUnmet.length > 0;
+  const orderedFailed = orderCriteria(
+    unmetCriteria.filter((criterion) => !inconclusive.has(criterion)),
+    declaredCriteria,
+  );
+  const orderedInconclusive = orderCriteria(
+    inconclusiveCriteria,
+    declaredCriteria,
+  );
+  const hasAnyCriteria =
+    orderedMet.length + orderedFailed.length + orderedInconclusive.length > 0;
   const failedEvaluatorName = failedRequiredEvaluatorName(evaluations);
 
   return (
@@ -697,15 +733,22 @@ export function RunVerdictPanel({
         <CriteriaSection
           heading="Failed criteria"
           headingColor={FAILED_COLOR}
-          criteria={orderedUnmet}
-          passed={false}
+          criteria={orderedFailed}
+          tone="failed"
           testId="run-verdict-failed-criteria"
+        />
+        <CriteriaSection
+          heading="Inconclusive criteria"
+          headingColor={FG_MUTED}
+          criteria={orderedInconclusive}
+          tone="inconclusive"
+          testId="run-verdict-inconclusive-criteria"
         />
         <CriteriaSection
           heading="Passed criteria"
           headingColor={PASSED_COLOR}
           criteria={orderedMet}
-          passed={true}
+          tone="passed"
           testId="run-verdict-passed-criteria"
         />
         {!hasAnyCriteria && !error ? (

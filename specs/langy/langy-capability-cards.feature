@@ -35,6 +35,39 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card offers an "Open in Analytics" link
 
   @integration
+  Scenario: A trace count split by model reads as a count of traces
+    Given the project has 7 traces, all on one model
+    When Langy counts the project's traces over the whole range, split by model
+    Then the metrics card is titled "Traces"
+    And its headline figure reads 7, captioned "traces"
+    And the model's own figure sits beside it, captioned by the model's name
+    And the card never shows the aggregation name or a count of result buckets
+
+  @integration @unit
+  Scenario: A grouped average is never summed into one figure
+    When Langy averages a metric split by model, with the models averaging 1 and 3
+    Then the metrics card shows each model's average beside its name
+    And it never shows their sum as the period's figure
+    And when every model spans several days, the card says the result has no single figure rather than that there is no data
+    And the CLI draws one line per model instead of one summed line, with no period-over-period total
+
+  @integration @unit
+  Scenario: A distinct count is added up only where each id falls once
+    When Langy counts distinct traces per day
+    Then the card and the CLI total the days, since each trace falls on one day
+    When Langy counts distinct users per day
+    Then neither totals the days, since a user can come back on another day
+    When Langy counts distinct traces split by model
+    Then the CLI draws one line per model and totals nothing, since one trace can carry two models
+
+  @unit
+  Scenario: A metrics card names its aggregation in words
+    When Langy reads a metric aggregated as a total, an average, a minimum, a maximum, a median or a percentile
+    Then the card keeps the metric as its heading
+    And the caption under the figure names the aggregation in words, such as "total" or "95th percentile"
+    And an aggregation it does not know is shown with its separators turned into spaces
+
+  @integration
   Scenario: An evaluation run renders its result
     When Langy runs an experiment or suite and it completes
     Then Langy shows an evaluation-run card with the run outcome
@@ -232,6 +265,26 @@ Feature: Langy renders domain-capability cards for tool calls
     And it does not claim that zero traces matched
     And the card still offers the way into Traces
 
+  # An oversized result is reduced before it is recorded: arrays keep a head and
+  # wide objects keep a few keys. Keys were kept in alphabetical order, so a
+  # trace row kept "error" to "metrics" and lost "trace_id". The card then read
+  # a total of 13 and no row it could name, and said "13 traces, showing 0. No
+  # traces matched."
+  @unit
+  Scenario: A reduced result keeps the id of every row it keeps
+    Given a trace search result too large to record whole
+    When the result is reduced to fit
+    Then every row that is kept still carries its trace id
+    And the total the search reported is kept
+
+  @integration
+  Scenario: Rows the card cannot identify render as unreadable, never as an empty result
+    When Langy runs the trace-search capability and the recorded rows carry no trace id
+    And the result still reports 13 matches
+    Then the card says it could not read the result
+    And it does not claim that no traces matched
+    And the card still offers the way into Traces
+
   @integration
   Scenario: A genuinely empty result still reads as a real answer
     When Langy runs the trace-search capability and it returns zero traces
@@ -382,6 +435,16 @@ Feature: Langy renders domain-capability cards for tool calls
       Then the recorded parts are the paragraphs and the calls in the order they happened
       And no paragraph written between two calls is dropped
 
+    # GPT-5 on the Responses API writes a commentary message and a final
+    # message in one reply. They reached the panel as one run of text with no
+    # break, so one sentence ran into the next ("met both criteria.Evals &
+    # LLM Ops is already complete.").
+    @unit
+    Scenario: Two text blocks of one reply are separated by a paragraph break
+      Given Langy wrote two text blocks with no tool call between them
+      When the turn streams to the panel
+      Then the second block starts on a new paragraph
+
     @unit
     Scenario: A card is recorded where the work began
       Given a call whose result arrived after the agent had written more text
@@ -453,6 +516,32 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A scenario card with an id opens that scenario
       When Langy shows a card for one named scenario
       Then the card's link opens that scenario in the library
+
+  # The card that says "Created and ready to use" was the end of the road:
+  # running the scenario meant leaving the panel for Simulations. The card now
+  # offers the run in words, through the composer, so Langy resolves the
+  # target and asks what it has to ask, exactly as it does for a typed request.
+  Rule: A created scenario offers its first run
+
+    @integration
+    Scenario: A created scenario offers to run against the connected agent
+      Given Langy created a scenario in a live conversation
+      When the card renders
+      Then it offers "Run against my agent" beside the deep link
+      And the offer waits while Langy is still answering
+
+    @integration
+    Scenario: Choosing the run offer asks Langy in words, through the composer
+      Given a created-scenario card with the run offer
+      When the reader chooses the offer
+      Then the composer sends "Run scenario "<name>" against my connected agent" as the reader's message
+      And the card itself schedules nothing
+
+    @integration
+    Scenario: A created scenario in a replayed conversation offers no run
+      Given a created-scenario card rendered while the reader replays an earlier turn
+      When the card renders
+      Then no run offer is drawn, since the replay can route no request
 
   # WHICH card a result renders in is decided once, at the command boundary,
   # from the command's name and the result's own shape together (ADR-079). The

@@ -76,6 +76,38 @@ const EXAMPLE_LOOKBACK_DAYS = 7;
 /** Rows an example query asks for. */
 const EXAMPLE_ROW_LIMIT = 100;
 
+/**
+ * A `timeColumn` whose declared type this matches is temporal or numeric —
+ * comparable to `subtractDays(now(), …)` — and can bound a lookback. A view
+ * whose time column is an opaque key (e.g. a String id used only to order,
+ * because the model has no `CreatedAt` and no `DateTime64` column) fails
+ * this match, and the example must not compare it to a date.
+ */
+export const BOUNDABLE_TIME_COLUMN_TYPE = /Date|Int|Float|Decimal/;
+
+/**
+ * The `WHERE <timeColumn> >= subtractDays(...)` clause for an example query,
+ * or `null` when the view's time column cannot be bounded that way.
+ *
+ * The predicate is advice for partitioned sources: filter on the time column
+ * to prune partitions. A view whose time column is an opaque key (a String
+ * used only to order rows, not a date) has nothing to bound — comparing it to
+ * a date is a ClickHouse type error, not a lookback.
+ */
+export function exampleLookbackPredicate({
+  view,
+}: {
+  view: LangWatchQLViewDefinition;
+}): string | null {
+  const timeColumnType = view.columns.find(
+    (column) => column.name === view.timeColumn,
+  )?.type;
+  if (!timeColumnType || !BOUNDABLE_TIME_COLUMN_TYPE.test(timeColumnType)) {
+    return null;
+  }
+  return `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`;
+}
+
 /** One column of a LangWatchQL view, as the schema endpoint publishes it. */
 export interface LangWatchQLSchemaColumn {
   readonly name: string;
@@ -108,8 +140,12 @@ export interface LangWatchQLSchemaView {
   readonly grain: string;
   /** Columns another LangWatchQL view can be joined to this one on. */
   readonly joinKeys: readonly string[];
-  /** Filter on this to prune partitions. */
-  readonly timeColumn: string;
+  /**
+   * Filter on this to prune partitions, or `null` for a view with no temporal
+   * column. Explicitly `null` rather than absent, like `unit`, so a consumer
+   * can tell "this view has no time column" from an older API.
+   */
+  readonly timeColumn: string | null;
   /** How far behind ingestion this view can be. */
   readonly freshness: string;
   readonly columns: readonly LangWatchQLSchemaColumn[];
@@ -185,9 +221,13 @@ export interface LangWatchQLSchema {
  *
  * Deliberately built from unrestricted columns only, so the example is valid
  * for every caller regardless of permissions — an example a caller cannot run
- * teaches them the wrong thing about the API. It filters on the view's time
- * column because that is the advice the catalog exists to give: without that
- * predicate the read touches every partition the tenant has.
+ * teaches them the wrong thing about the API. When the view's time column is
+ * temporal or numeric ({@link exampleLookbackPredicate}), it filters on that
+ * column, because that is the advice the catalog exists to give: without that
+ * predicate the read touches every partition the tenant has. A view whose
+ * time column is an opaque key (a derived model with no `CreatedAt` and no
+ * `DateTime64` column) has nothing to bound, so the example orders by it
+ * instead of comparing it to a date.
  */
 export function lwqlExampleSql({
   database,
@@ -206,20 +246,32 @@ export function lwqlExampleSql({
     .filter((column) => column.name !== EXAMPLE_SKIPPED_COLUMN)
     .slice(0, EXAMPLE_COLUMN_COUNT)
     .map((column) => column.name);
+  const lookback = exampleLookbackPredicate({ view });
   if (projection.length === 0) {
     // Every column carries its own gate: the one query still runnable by any
     // caller who can see the view is a count. No ORDER BY — an aggregate
     // without GROUP BY has nothing to order.
+    return lookback
+      ? `SELECT count() AS rows\n` +
+          `FROM ${database}.${view.name}\n` +
+          `${lookback}`
+      : `SELECT count() AS rows\nFROM ${database}.${view.name}`;
+  }
+  if (!lookback) {
+    // A view with no time column has nothing to order by — emit the projection
+    // and a bare LIMIT rather than `ORDER BY undefined`.
+    const orderBy = view.timeColumn ? `ORDER BY ${view.timeColumn} DESC\n` : "";
     return (
-      `SELECT count() AS rows\n` +
+      `SELECT ${projection.join(", ")}\n` +
       `FROM ${database}.${view.name}\n` +
-      `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`
+      `${orderBy}` +
+      `LIMIT ${EXAMPLE_ROW_LIMIT}`
     );
   }
   return (
     `SELECT ${projection.join(", ")}\n` +
     `FROM ${database}.${view.name}\n` +
-    `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})\n` +
+    `${lookback}\n` +
     `ORDER BY ${view.timeColumn} DESC\n` +
     `LIMIT ${EXAMPLE_ROW_LIMIT}`
   );
@@ -255,7 +307,7 @@ export function describeLangWatchQLSchema({
       description: view.description,
       grain: view.grain,
       joinKeys: view.joinKeys,
-      timeColumn: view.timeColumn,
+      timeColumn: view.timeColumn ?? null,
       freshness: view.freshness,
       columns: view.columns.map((column) => ({
         name: column.name,

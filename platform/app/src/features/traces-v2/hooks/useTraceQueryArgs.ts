@@ -14,6 +14,11 @@ import { useDrawerProjectId } from "./useDrawerProjectId";
  *   - `project` (resolved org/team/project),
  *   - `traceId` from the drawer store,
  *   - `occurredAtMs` URL hint for ClickHouse partition pruning,
+ *   - `hintReady`, true once that hint is known: the header read runs
+ *     without it and backfills it, every other per-trace read waits for it,
+ *     so a deep link costs one unpruned read rather than one per hook,
+ *   - `tenantId`, the member that owns the trace when the drawer is open
+ *     under an aggregate, so every read stays on that member,
  *   - `isLive` rolling-window flag for live refetch cadence,
  *   - `queryArgs` ready to spread into a `useQuery({ ... })` input.
  *
@@ -28,7 +33,14 @@ export function useTraceQueryArgs() {
   const storeTraceId = useDrawerStore((s) => s.traceId);
   const traceId = viewer.traceId ?? storeTraceId;
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  const storeTenantId = useDrawerStore((s) => s.tenantId);
   const projectId = useDrawerProjectId();
+  // The owning member, on an aggregate only: a plain project's own id adds
+  // nothing to the read and would only split its query cache.
+  const tenantId =
+    storeTenantId !== null && storeTenantId !== projectId
+      ? storeTenantId
+      : null;
 
   const isLive =
     occurredAtMs !== null && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
@@ -37,17 +49,21 @@ export function useTraceQueryArgs() {
     projectId,
     traceId: traceId ?? "",
     ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+    ...(tenantId !== null ? { tenantId } : {}),
   };
 
   const isReady = !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "");
+  const hintReady = occurredAtMs !== null;
 
   return {
     project,
     projectId,
     traceId,
     occurredAtMs,
+    tenantId,
     isLive,
     isReady,
+    hintReady,
     queryArgs,
   };
 }

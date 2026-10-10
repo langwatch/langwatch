@@ -21,6 +21,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prepareLitellmParams } from "../../api/routers/modelProviders.utils";
@@ -72,14 +73,12 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: orgAdmin.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: orgAdmin.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
   });
 
@@ -97,6 +96,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
           },
         },
       ],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["user", { id: orgAdminUserId }],
