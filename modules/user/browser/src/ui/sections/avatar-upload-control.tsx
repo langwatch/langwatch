@@ -105,7 +105,7 @@ function AvatarPhotoDialog({
   const src = useUserAvatarUrl(image);
   return (
     <Dialog.Root open={isOpen} onOpenChange={(e) => onOpenChange(e.open)} size="sm">
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Profile photo</Dialog.Title>
         </Dialog.Header>

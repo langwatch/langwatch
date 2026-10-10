@@ -33,12 +33,10 @@ export function TurnOffTwoStepDialog({
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Turn off two-step verification
-          </Dialog.Title>
+          <Dialog.Title>Turn off two-step verification</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body paddingBottom={6}>
           <VStack align="stretch" gap={4}>

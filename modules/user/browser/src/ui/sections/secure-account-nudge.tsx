@@ -27,12 +27,12 @@ export default function SecureAccountNudge() {
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg" data-testid="secure-account-nudge">
+      <Dialog.Content data-testid="secure-account-nudge">
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <HStack gap={2}>
             {offer.passkey ? <Fingerprint size={18} /> : <ShieldCheck size={18} />}
-            <Dialog.Title fontSize="md" fontWeight="500">
+            <Dialog.Title>
               {offer.passkey ? "Sign in faster next time" : "Secure your account"}
             </Dialog.Title>
           </HStack>

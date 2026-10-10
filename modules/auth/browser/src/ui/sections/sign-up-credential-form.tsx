@@ -214,7 +214,7 @@ export function SignUpCredentialForm({
         <FrontDoorField
           label="Password"
           labelEnd={
-            <Text fontSize="12px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               {PASSWORD_REQUIREMENTS_HINT}
             </Text>
           }

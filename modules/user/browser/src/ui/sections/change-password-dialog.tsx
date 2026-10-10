@@ -164,12 +164,10 @@ export function ChangePasswordDialog({
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            {copy.title}
-          </Dialog.Title>
+          <Dialog.Title>{copy.title}</Dialog.Title>
         </Dialog.Header>
         <form
           onSubmit={(event) => {

@@ -44,7 +44,7 @@ export function BackupCodesPanel({
         </Text>
       </VStack>
 
-      <Box borderWidth="1px" borderRadius="md" padding={4} fontFamily="monospace" overflow="hidden">
+      <Box borderWidth="1px" borderRadius="md" padding={4} fontFamily="mono" overflow="hidden">
         <SimpleGrid columns={{ base: 1, sm: 2 }} gap={2}>
           {codes.map((code) => (
             <Text key={code} fontSize="sm" data-testid="two-factor-backup-code">

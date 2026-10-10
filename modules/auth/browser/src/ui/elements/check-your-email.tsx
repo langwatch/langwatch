@@ -69,10 +69,10 @@ export function CheckYourEmail({
         ) : null}
         {onUseDifferentEmail ? (
           <Button
+            textStyle="bodySm"
             variant="plain"
             size="sm"
             alignSelf="center"
-            fontSize="13px"
             textDecoration="underline"
             textUnderlineOffset="3px"
             onClick={onUseDifferentEmail}

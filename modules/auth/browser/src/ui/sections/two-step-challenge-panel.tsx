@@ -77,7 +77,7 @@ export function TwoStepChallengePanel({
 
   return (
     <VStack width="full" align="stretch" gap="14px">
-      <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         {introFor(factor)}
       </Text>
       <HandledErrorAlert error={refusal} fallbackTitle="Couldn't check that code" />
@@ -168,7 +168,7 @@ function CodeField({
           value={code}
           onChange={(event) => onChange(event.target.value)}
           // 16px on a phone, or iOS zooms in on focus and never zooms out.
-          fontSize={{ base: "16px", md: "15px" }}
+          fontSize={{ base: "md", md: "sm" }}
           minHeight="44px"
           borderRadius={SHAPE.field}
           // A code is read one character at a time off another screen.
@@ -215,7 +215,7 @@ function QuietAction({
   children: ReactNode;
 }) {
   return (
-    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
+    <Text textStyle="bodySm" width="full" textAlign="center" color="fg.muted">
       <Box
         asChild
         color="fg"

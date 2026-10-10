@@ -126,7 +126,7 @@ function ForgotPasswordForm() {
                 placeholder="you@company.com"
                 // 16px on a phone: anything smaller makes iOS zoom the page in
                 // when the field takes focus, and it never zooms back out.
-                fontSize={{ base: "16px", md: "14px" }}
+                fontSize={{ base: "md", md: "sm" }}
                 minHeight="44px"
                 autoComplete="username"
                 {...FIELD_SURFACE}

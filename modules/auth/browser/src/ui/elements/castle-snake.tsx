@@ -96,15 +96,13 @@ export function CastleSnake() {
         data-testid="castle-snake"
       />
       <Box
+        textStyle="eyebrow"
         position="fixed"
         left={4}
         bottom={4}
         zIndex={4}
         pointerEvents="none"
         fontFamily={MONO_FONT}
-        fontSize="11px"
-        letterSpacing="0.08em"
-        textTransform="uppercase"
         color="fg.subtle"
         data-testid="castle-snake-hud"
       >

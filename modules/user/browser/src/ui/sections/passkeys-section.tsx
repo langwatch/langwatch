@@ -2,17 +2,17 @@
  * Passkeys section: create, view, and manage passkeys in account settings.
  */
 
+import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Menu } from "@langwatch/design-system/menu";
 import {
-  Alert,
   Box,
   Button,
   Field,
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -21,7 +21,8 @@ import {
   SettingsSection,
   SettingsSectionRow,
 } from "@langwatch/design-system/settings-section";
-import { readableDate } from "@langwatch/time";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { toEpochMs } from "@langwatch/time";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -73,12 +74,10 @@ function RenamePasskeyDialog({
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Rename passkey
-          </Dialog.Title>
+          <Dialog.Title>Rename passkey</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <Field.Root>
@@ -146,12 +145,10 @@ function RemovePasskeyDialog({
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Remove {passkey ? passkeyLabel(passkey) : "passkey"}?
-          </Dialog.Title>
+          <Dialog.Title>Remove {passkey ? passkeyLabel(passkey) : "passkey"}?</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <Text fontSize="sm" color="fg.muted">
@@ -214,7 +211,7 @@ function PasskeyGroup({
               {passkeyLabel(passkey)}
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              Added {readableDate(passkey.createdAt).toLocaleDateString()}
+              Added <FormattedDate value={toEpochMs(passkey.createdAt)} display="date" />
             </Text>
           </VStack>
           <Spacer />
@@ -247,18 +244,15 @@ function LastWayInNotice({ passkeys }: { passkeys: number | undefined }) {
   if (!warning) return null;
 
   return (
-    <Alert.Root status="warning" variant="surface" data-testid="last-way-in-notice">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>{warning.message}</Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="warning" data-testid="last-way-in-notice">
+      {warning.message}
+    </Banner>
   );
 }
 
 function SsoGovernedLine() {
   return (
-    <Text fontSize="sm" color="fg.muted" data-testid="passkeys-sso-governed">
+    <Text textStyle="body" color="fg.muted" data-testid="passkeys-sso-governed">
       {SSO_HANDLES_SIGN_IN}
     </Text>
   );
@@ -360,7 +354,7 @@ export function PasskeysSection() {
       <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
         <LastWayInNotice passkeys={isPending ? undefined : held.length} />
 
-        {isPending ? <Spinner size="sm" /> : null}
+        {isPending ? <SkeletonRows rows={2} /> : null}
 
         {!isPending && held.length === 0 ? (
           <SettingsEmptyState
@@ -419,14 +413,12 @@ export function PasskeysSection() {
 
         {/* The waiting state sits over the list the ceremony was started from. */}
         <Dialog.Root open={isCreating} placement="center">
-          <Dialog.Content bg="bg" data-testid="passkey-ceremony-dialog">
+          <Dialog.Content data-testid="passkey-ceremony-dialog">
             <Dialog.Header>
-              <Dialog.Title fontSize="md" fontWeight="500">
-                Create your passkey
-              </Dialog.Title>
+              <Dialog.Title>Create your passkey</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body paddingBottom={6}>
-              <Text fontSize="sm" color="fg.muted">
+              <Text textStyle="body" color="fg.muted">
                 Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
               </Text>
             </Dialog.Body>

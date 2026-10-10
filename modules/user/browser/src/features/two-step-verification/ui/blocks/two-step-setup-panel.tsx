@@ -39,7 +39,7 @@ function SetupKeyField({ setupKey }: { setupKey: string }) {
   return (
     <InputGroup
       width="full"
-      fontFamily="monospace"
+      fontFamily="mono"
       cursor="pointer"
       onClick={() => void copy()}
       endElement={<Copy size={16} aria-label="Copy the setup key" />}
@@ -88,7 +88,7 @@ export function TwoStepSetupPanel({
         <VStack align="stretch" gap={1}>
           <Text fontSize="sm">If you cannot scan it, type this into the app instead:</Text>
           <SetupKeyField setupKey={setupKey} />
-          <Text fontSize="xs" color="fg.muted" fontFamily="monospace">
+          <Text fontSize="xs" color="fg.muted" fontFamily="mono">
             {groupSetupKey(setupKey)}
           </Text>
         </VStack>

@@ -47,8 +47,7 @@ export function FrontDoorPrimaryButton({
 export const FRONT_DOOR_ACTION_GEOMETRY = {
   width: "full",
   minHeight: "44px",
-  fontSize: "14px",
-  fontWeight: 600,
+  textStyle: "cardTitle",
   borderRadius: SHAPE.control,
 } as const;
 

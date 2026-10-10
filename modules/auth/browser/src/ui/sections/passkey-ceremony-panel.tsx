@@ -50,8 +50,7 @@ export function PasskeyCeremonyPanel({ ceremony }: { ceremony: PasskeyCeremonySt
           <Fingerprint size={26} aria-hidden="true" />
         </Box>
         <Text
-          fontSize="13.5px"
-          lineHeight="1.6"
+          textStyle="bodySm"
           color="fg.muted"
           textAlign="center"
           maxWidth="34ch"
@@ -71,10 +70,10 @@ export function PasskeyCeremonyPanel({ ceremony }: { ceremony: PasskeyCeremonySt
           </FrontDoorPrimaryButton>
         ) : null}
         <Button
+          textStyle="body"
           variant="outline"
           width="full"
           minHeight="44px"
-          fontSize="14px"
           borderRadius={SHAPE.control}
           borderColor="frontDoor.fieldBorder"
           onClick={cancelPasskeyCeremony}
@@ -83,10 +82,10 @@ export function PasskeyCeremonyPanel({ ceremony }: { ceremony: PasskeyCeremonySt
           Cancel
         </Button>
         <Button
+          textStyle="bodySm"
           variant="plain"
           size="sm"
           alignSelf="center"
-          fontSize="13px"
           textDecoration="underline"
           textUnderlineOffset="3px"
           onClick={cancelPasskeyCeremony}

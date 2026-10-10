@@ -28,12 +28,10 @@ export function TwoStepDialogs({
         }}
         placement="center"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Set up two-step verification
-            </Dialog.Title>
+            <Dialog.Title>Set up two-step verification</Dialog.Title>
           </Dialog.Header>
           <Dialog.Body paddingBottom={6}>
             {isSettingUp ? (
@@ -53,12 +51,10 @@ export function TwoStepDialogs({
         }}
         placement="center"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Your new backup codes
-            </Dialog.Title>
+            <Dialog.Title>Your new backup codes</Dialog.Title>
           </Dialog.Header>
           <Dialog.Body paddingBottom={6}>
             <BackupCodesPanel codes={regenerated} onDone={onCloseCodes} />

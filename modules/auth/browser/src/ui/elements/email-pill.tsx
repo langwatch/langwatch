@@ -23,13 +23,13 @@ export function EmailPill({
       paddingX="14px"
       paddingY="7px"
     >
-      <Text fontSize="13px" color="fg.muted" truncate data-testid={testId}>
+      <Text textStyle="bodySm" color="fg.muted" truncate data-testid={testId}>
         {email}
       </Text>
       <Button
+        textStyle="caption"
         variant="plain"
         size="xs"
-        fontSize="12px"
         textDecoration="underline"
         textUnderlineOffset="2px"
         flexShrink={0}

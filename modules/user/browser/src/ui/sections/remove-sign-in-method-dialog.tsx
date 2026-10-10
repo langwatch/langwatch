@@ -34,12 +34,10 @@ export function RemoveSignInMethodDialog({
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg" data-testid="unlink-method-dialog">
+      <Dialog.Content data-testid="unlink-method-dialog">
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Remove {target?.name ?? "this sign-in method"}?
-          </Dialog.Title>
+          <Dialog.Title>Remove {target?.name ?? "this sign-in method"}?</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack align="start" gap={3}>

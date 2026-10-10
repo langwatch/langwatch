@@ -224,10 +224,10 @@ export function FederatedMethodButton({
 export function LastUsedBadge() {
   return (
     <Badge
+      textStyle="micro"
+      fontWeight="medium"
       borderRadius="full"
       paddingX="9px"
-      fontSize="10px"
-      fontWeight={500}
       backgroundColor={"frontDoor.tint"}
       color={"frontDoor.ink"}
       data-testid="last-used-method"
@@ -242,7 +242,7 @@ export function MethodDivider() {
   return (
     <HStack width="full" gap="10px" paddingY="6px">
       <Divider />
-      <Text fontSize="12px" color="fg.subtle">
+      <Text textStyle="caption" color="fg.subtle">
         or
       </Text>
       <Divider />
