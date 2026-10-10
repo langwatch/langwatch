@@ -46,7 +46,12 @@ export function InvitingOrganization({
               </Text>
             </>
           ) : (
-            "Join this organization on LangWatch"
+            <>
+              Join this organization on{" "}
+              <Text as="strong" fontWeight={500} color="fg">
+                LangWatch
+              </Text>
+            </>
           )}
         </Text>
       </VStack>
