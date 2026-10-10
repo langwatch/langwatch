@@ -694,7 +694,7 @@ function ConnectionFacts({ connection }: { connection: ConnectionRow }) {
       <Fact label="Set up">
         {connection.source === "legacy-grandfathered"
           ? "Carried over from an earlier configuration"
-          : "In the back office"}
+          : "Through single sign-on setup"}
       </Fact>
       <Fact label="Somebody signing in who is not a member yet">
         {ARRIVAL_LABELS[connection.arrivalPolicy]}
