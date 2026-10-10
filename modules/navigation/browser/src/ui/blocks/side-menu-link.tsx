@@ -39,8 +39,17 @@ function isIconComponent(icon: IconComponent | React.ReactNode): icon is IconCom
   );
 }
 
-function IconComponentNode({ icon: Icon, size }: { icon: IconComponent; size: string | number }) {
-  return <Icon size={size} color="var(--chakra-colors-nav-fg-muted)" />;
+function IconComponentNode({
+  icon: Icon,
+  size,
+  isActive,
+}: {
+  icon: IconComponent;
+  size: string | number;
+  isActive: boolean;
+}) {
+  const color = isActive ? "var(--chakra-colors-fg)" : "var(--chakra-colors-nav-fg-muted)";
+  return <Icon size={size} color={color} />;
 }
 
 // Renders the common visual content (icon, label, badge)
@@ -80,7 +89,7 @@ export const SideMenuItem = ({
   const density = useSideMenuDensity();
   // Use CSS variable for icon color to support dark mode
   const iconNode = isIconComponent(icon) ? (
-    <IconComponentNode icon={icon} size={density.iconSize} />
+    <IconComponentNode icon={icon} size={density.iconSize} isActive={isActive} />
   ) : (
     icon
   );
@@ -118,8 +127,9 @@ export const SideMenuItem = ({
         <>
           <Text
             fontSize={density.fontSize}
-            fontWeight="normal"
-            color="nav.fg"
+            // Active reads stronger than hover by weight and ink, not by a second fill.
+            fontWeight={isActive ? "medium" : "normal"}
+            color={isActive ? "fg" : "nav.fg"}
             whiteSpace="nowrap"
             flex={1}
             overflow="hidden"
@@ -212,7 +222,19 @@ export const SideMenuLink = ({
 
   // The link recipe's plain variant gives the entry its hover underline.
   return (
-    <Link asChild variant="plain" display="block" width="full">
+    <Link
+      asChild
+      variant="plain"
+      display="block"
+      width="full"
+      borderRadius="lg"
+      // Inset, so the scroll region never clips it; the ring keeps the row's radius.
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "colorPalette.focusRing",
+        outlineOffset: "-2px",
+      }}
+    >
       <NavigationLink
         ref={linkRef}
         href={href}

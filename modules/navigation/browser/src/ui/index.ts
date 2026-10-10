@@ -37,9 +37,10 @@ export { useSettingsMenu } from "../behavior/use-settings-menu.ts";
 export {
   settingsMenu,
   isSettingsMenuItemActive,
-  opsGroup,
+  adminMenu,
   instanceGroup,
   cloudAdminGroup,
+  type AdminMenuGates,
   type SettingsMenuGates,
   type SettingsMenuGroup,
   type SettingsMenuItem,

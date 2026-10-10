@@ -72,11 +72,22 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: Enterprise entries carry a quiet grey pill
+  Scenario: Enterprise entries are marked only where the plan lacks them
     Given my plan shows the enterprise settings entries
     When the settings sidebar renders
-    Then the enterprise entries carry an "ENT" pill
-    And the pill is grey with a hairline border, not a coloured one
+    Then no entry carries an "ENT" pill or a lock
+    And a plan without them is offered no enterprise entry at all
+
+  @integration
+  Scenario: Settings groups read in sentence case
+    When the settings sidebar renders
+    Then each group label is 12px medium sentence case in a token at 4.5:1 in both modes
+    And the open entry reads stronger than a hovered one, by weight and ink
+
+  @integration
+  Scenario: A detail page keeps its owning entry lit
+    Given I open a team's own page under /settings/teams
+    Then the Directory entry is marked as the open one
 
   @unit
   Scenario: A still-loading plan hides the enterprise entries
@@ -101,10 +112,10 @@ Feature: Settings shell
     And no divider separates them from the groups
 
   @integration
-  Scenario: API Keys sits under General
+  Scenario: API keys sits under General
     Given I open Settings
-    Then API Keys comes right after General in the ORGANIZATION group
-    And the ACCESS group does not hold it
+    Then API keys comes right after General in the Organization group
+    And the People & access group does not hold it
 
   @integration
   Scenario: The menu marks the page that is open

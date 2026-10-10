@@ -1,7 +1,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, ServerCog } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
@@ -95,6 +95,26 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
               </Menu.Item>
             );
           })}
+          {/* The operator console, for operators only: not a product, so it sits apart. */}
+          {host.opsAccess().hasAccess ? (
+            <>
+              <Menu.Separator />
+              <Menu.Item
+                value="admin"
+                data-testid="product-switcher-admin"
+                onClick={() => host.navigate("/ops")}
+                paddingY={2}
+                borderRadius="lg"
+              >
+                <HStack gap={2} width="full">
+                  <ServerCog size={13} color="var(--chakra-colors-fg-muted)" />
+                  <Text fontSize="13px" fontWeight="medium">
+                    Admin
+                  </Text>
+                </HStack>
+              </Menu.Item>
+            </>
+          ) : null}
         </Menu.Content>
       </Portal>
     </Menu.Root>

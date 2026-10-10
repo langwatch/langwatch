@@ -1,10 +1,11 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
-import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
@@ -15,7 +16,7 @@ import { featureIcons } from "../../model/feature-icons.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
-import { isPathUnder, type ProductId } from "../../model/products.ts";
+import { isAdminShellRoute, isPathUnder, type ProductId } from "../../model/products.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -23,7 +24,11 @@ import {
   governanceNavItems,
   type SectionNavItemData,
 } from "../../model/section-nav-items.ts";
-import { isSettingsMenuItemActive, OPS_ATTENTION_HREF } from "../../model/settings-menu.ts";
+import {
+  isSettingsMenuItemActive,
+  OPS_ATTENTION_HREF,
+  type SettingsMenuGroup,
+} from "../../model/settings-menu.ts";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
@@ -37,7 +42,12 @@ import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
 import { SidebarSection } from "./sidebar-section.tsx";
 import { UsageIndicator } from "./usage-indicator.tsx";
 
-export type SidebarSurface = ProductId | "settings";
+export type SidebarSurface = ProductId | "settings" | "admin";
+
+/** The sidebar a page outside every product draws: the Admin console on /ops, else Settings. */
+export function detourSurface(pathname: string): SidebarSurface {
+  return isAdminShellRoute(pathname) ? "admin" : "settings";
+}
 
 /**
  * Quick Search as the first sidebar entry in the navigation-v2 shells,
@@ -56,6 +66,12 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
       cursor="pointer"
       aria-label="Quick Search"
       onClick={commandBar.open}
+      borderRadius="lg"
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "colorPalette.focusRing",
+        outlineOffset: "-2px",
+      }}
     >
       <SideMenuItem
         icon={Search}
@@ -149,15 +165,17 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   );
 }
 
-/**
- * The Settings sidebar body: the regrouped, iconed settings menu with
- * the same gates the legacy settings navigation applies. Enterprise
- * entries carry the quiet grey pill.
- */
-function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
+/** A detour's grouped menu (Settings, Admin): sentence-case groups, one entry lit by prefix. */
+function DetourMenuBody({
+  groups,
+  showExpanded,
+  badgeFor,
+}: {
+  groups: SettingsMenuGroup[];
+  showExpanded: boolean;
+  badgeFor?: (href: string) => number | undefined;
+}) {
   const pathname = useNavigationHost().pathname();
-  const groups = useSettingsMenu();
-  const opsAttentionCount = useOpsAttentionCount();
 
   return (
     <>
@@ -167,6 +185,7 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
           id={group.id}
           label={group.label}
           showExpanded={showExpanded}
+          isSentenceCase
         >
           {group.items.map((item) => (
             <SideMenuLink
@@ -176,27 +195,29 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               href={item.href}
               isActive={isSettingsMenuItemActive({ item, pathname })}
               showLabel={showExpanded}
-              badgeNumber={item.href === OPS_ATTENTION_HREF ? opsAttentionCount : undefined}
-              rightElement={
-                item.isEnterprise ? (
-                  <Badge
-                    title="Enterprise plan feature"
-                    variant="outline"
-                    fontSize="8.5px"
-                    fontWeight="semibold"
-                    letterSpacing="0.06em"
-                    textTransform="uppercase"
-                    {...QUIET_SIDEBAR_CHIP}
-                  >
-                    ENT
-                  </Badge>
-                ) : undefined
-              }
+              badgeNumber={badgeFor?.(item.href)}
             />
           ))}
         </SidebarSection>
       ))}
     </>
+  );
+}
+
+/** The Settings sidebar body, with the same gates the legacy settings navigation applies. */
+function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
+  return <DetourMenuBody groups={useSettingsMenu()} showExpanded={showExpanded} />;
+}
+
+/** The Admin console's sidebar body; the operations badge sits on its dashboard. */
+function AdminMenuBody({ showExpanded }: { showExpanded: boolean }) {
+  const opsAttentionCount = useOpsAttentionCount();
+  return (
+    <DetourMenuBody
+      groups={useAdminMenu()}
+      showExpanded={showExpanded}
+      badgeFor={(href) => (href === OPS_ATTENTION_HREF ? opsAttentionCount : void 0)}
+    />
   );
 }
 
@@ -271,6 +292,9 @@ function ProductSidebarBody({
   if (surface === "settings") {
     return <SettingsMenuBody showExpanded={showExpanded} />;
   }
+  if (surface === "admin") {
+    return <AdminMenuBody showExpanded={showExpanded} />;
+  }
   if (surface === "me") {
     return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
@@ -330,7 +354,7 @@ export function SidebarContent({
         <QuickSearchMenuItem showLabel={showExpanded} />
       </Box>
 
-      {surface === "settings" && (
+      {(surface === "settings" || surface === "admin") && (
         <Box
           data-testid="sidebar-back-row"
           width="full"

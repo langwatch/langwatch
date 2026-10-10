@@ -45,7 +45,9 @@ function renderSettingsSidebar({
   isSaaS = false,
   hasCloudOps = false,
   permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
+  surface = "settings",
 }: {
+  surface?: "settings" | "admin";
   pathname?: string;
   isLiteMember?: boolean;
   isEnterprise?: boolean;
@@ -68,7 +70,7 @@ function renderSettingsSidebar({
         commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
       }}
     >
-      <SidebarContent surface="settings" showExpanded />
+      <SidebarContent surface={surface} showExpanded />
     </WithStubNavigationHost>,
   );
 }
@@ -246,16 +248,30 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "Enterprise entries carry a quiet grey pill" */
-    it("marks the enterprise entries with a grey pill in a hairline border", () => {
+    /** @scenario "Enterprise entries are marked only where the plan lacks them" */
+    it("marks no enterprise entry on a plan that includes them", () => {
       renderSettingsSidebar();
 
       expect(screen.getByRole("link", { name: /^Roles/ })).toBeInTheDocument();
-      const pills = screen.getAllByText("ENT");
-      expect(pills.length).toBeGreaterThanOrEqual(1);
-      // The hairline border is pinned on the shared chip style itself:
-      // model/__tests__/quiet-chip-style.unit.test.ts.
-      expect(pills[0]).toHaveStyle({ color: "var(--chakra-colors-fg-muted)" });
+      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Settings groups read in sentence case" */
+    it("labels its groups in sentence case", () => {
+      renderSettingsSidebar();
+
+      expect(screen.getByText("AI infrastructure")).toHaveStyle({ fontSize: "12px" });
+      expect(screen.getByText("Data controls")).not.toHaveStyle({ textTransform: "uppercase" });
+    });
+
+    /** @scenario "A detail page keeps its owning entry lit" */
+    it("lights Directory on a team's own page", () => {
+      renderSettingsSidebar({ pathname: "/settings/teams/platform" });
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
     });
 
     /** @scenario "The settings groups fold, and start open" */
@@ -305,17 +321,17 @@ describe("the settings shell in a new navigation mode", () => {
       );
     });
 
-    /** @scenario "API Keys sits under General" */
-    it("puts API Keys under General, above the ACCESS group", () => {
+    /** @scenario "API keys sits under General" */
+    it("puts API keys under General, above the access group", () => {
       renderSettingsSidebar();
 
       const entries = within(screen.getByTestId("sidebar-scroll-region"))
         .getAllByRole("link")
         .map((link) => link.textContent?.trim());
 
-      expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
-      expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
-      expect(entries.indexOf("API Keys")).toBeLessThan(entries.indexOf("Directory"));
+      expect(entries.filter((entry) => entry === "API keys")).toHaveLength(1);
+      expect(entries.indexOf("API keys")).toBe(entries.indexOf("General") + 1);
+      expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Directory"));
     });
 
     /** @scenario The menu marks the page that is open */
@@ -327,14 +343,14 @@ describe("the settings shell in a new navigation mode", () => {
         .filter((link) => link.getAttribute("aria-current") === "page")
         .map((link) => link.textContent?.trim());
 
-      expect(marked).toEqual(["Email Suppressions"]);
+      expect(marked).toEqual(["Email suppressions"]);
     });
 
     /** @scenario A lite member sees no restricted settings entries */
     it("hides the restricted entries from a lite member", () => {
       renderSettingsSidebar({ isLiteMember: true });
 
-      expect(screen.queryByRole("link", { name: "API Keys" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "API keys" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Secrets" })).not.toBeInTheDocument();
     });
   });
@@ -351,63 +367,65 @@ describe("the settings shell in a new navigation mode", () => {
   });
 
   describe("when the reader has ops access and is an admin", () => {
-    /** @scenario The settings menu holds the ops groups at the bottom */
-    it("puts Ops, Instance and Cloud admin last with cloud ops", () => {
+    /** @scenario "Settings holds no operator groups" */
+    it("keeps Health, Tools, Instance and Cloud out of Settings", () => {
       renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true, hasCloudOps: true });
 
-      const groupLabels = screen
-        .getAllByText(
-          /^(You|Organization|People & access|AI Infrastructure|Data Controls|Project|Ops|Instance|Cloud admin)$/,
-        )
-        .map((node) => node.textContent);
-
-      expect(groupLabels.slice(-3)).toEqual(["Ops", "Instance", "Cloud admin"]);
+      for (const label of ["Health", "Tools", "Instance", "Cloud", "Ops"]) {
+        expect(screen.queryByText(label)).not.toBeInTheDocument();
+      }
+      expect(screen.queryByRole("link", { name: "Foundry" })).not.toBeInTheDocument();
     });
 
-    it("hides Cloud admin without cloud ops", () => {
-      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true });
+    /** @scenario "The Admin console has its own sidebar" */
+    it("groups the Admin sidebar as Health, Tools, Instance and Cloud", () => {
+      renderSettingsSidebar({
+        surface: "admin",
+        pathname: "/ops",
+        hasOpsAccess: true,
+        isOpsAdmin: true,
+        hasCloudOps: true,
+      });
+
+      const groupLabels = screen
+        .getAllByText(/^(Health|Tools|Instance|Cloud)$/)
+        .map((node) => node.textContent);
+      expect(groupLabels).toEqual(["Health", "Tools", "Instance", "Cloud"]);
+      expect(screen.getByRole("link", { name: "Foundry" })).toBeInTheDocument();
+    });
+
+    it("hides Cloud without cloud ops", () => {
+      renderSettingsSidebar({ surface: "admin", hasOpsAccess: true, isOpsAdmin: true });
 
       expect(screen.getByText("Instance")).toBeInTheDocument();
-      expect(screen.queryByText("Cloud admin")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cloud")).not.toBeInTheDocument();
     });
   });
 
-  describe("when the reader has ops access", () => {
-    /** @scenario The settings menu holds the ops groups at the bottom */
-    it("shows the Ops group away from an ops page", () => {
-      renderSettingsSidebar({ hasOpsAccess: true });
+  describe("when the reader has ops access but is no platform administrator", () => {
+    it("offers Health and Tools only", () => {
+      renderSettingsSidebar({ surface: "admin", hasOpsAccess: true });
 
-      expect(screen.getByText("Ops")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "The Foundry" })).toBeInTheDocument();
-    });
-  });
-
-  describe("when the reader has no ops access", () => {
-    /** @scenario A reader without ops access sees no ops groups */
-    it("shows neither the Ops group nor its admin groups", () => {
-      renderSettingsSidebar({ isSaaS: true });
-
-      expect(screen.queryByText("Ops")).not.toBeInTheDocument();
+      expect(screen.getByText("Health")).toBeInTheDocument();
       expect(screen.queryByText("Instance")).not.toBeInTheDocument();
-      expect(screen.queryByText("Cloud admin")).not.toBeInTheDocument();
     });
   });
 
   describe("when an ops page is opened in a new navigation mode", () => {
-    /** @scenario An ops page renders inside the new settings shell */
+    /** @scenario An ops page renders inside the Admin console */
     it("marks the matching entry active for an ops page", () => {
-      renderSettingsSidebar({ hasOpsAccess: true, pathname: "/ops/upgrades" });
+      renderSettingsSidebar({ surface: "admin", hasOpsAccess: true, pathname: "/ops/upgrades" });
 
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
       const upgrades = screen.getByRole("link", { name: "Upgrades" });
       expect(upgrades).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario An ops page renders inside the new settings shell */
+    /** @scenario An ops page renders inside the Admin console */
     it("marks the owning entry active on an address that redirects onto it", () => {
-      renderSettingsSidebar({ hasOpsAccess: true, pathname: "/ops/scheduler" });
+      renderSettingsSidebar({ surface: "admin", hasOpsAccess: true, pathname: "/ops/scheduler" });
 
-      expect(screen.getByRole("link", { name: "Event Sourcing" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Event sourcing" })).toHaveAttribute(
         "aria-current",
         "page",
       );

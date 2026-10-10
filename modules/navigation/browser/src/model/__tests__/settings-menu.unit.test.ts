@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
+import { adminMenu, settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
 
 const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
@@ -23,10 +23,6 @@ function hrefsIn(gates: Partial<SettingsMenuGates>): string[] {
   return settingsMenu({ ...EVERYTHING_CLOSED, ...gates }).flatMap((group) =>
     group.items.map((item) => item.href),
   );
-}
-
-function groupIdsIn(gates: Partial<SettingsMenuGates>): string[] {
-  return settingsMenu({ ...EVERYTHING_CLOSED, ...gates }).map((group) => group.id);
 }
 
 describe("given a reader with no grants on a self-hosted deployment", () => {
@@ -46,9 +42,7 @@ describe("given a reader with no grants on a self-hosted deployment", () => {
     });
 
     it("offers neither the operations nor its admin groups", () => {
-      expect(groupIdsIn({})).not.toContain("settings-ops");
-      expect(groupIdsIn({})).not.toContain("settings-ops-instance");
-      expect(groupIdsIn({})).not.toContain("settings-cloud-admin");
+      expect(adminMenu(EVERYTHING_CLOSED)).toEqual([]);
     });
   });
 });
@@ -147,45 +141,81 @@ describe("given an enterprise plan", () => {
 });
 
 describe("given an operator", () => {
-  describe("when the menu is built with operations access", () => {
-    /**
-     * This menu is the ONLY place the operations pages are offered in this
-     * shell, so a page missing from the group cannot be reached from the menu
-     * at all.
-     */
-    it("offers the operations group", () => {
-      expect(groupIdsIn({ hasOpsAccess: true })).toContain("settings-ops");
-      expect(hrefsIn({ hasOpsAccess: true })).toContain("/ops/event-sourcing");
+  function adminHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
+    return adminMenu({ ...EVERYTHING_CLOSED, ...gates }).flatMap((group) =>
+      group.items.map((item) => item.href),
+    );
+  }
+  function adminGroupIdsIn(gates: Partial<SettingsMenuGates>): string[] {
+    return adminMenu({ ...EVERYTHING_CLOSED, ...gates }).map((group) => group.id);
+  }
+
+  describe("when the Settings menu is built with operations access", () => {
+    /** @scenario "Settings holds no operator groups" */
+    it("offers no operations page: those live in the Admin console", () => {
+      const everything = { hasOpsAccess: true, isPlatformAdmin: true, hasCloudOps: true };
+      expect(hrefsIn(everything).filter((href) => href.startsWith("/ops"))).toEqual([]);
+    });
+  });
+
+  describe("when the Admin menu is built with operations access", () => {
+    /** The Admin menu is the ONLY place the operations pages are offered in this shell. */
+    it("offers Health and Tools", () => {
+      expect(adminGroupIdsIn({ hasOpsAccess: true })).toEqual(["admin-health", "admin-tools"]);
+      expect(adminHrefsIn({ hasOpsAccess: true })).toContain("/ops/event-sourcing");
     });
 
     /** @scenario "Self-hosted installs do not offer the Feature Flags page" */
-    it("offers Feature Flags only where ops offers cloud ops", () => {
-      expect(hrefsIn({ hasOpsAccess: true })).not.toContain("/ops/feature-flags");
-      expect(hrefsIn({ hasOpsAccess: true, hasCloudOps: true })).toContain("/ops/feature-flags");
+    it("offers Feature flags only where ops offers cloud ops", () => {
+      expect(adminHrefsIn({ hasOpsAccess: true })).not.toContain("/ops/feature-flags");
+      expect(adminHrefsIn({ hasOpsAccess: true, hasCloudOps: true })).toContain(
+        "/ops/feature-flags",
+      );
     });
 
     /** @scenario "A developer's local stack offers the Feature Flags page" */
-    it("offers Feature Flags on a local development stack without cloud ops", () => {
-      expect(hrefsIn({ hasOpsAccess: true, hosting: "local" })).toContain("/ops/feature-flags");
+    it("offers Feature flags on a local development stack without cloud ops", () => {
+      expect(adminHrefsIn({ hasOpsAccess: true, hosting: "local" })).toContain(
+        "/ops/feature-flags",
+      );
     });
 
     it("offers instance administration only to a platform administrator", () => {
-      expect(groupIdsIn({ hasOpsAccess: true })).not.toContain("settings-ops-instance");
-      expect(groupIdsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain(
-        "settings-ops-instance",
+      expect(adminGroupIdsIn({ hasOpsAccess: true })).not.toContain("admin-instance");
+      expect(adminGroupIdsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain(
+        "admin-instance",
       );
-      expect(hrefsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain("/ops/users");
+      expect(adminHrefsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain("/ops/users");
     });
 
-    it("offers Cloud admin only to a platform administrator where ops offers cloud ops", () => {
+    it("offers Cloud only to a platform administrator where ops offers cloud ops", () => {
       const admin = { hasOpsAccess: true, isPlatformAdmin: true };
-      expect(groupIdsIn(admin)).not.toContain("settings-cloud-admin");
-      expect(groupIdsIn({ ...admin, isSaaS: true })).not.toContain("settings-cloud-admin");
-      expect(groupIdsIn({ ...admin, hasCloudOps: true })).toContain("settings-cloud-admin");
-      expect(groupIdsIn({ hasOpsAccess: true, hasCloudOps: true })).not.toContain(
-        "settings-cloud-admin",
+      expect(adminGroupIdsIn(admin)).not.toContain("admin-cloud");
+      expect(adminGroupIdsIn({ ...admin, isSaaS: true })).not.toContain("admin-cloud");
+      expect(adminGroupIdsIn({ ...admin, hasCloudOps: true })).toContain("admin-cloud");
+      expect(adminGroupIdsIn({ hasOpsAccess: true, hasCloudOps: true })).not.toContain(
+        "admin-cloud",
       );
-      expect(hrefsIn({ ...admin, hasCloudOps: true })).toContain("/ops/cloud/licenses");
+      expect(adminHrefsIn({ ...admin, hasCloudOps: true })).toContain("/ops/cloud/licenses");
     });
+
+    it("gives every entry an icon no other entry wears", () => {
+      const everything = { hasOpsAccess: true, isPlatformAdmin: true, hasCloudOps: true };
+      const icons = adminMenu({ ...EVERYTHING_CLOSED, ...everything }).flatMap((group) =>
+        group.items.map((item) => item.icon),
+      );
+      expect(new Set(icons).size).toBe(icons.length);
+    });
+  });
+});
+
+describe("given every Settings entry", () => {
+  it("gives every entry an icon no other entry wears", () => {
+    const icons = settingsMenu({
+      ...EVERYTHING_CLOSED,
+      hasPermission: () => true,
+      showEnterpriseNav: true,
+    }).flatMap((group) => group.items.map((item) => item.icon));
+    expect(new Set(icons).size).toBe(icons.length);
   });
 });

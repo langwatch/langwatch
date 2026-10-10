@@ -3,12 +3,12 @@
 import { AppTopBar } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
 import { HStack, Text } from "@langwatch/design-system/primitives";
-import { Settings as SettingsIcon } from "lucide-react";
+import { ServerCog, Settings as SettingsIcon } from "lucide-react";
 
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import type { ProductId } from "../../model/products.ts";
+import { isAdminShellRoute, type ProductId } from "../../model/products.ts";
 import { DevBadge } from "../elements/dev-badge.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
@@ -85,6 +85,8 @@ function ProductCluster({
   activeProductId: ProductId | null;
   width: string | undefined;
 }) {
+  const isAdmin = isAdminShellRoute(useNavigationHost().pathname());
+  const DetourIcon = isAdmin ? ServerCog : SettingsIcon;
   return (
     <HStack
       data-testid="shell-product-cluster"
@@ -102,13 +104,12 @@ function ProductCluster({
       {activeProductId ? (
         <ProductSwitcherMenu activeProductId={activeProductId} />
       ) : (
-        // Settings is a detour, not a product to switch between; the way
-        // out is the sidebar's back entry. It keeps the switcher pill's
-        // inset, so the icon sits where a product icon sits.
+        // Settings and the Admin console are detours, not products to switch between; the
+        // way out is the sidebar's back entry. The switcher pill's inset keeps the icon in place.
         <HStack gap={2} paddingX={2.5} height="28px">
-          <SettingsIcon size={14} color="var(--chakra-colors-fg-muted)" />
+          <DetourIcon size={14} color="var(--chakra-colors-fg-muted)" />
           <Text fontSize="13px" fontWeight="medium">
-            Settings
+            {isAdmin ? "Admin" : "Settings"}
           </Text>
         </HStack>
       )}

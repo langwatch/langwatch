@@ -54,7 +54,7 @@ function renderSettingsSidebar({ hasAccess }: { hasAccess: boolean }) {
         opsAccess: { hasAccess, isAdmin: hasAccess },
       }}
     >
-      <SidebarContent surface="settings" showExpanded />
+      <SidebarContent surface="admin" showExpanded />
     </WithStubNavigationHost>,
   );
 }
