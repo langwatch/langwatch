@@ -8,12 +8,14 @@ import type {
 } from "@langwatch/agent-contract";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { Field, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback, useState } from "react";
+
+import { knownResponseShape, responseShape } from "../../model/known-response-shapes.ts";
 
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
 import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
 import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
-import { OutputPathInput } from "../elements/http-output-path-input.tsx";
+import { OUTPUT_PATH_INPUT_ID, OutputPathInput } from "../elements/http-output-path-input.tsx";
 import { SessionPathInput } from "../elements/http-session-path-input.tsx";
 import { HttpTestPanel } from "./http-test-panel.tsx";
 
@@ -95,6 +97,16 @@ export function AgentHttpEditorTabs({
   renderVariables,
   explainTestError,
 }: AgentHttpEditorTabsProps) {
+  const [lastResponse, setLastResponse] = useState<unknown>(undefined);
+  const testedShape = responseShape({ response: lastResponse });
+  const shape = testedShape ?? knownResponseShape({ url });
+
+  const editOutputPath = useCallback(() => {
+    onActiveTabChange("body");
+    // The Body tab may not be mounted until the switch lands.
+    setTimeout(() => document.getElementById(OUTPUT_PATH_INPUT_ID)?.focus(), 0);
+  }, [onActiveTabChange]);
+
   return (
     <Tabs.Root
       value={activeTab}
@@ -120,11 +132,21 @@ export function AgentHttpEditorTabs({
             <Text fontSize="sm" color="fg.muted" marginBottom={2}>
               JSON body with mustache variables. Variables are replaced at runtime.
             </Text>
-            <BodyTemplateEditor value={bodyTemplate} onChange={onBodyTemplateChange} />
+            <BodyTemplateEditor
+              value={bodyTemplate}
+              onChange={onBodyTemplateChange}
+              headers={headers}
+            />
           </Field.Root>
           <Field.Root>
             <Field.Label>Output Path (JSONPath)</Field.Label>
-            <OutputPathInput value={outputPath} onChange={onOutputPathChange} />
+            <OutputPathInput
+              value={outputPath}
+              onChange={onOutputPathChange}
+              shape={shape}
+          shapeIsSample={testedShape === undefined}
+              shapeIsSample={testedShape === undefined}
+            />
           </Field.Root>
           <SessionPathInput value={sessionPath} onChange={onSessionPathChange} />
           {renderScenarioMappings({
@@ -187,6 +209,10 @@ export function AgentHttpEditorTabs({
           outputPath={outputPath}
           bodyTemplate={bodyTemplate}
           explainError={explainTestError}
+          onResult={(result) => setLastResponse(result.response)}
+          onEditOutputPath={editOutputPath}
+          shape={shape}
+          shapeIsSample={testedShape === undefined}
         />
       </Tabs.Content>
     </Tabs.Root>

@@ -1,6 +1,7 @@
 import { HStack, Icon, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ShareVisibility } from "@langwatch/share-contract";
+import { formatDistanceToNow } from "@langwatch/time";
 import type { IconType } from "react-icons";
 import { LuBuilding2, LuCopy, LuFolderClosed, LuGlobe, LuTrash2 } from "react-icons/lu";
 
@@ -20,12 +21,15 @@ export function ShareLinkRow({
   link,
   isFirst,
   isRevoking,
+  creatorName,
   onCopy,
   onRevoke,
 }: {
   link: ShareLinkView;
   isFirst: boolean;
   isRevoking: boolean;
+  /** The contract carries only `userId`; the host passes a resolved name when it has one. */
+  creatorName?: string;
   /** The host owns how a copy is reported; this row only asks for one. */
   onCopy: (url: string) => void;
   onRevoke: () => void;
@@ -48,23 +52,9 @@ export function ShareLinkRow({
       data-testid="share-link-row"
     >
       <VStack align="start" gap={0.5} flex="1" minWidth={0}>
-        <Text
-          as="code"
-          title={url}
-          fontFamily="mono"
-          fontSize="xs"
-          color="fg"
-          bg="bg.muted"
-          borderRadius="sm"
-          paddingX={1.5}
-          maxWidth="full"
-          truncate
-          data-testid="share-link-url"
-        >
-          <Text as="span" color="fg.muted">
-            …/share/
-          </Text>
-          {link.token}
+        <Text fontSize="xs" color="fg" truncate maxWidth="full" data-testid="share-link-created">
+          {creatorName ? `Created by ${creatorName}, ` : "Created "}
+          {formatDistanceToNow(link.createdAt, { addSuffix: true })}
         </Text>
         <HStack gap={1.5} color="fg.muted" fontSize="xs">
           <Icon as={audience.icon} boxSize={3} />

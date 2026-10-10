@@ -1,5 +1,7 @@
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
+import { prettyBody } from "../../model/http-body-language.ts";
 import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
 
 export function HttpTestRequestPreview({
@@ -47,19 +49,7 @@ export function HttpTestRequestPreview({
             </Text>
             <CopyButton text={body} label="Copy body" />
           </HStack>
-          <Box
-            as="pre"
-            fontSize="xs"
-            fontFamily="mono"
-            bg="bg.subtle"
-            padding={2}
-            borderRadius="md"
-            overflow="auto"
-            maxHeight="150px"
-            whiteSpace="pre-wrap"
-          >
-            {body}
-          </Box>
+          <CodePreview {...prettyBody({ body })} filename="body" maxHeight="200px" />
         </Box>
       </VStack>
     </CollapsibleSection>
