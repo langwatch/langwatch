@@ -291,3 +291,16 @@ Feature: Redis is an owned client, never a module singleton
     Given a connection whose Redis server answers
     When shutdown begins and a command is sent before the quit
     Then the command is answered and the quit resolves
+
+  @unit
+  Scenario: Hosted components hear shutdown begin before any of them stops
+    Given a server hosting components that ask to hear shutdown begin
+    When the server closes
+    Then every such component is told it is stopping
+    And only then does the first component stop
+
+  @integration
+  Scenario: A worker's group queue closes promptly on a lost Redis
+    Given a group queue consuming from a Redis server that has gone away
+    When the door tells the process stores that shutdown has begun
+    Then the queue's close ends within about a second

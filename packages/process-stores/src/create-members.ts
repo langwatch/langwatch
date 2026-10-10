@@ -97,6 +97,8 @@ export interface ProcessMemberSource {
    * the first that does not. Spec: specs/server/process-readiness.feature.
    */
   answer?(): Promise<void>;
+  /** Tells every opened client shutdown has begun: a lost Redis stops reconnecting. */
+  beginClose?(): void;
   /** Closes every client this source opened, in reverse construction order. */
   close(): Promise<void>;
   /** The same close, so `await using members = buildProcessStores(...).members` works. */
@@ -401,6 +403,9 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
         ),
       );
     },
+    beginClose(): void {
+      for (const entry of opened) entry.beginClose?.();
+    },
     async close(): Promise<void> {
       await closeOpened(opened);
       opened.length = 0;
@@ -418,6 +423,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
 export function hostedStores(source: ProcessMemberSource) {
   return {
     name: "process stores",
+    stopping: () => source.beginClose?.(),
     stop: () => source.close(),
     ...(source.answer === undefined
       ? {}
