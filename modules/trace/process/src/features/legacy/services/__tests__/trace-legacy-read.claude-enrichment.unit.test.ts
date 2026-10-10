@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * Claude Code content enrichment at read time: real enrichment adapter + join,
  * mocked trace read and log-record store (no Docker).
@@ -36,6 +37,8 @@ vi.mock("langwatch", () => ({
 }));
 
 import type { TraceEditOverlayService } from "../../../edit-overlay/services/trace-edit-overlay.service.ts";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "../legacy-trace-mapping.service.ts";
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
@@ -150,19 +153,26 @@ function makeService(
 ): TraceLegacyReadService {
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
-    traceRead: {
-      findTracesWithSpans: mockGetTracesWithSpans,
-      findTracesByThreadId: mockGetTracesByThreadId,
-      findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
-      listAllTracesForProject: mockGetAllTracesForProject,
-      findTraceSummaries: vi.fn(),
-      resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-      findCustomersAndLabels: vi.fn(),
-      findDistinctFieldNames: vi.fn(),
-      findTopicCounts: vi.fn(),
-      findSpanForPromptStudio: vi.fn(),
-      withPolicies: vi.fn(),
-    },
+    traceRead: createApiFixture<TraceLegacyReadRepository>(
+      {
+        findTraceSummaries: vi.fn(),
+        resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
+        findCustomersAndLabels: vi.fn(),
+        findDistinctFieldNames: vi.fn(),
+        findTopicCounts: vi.fn(),
+        findSpanForPromptStudio: vi.fn(),
+      },
+      "trace read store",
+    ),
+    mapping: createApiFixture<LegacyTraceMappingService>(
+      {
+        findTracesWithSpans: mockGetTracesWithSpans,
+        findTracesByThreadId: mockGetTracesByThreadId,
+        findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+        listAllTracesForProject: mockGetAllTracesForProject,
+      },
+      "legacy trace mapping",
+    ),
     editOverlay: {} as TraceEditOverlayService,
     logRecordStorage: { getLogsByTraceId },
     // The enrichment join reads no evaluation; a refusing double proves it.

@@ -9,6 +9,7 @@ import { MemoryTraceEvaluationRunsRepository } from "../../../../../repositories
 import { explorerOriginExclusion } from "../../../../../rules/trace-filter-hidden-origins.rules.ts";
 import { TraceEditOverlayService } from "../../../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceLegacyReadRepository } from "../../../../legacy/repositories/trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "../../../../legacy/services/legacy-trace-mapping.service.ts";
 import { TraceLegacyReadService } from "../../../../legacy/services/trace-legacy-read.service.ts";
 
 /** A real legacy read service whose project-wide page is scripted; other reads throw by name. */
@@ -18,6 +19,7 @@ export function legacyReadAnswering(
   const service = TraceLegacyReadService.create({
     traceCanonicalisation: TraceCanonicalisationService.create(),
     traceRead: createApiFixture<TraceLegacyReadRepository>({}, "trace read store"),
+    mapping: createApiFixture<LegacyTraceMappingService>({}, "legacy trace mapping"),
     editOverlay: TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create()),
     evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
   });

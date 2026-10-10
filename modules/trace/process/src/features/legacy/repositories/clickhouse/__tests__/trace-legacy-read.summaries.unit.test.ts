@@ -5,8 +5,6 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
-
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
@@ -26,7 +24,6 @@ function compose(answers: unknown[][]) {
   const client = createApiFixture<TraceClickHouseClient>({ query });
   const repository = new TraceLegacyReadClickHouseRepository({
     resolveClickHouseClient: async () => client,
-    traceCanonicalisation: TraceCanonicalisationService.create(),
   });
   return { repository, query };
 }
@@ -98,7 +95,6 @@ describe("TraceLegacyReadClickHouseRepository.findTraceSummaries", () => {
     });
     const repository = new TraceLegacyReadClickHouseRepository({
       resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
-      traceCanonicalisation: TraceCanonicalisationService.create(),
     });
 
     await expect(

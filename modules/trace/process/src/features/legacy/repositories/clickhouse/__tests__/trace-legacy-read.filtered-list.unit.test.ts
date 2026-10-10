@@ -12,7 +12,7 @@ import { boundedSubquery } from "#features/query/rules/trace-query-subquery.rule
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
@@ -23,7 +23,7 @@ function compose() {
     }),
   );
   const client = createApiFixture<TraceClickHouseClient>({ query });
-  const repository = new TraceLegacyReadClickHouseRepository({
+  const repository = mappedLegacyRead({
     resolveClickHouseClient: async () => client,
     traceCanonicalisation: TraceCanonicalisationService.create(),
   });

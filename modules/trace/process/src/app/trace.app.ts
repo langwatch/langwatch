@@ -265,7 +265,8 @@ import {
   type CodingAgentIngestFilter,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
 import type {
-  TraceLegacyReadPolicies,
+  ResolveTraceSpansBatchFn,
+  ResolveTraceSpansFn,
   TraceLegacyReadRepository,
 } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
@@ -281,6 +282,7 @@ import {
   traceLegacySearchBodySchema,
 } from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
 import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
+import { LegacyTraceMappingService } from "../features/legacy/services/legacy-trace-mapping.service.ts";
 import {
   AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
@@ -849,10 +851,13 @@ type TraceReaderCompositionOptions = {
   publicBaseUrl?: string;
 };
 
-/** What a composition root gives the legacy trace read: the store, and the policies over it. */
-type TraceLegacyReadCompositionOptions = Omit<TraceLegacyReadPolicies, "retentionDays"> & {
+/** What a composition root gives the legacy trace read: the store, and its mapping's inputs. */
+type TraceLegacyReadCompositionOptions = {
   /** The registry's legacy read store (§3.3). */
   repository: TraceLegacyReadRepository;
+  traceCanonicalisation: TraceCanonicalisationService;
+  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
+  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /** Restores offloaded spans from the blob store (ADR-022) where no resolver is supplied. */
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
@@ -1026,7 +1031,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: options.canonicalisation,
-      traceRead: TraceModule.composeLegacyRead({
+      traceRead: options.repositories.legacyRead,
+      mapping: TraceModule.composeLegacyRead({
         repository: options.repositories.legacyRead,
         traceCanonicalisation: options.canonicalisation,
         retentionResolver: options.dataRetention,
@@ -1190,22 +1196,22 @@ export class TraceModule implements TraceApi, CollectorApp {
     };
   }
 
-  /** The legacy trace read over ClickHouse, with its offload resolution and retention floor. */
-  static composeLegacyRead(options: TraceLegacyReadCompositionOptions): TraceLegacyReadRepository {
-    const { repository, blobResolutionDeps, retentionResolver, ...policies } = options;
+  /** The legacy trace read's mapping, with its offload resolution and retention floor. */
+  static composeLegacyRead(options: TraceLegacyReadCompositionOptions): LegacyTraceMappingService {
+    const { blobResolutionDeps, retentionResolver, ...mapping } = options;
 
-    return repository.withPolicies({
-      ...policies,
+    return LegacyTraceMappingService.create({
+      ...mapping,
       ...(retentionResolver
         ? { retentionDays: TraceRetentionFloorService.create(retentionResolver) }
         : {}),
       resolveTraceSpans:
-        policies.resolveTraceSpans ??
+        mapping.resolveTraceSpans ??
         (blobResolutionDeps
           ? TraceOffloadResolutionService.create().resolverFor(blobResolutionDeps)
           : undefined),
       resolveTraceSpansBatch:
-        policies.resolveTraceSpansBatch ??
+        mapping.resolveTraceSpansBatch ??
         (blobResolutionDeps
           ? TraceOffloadResolutionBatchService.create().resolverFor(blobResolutionDeps)
           : undefined),

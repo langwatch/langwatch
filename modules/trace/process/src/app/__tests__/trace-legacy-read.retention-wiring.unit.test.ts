@@ -25,18 +25,15 @@ vi.mock("langwatch", () => ({
 const { TraceModule } = await import("../trace.app.ts");
 const { TraceLegacyReadClickHouseRepository } =
   await import("../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts");
+const { LegacyTraceMappingService } =
+  await import("../../features/legacy/services/legacy-trace-mapping.service.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
 const repository = TraceLegacyReadClickHouseRepository.create({});
 const retentionResolver = { resolve: async () => null };
 
-/** The service keeps its floor service private; this is the wiring under test. */
+/** The mapping keeps the policy it passes to each read private; this is the wiring under test. */
 function retentionProviderOf(service: unknown) {
-  const floor = (service as { retentionFloor: { provider?: unknown } }).retentionFloor;
-  return (floor as { provider?: unknown }).provider;
-}
-
-function annotationServiceOf(service: unknown) {
-  return (service as { annotations?: unknown }).annotations;
+  return (service as { retentionDays?: unknown }).retentionDays;
 }
 
 describe("the production trace-service factory", () => {
@@ -67,16 +64,6 @@ describe("the production trace-service factory", () => {
 
         expect(provider?.resolver).toBe(retentionResolver);
       });
-
-      it("keeps the registry's annotation reads under the policies", () => {
-        const annotations = {} as never;
-        const service = TraceModule.composeLegacyRead({
-          repository: TraceLegacyReadClickHouseRepository.create({ annotations }),
-          traceCanonicalisation,
-        });
-
-        expect(annotationServiceOf(service)).toBe(annotations);
-      });
     });
   });
 
@@ -84,9 +71,7 @@ describe("the production trace-service factory", () => {
     describe("when no resolver is supplied", () => {
       /** @scenario "A caller with no resolver wired still gets a bounded read" */
       it("leaves the floor on the platform default, so unit tests stay database-free", () => {
-        const service = new TraceLegacyReadClickHouseRepository({
-          traceCanonicalisation,
-        });
+        const service = LegacyTraceMappingService.create({ repository, traceCanonicalisation });
 
         expect(retentionProviderOf(service)).toBeUndefined();
       });

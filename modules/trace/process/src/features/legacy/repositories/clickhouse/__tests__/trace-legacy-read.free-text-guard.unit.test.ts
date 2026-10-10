@@ -14,7 +14,7 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const PROJECT_ID = "project-1";
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
@@ -41,7 +41,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           json: async (): Promise<unknown[]> => [],
         }),
       );
-      const repository = new TraceLegacyReadClickHouseRepository({
+      const repository = mappedLegacyRead({
         resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
@@ -83,7 +83,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           json: async (): Promise<unknown[]> => [],
         }),
       );
-      const repository = new TraceLegacyReadClickHouseRepository({
+      const repository = mappedLegacyRead({
         resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
@@ -115,7 +115,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           json: async (): Promise<unknown[]> => [],
         }),
       );
-      const repository = new TraceLegacyReadClickHouseRepository({
+      const repository = mappedLegacyRead({
         resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });

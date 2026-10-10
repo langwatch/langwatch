@@ -1,14 +1,14 @@
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
-  TraceCanonicalisationService,
+  Event,
   NormalizedSpan,
+  ProjectedAnnotation,
   Protections,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   PromptStudioSpanResult,
   TopicCountsResult,
-  Trace,
-  TracesForProjectResult,
+  TraceSummaryData,
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
@@ -17,6 +17,7 @@ import type {
   TraceSummaryPage,
 } from "@langwatch/trace-contract";
 
+import type { ClickHouseEvaluationRunRow } from "../../../rules/trace-evaluation-mapping.rules.ts";
 import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
 
 /**
@@ -49,14 +50,25 @@ interface TraceOccurredAtRange {
   to: number;
 }
 
-/** The composition root's layer over the registry's store: canonicalisation, offload, retention. */
-export type TraceLegacyReadPolicies = {
-  traceCanonicalisation: TraceCanonicalisationService;
-  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
-  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
-  /** The tenant's retention policy; absent, the span read floors at the platform default. */
-  retentionDays?: RetentionDaysProvider | undefined;
+/** One stored trace as the store holds it: its summary row and its spans, unmapped. */
+export type TraceLegacyRow = { summary: TraceSummaryData; spans: NormalizedSpan[] };
+
+/** One list page as the store holds it; the mapping service turns it into the page's traces. */
+export type TraceLegacyPage = {
+  summaries: TraceSummaryData[];
+  totalHits: number;
+  scrollId?: string | undefined;
+  /** Updated axis only: the upper bound this scroll covered, in epoch ms. */
+  updatedThrough?: number | undefined;
+  /** The page's spans by trace id, read only where spans or full IO were asked for. */
+  spans: Map<string, TraceLegacyRow>;
+  evaluations: ClickHouseEvaluationRunRow[];
+  events?: Map<string, Event[]> | undefined;
+  annotations?: Map<string, ProjectedAnnotation[]> | undefined;
 };
+
+/** The tenant's retention policy, which widens the span read's floor past the platform default. */
+type TraceLegacySpanFloor = { retentionDays: RetentionDaysProvider | undefined };
 
 /**
  * Every read the legacy trace surface makes against the stored trace summaries
@@ -64,14 +76,13 @@ export type TraceLegacyReadPolicies = {
  * service that orchestrates a read never names one.
  */
 export abstract class TraceLegacyReadRepository {
-  /** The same store with the composition root's policies over it. */
-  abstract withPolicies(policies: TraceLegacyReadPolicies): TraceLegacyReadRepository;
-
   abstract listAllTracesForProject(
-    input: GetAllTracesForProjectInput,
-    protections: Protections,
-    options?: GetAllTracesForProjectOptions,
-  ): Promise<TracesForProjectResult>;
+    params: TraceLegacySpanFloor & {
+      input: GetAllTracesForProjectInput;
+      protections: Protections;
+      options: GetAllTracesForProjectOptions;
+    },
+  ): Promise<TraceLegacyPage>;
 
   abstract findTraceSummaries(
     query: TraceSummaryListQuery,
@@ -90,43 +101,25 @@ export abstract class TraceLegacyReadRepository {
 
   abstract findTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult>;
 
-  abstract findTracesByThreadId({
-    projectId,
-    threadId,
-    protections,
-    opts,
-  }: {
-    projectId: string;
-    threadId: string;
-    protections: Protections;
-    opts?: { resolveBlobs?: boolean };
-  }): Promise<Trace[]>;
+  abstract findTracesByThreadId(
+    params: TraceLegacySpanFloor & { projectId: string; threadId: string },
+  ): Promise<TraceLegacyRow[]>;
 
-  abstract findTracesWithSpans({
-    projectId,
-    traceIds,
-    protections,
-    occurredAt,
-    opts,
-  }: {
-    projectId: string;
-    traceIds: string[];
-    protections: Protections;
-    occurredAt?: TraceOccurredAtRange;
-    opts?: { resolveBlobs?: boolean };
-  }): Promise<Trace[]>;
+  abstract findTracesWithSpans(
+    params: TraceLegacySpanFloor & {
+      projectId: string;
+      traceIds: string[];
+      occurredAt?: TraceOccurredAtRange | undefined;
+    },
+  ): Promise<TraceLegacyRow[]>;
 
-  abstract findTracesWithSpansByThreadIds({
-    projectId,
-    threadIds,
-    protections,
-    opts,
-  }: {
-    projectId: string;
-    threadIds: string[];
-    protections: Protections;
-    opts?: { resolveBlobs?: boolean };
-  }): Promise<Trace[]>;
+  abstract findTracesWithSpansByThreadIds(
+    params: TraceLegacySpanFloor & {
+      projectId: string;
+      threadIds: string[];
+      maxTraces?: number | undefined;
+    },
+  ): Promise<TraceLegacyRow[]>;
 
   abstract resolveTraceIdByPrefix(params: {
     projectId: string;

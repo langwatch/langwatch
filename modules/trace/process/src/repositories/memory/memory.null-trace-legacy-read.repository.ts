@@ -12,10 +12,6 @@ export class MemoryNullTraceLegacyReadRepository extends TraceLegacyReadReposito
     super();
   }
 
-  withPolicies(): MemoryNullTraceLegacyReadRepository {
-    return this;
-  }
-
   listAllTracesForProject = refuse;
   findTraceSummaries = refuse;
   findCustomersAndLabels = refuse;
