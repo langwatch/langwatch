@@ -72,7 +72,10 @@ import {
   passkeySignUpRegistration,
   type SignUpVerification,
 } from "./http.passkey-sign-up.channel.ts";
-import { PasswordResetSessionChannel } from "./http.password-reset-session.channel.ts";
+import {
+  PasswordResetSessionChannel,
+  replaceLiveResetLink,
+} from "./http.password-reset-session.channel.ts";
 import { resilientGenericOAuth } from "./http.resilient-generic-oauth.channel.ts";
 import { samlOwnOriginRepost } from "./http.saml-own-origin-repost.channel.ts";
 import { SessionCallbackEvidenceChannel } from "./http.session-callback-evidence.channel.ts";
@@ -662,6 +665,7 @@ export const createAuthOptions = ({
             verification: { ...verification, expiresAt: fromDate(verification.expiresAt) },
             context,
           });
+          await replaceLiveResetLink({ verification, storage: context?.context.adapter });
           return undefined;
         },
       },

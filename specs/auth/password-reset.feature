@@ -100,6 +100,13 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then the reset is refused as an invalid token
     And neither the credential nor the set of sessions changes
 
+  @unit
+  Scenario: A second reset request while a link is live sends a fresh link
+    Given a credential user holds a reset link that has not expired
+    When the user asks for another reset link
+    Then the request is answered like the first, never with a server error
+    And the earlier link is replaced by the fresh one
+
   @integration
   Scenario: Wrong-password and unknown-email attempts have one backend refusal
     Given one submitted email has a credential account and one has no account
