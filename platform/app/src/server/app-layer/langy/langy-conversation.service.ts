@@ -183,18 +183,38 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 25;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with NO turn receipt before we conclude the id
- * is simply unknown.
+ * How far back the visibility-evidence read looks — the only events that can
+ * answer "is a create in flight for this caller right now?" are the ones a
+ * create in flight just wrote.
  *
- * The receipt is the evidence that a create is in flight: it is written in the
- * turn admission transaction at send time, before any event is folded. It is
- * the ONLY such evidence. The projection row and the handoff fields on it are
- * folded from events, so before the fold there is no row and no handoff, and
- * a read that keyed on the handoff never waited at all. The grace cannot be
- * zero either: the receipt lands in the same beat as the create, so a read a
- * few milliseconds older than the send finds nothing and must look again.
+ * The evidence read exists for the window between a create being accepted and
+ * its projection row landing; a create still in that window is at most the
+ * dispatch budget old (`DISPATCH_LAG_ATTEMPTS * DISPATCH_LAG_RETRY_MS`, 10s),
+ * so a lower bound generously past that catches every in-flight create. It
+ * also bounds the read: without it the scan had no time floor and no row
+ * limit, so a long FOREIGN conversation transferred its whole history and
+ * took more work — and more time — than an absent id, the very timing signal
+ * this method exists not to emit (CWE-208). A recent-only read is O(recent)
+ * for every id alike. An old conversation's owner-establishing event falls
+ * outside the window, so the read finds no owner and gives up at the grace,
+ * exactly as an absent id does.
  */
-const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
+const DISPATCH_EVIDENCE_WINDOW_MS = 5 * 60 * 1000;
+/**
+ * How many attempts may pass with NO evidence that waiting can help before we
+ * conclude the id is simply unknown.
+ *
+ * It cannot be zero: the evidence — the aggregate's events — is written by
+ * the very dispatch we are waiting on (commands are queued, so the event
+ * append trails the accept). A read that arrives before it lands finds
+ * nothing, and a couple of beats of grace is the difference between "no
+ * create is in flight" and "the create is a few milliseconds younger than
+ * this read". It is also the SAME exit for absent, foreign and archived ids
+ * alike — and for a reader outage, which can establish nothing — so an id
+ * nobody may see never answers on a different clock than an id that does
+ * not exist.
+ */
+const DISPATCH_EVIDENCE_GRACE_ATTEMPTS = 3;
 
 const conversationServiceLogger = createLogger(
   "langwatch:langy:conversation-service",
@@ -382,6 +402,42 @@ function isLangyWaitEventType(type: string): boolean {
 }
 
 /**
+ * Whether this caller will see the conversation's projection row once the
+ * fold lands it, decided from the raw event log by the fold's own rules
+ * (`foldLangyConversationState`): the owner is named first-writer-wins by a
+ * started, forked or message_recorded event — the last because a lazily
+ * created conversation's first message is what owns it — the latest metadata
+ * word decides shared, and an archive is terminal. The vocabulary has no
+ * unarchive, so one archive event means the visible row is never coming back
+ * and waiting cannot help. (message_imported carries no userId and never
+ * sets ownership, exactly like the fold.)
+ *
+ * Only meaningful for a NON-EMPTY log; an empty one says nothing about
+ * whether the conversation exists (the caller owns that distinction).
+ */
+function eventLogSaysVisible(
+  events: readonly LangyConversationProcessingEvent[],
+  userId: string,
+): boolean {
+  let owner: string | null = null;
+  let isShared = false;
+  for (const event of events) {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED
+    ) {
+      owner ??= event.data.userId;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED) {
+      isShared = event.data.isShared ?? isShared;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED) {
+      return false;
+    }
+  }
+  return owner === userId || isShared;
+}
+
+/**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
  */
@@ -397,17 +453,25 @@ export class LangyConversationService {
   /**
    * The visibility read, tolerant of the DISPATCH window.
    *
-   * A conversation whose create was just accepted has a turn receipt, written
-   * in the admission transaction at send time, before its projection row
-   * lands, so "missing row + receipt" means NOT YET, never "never". In that
-   * window this retries instead of reporting "conversation not found", the
-   * answer the panel would render moments before the same conversation's
-   * turn is accepted, and the answer the worker's first `code_access` read
-   * would end the turn on, without its card (see `getById` below). A miss
-   * with NO receipt stays a quick not-found: an
-   * unknown id must not grow a probe-friendly delay. The receipt is read for
-   * this user, and the retried read still enforces visibility, so the
-   * receipt's existence never widens access.
+   * A conversation's projection row is written by an asynchronous fold, so
+   * every read of a brand-new conversation can run before the row lands. In
+   * that window this retries instead of reporting the very lie the `getById`
+   * doc below spends three paragraphs on: the panel used to render
+   * "conversation not found" moments before the same conversation's turn was
+   * accepted.
+   *
+   * Whether a miss is worth waiting out is decided from the canonical event
+   * log (`dispatchInFlightEvidence`): a caller the log says will see the row
+   * once it lands waits out the FULL budget; every other miss — absent,
+   * foreign and archived alike — gives up at the same short grace, so timing
+   * never becomes an existence oracle across users. The grace exists because
+   * commands are queued: the event append itself can trail the accept by a
+   * beat, so "nothing on the log yet" early on means "too soon to tell", not
+   * "no such conversation" — which is also why the evidence is re-asked
+   * every beat until it says wait, rather than trusted once up front.
+   *
+   * Evidence only ever EXTENDS the wait: the answer always comes from the
+   * retried `findVisibleById`, which enforces visibility on every beat.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -418,6 +482,7 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }) {
+    let waitOutFullBudget = false;
     for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
       const row = await this.repository.findVisibleById({
         id,
@@ -426,13 +491,14 @@ export class LangyConversationService {
       });
       if (row) return row;
 
-      // Re-asked every beat, not once up front: the receipt lands on the same
-      // send we are waiting for, so "no receipt yet" early on means "too soon
-      // to tell", not "no such conversation".
-      const admitted = await this.repository
-        .hasAdmittedTurn({ projectId, conversationId: id, userId })
-        .catch(() => false);
-      if (!admitted && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+      // Short-circuits once the log has said wait: evidence is not re-read
+      // every beat after, only the projection is.
+      waitOutFullBudget =
+        waitOutFullBudget ||
+        (await this.dispatchInFlightEvidence({ id, projectId, userId }));
+      if (!waitOutFullBudget && attempt >= DISPATCH_EVIDENCE_GRACE_ATTEMPTS) {
+        return null;
+      }
 
       if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
       await new Promise((resolve) =>
@@ -440,6 +506,67 @@ export class LangyConversationService {
       );
     }
     return null;
+  }
+
+  /**
+   * Whether a projection miss is worth waiting out — the answer to "will
+   * this caller's `findVisibleById` succeed once the fold catches up?".
+   *
+   * The ONLY source is the canonical event log, the very record the
+   * projection is folded FROM: owned-or-shared and not archived means the
+   * visible row WILL land (`eventLogSaysVisible`), anything else means
+   * waiting cannot help. An EMPTY log is "no evidence", not "no
+   * conversation" — the caller re-asks each beat of its grace window because
+   * the append itself may be a few milliseconds younger than this read.
+   *
+   * No reader (event sourcing disabled) and a failed log read both answer
+   * "no evidence", never a guess: only evidence that ESTABLISHES the
+   * caller's visibility may extend the wait, or the window itself becomes a
+   * timing signal — a pending handoff, say, proves a dispatch is in flight
+   * for SOMEONE, and stretching a foreign caller's miss on it would tell
+   * them the id exists. Failing toward the short grace costs one thing: a
+   * fresh read during a reader outage can 404 early — which the client
+   * absorbs, because an unconfirmed conversation's poll keeps re-asking
+   * until the projection answers (`useLangyMessages`).
+   */
+  private async dispatchInFlightEvidence({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<boolean> {
+    if (!this.events) return false;
+    try {
+      // Bounded to the recent past, never `0`: only a create still in the
+      // dispatch window can make waiting worthwhile, and its events are
+      // seconds old. An unbounded read let a long foreign conversation cost
+      // more than an absent id — a timing oracle (CWE-208). See
+      // DISPATCH_EVIDENCE_WINDOW_MS.
+      const occurredAtFromMs = Math.max(
+        0,
+        Date.now() - DISPATCH_EVIDENCE_WINDOW_MS,
+      );
+      const events = await this.events.getEventsOccurredSince(
+        id,
+        { tenantId: createTenantId(projectId) },
+        "langy_conversation",
+        occurredAtFromMs,
+      );
+      return events.length > 0 && eventLogSaysVisible(events, userId);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        {
+          projectId,
+          conversationId: id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Event-log evidence read failed during the dispatch window — treating as no evidence (short grace)",
+      );
+      return false;
+    }
   }
 
   /**
@@ -1178,6 +1305,18 @@ export class LangyConversationService {
    * secret could forge a result into any tenant's conversation, and a benign
    * projectId/conversationId mix-up in the multiplexing manager would write
    * one tenant's output into another's with nothing to catch it.
+   *
+   * Decided projection-first (one indexed Postgres read, and a hit is
+   * definitive), then from the EVENT LOG on a miss: the turn projection is an
+   * asynchronous fold, and the durable result path is exactly the caller
+   * racing it — an agent can finish a short turn and post its final before
+   * the fold has landed the turn row. The acceptance event is the record the
+   * projection is derived from, so it answers "was this turn really accepted
+   * here?" without waiting, and a finished answer is never discarded because
+   * the projection lags. A reader failure PROPAGATES rather than answering
+   * "no": the route turns false into a 404 the posting manager treats as
+   * terminal, and a dropped final is the one outcome this check exists to
+   * prevent — a 5xx, by contrast, is retried.
    */
   async turnExists({
     projectId,
@@ -1188,7 +1327,24 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
   }): Promise<boolean> {
-    return this.repository.turnExists({ projectId, conversationId, turnId });
+    const projected = await this.repository.turnExists({
+      projectId,
+      conversationId,
+      turnId,
+    });
+    if (projected) return true;
+    if (!this.events) return false;
+    const events = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+    return events.some(
+      (event) =>
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED &&
+        event.data.turnId === turnId,
+    );
   }
 
   async ingestAgentTurnResult({
