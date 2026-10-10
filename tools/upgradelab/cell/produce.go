@@ -113,15 +113,10 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 	if load := oneMinuteLoad(); options.MaxLoad > 0 && load > options.MaxLoad {
 		return "", fmt.Errorf("machine load %.0f is above -max-load %.0f", load, options.MaxLoad)
 	}
-	light := options.Options
-	if light.Tier == tierHeavy {
-		light.Tier = "S" // prepare checks the light tiers; seedTier does the rest
-	}
-	cell, err := prepare(light)
+	cell, err := prepare(options.Options)
 	if err != nil {
 		return "", err
 	}
-	cell.options.Tier, cell.report.Tier = options.Tier, options.Tier
 	defer cell.teardown()
 	build := func(ctx context.Context) error {
 		return FromBuild(options.FromDir).Ensure(ctx, cell.logPath("from-build"))

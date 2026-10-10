@@ -41,7 +41,7 @@ var cloudBilling = map[string]string{"STRIPE_SECRET_KEY": "sk_test_upgradelab_ne
 
 // Tiers and shapes a cell accepts today; L and XL wait for the scale generator (lane L4).
 var (
-	Tiers      = []string{"S"}
+	Tiers      = []string{"S", "M"}
 	DataShapes = []string{"typical"}
 )
 

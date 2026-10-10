@@ -42,6 +42,7 @@ type Options struct {
 	MaxLoad                          float64  // refuse to start above this 1-minute load average
 	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
+	NoAdminEmails                    bool      // boot self-hosted-free without ADMIN_EMAILS
 	Stdout                           io.Writer // where the live origin lines go; nil prints nothing
 }
 
@@ -187,6 +188,7 @@ func prepare(options Options) (*run, error) {
 	if err := os.MkdirAll(filepath.Join(options.RunDir, "shots"), 0o750); err != nil {
 		return nil, err
 	}
+	profile.NoAdminEmails = options.NoAdminEmails
 	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{})}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
 		Release: options.Release, Head: options.HeadDir, HeadCommit: HeadCommit(options.HeadDir), Started: cell.origin.UTC().Format(time.RFC3339)}

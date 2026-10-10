@@ -62,7 +62,8 @@ func parse(args []string) (Options, error) {
 func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | hybrid | self-hosted")
-	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S (L and XL wait for lane L4)")
+	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S or M (L and XL wait for lane L4)")
+	flags.BoolVar(&options.NoAdminEmails, "no-admin-emails", false, "self-hosted-free boots without ADMIN_EMAILS")
 	flags.StringVar(&options.Shape, "shape", "typical", "data shape: typical")
 	flags.Int64Var(&options.Seed, "seed", 1, "seed for every generated id and payload")
 	flags.StringVar(&options.FromDir, "from-dir", ".worktrees/upgradelab-main", "checkout of the release upgraded from (no .env)")

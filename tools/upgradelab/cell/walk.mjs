@@ -118,6 +118,8 @@ try {
         ["prompts", `/${project}/prompts`],
         ["experiments", `/${project}/experiments`],
         ["upgrades", "/ops/upgrades"],
+        ["signin", "/auth/signin"],
+        ["settings", "/settings"],
       ];
       for (const [name, path] of pages) {
         step = name;

@@ -131,6 +131,17 @@ var invariantNames = map[string]string{
 	"D1":  "api before worker: a read meets 503 upgrade_in_progress with Retry-After and succeeds on retry",
 	"D2":  "head's worker killed mid-upgrade and restarted: the upgrade still completes",
 	"D3":  "a failed background step retried from Ops > Upgrades runs again to done",
+	"E1":  "the license carries over: licensing:copy-organization-licenses settled and every licensed organization keeps its key",
+	"E2":  "SSO sign-in works before, during and after the switch",
+	"E3":  "SCIM pushed mid-upgrade lands once",
+	"E4":  "custom roles and grants behave as on main: a key with no grant is refused",
+	"E5":  "the seed account is a platform operator after the upgrade (ADMIN_EMAILS set, or the sole-organization bootstrap)",
+	"U1":  "the holding and upgrading pages are branded, centered and say what is happening (Haiku reads the shots)",
+	"U2":  "every command of docs/self-hosting/upgrade.mdx ran as written and exited 0",
+	"U3":  "Ops > Upgrades explains a held tenant and a failed step, and Retry fixes the failed one",
+	"U4":  "an operator can tell from the panel alone when it is safe to stop the old release (Haiku reads the shots)",
+	"U5":  "compose up with the new image needed no step the guide omits",
+	"U6":  "helm upgrade rolled with no unanswered probe",
 }
 
 // scenarioIDs maps each check to the soak scenarios it judges (plan section 8.3, "Judged by").
@@ -139,6 +150,8 @@ var scenarioIDs = map[string][]string{
 	"I0": {"S6"}, "I2": {"S7", "F1"}, "I2b": {"S7"}, "I4": {"S8"}, "I6": {"S9"}, "I5": {"S10"}, "I7": {"S14"}, "I9": {"S11"}, "B1": {"S11"},
 	"O1": {"S12"}, "I8": {"S13", "F2"}, "D3": {"U3"},
 	"H1": {"H1"}, "H2": {"H2"}, "H3": {"H3"}, "H4": {"H4"}, "H5": {"H5"},
+	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"},
+	"U1": {"U1"}, "U2": {"U2"}, "U3": {"U3"}, "U4": {"U4"}, "U5": {"U5"}, "U6": {"U6"},
 }
 
 // Summarize folds the calls by kind and by phase; visible holds each write id seen after settle.

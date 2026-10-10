@@ -281,3 +281,15 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     Given the ledger and the count of licensed organisations without a key
     When the copy step is absent, or any organisation lost its key
     Then E1 fails
+
+  @unit
+  Scenario: A tier M cell carries its tier in its name, its stores and its cache key
+    Given the options -tier M and -no-admin-emails
+    When the cell is named and the flags are parsed
+    Then the name says m, the flag is set, and a tier S cache key is unchanged
+
+  @unit
+  Scenario: The self-hosted rows are named and mapped to their scenarios in the report
+    Given the E and U ids
+    When the report tables are read
+    Then each has a name and maps to its own scenario

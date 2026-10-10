@@ -1,6 +1,11 @@
 package cell
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+
+	"github.com/langwatch/langwatch/tools/upgradelab/seed"
+)
 
 func resultOf(verdicts []Verdict, id string) string {
 	for _, verdict := range verdicts {
@@ -92,5 +97,35 @@ func TestE1NeedsTheCopyStepAndEveryKey(t *testing.T) {
 	}
 	if got := resultOf(JudgeSelfHosted(SelfHostedRun{}), "E1"); got != "absent" {
 		t.Errorf("free shape judged E1: %s", got)
+	}
+}
+
+// @scenario "A tier M cell carries its tier in its name, its stores and its cache key"
+func TestTierMCellNamesCarryTheTier(t *testing.T) {
+	options, err := parse([]string{"-tier", "M", "-release", "main@e683dd9ea5", "-run-dir", t.TempDir(), "-no-admin-emails"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := options.Name(); got != "cloud_m_typical_1" {
+		t.Errorf("Name() = %q, want cloud_m_typical_1", got)
+	}
+	if !options.NoAdminEmails {
+		t.Error("-no-admin-emails did not set Options.NoAdminEmails")
+	}
+	if !contains(Tiers, "M") {
+		t.Errorf("Tiers %v lacks M", Tiers)
+	}
+	small := Options{Deployment: "cloud", Tier: "S", Shape: "typical", Seed: 1, Release: "main@e683dd9ea5"}
+	if got, want := CacheKey(small), "cloud-S-typical-seed1-main-e683dd9ea5-r"+strconv.Itoa(seed.RecipeVersion); got != want {
+		t.Errorf("CacheKey = %q, want %q", got, want)
+	}
+}
+
+// @scenario "The self-hosted rows are named and mapped to their scenarios in the report"
+func TestSelfHostedRowsAreInTheReportTables(t *testing.T) {
+	for _, id := range []string{"E1", "E2", "E3", "E4", "E5", "U1", "U2", "U3", "U4", "U5", "U6"} {
+		if invariantNames[id] == "" || len(scenarioIDs[id]) != 1 || scenarioIDs[id][0] != id {
+			t.Errorf("%s: name %q scenarios %v", id, invariantNames[id], scenarioIDs[id])
+		}
 	}
 }
