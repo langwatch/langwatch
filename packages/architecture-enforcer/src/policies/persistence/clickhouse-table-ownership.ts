@@ -502,6 +502,26 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
   return ts.isIdentifier(value) ? reader.constant(value.text) : void 0;
 }
 
+function isInsertOptions(node: ts.Node): boolean {
+  const call = node.parent;
+
+  return (
+    ts.isCallExpression(call) &&
+    ts.isPropertyAccessExpression(call.expression) &&
+    call.expression.name.text === "insert"
+  );
+}
+
+/** `{ table: CONSTANT }` handed to a read helper: the constant names the table read. */
+function readTable(reader: Reader, property: ts.Node): string | undefined {
+  if (!ts.isPropertyAssignment(property) || isInsertOptions(property.parent)) return void 0;
+
+  const { name, initializer } = property;
+  if (!ts.isIdentifier(name) || name.text !== "table") return void 0;
+
+  return ts.isIdentifier(initializer) ? reader.constant(initializer.text) : void 0;
+}
+
 /** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
 function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): string | undefined {
   const spans = template.templateSpans;
@@ -550,6 +570,9 @@ function readFile({
       const table = insertedTable(reader, node);
       if (table) record({ reader, node, table, write: true });
     }
+
+    const read = readTable(reader, node);
+    if (read) record({ reader, node, table: read, write: false });
 
     ts.forEachChild(node, visit);
   };
