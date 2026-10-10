@@ -25,6 +25,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
+import { UpgradeTenantList } from "./upgrade-tenant-list.tsx";
 const STATUS_COLOR: Record<string, string> = {
   finalized: "green",
   migrated: "orange",
@@ -193,6 +194,8 @@ export function UpgradeTenantMigrations() {
           canManage={canManage}
         />
       ))}
+
+      <UpgradeTenantList steps={migrations} />
     </Stack>
   );
 }

@@ -23,6 +23,7 @@ import {
   opsMigrationOverviewSchema,
   opsMigrationTargetedRunResultSchema,
   opsMigrationTenantInputSchema,
+  opsMigrationTenantRowSchema,
   opsRollBackSystemMigrationTenantInputSchema,
   opsRunSystemMigrationForOrganizationInputSchema,
   opsSearchMigrationOrganizationsInputSchema,
@@ -196,6 +197,17 @@ export const opsUpgradeListRunsInputSchema = z.object({
 });
 export type OpsUpgradeListRunsInput = z.infer<typeof opsUpgradeListRunsInputSchema>;
 
+/** Tenant rows of one step (`step` = migration name) or all, in one state or all, newest first. */
+export const opsUpgradeListTenantsInputSchema = z.object({
+  step: z.string().min(1).max(200).optional(),
+  state: opsMigrationTenantRowSchema.shape.status.optional(),
+  cursor: z.string().nullable().optional(),
+  limit: z.number().int().positive().max(200).optional(),
+});
+export type OpsUpgradeListTenantsInput = z.infer<typeof opsUpgradeListTenantsInputSchema>;
+export const opsUpgradeTenantPageSchema = opsUpgradePageSchema(opsMigrationTenantRowSchema);
+export type OpsUpgradeTenantPage = z.infer<typeof opsUpgradeTenantPageSchema>;
+
 /** One step or run, by the id the ledger records it under. */
 export const opsUpgradeIdInputSchema = z.object({ id: z.string().min(1) });
 export type OpsUpgradeIdInput = z.infer<typeof opsUpgradeIdInputSchema>;
@@ -310,6 +322,11 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .query("listSystemMigrations")
   .withInput(z.void())
   .withOutput(opsMigrationOverviewSchema.array())
+
+  /** Every tenant's state per tenant step, filterable by step and state, one page at a time. */
+  .query("listTenants")
+  .withInput(opsUpgradeListTenantsInputSchema)
+  .withOutput(opsUpgradeTenantPageSchema)
 
   /**
    * Which organizations are enrolled for which migrations, with the names an

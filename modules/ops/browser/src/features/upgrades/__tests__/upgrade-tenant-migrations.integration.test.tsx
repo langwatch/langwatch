@@ -31,6 +31,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
     ops: {
       upgrade: {
         listSystemMigrations: { useQuery: () => ({ data: MIGRATIONS, isLoading: false }) },
+        listTenants: { useInfiniteQuery: () => ({ data: { pages: [] }, isLoading: false }) },
         listMigrationEnrollments: {
           useQuery: () => ({ data: { isSaaS, enrollments: [] } }),
         },
@@ -83,6 +84,7 @@ describe("UpgradeTenantMigrations", () => {
   });
 
   describe("given an automatic step on SaaS with one held organization and no enrolment rows", () => {
+    /** @scenario "An automatic step reads every organization as enrolled" */
     it("reads Enrolled as All and lists the held organization without an empty enrolment table", () => {
       MIGRATIONS = [
         {

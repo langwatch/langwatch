@@ -177,14 +177,17 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     migrationName,
     statuses,
     limit,
+    offset = 0,
   }: {
-    migrationName: string;
+    migrationName?: string | undefined;
     statuses: TenantMigrationStatus[];
     limit: number;
+    offset?: number;
   }): Promise<OpsMigrationOverview["attention"]> {
     const rows = await this.prisma.systemMigrationTenantState.findMany({
-      where: { migrationName, status: { in: statuses } },
-      orderBy: { updatedAt: "desc" },
+      where: { ...(migrationName ? { migrationName } : {}), status: { in: statuses } },
+      orderBy: [{ updatedAt: "desc" }, { migrationName: "asc" }, { tenantId: "asc" }],
+      skip: offset,
       take: limit,
     });
     return rows.map((row) => ({

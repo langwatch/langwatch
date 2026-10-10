@@ -236,6 +236,7 @@ import {
   type OpsUpgradeIdInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
+  type OpsUpgradeListTenantsInput,
   type OpsUpgradePreview,
   type OpsUpgradePreviewInput,
   type OpsUpgradeReleasePage,
@@ -244,6 +245,7 @@ import {
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
   type OpsUpgradeStepPage,
+  type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -559,6 +561,7 @@ export interface OpsAppDependencies {
  */
 export interface OpsSystemMigrationRunner {
   getOverview(): Promise<OpsMigrationOverview[]>;
+  listTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage>;
   getEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
   searchOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
   /**
@@ -1592,6 +1595,10 @@ export class OpsModule implements OpsApi {
 
   listSystemMigrations(): Promise<OpsMigrationOverview[]> {
     return this.#dependencies.systemMigrations.getOverview();
+  }
+
+  listUpgradeTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage> {
+    return this.#dependencies.systemMigrations.listTenants(input);
   }
 
   listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing> {

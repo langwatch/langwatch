@@ -8,10 +8,13 @@ import { createLogger } from "@langwatch/observability";
 import {
   MigrationDrainProofRequiresMigratedError,
   MigrationStateNotFoundError,
+  type OpsUpgradeListTenantsInput,
+  type OpsUpgradeTenantPage,
 } from "@langwatch/ops-contract";
 import {
   type MigrationPassSummary,
   SystemMigrationRecordNotFoundError,
+  TENANT_MIGRATION_STATUSES,
 } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 
@@ -27,6 +30,9 @@ import { SystemMigrationRollbackService } from "./system-migration-rollback.serv
 import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
+
+/** How many tenant rows one `listTenants` page holds when the caller names no limit. */
+const TENANT_PAGE_LIMIT = 50;
 
 export class SystemMigrationsService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationsService {
@@ -99,6 +105,26 @@ export class SystemMigrationsService {
         };
       }),
     );
+  }
+
+  /** One page of tenant rows; the cursor is the next row's offset (ops page, small tables). */
+  async listTenants({
+    step,
+    state,
+    cursor,
+    limit = TENANT_PAGE_LIMIT,
+  }: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage> {
+    const offset = Number.parseInt(cursor ?? "0", 10) || 0;
+    const rows = await this.deps.state.findRecordsByStatus({
+      migrationName: step,
+      statuses: state ? [state] : [...TENANT_MIGRATION_STATUSES],
+      limit: limit + 1,
+      offset,
+    });
+    return {
+      items: rows.slice(0, limit),
+      cursor: rows.length > limit ? String(offset + limit) : null,
+    };
   }
 
   /** The enrollment listing for the ops page, audited because it carries enrollers' names. */

@@ -27,6 +27,7 @@ const service = {
   withdraw: vi.fn<OpsSystemMigrationRunner["withdraw"]>(),
   getEnrollments: vi.fn<OpsSystemMigrationRunner["getEnrollments"]>(),
   getOverview: vi.fn<OpsSystemMigrationRunner["getOverview"]>(),
+  listTenants: vi.fn<OpsSystemMigrationRunner["listTenants"]>(),
   startPass: vi.fn<OpsSystemMigrationRunner["startPass"]>(),
   executePass: vi.fn<OpsSystemMigrationRunner["executePass"]>(),
   rollBack: vi.fn<OpsSystemMigrationRunner["rollBack"]>(),

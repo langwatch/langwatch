@@ -82,19 +82,23 @@ export class MemorySystemMigrationStateRepository implements SystemMigrationStat
     migrationName,
     statuses,
     limit,
+    offset = 0,
   }: {
-    migrationName: string;
+    migrationName?: string | undefined;
     statuses: TenantMigrationStatus[];
     limit: number;
+    offset?: number;
   }): Promise<OpsMigrationOverview["attention"]> {
     return this.#all()
       .filter(
-        (record) => record.migrationName === migrationName && statuses.includes(record.status),
+        (record) =>
+          (!migrationName || record.migrationName === migrationName) &&
+          statuses.includes(record.status),
       )
       .toSorted(
         (left, right) => right.updatedAt.epochMilliseconds - left.updatedAt.epochMilliseconds,
       )
-      .slice(0, limit)
+      .slice(offset, offset + limit)
       .map((record) => ({ ...record, updatedAt: toDate(record.updatedAt) }));
   }
 

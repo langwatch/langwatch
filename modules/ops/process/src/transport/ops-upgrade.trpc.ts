@@ -50,6 +50,10 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.listSystemMigrations())
 
+    .procedure("listTenants")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listUpgradeTenants(input))
+
     .procedure("listMigrationEnrollments")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, actor }) => app.listMigrationEnrollments({ requestedBy: actor.id }))

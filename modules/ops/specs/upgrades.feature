@@ -95,6 +95,30 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the held organization is listed as needing attention
 
   @integration
+  Scenario: The Tenant migrations tab lists every tenant's state, filtered by step and state
+    Given a held organization in one step and a finalized one in another
+    When an operator filters the tenant list to held tenants
+    Then only the held organization is listed, with its step and state
+
+  @integration
+  Scenario: The tenant list names a failed read instead of showing an empty list
+    Given the tenant read fails
+    When an operator opens the Tenant migrations tab
+    Then the tenant list shows the failure and not the empty state
+
+  @unit
+  Scenario: Tenant rows are listed by step and state, one page at a time
+    Given three parked tenants and one finalized in one step, and one parked in another
+    When an operator asks for the first step's parked tenants two at a time
+    Then the first page holds two rows and a cursor, and the next page the last row and none
+
+  @unit
+  Scenario: A non-operator asking for the tenant list is refused by the door
+    Given a signed-in user without ops:view
+    When they ask for the tenant list
+    Then the door refuses it
+
+  @integration
   Scenario: The step drawer shows a step's error, fix and checkpoint, read-only
     Given a failed data step whose error names its fix and whose report holds a checkpoint
     When an operator opens the step drawer

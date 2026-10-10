@@ -64,6 +64,7 @@ import type {
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
+  OpsUpgradeListTenantsInput,
   OpsUpgradePreview,
   OpsUpgradePreviewInput,
   OpsUpgradeReleasePage,
@@ -73,6 +74,7 @@ import type {
   OpsUpgradeStepDetail,
   OpsUpgradeStepPage,
   OpsUpgradeTargetSummary,
+  OpsUpgradeTenantPage,
 } from "./features/migrations/ops-upgrade.ts";
 import type {
   AggregateProcessManager,
@@ -512,6 +514,8 @@ export interface OpsApi {
   /** This deployment's product-analytics target; empty where it configured none. */
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   listSystemMigrations(): Promise<OpsMigrationOverview[]>;
+  /** Tenant rows across the tenant steps, newest movement first; `cursor` pages them. */
+  listUpgradeTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage>;
   listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
   searchMigrationOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
   enrollMigrationTenant(input: {
