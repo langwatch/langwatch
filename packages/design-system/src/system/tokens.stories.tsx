@@ -2,6 +2,7 @@ import { Box, Card, Grid, Heading, HStack, Stack, Table, Text } from "@chakra-ui
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 
+import { colorSystem } from "../color-mode/color-system.ts";
 import { DarkMode, LightMode } from "../color-mode/index.tsx";
 import { CopyButton } from "../components/display/copy-button.tsx";
 import { system } from "./create-system.ts";
@@ -307,6 +308,67 @@ type Story = StoryObj<typeof meta>;
 
 export const Colour: Story = { render: () => <SemanticColours /> };
 
+/** Measured from the shipped hex, including sRGB rounding. */
+function oklch(hex: string): string {
+  const linear = (offset: number) => {
+    const channel = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  const r = linear(1),
+    g = linear(3),
+    b = linear(5);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const lightness = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const blue = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  const chroma = Math.hypot(a, blue);
+  const hue = ((Math.atan2(blue, a) * 180) / Math.PI + 360) % 360;
+  return `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} ${hue.toFixed(1)})`;
+}
+
+function InkSwatches() {
+  const levels = [
+    ["Ground · page / surface", 950],
+    ["Card / overlay", 800],
+    ["Nested well / card edge", 700],
+    ["Control / well edge", 600],
+    ["Control edge", 400],
+  ] as const;
+  return (
+    <DarkMode>
+      <Stack bg="bg.page" color="fg" padding={4} gap={3} borderRadius="lg">
+        <Text fontSize="sm">Blue ink · hue 250° · chroma tapers with lightness</Text>
+        {levels.map(([label, step]) => {
+          const hex = colorSystem.zinc[step].value;
+          return (
+            <HStack key={step} gap={3}>
+              <Box
+                width={16}
+                height={10}
+                flexShrink={0}
+                borderRadius="md"
+                style={{ background: hex }}
+                borderWidth="1px"
+                borderColor="border.card"
+              />
+              <Stack gap={0}>
+                <Text fontSize="sm">{label}</Text>
+                <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+                  {hex} · {oklch(hex)}
+                </Text>
+              </Stack>
+            </HStack>
+          );
+        })}
+      </Stack>
+    </DarkMode>
+  );
+}
+
+export const DarkInk: Story = { render: () => <InkSwatches /> };
+
 function NestedSurfaces() {
   return (
     <Stack bg="bg.page" color="fg" padding={5} gap={4} borderRadius="xl">
@@ -355,8 +417,10 @@ export const SurfaceLadder: Story = {
   render: () => (
     <Stack gap={4}>
       <Text>
-        Page → card → nested row → small control. Dark CIELAB L* steps: 8.30 / 9.96 / 10.31.
+        Page → card → nested well → small control. One blue-ink hue; each dark step remains at least
+        8 CIELAB L* apart.
       </Text>
+      <InkSwatches />
       <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
         <Stack gap={2}>
           <Heading size="sm">Light</Heading>

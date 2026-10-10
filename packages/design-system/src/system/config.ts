@@ -57,7 +57,7 @@ export const designSystemConfig = defineConfig({
     body: {
       background: "bg.page",
       fontSize: "14px",
-      color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
+      color: { _light: "{colors.gray.900}", _dark: "{colors.zinc.50}" },
     },
     "*::selection": {
       // Undo Chakra's selection color override
@@ -147,7 +147,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.600}" },
           },
           contrast: {
-            value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" },
+            value: { _light: "{colors.gray.800}", _dark: "{colors.zinc.100}" },
           },
           subtle: {
             value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.800}" },
@@ -159,7 +159,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.400}", _dark: "{colors.zinc.600}" },
           },
           fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
+            value: { _light: "{colors.gray.700}", _dark: "{colors.zinc.200}" },
           },
           focusRing: { value: "{colors.blue.500}" },
         },
@@ -433,10 +433,10 @@ export const designSystemConfig = defineConfig({
         // The logo: brand navy with white faces on light; on dark the faces
         // drop out and the lines go off-white, as the dark-theme wordmark draws it.
         logo: {
-          mark: { value: { _light: "#213B41", _dark: "{colors.gray.100}" } },
+          mark: { value: { _light: "#213B41", _dark: "{colors.zinc.100}" } },
           face: { value: { _light: "white", _dark: "transparent" } },
-          wordmark: { value: { _light: "#1D293D", _dark: "{colors.gray.100}" } },
-          wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.gray.300}" } },
+          wordmark: { value: { _light: "#1D293D", _dark: "{colors.zinc.100}" } },
+          wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.zinc.300}" } },
         },
 
         // Data series, in the order `rotatingColors` hands out hues.
@@ -482,10 +482,10 @@ export const designSystemConfig = defineConfig({
         // Navigation semantic tokens - for sidebar menu items
         nav: {
           fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
+            value: { _light: "{colors.gray.700}", _dark: "{colors.zinc.300}" },
           },
           fgMuted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.400}" },
           },
           bgActive: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
@@ -504,10 +504,10 @@ export const designSystemConfig = defineConfig({
         // Label semantic tokens - for form labels, section headers
         label: {
           fg: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.400}" },
           },
           fgMuted: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.zinc.500}" },
           },
         },
 
@@ -521,19 +521,19 @@ export const designSystemConfig = defineConfig({
           card: {
             value: {
               _light: "white",
-              _dark: "color-mix(in srgb, {colors.gray.800} 70%, {colors.zinc.750})",
+              _dark: "{colors.zinc.800}",
             },
           },
           nested: {
             value: {
               _light: "{colors.gray.100}",
-              _dark: "color-mix(in srgb, {colors.gray.700} 60%, {colors.gray.600})",
+              _dark: "{colors.zinc.700}",
             },
           },
           control: {
             value: {
               _light: "{colors.gray.200}",
-              _dark: "color-mix(in srgb, {colors.gray.600} 50%, {colors.gray.500})",
+              _dark: "{colors.zinc.600}",
             },
           },
           surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
@@ -564,15 +564,15 @@ export const designSystemConfig = defineConfig({
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
           DEFAULT: {
-            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.100}" },
+            value: { _light: "{colors.gray.900}", _dark: "{colors.zinc.100}" },
           },
           muted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.200}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.200}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.300}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.zinc.300}" },
           },
-          inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          inverted: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
           // Status text, one per meaning.
           error: { value: { _light: "{colors.red.700}", _dark: "{colors.red.100}" } },
           success: { value: { _light: "{colors.green.700}", _dark: "{colors.green.200}" } },
@@ -584,7 +584,7 @@ export const designSystemConfig = defineConfig({
         border: {
           card: { value: { _light: "{colors.gray.300}", _dark: "{colors.bg.nested}" } },
           nested: { value: { _light: "{colors.gray.400}", _dark: "{colors.bg.control}" } },
-          control: { value: { _light: "{colors.gray.450}", _dark: "{colors.gray.400}" } },
+          control: { value: { _light: "{colors.gray.450}", _dark: "{colors.zinc.400}" } },
           DEFAULT: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
           muted: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
           subtle: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
@@ -609,8 +609,8 @@ export const designSystemConfig = defineConfig({
           "--skeleton-from": "{colors.gray.100}",
           "--skeleton-to": "{colors.gray.200}",
           _dark: {
-            "--skeleton-from": "{colors.gray.800}",
-            "--skeleton-to": "{colors.gray.700}",
+            "--skeleton-from": "{colors.zinc.800}",
+            "--skeleton-to": "{colors.zinc.700}",
           },
         },
       }),

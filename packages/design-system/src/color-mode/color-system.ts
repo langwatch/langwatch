@@ -14,16 +14,23 @@ export const colorSystem = {
     100: { value: "#f1f5f9" },
     50: { value: "#f8fafc" },
   },
-  // Used on _dark sides only; near-neutral with the smallest indigo tint.
+  // Dark blue ink: OKLCH hue 250°, chroma tapers as lightness rises.
   zinc: {
-    500: { value: "#565664" },
-    600: { value: "#3a3a44" },
-    700: { value: "#282832" },
-    750: { value: "#20202a" },
-    800: { value: "#1a1a24" },
-    850: { value: "#15151e" },
-    900: { value: "#10101a" },
-    950: { value: "#080812" },
+    50: { value: "#f7f8fa" }, // oklch(0.980 0.0020 250)
+    100: { value: "#e9ebee" }, // oklch(0.940 0.0040 250)
+    150: { value: "#dbdee1" }, // oklch(0.900 0.0050 250)
+    200: { value: "#d1d5d8" }, // oklch(0.870 0.0060 250)
+    300: { value: "#babec3" }, // oklch(0.800 0.0080 250)
+    400: { value: "#9a9fa5" }, // oklch(0.700 0.0100 250)
+    450: { value: "#878d93" }, // oklch(0.640 0.0110 250)
+    500: { value: "#595e64" }, // oklch(0.480 0.0120 250)
+    600: { value: "#42484f" }, // oklch(0.400 0.0140 250)
+    700: { value: "#2d343b" }, // oklch(0.320 0.0160 250)
+    750: { value: "#232a31" }, // oklch(0.280 0.0170 250)
+    800: { value: "#192028" }, // oklch(0.240 0.0180 250)
+    850: { value: "#0f171e" }, // oklch(0.200 0.0190 250)
+    900: { value: "#0b121a" }, // oklch(0.180 0.0195 250)
+    950: { value: "#070e16" }, // oklch(0.160 0.0200 250)
   },
   red: {
     50: { value: "#FFF5F5" },

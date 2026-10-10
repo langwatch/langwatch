@@ -54,38 +54,35 @@ variable), or `getRawColorValue` / `useColorRawValue` for a literal in the curre
 
 ### Surface ladder
 
-Use these four levels in order. Each child has a distinct ground and an edge
-against its parent; do not reuse the card ground for every nested element.
-`Foundations/Tokens → Surface ladder` shows the same nesting in both modes.
+The dark material is blue ink: OKLCH hue **250°**, with chroma tapering from
+**0.020 to 0.014** across the four surface steps. The values below are sRGB
+hexes derived from that curve; the Tokens story shows hex and measured OKLCH
+swatches together. Light values are unchanged.
 
-| Level                      | Background   | Light    | Dark                        | Matching edge (light / dark)           |
-| -------------------------- | ------------ | -------- | --------------------------- | -------------------------------------- |
-| Page                       | `bg.page`    | gray.150 | zinc.950                    | —                                      |
-| Card                       | `bg.card`    | white    | zinc.750 35% + zinc.800 65% | `border.card`: gray.300 / bg.nested    |
-| Row group / well           | `bg.nested`  | gray.100 | zinc.600 50% + zinc.700 50% | `border.nested`: gray.400 / bg.control |
-| Chip / input / inline code | `bg.control` | gray.200 | zinc.500 50% + zinc.600 50% | `border.control`: gray.450 / gray.400  |
+| Level          | Background   | Light    | Dark               | Matching edge  |
+| -------------- | ------------ | -------- | ------------------ | -------------- |
+| App frame      | `bg.page`    | gray.100 | #070e16 · zinc.950 | —              |
+| Content ground | `bg.surface` | white    | #070e16 · zinc.950 | border.card    |
+| Card / overlay | `bg.card`    | white    | #192028 · zinc.800 | border.card    |
+| Nested well    | `bg.nested`  | gray.100 | #2d343b · zinc.700 | border.nested  |
+| Small control  | `bg.control` | gray.200 | #42484f · zinc.600 | border.control |
 
-Dark mixtures use `color-mix(in srgb, …)`. The cooler card leans toward
-zinc.800 while retaining a visible edge above the blue-black page.
-CIELAB L* is **2.43 → 10.73 → 20.69 → 31.00**, increasing by
-**8.30, 9.96, 10.31** per step. Relative-luminance differences are
-**0.00955, 0.01941, 0.03487**.
-Light alternates pale grounds so nesting reads without shadows, with
-relative-luminance differences **0.16609, 0.09155, 0.10672**.
-These are surface-separation measurements, not text contrast ratios.
-`fg`, `fg.muted`, `fg.subtle` and `fg.<status>` retain at least 4.5:1 on all
-four grounds in both modes. The lowest neutral-text ratios are 5.30:1 light
-and 6.07:1 dark. Use a status background for palette-role status chips.
+Dark borders follow the same hue: `border.card` uses the nested step,
+`border.nested` the control step, and `border.control` is #9a9fa5 (zinc.400).
+The four dark surface targets are OKLCH lightness 0.16 / 0.24 / 0.32 / 0.40.
+The existing separation test still requires each adjacent step to be at least
+8 CIELAB L* apart, with at most 3 L* variation between gaps. Neutral and
+status text remain AA on every level, and control edges have 3:1 contrast.
+Orange and status palettes retain their values; blue ink is only the neutral
+material beneath them.
 
-Compatibility names follow the ladder: `bg.surface` → page; `bg.panel` → card;
-`bg.raised`, `bg.muted`, `bg.subtle`, `bg.softHover` → nested;
-`bg.emphasized`, `bg.input` → control; `bg.inputHover` → card.
-`border`, `border.muted`, `border.subtle` → card; `border.emphasized` → nested;
-`border.strong` → control. Navigation rails and status grounds keep their own roles.
+Compatibility aliases: `bg.panel` → card; `bg.raised` / `bg.muted` → nested;
+`bg.emphasized` / `bg.input` → control. `bg.surface` is the content ground,
+not a card. `bg.subtle` is an auxiliary low-contrast tint, not another container
+level. Use the canonical names for new components.
 
-Card `outline` and `elevated` use the card ground and edge; `elevated` keeps
-its shadow. Card `subtle` uses the nested ground and edge. Small surfaces
-inside that card use `bg.control` and `border.control`.
+Card `outline`, `elevated` and `showcase` use `bg.card` / `border.card`;
+`subtle` is a nested well on `bg.nested` / `border.nested`.
 
 ## Checklist
 

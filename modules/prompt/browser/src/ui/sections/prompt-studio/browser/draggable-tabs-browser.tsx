@@ -180,7 +180,7 @@ function DragOverlayContent({
         padding: 8,
         border: "1px solid var(--chakra-colors-border)",
         borderRadius: 6,
-        boxShadow: "0 2px 8px color-mix(in srgb, var(--chakra-colors-bg-scrim) 15%, transparent)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
         pointerEvents: "none",
       }}
     >
