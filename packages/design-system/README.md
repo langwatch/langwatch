@@ -58,21 +58,24 @@ Use these four levels in order. Each child has a distinct ground and an edge
 against its parent; do not reuse the card ground for every nested element.
 `Foundations/Tokens → Surface ladder` shows the same nesting in both modes.
 
-| Level                      | Background   | Light    | Dark     | Matching edge (light / dark)          |
-| -------------------------- | ------------ | -------- | -------- | ------------------------------------- |
-| Page                       | `bg.page`    | gray.150 | zinc.950 | —                                     |
-| Card                       | `bg.card`    | white    | zinc.750 | `border.card`: gray.300 / zinc.600    |
-| Row group / well           | `bg.nested`  | gray.100 | zinc.600 | `border.nested`: gray.400 / zinc.500  |
-| Chip / input / inline code | `bg.control` | gray.200 | zinc.500 | `border.control`: gray.450 / gray.300 |
+| Level                      | Background   | Light    | Dark                        | Matching edge (light / dark)           |
+| -------------------------- | ------------ | -------- | --------------------------- | -------------------------------------- |
+| Page                       | `bg.page`    | gray.150 | zinc.950                    | —                                      |
+| Card                       | `bg.card`    | white    | zinc.750 35% + zinc.800 65% | `border.card`: gray.300 / bg.nested    |
+| Row group / well           | `bg.nested`  | gray.100 | zinc.600 50% + zinc.700 50% | `border.nested`: gray.400 / bg.control |
+| Chip / input / inline code | `bg.control` | gray.200 | zinc.500 50% + zinc.600 50% | `border.control`: gray.450 / gray.400  |
 
-The dark ladder increases CIELAB L* by **10.22, 12.12, 12.26** per step;
-relative-luminance differences are **0.01238, 0.02836, 0.05211**.
+Dark mixtures use `color-mix(in srgb, …)`. The cooler card leans toward
+zinc.800 while retaining a visible edge above the blue-black page.
+CIELAB L* is **2.43 → 10.73 → 20.69 → 31.00**, increasing by
+**8.30, 9.96, 10.31** per step. Relative-luminance differences are
+**0.00955, 0.01941, 0.03487**.
 Light alternates pale grounds so nesting reads without shadows, with
 relative-luminance differences **0.16609, 0.09155, 0.10672**.
 These are surface-separation measurements, not text contrast ratios.
 `fg`, `fg.muted`, `fg.subtle` and `fg.<status>` retain at least 4.5:1 on all
 four grounds in both modes. The lowest neutral-text ratios are 5.30:1 light
-and 4.86:1 dark. Use a status background for palette-role status chips.
+and 6.07:1 dark. Use a status background for palette-role status chips.
 
 Compatibility names follow the ladder: `bg.surface` → page; `bg.panel` → card;
 `bg.raised`, `bg.muted`, `bg.subtle`, `bg.softHover` → nested;

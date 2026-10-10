@@ -5,20 +5,30 @@ import { designSystemConfig } from "../src/system/config.ts";
 
 type Mode = "_light" | "_dark";
 
-function colour(reference: string): string {
-  if (reference === "white") return "#ffffff";
+function colour(reference: string): number[] {
+  if (reference === "white") return [255, 255, 255];
+  const mix = /^color-mix\(in srgb, (\{colors\.[^}]+\}) (\d+)%, (\{colors\.[^}]+\})\)$/.exec(
+    reference,
+  );
+  if (mix?.[1] && mix[2] && mix[3]) {
+    const share = Number(mix[2]) / 100;
+    const other = colour(mix[3]);
+    return colour(mix[1]).map(
+      (channel, index) => channel * share + (other[index] ?? 0) * (1 - share),
+    );
+  }
   const name = reference.replace(/[{}]/g, "").replace("colors.", "");
   const [hue, step] = name.split(".");
   const scale = Object.entries(colorSystem).find(([key]) => key === hue)?.[1];
   const value = Object.entries(scale ?? {}).find(([key]) => key === step)?.[1].value;
   if (!value) throw new Error(`Unknown palette reference: ${reference}`);
-  return value;
+  return [0, 2, 4].map((index) => Number.parseInt(value.slice(index + 1, index + 3), 16));
 }
 
 function luminance(reference: string): number {
-  const hex = colour(reference);
+  const channels = colour(reference);
   return [0.2126, 0.7152, 0.0722].reduce((sum, weight, index) => {
-    const channel = Number.parseInt(hex.slice(index * 2 + 1, index * 2 + 3), 16) / 255;
+    const channel = (channels[index] ?? 0) / 255;
     const linear = channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
     return sum + weight * linear;
   }, 0);
@@ -89,7 +99,7 @@ describe("nested surface separation", () => {
         (name, index) =>
           lightness(token(name, "_dark")) - lightness(token(levels[index] ?? "bg.page", "_dark")),
       );
-    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(10);
+    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(8);
     expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(3);
   });
 

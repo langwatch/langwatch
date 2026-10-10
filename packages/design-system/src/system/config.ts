@@ -516,12 +516,23 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.950}" },
           },
           // Four levels: page, card, nested group, then a small control.
-          card: { value: { _light: "white", _dark: "{colors.zinc.750}" } },
+          card: {
+            value: {
+              _light: "white",
+              _dark: "color-mix(in srgb, {colors.zinc.750} 35%, {colors.zinc.800})",
+            },
+          },
           nested: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.600}" },
+            value: {
+              _light: "{colors.gray.100}",
+              _dark: "color-mix(in srgb, {colors.zinc.600} 50%, {colors.zinc.700})",
+            },
           },
           control: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.500}" },
+            value: {
+              _light: "{colors.gray.200}",
+              _dark: "color-mix(in srgb, {colors.zinc.500} 50%, {colors.zinc.600})",
+            },
           },
           surface: { value: { _light: "{colors.bg.page}", _dark: "{colors.bg.page}" } },
           panel: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
@@ -569,9 +580,9 @@ export const designSystemConfig = defineConfig({
 
         // Border semantic tokens - visible in dark mode
         border: {
-          card: { value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.600}" } },
-          nested: { value: { _light: "{colors.gray.400}", _dark: "{colors.zinc.500}" } },
-          control: { value: { _light: "{colors.gray.450}", _dark: "{colors.gray.300}" } },
+          card: { value: { _light: "{colors.gray.300}", _dark: "{colors.bg.nested}" } },
+          nested: { value: { _light: "{colors.gray.400}", _dark: "{colors.bg.control}" } },
+          control: { value: { _light: "{colors.gray.450}", _dark: "{colors.gray.400}" } },
           DEFAULT: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
           muted: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },
           subtle: { value: { _light: "{colors.border.card}", _dark: "{colors.border.card}" } },

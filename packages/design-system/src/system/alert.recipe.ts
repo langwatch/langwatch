@@ -101,7 +101,10 @@ export const alertSlotRecipe = defineSlotRecipe({
       neutral: {
         root: {
           // A neutral wash must separate from the brighter card ground too.
-          "--chakra-colors-color-palette-solid": "{colors.fg.subtle}",
+          "--chakra-colors-color-palette-solid": {
+            _light: "{colors.fg.subtle}",
+            _dark: "{colors.border.control}",
+          },
         },
       },
     },

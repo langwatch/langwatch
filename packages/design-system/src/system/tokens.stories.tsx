@@ -355,7 +355,7 @@ export const SurfaceLadder: Story = {
   render: () => (
     <Stack gap={4}>
       <Text>
-        Page → card → nested row → small control. Dark CIELAB L* steps: 10.22 / 12.12 / 12.26.
+        Page → card → nested row → small control. Dark CIELAB L* steps: 8.30 / 9.96 / 10.31.
       </Text>
       <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
         <Stack gap={2}>
