@@ -2,6 +2,8 @@ import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-
 import { Alert, Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertCircle, Clock } from "lucide-react";
 
+import { locateJsonPathNode } from "../../model/json-path-segments.ts";
+import { responseShape } from "../../model/known-response-shapes.ts";
 import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
 
 export function getStatusColor(status: number): string {
@@ -56,14 +58,20 @@ function TestFailure({
 export function HttpTestResponseDisplay({
   result,
   explainError,
+  outputPath,
 }: {
   result: HttpTestResult;
   explainError?: HttpTestErrorExplanation;
+  /** The JSONPath whose node is marked in the response body. */
+  outputPath?: string;
 }) {
+  const parsed = responseShape({ response: result.response });
+  const located =
+    outputPath && parsed !== undefined ? locateJsonPathNode({ value: parsed, path: outputPath }) : undefined;
   const responseString =
-    typeof result.response === "string"
-      ? result.response
-      : JSON.stringify(result.response, null, 2);
+    located?.text ??
+    (typeof result.response === "string" ? result.response : JSON.stringify(result.response, null, 2));
+  const range = located?.range;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -161,7 +169,23 @@ export function HttpTestResponseDisplay({
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {responseString}
+            {range ? (
+              <>
+                {responseString.slice(0, range.start)}
+                <Box
+                  as="mark"
+                  bg="yellow.subtle"
+                  color="fg"
+                  borderRadius="sm"
+                  data-testid="response-output-mark"
+                >
+                  {responseString.slice(range.start, range.end)}
+                </Box>
+                {responseString.slice(range.end)}
+              </>
+            ) : (
+              responseString
+            )}
           </Box>
         </CollapsibleSection>
       )}
