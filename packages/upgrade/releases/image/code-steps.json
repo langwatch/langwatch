@@ -156,6 +156,13 @@
     "description": "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments."
   },
   {
+    "id": "ops:checkup-canary-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Creates the hidden system organization and the project the Ops checkup's canaries run in, so they never write into a customer's project."
+  },
+  {
     "id": "ops:seed-platform-operators",
     "kind": "data",
     "mode": "background",

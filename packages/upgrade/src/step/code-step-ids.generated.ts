@@ -20,6 +20,7 @@ export type CodeStepId =
   | "licensing:copy-organization-licenses"
   | "model-provider:seal-plaintext-custom-keys"
   | "ops:copy-automation-migration-state"
+  | "ops:checkup-canary-project"
   | "ops:seed-platform-operators"
   | "organization:record-presence-settings"
   | "project:record-created-facts"
