@@ -30,7 +30,11 @@ export function DatasetPreview({
       width="100%"
       maxHeight="200px"
       overflow="auto"
-      borderBottom={rows.length === 0 ? "1px solid rgba(189, 195, 199, 0.58)" : "none"}
+      borderBottom={
+        rows.length === 0
+          ? "1px solid color-mix(in srgb, var(--chakra-colors-border) 58%, transparent)"
+          : "none"
+      }
       className="dataset-preview"
       position="relative"
       {...props}
