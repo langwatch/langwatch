@@ -4,7 +4,7 @@ import {
   type ServingRosterEntry,
   UpgradeLedgerRepository as ServingLedger,
 } from "@langwatch/upgrade";
-import { readImageCodeSteps } from "@langwatch/upgrade/gate";
+import { imageRelease, readImageCodeSteps, servingImageTree } from "@langwatch/upgrade/gate";
 import { type Deprecation, loadDeprecations, loadReleases } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
@@ -60,7 +60,7 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   }): PrismaUpgradeLedgerRepository {
     const releases = loadReleases();
     const { manifests, floor } = releases;
-    const release = manifests.at(-1)?.release;
+    const release = imageRelease({ manifests, tree: servingImageTree() }) ?? undefined;
     const shipped = imageSteps({ release: release ?? "0.0.0" });
     const postgres = {
       query: async <Row extends object>(text: string, values: unknown[] = []) => ({
