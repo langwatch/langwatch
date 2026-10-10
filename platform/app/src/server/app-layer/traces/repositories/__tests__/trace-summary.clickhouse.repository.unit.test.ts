@@ -18,7 +18,10 @@ import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { traceSummaryRepositoryFor } from "~/test-utils/traceSummaryRepository";
+
+const authorization = ownProof({ projectId: "tenant-1" });
 
 const heavyRow = {
   ProjectionId: "p1",
@@ -42,7 +45,7 @@ function makeRepo(responder: (sql: string) => unknown[]) {
     }),
   } as unknown as ClickHouseClient;
   return {
-    repo: new TraceSummaryClickHouseRepository(async () => client),
+    repo: traceSummaryRepositoryFor(async () => client),
     queries,
   };
 }
@@ -55,7 +58,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId("tenant-1", "t1");
+    const result = await repo.findByTraceId({ authorization, traceId: "t1" });
 
     expect(result).not.toBeNull();
     expect(result?.traceId).toBe("t1");
@@ -71,7 +74,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
         : [heavyRow],
     );
 
-    const result = await repo.findByTraceId("tenant-1", "t1");
+    const result = await repo.findByTraceId({ authorization, traceId: "t1" });
 
     expect(result?.traceId).toBe("t1");
     const heavy = queries.find((q) => q.includes("ComputedInput"));
@@ -84,7 +87,10 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "0", occurredAtMs: null }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId("tenant-1", "missing");
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: "missing",
+    });
 
     expect(result).toBeNull();
     expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
@@ -93,7 +99,9 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
   it("applies an explicit window verbatim as one bounded read", async () => {
     const { repo, queries } = makeRepo(() => [heavyRow]);
 
-    const result = await repo.findByTraceId("tenant-1", "t1", {
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: "t1",
       window: { fromMs: 1_000, toMs: 2_000 },
     });
 
@@ -108,7 +116,9 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
     // executor is about to re-read anyway.
     const { repo, queries } = makeRepo(() => []);
 
-    const result = await repo.findByTraceId("tenant-1", "t1", {
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: "t1",
       window: { fromMs: 1_000, toMs: 2_000 },
     });
 
@@ -146,7 +156,9 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId("tenant-1", "t1", {
+      const result = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
         window: { fromMs: baselineMs - 1_000, toMs: baselineMs + 1_000 },
       });
 
@@ -167,7 +179,9 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId("tenant-1", "t1", {
+      const result = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
         window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
       });
 
@@ -189,7 +203,9 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId("tenant-1", "t1", {
+      const result = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
         window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
       });
 
@@ -203,7 +219,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
       const insert = vi.fn().mockResolvedValue(undefined);
       const client = { insert } as unknown as ClickHouseClient;
       return {
-        repo: new TraceSummaryClickHouseRepository(async () => client),
+        repo: traceSummaryRepositoryFor(async () => client),
         insert,
       };
     }

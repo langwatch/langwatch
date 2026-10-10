@@ -15,10 +15,12 @@ import {
 } from "react";
 import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
+import { AggregateReadOnlyNotice } from "~/components/projects/AggregateReadOnlyNotice";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import type { ChatMessage } from "~/server/tracer/types";
 import { isLLMErrorType } from "~/utils/formatLLMError";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -70,6 +72,16 @@ const PromptPlaygroundChat = forwardRef<
       variables,
     });
   }, [formValues, variables]);
+
+  // An aggregate (ADR-144) holds no key to send the chat with and runs
+  // nothing, so the chat client is never mounted and no request is sent.
+  if (isAggregateProjectKind(project?.kind)) {
+    return (
+      <Box width="full" height="full" padding={4} {...boxProps}>
+        <AggregateReadOnlyNotice />
+      </Box>
+    );
+  }
 
   return (
     <Box

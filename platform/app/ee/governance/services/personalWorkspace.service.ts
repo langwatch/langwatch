@@ -40,6 +40,7 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:governance:personal-workspace");
@@ -69,18 +70,31 @@ export interface LwqlKeyMapSync {
   syncLwqlKeyMapRow(project: { id: string; lwqlKey: string }): Promise<void>;
 }
 
+/** Re-reads every aggregate of the organisation (ADR-144 block E). */
+type AggregateMembersSync = Pick<
+  AggregateReconciler,
+  "reconcileOrganizationOrLog"
+>;
+
 export class PersonalWorkspaceService {
   private readonly writer: GrantsLedgerWriter;
   private readonly lwqlKeyMap?: LwqlKeyMapSync;
+  private readonly aggregateMembers?: AggregateMembersSync;
 
   constructor(
     private readonly prisma: PrismaClient,
-    deps: { writer?: GrantsLedgerWriter; lwqlKeyMap?: LwqlKeyMapSync } = {},
+    deps: {
+      writer?: GrantsLedgerWriter;
+      lwqlKeyMap?: LwqlKeyMapSync;
+      aggregateMembers?: AggregateMembersSync;
+    } = {},
   ) {
     this.writer = deps.writer ?? grantsLedgerWriter();
     // Unset means the App's project service, resolved when a workspace is
     // actually created.
     this.lwqlKeyMap = deps.lwqlKeyMap;
+    // Unset means the App's reconciler, resolved the same way.
+    this.aggregateMembers = deps.aggregateMembers;
   }
 
   /**
@@ -160,6 +174,7 @@ export class PersonalWorkspaceService {
       workspace,
       grantOnTeamId,
       createdProject = null,
+      reactivated = false,
     } = await this.prisma.$transaction(
       async (
         tx,
@@ -168,6 +183,8 @@ export class PersonalWorkspaceService {
         grantOnTeamId: string | null;
         /** Set only when this call created the personal project. */
         createdProject?: { id: string; lwqlKey: string } | null;
+        /** True only when this call revived an archived workspace. */
+        reactivated?: boolean;
       }> => {
         const existing = await this.findInTx(tx, { userId, organizationId });
         if (existing) {
@@ -196,6 +213,7 @@ export class PersonalWorkspaceService {
           return {
             workspace: { ...reactivated.workspace, created: false },
             grantOnTeamId: reactivated.teamId,
+            reactivated: true,
           };
         }
 
@@ -227,6 +245,19 @@ export class PersonalWorkspaceService {
       await (this.lwqlKeyMap ?? tryGetApp()?.projects)?.syncLwqlKeyMapRow(
         createdProject,
       );
+    }
+
+    if (createdProject || reactivated) {
+      // ADR-144 block E: a personal project just appeared in this
+      // organisation, and an aggregate reading every personal project should
+      // read it from now. Before the owner's grant, whose failure would
+      // otherwise skip this; never throws, the nightly sweep is the retry.
+      await (
+        this.aggregateMembers ?? tryGetApp()?.projects.aggregateReconciler
+      )?.reconcileOrganizationOrLog({
+        organizationId,
+        trigger: "personal-workspace",
+      });
     }
 
     if (grantOnTeamId) {

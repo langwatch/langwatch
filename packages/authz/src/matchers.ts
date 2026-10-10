@@ -12,7 +12,7 @@ import {
   bindingScopeCanGrantPermission,
   permissionSatisfiedBy,
 } from "./registry";
-import { builtinRoleGrants } from "./roles";
+import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles";
 import { audienceMatches } from "./scope";
 import type {
   AuthzScopeRef,
@@ -64,6 +64,17 @@ export function bindingGrants({
       granted: new Set(customPermissions),
       requested: permission,
     });
+  }
+
+  // ADR-144: a shared project-to-project read. The ledger places it on a
+  // PROJECT scope and nowhere else, and nothing widens or narrows it - not
+  // an organisation role, not the EXTERNAL cap - because the principal is a
+  // project, which has neither.
+  if (roleKey === PROJECT_READER_ROLE_KEY) {
+    return (
+      binding.scopeType === "PROJECT" &&
+      builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })
+    );
   }
 
   if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {

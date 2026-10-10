@@ -30,6 +30,10 @@ import {
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
+import {
+  hasTracesToShow,
+  isAggregateProjectKind,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleService } from "~/server/role/role.service";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
@@ -314,9 +318,19 @@ export const organizationRouter = createTRPCRouter({
           const canManageProject =
             manageableProjectsByOrg.get(organization.id)?.get(project.id) ??
             false;
-          if (isDemo || !canManageProject) {
+          // An aggregate owns no credential (ADR-144), so its stored key is
+          // shown to nobody, its admins included.
+          if (
+            isDemo ||
+            !canManageProject ||
+            isAggregateProjectKind(project.kind)
+          ) {
             project.apiKey = "";
           }
+          // An aggregate is never sent traces, so its own first-message flag
+          // stays false while its members hold traces; every client gate on
+          // the flag reads it through this.
+          project.firstMessage = hasTracesToShow(project);
           // The LangWatchQL key is a control-plane secret: no client surface
           // reads it, so unlike the base key it is sent to no one at all.
           project.lwqlKey = "";

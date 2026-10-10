@@ -81,6 +81,7 @@ import {
   LiteMemberViewerOnlyError,
 } from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "../app-layer/projects/project-kinds";
 import type {
   PlanProvider,
   PlanProviderUser,
@@ -1132,6 +1133,68 @@ export class InviteService {
   }
 
   /**
+   * The invitations waiting for an account, by the addresses it has PROVED
+   * (ADR-143 v6). What comes back includes the invitation code, which is the
+   * secret from the mail, so the caller hands in verified addresses only and
+   * this never falls back to anything softer. Lowercased the way an invite
+   * is stored. Nothing is asked when there is nothing to ask about.
+   *
+   * One `findFirst` per address rather than one `findMany` over them all:
+   * invitations span organizations by definition, and the tenancy guard
+   * admits a read bounded by subject only in the shape the sign-up policy
+   * already uses, a single address answered with at most one row. A
+   * `findMany` naming several addresses is refused outright, which this
+   * lookup learned the hard way: the refusal was invisible for as long as
+   * the address list arrived empty. The oldest pending invitation per
+   * address is the one offered.
+   */
+  async findPendingForAddresses({
+    addresses,
+  }: {
+    addresses: readonly string[];
+  }): Promise<
+    Array<{
+      inviteCode: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+    }>
+  > {
+    const normalized = [
+      ...new Set(addresses.map((address) => address.trim().toLowerCase())),
+    ].filter(Boolean);
+    if (normalized.length === 0) return [];
+
+    const now = new Date();
+    // Invitations are stored as the administrator typed the address, so the
+    // match is case-insensitive like every other address lookup here.
+    const invites = await Promise.all(
+      normalized.map((address) =>
+        this.prisma.organizationInvite.findFirst({
+          where: {
+            email: { equals: address, mode: "insensitive" as const },
+            status: "PENDING",
+            OR: [{ expiration: null }, { expiration: { gt: now } }],
+          },
+          select: {
+            inviteCode: true,
+            role: true,
+            organization: { select: { name: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+      ),
+    );
+
+    return invites
+      .filter((invite) => invite !== null)
+      .map((invite) => ({
+        inviteCode: invite.inviteCode,
+        organizationName: invite.organization.name,
+        role: invite.role,
+      }));
+  }
+
+  /**
    * Pending and approval-waiting invites with the acceptance link each one
    * carries. The link is included because a provisioning tool with no email
    * provider configured has no other way to hand the invite to the person.
@@ -1432,7 +1495,8 @@ export class InviteService {
    * Finds the best project slug to redirect to after accepting an invite.
    * Tries the first assigned team first, then falls back to any non-archived
    * project in the org so the client can land directly in the app rather than
-   * hitting the onboarding flow.
+   * hitting the onboarding flow. Never an aggregate, opened on purpose
+   * (ADR-144 block F), nor the governance project, which no one sees.
    */
   async findLandingProjectSlug(
     invite: OrganizationInvite,
@@ -1453,7 +1517,11 @@ export class InviteService {
     const project =
       (invitedTeamIds.length > 0
         ? await this.prisma.project.findFirst({
-            where: { teamId: { in: invitedTeamIds }, archivedAt: null },
+            where: {
+              teamId: { in: invitedTeamIds },
+              archivedAt: null,
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+            },
             select: { slug: true },
           })
         : null) ??
@@ -1464,6 +1532,7 @@ export class InviteService {
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },
               archivedAt: null,
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
             },
             select: { slug: true },
           })

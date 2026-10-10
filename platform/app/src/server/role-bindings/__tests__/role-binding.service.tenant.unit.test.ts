@@ -29,6 +29,7 @@ function grant(overrides: Partial<Grant> = {}): Grant {
     principalType: "GROUP",
     principalId: "group_1",
     roleKey: "member",
+    condition: null,
     legacyRole: "MEMBER",
     source: "migration",
     scopeType: "TEAM",

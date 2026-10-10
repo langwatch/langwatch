@@ -15,17 +15,19 @@ type HeaderInput = {
   occurredAtMs?: number;
 };
 
-const { openDrawerMock, capturedHeaderInputs } = vi.hoisted(() => ({
-  openDrawerMock: vi.fn(),
-  capturedHeaderInputs: [] as HeaderInput[],
-}));
+const { openDrawerMock, capturedHeaderInputs, useOrganizationTeamProjectMock } =
+  vi.hoisted(() => ({
+    openDrawerMock: vi.fn(),
+    capturedHeaderInputs: [] as HeaderInput[],
+    useOrganizationTeamProjectMock: vi.fn(() => ({ project: { id: "p1" } })),
+  }));
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
+  useOrganizationTeamProject: useOrganizationTeamProjectMock,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -57,6 +59,7 @@ const lastHeaderInput = (): HeaderInput => {
 describe("TraceIdPeek", () => {
   beforeEach(() => {
     openDrawerMock.mockClear();
+    useOrganizationTeamProjectMock.mockClear();
     capturedHeaderInputs.length = 0;
   });
 
@@ -121,6 +124,47 @@ describe("TraceIdPeek", () => {
           expect(capturedHeaderInputs.length).toBeGreaterThan(0),
         );
         expect(lastHeaderInput().occurredAtMs).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given the row names no project that owns the trace", () => {
+    it("renders without resolving the current project", () => {
+      render(<TraceIdPeek traceId="trace-1" />, { wrapper: Wrapper });
+
+      expect(useOrganizationTeamProjectMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the row names a member of the aggregate project as the owner", () => {
+    describe("when the eye icon is clicked", () => {
+      it("opens the drawer on that member", async () => {
+        render(<TraceIdPeek traceId="trace-1" ownerProjectId="member-1" />, {
+          wrapper: Wrapper,
+        });
+
+        await userEvent.click(screen.getByRole("button"));
+
+        expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+          traceId: "trace-1",
+          tenantId: "member-1",
+        });
+      });
+    });
+  });
+
+  describe("given the row names the current project as the owner", () => {
+    describe("when the eye icon is clicked", () => {
+      it("opens the drawer naming no member", async () => {
+        render(<TraceIdPeek traceId="trace-1" ownerProjectId="p1" />, {
+          wrapper: Wrapper,
+        });
+
+        await userEvent.click(screen.getByRole("button"));
+
+        expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+          traceId: "trace-1",
+        });
       });
     });
   });

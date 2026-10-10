@@ -7,6 +7,7 @@ import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
+import { enforceCreationLimit } from "../../license-enforcement";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
@@ -100,6 +101,13 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
+      await enforceCreationLimit({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        limitType: "evaluators",
+        user: ctx.session.user,
+      });
+
       if (input.type === "code") {
         const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
         if (!parsed.success) {

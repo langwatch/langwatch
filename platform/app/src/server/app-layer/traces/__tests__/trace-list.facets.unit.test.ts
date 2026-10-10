@@ -9,6 +9,7 @@
  * updates").
  */
 import { describe, expect, it, vi } from "vitest";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 import { LANGY_TRACE_ORIGIN } from "../derive-trace-origin";
 import { FACET_REGISTRY } from "../facet-registry";
 import { translateFilterToClickHouse } from "../filter-to-clickhouse";
@@ -16,6 +17,7 @@ import { HIDDEN_ORIGINS_PARAM } from "../hidden-origins";
 import { TraceListService } from "../trace-list.service";
 
 const TENANT = "tenant-1";
+const PROOF = ownProof({ projectId: TENANT });
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 
 function fakeRepository() {
@@ -39,7 +41,7 @@ function fakeRepository() {
 function serviceWith(repository: ReturnType<typeof fakeRepository>) {
   return new TraceListService(
     repository as never,
-    { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
+    { findSummariesByTraceIds: vi.fn().mockResolvedValue([]) } as never,
     { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
   );
 }
@@ -72,7 +74,7 @@ function batchCarrying(
 }
 
 const compiled = (query: string) =>
-  translateFilterToClickHouse(query, TENANT, timeRange)!.sql;
+  translateFilterToClickHouse(query, timeRange)!.sql;
 
 describe("TraceListService.getFacets", () => {
   describe("given a query naming two facet fields", () => {
@@ -82,7 +84,7 @@ describe("TraceListService.getFacets", () => {
     it("counts each named facet under the query without its own field", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -101,7 +103,7 @@ describe("TraceListService.getFacets", () => {
     it("counts a facet the query never names under the whole query", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -119,7 +121,7 @@ describe("TraceListService.getFacets", () => {
     it("shares one scan between every facet under the same predicate", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -139,7 +141,7 @@ describe("TraceListService.getFacets", () => {
     it("reaches facets on other tables through the filtered traces", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -156,14 +158,14 @@ describe("TraceListService.getFacets", () => {
       const evaluator = repository.findCategoricalFacetRaw.mock.calls
         .map(([params]) => params.query as { sql: string; params: unknown })
         .find((q) => q.sql.includes("FROM evaluation_runs"));
-      expect(evaluator?.sql).toContain("TraceId IN (");
+      expect(evaluator?.sql).toContain("(TenantId, TraceId) IN (");
       expect(evaluator?.sql).toContain(compiled(query));
     });
 
     it("leaves attribute key discovery to discover", async () => {
       const repository = fakeRepository();
       const { facets } = await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
       });
@@ -180,7 +182,7 @@ describe("TraceListService.getFacets", () => {
     it("applies the exclusion to every facet but origin", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: "status:error",
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -210,7 +212,7 @@ describe("TraceListService.getFacets", () => {
     it("counts facets on other tables as discover does when only the origin rule applies", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: "",
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -223,7 +225,7 @@ describe("TraceListService.getFacets", () => {
       const evaluator = repository.findCategoricalFacetRaw.mock.calls
         .map(([params]) => params.query as { sql: string })
         .find((q) => q.sql.includes("FROM evaluation_runs"));
-      expect(evaluator?.sql).not.toContain("TraceId IN (");
+      expect(evaluator?.sql).not.toContain("(TenantId, TraceId) IN (");
     });
   });
 
@@ -232,7 +234,7 @@ describe("TraceListService.getFacets", () => {
     it("scopes that facet to the window's visible traces, its own field left out", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: "evaluatorStatus:error",
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -250,7 +252,7 @@ describe("TraceListService.getFacets", () => {
     it("reads every trace facet but origin in one batched scan", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: null,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -278,6 +280,90 @@ describe("TraceListService.getFacets", () => {
     });
   });
 
+  describe("given an aggregate whose facet lists a member's topic", () => {
+    const AGGREGATE = "aggregate-1";
+    const MEMBER = "member-1";
+    const OUTSIDER = "outsider-1";
+    /** Topic rows as Postgres holds them: the id is the primary key. */
+    const TOPICS = [
+      { id: "topic-own", projectId: AGGREGATE, name: "Own topic" },
+      { id: "topic-member", projectId: MEMBER, name: "Member topic" },
+      { id: "topic-outsider", projectId: OUTSIDER, name: "Outsider topic" },
+    ];
+
+    function topicService() {
+      return {
+        getNamesByIds: vi.fn(
+          async ({
+            projectIds,
+            ids,
+          }: {
+            projectIds: readonly string[];
+            ids: readonly string[];
+          }) =>
+            new Map(
+              TOPICS.filter(
+                (topic) =>
+                  projectIds.includes(topic.projectId) &&
+                  ids.includes(topic.id),
+              ).map((topic) => [topic.id, topic.name]),
+            ),
+        ),
+      };
+    }
+
+    describe("when the facets are read", () => {
+      it("names the member's topic and leaves a topic outside the proof unnamed", async () => {
+        const repository = fakeRepository();
+        repository.findBatchedFacets.mockImplementation(
+          async ({ table }: { table: string }) =>
+            table === "trace_summaries"
+              ? {
+                  categoricals: {
+                    topic: {
+                      values: TOPICS.map((topic) => ({
+                        value: topic.id,
+                        count: 1,
+                      })),
+                      totalDistinct: TOPICS.length,
+                    },
+                  },
+                  ranges: {},
+                }
+              : { categoricals: {}, ranges: {} },
+        );
+        const topics = topicService();
+        const service = new TraceListService(
+          repository as never,
+          { findSummariesByTraceIds: vi.fn().mockResolvedValue([]) } as never,
+          topics as never,
+        );
+
+        const { facets } = await service.getFacets({
+          authorization: aggregateProof({
+            projectId: AGGREGATE,
+            members: [{ projectId: MEMBER, from: 0 }],
+          }),
+          timeRange,
+        });
+
+        const topic = facets.find((facet) => facet.key === "topic");
+        const labels =
+          topic?.kind === "categorical"
+            ? topic.topValues.map((value) => [value.value, value.label])
+            : [];
+        expect(labels).toEqual([
+          ["topic-own", "Own topic"],
+          ["topic-member", "Member topic"],
+          ["topic-outsider", undefined],
+        ]);
+        expect(topics.getNamesByIds).toHaveBeenCalledWith(
+          expect.objectContaining({ projectIds: [AGGREGATE, MEMBER] }),
+        );
+      });
+    });
+  });
+
   describe("given a live window", () => {
     /** @scenario "Facet counts leave out the hidden origin and the traces outside the window" */
     it("reads the window as given, never snapped", async () => {
@@ -288,7 +374,7 @@ describe("TraceListService.getFacets", () => {
         live: true,
       };
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: live,
         query: "status:error",
       });

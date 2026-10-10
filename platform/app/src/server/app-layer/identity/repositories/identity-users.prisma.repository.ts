@@ -87,6 +87,23 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
   }
 
   /**
+   * The legacy `User.email` column, only where better-auth marked it
+   * verified: the address a user not on identifiers yet has proven. An
+   * unverified column answers null, which every caller treats as nothing.
+   */
+  async findVerifiedLegacyEmail({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<string | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, emailVerified: true },
+    });
+    return row?.emailVerified ? (row.email ?? null) : null;
+  }
+
+  /**
    * The legacy method answer for an unlatched sign-in. Password presence is
    * evaluated inside Prisma, so no credential hash crosses this boundary.
    * Provider ids cross verbatim so the router can retain each configured
