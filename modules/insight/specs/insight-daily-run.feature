@@ -266,14 +266,36 @@ Feature: The daily insights run
 
     @unit
     Scenario: A finding with a query is filed with the run's own window
-      Given a finding that carries a query
+      Given a finding that hands back a stored query of the widget it names
       When the run files it
       Then the insight replays that query over the window the run was given
       And a finding without a query is filed with no window
 
+    # The query an insight keeps is the board's own text, never Langy's: a query Langy wrote
+    # may name a database or a date, and then the insight does not replay elsewhere or later.
+    @unit
+    Scenario: A finding keeps only a stored query of the widget it names
+      Given a widget on the board that stores a query on several lines
+      When an answer's findings name the widget and hand that query back, as stored and on one line
+      Then each finding keeps the query exactly as the board stores it
+
+    @unit
+    Scenario: A stored query handed back with the run's step written in is kept as stored
+      Given a widget on the board whose stored query declares the step parameter
+      When a finding names the widget and hands the query back with the run's step in its place
+      Then the finding keeps the query exactly as the board stores it, parameter included
+
+    @unit
+    Scenario: A query Langy wrote or changed is dropped and its finding is kept
+      Given findings whose query names a database and dates, has another step written in, or holds a literal \n
+      And findings that hand back a stored query for another widget, for no widget or for a widget elsewhere
+      When the answer is checked
+      Then every finding is kept
+      And none keeps a query
+
     @unit
     Scenario: A query that does not validate is dropped and its finding is kept
-      Given Langy answers one finding with a query the analytics module refuses and one it admits
+      Given Langy answers one finding with a stored query the analytics module refuses and one it admits
       When the run files them
       Then the first is filed with no query and no window
       And the second keeps its query and the run's window
@@ -414,6 +436,40 @@ Feature: The daily insights run
       When it is written
       Then it tells Langy to write no link or web address in a finding
       And it names the 120 and 4,000 character limits of a title and a body
+
+    @unit
+    Scenario: The brief tells Langy to write no file and to run one query per command
+      Given a run's brief
+      When it is written
+      Then it tells Langy to write no file and no script, not even in its own workspace
+      And to run one command at a time with one query in it
+      And to write a query on one line, because a literal \n in it fails
+
+    # `langwatch query` fills the window from --start and --end and has no flag for the step.
+    @unit
+    Scenario: The brief names the commands that read a widget and run its query over the window
+      Given a run's brief
+      When it is written
+      Then it names the command that shows a widget's stored queries
+      And the command that runs a query, with the flags that fill the reserved period parameters
+      And both windows as those flags
+      And that no flag fills the step, and the number to write in its place in the copy that is run
+
+    @unit
+    Scenario: The brief asks for the hours inside the window before a total
+      Given a run's brief
+      When it is written
+      Then it tells Langy to read the window's hourly steps before it reports a total
+      And to name the hours and their numbers when a change falls in a few of them
+      And its example finding names the hour most of the change fell in
+
+    @unit
+    Scenario: The brief asks for the widget's stored query back, as stored
+      Given a run's brief
+      When it is written
+      Then it tells Langy to start from the widget's stored query
+      And to hand it back as stored, with its parameters and no date or database name
+      And says that any other query is not kept
 
     @unit
     Scenario: The brief lists the person's open insights for the board

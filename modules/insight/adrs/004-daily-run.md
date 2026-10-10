@@ -54,9 +54,17 @@ list, or hands back the example finding the brief shows. So an answer cannot nam
 owner, a project or a board. A finding's title is at most 120 characters and its body 4,000,
 and a finding that holds a web address refuses the answer with the reason
 `finding_has_url`. What passes is cut to the run's maximum, and a widget id that is not
-on the board is dropped. A finding's query is kept only when the analytics module's
-validation door admits it for the person; otherwise the finding is filed without it. The owner is the run's person, the board is the
-run's board, and the window of a finding's query is the run's own window.
+on the board is dropped. A finding's query is never Langy's own text. It is kept only when it
+is a stored query of the widget the finding names, compared with white space aside and with
+the run's step read as the step parameter (the brief has Langy write the step into the copy
+it runs), and the board's copy is what is filed: the text the widget itself runs, with its window as the reserved
+`dashboard_context_*` parameters where its author used them
+([ADR-002](./002-pointer-and-fixed-date-evidence.md)). A query Langy wrote may name a database
+or a date, and such an insight replays on one deployment or for one day only. The board's copy
+is kept only when the analytics module's validation door admits it for the person. A query
+that fails either check is dropped and its finding is filed without it. The owner is the run's
+person, the board is the run's board, and the window of a finding's query is the run's own
+window.
 
 **Delivery is at least once.** The outbox may carry a run out twice. Every id and
 instant is derived from the run: the Langy idempotency key is the schedule and run
@@ -64,7 +72,10 @@ id, each insight id is a digest of the schedule, the run and the finding's posit
 and each filing is stamped with the run's slot. The brief is built only from what is
 fixed for the run, so a repeat sends the same words and Langy answers with the same
 turn. It lists at most 40 widgets, stays within 12,000 characters, and holds every name
-a person wrote inside one marked block that it calls data. A repeat whose brief differs is refused by Langy and recorded as `failed` with
+a person wrote inside one marked block that it calls data. It tells Langy to write no file,
+to run one query per command and on one line, to start from a widget's stored query, to hand
+that query back as stored, and to read the window's hourly steps before it reports a total.
+A repeat whose brief differs is refused by Langy and recorded as `failed` with
 `brief_changed`. The row keeps the first outcome a run recorded.
 
 **Every run records an outcome.** `filed`, `nothing`, `failed` or `skipped`, each
@@ -91,6 +102,12 @@ no push notification.
   `hour`, `timezone`, `maxInsights`) and `lastRunRenewed`, which nothing writes yet,
   so the next slices add no column to a projection table.
 - A run reads calendar days in UTC until a schedule carries the person's timezone.
+- Langy's command line fills the window of a stored query (`langwatch query --start --end`)
+  but not its step: `query` has no flag for `dashboard_context_granularity_seconds`, and a
+  reserved name passed as `--param` is refused. The brief tells Langy to write the step into
+  the copy it runs. A flag for the step would let Langy run a stored query unchanged.
+- A finding from a query of Langy's own keeps no query, so its insight shows no evidence
+  chart. Only a widget's stored query is evidence.
 - A run's brief names custom chart widgets only. Builder graphs and saved charts
   placed on a board are not listed, so a board that holds only those is `board_empty`.
 - Daily runs on From LangWatch boards need the template catalogue, or the part of it

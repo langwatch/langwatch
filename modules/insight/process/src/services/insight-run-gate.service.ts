@@ -21,6 +21,7 @@ type Viewer = Readonly<{ userId: string }>;
 type RunBoardWidget = Readonly<{
   id: string;
   name: string;
+  definition: Readonly<{ queries: readonly { sql: string }[] }>;
   dashboardId: string | null;
   gridColumn: number;
   gridRow: number;
@@ -48,8 +49,8 @@ export type RunGateResult =
       ok: true;
       /** The board as it is now, its name as a pointer keeps it. */
       board: { id: string; name: string };
-      /** The widgets on it, in reading order. Never empty. */
-      widgets: readonly { id: string; name: string }[];
+      /** The widgets on it, in reading order, each with its stored queries. Never empty. */
+      widgets: readonly { id: string; name: string; queries: readonly string[] }[];
     }>
   | Readonly<{ ok: false; reason: InsightRunSkipReason }>;
 
@@ -154,7 +155,11 @@ export class InsightRunGateService {
     const widgets = onBoard
       .filter((widget) => widget.dashboardId === stored.id)
       .toSorted(inReadingOrder)
-      .map(({ id, name }) => ({ id, name: pointerName({ name, fallback: id }) }));
+      .map(({ id, name, definition }) => ({
+        id,
+        name: pointerName({ name, fallback: id }),
+        queries: definition.queries.map((query) => query.sql),
+      }));
     if (widgets.length === 0) return skipped("board_empty");
     return {
       ok: true,

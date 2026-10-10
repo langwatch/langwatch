@@ -46,7 +46,7 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
       check: async () => ({
         ok: true,
         board: { id: BOARD.id, name: BOARD.name },
-        widgets: [{ id: "widget-cost", name: "Cost per day" }],
+        widgets: [{ id: "widget-cost", name: "Cost per day", queries: [] }],
       }),
     }),
     langy: createApiFixture<Langy>({

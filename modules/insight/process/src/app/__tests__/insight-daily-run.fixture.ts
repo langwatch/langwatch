@@ -54,7 +54,17 @@ export const PROTECTIONS: LangWatchQLProtections = {
 type Project = NonNullable<Awaited<ReturnType<ProjectApi["findById"]>>>;
 type Widget = Awaited<ReturnType<DashboardApi["listDashboardWidgets"]>>[number];
 
-type ScriptedWidget = { id: string; name: string; gridRow?: number; gridColumn?: number };
+/** The queries the default board's two widgets store; a finding keeps no other. */
+export const COST_QUERY = "from traces | sum(cost)";
+export const ERRORS_QUERY = "from traces | count(errors)";
+
+type ScriptedWidget = {
+  id: string;
+  name: string;
+  queries?: string[];
+  gridRow?: number;
+  gridColumn?: number;
+};
 
 /**
  * A stored board. Left out, it is the run's own project's, at the scope Project, with no
@@ -140,7 +150,11 @@ function widget({
     id: scripted.id,
     projectId,
     name: scripted.name,
-    definition: { version: 1, code: "", queries: [] },
+    definition: {
+      version: 1,
+      code: "",
+      queries: (scripted.queries ?? []).map((sql, at) => ({ name: `query-${at}`, sql })),
+    },
     createdAt: instant,
     updatedAt: instant,
     dashboardId: boardId,
@@ -179,8 +193,8 @@ export function runWorld() {
         {
           name: "Costs",
           widgets: [
-            { id: "widget-cost", name: "Cost per day" },
-            { id: "widget-errors", name: "Errors per day" },
+            { id: "widget-cost", name: "Cost per day", queries: [COST_QUERY] },
+            { id: "widget-errors", name: "Errors per day", queries: [ERRORS_QUERY] },
           ],
         },
       ],

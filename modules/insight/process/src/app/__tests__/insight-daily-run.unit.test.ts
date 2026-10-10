@@ -24,6 +24,8 @@ import { dailyRunWindows } from "../../rules/insight-daily-run.rules.ts";
 import {
   answerWith,
   BOARD,
+  COST_QUERY,
+  ERRORS_QUERY,
   finding,
   installDailyRuns,
   type InstalledDailyRuns,
@@ -668,7 +670,7 @@ describe("given Langy's answer, which is untrusted", () => {
   /** @scenario "A finding with a query is filed with the run's own window" */
   it("replays a finding's query over the window the run was given, and files no window without a query", async () => {
     installed.world.langy.answer = answerWith([
-      finding({ title: "with a query", lwql: "from traces | sum(cost)" }),
+      finding({ title: "with a query", widgetId: "widget-cost", lwql: COST_QUERY }),
       finding({ title: "without a query" }),
     ]);
 
@@ -677,7 +679,7 @@ describe("given Langy's answer, which is untrusted", () => {
     const { window } = dailyRunWindows({ slot: payload.slot, timezone: "UTC" });
     const byTitle = new Map((await insightsOf()).map((entry) => [entry.title, entry]));
     expect(byTitle.get("with a query")).toMatchObject({
-      lwql: "from traces | sum(cost)",
+      lwql: COST_QUERY,
       replay: { ...window, granularitySeconds: 3_600, period: null, parameters: {} },
     });
     expect(byTitle.get("without a query")).toMatchObject({ lwql: null, replay: null });
@@ -692,10 +694,10 @@ describe("given a finding's query, which a reader replays later", () => {
 
   /** @scenario "A query that does not validate is dropped and its finding is kept" */
   it("files a finding without the query the analytics module refuses, and keeps the one it admits", async () => {
-    installed.world.lwql.refused.add("from api_keys | select secret");
+    installed.world.lwql.refused.add(ERRORS_QUERY);
     installed.world.langy.answer = answerWith([
-      finding({ title: "refused query", lwql: "from api_keys | select secret" }),
-      finding({ title: "admitted query", lwql: "from traces | sum(cost)" }),
+      finding({ title: "refused query", widgetId: "widget-errors", lwql: ERRORS_QUERY }),
+      finding({ title: "admitted query", widgetId: "widget-cost", lwql: COST_QUERY }),
     ]);
 
     const { payload } = await run();
@@ -709,20 +711,22 @@ describe("given a finding's query, which a reader replays later", () => {
       replay: null,
     });
     expect(byTitle.get("admitted query")).toMatchObject({
-      lwql: "from traces | sum(cost)",
+      lwql: COST_QUERY,
       replay: { ...window, granularitySeconds: 3_600 },
     });
     expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
     expect(installed.lwql.protectionAsks).toEqual([{ userId: MEMBER, projectId: PROJECT }]);
     expect(installed.lwql.validations).toEqual([
-      { sql: "from api_keys | select secret", protections: PROTECTIONS, timeWindow },
-      { sql: "from traces | sum(cost)", protections: PROTECTIONS, timeWindow },
+      { sql: ERRORS_QUERY, protections: PROTECTIONS, timeWindow },
+      { sql: COST_QUERY, protections: PROTECTIONS, timeWindow },
     ]);
   });
 
   it("keeps no query when the analytics module will not say what the person may see", async () => {
     installed.world.lwql.protectionsError = refusal("project_not_found");
-    installed.world.langy.answer = answerWith([finding({ lwql: "from traces | sum(cost)" })]);
+    installed.world.langy.answer = answerWith([
+      finding({ widgetId: "widget-cost", lwql: COST_QUERY }),
+    ]);
 
     await run();
 

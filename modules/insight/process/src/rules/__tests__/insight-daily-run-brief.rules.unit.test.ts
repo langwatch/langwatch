@@ -221,6 +221,57 @@ describe("buildDailyRunBrief", () => {
     });
   });
 
+  describe("given a run Langy reads with its command line", () => {
+    /** @scenario "The brief tells Langy to write no file and to run one query per command" */
+    it("forbids a file or a script anywhere, and asks for one command with one query on one line", () => {
+      const brief = buildDailyRunBrief(input());
+
+      expect(brief).toContain("- Write no file and no script, not even in your own workspace.");
+      expect(brief).toContain("Run one `langwatch`\n  command at a time, with one query in it.");
+      expect(brief).toContain("4. Write the query on one line");
+      expect(brief).toContain("holds the two characters \\n fails");
+    });
+
+    /** @scenario "The brief names the commands that read a widget and run its query over the window" */
+    it("names both commands, each window as the flags that fill it, and what stands in for the step", () => {
+      const brief = buildDailyRunBrief(input());
+
+      expect(brief).toContain("`langwatch dashboard-widget get <widget id>`");
+      expect(brief).toContain('`langwatch query "<query>" --start <start> --end <end>`');
+      expect(brief).toContain(
+        "flags fill {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}",
+      );
+      expect(brief).toContain("Its flags: --start 2026-10-09T00:00:00Z --end 2026-10-10T00:00:00Z");
+      expect(brief).toContain("Its flags: --start 2026-10-08T00:00:00Z --end 2026-10-09T00:00:00Z");
+      expect(brief).toContain(
+        "No flag fills {dashboard_context_granularity_seconds:UInt32}. In the copy you run, and\n   only there, write 3600 in its place.",
+      );
+    });
+
+    /** @scenario "The brief asks for the hours inside the window before a total" */
+    it("asks for the hourly steps before a total, and shows a finding that names the hour", () => {
+      const brief = buildDailyRunBrief(input());
+
+      expect(brief).toContain(
+        "Before you report\na total for the whole window, read its hourly steps",
+      );
+      expect(brief).toContain("name the hours and their numbers");
+      expect(brief).toContain("71 of the 96 fell between 14:00 and 15:00 UTC.");
+    });
+
+    /** @scenario "The brief asks for the widget's stored query back, as stored" */
+    it("asks to start from the stored query and to hand it back with no date and no database name", () => {
+      const brief = buildDailyRunBrief(input());
+
+      expect(brief).toContain("Start from the widget's stored query.");
+      expect(brief).toContain("write no date and no database name into it");
+      expect(brief).toContain(
+        "exactly as the widget\nstores it: its parameters left in, no date and no database name. Any other query is not\nkept",
+      );
+      expect(brief).toContain(`"lwql":"that widget's stored query, exactly as stored"`);
+    });
+  });
+
   describe("given a run nobody reads over Langy's shoulder", () => {
     /** @scenario "The brief asks for no link in a finding" */
     it("tells Langy to write no link, and the limits a finding is held to", () => {
