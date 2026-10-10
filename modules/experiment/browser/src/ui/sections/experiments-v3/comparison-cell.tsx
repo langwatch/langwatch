@@ -144,7 +144,7 @@ function WinnerLabel({
   return (
     <Text
       as="button"
-      fontSize="13px"
+      textStyle="bodySm"
       fontWeight="semibold"
       color="green.fg"
       cursor="pointer"
@@ -222,7 +222,7 @@ export function ComparisonCell({
 
   if (isLoading || parsed.status === "running") {
     return (
-      <Text fontSize="13px" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         Comparing...
       </Text>
     );
@@ -230,7 +230,7 @@ export function ComparisonCell({
 
   if (parsed.status === "pending") {
     return withRunAction(
-      <Text fontSize="13px" color="fg.subtle">
+      <Text textStyle="bodySm" color="fg.subtle">
         No verdict yet
       </Text>,
     );
@@ -252,7 +252,7 @@ export function ComparisonCell({
                   textAlign="left"
                   color="fg.muted"
                   textDecoration="underline"
-                  fontSize="11px"
+                  textStyle="micro"
                 >
                   show details
                 </Box>
@@ -261,7 +261,7 @@ export function ComparisonCell({
                 <Popover.Content maxWidth="460px">
                   <Popover.Arrow />
                   <Popover.Body
-                    fontSize="12px"
+                    textStyle="caption"
                     whiteSpace="pre-wrap"
                     data-testid="comparison-error-details"
                   >
@@ -292,7 +292,7 @@ export function ComparisonCell({
   if (label === "tie") {
     return withRunAction(
       <VStack align="stretch" gap={1.5}>
-        <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
+        <HStack gap={1.5} textStyle="bodySm" flexWrap="wrap">
           <Icon as={Equal} color="fg.muted" boxSize="14px" />
           <Text fontWeight="medium">Tie</Text>
         </HStack>
@@ -300,7 +300,7 @@ export function ComparisonCell({
           <Popover.Root>
             <Popover.Trigger asChild>
               <Box as="button" textAlign="left" color="fg.muted" _hover={{ color: "fg" }}>
-                <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
+                <Text textStyle="caption" lineClamp={2} wordBreak="break-word">
                   {reasoningPreview}
                 </Text>
               </Box>
@@ -308,7 +308,7 @@ export function ComparisonCell({
             <Popover.Positioner>
               <Popover.Content maxWidth="560px" maxHeight="420px" overflowY="auto">
                 <Popover.Arrow />
-                <Popover.Body fontSize="13px">
+                <Popover.Body textStyle="bodySm">
                   <Markdown>{reasoning}</Markdown>
                 </Popover.Body>
               </Popover.Content>
@@ -321,7 +321,7 @@ export function ComparisonCell({
 
   if (!label) {
     return withRunAction(
-      <Text fontSize="13px" color="fg.subtle">
+      <Text textStyle="bodySm" color="fg.subtle">
         No verdict yet
       </Text>,
     );
@@ -329,7 +329,7 @@ export function ComparisonCell({
 
   return withRunAction(
     <VStack align="stretch" gap={1.5}>
-      <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
+      <HStack gap={1.5} textStyle="bodySm" flexWrap="wrap">
         <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
         {variantTargets.map((t, i) => (
           <WinnerLabel
@@ -345,7 +345,7 @@ export function ComparisonCell({
         <Popover.Root>
           <Popover.Trigger asChild>
             <Box as="button" textAlign="left" color="fg.muted" _hover={{ color: "fg" }}>
-              <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
+              <Text textStyle="caption" lineClamp={2} wordBreak="break-word">
                 {reasoningPreview}
               </Text>
             </Box>
@@ -353,7 +353,7 @@ export function ComparisonCell({
           <Popover.Positioner>
             <Popover.Content maxWidth="560px" maxHeight="420px" overflowY="auto">
               <Popover.Arrow />
-              <Popover.Body fontSize="13px">
+              <Popover.Body textStyle="bodySm">
                 <Markdown>{reasoning}</Markdown>
               </Popover.Body>
             </Popover.Content>

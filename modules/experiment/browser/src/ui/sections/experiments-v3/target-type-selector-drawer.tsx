@@ -202,12 +202,12 @@ function TargetTypeCard({ type, icon: Icon, title, description, onClick }: Targe
   return (
     <VStack align="start">
       {type === "comparison" && (
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           Compare existing columns:
         </Text>
       )}
       {type === "evaluator" && (
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           Or evaluate an evaluator:
         </Text>
       )}
@@ -241,7 +241,7 @@ function TargetTypeCard({ type, icon: Icon, title, description, onClick }: Targe
                 </Badge>
               )}
             </HStack>
-            <Text fontSize="13px" color="fg.muted">
+            <Text textStyle="bodySm" color="fg.muted">
               {description}
             </Text>
           </VStack>

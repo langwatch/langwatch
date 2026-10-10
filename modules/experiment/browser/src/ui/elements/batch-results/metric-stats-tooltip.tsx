@@ -10,7 +10,7 @@ type MetricStatsTooltipProps = {
 };
 
 export const MetricStatsTooltip = ({ stats, formatValue }: MetricStatsTooltipProps) => (
-  <VStack align="stretch" gap={1} fontSize="11px" minWidth="140px">
+  <VStack align="stretch" gap={1} textStyle="micro" minWidth="140px">
     <HStack justify="space-between">
       <Text color="fg.muted">Min</Text>
       <Text>{formatValue(stats.min)}</Text>

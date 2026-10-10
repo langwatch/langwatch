@@ -25,7 +25,7 @@ type DiffCellProps = {
 export const DiffCell = ({ values, inline = false }: DiffCellProps) => {
   if (values.length === 0) {
     return (
-      <Text fontSize="13px" color="fg.subtle">
+      <Text textStyle="bodySm" color="fg.subtle">
         -
       </Text>
     );

@@ -124,18 +124,18 @@ const EvaluationSummaryCard = ({
     <Card.Root>
       <Card.Body>
         <VStack align="start" justify="center" height="full" gap={2}>
-          <Text color="fg" fontSize="15px" fontWeight="500">
+          <Text color="fg" textStyle="body" fontWeight="medium">
             {name}
           </Text>
           <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
-            <Text fontSize="26px" fontWeight="300">
+            <Text textStyle="metric">
               {numeral(score).format(metric === "score" ? "0.00" : "0%")}
             </Text>
-            <Text fontSize="13px" fontWeight="500" marginBottom="4px" opacity={0.8}>
+            <Text textStyle="label" marginBottom="4px" opacity={0.8}>
               {metric === "score" ? "avg score" : "pass rate"}
             </Text>
           </HStack>
-          <HStack fontSize="11px" textTransform="uppercase" fontWeight="600" color="fg.muted">
+          <HStack textStyle="eyebrow" color="fg.muted">
             {group.skipped.length && (
               <Text>
                 <StatusDot color="yellow.fg" />
@@ -159,12 +159,10 @@ const StatCard = ({ title, value }: { title: string; value: string }) => (
   <Card.Root>
     <Card.Body>
       <VStack align="start" justify="center" height="full" gap={2}>
-        <Text color="fg" fontSize="15px" fontWeight="500">
+        <Text color="fg" textStyle="body" fontWeight="medium">
           {title}
         </Text>
-        <Text fontSize="26px" fontWeight="300">
-          {value}
-        </Text>
+        <Text textStyle="metric">{value}</Text>
       </VStack>
     </Card.Body>
   </Card.Root>

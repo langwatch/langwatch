@@ -77,14 +77,14 @@ function EvaluatorInlineResult({
   if (status === "error") return <Icon as={LuCircleX} color={statusColor} boxSize="12px" />;
   if (score !== undefined) {
     return (
-      <Text fontSize="10px" fontWeight="semibold">
+      <Text textStyle="micro" fontWeight="semibold">
         {score.toFixed(2)}
       </Text>
     );
   }
   if (label) {
     return (
-      <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
+      <Text textStyle="micro" fontWeight="medium" maxWidth="60px" truncate>
         {label}
       </Text>
     );
@@ -127,7 +127,7 @@ export function EvaluatorChip({
         <Button
           variant="outline"
           size="xs"
-          fontSize="11px"
+          textStyle="micro"
           fontWeight="medium"
           borderColor={hasMissingMappings ? "orange.solid" : undefined}
           minWidth={0}

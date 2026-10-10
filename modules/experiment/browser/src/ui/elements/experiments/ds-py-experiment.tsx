@@ -71,6 +71,7 @@ type DSPyStepQuery = UseTRPCQueryResult<
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
@@ -471,7 +472,7 @@ export function DSPyExperimentRunList({
       paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
       borderColor="border.emphasized"
-      fontSize="14px"
+      textStyle="body"
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
@@ -594,7 +595,7 @@ function LoadedRunSummary({
               backgroundColor={getColorForString("colors", run.runId).color}
             />
           )}
-          <Text fontSize={size === "sm" ? "13px" : "14px"}>{runName}</Text>
+          <Text textStyle={size === "sm" ? "bodySm" : "body"}>{runName}</Text>
           {(incomingRunIds ?? []).includes(run.runId) && (
             <>
               <Spacer />
@@ -603,7 +604,7 @@ function LoadedRunSummary({
           )}
         </HStack>
 
-        <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
+        <HStack color="fg.subtle" textStyle={size === "sm" ? "caption" : "bodySm"}>
           <Text>
             {run.created_at
               ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
@@ -839,7 +840,7 @@ const RunDetailsHeader = ({
 const StepSummaryInline = ({ dspyStepSummary }: { dspyStepSummary: DSPyStepSummary }) => (
   <>
     <Spacer />
-    <HStack paddingX={4} color="fg.muted" fontSize="12px" textTransform="uppercase">
+    <HStack paddingX={4} color="fg.muted" textStyle="eyebrow">
       <Text>Step Cost: {stepCostOf(dspyStepSummary)}</Text>
       <Separator orientation="vertical" />
       <Text>Step Tokens: {stepTokensOf(dspyStepSummary)}</Text>
@@ -1160,7 +1161,7 @@ function CollapsableSignature({
       <HStack>
         <Button
           size="sm"
-          fontSize="14px"
+          textStyle="body"
           fontWeight="normal"
           variant="ghost"
           onClick={() => setIsOpen(!isOpen)}
@@ -1366,7 +1367,7 @@ export function DSPyRunsScoresChart({
                 position="top"
                 offset={10}
                 fill={getRawColorValue("fg.muted")}
-                fontSize="12px"
+                fontSize={TYPE_SCALE_PX.caption}
               />
             </ReferenceDot>
           )}

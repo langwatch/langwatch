@@ -95,9 +95,7 @@ export function ComparisonColumnHeader({
         data-testid="comparison-column-header-edit"
       >
         <Icon as={Swords} color="fg.muted" boxSize="14px" />
-        <Text fontSize="13px" fontWeight="medium">
-          {name}
-        </Text>
+        <Text textStyle="label">{name}</Text>
       </Button>
       {hasMissingMappings && (
         <Tooltip
