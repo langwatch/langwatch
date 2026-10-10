@@ -215,6 +215,8 @@ export class ProcessServer implements ProcessBoot {
       return runtime;
     } catch (error) {
       await members?.close();
+      // A refused boot releases the door it opened, so a retry in this process can bind it again.
+      await this.server.close();
       throw error;
     } finally {
       this.resolver.seal();
