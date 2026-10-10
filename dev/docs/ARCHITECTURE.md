@@ -1501,6 +1501,12 @@ in-request, as main did; passes run on a worker (§9); apps/tasks keeps the star
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
 
+**Upgrades fail forward when it is safe** (Alex, 2026-10-11): each step is locked and only moves
+through safe states (expand, copy, switch readers, retire the old, record done in the ledger, unlock
+the next). A step that stops mid-way never rolls back and never leaves a half state: the old data is
+still there and served, and it resumes or retries from its checkpoint. Where going forward could be
+unsafe it stops, safely, and names what a person must do; otherwise no operator needs a shell.
+
 **Upgrades run on deploy** (ADR-173, which carries every ruling of rounds 8 to 17). One ledger keyed by
 step id (and target) serves cloud and self-hosted, and presence says when old writers are gone. A
 failing presence write never takes an admitted process out of service; a presence row not refreshed
