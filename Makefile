@@ -250,7 +250,7 @@ herrgen-check:
 # SEMGREP_VERSION is PINNED to what .github/workflows/coderabbit-config-check.yml
 # uses — rule-matching behaviour is version-sensitive. Bump both together.
 SEMGREP_VERSION  := 1.164.0
-GOLANGCI_VERSION := v2.13.2
+GOLANGCI_VERSION := v2.14.0
 
 # uvx runs the pinned version without installing it globally, so a developer
 # with a different semgrep on PATH still gets the CI behaviour.
@@ -274,8 +274,11 @@ lint-rules-test:
 
 # golangci-lint's config is version: "2"; a v1 binary refuses it outright,
 # which is why "run the Go checks before pushing" quietly stopped happening.
-# Always resolve the pinned version rather than trusting PATH.
-GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
+# Always resolve the pinned version rather than trusting PATH: a PATH binary built
+# with an older Go cannot read this toolchain's export data. Build the local one with
+# GOBIN=.bin/golangci-lint go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
+GOLANGCI_BIN := $(CURDIR)/.bin/golangci-lint/golangci-lint
+GOLANGCI := $(shell if $(GOLANGCI_BIN) --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION)) built with $$(go env GOVERSION)"; then echo $(GOLANGCI_BIN); else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
 # The workspace modules golangci-lint covers (go.work also holds the SDK and the
 # ClickHouse operator, linted by their own workflows). Each runs in its module.
 GO_LINT_MODULES ?= cmd pkg services tools
