@@ -504,6 +504,7 @@ Rule: Per-evaluator eval columns persist like any column
   Background:
     Given the user is authenticated with "traces:view" permission
 
+  @unit
   Scenario: Eval column survives a reload
     Given the user added an eval column for "Faithfulness" on field "Score"
     When the page reloads
