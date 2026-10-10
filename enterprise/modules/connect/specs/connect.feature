@@ -86,3 +86,64 @@ Feature: The hosted end of Connect
       Given a correctly signed hosted call from a key no licence carries
       When it asks for a hosted judgement
       Then it passes the gateway's door and is refused as connect_service_not_entitled
+
+  Rule: The contract budget follows licensing's contract_terms_changed fact
+
+    Licensing says the terms moved; connect brings the budget in line with the terms licensing
+    answers now and writes it only through the gateway's operations. Connect owns no table.
+    Billing's renewal and onboarding facts reset and sync it the same way.
+
+    @unit
+    Scenario: A contract_terms_changed fact syncs the contract budget
+      Given licensing records a contract_terms_changed fact for an organization
+      When connect's subscriber receives it
+      Then the organization's contract budget is brought in line with its current terms
+
+    @unit
+    Scenario: A renewal fact resets then syncs the contract budget
+      Given billing records a connected_term_renewed fact for an organization with a contract budget
+      When connect's subscriber receives it
+      Then the budget starts a new window first
+      And it is then brought in line with the organization's current terms
+
+    @unit
+    Scenario: An onboarding fact syncs the contract budget
+      Given billing records a connected_customer_onboarded fact for an organization
+      When connect's subscriber receives it
+      Then the organization's contract budget is brought in line with its current terms
+
+    @unit
+    Scenario: A reset with no contract budget does nothing
+      Given an organization with no contract budget
+      When connect starts a new budget window for it
+      Then the gateway is asked for nothing
+
+    @unit
+    Scenario: A redelivered renewal fact starts the window once
+      Given a contract budget whose window already restarted at or after a renewal
+      When the same renewal fact arrives again
+      Then the window is left alone, so spend since the reset still counts
+
+    @unit
+    Scenario: A redelivered fact syncs to the same cap
+      Given connect has already synced an organization's contract budget from a fact
+      When the same fact is delivered again
+      Then the budget is left at the same cap and no second budget is created
+
+    @unit
+    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
+      Given the organization's gateway budgets include one carrying the contract's external id
+      When connect reads the organization's contract budget
+      Then it answers that budget's limit in cents and whether the customer set the cap
+
+    @unit
+    Scenario: An archived contract budget is no contract budget
+      Given the organization's only contract budget is archived
+      When connect reads the organization's contract budget
+      Then it answers none
+
+    @unit
+    Scenario: A new contract budget is a blocking organization budget under the contract's id
+      Given an organization with agreed terms and no contract budget
+      When connect creates its contract budget
+      Then the gateway holds one blocking budget, capped by LangWatch, under the contract's id

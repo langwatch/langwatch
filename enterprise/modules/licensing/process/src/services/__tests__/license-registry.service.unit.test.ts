@@ -70,9 +70,17 @@ class RecordingManagedKeys {
 
 class RecordingBudgets {
   readonly synced: string[] = [];
+  readonly operators: string[] = [];
 
-  async sync({ organizationId }: { organizationId: string }): Promise<void> {
+  async sync({
+    organizationId,
+    operatorId,
+  }: {
+    organizationId: string;
+    operatorId: string;
+  }): Promise<void> {
     this.synced.push(organizationId);
+    this.operators.push(operatorId);
   }
 }
 
@@ -703,5 +711,72 @@ describe("the commercial terms on a registry row", () => {
       }),
     ).rejects.toBeInstanceOf(LicenseOverageMaxRequiresOverageError);
     expect(await repository.findById(license.id)).toMatchObject({ overageEnabled: false });
+  });
+});
+
+/** A signed licence the registry has not been told any organization for. */
+function unlinkedLicenseKey(): string {
+  return LicenseGenerationService.create(NodeLicenseCryptographyService.create()).generate({
+    organizationName: "ACME",
+    email: "buyer@acme.test",
+    planType: "GROWTH",
+    maxMembers: 10,
+    privateKey: TEST_PRIVATE_KEY,
+    now: new Date("2026-01-01T00:00:00.000Z"),
+  }).licenseKey;
+}
+
+describe("recording that a customer's contract terms moved", () => {
+  /** @scenario "Issuing, revoking, changing terms or linking a licence records contract_terms_changed" */
+  it("records one fact for the licence's organization after each change", async () => {
+    const { registry, contractBudgets } = harness();
+    const { license } = await registry.issue(issueInput());
+    expect(contractBudgets.synced).toEqual(["org-acme"]);
+
+    await registry.updateTerms({ id: license.id, operatorId: "operator-2", commitUsdCents: 5_000 });
+    expect(contractBudgets.synced).toEqual(["org-acme", "org-acme"]);
+
+    await registry.revoke({ id: license.id, operatorId: "operator-3", reason: "contract ended" });
+    expect(contractBudgets.synced).toEqual(["org-acme", "org-acme", "org-acme"]);
+    expect(contractBudgets.operators).toEqual(["operator-1", "operator-2", "operator-3"]);
+  });
+
+  /** @scenario "Issuing, revoking, changing terms or linking a licence records contract_terms_changed" */
+  it("records one for the organization a moved licence left, and one for the one it joined", async () => {
+    const { registry, contractBudgets } = harness();
+    const { license } = await registry.issue(issueInput());
+
+    await registry.linkToOrganization({
+      id: license.id,
+      organizationId: "org-other",
+      operatorId: "operator-4",
+    });
+
+    expect(contractBudgets.synced).toEqual(["org-acme", "org-acme", "org-other"]);
+  });
+
+  /** @scenario "Issuing, revoking, changing terms or linking a licence records contract_terms_changed" */
+  it("records one when an unlinked licence is linked for the first time", async () => {
+    const { registry, contractBudgets } = harness();
+    const license = await registry.record({ licenseKey: unlinkedLicenseKey(), source: "PURCHASE" });
+
+    await registry.linkToOrganization({
+      id: license.id,
+      organizationId: "org-acme",
+      operatorId: "operator-4",
+    });
+
+    expect(contractBudgets.synced).toEqual(["org-acme"]);
+  });
+
+  /** @scenario "A licence linked to no organization records no contract_terms_changed fact" */
+  it("records none for a licence no organization carries", async () => {
+    const { registry, contractBudgets } = harness();
+    const license = await registry.record({ licenseKey: unlinkedLicenseKey(), source: "PURCHASE" });
+
+    await registry.updateTerms({ id: license.id, operatorId: "operator-2", commitUsdCents: 5_000 });
+    await registry.revoke({ id: license.id, operatorId: "operator-2", reason: "contract ended" });
+
+    expect(contractBudgets.synced).toEqual([]);
   });
 });

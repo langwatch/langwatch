@@ -417,6 +417,7 @@ export const WelcomeScreen: React.FC = () => {
         subTitle={currentScreen?.subHeading}
         showBackButton={false}
         widthVariant={guided ? "guided" : "narrow"}
+        below={currentScreen?.footer ? <currentScreen.footer surface={screenSurface} /> : null}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
           <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">

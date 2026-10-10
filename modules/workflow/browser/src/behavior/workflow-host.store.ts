@@ -17,6 +17,8 @@ export const useWorkflowHostSlice = defineSlice<WorkflowHostSlice>({
     navigate: unmounted,
     back: unmounted,
     succeeded: unmounted,
+    warned: unmounted,
+    informed: unmounted,
     failed: unmounted,
   }),
 });

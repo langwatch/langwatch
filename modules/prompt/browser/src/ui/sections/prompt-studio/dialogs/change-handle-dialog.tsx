@@ -60,10 +60,8 @@ export function ChangeHandleDialog({
    * Reset the form values when the component mounts.
    */
   useEffect(() => {
-    reset({
-      handle,
-      scope: scope,
-    });
+    // The compiled dialog never re-calls register(), so a reset keeps its fields (WEB-5030).
+    reset({ handle, scope }, { keepFieldsRef: true });
   }, [handle, scope, reset]);
 
   /**
@@ -75,7 +73,7 @@ export function ChangeHandleDialog({
         handle: data.handle,
         scope: data.scope,
       });
-      reset();
+      reset(undefined, { keepFieldsRef: true });
     },
     [onSubmit, reset],
   );
@@ -89,7 +87,7 @@ export function ChangeHandleDialog({
       open={isOpen}
       onOpenChange={({ open }) => {
         if (!open) {
-          reset();
+          reset(undefined, { keepFieldsRef: true });
           onClose();
         }
       }}

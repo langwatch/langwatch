@@ -42,7 +42,7 @@ function RailLink({
         onNavigate(link.href);
       }}
       variant="plain"
-      paddingX={3}
+      paddingX={2}
       paddingY={1}
       borderRadius="lg"
       flexShrink={0}
@@ -62,14 +62,20 @@ function RailLink({
 
 export function SectionNavigationFrame({
   label,
+  hideTitle = false,
+  header,
   links = [],
   groups = [],
   activeHref,
   onNavigate,
   children,
 }: {
-  /** The section's name, over the rail and in the rail's accessible name. */
+  /** The section's name, at the top of the rail and in the rail's accessible name. */
   label: string;
+  /** Hides the title when the page header already says it; label stays the accessible name. */
+  hideTitle?: boolean;
+  /** The page's header (a PageLayout.Header); it spans the content column, never the rail. */
+  header?: ReactNode;
   links?: readonly SectionNavigationLink[];
   /** Labelled runs under `links`, for a rail with more than one kind of entry. */
   groups?: readonly SectionNavigationGroup[];
@@ -84,11 +90,12 @@ export function SectionNavigationFrame({
   );
   return (
     <Stack
+      data-section-frame
       direction={{ base: "column", md: "row" }}
-      alignItems={{ base: "stretch", md: "start" }}
-      gap={{ base: 3, md: 6 }}
+      alignItems="stretch"
+      gap={0}
       width="full"
-      paddingTop={3}
+      minHeight="full"
     >
       <Box
         as="nav"
@@ -96,27 +103,30 @@ export function SectionNavigationFrame({
         width={{ base: "full", md: "200px" }}
         minWidth={{ base: 0, md: "200px" }}
         flexShrink={0}
+        background="bg.subtle"
         borderRightWidth={{ base: 0, md: "1px" }}
         borderRightColor="border.muted"
         borderBottomWidth={{ base: "1px", md: 0 }}
         borderBottomColor="border.muted"
-        paddingRight={{ base: 0, md: 4 }}
-        paddingBottom={{ base: 2, md: 0 }}
+        paddingX={2}
+        paddingTop={{ base: 2, md: 0 }}
+        paddingBottom={2}
       >
-        <Text
-          data-testid="section-navigation-title"
-          display={{ base: "none", md: "block" }}
-          fontSize="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          paddingX={3}
-          paddingTop={1}
-          paddingBottom={2}
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {label}
-        </Text>
+        {hideTitle ? (
+          <Box display={{ base: "none", md: "block" }} height={3} />
+        ) : (
+          <Text
+            data-testid="section-navigation-title"
+            display={{ base: "none", md: "flex" }}
+            alignItems="center"
+            height="48px"
+            paddingX={2}
+            fontSize="md"
+            fontWeight="semibold"
+          >
+            {label}
+          </Text>
+        )}
         <Stack
           direction={{ base: "row", md: "column" }}
           alignItems="stretch"
@@ -134,7 +144,7 @@ export function SectionNavigationFrame({
                   display={{ base: "none", md: "block" }}
                   fontSize="xs"
                   color="fg.subtle"
-                  paddingX={3}
+                  paddingX={2}
                   paddingTop={1}
                 >
                   {run.label}
@@ -154,7 +164,10 @@ export function SectionNavigationFrame({
         </Stack>
       </Box>
       <Box flex={1} minWidth={0}>
-        {children}
+        {header}
+        <Box paddingX={6} paddingTop={4} paddingBottom={16}>
+          {children}
+        </Box>
       </Box>
     </Stack>
   );

@@ -1,3 +1,4 @@
+import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
@@ -30,6 +31,8 @@ export function defineBrowserVitestConfig(
 ): ViteUserConfig {
   const { include, exclude, setupFiles, testTimeout, test } = options;
   return defineConfig({
+    // The same React Compiler output apps/ui ships, as the jsdom builder compiles.
+    plugins: [react({ compiler: true })],
     test: {
       include: include ?? [BROWSER_TEST_GLOB],
       exclude: exclude ?? DEFAULT_EXCLUDE,

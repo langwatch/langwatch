@@ -61,6 +61,12 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When the user has not selected an intent
       Then the user cannot proceed to the next step
 
+    @integration
+    Scenario: Going back to the organization step keeps what was typed
+      Given the user named the organization, ticked the terms and picked an intent
+      When the user presses Back on the intent screen
+      Then the organization name and the terms tick are still filled in
+
   # ============================================================================
   # Governance track
   # ============================================================================

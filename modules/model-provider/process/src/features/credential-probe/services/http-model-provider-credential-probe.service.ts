@@ -367,6 +367,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     await this.egress.assertDestination(endpoint.trim()).catch((error: unknown) => {
       throw new ModelProviderInvalidError(
         error instanceof Error ? error.message : "The endpoint is not allowed",
+        "endpoint_not_allowed",
       );
     });
   }

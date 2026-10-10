@@ -24,9 +24,11 @@ export const datasetColumnTypeSchema = z.enum([
 ]);
 export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
 
-export const datasetColumnSchema = z
-  .object({ name: z.string().min(1), type: datasetColumnTypeSchema })
-  .strict();
+/** Strips extra keys, as main does: an upload stores `sourceHeader` on its columns (WEB-5120). */
+export const datasetColumnSchema = z.object({
+  name: z.string().min(1),
+  type: datasetColumnTypeSchema,
+});
 export const datasetColumnsSchema = z.array(datasetColumnSchema);
 export type DatasetColumn = z.infer<typeof datasetColumnSchema>;
 export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;

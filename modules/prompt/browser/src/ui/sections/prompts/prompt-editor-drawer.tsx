@@ -283,7 +283,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // Drift reads the actual latest: a pinned promptVersionId makes promptQuery
   // return that version.
-  const currentVersion = methods.watch("versionMetadata.versionNumber");
+  const currentVersion = useWatch({
+    control: methods.control,
+    name: "versionMetadata.versionNumber",
+  });
   const { latestVersion, isOutdated, nextVersion } = useLatestPromptVersion({
     configId: promptId,
     currentVersion,
@@ -295,13 +298,18 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     onInputMappingsChange,
   });
 
-  const watchedInputs = methods.watch("version.configData.inputs");
+  // useWatch, not methods.watch: the React Compiler memoises watch() on the stable form object.
+  const watchedInputs = useWatch({ control: methods.control, name: "version.configData.inputs" });
   const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
   const availableFields = inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
-  const watchedMessages = methods.watch("version.configData.messages");
+  const watchedMessages = useWatch({
+    control: methods.control,
+    name: "version.configData.messages",
+  });
+  const versionMetadata = useWatch({ control: methods.control, name: "versionMetadata" });
   const missingMappingIds = useMemo(
     () =>
       missingMappingIdsFor({
@@ -326,7 +334,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         onVersionRestore={save.handleVersionRestore}
         configId={promptQuery.data?.id}
         handle={promptQuery.data?.handle ?? undefined}
-        currentVersionId={methods.watch("versionMetadata")?.versionId}
+        currentVersionId={versionMetadata?.versionId}
         onApply={targetId || props.headless ? handleClose : undefined}
       />
     </FormProvider>

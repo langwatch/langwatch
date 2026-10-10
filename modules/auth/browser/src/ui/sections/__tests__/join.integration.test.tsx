@@ -17,20 +17,28 @@ type ReadState = {
   refetch?: () => void;
 };
 
-const { lookupRef, mineRef, requestMock, hardRedirectMock, invalidateMock, navigatingAwayRef } =
-  vi.hoisted(() => {
-    const lookup: { current: ReadState } = { current: {} };
-    const mine: { current: ReadState } = { current: {} };
-    const navigating: { current: boolean } = { current: false };
-    return {
-      lookupRef: lookup,
-      mineRef: mine,
-      requestMock: vi.fn(),
-      hardRedirectMock: vi.fn(),
-      invalidateMock: vi.fn(),
-      navigatingAwayRef: navigating,
-    };
-  });
+const {
+  lookupRef,
+  mineRef,
+  requestMock,
+  dismissMock,
+  hardRedirectMock,
+  invalidateMock,
+  navigatingAwayRef,
+} = vi.hoisted(() => {
+  const lookup: { current: ReadState } = { current: {} };
+  const mine: { current: ReadState } = { current: {} };
+  const navigating: { current: boolean } = { current: false };
+  return {
+    lookupRef: lookup,
+    mineRef: mine,
+    requestMock: vi.fn(),
+    dismissMock: vi.fn(),
+    hardRedirectMock: vi.fn(),
+    invalidateMock: vi.fn(),
+    navigatingAwayRef: navigating,
+  };
+});
 
 vi.mock("@langwatch/identity-client", () => ({
   identityClient: {
@@ -40,6 +48,7 @@ vi.mock("@langwatch/identity-client", () => ({
         lookup: { useQuery: () => lookupRef.current },
         mine: { useQuery: () => mineRef.current },
         request: { useMutation: () => ({ mutate: requestMock, error: null }) },
+        dismissOffer: { useMutation: () => ({ mutate: dismissMock, isPending: false }) },
       },
     },
   },
@@ -100,6 +109,21 @@ describe("given a verified address an organization is open to", () => {
 
       expect(requestMock.mock.calls[0]?.[0]).toEqual({ organizationId: "org_acme" });
       expect(hardRedirectMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Declining the team at sign-up is not asked again during onboarding" */
+    it("records the decline before moving on to workspace creation", async () => {
+      renderScreen();
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: /^Create a new organization$/ }),
+      );
+
+      expect(dismissMock).toHaveBeenCalledTimes(1);
+      expect(hardRedirectMock).not.toHaveBeenCalled();
+      const options = dismissMock.mock.calls[0]?.[1] as { onSettled: () => void };
+      options.onSettled();
+      expect(hardRedirectMock).toHaveBeenCalledWith("/");
     });
 
     /** @scenario "A waiting requester can still create a workspace, deliberately" */

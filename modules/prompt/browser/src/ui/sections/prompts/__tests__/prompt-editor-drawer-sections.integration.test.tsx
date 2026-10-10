@@ -196,3 +196,27 @@ describe("given a studio node whose library prompt is not in this project", () =
     });
   });
 });
+
+describe("given a prompt whose template names a variable it does not declare", () => {
+  describe("when the variable is created from the warning", () => {
+    it("clears the undefined-variables warning", async () => {
+      const user = userEvent.setup();
+      renderEditor({
+        promptId: "missing-prompt",
+        inlineConfigFallback: {
+          llm: { model: "openai/gpt-5-mini" },
+          messages: [{ role: "system", content: "Answer {{question}}" }],
+          inputs: [],
+          outputs: [{ identifier: "answer", type: "str" }],
+        },
+      });
+
+      const banner = await screen.findByTestId("undefined-variables-banner");
+      expect(banner).toHaveTextContent("Undefined variables: question");
+
+      await user.click(screen.getByTestId("create-missing-variable-button"));
+
+      expect(screen.queryByTestId("undefined-variables-banner")).toBeNull();
+    });
+  });
+});

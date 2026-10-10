@@ -18,6 +18,7 @@ const CONSOLES: { label: string; service: string | null; group?: string }[] = [
   { label: "LLM", service: "llm", group: "Sims" },
   { label: "Analytics", service: "analytics", group: "Sims" },
   { label: "Outbound", service: "outbound", group: "Sims" },
+  { label: "Payment", service: "payment", group: "Sims" },
   { label: "Telemetry", service: "telemetry", group: "Sims" },
   { label: "Design system", service: "design-system", group: "Tools" },
   { label: "Mail room", service: "mail-room", group: "Tools" },

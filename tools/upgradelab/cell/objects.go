@@ -122,8 +122,9 @@ func datasetWithRows(ctx context.Context, client Client, n int) (*http.Request, 
 		return nil, name, err
 	}
 	_ = response.Body.Close()
-	if response.StatusCode/100 != 2 {
-		return nil, name, fmt.Errorf("POST /api/dataset answered %d", response.StatusCode)
+	if response.StatusCode/100 != 2 && response.StatusCode != http.StatusConflict {
+		create, err = client.post(ctx, "/api/dataset", map[string]any{"name": name, "columnTypes": []any{map[string]any{"name": "input", "type": "string"}}})
+		return create, name, err // the traffic sends the create again, so its answer (e.g. upgrade_in_progress) is the call's
 	}
 	request, err := client.post(ctx, "/api/dataset/"+name+"/entries", map[string]any{"entries": []any{map[string]any{"input": "row " + name}}})
 	return request, name, err

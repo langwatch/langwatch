@@ -109,3 +109,12 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
     And a call answered 2xx whose write is not visible after settle counts as lost
     And a call with no answer counts as failed in the phase it was sent in
     And a call answered upgrade_in_progress is retried after Retry-After and counted with its retry window
+
+  @unit
+  Scenario: A cell claims its ledger row and reports its verdict to it
+    Given a cell run with a tested-flow ledger row named
+    When the cell starts and when it ends
+    Then the row is claimed in progress at the start
+    And at the end the row carries the status, who tested it, the date and the evidence, with no host or local path
+    And one line naming the row and its failing invariants is added first under the log
+    And no other row changes

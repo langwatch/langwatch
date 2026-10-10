@@ -140,7 +140,7 @@ Feature: haven lifecycle usability
   # goodbye it ever gets. A launcher killed by pid says none. Observed: a
   # foreground `haven up --agent` still supervising a full stack, two days
   # after the session that ran it was gone. So the foreground run watches the
-  # process group it was launched into, the same way dev-supervisor does, and
+  # process group it was launched into, the same way the old dev supervisor did, and
   # shuts down as if interrupted when that group loses its leader.
   @unit
   Scenario: A foreground up goes down with the group that launched it

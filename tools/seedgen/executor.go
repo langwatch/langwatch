@@ -37,6 +37,7 @@ type RunConfig struct {
 // Result counts what this session sent, how long sending took from the first ack, and the drain.
 type Result struct {
 	Actions, Cells, Spans, Logs, MetricPoints int
+	IdentityRefused                           int // refused identity actions: what was asked for does not all exist
 	Refusals                                  map[string]int
 	Sent, Drained                             time.Duration
 }
@@ -211,6 +212,9 @@ func (r *run) ack(step Step, refs map[string]string, refused string) {
 	if refused != "" {
 		r.result.Refusals[refused]++
 		counter = "refused:" + refused
+		if step.Action != nil {
+			r.result.IdentityRefused++
+		}
 	}
 	if step.Cell != nil {
 		r.result.Cells++
@@ -357,8 +361,8 @@ func (r *run) drain(ctx context.Context) time.Duration {
 	return r.cfg.Now().Sub(started)
 }
 
-// BindInto binds every org and project ref the checkpoint has not minted to one fixed org and
-// project, so telemetry lands while the identity kinds are not built yet (--into).
+// BindInto binds every org and project ref the checkpoint has not minted to one existing org and
+// project (--into): the plan then sends telemetry only.
 func BindInto(plan *Plan, cp *Checkpoint, into string) {
 	org, project, _ := strings.Cut(into, "/")
 	for _, o := range plan.Orgs {

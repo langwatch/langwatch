@@ -13,3 +13,22 @@ Feature: The team settings page reads as main's does
     Given a team the reader may edit
     When the team settings page opens
     Then "Manage organization members" is a link to "/settings/members"
+
+  @unit
+  Scenario: A member with no display name is labelled by their email in team pickers
+    Given an account with an email but no display name
+    When it is offered as a team member
+    Then its label is the email alone, never "null"
+
+  @integration
+  Scenario: A blank team name is refused on the field
+    Given the Create New Team drawer
+    When Create is pressed with the name left blank
+    Then the name field says it is required, as on main
+    And no team is sent to be created
+
+  @integration
+  Scenario: Renaming a team saves the new name
+    Given a team the reader may edit, with one admin member
+    When a new name is typed into the name field and Enter is pressed
+    Then the team is saved with the new name and its members unchanged, with no save button

@@ -5,6 +5,7 @@ import { routingDecisionSchema } from "@langwatch/identity-contract";
  * screens have always called.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { inviteLandingSchema } from "@langwatch/organization-contract";
 import {
   createdUserSchema,
   userApiChangePasswordInputSchema,
@@ -24,7 +25,6 @@ import {
   addressConfirmationSchema,
   frontDoorAskedSchema,
   frontDoorOwnAddressSentSchema,
-  inviteLandingSchema,
   priorSessionSchema,
   signUpEnrollmentSchema,
   signUpVerificationRequestSchema,

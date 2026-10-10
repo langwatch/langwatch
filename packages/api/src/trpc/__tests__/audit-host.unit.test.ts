@@ -13,6 +13,7 @@ import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import type { TrpcAuditSink } from "../../hosting/api-door.ts";
 import { SessionReader } from "../../hosting/session-reader.ts";
+import { isAuditLogExempt } from "../audit.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
 import { defineTrpcRouter } from "../runtime.ts";
@@ -42,7 +43,13 @@ function declaration() {
 type Recorded = Parameters<TrpcAuditSink["record"]>[0];
 type LogRecord = { level: string; fields: unknown; message?: string | undefined };
 
-function served({ audit }: { audit: TrpcAuditSink | undefined }) {
+function served({
+  audit,
+  impersonator,
+}: {
+  audit: TrpcAuditSink | undefined;
+  impersonator?: string;
+}) {
   const logs: LogRecord[] = [];
   const at =
     (level: string) =>
@@ -59,7 +66,12 @@ function served({ audit }: { audit: TrpcAuditSink | undefined }) {
     projectKindOf: async () => "application",
   });
   const trpc = TrpcHost.create({
-    sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
+    sessions: SessionReader.create({
+      verify: async () => ({
+        userId: "sam",
+        ...(impersonator ? { impersonator: { id: impersonator } } : {}),
+      }),
+    }),
     authz,
     audit,
     logger: { warn: at("warn"), error: at("error") },
@@ -68,17 +80,23 @@ function served({ audit }: { audit: TrpcAuditSink | undefined }) {
   trpc.mount(composeTrpcRouters("project", [declaration()]), () => ({ rename }));
 
   /** Posts one `project.rename` call through the host, as a browser would. */
-  const renameIn = async (input: { organizationId: string; projectId: string; name: string }) => {
+  const renameIn = async (
+    input: { organizationId: string; projectId: string; name: string },
+    from: { address?: string; userAgent?: string } = {},
+  ) => {
     const request = new Request(`http://api.test${TrpcHost.path}/project.rename`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(from.userAgent ? { "User-Agent": from.userAgent } : {}),
+      },
       body: JSON.stringify(input),
     });
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: request,
       router: trpc.router,
-      createContext: () => trpc.context({ request }),
+      createContext: () => trpc.context({ request, address: from.address }),
     });
 
     return (await response.json()) as { result?: { data?: unknown }; error?: unknown };
@@ -112,6 +130,53 @@ describe("given a process whose door records through an installed audit trail", 
       });
       expect(rows[0]?.error).toBeUndefined();
     });
+  });
+});
+
+describe("given a process whose door records through an installed audit trail, as main did", () => {
+  describe("when a signed-in caller's mutation is answered", () => {
+    /** @scenario "A recorded mutation keeps where it came from and who really made it" */
+    it("records the address the door resolved and the caller's user agent", async () => {
+      const rows: Recorded[] = [];
+      const { renameIn } = served({ audit: { record: (entry) => void rows.push(entry) } });
+
+      await renameIn(
+        { organizationId: "organization-1", projectId: "project-1", name: "demo" },
+        { address: "203.0.113.7", userAgent: "Mozilla/5.0 (audit test)" },
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        ipAddress: "203.0.113.7",
+        userAgent: "Mozilla/5.0 (audit test)",
+      });
+      expect(rows[0]?.actorUserId).toBeUndefined();
+    });
+
+    /** @scenario "A recorded mutation keeps where it came from and who really made it" */
+    it("names the operator behind an impersonated call as the row's actor", async () => {
+      const rows: Recorded[] = [];
+      const { renameIn } = served({
+        audit: { record: (entry) => void rows.push(entry) },
+        impersonator: "operator-1",
+      });
+
+      await renameIn({ organizationId: "organization-1", projectId: "project-1", name: "demo" });
+
+      expect(rows[0]).toMatchObject({
+        userId: "sam",
+        actorUserId: "operator-1",
+        metadata: { impersonatorId: "operator-1" },
+      });
+    });
+  });
+});
+
+describe("given a mutation whose handler writes its own, richer audit row", () => {
+  /** @scenario "A mutation that audits itself is recorded once" */
+  it("leaves the generic row out, as main did, and still records every other mutation", () => {
+    expect(isAuditLogExempt("identity.joinRequests.setJoining")).toBe(true);
+    expect(isAuditLogExempt("identity.joinRequests.dismissOffer")).toBe(false);
   });
 });
 

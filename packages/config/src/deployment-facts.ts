@@ -379,3 +379,12 @@ export const { posthogKey, posthogHost } = Config.define((c) => ({
 export const { foldCacheTtlSeconds } = Config.define((c) => ({
   foldCacheTtlSeconds: c.env("LANGWATCH_FOLD_CACHE_TTL_SECONDS", positiveInteger.default(300)),
 }));
+
+/** Where Slack is reached: slack and automation both call it; haven points both at outboundsim. */
+export const { slackApiBase, slackWebhookBase } = Config.define((c) => ({
+  slackApiBase: c.env("SLACK_API_BASE", z.string().url().default("https://slack.com/api")),
+  slackWebhookBase: c.env(
+    "SLACK_WEBHOOK_BASE",
+    z.string().url().default("https://hooks.slack.com"),
+  ),
+}));

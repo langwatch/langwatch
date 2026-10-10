@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./templating": {
+      "types": "./dist/templating/render-email.d.ts",
+      "default": "./src/templating/render-email.ts"
     }
   },
   "scripts": {

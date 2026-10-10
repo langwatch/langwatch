@@ -188,6 +188,14 @@ class HostServiceAutomationHost extends AutomationHost {
     this.members.feedback.succeeded(notice);
   }
 
+  warned(notice: AutomationSuccessNotice): void {
+    this.members.feedback.warned(notice);
+  }
+
+  informed(notice: AutomationSuccessNotice): void {
+    this.members.feedback.informed(notice);
+  }
+
   failed(failure: AutomationFailureNotice): void {
     this.members.feedback.failed(failure);
   }

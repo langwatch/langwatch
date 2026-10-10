@@ -97,6 +97,14 @@ class HostServiceGovernanceHost extends GovernanceHostApi {
     this.inputs.feedback.succeeded(notice);
   }
 
+  warned(notice: GovernanceSuccessNotice): void {
+    this.inputs.feedback.warned(notice);
+  }
+
+  informed(notice: GovernanceSuccessNotice): void {
+    this.inputs.feedback.informed(notice);
+  }
+
   failed(failure: GovernanceFailureNotice): void {
     this.inputs.feedback.failed(failure);
   }

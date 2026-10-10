@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import pino, {
   type DestinationStream,
   type LoggerOptions,
@@ -339,8 +339,28 @@ function buildTransport(configuration: ResolvedLoggerConfiguration): Destination
   const otel = buildOtelTransport(configuration);
   return pino.multistream([
     { level: consoleTarget.level, stream: consoleStream },
-    { level: otel.level, stream: transportOrStdout({ target: otel, fallback: null }) },
+    {
+      level: otel.level,
+      stream: transportOrStdout({ target: otel, fallback: null, encode: epochMillisTime }),
+    },
   ]);
+}
+
+const ISO_TIME = /"time":"([^"]+)"/;
+
+/**
+ * The OTel SDK throws on our ISO `time` string, silently ending the transport
+ * worker (WEB-703), so its lines carry epoch milliseconds. Pino writes `time`
+ * before any caller field, so the first match is pino's own.
+ */
+function epochMillisTime(line: string): string {
+  return line.replace(ISO_TIME, (field, iso: string) => {
+    try {
+      return `"time":${Temporal.Instant.from(iso).epochMilliseconds}`;
+    } catch {
+      return field;
+    }
+  });
 }
 
 const TRANSPORT_RETRY_MS = 30_000;
@@ -354,9 +374,11 @@ const TRANSPORT_RETRY_MS = 30_000;
 function transportOrStdout({
   target,
   fallback,
+  encode = (line) => line,
 }: {
   target: pino.TransportTargetOptions;
   fallback: DestinationStream | null;
+  encode?: (line: string) => string;
 }): DestinationStream & { emit(event: string, ...args: unknown[]): boolean } {
   let warned = false;
   let failedAt: number | undefined;
@@ -390,7 +412,7 @@ function transportOrStdout({
       retryIfDue();
       if (failedAt !== undefined) return fallback?.write(line);
       try {
-        return transport.write(line);
+        return transport.write(encode(line));
       } catch {
         failedAt = nowInstant().epochMilliseconds;
         return fallback?.write(line);

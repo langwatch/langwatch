@@ -137,6 +137,13 @@ Feature: haven service selection
       Then the tier they asked for is the tier they get
       And refusing host access explicitly keeps the sandboxed tier
 
+    Scenario: A Langy that cannot start leaves the app no dead agent address
+      Given the developer ran "haven up +langy"
+      And the langy-worker build failed, so langy is skipped for this run
+      When the services start
+      Then the app is not given LANGY_AGENT_URL or the agent's shared secret
+      And a Langy send refuses with "Agent not configured" instead of reconnecting forever
+
   Rule: The developer tools are optional lanes, never product lanes
 
     # The design system's Storybook and the mail studio are tools a developer

@@ -22,6 +22,7 @@ import type {
   CodexPollResult,
 } from "../../features/codex/services/codex-account.service.ts";
 import { ModelProviderCredentialProbe } from "../../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import type { ModelCostPreviewSpanReader } from "../../features/model-cost/services/model-cost-preview.service.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 
@@ -136,7 +137,7 @@ export class StubCodexAccounts implements ModelProviderCodexDeviceFlow {
  */
 export function mountableModelProviderApp(options: {
   modelProviders?: Partial<ModelProviderApi>;
-  spans?: unknown;
+  spans?: ModelCostPreviewSpanReader;
   probe?: RecordingCredentialProbe;
   permits?: ModelProviderTestDecision;
   /** The device flow this suite decided, or none where it reaches no issuer. */
@@ -162,7 +163,7 @@ export function mountableModelProviderApp(options: {
     },
     infrastructure: {
       credentialProbe: probe,
-      spans: options.spans ?? {},
+      ...(options.spans ? { spans: options.spans } : {}),
       ...(options.codexAccounts ? { codexAccounts: options.codexAccounts } : {}),
     },
   });

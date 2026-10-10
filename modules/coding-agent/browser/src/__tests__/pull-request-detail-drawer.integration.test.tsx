@@ -745,7 +745,7 @@ describe("the pull request detail drawer", () => {
         await user.click(screen.getByText("Ran but stored nothing"));
 
         await waitFor(() =>
-          expect(host.recording.successes).toContainEqual(
+          expect(host.recording.infos).toContainEqual(
             expect.objectContaining({
               title: "No stored traces for this session yet",
             }),

@@ -178,8 +178,18 @@ describe("given an Enterprise organization with a mixed audit history", () => {
     });
 
     /** @scenario A row written by a system actor says so rather than naming nobody */
-    it("says the actor is unknown rather than rendering an empty cell", () => {
+    it("names the system as the actor rather than reporting a failed lookup", () => {
       state.auditLogs = [auditRow({ userId: null, user: null })];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getByText("System")).toBeInTheDocument();
+      expect(screen.queryByText("User not found")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A row written by a system actor says so rather than naming nobody */
+    it("says the user is not found when the row names one that no longer resolves", () => {
+      state.auditLogs = [auditRow({ userId: "u-gone", user: null })];
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 

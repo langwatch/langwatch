@@ -108,7 +108,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         });
       } else {
         // Not a failure: a run was already underway, and its results land here.
-        host.succeeded({
+        host.informed({
           title: "A run is already in progress",
           description: "Its results will appear here when it finishes.",
         });

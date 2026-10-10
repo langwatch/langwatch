@@ -527,6 +527,7 @@ export const APP_ERROR_CODES = [
   "model_provider_custom_keys_missing",
   "model_provider_deprecated",
   "model_provider_disabled",
+  "model_provider_invalid",
   "model_provider_not_found",
   "model_provider_routing_handle_invalid",
   "model_provider_routing_handle_taken",

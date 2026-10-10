@@ -92,7 +92,10 @@ describe("Feature: Admin User Impersonation Reason", () => {
 
       expect(impersonateUser).not.toHaveBeenCalled();
       expect(host.recording.failures).toContainEqual(
-        expect.objectContaining({ fallbackTitle: "Reason is required" }),
+        expect.objectContaining({
+          fallbackTitle: "Reason is required",
+          description: "Saved to the audit log alongside the impersonation.",
+        }),
       );
     });
   });

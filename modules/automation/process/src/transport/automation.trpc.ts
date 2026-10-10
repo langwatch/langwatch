@@ -134,6 +134,10 @@ export const automationTrpcTransport: TrpcRouterDeclaration<AutomationApi, typeo
     .withPermission("triggers:update")
     .handle(({ app, input, actor }, email) => app.sendTestFire(input, { id: actor.id, email }))
 
+    .procedure("previewTriggerEmail")
+    .withPermission("triggers:update")
+    .handle(({ app, input }) => app.previewTriggerEmail(input))
+
     .procedure("upsert")
     .withPermission("triggers:update")
     .handle(({ app, input, actor }) => app.saveAutomation(input, { id: actor.id }))

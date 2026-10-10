@@ -30,6 +30,27 @@ import { TimeRangePicker } from "./time-range-picker.tsx";
 // the filters sidebar is wide.
 const TOOLBAR_LABELS_MIN_WIDTH = 800;
 const TOOLBAR_CHEVRONS_MIN_WIDTH = 620;
+// Room the optional controls take, so the thresholds hold when they are on the bar.
+const SAMPLE_TOGGLE_WIDTH = 120;
+const TOUR_LABEL_WIDTH = 100;
+
+function toolbarCompactness({
+  width,
+  hasSampleToggle,
+  hasTourLabel,
+}: {
+  width: number;
+  hasSampleToggle: boolean;
+  hasTourLabel: boolean;
+}): { labelsCompact: boolean; chevronsCompact: boolean } {
+  if (width <= 0) return { labelsCompact: false, chevronsCompact: false };
+  const optional =
+    (hasSampleToggle ? SAMPLE_TOGGLE_WIDTH : 0) + (hasTourLabel ? TOUR_LABEL_WIDTH : 0);
+  return {
+    labelsCompact: width < TOOLBAR_LABELS_MIN_WIDTH + optional,
+    chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH + optional,
+  };
+}
 
 interface ToolbarProps {
   onExportAll?: () => void;
@@ -187,8 +208,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const labelsCompact = toolbarWidth > 0 && toolbarWidth < TOOLBAR_LABELS_MIN_WIDTH;
-  const chevronsCompact = toolbarWidth > 0 && toolbarWidth < TOOLBAR_CHEVRONS_MIN_WIDTH;
+  const { labelsCompact, chevronsCompact } = toolbarCompactness({
+    width: toolbarWidth,
+    hasSampleToggle: !hideSampleDataAction && showSampleDataToggle,
+    hasTourLabel: isNewAccount,
+  });
 
   return (
     <Flex
@@ -215,6 +239,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             onClick={handleSamplePreviewToggle}
             aria-label={showSamplePreview ? "Hide sample data" : "See sample data"}
             aria-pressed={showSamplePreview}
+            flexShrink={0}
           >
             <Icon boxSize={3.5} color={{ base: "orange.500", _dark: "orange.fg" }}>
               {showSamplePreview ? <Tent /> : <Compass />}

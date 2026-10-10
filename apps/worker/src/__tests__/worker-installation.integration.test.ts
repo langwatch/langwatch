@@ -186,6 +186,7 @@ describe("the worker process installation", () => {
       expect(pipelines).not.toContain("data_retention_project_scope");
       expect(pipelines).not.toContain("data_privacy_project_scope");
       expect(pipelines).toContain("data_retention_seat_policy");
+      expect(pipelines).toContain("connect_contract_budget");
       expect(pipelines).toContain("audit_log");
       expect(pipelines).toContain("agent_lifecycle");
       expect(pipelines).toContain("annotation_lifecycle");

@@ -11,10 +11,13 @@ import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useEffect, useReducer } from "react";
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AnalyticsRouteReading } from "../../../model/analytics-host.ts";
+import {
+  AnalyticsHostProvider,
+  type AnalyticsRouteReading,
+} from "../../../model/analytics-host.ts";
 import {
   ANALYTICS_MEMBER_PERMISSIONS,
   StubAnalyticsHost,
@@ -160,14 +163,23 @@ class AddressedHost extends StubAnalyticsHost {
   }
 }
 
-/** Renders the board again whenever its address changes. */
+/**
+ * Renders the board again whenever its address changes, under a host that is a new object
+ * each time, as the router's is: a compiled screen reads the address again only for a new
+ * host. The new object is the same double underneath, so the test reads what it recorded.
+ */
 function AddressedBoard({ host }: { host: AddressedHost }) {
-  const [, rerender] = useReducer((count: number) => count + 1, 0);
+  const [atAddress, setAtAddress] = useState(host);
   useEffect(() => {
-    host.listeners.add(rerender);
-    return () => void host.listeners.delete(rerender);
+    const readdress = () => setAtAddress(new Proxy(host, {}));
+    host.listeners.add(readdress);
+    return () => void host.listeners.delete(readdress);
   }, [host]);
-  return <DashboardBoardScreen />;
+  return (
+    <AnalyticsHostProvider value={atAddress}>
+      <DashboardBoardScreen />
+    </AnalyticsHostProvider>
+  );
 }
 
 function openBoard({

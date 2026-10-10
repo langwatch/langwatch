@@ -3,10 +3,7 @@
  * reads the URL directly. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
-import {
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  type ScopeAssignment,
-} from "@langwatch/data-retention-contract";
+import { type ScopeAssignment } from "@langwatch/data-retention-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -347,6 +344,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
         {snapshot && (
           <RetentionPolicyList
             ruleCount={snapshot.rules.length}
+            defaultDays={snapshot.effective.traces}
             scopeGroups={scopeGroups}
             canWrite={canWrite}
             onAdd={() => setDrawerOpen(true)}
@@ -458,6 +456,8 @@ function DataRetentionLoading() {
 
 type RetentionPolicyListProps = {
   ruleCount: number;
+  /** With no policies written, the effective value is the deployment's platform default. */
+  defaultDays: number;
   scopeGroups: RetentionScopeGroup[];
   canWrite: boolean;
   onAdd: () => void;
@@ -468,6 +468,7 @@ type RetentionPolicyListProps = {
 /** The policies in scope: an invitation when none exist, a note when the filter hides them. */
 function RetentionPolicyList({
   ruleCount,
+  defaultDays,
   scopeGroups,
   canWrite,
   onAdd,
@@ -478,7 +479,7 @@ function RetentionPolicyList({
     return (
       <NoDataInfoBlock
         title="No retention policies"
-        description={`Add a retention policy to override the platform default of ${PLATFORM_DEFAULT_RETENTION_DAYS} days.`}
+        description={`Add a retention policy to override the platform default of ${defaultDays} days.`}
         icon={<DatabaseBackup size={24} />}
       >
         {canWrite && (

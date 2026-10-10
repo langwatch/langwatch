@@ -153,3 +153,9 @@ Feature: Annotation service boundary
     When the worker's installed modules list their upgrade steps
     Then annotation:record-trace-annotations is a background data step
     And it runs only once no older image serves
+
+  @integration
+  Scenario: An edited annotation score's typed name is the one saved
+    Given the score form opened on an existing score and the score loaded
+    When its name is edited and saved
+    Then the save carries the typed name and the loaded description

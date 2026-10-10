@@ -13,6 +13,7 @@ import {
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service.ts";
 
@@ -32,36 +33,11 @@ const PER_MODEL_SAMPLE_LIMIT = 3;
 /** Non-matching models surfaced in the zero/partial-match hint. */
 const MAX_UNMATCHED_MODELS = 8;
 
-/**
- * The two span reads the preview issues, declared structurally.
- */
-export type ModelCostPreviewSpanReader = Readonly<{
-  getModelUsageStats(input: {
-    authorization: Authorization;
-    fromMs: number;
-    limit: number;
-  }): Promise<{ model: string; spanCount: number; lastSeenMs: number }[]>;
-  getRecentSpansByModels(input: {
-    authorization: Authorization;
-    models: string[];
-    fromMs: number;
-    perModelLimit: number;
-    limit: number;
-  }): Promise<
-    {
-      traceId: string;
-      spanId: string;
-      spanName: string;
-      model: string;
-      inputTokens: number | null;
-      outputTokens: number | null;
-      cacheReadTokens: number | null;
-      cacheCreationTokens: number | null;
-      cacheCreation1hTokens: number | null;
-      startTimeMs: number;
-    }[]
-  >;
-}>;
+/** The two span reads the preview issues, as trace answers them. */
+export type ModelCostPreviewSpanReader = Pick<
+  TraceApi,
+  "readModelUsageStats" | "readRecentSpansByModels"
+>;
 
 /** The rule being typed, as one catalogue rate. */
 function candidateRate(input: CostRulePreviewInput): ModelCostRate {
@@ -117,7 +93,7 @@ export class ModelCostPreviewService {
 
     const candidate = candidateRate(input);
     const fromMs = nowInstant().epochMilliseconds - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    const stats = await spans.getModelUsageStats({
+    const stats = await spans.readModelUsageStats({
       authorization,
       fromMs,
       limit: MAX_DISTINCT_MODELS,
@@ -135,7 +111,7 @@ export class ModelCostPreviewService {
 
     let sampleSpans: CostRulePreviewSampleSpan[] = [];
     if (matchedModels.length > 0) {
-      const rows = await spans.getRecentSpansByModels({
+      const rows = await spans.readRecentSpansByModels({
         authorization,
         models: matchedModels.map((m) => m.model),
         fromMs,

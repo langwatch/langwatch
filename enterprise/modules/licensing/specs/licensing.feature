@@ -190,23 +190,30 @@ Feature: Enterprise licensing lifecycle
       When an operator lists the self-hosted instances
       Then the install is listed with no organization name
 
-  Rule: Every deployment composes the licence registry from its own stores
+  Rule: Licensing records that a customer's contract terms moved
 
-    Main built the licence registry, activation codes and licence sync from
-    Postgres on every deployment. The managed keys and the contract budget are
-    the gateway's, reached through its operations.
-
-    @unit
-    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
-      Given the organization's gateway budgets include one carrying the contract's external id
-      When licensing reads the organization's contract budget
-      Then it answers that budget's limit in cents and whether the customer set the cap
+    The contract budget follows the customer's terms, and the budget is connect's. Licensing says only
+    that the terms moved, as a fact on the licensing_customer aggregate keyed by the organization;
+    connect syncs the budget from it, seconds later.
 
     @unit
-    Scenario: An archived contract budget is no contract budget
-      Given the organization's only contract budget is archived
-      When licensing reads the organization's contract budget
-      Then it answers none
+    Scenario: Issuing, revoking, changing terms or linking a licence records contract_terms_changed
+      Given a licence registry that records licensing's customer facts
+      When an operator issues, revokes, changes the terms of, or links a licence to an organization
+      Then each change records a contract_terms_changed fact for the licence's organization
+      And moving a licence between organizations records one for the organization it left as well
+
+    @unit
+    Scenario: A licence linked to no organization records no contract_terms_changed fact
+      Given a licence that no organization carries
+      When an operator revokes it or changes its terms
+      Then no contract_terms_changed fact is recorded
+
+    @unit
+    Scenario: Each contract_terms_changed fact is its own message
+      Given the same operator changes the same organization's terms twice, a moment apart
+      When both facts are recorded
+      Then they carry different idempotency keys, so neither is dropped as a repeat
 
   Rule: Licensing owns the licence signing key
 

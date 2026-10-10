@@ -39,12 +39,18 @@ type StoreEstimate struct {
 // Estimate walks the stream without writing anything.
 func (p *Plan) Estimate() Estimate {
 	counts := map[string]int{"orgs": len(p.Orgs)}
+	if p.Flags.Into != "" {
+		counts["orgs"] = 0 // --into creates no org
+	}
 	for step := range p.Steps() {
 		if step.Action != nil {
 			counts[step.Action.Kind]++
 			continue
 		}
 		counts["cells"]++
+		if step.Cell.Turns > 0 {
+			counts["conversations"]++
+		}
 		counts["spans"] += step.Cell.Spans
 		counts["logs"] += step.Cell.Logs
 		counts["metricPoints"] += step.Cell.MetricPoints

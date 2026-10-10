@@ -22,6 +22,10 @@ type Part struct {
 	Preset Preset
 	Index  int
 	Count  int
+	// Thread, when set, is the trace's session id ($session), so many traces share one thread.
+	Thread string
+	// At, when set, places the trace there instead of a drawn instant in the window.
+	At time.Time
 }
 
 // Backfill is one chunk of past telemetry: every instant falls in [Start, Start+Window), so a
@@ -121,7 +125,14 @@ func backfillTraces(fill Backfill) *colltracepb.ExportTraceServiceRequest {
 		part := &fill.Parts[i]
 		p := part.Preset
 		p.Spans = p.Spans[:min(part.Count, len(p.Spans))]
-		spans := fill.item(p, part.Index, extent(p)).traces(p, nil).GetResourceSpans()[0].GetScopeSpans()[0].GetSpans()
+		item := fill.item(p, part.Index, extent(p))
+		if part.Thread != "" {
+			item.session = part.Thread
+		}
+		if !part.At.IsZero() {
+			item.at = part.At
+		}
+		spans := item.traces(p, nil).GetResourceSpans()[0].GetScopeSpans()[0].GetSpans()
 		rs := groups.get(p.Name, func() *tracepb.ResourceSpans {
 			return &tracepb.ResourceSpans{Resource: resourceFor(p), ScopeSpans: []*tracepb.ScopeSpans{{Scope: scope()}}}
 		})

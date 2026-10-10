@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -100,8 +101,17 @@ func (o *Orchestrator) writeSeedStatus(slug string, st seedStatus) {
 	}
 }
 
-// ClearSeedStatus forgets a stack's seed, after `haven db reset` emptied its stores.
-func (o *Orchestrator) ClearSeedStatus(slug string) { _ = os.Remove(o.seedStatusPath(slug)) }
+// seedRunsDir holds one directory per seedgen run on a stack: its manifest and checkpoint are
+// the run record the access block (and the seed console) lists orgs from.
+func (o *Orchestrator) seedRunsDir(slug string) string {
+	return filepath.Join(o.cfg.Home, "seed", slug)
+}
+
+// ClearSeedStatus forgets a stack's seed and its run records, after `haven db reset` emptied its stores.
+func (o *Orchestrator) ClearSeedStatus(slug string) {
+	_ = os.Remove(o.seedStatusPath(slug))
+	_ = os.RemoveAll(o.seedRunsDir(slug))
+}
 
 // SeedStatusLine is the one line `haven status` shows for a stack's seed, or "" when it never ran.
 func (o *Orchestrator) SeedStatusLine(slug string) string {
@@ -191,7 +201,7 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 	status := seedStatus{State: "running", Auto: t.IsAuto, Args: args, PID: o.sys.Getpid(), StartedAt: o.sys.Now()}
 	o.writeSeedStatus(t.Slug, status)
 	shell := "go run " + shellQuote(filepath.Join(t.Dir, "cmd", "seedgen")) + " run"
-	for _, a := range args {
+	for _, a := range o.runRecordArgs(t.Slug, args) {
 		shell += " " + shellQuote(a)
 	}
 	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+seedTaskModule)
@@ -212,6 +222,25 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 	}
 	o.writeSeedStatus(t.Slug, status)
 	return status.Exit
+}
+
+// runRecordArgs points seedgen at this stack's record of the run args plan; a run seen before
+// resumes from its checkpoint, so seeding again sends nothing twice.
+func (o *Orchestrator) runRecordArgs(slug string, args []string) []string {
+	flags, err := seedgen.ParseFlags(args, o.sys.Now().UTC().Truncate(time.Hour))
+	if err != nil || o.cfg.Home == "" {
+		return args // seedgen refuses the same flags itself, with exit 2
+	}
+	plan, err := seedgen.NewPlan(flags)
+	if err != nil {
+		return args
+	}
+	dir := filepath.Join(o.seedRunsDir(slug), plan.Run)
+	record := append(slices.Clone(args), "--run-dir", dir)
+	if _, err := os.Stat(filepath.Join(dir, "run.json")); err == nil {
+		record = append(record, "--resume")
+	}
+	return record
 }
 
 // AutoSeed runs after an up's identity seed (design §9.1). It seeds a stack that was never seeded

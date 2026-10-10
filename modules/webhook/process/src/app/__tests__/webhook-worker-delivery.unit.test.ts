@@ -85,7 +85,7 @@ describe("given a memory-tier worker with one active HTTP endpoint", () => {
         const webhooks = runtime.service(WebhookApi);
         const { endpoint } = await webhooks.create({
           organizationId: ORGANIZATION_ID,
-          url: "https://10.0.0.1/hooks/spend",
+          url: "https://example.com/hooks/spend",
           enabledEvents: ["gateway.request.completed"],
           maxBatchDelayMs: 0,
         });
@@ -99,7 +99,7 @@ describe("given a memory-tier worker with one active HTTP endpoint", () => {
         await webhooks.requestGatewayEventDelivery(admitted);
         await webhooks.requestGatewayEventDelivery(confirmed);
 
-        // The URL policy refuses the private address before any channel; one attempt is logged.
+        // The memory HTTP channel answers every send; one attempt is logged.
         await vi.waitFor(
           async () => {
             const log = await webhooks.getDeliveries({
@@ -128,7 +128,7 @@ describe("given a memory-tier worker with one active HTTP endpoint and an emitte
         const webhooks = runtime.service(WebhookApi);
         const { endpoint } = await webhooks.create({
           organizationId: ORGANIZATION_ID,
-          url: "https://10.0.0.1/hooks/spend",
+          url: "https://example.com/hooks/spend",
           enabledEvents: ["gateway.request.completed"],
           maxBatchDelayMs: 0,
         });
@@ -174,7 +174,7 @@ describe("given a memory-tier worker with an endpoint that holds envelopes for a
         const webhooks = runtime.service(WebhookApi);
         const { endpoint } = await webhooks.create({
           organizationId: ORGANIZATION_ID,
-          url: "https://10.0.0.1/hooks/spend",
+          url: "https://example.com/hooks/spend",
           enabledEvents: ["gateway.request.completed"],
           maxBatchDelayMs: 60_000,
         });

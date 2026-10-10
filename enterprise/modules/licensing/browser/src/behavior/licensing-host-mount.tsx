@@ -73,6 +73,14 @@ class CapabilityLicensingHost extends LicensingHostApi {
     this.feedback.succeeded(notice);
   }
 
+  warned(notice: LicensingSuccessNotice): void {
+    this.feedback.warned(notice);
+  }
+
+  informed(notice: LicensingSuccessNotice): void {
+    this.feedback.informed(notice);
+  }
+
   failed(failure: LicensingFailureNotice): void {
     this.feedback.failed(failure);
   }

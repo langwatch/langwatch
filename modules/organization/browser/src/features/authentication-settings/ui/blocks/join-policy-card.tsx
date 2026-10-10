@@ -8,6 +8,7 @@ import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-syst
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { DEFAULT_DOMAIN_JOIN_SETTING } from "@langwatch/identity-contract";
 import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity-contract";
 import { Lock } from "lucide-react";
 import { useState } from "react";
@@ -91,7 +92,7 @@ function JoinerSeatOptions({
               background="bg.panel"
               _checked={{
                 borderColor: "colorPalette.solid",
-                background: "colorPalette.subtle",
+                background: "bg.muted",
               }}
             >
               <RadioGroup.ItemHiddenInput data-testid={`joiner-seat-${option.value}`} />
@@ -143,7 +144,10 @@ export function JoinPolicyCard({
   const [selected, setSelected] = useState<DomainJoinSetting>(domainJoin);
   const [domains, setDomains] = useState(joinDomains.join(", "));
   const [seat, setSeat] = useState<JoinerRole>(joinerRole);
-  const explanation = domainJoin === "off" ? OFF_EXPLANATION : HELD_EXPLANATION;
+  const explanation =
+    domainJoin === "off" || domainJoin === DEFAULT_DOMAIN_JOIN_SETTING
+      ? OFF_EXPLANATION
+      : HELD_EXPLANATION;
 
   const isLocked = (value: DomainJoinSetting) =>
     planLocked && value !== "off" && value !== domainJoin;
@@ -221,7 +225,7 @@ export function JoinPolicyCard({
                   transition="background 0.15s ease, border-color 0.15s ease"
                   _checked={{
                     borderColor: "colorPalette.solid",
-                    background: "colorPalette.subtle",
+                    background: "bg.muted",
                   }}
                   _hover={{ borderColor: "border.emphasized" }}
                 >

@@ -93,6 +93,26 @@ describe("ModelProviderExecutionService.prepare", () => {
     });
   });
 
+  describe("given a stored row addressed by id", () => {
+    /** @scenario "A chat provider is proven by a generation, not by a listing" */
+    it("prepares that row although its id carries no mp_ prefix", async () => {
+      const row = { ...openai, provider: "openai", customKeys: { OPENAI_API_KEY: "row" } };
+      const service = executionWith({}, row);
+
+      await expect(
+        service.prepareRow({ id: "provider_2abc", model: "gpt-5-mini", projectId: "project-1" }),
+      ).resolves.toMatchObject({ model: "openai/gpt-5-mini" });
+    });
+
+    it("still refuses a row that resolves to the Codex provider", async () => {
+      const service = executionWith({}, { provider: "openai_codex", enabled: true, models: [] });
+
+      await expect(
+        service.prepareRow({ id: "provider_2abc", model: "gpt-5-mini", projectId: "project-1" }),
+      ).rejects.toBeInstanceOf(ModelRestrictedForExecutionError);
+    });
+  });
+
   describe("given an ordinary model on a configured provider", () => {
     it("prepares it", async () => {
       const service = executionWith({ openai });

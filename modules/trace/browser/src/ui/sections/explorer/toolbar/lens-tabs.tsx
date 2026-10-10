@@ -145,35 +145,34 @@ export const LensTabs: React.FC = () => {
 
   return (
     <>
-      <HStack gap={0} flex="1" minWidth={0}>
-        {sidebarCollapsed && (
-          <Tooltip
-            content={
-              <HStack gap={1.5}>
-                <Text>Show filters sidebar</Text>
-                <Kbd>{"["}</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
+      {sidebarCollapsed && (
+        <Tooltip
+          content={
+            <HStack gap={1.5}>
+              <Text>Show filters sidebar</Text>
+              <Kbd>{"["}</Kbd>
+            </HStack>
+          }
+          positioning={{ placement: "bottom" }}
+        >
+          {/* Reads as a real button (matching the time-range button) with a
+              "Filters" label, not a bare chevron the user has to decode. */}
+          <Button
+            aria-label="Show filters sidebar"
+            variant="outline"
+            size="xs"
+            fontWeight="medium"
+            gap={1.5}
+            color="fg.subtle"
+            onClick={toggleSidebar}
+            flexShrink={0}
           >
-            {/* Reads as a real button (matching the time-range button) with a
-                "Filters" label, not a bare chevron the user has to decode. */}
-            <Button
-              aria-label="Show filters sidebar"
-              variant="outline"
-              size="xs"
-              fontWeight="medium"
-              gap={1.5}
-              color="fg.subtle"
-              onClick={toggleSidebar}
-              marginRight={2}
-              flexShrink={0}
-            >
-              <PanelLeftOpen size={14} />
-              Filters
-            </Button>
-          </Tooltip>
-        )}
+            <PanelLeftOpen size={14} />
+            Filters
+          </Button>
+        </Tooltip>
+      )}
+      <HStack gap={0} flex="1" minWidth={0}>
         <Tabs.Root
           value={activeLensId}
           onValueChange={(e) => handleLensChange(e.value)}

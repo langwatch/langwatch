@@ -70,7 +70,6 @@ export type {
 
 /** The hosted end of Connect (ADR-156, section 5), on LangWatch Cloud only. */
 export { connectHostRest } from "./transport/connect-host.rest.ts";
-export type { ContractBudget, ContractBudgetStore } from "./services/contract-budget.service.ts";
 export type {
   HostedBudgetUsage,
   HostedUsageReader,

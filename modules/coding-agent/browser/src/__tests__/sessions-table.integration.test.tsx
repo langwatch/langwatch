@@ -596,7 +596,7 @@ describe("the personal Sessions table", () => {
       await user.click(screen.getByText("Link sessions to pull requests"));
 
       await waitFor(() =>
-        expect(host.recording.successes).toContainEqual(
+        expect(host.recording.infos).toContainEqual(
           expect.objectContaining({
             title: "No stored traces for this session yet",
           }),

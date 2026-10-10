@@ -11,9 +11,9 @@
     }
   },
   "scripts": {
-    "dev": "LANGWATCH_DEV_RELOAD=${LANGWATCH_DEV_RELOAD:-module} LANGWATCH_DEV_READY_PATTERN='\"msg\":\"backend ready\"' node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts --backend-only",
+    "dev": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts --backend-only; code=$?; test $code -eq 75 || exit $code; done",
     "predev:one": "bash ../../dev/scripts/devscripts.sh ensure-built",
-    "dev:one": "LANGWATCH_DEV_RELOAD=${LANGWATCH_DEV_RELOAD:-module} LANGWATCH_DEV_READY_PATTERN='\"msg\":\"backend ready\"' node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts",
+    "dev:one": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts; code=$?; test $code -eq 75 || exit $code; done",
     "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
     "typecheck": "tsc -b",
     "test": "vitest run"

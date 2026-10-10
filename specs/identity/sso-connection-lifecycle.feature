@@ -98,6 +98,13 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And the event carries a client id reference, never a client secret
 
   @unit
+  Scenario: A registration whose command was never staged frees its slot
+    Given a register_connection command for "acme" whose guard claimed the registration slot
+    When committing the command fails before it reaches the queue
+    Then the slot is released
+    And "acme" can register a new connection on the next attempt
+
+  @unit
   Scenario: A claimed domain waits for ops approval
     Given a DRAFT connection for "acme"
     When "ana" claims the domain "acme.com"

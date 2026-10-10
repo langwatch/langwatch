@@ -32,6 +32,14 @@ class HostServiceTopicHost extends TopicHostApi {
     this.deps.feedback.succeeded(notice);
   }
 
+  warned(notice: TopicSuccessNotice): void {
+    this.deps.feedback.warned(notice);
+  }
+
+  informed(notice: TopicSuccessNotice): void {
+    this.deps.feedback.informed(notice);
+  }
+
   failed(failure: TopicFailureNotice): void {
     this.deps.feedback.failed(failure);
   }

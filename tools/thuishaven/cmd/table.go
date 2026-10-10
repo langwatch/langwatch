@@ -232,7 +232,7 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", isSwitch: true, summary: "rebuild and swap the Go services on a change (the default; --watch=false turns it off)"},
+			{long: "--watch", short: "-w", isSwitch: true, summary: "reload on a change (the default). --watch=false holds the stack: no Go rebuilds, no Node reloads, sticks; `haven reload` applies changes"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
@@ -260,10 +260,14 @@ var baseTable = []commandSpec{
 			if err := applyDeploymentMode(&d.opts, mode, d.worktree); err != nil {
 				return err
 			}
-			d.opts.Selection = sel
 			if inv.has("--watch") {
 				d.opts.ShouldGoWatch = inv.value("--watch") != "false" && inv.value("--watch") != "0"
+				if sel, err = d.orch.ResolveHold(d.worktree, sel, !d.opts.ShouldGoWatch); err != nil {
+					return err
+				}
 			}
+			d.opts.ShouldGoWatch = d.opts.ShouldGoWatch && !sel.Held
+			d.opts.Selection = sel
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")
 			if d.opts.IsStub {
@@ -297,6 +301,9 @@ var baseTable = []commandSpec{
 			if inv.has("--all") {
 				return d.orch.DownAll(ctx)
 			}
+			if slug, err := d.orch.ResolveSlug(d.params); err == nil {
+				stopBrowser(slug)
+			}
 			return d.orch.Down(ctx, d.params, inv.has("--force"))
 		},
 	},
@@ -324,6 +331,19 @@ var baseTable = []commandSpec{
 				name = inv.args[0]
 			}
 			return d.orch.Restart(ctx, d.params, name, inv.has("--rebuild"))
+		},
+	},
+	{
+		name:    "reload",
+		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready",
+		args:    "[app|api|worker]",
+		maxArgs: 1,
+		run: func(ctx context.Context, d deps, inv invocation) error {
+			name := "app"
+			if len(inv.args) > 0 {
+				name = inv.args[0]
+			}
+			return d.orch.Reload(ctx, d.params, name)
 		},
 	},
 	{
@@ -492,6 +512,8 @@ var baseTable = []commandSpec{
 	querySpec(),
 	seedSpec(),
 	telemetrySpec(),
+	authSpec(),
+	browserSpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",

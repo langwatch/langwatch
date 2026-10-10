@@ -165,7 +165,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	// Docker Desktop): its ceiling is explicit and per-profile, so neither
 	// container can quietly take the machine. Both containers are sized against this machine's RAM/CPU.
 	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
-	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup)
+	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup).WithHome(havenHome())
 	chRuntime, ch := managedClickHouse(rt)
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
 	rds := redisbrew.New(

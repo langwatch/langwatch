@@ -23,6 +23,7 @@ const PROJECT = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 function projectKey(
@@ -697,6 +698,29 @@ describe("the tRPC audit sink", () => {
           targetKind: "organization",
           targetId: "org-1",
           metadata: { impersonatorId: "admin-1" },
+        }),
+      );
+    });
+  });
+
+  describe("given a row that says where the call came from", () => {
+    /** @scenario "A recorded mutation keeps where it came from and who really made it" */
+    it("records the address, the user agent and the operator in their own columns", async () => {
+      const { trpc, record } = auditedDoor();
+
+      await trpc.record({
+        userId: "user-1",
+        action: "project.rename",
+        actorUserId: "admin-1",
+        ipAddress: "203.0.113.7",
+        userAgent: "Mozilla/5.0 (audit test)",
+      });
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId: "admin-1",
+          ipAddress: "203.0.113.7",
+          userAgent: "Mozilla/5.0 (audit test)",
         }),
       );
     });

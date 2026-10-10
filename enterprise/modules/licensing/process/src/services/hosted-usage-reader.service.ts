@@ -3,7 +3,8 @@ import type { HostedCaller } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi, GatewayBudgetWithSeats } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
-import { CONTRACT_BUDGET_EXTERNAL_ID } from "./contract-budget-store.service.ts";
+/** Addresses the contract budget within its organization; connect creates it under this id. */
+export const CONTRACT_BUDGET_EXTERNAL_ID = "connect-contract";
 
 type UsageGateway = Pick<
   GatewayApi,

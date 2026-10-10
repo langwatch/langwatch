@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 import {
   ALERT_TRIGGER_DEFAULTS,
   DEFAULT_WEBHOOK_CONTENT_TYPE,
-  renderTriggerEmail,
   renderTriggerSlack,
   renderWebhookBody,
   resolveSlackTemplateType,
 } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract/templating";
 import { DispatchError } from "@langwatch/eventing";
 
 import type {

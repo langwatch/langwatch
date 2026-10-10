@@ -128,13 +128,6 @@ import {
 const TRANSLATE_FEATURE_KEY = "translate.text";
 
 /**
- * The process's span reader, opaque here — only the process knows its concrete type. Carried
- * so the cost-rule preview reads through the same request-scoped services as the rest of the
- * call, rather than a process singleton.
- */
-type SpanReader = unknown;
-
-/**
  * The collaborators the module composes in `create`: its registry, egress fence, identifier
  * format, OAuth issuer, counters and span reader. None is another module's service; a test
  * hands its own through `createForTesting`.
@@ -166,8 +159,8 @@ export interface ModelProviderInfrastructure {
    * outside production the issuer is overridable.
    */
   codexAccounts: ModelProviderCodexDeviceFlow;
-  /** The request's span reader, for the cost-rule preview. */
-  spans: SpanReader;
+  /** Trace's span reads, for the cost-rule preview. */
+  spans: ModelCostPreviewSpanReader;
 }
 
 /** The identifier format this deployment mints a provider, default or cost in. */
@@ -355,8 +348,7 @@ export class ModelProviderModule implements ModelProviderApi {
       }),
       credentialProbe: probe,
       codexAccounts: CodexAccountService.create(),
-      // No trace read stack is composed here: the transport supplies the request's span reader.
-      spans: undefined,
+      spans: channels.spans,
     };
   }
 
@@ -400,7 +392,7 @@ export class ModelProviderModule implements ModelProviderApi {
   readonly #modelProviders: ModelProviderGateway;
   readonly #credentialProbe: ModelProviderCredentialProbe;
   readonly #codexAccounts: ModelProviderCodexDeviceFlow;
-  readonly #spans: SpanReader;
+  readonly #spans: ModelCostPreviewSpanReader;
   /**
    * The per-scope write check the provider commands already run, held here so
    * the credential probe is held to the same standing. Nothing downstream
@@ -847,19 +839,19 @@ export class ModelProviderModule implements ModelProviderApi {
 
   /**
    * What a cost rule the caller is still typing would match, priced under rates entered so far.
-   * Throws when no span reader was composed, rather than a false "no matching spans".
+   * Throws without the route's proof, rather than a false "no matching spans".
    */
   previewCostRuleMatchingSpans(
     input: ModelCostPreviewRequest,
     { authorization }: { authorization?: Authorization } = {},
   ): Promise<CostRuleMatchingSpansPreview> {
-    const spans = this.#spans;
+    if (!authorization) throw new ModelCostPreviewUnavailableError();
 
-    if (!isPreviewSpanReader(spans) || !authorization) {
-      throw new ModelCostPreviewUnavailableError();
-    }
-
-    return this.#costPreview.previewCostRuleMatchingSpans({ spans, input, authorization });
+    return this.#costPreview.previewCostRuleMatchingSpans({
+      spans: this.#spans,
+      input,
+      authorization,
+    });
   }
 
   // ── translation ────────────────────────────────────────────────────────────
@@ -893,14 +885,4 @@ function probedTenantScope(input: ModelProviderCredentialProbeRequest): ModelDef
   }
 
   throw new ModelProviderAnchorRequiredError("project_or_organization");
-}
-
-/** Whether this application's opaque span handle answers the two preview reads. */
-function isPreviewSpanReader(spans: SpanReader): spans is ModelCostPreviewSpanReader {
-  const candidate = spans as Partial<ModelCostPreviewSpanReader> | null | undefined;
-
-  return (
-    typeof candidate?.getModelUsageStats === "function" &&
-    typeof candidate?.getRecentSpansByModels === "function"
-  );
 }

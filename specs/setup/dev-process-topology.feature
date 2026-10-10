@@ -102,74 +102,6 @@ Feature: The local development process topology
     When the launcher derives its ports
     Then their value is kept and nothing is derived over it
 
-  # --- Debounced restart on change ---
-
-  # A watcher that restarts the instant a file changes, with no quiet window,
-  # turns an agent editing five files across a feature package in the same
-  # second into five restarts — five reconnects to Postgres/ClickHouse/Redis.
-  # dev/scripts/dev-supervisor.mjs's `--watch` mode wraps the command with a
-  # debounced quiet window instead (LANGWATCH_DEV_WATCH_DEBOUNCE_MS, default
-  # 2 s, at most 30 s after the first change), coalescing a burst into one restart. See
-  # dev/scripts/__tests__/dev-supervisor-watch.unit.test.mjs.
-
-  # Hundreds of files over several seconds, in bursts with gaps between them,
-  # is what an agent renaming across a feature package actually writes. A short
-  # window turns that into a restart per gap.
-  @unit
-  Scenario: A write storm from an agent restarts the backend once
-    Given the backend lane running under a debounced watch
-    When an agent writes hundreds of files in bursts inside the quiet window
-    Then exactly one restart happens once the tree is still
-    And every file that contributed is named to it
-
-  @unit
-  Scenario: A burst of source changes restarts the API once
-    Given the backend lane's dev script running under a debounced watch
-    When five files change within the same quiet window
-    Then exactly one restart happens
-    And it reports how many files triggered it
-
-  # A module's browser half cannot reach the backend: the architecture
-  # enforcer forbids api/worker code from importing a browser package. That
-  # guarantee is the reason a browser-only edit must NOT restart the backend
-  # — it reloads code that provably cannot have changed. With several sessions
-  # sharing one checkout, watching them means one session's screen work
-  # bounces another's API, and each bounce races the worker onto its metrics
-  # port.
-  @unit
-  Scenario: A browser-half edit leaves the backend lane alone
-    Given the backend lane running under a debounced watch
-    When a file changes in a module's browser package
-    Then the change is not worth a restart
-
-  # tsup and vite bundle their own config into a temp file beside it
-  # (`tsup.config.bundled_<hash>.mjs`) and delete it when the build ends. It is
-  # not source, nothing imports it, and `ensure:built` runs on every lane's
-  # predev and every scoped test — so on a shared checkout one session's build
-  # restarted another session's api, once per build.
-  @unit
-  Scenario: A build tool's own temp config leaves the backend lane alone
-    Given the backend lane running under a debounced watch
-    When a build tool writes its bundled config beside the package
-    Then the change is not worth a restart
-
-  @unit
-  Scenario: An agent's import-graph probe leaves the backend lane alone
-    Given the backend lane running under a debounced watch
-    When an agent writes a probe file into a watched source directory
-    Then the change is not worth a restart
-    # Probes are written and deleted seconds apart. Boot is slower than that
-    # gap, so a stack shared with a probing session never finished starting.
-
-  # An agent writes one file per tool call, seconds apart, so a short window
-  # sees every edit as its own burst. The window restarts on each change, which
-  # would starve the restart under a steady trickle: the max wait bounds it.
-  @unit
-  Scenario: A steady trickle of edits still restarts within the max wait
-    Given the backend lane running under a debounced watch
-    When files keep changing so the quiet window never elapses
-    Then the restart fires once the max wait since the first change has passed
-
   # --- haven rebuilds and swaps the stack's Go child (HAVEN-SWAP, HAVEN-REBUILD) ---
 
   # haven's own watch replaced air: it builds ./cmd/service into
@@ -212,39 +144,25 @@ Feature: The local development process topology
 
   # Restarting the whole process for every edit left a shared checkout's api
   # booting most of the time. The api lane now loads api and worker through a
-  # Vite module runner and re-links only what an edit reaches; the supervisor
+  # Vite module runner and re-links only what an edit reaches; no supervisor
   # keeps the process, and LANGWATCH_DEV_RELOAD=process restores the old restart.
   @unit
   Scenario: A module edit reloads in-process without a new process
-    Given the api lane reloading in-process under the supervisor
+    Given the api lane reloading in-process in-process
     When a backend source file the runner loaded changes
     Then only that module and the modules importing it are evaluated again
-    And the supervisor does not restart the process, so its pid stays the same
+    And the process is not restarted, so its pid stays the same
 
   # Node loaded the host's own source natively, so no module runner can drop it;
   # restarting for it took the whole stack down, so it waits for a manual restart.
-  @unit
-  Scenario: An edit never restarts the in-process api lane
-    Given the api lane reloading in-process under the supervisor
-    When a package.json or a module file changes
-    Then it is left to the in-process reload and the supervisor does not restart the process
-    And a file of the host's own source only logs that it applies on the next restart
-
   # A bad edit never exits an in-process host (the old generation keeps
   # serving), so an exit after it said "backend ready" is a crash.
-  @unit
-  Scenario: An in-process api lane that crashes after booting is started again
-    Given the api lane reloading in-process under the supervisor
-    And the process has said it is ready
-    When the process exits non-zero
-    Then the supervisor starts it again after the quiet window, without waiting for a change
-
   # ADR-168 step 5: a generation's own close is what releases its stores,
   # queues and pools, so it runs before the next worker boots (the next api
   # boots beside it on its own port, see the swap scenarios below).
   @unit
   Scenario: A reload disposes the previous generation before the next one boots
-    Given the api lane reloading in-process under the supervisor
+    Given the api lane reloading in-process in-process
     And a generation serving that attached process listeners while it ran
     When a module edit links the next generation
     Then the old generation drains, worker first and then the api
@@ -254,26 +172,26 @@ Feature: The local development process topology
   # Module-level state leaks a little per generation; a fresh process bounds it.
   @unit
   Scenario: The in-process api lane hands over to a fresh process after enough generations
-    Given the api lane reloading in-process under the supervisor
+    Given the api lane reloading in-process in-process
     And it has served LANGWATCH_DEV_RECYCLE_GENERATIONS generations (50 by default)
     When the next module edit arrives
     Then the host logs "backend recycling" with the generation limit as its reason
-    And it drains and exits non-zero, so the supervisor starts a fresh process
+    And it drains and exits non-zero, so the dev script's loop (or haven's lane) starts a fresh process
 
   @unit
   Scenario: The in-process api lane hands over to a fresh process once its memory passes the ceiling
-    Given the api lane reloading in-process under the supervisor
-    And its RSS is above LANGWATCH_DEV_RECYCLE_RSS_MIB (4096 by default)
+    Given the api lane reloading in-process in-process
+    And its RSS is above LANGWATCH_DEV_RECYCLE_RSS_MIB (8192 by default)
     When the next module edit arrives
     Then the host logs "backend recycling" with the RSS ceiling as its reason
-    And it drains and exits non-zero, so the supervisor starts a fresh process
+    And it drains and exits non-zero, so the dev script's loop (or haven's lane) starts a fresh process
 
   @unit
   Scenario: A generation that did not drain is replaced by a fresh process
-    Given the api lane reloading in-process under the supervisor
+    Given the api lane reloading in-process in-process
     When the old generation's drain fails during a reload
     Then the host does not start the next worker beside it
-    And it logs "backend recycling" and exits non-zero, so the supervisor starts a fresh process
+    And it logs "backend recycling" and exits non-zero, so the dev script's loop (or haven's lane) starts a fresh process
 
   # --- One process is the default (ADR-168, amendment 2026-10-09) ---
 
@@ -307,55 +225,6 @@ Feature: The local development process topology
   # Only the packages the backend can load matter. pnpm resolves declared
   # dependencies only, so a workspace package that no backend dependency reaches
   # (design-system, browser-host) cannot be on its import graph.
-  @unit
-  Scenario: A browser-only package leaves the backend lane alone
-    Given the backend lane running under a debounced watch
-    When a file changes in a workspace package the backend does not depend on
-    Then the change is not worth a restart
-
-  @unit
-  Scenario: Prose, specs and tool config leave the backend lane alone
-    Given the backend lane running under a debounced watch
-    When a markdown file, a feature file or a tsconfig changes
-    Then the change is not worth a restart
-
-  # --- One reload at a time ---
-
-  # 44% of restarts landed mid-boot, and the second one ran beside the first:
-  # two backends, one port, EADDRINUSE. A change while a reload is running is
-  # queued and answered by exactly one follow-up when that boot settles (the
-  # child says "backend ready", exits, or LANGWATCH_DEV_BOOT_SETTLE_MS passes).
-  @unit
-  Scenario: Changes during a reload queue exactly one follow-up
-    Given the backend lane is booting after a restart
-    When several files change before the boot settles
-    Then no second backend starts beside the first
-    And exactly one follow-up restart happens after the boot settles, naming every file
-
-  # A half-written import crashes boot. Exiting would end the lane: haven
-  # respawns it every second, and `pnpm dev`'s concurrently takes the stack down.
-  @unit
-  Scenario: A crashed boot waits for the next change instead of ending the lane
-    Given the backend lane running under a debounced watch
-    When the backend exits non-zero
-    Then the supervisor stays up and says once that it is waiting for a change
-    And the next change starts the backend again
-
-  # --- The worker drains before a restart takes it down ---
-
-  # A restart is a takedown-and-respawn: SIGTERM, then SIGKILL only after a
-  # grace period. The worker's own shutdown handler
-  # (apps/worker/src/platform/lifecycle/worker.signals.ts) treats SIGTERM as
-  # "finish what is running, then exit" — an in-flight GroupQueue job gets a
-  # chance to complete instead of being cut off mid-job.
-
-  @unit
-  Scenario: A restart lets the worker drain before it exits
-    Given a running process that finishes its own shutdown work on SIGTERM
-    When a restart takes it down
-    Then it is given the chance to finish before anything forces it
-    And a process that ignores SIGTERM is still killed once the grace period elapses
-
   # --- Developer tools start on the first visit and stop once idle ---
 
   # Storybook and the mail preview used to run until the dev server stopped,
@@ -451,3 +320,22 @@ Feature: The local development process topology
     When the next worker throws while booting after the old one drained
     Then the new api keeps serving and the worker's failure is logged by name
     And the next code change retries the boot
+
+  # --- A held stack reloads on demand (ADR-168, amendment 2026-10-10) ---
+
+  # `haven up --watch=false` sticks for the stack: the Node host gets
+  # LANGWATCH_DEV_WATCH=0 and does not reload the backend on a file change (the
+  # UI's HMR is untouched). `haven reload` applies the changes in place and
+  # waits for the host's own "backend reload finished" line.
+  @unit
+  Scenario: A held stack runs its Node host without a backend reload on change
+    Given a stack started with "haven up --watch=false"
+    When haven plans the Node lanes
+    Then each lane's env sets LANGWATCH_DEV_WATCH=0
+    And the hold is remembered for the next "haven up"
+
+  @unit
+  Scenario: Reload waits for the host to finish, not for a pause
+    Given a running held stack and a log with an old ready line
+    When "haven reload" signals the host
+    Then it returns only once a new "backend reload finished" or "backend ready" line is logged

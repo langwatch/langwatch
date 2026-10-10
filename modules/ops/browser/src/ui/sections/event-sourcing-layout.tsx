@@ -64,23 +64,21 @@ export function EventSourcingLayout({
       .toSorted((a, b) => b.href.length - a.href.length)[0]?.href ?? "";
 
   return (
-    <>
-      {pageTitle && (
-        <PageLayout.Header>
-          <PageLayout.Heading>{pageTitle}</PageLayout.Heading>
-        </PageLayout.Header>
-      )}
-      <PageLayout.Container>
-        <SectionNavigationFrame
-          label={SECTION_LABEL}
-          links={items}
-          activeHref={activeHref}
-          onNavigate={(href) => router.push(href)}
-        >
-          {children}
-        </SectionNavigationFrame>
-      </PageLayout.Container>
-    </>
+    <SectionNavigationFrame
+      label={SECTION_LABEL}
+      header={
+        pageTitle && (
+          <PageLayout.Header>
+            <PageLayout.Heading>{pageTitle}</PageLayout.Heading>
+          </PageLayout.Header>
+        )
+      }
+      links={items}
+      activeHref={activeHref}
+      onNavigate={(href) => router.push(href)}
+    >
+      {children}
+    </SectionNavigationFrame>
   );
 }
 

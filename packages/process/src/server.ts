@@ -103,6 +103,8 @@ export class Server {
       logger: options.logger,
       shutdownDeadlineMs: options.shutdownDeadlineMs,
       exit,
+      // An embedded server's process stays up, so a timed-out drain must still release the door.
+      terminating: options.ownsProcess !== false,
     });
     // Hosted first, so it stops LAST: the health door outlives every drain
     // phase, and a probe during shutdown still sees the process as alive.
@@ -128,6 +130,7 @@ export class Server {
   private readonly healthRoutes = new Map<string, HealthRoute>();
   /** The ONE handler the application composed. Absent until `serve`. */
   private served: ApplicationHandler | undefined;
+  private applicationExpected = false;
   private healthListener: http.Server | undefined;
   /** Set by `run`: a process with no HTTP surface answers liveness off its main loop. */
   private livenessOffLoop = false;
@@ -155,11 +158,13 @@ export class Server {
     logger,
     shutdownDeadlineMs,
     exit,
+    terminating,
   }: {
     name: string;
     logger: ServerLogger;
     shutdownDeadlineMs: number | undefined;
     exit: (code: number) => never;
+    terminating: boolean;
   }) {
     this.name = name;
     this.logger = logger;
@@ -167,7 +172,7 @@ export class Server {
       logger,
       ...(shutdownDeadlineMs === undefined ? {} : { deadlineMs: shutdownDeadlineMs }),
       exit,
-      terminating: true,
+      terminating,
     });
   }
 
@@ -204,6 +209,11 @@ export class Server {
    * slow boot stage (the voice tunnel mint) is still running. `listen` finds it open.
    * Spec: specs/server/worker-liveness-probe.feature.
    */
+  /** An application will be served: until then a product request is told to retry, not 404. */
+  expectApplication(): void {
+    this.applicationExpected = true;
+  }
+
   openLiveness(): Promise<void> {
     this.livenessOffLoop = true;
     return this.openHealth();
@@ -328,7 +338,14 @@ export class Server {
 
     const application = this.served;
     if (application === undefined) {
-      if (!response.headersSent) response.writeHead(404).end();
+      if (response.headersSent) return;
+      if (this.applicationExpected) {
+        response
+          .writeHead(503, { "Content-Type": "text/plain", "Retry-After": "5" })
+          .end(`${this.name} is starting`);
+        return;
+      }
+      response.writeHead(404).end();
       return;
     }
 

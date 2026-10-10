@@ -22,6 +22,8 @@ func TestOutboundProviderEnvPointsSlackAtOutboundsimAndAdmitsLocalWebhooks(t *te
 		"SLACK_PLAN_LIMIT_CHANNEL=" + endpoint + "/services/T0SIM/B0PLANLIMIT/x",
 		"SLACK_CHANNEL_SUBSCRIPTIONS=" + endpoint + "/services/T0SIM/B0SUBSCRIPTIONS/x",
 		"SLACK_CHANNEL_SELF_HOSTED=" + endpoint + "/services/T0SIM/B0SELFHOSTED/x",
+		"SLACK_API_BASE=" + endpoint + "/api",
+		"SLACK_WEBHOOK_BASE=" + endpoint,
 		"WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1",
 	} {
 		if !slices.Contains(env, want) {
@@ -41,7 +43,24 @@ func TestOutboundProviderEnvLeavesChosenSettingsAlone(t *testing.T) {
 			t.Errorf("overlay %v overrides a setting .env chose", env)
 		}
 	}
-	if len(env) != 3 {
-		t.Errorf("overlay %v should still set the other three Slack channels", env)
+	if len(env) != 5 {
+		t.Errorf("overlay %v should still set the other three Slack channels and both Slack addresses", env)
+	}
+}
+
+// @scenario "The overlay points the product's Slack addresses at outboundsim"
+func TestOutboundProviderEnvPointsSlackAddressesAtOutboundsimUnlessChosen(t *testing.T) {
+	endpoint := "https://outbound.feat-x.langwatch.localhost"
+	env := OutboundProviderEnv(map[string]string{}, endpoint)
+	for _, want := range []string{"SLACK_API_BASE=" + endpoint + "/api", "SLACK_WEBHOOK_BASE=" + endpoint} {
+		if !slices.Contains(env, want) {
+			t.Errorf("overlay %v is missing %s", env, want)
+		}
+	}
+	own := OutboundProviderEnv(map[string]string{"SLACK_API_BASE": "https://slack.com/api", "SLACK_WEBHOOK_BASE": "https://hooks.slack.com"}, endpoint)
+	for _, line := range own {
+		if strings.HasPrefix(line, "SLACK_API_BASE=") || strings.HasPrefix(line, "SLACK_WEBHOOK_BASE=") {
+			t.Errorf("overlay %v overrides a Slack address .env chose", own)
+		}
 	}
 }

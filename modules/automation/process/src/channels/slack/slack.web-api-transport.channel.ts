@@ -6,17 +6,30 @@ import type { SlackApiTransport } from "./slack.web-api-delivery.channel.ts";
 const REQUEST_TIMEOUT_MS = 10_000;
 /** Enough of the answer to parse Slack's `ok` flag and its error code. */
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
+const SLACK_API_BASE = "https://slack.com/api";
 
 /**
  * The HTTPS call behind a Slack bot delivery. Uses constant endpoints (not
  * customer-supplied) and bounds response size to prevent memory exhaustion.
  */
 export class SlackWebApiTransportChannel implements SlackApiTransport {
-  static create(options: { fetch?: typeof globalThis.fetch } = {}): SlackWebApiTransportChannel {
-    return new SlackWebApiTransportChannel(options.fetch ?? globalThis.fetch);
+  static create(
+    options: {
+      fetch?: typeof globalThis.fetch;
+      /** Slack's Web API, or the stand-in a dev stack names. */
+      apiBase?: string;
+    } = {},
+  ): SlackWebApiTransportChannel {
+    return new SlackWebApiTransportChannel(
+      options.fetch ?? globalThis.fetch,
+      (options.apiBase ?? SLACK_API_BASE).replace(/\/+$/, ""),
+    );
   }
 
-  private constructor(private readonly fetchImpl: typeof globalThis.fetch) {}
+  private constructor(
+    private readonly fetchImpl: typeof globalThis.fetch,
+    private readonly apiBase: string,
+  ) {}
 
   async request(input: {
     url: string;
@@ -28,7 +41,7 @@ export class SlackWebApiTransportChannel implements SlackApiTransport {
   }): Promise<{ status: number; body: string }> {
     let response: Response;
     try {
-      response = await this.fetchImpl(input.url, {
+      response = await this.fetchImpl(this.addressed(input.url), {
         method: input.method,
         headers: input.headers,
         body: input.body,
@@ -55,5 +68,12 @@ export class SlackWebApiTransportChannel implements SlackApiTransport {
       status: response.status,
       body: body.slice(0, input.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES),
     };
+  }
+
+  /** The delivery names Slack's own endpoints; the configured base answers them. */
+  private addressed(url: string): string {
+    return url.startsWith(`${SLACK_API_BASE}/`)
+      ? this.apiBase + url.slice(SLACK_API_BASE.length)
+      : url;
   }
 }

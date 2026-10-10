@@ -20,6 +20,7 @@ export const UI_PUBLIC_ROUTES: readonly string[] = [
   "/auth/reset-password",
   "/auth/verify-email",
   "/auth/error",
+  "/invite/accept",
 ];
 
 /** The personal workspace's own top-level segment. */

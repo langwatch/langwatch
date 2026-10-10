@@ -127,7 +127,7 @@ func Env(inherit []string, slug string, options EnvOptions) []string {
 		env = append(env, entry)
 	}
 	// LANGWATCH_DEV_WATCH=0: a measured stack never restarts on checkout edits
-	// (dev/scripts/dev-supervisor.mjs); only down/up or `haven up -f` reload it.
+	// (tools/dev-runtime holds); `haven reload` or `haven up -f` applies them.
 	// LANGWATCH_DEV_ONE_PROCESS=0: diff stacks run the split ui/api/worker processes.
 	env = append(env, "LANGWATCH_SLUG="+slug, "LANGWATCH_DEV_WATCH=0", "LANGWATCH_DEV_ONE_PROCESS=0")
 	return append(env, options.Extra...)

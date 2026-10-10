@@ -21,6 +21,7 @@ import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
 import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import { retryAfterOf } from "../errors.ts";
 import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
 import type {
@@ -32,6 +33,7 @@ import type { RateLimiter } from "../ports.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
+  type TrpcAuditEntry,
   type TrpcAuthorizationDenial,
   type TrpcRequestLike,
 } from "./policy.ts";
@@ -257,6 +259,15 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     return query ? { [SCHEMA_HASH_HEADER]: schemaHashOf(query) } : {};
   }
 
+  /** A failed call's `Retry-After`, from its handled cause's wait as on REST; none otherwise. */
+  retryAfterHeaders(input: {
+    errors: readonly { cause?: unknown }[];
+  }): Readonly<Record<string, string>> {
+    const retryAfter = input.errors.map(({ cause }) => retryAfterOf(cause)).find(Boolean);
+
+    return retryAfter ? { "Retry-After": retryAfter } : {};
+  }
+
   /** The caller's session version header; none for an anonymous caller or an unreadable store. */
   async sessionVersionHeaders(input: {
     context: () => Promise<TrpcRequestContext>;
@@ -397,7 +408,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
    * One mutation on the deployment's trail. A build that installed no audit
    * sink says so once per call rather than dropping the row silently.
    */
-  async #record(entry: Parameters<TrpcAuditSink["record"]>[0]): Promise<void> {
+  async #record(entry: TrpcAuditEntry): Promise<void> {
     const audit = this.#options.audit;
 
     if (!audit) {
@@ -412,6 +423,9 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     const scopes = auditScopeIds(entry.args);
     const organizationId = entry.organizationId ?? scopes.organizationId;
     const projectId = entry.projectId ?? scopes.projectId;
+    const actorUserId = entry.metadata?.impersonatorId;
+    const ipAddress = entry.req?.socket?.remoteAddress;
+    const userAgent = entry.req?.headers["user-agent"];
 
     await audit.record({
       userId: entry.userId,
@@ -423,6 +437,9 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       ...(entry.targetKind === void 0 ? {} : { targetKind: entry.targetKind }),
       ...(entry.targetId === void 0 ? {} : { targetId: entry.targetId }),
       ...(entry.metadata === void 0 ? {} : { metadata: entry.metadata }),
+      ...(actorUserId ? { actorUserId } : {}),
+      ...(ipAddress ? { ipAddress } : {}),
+      ...(userAgent ? { userAgent } : {}),
     });
   }
 }

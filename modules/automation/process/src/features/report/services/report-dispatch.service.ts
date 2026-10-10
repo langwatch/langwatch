@@ -1,6 +1,5 @@
 import {
   REPORT_TRIGGER_DEFAULTS,
-  renderTriggerEmail,
   renderTriggerSlack,
   resolveSlackTemplateType,
   buildReportTemplateContext,
@@ -10,6 +9,7 @@ import {
   findReportFromTriggerRow,
   type Trigger,
 } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract/templating";
 import { createLogger } from "@langwatch/observability";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { Cron } from "croner";

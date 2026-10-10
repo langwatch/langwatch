@@ -1,5 +1,6 @@
 /**
  * What the address bar says about the scope, read through the real router.
+ * @see modules/organization/specs/invitations.feature
  */
 
 import { render } from "@testing-library/react";
@@ -123,6 +124,12 @@ describe("given an address the router matched", () => {
       expect(readAt("/acme-app/traces").isPublicRoute).toBe(false);
       expect(readAt("/acme-app/traces").shareToken).toBe("");
     });
+  });
+});
+
+describe("given a visitor with no session opening an invitation link", () => {
+  it("renders the landing instead of sending the visitor to sign in", () => {
+    expect(isUiPublicRoute("/invite/accept")).toBe(true);
   });
 });
 

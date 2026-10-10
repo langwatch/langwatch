@@ -18,6 +18,14 @@ func TestSeedgenArgsPassFlagsThroughInSeedgensSpelling(t *testing.T) {
 	if got := seedgenArgs(inv); !slices.Equal(got, want) {
 		t.Fatalf("args = %v, want %v", got, want)
 	}
+	inv, err = parse(seedSpec(), []string{"--org", "name=acme,users=3", "--org=name=globex", "--into", "o/p"})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	want = []string{"--into", "o/p", "--org", "name=acme,users=3", "--org", "name=globex"}
+	if got := seedgenArgs(inv); !slices.Equal(got, want) {
+		t.Fatalf("args = %v, want %v: every --org passes through", got, want)
+	}
 	if _, err := parse(seedSpec(), []string{"--nosuch"}); err == nil {
 		t.Error("an undeclared flag was accepted")
 	}

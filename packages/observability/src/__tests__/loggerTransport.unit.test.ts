@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const pinoMock = vi.hoisted(() => {
   const transport = vi.fn();
-  const multistream = vi.fn((streams: unknown) => ({ streams }));
+  const multistream = vi.fn((streams: { stream: { write(line: string): void } }[]) => ({
+    streams,
+  }));
   const pino = vi.fn((options: { level: string }, _stream?: { write(line: string): void }) => ({
     level: options.level,
   }));
@@ -147,6 +149,24 @@ describe("configured Node logger transports", () => {
     reported.mockRestore();
     printed.mockRestore();
     vi.useRealTimers();
+  });
+
+  it("hands the OTel worker epoch milliseconds, since an ISO time string ends that worker", () => {
+    const consoleTransport = fakeTransport();
+    const otelTransport = fakeTransport();
+    pinoMock.transport.mockReturnValueOnce(consoleTransport).mockReturnValueOnce(otelTransport);
+
+    createLoggerFactory({ environment: "production", otelExportEnabled: true }).createLogger(
+      "transport-otel-time",
+    );
+    const [streams] = pinoMock.multistream.mock.lastCall ?? [];
+    const line = '{"level":"info","time":"2026-10-09T17:38:32.936Z","msg":"a"}\n';
+    for (const { stream } of streams ?? []) stream.write(line);
+
+    expect(consoleTransport.write).toHaveBeenCalledWith(line);
+    expect(otelTransport.write).toHaveBeenCalledWith(
+      '{"level":"info","time":1791567512936,"msg":"a"}\n',
+    );
   });
 
   it("falls back to stdout when a configured transport cannot initialize", () => {
