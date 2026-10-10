@@ -823,6 +823,24 @@ describe("QueueService", () => {
     });
   });
 
+  describe("unblockAll() given the queue name as the Ops UI shows it", () => {
+    it("unblocks the braced registered queue", async () => {
+      const repo = createMockRepo({
+        discoverQueueNames: vi.fn().mockResolvedValue(["{event-sourcing/jobs}"]),
+        unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 3 }),
+      });
+      const service = QueueService.create({ repo });
+
+      const result = await service.unblockAll({
+        queueName: "event-sourcing/jobs",
+        requestedBy: "user_1",
+      });
+
+      expect(result).toEqual({ unblockedCount: 3 });
+      expect(repo.unblockAll).toHaveBeenCalledWith({ queueName: "{event-sourcing/jobs}" });
+    });
+  });
+
   describe("canaryRedrive()", () => {
     describe("when DLQ groups exist", () => {
       it("delegates to repo with count and filter", async () => {
