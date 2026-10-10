@@ -42,9 +42,11 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
         <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
           <ChakraDrawer.Content
             ref={ref}
-            margin={2}
+            // A phone shows every drawer as a full-screen sheet; wider screens float it.
+            margin={{ base: 0, md: 2 }}
+            maxWidth={{ mdDown: "100%" }}
             pointerEvents="auto"
-            borderRadius="lg"
+            borderRadius={{ base: 0, md: "lg" }}
             marginTop={marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)}
             marginEnd={inset > 0 ? `${inset}px` : undefined}
             {...contentProps}

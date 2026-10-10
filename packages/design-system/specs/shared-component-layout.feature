@@ -63,3 +63,11 @@ Feature: Shared components sit cleanly on the page
     And a fade marks the edge that still hides columns
     When the reader scrolls to the last column
     Then the fade moves to the edge the first columns went behind
+
+  @integration
+  Scenario: On a phone the page body, the pager and every drawer use the full width
+    Given a narrow screen with no sidebar beside the page
+    When the reader opens a list page with a pager and then a drawer
+    Then the page container takes the full width
+    And the pager stacks its count above its page buttons
+    And the drawer opens as a full-screen sheet with no margin or rounded corners

@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ListTable } from "../src/components/layout/list-table.tsx";
 import { PageLayout } from "../src/components/layout/page-layout.tsx";
+import { Pagination } from "../src/components/layout/pagination.tsx";
+import { Drawer } from "../src/components/overlays/drawer.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
@@ -73,5 +75,36 @@ describe("narrow layouts", () => {
     overflowSideways(scroller, { scrollLeft: 600 });
     expect(fade("start")).toBe("true");
     expect(fade("end")).toBe("false");
+  });
+
+  // jsdom applies no media query, so computed styles here are the phone (base) layout.
+  /** @scenario On a phone the page body, the pager and every drawer use the full width */
+  it("gives the page, the pager and a drawer the full phone width", () => {
+    renderWithDesignSystem(
+      <>
+        <PageLayout.Container data-testid="page">rows</PageLayout.Container>
+        <Pagination
+          page={1}
+          pageSize={25}
+          totalCount={60}
+          unitLabel="sessions"
+          onPageChange={() => {}}
+        />
+        <Drawer.Root open={true} placement="end">
+          <Drawer.Content>
+            <Drawer.Body>Trace</Drawer.Body>
+          </Drawer.Content>
+        </Drawer.Root>
+      </>,
+    );
+
+    expect(getComputedStyle(screen.getByTestId("page")).maxWidth).toBe("var(--chakra-sizes-full)");
+    const pager = getComputedStyle(screen.getByTestId("pagination"));
+    expect(pager.gridTemplateColumns).toBe("minmax(0, 1fr)");
+    const sheet = document.querySelector<HTMLElement>("[data-part='content']");
+    if (!sheet) throw new Error("drawer content panel not found");
+    const style = getComputedStyle(sheet);
+    expect(style.marginLeft).toBe("0px");
+    expect(style.borderRadius).toBe("0px");
   });
 });

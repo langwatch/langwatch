@@ -42,7 +42,8 @@ function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren
   return (
     <ChakraContainer
       data-page-container
-      maxW={`calc(100vw - ${sidebarWidth}px)`}
+      // A phone has no sidebar beside the page, so the page takes the full width.
+      maxW={{ base: "full", md: `calc(100vw - ${sidebarWidth}px)` }}
       paddingX={6}
       paddingY={3}
       {...props}
