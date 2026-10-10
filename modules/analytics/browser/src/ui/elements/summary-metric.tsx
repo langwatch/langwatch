@@ -41,10 +41,10 @@ function changeColorFor({
   change: number | undefined;
   increaseReversal: number;
 }): string {
-  if (change === undefined || change === 0) return "gray.500";
+  if (change === undefined || change === 0) return "fg.muted";
   if (increaseReversal === 0) return "fg.muted";
 
-  return change * increaseReversal > 0 ? "green.500" : "red.500";
+  return change * increaseReversal > 0 ? "green.fg" : "red.fg";
 }
 
 export function SummaryMetric({

@@ -314,7 +314,7 @@ function DashboardRowMenu({
         {canDelete && (
           <Menu.Item
             value="delete"
-            color="red.600"
+            color="red.fg"
             data-testid="analytics-dashboard-delete"
             onClick={onDelete}
           >
