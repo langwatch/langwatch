@@ -8,7 +8,6 @@ import type { AgentType } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
-import type { UserWhatsNew } from "@langwatch/user-contract";
 
 export type NavigationHomeResolution = {
   destination: string;
@@ -155,13 +154,6 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     /** Whether the reader still owes their organization an SSO link. */
     getSsoStatus: {
       query: { input: Record<string, never>; output: { pendingSsoSetup?: boolean } };
-    };
-    /** The public changelog's latest entry for the "What's new" card; empty when off. */
-    whatsNew: {
-      query: { input: Record<string, never>; output: UserWhatsNew };
-    };
-    markWhatsNewSeen: {
-      mutation: { input: { entryId: string }; output: { ok: true } };
     };
   };
 

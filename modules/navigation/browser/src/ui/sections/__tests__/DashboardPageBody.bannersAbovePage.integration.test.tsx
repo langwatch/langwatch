@@ -32,11 +32,7 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
         }),
       },
     },
-    user: {
-      getSsoStatus: { useQuery: () => ({ data: undefined }) },
-      whatsNew: { useQuery: () => ({}) },
-      markWhatsNewSeen: { useMutation: () => ({ mutate: () => undefined }) },
-    },
+    user: { getSsoStatus: { useQuery: () => ({ data: undefined }) } },
     governance: {
       recordWorkspaceView: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),

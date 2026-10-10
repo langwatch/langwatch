@@ -226,32 +226,6 @@ export type SetUserNotificationPreferenceInput = z.infer<
   typeof setUserNotificationPreferenceInputSchema
 >;
 
-/** One line of a changelog entry's "What You Can Do Now", linking where the line points. */
-export const userWhatsNewFeatureSchema = z.object({ text: z.string(), url: z.string() }).strict();
-
-/** The public changelog's latest entry, and whether this person has opened it. */
-export const userWhatsNewEntrySchema = z
-  .object({
-    id: z.string(),
-    title: z.string(),
-    url: z.string(),
-    publishedAt: z.string(),
-    imageUrl: z.string().nullable(),
-    features: z.array(userWhatsNewFeatureSchema).max(4),
-    seen: z.boolean(),
-  })
-  .strict();
-export type UserWhatsNewEntry = z.infer<typeof userWhatsNewEntrySchema>;
-
-/** Empty while the changelog is off, unreachable or unparseable; at most the latest entry. */
-export const userWhatsNewSchema = z.object({ entries: z.array(userWhatsNewEntrySchema) }).strict();
-export type UserWhatsNew = z.infer<typeof userWhatsNewSchema>;
-
-export const markUserWhatsNewSeenInputSchema = z
-  .object({ id: z.string().min(1), entryId: z.string().min(1).max(512) })
-  .strict();
-export type MarkUserWhatsNewSeenInput = z.infer<typeof markUserWhatsNewSeenInputSchema>;
-
 export const userTourPreferenceRowSchema = z
   .object({ tracesExplorerTourDismissedAt: z.date().nullable() })
   .strict();

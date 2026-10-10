@@ -19,11 +19,7 @@ import { ShellPageBody } from "../shell-page-body.tsx";
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     limits: { getUsage: { useQuery: () => ({ data: undefined }) } },
-    user: {
-      getSsoStatus: { useQuery: () => ({ data: undefined }) },
-      whatsNew: { useQuery: () => ({}) },
-      markWhatsNewSeen: { useMutation: () => ({ mutate: () => undefined }) },
-    },
+    user: { getSsoStatus: { useQuery: () => ({ data: undefined }) } },
     governance: {
       recordWorkspaceView: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },

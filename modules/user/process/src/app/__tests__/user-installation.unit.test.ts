@@ -38,7 +38,6 @@ function process(
         passkeysEnabled: false,
         mfaEnrollmentOpen: false,
         localPasswords: false,
-        whatsNewDisabled: true,
       },
     })
     .provide({

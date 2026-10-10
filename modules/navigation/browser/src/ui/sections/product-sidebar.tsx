@@ -31,7 +31,6 @@ import {
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SupportMenu } from "../blocks/support-menu.tsx";
 import { ThemeToggle } from "../blocks/theme-toggle.tsx";
-import { WhatsNewMenu } from "../blocks/whats-new-menu.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { MainMenuSections } from "./main-menu.tsx";
 import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
@@ -119,7 +118,6 @@ function SidebarBottomBlock({
         />
       )}
       <SupportMenu showLabel={showExpanded} />
-      <WhatsNewMenu showLabel={showExpanded} />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
   );
