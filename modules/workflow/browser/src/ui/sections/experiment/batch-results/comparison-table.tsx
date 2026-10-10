@@ -3,7 +3,8 @@
  */
 
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { Box, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, HStack, Spacer, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   createColumnHelper,
   flexRender,
@@ -37,6 +38,7 @@ import {
   type RenderTracePeek,
 } from "./presentation.tsx";
 import { calculateMinTableWidth, getTableStyles } from "./table-utils.ts";
+import { VirtualPaddingRow } from "./virtual-padding-row.tsx";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */
@@ -450,8 +452,8 @@ const GroupHeaderRow = ({
   collapsed: boolean;
   onToggleCollapse: (value: string) => void;
 }) => (
-  <tr data-testid={`group-header-${value}`}>
-    <td
+  <Table.Row data-testid={`group-header-${value}`}>
+    <Table.Cell
       colSpan={columnCount}
       style={{
         background: "var(--chakra-colors-bg-subtle)",
@@ -491,8 +493,8 @@ const GroupHeaderRow = ({
         <Spacer />
         <GroupMeanBadges value={value} aggregates={aggregates} comparisonData={comparisonData} />
       </HStack>
-    </td>
-  </tr>
+    </Table.Cell>
+  </Table.Row>
 );
 
 /** One <tbody> per group: header row plus the group's data rows. */
@@ -515,7 +517,7 @@ const GroupSection = ({
   onToggleCollapse: (value: string) => void;
   tableRowByIndex: Map<number, Row<ComparisonRow>>;
 }) => (
-  <tbody data-testid={`group-section-${value}`}>
+  <Table.Body data-testid={`group-section-${value}`}>
     <GroupHeaderRow
       value={value}
       rowCount={rows.length}
@@ -530,16 +532,16 @@ const GroupSection = ({
         const tableRow = tableRowByIndex.get(comparisonRow.index);
         if (!tableRow) return null;
         return (
-          <tr key={tableRow.id} data-index={tableRow.index}>
+          <Table.Row key={tableRow.id} data-index={tableRow.index}>
             {tableRow.getVisibleCells().map((cell) => (
-              <td key={cell.id} style={{ width: cell.column.getSize() }}>
+              <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
+              </Table.Cell>
             ))}
-          </tr>
+          </Table.Row>
         );
       })}
-  </tbody>
+  </Table.Body>
 );
 
 /**
@@ -741,23 +743,23 @@ export function ComparisonTable({
         minHeight={0}
         css={tableStyles}
       >
-        <table>
-          <thead>
+        <ListTable variant="embedded" stickyHeader containerProps={{ overflow: "visible" }}>
+          <Table.Header>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
+              <Table.Row key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} style={{ width: header.getSize() }}>
+                  <Table.ColumnHeader key={header.id} style={{ width: header.getSize() }}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
+                  </Table.ColumnHeader>
                 ))}
-              </tr>
+              </Table.Row>
             ))}
-          </thead>
+          </Table.Header>
 
           {groupedRows ? (
-            // Grouped mode: one <tbody> per group. Header row spans all
+            // Grouped mode: one body per group. Header row spans all
             // columns and carries the per-run mean badges.
             groupedRows.map(({ value, rows, aggregates }) => (
               <GroupSection
@@ -773,63 +775,51 @@ export function ComparisonTable({
               />
             ))
           ) : (
-            <tbody>
+            <Table.Body>
               {disableVirtualization ? (
                 // Test mode: render all rows without virtualization
                 tableRows.map((row) => (
-                  <tr key={row.id} data-index={row.index}>
+                  <Table.Row key={row.id} data-index={row.index}>
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                      <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                      </Table.Cell>
                     ))}
-                  </tr>
+                  </Table.Row>
                 ))
               ) : (
                 <>
                   {/* Top padding row to maintain scroll position */}
                   {paddingTop > 0 && (
-                    <tr>
-                      <td
-                        aria-hidden="true"
-                        style={{ height: `${paddingTop}px`, padding: 0 }}
-                        colSpan={columnCount}
-                      />
-                    </tr>
+                    <VirtualPaddingRow height={paddingTop} columns={columnCount} />
                   )}
                   {/* Render only virtualized rows - empty until container is measured */}
                   {virtualRows.map((virtualRow) => {
                     const row = tableRows[virtualRow.index];
                     if (!row) return null;
                     return (
-                      <tr
+                      <Table.Row
                         key={row.id}
                         data-index={virtualRow.index}
                         ref={rowVirtualizer.measureElement}
                       >
                         {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                          <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
+                          </Table.Cell>
                         ))}
-                      </tr>
+                      </Table.Row>
                     );
                   })}
                   {/* Bottom padding row to maintain scroll position */}
                   {paddingBottom > 0 && (
-                    <tr>
-                      <td
-                        aria-hidden="true"
-                        style={{ height: `${paddingBottom}px`, padding: 0 }}
-                        colSpan={columnCount}
-                      />
-                    </tr>
+                    <VirtualPaddingRow height={paddingBottom} columns={columnCount} />
                   )}
                 </>
               )}
-            </tbody>
+            </Table.Body>
           )}
-        </table>
+        </ListTable>
       </Box>
     </VStack>
   );

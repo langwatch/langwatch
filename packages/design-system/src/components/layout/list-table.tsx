@@ -22,6 +22,14 @@ const COMPACT_CELLS = { "& :where(tbody td)": { paddingY: "1.5", paddingX: "3" }
 
 /** What the pinned action column paints under itself, so scrolled cells don't show through. */
 const GROUND = "--list-table-ground";
+/** Above the pinned action cells; a collapsed border scrolls away, so the rule is a shadow. */
+const STICKY_HEADER = {
+  position: "sticky",
+  top: 0,
+  zIndex: 2,
+  background: `var(${GROUND})`,
+  boxShadow: "inset 0 -1px 0 var(--chakra-colors-border-muted)",
+} as const;
 
 function ListTableRoot({
   children,
@@ -29,6 +37,7 @@ function ListTableRoot({
   columnRules = false,
   density = "default",
   variant = "card",
+  stickyHeader = false,
   ...props
 }: Omit<ComponentProps<typeof Table.Root>, "variant"> & {
   /** `compact`: a shorter header and tighter cells, for dense logs. */
@@ -40,6 +49,12 @@ function ListTableRoot({
   variant?: "card" | "embedded";
   /** Opt in to column dividers; ordinary lists use row rules only. */
   columnRules?: boolean;
+  /**
+   * Keeps the header row in view while its scroller moves, painting the table's ground under
+   * it. The scroller is the card (`containerProps` with a height and `overflow: auto`) or, with
+   * `overflow: visible` on the card, an element around it.
+   */
+  stickyHeader?: boolean;
   /**
    * Overrides on the container, for a page that needs the card itself to scroll rather
    * than clip. The border and the radius are the look and are not meant to be overridden.
@@ -62,7 +77,11 @@ function ListTableRoot({
         borderRadius="inherit"
         variant="line"
         css={{
-          "& thead th": { ...HEADER, height: HEADER_HEIGHT[density] },
+          "& thead th": {
+            ...HEADER,
+            height: HEADER_HEIGHT[density],
+            ...(stickyHeader ? STICKY_HEADER : {}),
+          },
           ...(density === "compact" ? COMPACT_CELLS : {}),
           // Quiet row rules in the softer separator token.
           "& th, & td": { borderColor: "border.muted" },
