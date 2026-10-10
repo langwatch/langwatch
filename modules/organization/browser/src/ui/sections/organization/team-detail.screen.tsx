@@ -122,6 +122,17 @@ export default function TeamDetailScreen() {
     }
   }
 
+  if (trpcErrorCode(team.error) === "NOT_FOUND") {
+    return (
+      <VStack gap={2} align="start">
+        <Heading as="h1">Team not found</Heading>
+        <Text color="fg.muted">
+          This team does not exist, or it was archived. Pick another from the Teams list.
+        </Text>
+      </VStack>
+    );
+  }
+
   // Handle loading state
   if (team.isLoading || !team.data) {
     return (

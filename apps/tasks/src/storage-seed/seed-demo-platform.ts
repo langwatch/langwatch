@@ -2,8 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { ExperimentType, type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
-  DEMO_HTTP_AGENT_CONFIG,
   DEMO_PLATFORM_IDS,
+  demoHttpAgentConfig,
   DEMO_PROMPT_CONFIG_DATA,
 } from "./demo-platform-ids.ts";
 
@@ -51,11 +51,13 @@ export async function seedDemoPlatform({
   projectId,
   organizationId,
   userId,
+  environment,
 }: {
   prisma: PrismaClient;
   projectId: string;
   organizationId: string;
   userId: string;
+  environment: Readonly<Record<string, string | undefined>>;
 }): Promise<void> {
   const supportAgent = await prisma.agent.upsert({
     where: { id: DEMO_PLATFORM_IDS.agents.support },
@@ -94,7 +96,7 @@ export async function seedDemoPlatform({
       projectId,
       name: "HTTP Echo Agent",
       type: "http",
-      config: DEMO_HTTP_AGENT_CONFIG as Prisma.InputJsonValue,
+      config: demoHttpAgentConfig({ environment }) as Prisma.InputJsonValue,
     },
     update: { archivedAt: null },
   });
