@@ -84,6 +84,10 @@ import { JoinRequestGuardsService } from "../features/join-request/services/join
 import { JoinRequestNotifierService } from "../features/join-request/services/join-request-notifier.service.ts";
 import { JoinRequestService } from "../features/join-request/services/join-request.service.ts";
 import { JoinRequestsService } from "../features/join-request/services/join-requests.service.ts";
+import {
+  defineTwoStepRequirementPipeline,
+  type TwoStepRequirementPipeline,
+} from "../features/mfa/eventing/two-step-requirement.pipeline.ts";
 import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
 import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
@@ -243,7 +247,7 @@ type IdentityAppParts = {
   pipelines: IdentityPipelineBuilders;
 };
 
-/** The three pipelines' definitions over the module's own rows, in every role (2026-09-27). */
+/** The pipelines' definitions over the module's own rows, in every role (2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
   /** Each pipeline's own event store, kept as the process builds it (record §7). */
@@ -251,6 +255,7 @@ type IdentityPipelineBuilders = {
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
   ssoConnections: () => SsoConnectionPipeline;
+  twoStepRequirement: () => TwoStepRequirementPipeline;
 };
 
 /**
@@ -931,11 +936,7 @@ export class IdentityModule
             setup.channels.authReads.findAssertedAmrForIdentifiers(args),
           offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen,
         },
-        notifier: OrganizationMfaNotifierService.create({
-          accounts: setup.repositories.twoStepVerification,
-          mail: setup.channels.organizationMfaMail,
-          emails,
-        }),
+        eventing: identityEventing,
         entitled: async ({ organizationId }) =>
           isEnterpriseTier(
             (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
@@ -960,6 +961,14 @@ export class IdentityModule
             notifier: joinRequestNotifier,
           }),
         ssoConnections: ssoConnectionGraph.pipeline,
+        twoStepRequirement: () =>
+          defineTwoStepRequirementPipeline({
+            notices: OrganizationMfaNotifierService.create({
+              accounts: setup.repositories.twoStepVerification,
+              mail: setup.channels.organizationMfaMail,
+              emails,
+            }),
+          }),
       },
     });
   }
@@ -974,6 +983,10 @@ export class IdentityModule
 
   ssoConnectionPipeline(): SsoConnectionPipeline {
     return this.#parts.pipelines.ssoConnections();
+  }
+
+  twoStepRequirementPipeline(): TwoStepRequirementPipeline {
+    return this.#parts.pipelines.twoStepRequirement();
   }
 
   /** Keeps a built pipeline's own event store; a build only to be listed keeps nothing. */

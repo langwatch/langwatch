@@ -50,5 +50,22 @@ describe("sendOrganizationMfaRequirementEmail", () => {
       expect(mailer.sent[0]?.subject).toBe("Two-step verification is no longer required for Acme");
       expect(mailer.sent[0]?.html).toContain("without proving a second factor");
     });
+
+    it("hands the member's delivery key to the sender, so a retry is not a second mail", async () => {
+      const mailer = new RecordingMailer();
+
+      await sendOrganizationMfaRequirementEmail({
+        mailer,
+        to: "morgan@acme.example",
+        organizationName: "Acme",
+        actorName: "Riley Chen",
+        required: true,
+        idempotencyKey: "two-step-requirement:org_acme:true:1:user_morgan",
+      });
+
+      expect(mailer.sent[0]?.idempotencyKey).toBe(
+        "two-step-requirement:org_acme:true:1:user_morgan",
+      );
+    });
   });
 });
