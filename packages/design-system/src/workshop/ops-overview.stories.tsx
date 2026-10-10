@@ -67,6 +67,7 @@ function OpsOverviewExample({
             />
             <Box flex="1" minWidth="48">
               <SearchInput
+                containerProps={{ width: "full", minWidth: 0 }}
                 aria-label="Search processes"
                 placeholder="Search processes"
                 value={search}

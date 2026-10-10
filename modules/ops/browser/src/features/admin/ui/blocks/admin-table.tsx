@@ -51,6 +51,7 @@ export function AdminTable({
       toolbar={
         searchInput ?? (
           <SearchInput
+            containerProps={{ width: "full", maxWidth: "lg", minWidth: 0 }}
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={searchPlaceholder}
