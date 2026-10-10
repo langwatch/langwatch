@@ -446,6 +446,13 @@ Feature: Local IdP simulator (idpsim)
     Then the tenant's clock is still skewed by ten minutes
 
   @unit
+  Scenario: A tenant can assert a second factor in its ID tokens
+    Given a tenant whose ID tokens assert no authentication methods
+    When its config sets amr to "pwd" and "mfa"
+    Then the next ID token carries amr ["pwd", "mfa"]
+    And an empty list, or resetting the tenant, stops asserting it
+
+  @unit
   Scenario: After a key rotation both keys are published and the new one signs
     Given a tenant with one signing key
     When the tenant's signing key is rotated through the control API

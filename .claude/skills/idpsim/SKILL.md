@@ -45,6 +45,8 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   with a "Post it to the ACS" form, lists sign-in links (as `haven sim idp signin`) and resets.
   After any reload its skew and break inputs show the tenant's values again.
 - `POST /control/t/<n>/tamper {"mode":"saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to"}` breaks the next SAML response once (`haven sim idp fault <n> <mode>`).
+- `POST /control/t/<n>/config {"amr":["pwd","mfa"]}` makes the tenant's OIDC ID tokens assert those
+  authentication methods (an IdP-verified second factor); `{"amr":[]}` or a reset stops it. Survives a restart.
 - `POST /control/t/<n>/config {"skewSeconds":600}` runs the tenant clock ahead (negative = behind) for ID tokens and SAML assertions (`haven sim idp skew <n> <seconds>`).
 - `POST /control/t/<n>/rotate-key {}` makes a new signing key current while JWKS and SAML metadata still publish the old one; `{"dropPrevious":true}` stops publishing it (`haven sim idp rotate-key <n> [--drop-previous]`). Reset clears skew but keeps keys.
 - `POST /control/t/<n>/user-active {"user":"<email>","active":false}` disables a user at the IdP; OIDC and SAML sign-in refuse them (`haven sim idp user disable|enable <n> <email>`).

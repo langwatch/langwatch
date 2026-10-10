@@ -113,6 +113,8 @@ type Tenant struct {
 	// skew and lastAssertionID are SAML/OIDC fault state (saml_tamper.go); Reset clears both.
 	skew            time.Duration
 	lastAssertionID string
+	// amr is the authentication methods its ID tokens assert (amr.go); Reset clears it.
+	amr []string
 	// keyVersion numbers Key; previousKey and previousCert are what the last
 	// rotation retired, still published until dropped (RotateKey).
 	keyVersion   int
@@ -203,6 +205,7 @@ func (t *Tenant) Reset() {
 	defer t.mu.Unlock()
 	t.seedUsers()
 	t.skew, t.lastAssertionID = 0, ""
+	t.amr = nil
 }
 
 // Users returns a snapshot of the tenant's users.
