@@ -10,6 +10,8 @@ import {
 
 import type { SignInDomainRouting } from "../../signin/services/signin-router.service.ts";
 import type { LegacySsoOrganizationRepository } from "../../sso-arrival/repositories/legacy-sso-organization.repository.ts";
+import { isTerminalSsoConnection } from "../../sso-domain/rules/sso-domain-ownership.rules.ts";
+import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
 import { grandfatherCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
@@ -39,10 +41,17 @@ type SsoConnectionGrandfatherOutcome =
           comparison: ConnectionRoutingComparison;
         }[];
       };
+    }
+  | {
+      status: "migrated";
+      heldReason: "proof";
+      report: { kind: "competing_connection"; connectionId: string; domains: string[] };
     };
 
 interface SsoConnectionGrandfatherDeps {
   connections: SsoConnectionService;
+  /** The connections the organization already holds, read before stating its history. */
+  connectionReads: Pick<SsoConnectionReadRepository, "findForOrganization">;
   /** Where the legacy strings are read from. */
   legacy: Pick<LegacySsoOrganizationRepository, "getLegacySso">;
   /** The string-based lookup — what decides sign-in today. */
@@ -88,6 +97,15 @@ export class SsoConnectionGrandfatherService {
 
     const domains = [normalizeDomain(legacy.ssoDomain)];
     const connectionId = grandfatheredSsoConnectionId({ organizationId });
+    // One connection per org (ADR-124 §7): another live one holds the org on the legacy door,
+    // as main does, until a later pass finds it alone.
+    if (await this.holdsCompetingConnection({ organizationId, connectionId })) {
+      return {
+        status: "migrated",
+        heldReason: "proof",
+        report: { kind: "competing_connection", connectionId, domains },
+      };
+    }
     const facts = await this.deps.connections.grandfatherConnection({
       tenantId: organizationId,
       organizationId,
@@ -109,6 +127,19 @@ export class SsoConnectionGrandfatherService {
     });
 
     return this.prove({ organizationId, connectionId, domains, facts: facts.length });
+  }
+
+  /** Another live connection, unless the grandfathered one exists: a replacement sits beside it. */
+  private async holdsCompetingConnection({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<boolean> {
+    const held = await this.deps.connectionReads.findForOrganization({ organizationId });
+    if (held.some((connection) => connection.connectionId === connectionId)) return false;
+    return held.some((connection) => !isTerminalSsoConnection(connection.state));
   }
 
   /**

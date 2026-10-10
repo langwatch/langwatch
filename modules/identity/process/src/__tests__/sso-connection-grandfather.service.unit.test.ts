@@ -1,4 +1,4 @@
-import type { RoutableConnection } from "@langwatch/identity-contract";
+import { emptySsoConnection, type RoutableConnection } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { SignInDomainRouting } from "../features/signin/services/signin-router.service.ts";
@@ -105,6 +105,7 @@ function grandfatherOf({
 }) {
   return SsoConnectionGrandfatherService.create({
     connections: serviceOf(connections),
+    connectionReads: connections,
     legacy: {
       getLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),
     },
@@ -239,6 +240,37 @@ describe("the sso connection grandfather migration", () => {
         kind: "grandfathered",
         eventsAppended: 0,
       });
+    });
+  });
+
+  describe("given an organization that already holds another live connection", () => {
+    /** @scenario "The grandfather step holds an organization that already has another live connection" */
+    it("holds it on its proof, writes no grandfathered connection, and holds it again next pass", async () => {
+      connections.seed({
+        ...emptySsoConnection({ connectionId: "ssoc_direct" }),
+        organizationId: ORG,
+        state: "VERIFICATION_PENDING",
+      });
+      const run = () =>
+        grandfatherOf({
+          legacyRouting: new StubRouting({ "acme.com": routable({ connectionId: `org:${ORG}` }) }),
+          connectionRouting: new StubRouting({}),
+        }).migrateOrganization({ organizationId: ORG });
+
+      for (const outcome of [await run(), await run()]) {
+        expect(outcome).toEqual({
+          status: "migrated",
+          heldReason: "proof",
+          report: {
+            kind: "competing_connection",
+            connectionId: "ssoc_gf_org_acme",
+            domains: ["acme.com"],
+          },
+        });
+      }
+      await expect(
+        connections.getConnection({ connectionId: "ssoc_gf_org_acme" }),
+      ).rejects.toMatchObject({ code: "sso_connection_not_found" });
     });
   });
 });

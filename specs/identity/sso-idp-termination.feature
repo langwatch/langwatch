@@ -446,6 +446,15 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When the sources are read for a legacy-configuration proof or a legacy-grandfathered source being written
     Then only the grandfather tenant step writes either, so no customer-facing route or Api operation on cloud can mint one
 
+  @unit
+  Scenario: The grandfather step holds an organization that already has another live connection
+    Given an organization with legacy single sign-on settings
+    And it already holds a connection that is not closed and is not its grandfathered connection
+    When the grandfather step runs for it
+    Then the organization is held on its proof with a competing-connection report naming its legacy domains
+    And no grandfathered connection is written, so its people keep signing in through the legacy settings, as on main
+    And the next pass checks it again
+
   @integration @regression
   Scenario: Migration routing waits for the replacement to be active
     Given the replacement has completed a test sign-in but is not active

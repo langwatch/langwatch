@@ -795,6 +795,7 @@ export class IdentityModule
     const ssoConnectionGrandfather = ssoConnections
       ? SsoConnectionGrandfatherService.create({
           connections: ssoConnections,
+          connectionReads: setup.repositories.ssoConnections,
           legacy: setup.repositories.legacySsoOrganizations,
           legacyRouting: legacyDomainRouting,
           connectionRouting: connectionDomainRouting,
