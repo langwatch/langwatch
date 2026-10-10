@@ -614,11 +614,17 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
           !(candidate.organizationId === organizationId && candidate.userId === userId),
       ),
     );
+    const teamIds = new Set(this.teamsOf(organizationId).map((team) => team.id));
     this.memory.teamUsers.splice(
       0,
       this.memory.teamUsers.length,
-      ...this.memory.teamUsers.filter((candidate) => candidate.userId !== userId),
+      ...this.memory.teamUsers.filter(
+        (candidate) => candidate.userId !== userId || !teamIds.has(candidate.teamId),
+      ),
     );
+    for (const group of this.memory.groups.values()) {
+      if (group.organizationId === organizationId) group.memberIds.delete(userId);
+    }
 
     const archivedAt = nowInstant();
     const archivedTeamIds: string[] = [];

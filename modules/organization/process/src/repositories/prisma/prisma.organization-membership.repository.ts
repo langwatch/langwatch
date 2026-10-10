@@ -1830,6 +1830,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // above revokes on retry; a refusal inside the transaction revokes nothing.
     const archivedTeamIds = await this.prisma.$transaction(async (tx) => {
       await this.deleteMembershipRow({ tx, organizationId, userId });
+      // As main's offboard: a kept group or team row would hand the access back on a rejoin.
+      await tx.groupMembership.deleteMany({ where: { userId, group: { organizationId } } });
+      await tx.teamUser.deleteMany({ where: { userId, team: { organizationId } } });
       return this.archivePersonalWorkspaces({ tx, organizationId, userId });
     });
     await revokeTheirGrants();
