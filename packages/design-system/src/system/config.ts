@@ -39,16 +39,16 @@ const toastPanel = {
 const toastMesh = (hue: "red" | "orange" | "green" | "blue") => {
   const c = (n: number, alpha = "100%") =>
     `color-mix(in srgb, var(--chakra-colors-${hue}-${n}) ${alpha}, transparent)`;
-  const deep = `color-mix(in srgb, var(--chakra-colors-${hue}-800) 45%, var(--chakra-colors-${hue}-700))`;
+  const mid = `color-mix(in srgb, var(--chakra-colors-${hue}-700) 50%, var(--chakra-colors-${hue}-600))`;
   return {
     bg: `${hue}.700`,
     backgroundImage: [
-      "linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, transparent 50%)",
-      `radial-gradient(55% 140% at 100% 0%, ${c(400, "80%")} 0%, transparent 60%)`,
-      `radial-gradient(60% 150% at 85% 125%, ${c(500, "75%")} 0%, transparent 65%)`,
-      `linear-gradient(105deg, ${deep} 0%, ${c(700)} 55%, ${c(600)} 100%)`,
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, transparent 55%)",
+      `radial-gradient(55% 140% at 100% 0%, ${c(400, "85%")} 0%, transparent 62%)`,
+      `radial-gradient(60% 150% at 85% 125%, ${c(500, "80%")} 0%, transparent 65%)`,
+      `linear-gradient(105deg, ${c(700)} 0%, ${mid} 50%, ${c(600)} 100%)`,
     ].join(", "),
-    boxShadow: `inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 10px 28px -10px ${c(600, "70%")}`,
+    boxShadow: `inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 28px -10px ${c(500, "70%")}`,
   };
 };
 
