@@ -75,6 +75,19 @@ export function formatLimitOrUnlimited(value: number): string {
   return value.toLocaleString();
 }
 
+/** Whether a limit is a real count: a license writes "unlimited" as a number of 1M or more. */
+export function isCappedLimit(value: number): boolean {
+  return Number.isFinite(value) && value < 1_000_000;
+}
+
+/** The Lite seats in use against the license's limit, or null when it does not cap them. */
+export function cappedLiteSeatsOf(
+  status: Pick<LicenseStatusWithMetadata, "currentMembersLite" | "maxMembersLite">,
+): { current: number; max: number } | null {
+  if (!isCappedLimit(status.maxMembersLite)) return null;
+  return { current: status.currentMembersLite, max: status.maxMembersLite };
+}
+
 /**
  * Formats a file size in bytes to a human-readable string.
  * Returns bytes for < 1KB, KB for < 1MB, MB otherwise.

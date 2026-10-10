@@ -7,12 +7,14 @@ import {
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
-import { Building2, CalendarClock, Layers, Users } from "lucide-react";
+import { Building2, CalendarClock, Layers, UserRound, Users } from "lucide-react";
 
 import {
+  cappedLiteSeatsOf,
   formatLicenseDate,
   formatLimitOrUnlimited,
   hasLicenseMetadata,
+  isCappedLimit,
   isCorruptedLicense,
   isLicenseExpired,
 } from "../../model/license-status.ts";
@@ -158,13 +160,14 @@ export function LicenseDetailsCard({
     return null;
   }
 
-  const seatsAreCapped = Number.isFinite(status.maxMembers) && status.maxMembers < 1_000_000;
+  const seatsAreCapped = isCappedLimit(status.maxMembers);
+  const liteSeats = cappedLiteSeatsOf(status);
 
   return (
     <>
       {isExpired && <LapsedLicenseNotice maxMembers={status.maxMembers} />}
       {!isValid && !isExpired && <InvalidLicenseNotice />}
-      <StatTileGrid columns={4}>
+      <StatTileGrid columns={liteSeats ? 5 : 4}>
         <StatTile label="Plan" icon={<Layers size={14} />} data-testid="license-plan">
           <StatTileFigure>{status.planName}</StatTileFigure>
         </StatTile>
@@ -180,6 +183,18 @@ export function LicenseDetailsCard({
             {status.currentMembers.toLocaleString()} / {formatLimitOrUnlimited(status.maxMembers)}
           </StatTileFigure>
         </StatTile>
+        {liteSeats ? (
+          <StatTile
+            data-testid="license-lite-seats"
+            label="Lite seats"
+            icon={<UserRound size={14} />}
+            meter={liteSeats}
+          >
+            <StatTileFigure>
+              {liteSeats.current.toLocaleString()} / {liteSeats.max.toLocaleString()}
+            </StatTileFigure>
+          </StatTile>
+        ) : null}
         <StatTile label="Expires" icon={<CalendarClock size={14} />} data-testid="license-expires">
           <StatTileFigure>
             <Text as="span" color={isExpired ? "orange.fg" : void 0}>

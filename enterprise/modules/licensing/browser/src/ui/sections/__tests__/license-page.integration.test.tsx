@@ -129,6 +129,28 @@ describe("the License page", () => {
     });
   });
 
+  describe("given a license with a finite Lite seat limit", () => {
+    /** @scenario "A finite Lite seat limit is shown next to the seats" */
+    it("shows the Lite seats in use against the limit, right after the seats tile", () => {
+      renderCard({ ...valid, currentMembersLite: 3, maxMembersLite: 50 });
+
+      const tile = screen.getByTestId("license-lite-seats");
+      expect(within(tile).getByText("Lite seats")).toBeDefined();
+      expect(within(tile).getByText("3 / 50")).toBeDefined();
+      expect(screen.getByTestId("license-seats").nextElementSibling).toBe(tile);
+    });
+  });
+
+  describe("given a license whose Lite seats are unlimited", () => {
+    /** @scenario "Unlimited Lite seats are not shown" */
+    it("shows no Lite seats tile", () => {
+      renderCard({ ...valid, maxMembersLite: Number.MAX_SAFE_INTEGER });
+
+      expect(screen.queryByTestId("license-lite-seats")).toBeNull();
+      expect(screen.getByTestId("license-seats")).toBeDefined();
+    });
+  });
+
   describe("given a license file that cannot be read", () => {
     /** @scenario An unreadable license is named and can be removed */
     it("says it is corrupted and still offers removal", () => {

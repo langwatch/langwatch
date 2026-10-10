@@ -27,6 +27,16 @@ Feature: The License page says where a license stands
       And it draws no meter
 
     @integration
+    Scenario: A finite Lite seat limit is shown next to the seats
+      Given a valid license covering 50 Lite seats with 3 in use
+      Then a Lite seats tile shows 3 of 50, right after the seats tile
+
+    @integration
+    Scenario: Unlimited Lite seats are not shown
+      Given a license whose Lite seats are unlimited
+      Then the page shows no Lite seats tile
+
+    @integration
     Scenario: A license can be removed from the page
       Given a valid license is installed
       Then I can remove the license

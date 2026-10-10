@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cappedLiteSeatsOf,
   formatFileSize,
   formatLicenseDate,
   formatLimitOrUnlimited,
@@ -226,6 +227,32 @@ describe("formatLimitOrUnlimited", () => {
   it("returns 'Unlimited' for values >= 1M", () => {
     expect(formatLimitOrUnlimited(1_000_000)).toBe("Unlimited");
     expect(formatLimitOrUnlimited(Number.MAX_SAFE_INTEGER)).toBe("Unlimited");
+  });
+});
+
+describe("cappedLiteSeatsOf", () => {
+  describe("when the license carries a finite Lite seat limit", () => {
+    /** @scenario "A finite Lite seat limit is shown next to the seats" */
+    it("answers the Lite seats in use against the limit", () => {
+      expect(cappedLiteSeatsOf({ currentMembersLite: 3, maxMembersLite: 50 })).toEqual({
+        current: 3,
+        max: 50,
+      });
+    });
+
+    it("answers a limit of zero as a limit", () => {
+      expect(cappedLiteSeatsOf({ currentMembersLite: 0, maxMembersLite: 0 })).toEqual({
+        current: 0,
+        max: 0,
+      });
+    });
+  });
+
+  describe("when the license does not cap Lite seats", () => {
+    /** @scenario "Unlimited Lite seats are not shown" */
+    it.each([1_000_000, Number.MAX_SAFE_INTEGER, Infinity])("answers null for %s", (max) => {
+      expect(cappedLiteSeatsOf({ currentMembersLite: 3, maxMembersLite: max })).toBeNull();
+    });
   });
 });
 
