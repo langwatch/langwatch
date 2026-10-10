@@ -24,6 +24,12 @@ Feature: Enterprise billing compatibility
     When their automation daily dispatch ceilings are compared
     Then each rung's ceiling is strictly higher than the rung below it
 
+  @unit
+  Scenario: A billing Slack notice carries the message and none of the client's options
+    Given a billing alert posted to a Slack incoming webhook
+    When the webhook receives it
+    Then the body holds the message's fields and no "timeout"
+
   Rule: A billing month names one whole calendar month in UTC
 
     The month a usage figure is billed under is a UTC calendar month, not a
