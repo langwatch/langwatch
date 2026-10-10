@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
+
 /**
  * Shared recharts styling for the governance charts.
  *
@@ -16,7 +18,7 @@ export const CHART_TOOLTIP_CONTENT = {
   background: "var(--chakra-colors-bg-panel)",
   border: "1px solid var(--chakra-colors-border)",
   borderRadius: 6,
-  fontSize: 12,
+  fontSize: TYPE_SCALE_PX.caption,
 } as const;
 
 /**
@@ -39,7 +41,7 @@ export const CHART_TOOLTIP_CURSOR = {
  * against a dark panel and out of step with every other label on the page.
  */
 export const CHART_AXIS_TICK = {
-  fontSize: 11,
+  fontSize: TYPE_SCALE_PX.micro,
   fill: "var(--chakra-colors-fg-muted)",
 } as const;
 
