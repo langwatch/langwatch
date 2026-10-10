@@ -49,7 +49,13 @@ import type {
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst, pickHighestRelease } from "./release.ts";
 import { parseRunPhases } from "./run-phase-view.ts";
-import { filterSteps, mergeSteps, viewDeclaredStep, viewRecordedStep } from "./step-view.ts";
+import {
+  filterSteps,
+  imageReleaseRow,
+  mergeSteps,
+  viewDeclaredStep,
+  viewRecordedStep,
+} from "./step-view.ts";
 
 const DEFAULT_RUN_PAGE = 25;
 const MAX_RUN_PAGE = 100;
@@ -186,13 +192,14 @@ function summariseReleases({
   const byRelease = new Map<string | null, UpgradeStepView[]>();
   for (const step of steps)
     byRelease.set(step.release, [...(byRelease.get(step.release) ?? []), step]);
-  if (!byRelease.has(image.release)) byRelease.set(image.release, []);
+  const imageRow = imageReleaseRow({ release: image.release });
+  if (!byRelease.has(imageRow)) byRelease.set(imageRow, []);
   return [...byRelease.entries()]
     .toSorted(([left], [right]) => compareReleasesNewestFirst({ left, right }))
     .map(([release, members]) => ({
       release,
       installed: release !== null && release === installed,
-      image: release === image.release,
+      image: release === imageRow,
       stepCount: members.length,
       counts: countBy({ items: members, key: (step) => step.status }),
     }));

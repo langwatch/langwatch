@@ -22,6 +22,14 @@ export function progressOf({
 }
 
 const SETTLED = new Set(["done", "not-needed"]);
+
+/** The name every caller hands the reader for an image no release manifest names. */
+const UNRELEASED_IMAGE = "unreleased";
+
+/** The release row an image's steps read under: none (Unreleased) for an unreleased image. */
+export function imageReleaseRow({ release }: { release: string }): string | null {
+  return release === UNRELEASED_IMAGE ? null : release;
+}
 const NO_STEPS: ReadonlySet<string> = new Set();
 
 /**
@@ -109,7 +117,7 @@ function viewDeclared({
   return {
     id: step.id,
     kind: step.kind,
-    release: step.release ?? imageRelease,
+    release: step.release === undefined ? imageReleaseRow({ release: imageRelease }) : step.release,
     mode: step.mode,
     status: "pending",
     statusLabel: describeStepStatus({ status: "pending" }),
