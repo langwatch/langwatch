@@ -171,16 +171,24 @@ func errText(err error) string {
 	return err.Error()
 }
 
+// exitText names a command's outcome: "0" when it succeeded, else its error.
+func exitText(err error) string {
+	if err == nil {
+		return "0"
+	}
+	return err.Error()
+}
+
 // secondRunVerdict: a second upgrade exits 0 and changes no ledger row.
 func (cell *run) secondRunVerdict(ctx context.Context, final []LedgerRow) Verdict {
-	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "upgrade") // #nosec G204 -- fixed argv.
+	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "--disable-warning=ExperimentalWarning", "src/main.ts", "upgrade") // #nosec G204 -- fixed argv.
 	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
 	out, err := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("second-upgrade"), out, 0o600)
 	again, ledgerErr := Ledger(ctx, cell.stores)
 	changed := Reopened(final, again)
 	return verdict("I8", err == nil && ledgerErr == nil && len(changed) == 0,
-		fmt.Sprintf("exit %v; changed %v", errText(err), changed))
+		fmt.Sprintf("exit %v; changed %v", exitText(err), changed))
 }
 
 // acceptedLog is an error signature the lab tolerates, with the reason printed in the report.
