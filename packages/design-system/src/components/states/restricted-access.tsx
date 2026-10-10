@@ -87,13 +87,13 @@ export function RestrictedAccess({
       <Box filter="blur(6px)" opacity={0.5} pointerEvents="none" userSelect="none" aria-hidden>
         {backdrop ?? <Placeholder />}
       </Box>
-      <Center position="absolute" inset={0} padding={6}>
+      <Center position="absolute" inset={0} padding={{ base: 4, md: 6 }}>
         <Stack
           role="note"
           gap={4}
           width="full"
           maxWidth="420px"
-          padding={6}
+          padding={{ base: 5, md: 6 }}
           borderRadius="l3"
           borderWidth="1px"
           borderColor="border.muted"
@@ -110,13 +110,15 @@ export function RestrictedAccess({
             >
               <Lock size={16} aria-hidden />
             </Center>
-            <Heading size="md">You need access to {area}</Heading>
+            <Heading as="h2" size="md">
+              You need access to {area}
+            </Heading>
           </HStack>
           <Text fontSize="sm" color="fg.muted" lineHeight="1.6">
             Your role doesn't include <InlineCode>{permission}</InlineCode>. Copy a request and send
             it to an organization admin, who can grant it.
           </Text>
-          <HStack justify="end" gap={2} paddingTop={1}>
+          <HStack justify="end" gap={2} paddingTop={1} flexWrap="wrap">
             <Button size="sm" variant="ghost" onClick={() => window.history.back()}>
               Go back
             </Button>
