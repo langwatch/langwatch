@@ -135,6 +135,8 @@ var invariantNames = map[string]string{
 	"E2":  "SSO sign-in works before, during and after the switch",
 	"E3":  "SCIM pushed mid-upgrade lands once",
 	"E4":  "custom roles and grants behave as on main: a key with no grant is refused",
+	"E6":  "a plain member signs in through the deployment's SSO on main and again on head after the migrations; main's cookie reads cleanly",
+	"E7":  "a plain member signs in through their organization's own SSO connection before and after the upgrade",
 	"E5":  "the seed account is a platform operator after the upgrade (ADMIN_EMAILS set, or the sole-organization bootstrap)",
 	"U1":  "the holding and upgrading pages are branded, centered and say what is happening (Haiku reads the shots)",
 	"U2":  "every command of docs/self-hosting/upgrade.mdx ran as written and exited 0",
@@ -150,7 +152,7 @@ var scenarioIDs = map[string][]string{
 	"I0": {"S6"}, "I2": {"S7", "F1"}, "I2b": {"S7"}, "I4": {"S8"}, "I6": {"S9"}, "I5": {"S10"}, "I7": {"S14"}, "I9": {"S11"}, "B1": {"S11"},
 	"O1": {"S12"}, "I8": {"S13", "F2"}, "D3": {"U3"},
 	"H1": {"H1"}, "H2": {"H2"}, "H3": {"H3"}, "H4": {"H4"}, "H5": {"H5"},
-	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"},
+	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"}, "E6": {"E6"}, "E7": {"E7"},
 	"U1": {"U1"}, "U2": {"U2"}, "U3": {"U3"}, "U4": {"U4"}, "U5": {"U5"}, "U6": {"U6"},
 }
 

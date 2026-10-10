@@ -158,6 +158,24 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     When the run cuts over to the branch and settles
     Then scenario E2 holds
 
+  # Judged by: E6 (the cloud-sso profile: the cell's own idpsim behind main's NEXTAUTH_PROVIDER=oidc)
+  @e2e @unimplemented
+  Scenario: E6: A plain member signs in through the deployment's SSO before and after the upgrade
+    Given main signs in through the cell's identity provider and an organization pins its domain to it
+    And a plain member of that organization, no admin, no operator, signed in through it on main and landed on the project
+    When the run cuts over to the branch, the upgrade ledger is done and the member signs in again
+    Then the member lands on the same project, not on onboarding, an error or a blank page
+    And the session cookie main issued is still valid on the branch, or sends the member cleanly to sign in
+    And a 5xx, a blank page or a sign-in that ends nowhere fails the scenario with the page the member saw
+
+  # Judged by: E7
+  @e2e @unimplemented
+  Scenario: E7: A member of an organization's own SSO connection signs in before and after the upgrade
+    Given an organization whose own connection is active against the cell's identity provider
+    When the member signs in through it on main and again after the upgrade
+    Then they land on their project both times
+    But until a connection can be seeded headlessly the check says inconclusive and names what is missing, never pass
+
   # Judged by: SCIM stream and user count
   @e2e @unimplemented
   Scenario: E3: SCIM pushed mid-upgrade lands once

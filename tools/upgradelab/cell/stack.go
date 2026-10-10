@@ -27,6 +27,7 @@ type Stores struct {
 	RedisPort                    string
 	Private                      []string       // private ClickHouse labels (hybrid)
 	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
+	IDP                          int            // idpsim port, for profiles that sign in through an identity provider
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.

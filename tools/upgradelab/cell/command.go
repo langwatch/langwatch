@@ -61,7 +61,7 @@ func parse(args []string) (Options, error) {
 // cellFlags are the flags cell and produce share.
 func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
-	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | hybrid | self-hosted")
+	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | cloud-sso | hybrid | self-hosted")
 	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S or M (L and XL wait for lane L4)")
 	flags.BoolVar(&options.NoAdminEmails, "no-admin-emails", false, "self-hosted-free boots without ADMIN_EMAILS")
 	flags.StringVar(&options.Shape, "shape", "typical", "data shape: typical")

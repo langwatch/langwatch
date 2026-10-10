@@ -82,6 +82,7 @@ type run struct {
 	granted            chan struct{} // closed once the seed account is a platform operator on head
 	recipe             snapshot.Recipe
 	anchor             time.Time
+	sso                ssoSeed
 
 	stopTraffic, stopPoller, stopSampler context.CancelFunc
 	trafficDone                          chan struct{}
@@ -174,7 +175,7 @@ func prepare(options Options) (*run, error) {
 	profile, ok := Profiles[options.Deployment]
 	switch {
 	case !ok:
-		return nil, fmt.Errorf("unknown deployment %q: want cloud, hybrid or self-hosted", options.Deployment)
+		return nil, fmt.Errorf("unknown deployment %q: want cloud, cloud-sso, hybrid or self-hosted", options.Deployment)
 	case profile.Missing != "":
 		return nil, fmt.Errorf("deployment %s cannot run yet: %s", options.Deployment, profile.Missing)
 	case !contains(Tiers, options.Tier) || !contains(DataShapes, options.Shape):
@@ -229,6 +230,11 @@ func (cell *run) freshStores(ctx context.Context) error {
 	if cell.profile.Objects {
 		if err := cell.startObjectStores(slices.Collect(maps.Keys(shape.PrivateObjectTargets()))); err != nil {
 			return err
+		}
+	}
+	if cell.profile.SSO {
+		if err := cell.startIdentityProvider(ctx); err != nil {
+			return fmt.Errorf("idpsim: %w", err)
 		}
 	}
 	redis, err := Start(ProcSpec{Name: "redis", Dir: cell.options.RunDir, Log: cell.logPath("redis"),
@@ -382,6 +388,9 @@ func (cell *run) seed(ctx context.Context) error {
 	}
 	if err := cell.basePrompt(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
+	}
+	if cell.profile.SSO {
+		cell.seedSSO(ctx)
 	}
 	return nil
 }

@@ -25,12 +25,16 @@ type Profile struct {
 	Objects bool
 	// NoAdminEmails: the operator never set ADMIN_EMAILS (plan section 7.1, sh-free's second variant).
 	NoAdminEmails bool
+	// SSO: the cell runs its own idpsim and the deployment signs in through it (E6).
+	SSO bool
 }
 
 // Profiles are the deployments a cell runs; a new deployment is one entry here.
 var Profiles = map[string]Profile{
 	"cloud":  {Shape: "saas", Extra: cloudBilling},
 	"hybrid": {Shape: "hybrid", Extra: cloudBilling, Objects: true},
+	// Cloud with main's instance-wide sign-in (NEXTAUTH_PROVIDER) on the cell's idpsim; passwords kept for the seed account.
+	"cloud-sso": {Shape: "saas", Extra: cloudBilling, SSO: true},
 	// Self-hosted from origin/main like the others; 3.20.1 stays a cell of its own (-from-dir a 3.20.1 tree).
 	"self-hosted":      {Shape: "sh-licensed", StopStart: true},
 	"self-hosted-free": {Shape: "sh-free", StopStart: true}, // the ADMIN_EMAILS-unset variant sets NoAdminEmails on it
@@ -83,6 +87,7 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	}
 	routePrivateTargets(env, input.Stores, shape.PrivateTargets())
 	routeObjects(env, input.Stores, shape.PrivateObjectTargets())
+	routeIdentityProvider(env, input.Stores)
 	return env, nil
 }
 
@@ -135,6 +140,17 @@ func routeObjects(env map[string]string, stores Stores, targets map[string]strin
 			env["DATAPLANE_S3__"+label+"__"+organization] = string(account)
 		}
 	}
+}
+
+// routeIdentityProvider is idpsim's own `legacy env` for a generic tenant: main's NEXTAUTH_PROVIDER, which head
+// still applies (deprecated), so the operator's .env stays as it was across the upgrade.
+func routeIdentityProvider(env map[string]string, stores Stores) {
+	if stores.IDP == 0 {
+		return
+	}
+	idp := stores.IDPURL()
+	maps.Copy(env, map[string]string{"NEXTAUTH_PROVIDER": "oidc", "OIDC_ISSUER": idp + "/t/" + ssoTenant, "OIDC_CLIENT_ID": "langwatch-upgradelab",
+		"OIDC_CLIENT_SECRET": "idpsim-accepts-any-secret-for-an-unregistered-client", "LOCAL_PASSWORDS_ENABLED": "on", "SSO_TRUSTED_IDP_ORIGINS": idp})
 }
 
 // CheckSourceDir refuses a release directory holding a .env: both releases read one when it exists.

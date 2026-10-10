@@ -43,6 +43,7 @@ func (cell *run) checks(ctx context.Context) error {
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
 		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
 	for index := range cell.report.Verdicts {
