@@ -157,6 +157,7 @@ describe("given an operator", () => {
       expect(hrefsIn({ hasOpsAccess: true })).toContain("/ops/event-sourcing");
     });
 
+    /** @scenario "Self-hosted installs do not offer the Feature Flags page" */
     it("offers Feature Flags only where ops offers cloud ops", () => {
       expect(hrefsIn({ hasOpsAccess: true })).not.toContain("/ops/feature-flags");
       expect(hrefsIn({ hasOpsAccess: true, hasCloudOps: true })).toContain("/ops/feature-flags");

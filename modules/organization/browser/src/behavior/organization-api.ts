@@ -508,7 +508,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       };
       revokeGrant: {
         mutation: {
-          input: Omit<AuthzRevokeGrantByIdInput, "actor">;
+          input: Omit<AuthzRevokeGrantByIdInput, "caller" | "actor">;
           output: GrantRevoked;
         };
       };

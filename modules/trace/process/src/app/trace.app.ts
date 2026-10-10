@@ -422,7 +422,7 @@ import {
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
-import { gateSessionCost } from "../rules/trace-view-gates.rules.ts";
+import { gateEvaluations, gateSessionCost } from "../rules/trace-view-gates.rules.ts";
 import { TraceTenantUpdateStreamService } from "../services/trace-tenant-update-stream.service.ts";
 import type {
   TraceLegacyReads,
@@ -2390,9 +2390,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         }),
       );
       return {
-        [input.traceId]: (byTrace[input.traceId] ?? []).map((evaluation) =>
-          gateEvaluationContent({ evaluation, protections }),
-        ),
+        [input.traceId]: gateEvaluations({
+          evaluations: byTrace[input.traceId] ?? [],
+          protections,
+        }),
       };
     }
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);

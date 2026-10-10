@@ -1,5 +1,4 @@
 import type { AgentCascadeArchive, RelatedAgentEntities } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/api/web";
 import { useEffect, useState } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
@@ -8,7 +7,7 @@ import type { AgentBrowser } from "../model/agent-client.ts";
 export type AgentListArchiveOptions = {
   onGetRelated: (agentId: string) => Promise<RelatedAgentEntities>;
   onDelete(agentId: string): Promise<void>;
-  onCascadeArchive(agentId: string): Promise<WireOf<AgentCascadeArchive>>;
+  onCascadeArchive(agentId: string): Promise<AgentCascadeArchive>;
   onArchived(workflowArchived: boolean): void;
   onError: (error: unknown) => void;
 };

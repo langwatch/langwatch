@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/seedgen"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -239,5 +240,26 @@ func TestSeedPresetMapsDemoToTheStartupPersona(t *testing.T) {
 	}
 	if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "'--size' 'tiny' '--persona' 'startup'") {
 		t.Fatalf("shells = %v", sup.shells)
+	}
+}
+
+// @scenario "A failed seed says why on its last line"
+func TestAFailedSeedNamesSeedgensReason(t *testing.T) {
+	sup := &fakeSupervisor{err: exit2Error(t)}
+	o := seedOrchestrator(t, sup, seedStack())
+	args := []string{"--size", "small"}
+	dir := o.seedRunDir("feat-x", args)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, seedgen.FailureFile), []byte("the api answered 500\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := o.Seed(context.Background(), UpParams{ExplicitSlug: "feat-x"}, SeedRequest{Args: args})
+	if err == nil || !strings.HasSuffix(err.Error(), ": the api answered 500") {
+		t.Fatalf("err = %v, want it to end with seedgen's reason", err)
+	}
+	if line := o.SeedStatusLine("feat-x"); !strings.Contains(line, "failed") || !strings.Contains(line, "the api answered 500") {
+		t.Errorf("status line = %q, want the failure and its reason", line)
 	}
 }

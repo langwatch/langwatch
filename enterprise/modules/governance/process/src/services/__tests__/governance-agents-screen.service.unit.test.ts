@@ -56,7 +56,12 @@ async function setup({ projectIds }: { projectIds: string[] }) {
     }),
     organizations: createApiFixture<OrganizationApi>({
       findMembersWithDepartments: async () => [
-        { userId: "user-7", departmentId: null, user: { name: "Dana Okafor", email: null } },
+        {
+          userId: "user-7",
+          departmentId: null,
+          disabledAt: null,
+          user: { name: "Dana Okafor", email: null },
+        },
       ],
     }),
     discoveredAgents,

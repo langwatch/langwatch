@@ -128,6 +128,7 @@ describe("given an address the router matched", () => {
 });
 
 describe("given a visitor with no session opening an invitation link", () => {
+  /** @scenario "The invite landing renders for a visitor with no session" */
   it("renders the landing instead of sending the visitor to sign in", () => {
     expect(isUiPublicRoute("/invite/accept")).toBe(true);
   });

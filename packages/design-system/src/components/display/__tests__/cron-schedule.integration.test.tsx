@@ -11,6 +11,7 @@ import { CronSchedule, describeCronField, describeCronSchedule } from "../cron-s
 afterEach(cleanup);
 
 describe("Feature: A cron schedule reads as a sentence with its expression beside it", () => {
+  /** @scenario "Common schedules read as sentences" */
   it("Scenario: Common schedules read as sentences", () => {
     expect(describeCronSchedule("*/15 * * * *")).toBe("Every 15 minutes");
     expect(describeCronSchedule("0 9 * * 1")).toBe("Every Monday at 09:00");
@@ -19,6 +20,7 @@ describe("Feature: A cron schedule reads as a sentence with its expression besid
     expect(describeCronSchedule("0 */2 * * *")).toBe("Every 2 hours");
   });
 
+  /** @scenario "A schedule it cannot say reads as custom" */
   it("Scenario: A schedule it cannot say reads as custom", () => {
     expect(describeCronSchedule("0 9 1-7 1,7 *")).toBeNull();
     renderWithDesignSystem(<CronSchedule cron="0 9 1-7 1,7 *" timezone="UTC" />);
@@ -26,6 +28,7 @@ describe("Feature: A cron schedule reads as a sentence with its expression besid
     expect(screen.getByText("1,7")).toBeInTheDocument();
   });
 
+  /** @scenario "Each field of the expression names itself" */
   it("Scenario: Each field of the expression names itself", () => {
     renderWithDesignSystem(<CronSchedule cron="*/15 * * * *" timezone="Europe/Amsterdam" />);
     const labels = [...document.querySelectorAll("[data-cron-field]")].map((el) =>

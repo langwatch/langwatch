@@ -146,6 +146,8 @@ func TestAChildThatPrintsAHugeLineIsNotBlocked(t *testing.T) {
 
 // A build note or a run's summary is plain output: each line shows as itself, never folded into
 // one error line. Only a run holding a stack frame is a crash, collapsed at error.
+//
+// @scenario "A failed seed says why on its last line"
 func TestPlainRawRunsShowLineByLineAndOnlyCrashesCollapse(t *testing.T) {
 	c, _ := captureSink(t)
 	c.stream(strings.NewReader("ensure-built: building @langwatch/mail\nbuilt in 9s\nseeded: 3 orgs\n"))

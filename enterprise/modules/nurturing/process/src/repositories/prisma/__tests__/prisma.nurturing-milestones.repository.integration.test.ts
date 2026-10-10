@@ -50,6 +50,7 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table", () => {
   });
 
   describe("when two events record one organization at once", () => {
+    /** @scenario "Concurrent events recording one organization leave one row and raise no error" */
     it("resolves both and leaves one row", async () => {
       const raced = `${organizationId}-raced`;
       const input = { organizationId: raced, adminUserId: null, seeded: true };

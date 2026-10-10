@@ -28,6 +28,7 @@ export function makeReader(
     findShareLinks: vi.fn().mockResolvedValue([]),
     findProjectLineage: vi.fn().mockResolvedValue(null),
     findTeamOrganization: vi.fn().mockResolvedValue(null),
+    findLiveSharedReads: vi.fn().mockResolvedValue([]),
   };
   return { ...base, ...overrides } as Mocked<AuthzReadRepository>;
 }

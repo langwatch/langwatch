@@ -362,7 +362,11 @@ describe("TraceModule", () => {
         });
 
         expect(verdicts["trace-1"]?.map((e) => e.evaluation_id)).toEqual([`evaluation-${SELLER}`]);
-        expect(verdicts["trace-1"]?.[0]).toMatchObject({ score: 1, details: null, inputs: null });
+        expect(verdicts["trace-1"]?.[0]).toMatchObject({
+          score: 1,
+          details: null,
+          inputs: undefined,
+        });
       });
     });
 

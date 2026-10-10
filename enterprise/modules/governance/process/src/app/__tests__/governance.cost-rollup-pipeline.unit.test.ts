@@ -98,7 +98,7 @@ describe("the pulled-usage pipeline's commands", () => {
 describe("the pulled-usage pipeline's event rows", () => {
   describe("when the store stamps a tenant's retention", () => {
     it("asks data-retention for the tenant's policy", async () => {
-      const policy = { defaultRetentionDays: 30 };
+      const policy = { traces: 30, scenarios: 30, experiments: 30 };
       const getResolvedForProject = vi.fn(async () => policy);
       const app = await buildApp(createApiFixture<DataRetentionApi>({ getResolvedForProject }));
 

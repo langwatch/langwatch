@@ -11,7 +11,6 @@ import { Field, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode, useCallback, useState } from "react";
 
 import { knownResponseShape, responseShape } from "../../model/known-response-shapes.ts";
-
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
 import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
 import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
@@ -144,7 +143,6 @@ export function AgentHttpEditorTabs({
               value={outputPath}
               onChange={onOutputPathChange}
               shape={shape}
-          shapeIsSample={testedShape === undefined}
               shapeIsSample={testedShape === undefined}
             />
           </Field.Root>

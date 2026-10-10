@@ -11,6 +11,7 @@ import { InlineCode } from "../inline-code.tsx";
 afterEach(cleanup);
 
 describe("Feature: Machine identifiers read as code", () => {
+  /** @scenario "An identifier renders as a code element with its full text as title" */
   it("Scenario: An identifier renders as a code element with its full text as title", () => {
     renderWithDesignSystem(<InlineCode>gateway.virtual_key.created</InlineCode>);
     const el = screen.getByText("gateway.virtual_key.created");
@@ -18,6 +19,7 @@ describe("Feature: Machine identifiers read as code", () => {
     expect(el).toHaveAttribute("title", "gateway.virtual_key.created");
   });
 
+  /** @scenario "A glob wildcard is emphasised" */
   it("Scenario: A glob wildcard is emphasised", () => {
     renderWithDesignSystem(<InlineCode>gateway.*</InlineCode>);
     expect(screen.getByText("*").tagName).toBe("SPAN");

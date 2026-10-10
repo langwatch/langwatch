@@ -76,7 +76,7 @@ function harness() {
     authz.authorize({
       principal: { type: "user", id: actor },
       permission: "traces:view",
-      scope: { type: "project", id: projectId },
+      scope: { type: "project", id: projectId, teamId: TEAM, organizationId: ORG },
       proof: { actor: { type: "user", id: actor }, purpose: { kind: "route", route } },
     });
 

@@ -21,6 +21,7 @@ const rows: LLMModelCostRow[] = [
 const base = { rows, search: "", provider: "", customOnly: false, sort: null };
 
 describe("filterAndSortCosts", () => {
+  /** @scenario "The model costs table filters by text, provider and custom rules" */
   it("filters by model text, regex text, provider and custom rows", () => {
     expect(filterAndSortCosts({ ...base, search: "CLAUDE" })).toHaveLength(1);
     expect(filterAndSortCosts({ ...base, search: "^gem" })[0]?.model).toBe("gemini");
@@ -28,6 +29,7 @@ describe("filterAndSortCosts", () => {
     expect(filterAndSortCosts({ ...base, customOnly: true })[0]?.id).toBe("c1");
   });
 
+  /** @scenario "The model costs table sorts by model, input cost and output cost" */
   it("sorts by model and by rate, keeping unset rates last in both directions", () => {
     const models = (sort: Parameters<typeof filterAndSortCosts>[0]["sort"]) =>
       filterAndSortCosts({ ...base, sort }).map((row) => row.model);
@@ -50,6 +52,7 @@ describe("filterAndSortCosts", () => {
 });
 
 describe("nextSort", () => {
+  /** @scenario "The model costs table sorts by model, input cost and output cost" */
   it("cycles ascending, descending, then off", () => {
     const asc = nextSort({ current: null, key: "model" });
     expect(asc).toEqual({ key: "model", direction: "asc" });

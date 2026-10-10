@@ -187,3 +187,23 @@ Feature: haven logs
     When the line is rendered
     Then the ready line and everything around it collapse to one record naming the tool, its version and its start time
     And a banner holding nothing but addresses and the help hint is dropped entirely
+
+  # haven's own supervisor restarts any exited lane after a backoff, forever.
+  @unit
+  Scenario: The restart line itself renders at warn, not with no level
+    Given a lane that exited and is about to be restarted
+    When haven's supervisor logs the restart
+    Then the line renders at level warn
+
+  @unit
+  Scenario: A repeated identical crash is rendered once with a counter
+    Given a lane that keeps crash-looping on the same unfixed cause
+    When it crashes a second and third time with the same fatal message
+    Then the second and third occurrences render as one short line with a restart count
+    And neither repeats the full message or the location a second time
+
+  @unit
+  Scenario: A different crash after a repeat is rendered in full again
+    Given a lane that crash-looped once on one cause
+    When it then crashes on a different cause
+    Then the new failure is rendered in full, not folded into the previous counter

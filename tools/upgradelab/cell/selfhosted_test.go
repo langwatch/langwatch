@@ -82,7 +82,7 @@ func TestNoAdminVariantHoldsNoAdminEmails(t *testing.T) {
 	}
 }
 
-// @scenario "E1 fails when the licence copy step is missing or a licensed organization lost its key"
+// @scenario "E1 fails when the licence copy step is missing or a licensed organisation lost its key"
 func TestE1NeedsTheCopyStepAndEveryKey(t *testing.T) {
 	ledger := []LedgerRow{{ID: "licensing:copy-organization-licenses", Status: "done"}}
 	cases := []struct {

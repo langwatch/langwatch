@@ -444,6 +444,7 @@ interface GovernanceAppDependencies {
       | "findPrimaryIntent"
       | "getTeam"
       | "getTeamWithMembers"
+      | "getMember"
       | "getSessionPolicy"
       | "saveSessionPolicy"
       | "getSettings"

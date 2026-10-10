@@ -19,8 +19,8 @@ async function setup() {
   return { service, platform };
 }
 
-/** @scenario A team name is unique within its organization */
 describe("team names are unique per organization", () => {
+  /** @scenario "A team name is unique within its organization" */
   it("refuses creating a team with a taken name, ignoring case and padding", async () => {
     const { service } = await setup();
 

@@ -40,6 +40,7 @@ const workspace = (overrides: Partial<ProjectIdentity>): ProjectIdentity => ({
   organizationId: ORGANIZATION_ID,
   isPersonal: true,
   ownerUserId: OWNER_ID,
+  kind: "application",
   ...overrides,
 });
 

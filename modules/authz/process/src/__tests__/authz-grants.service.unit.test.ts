@@ -43,7 +43,15 @@ type CompatibilityMethod = keyof Pick<
   | "deleteRole"
 >;
 
-type LedgerStub = Record<CompatibilityMethod, Mock>;
+type SharedProjectMethod = keyof Pick<
+  EventingAuthzLedgerAdapter,
+  | "findLiveSharedProjectGrants"
+  | "attachSharedProjectGrant"
+  | "awaitSharedProjectGrants"
+  | "revokeSharedProjectGrants"
+>;
+
+type LedgerStub = Record<CompatibilityMethod | SharedProjectMethod, Mock>;
 
 const OFFBOARD_COUNTS = {
   bindings: 2,
@@ -85,6 +93,10 @@ function makeLedger(overrides: Partial<LedgerStub> = {}): LedgerStub {
     attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
     attachResourceGrant: vi.fn().mockResolvedValue(undefined),
     revokeResourceGrants: vi.fn().mockResolvedValue(undefined),
+    findLiveSharedProjectGrants: vi.fn().mockResolvedValue([]),
+    attachSharedProjectGrant: vi.fn(),
+    awaitSharedProjectGrants: vi.fn().mockResolvedValue(undefined),
+    revokeSharedProjectGrants: vi.fn().mockResolvedValue(undefined),
     changeBindingRole: vi.fn().mockResolvedValue(undefined),
     revokeBindings: vi.fn().mockResolvedValue(undefined),
     revokeBindingsWhere: vi.fn().mockResolvedValue(0),
