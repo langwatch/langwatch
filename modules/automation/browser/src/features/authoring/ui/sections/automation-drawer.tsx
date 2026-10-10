@@ -416,7 +416,12 @@ export function AutomationDrawer({
           timePeriodMinutes: draft.graphAlert.timePeriod,
         }
       : null,
-    report: isReport ? { sourceKind: draft.report.sourceKind } : null,
+    report: isReport
+      ? {
+          sourceKind: draft.report.sourceKind,
+          scheduleLabel: describeCron(draft.report.cron, draft.report.timezone),
+        }
+      : null,
   });
   const localPreview = useNotifyPreview({
     channel: section === "configuration" && channel !== "email" ? channel : null,
