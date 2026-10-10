@@ -1,6 +1,7 @@
 /**
  * `servingUpgradeGate`'s seam over a real Postgres: each test gets its own schema. Requires
- * LANGWATCH_TEST_DATABASE_URL. Spec: specs/upgrade/entry-points.feature.
+ * LANGWATCH_TEST_DATABASE_URL. Specs: specs/upgrade/entry-points.feature and
+ * specs/upgrade/upgrade-stuck-states-gate.feature.
  */
 import pg from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -59,6 +60,16 @@ async function recordSteps(steps: Record<string, "done" | "pending">): Promise<v
       `INSERT INTO "_langwatch_upgrade_step" ("id", "kind", "mode", "status", "updated_at")
        VALUES ($1, $2, 'blocking', $3, now())`,
       [id, kindOf(id), status],
+    );
+  }
+}
+
+async function registerSteps({ ids, mode }: { ids: string[]; mode: string }): Promise<void> {
+  for (const id of ids) {
+    await scratch.postgres.query(
+      `INSERT INTO "_langwatch_upgrade_step" ("id", "kind", "mode", "status", "updated_at")
+       VALUES ($1, 'data', $2, 'pending', now())`,
+      [id, mode],
     );
   }
 }
@@ -243,6 +254,41 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
       await gate.release();
     });
 
+    /** @scenario "A Retry of the failed blocking step frees the worker while another failed row stays" */
+    it("runs again after the Retry, ignoring a failed row outside the image's blocking steps", async () => {
+      const said: string[] = [];
+      let runs = 0;
+      let waits = 0;
+      const gate = gateFor({
+        role: "worker",
+        warn: (message) => void said.push(message),
+        wait: async () => {
+          waits += 1;
+          if (waits > 5) throw new Error("the worker is still waiting after the Retry");
+          if (said.some((line) => line.includes("waits for a Retry"))) {
+            await markStep({ id: PRISMA, status: "pending" });
+          }
+        },
+        firstInstall: async () => {
+          runs += 1;
+          if (runs === 1) {
+            await recordSteps({ [PRISMA]: "pending", [GOOSE]: "pending" });
+            await registerSteps({ ids: ["trace:retired-backfill"], mode: "background" });
+            await markStep({ id: "trace:retired-backfill", status: "failed" });
+            await markStep({ id: PRISMA, status: "failed" });
+            return { exitCode: 1, logTail: [] };
+          }
+          await markStep({ id: PRISMA, status: "done" });
+          await markStep({ id: GOOSE, status: "done" });
+          return { exitCode: 0, logTail: [] };
+        },
+      });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(runs).toBe(2);
+      await gate.release();
+    });
+
     /** @scenario "The api never runs the upgrade on a first install" */
     it("answers the api upgrading and runs nothing", async () => {
       let runs = 0;
@@ -284,12 +330,33 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         warn: (message) => void said.push(message),
         firstInstall: async () => {
           for (const id of blocking) await markStep({ id, status: "done" });
+          await registerSteps({ ids: background, mode: "background" });
           return { exitCode: 0, logTail: [] };
         },
       });
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
-      expect(said[0]).toContain(`blocking steps not done: ${blocking.join(", ")}`);
+      expect(said[0]).toContain(`steps not done: ${blocking.join(", ")}`);
+      await gate.release();
+    });
+
+    /** @scenario "A worker runs the upgrade for a background step the ledger has not registered" */
+    it("runs the upgrade for the worker when only a background step is unregistered", async () => {
+      expect(background.length).toBeGreaterThan(0);
+      await recordSteps({ ...schemaDone, ...doneOf(blocking) });
+      let runs = 0;
+      const gate = gateFor({
+        role: "worker",
+        tree,
+        firstInstall: async () => {
+          runs += 1;
+          await registerSteps({ ids: background, mode: "background" });
+          return { exitCode: 0, logTail: [] };
+        },
+      });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(runs).toBe(1);
       await gate.release();
     });
 

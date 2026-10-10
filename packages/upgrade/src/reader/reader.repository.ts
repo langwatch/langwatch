@@ -85,6 +85,7 @@ const runFactSchema = z.object({
   release: nullable(z.string()),
   floor: nullable(z.string()),
   started_at: z.date(),
+  plan: jsonObject,
 });
 export type LedgerRunFact = z.infer<typeof runFactSchema>;
 
@@ -340,7 +341,8 @@ export class UpgradeReaderRepository {
     if (!tables.run) return [];
     const { rows } = await this.query<object>(
       (t) => `SELECT run."kind", run."outcome", run."release",
-          to_jsonb(run) ->> 'floor' AS "floor", run."started_at" FROM ${t.run} run`,
+          to_jsonb(run) ->> 'floor' AS "floor", to_jsonb(run) -> 'plan' AS "plan",
+          run."started_at" FROM ${t.run} run`,
     );
     return rows.map((row) => runFactSchema.parse(row));
   }

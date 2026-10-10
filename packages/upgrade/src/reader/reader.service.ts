@@ -221,13 +221,13 @@ function planFactsFrom({
     const kind = upgradeRunKindSchema.safeParse(run.kind);
     const outcome = upgradeRunOutcomeSchema.nullable().safeParse(run.outcome);
     if (!kind.success || !outcome.success) return [];
-    const { release, floor, started_at: startedAt } = run;
-    return [{ kind: kind.data, outcome: outcome.data, release, floor, startedAt }];
+    const { release, floor, plan, started_at: startedAt } = run;
+    return [{ kind: kind.data, outcome: outcome.data, release, floor, plan, startedAt }];
   });
   return { steps, runs };
 }
 
-/** The ledger as the planner reads it; an empty or absent one is read from the tools' records. */
+/** As the runner: the ledger once a seed run succeeded, else the tools' records. */
 async function readPlanFacts({
   repository,
   tables,
@@ -243,7 +243,8 @@ async function readPlanFacts({
     repository.findStepFacts({ tables }),
     repository.findRunFacts({ tables }),
   ]);
-  if (stepRows.length > 0 || runRows.length > 0) return planFactsFrom({ stepRows, runRows });
+  const seeded = runRows.some((run) => run.kind === "seed" && run.outcome === "succeeded");
+  if (seeded) return planFactsFrom({ stepRows, runRows });
   const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
   const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
   return { steps: [...prisma, ...goose], runs: [] };
@@ -312,6 +313,7 @@ export function createUpgradeReader({
       steps: facts.stepFacts,
       failedTargets: facts.failedTargets,
       holdsLease: facts.holdsLease,
+      lastRunFailed: facts.latestRun?.outcome === "failed",
     });
     return {
       ...verdict,

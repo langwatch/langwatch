@@ -159,7 +159,7 @@ export function upgradeGateOver({
                 gate,
                 firstInstall,
                 warn,
-                findFailedSteps,
+                findFailedSteps: findBlockingFailures,
                 findLeaseHolder,
                 wait,
               })
@@ -285,7 +285,7 @@ function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateW
   const why =
     verdict.outcome === "first-install"
       ? "first install: the ledger and the schema are empty"
-      : `behind this image: blocking steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
+      : `behind this image: steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
   warn(
     `${why}, so this worker runs \`${UPGRADE_COMMAND}\` before it takes jobs; its lines follow`,
     {
