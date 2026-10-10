@@ -110,7 +110,7 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           border="1px solid"
           borderColor="border"
           cursor="pointer"
-          _hover={{ bg: "gray.50" }}
+          _hover={{ bg: "bg.subtle" }}
           transition="background 0.15s"
           justify="space-between"
         >

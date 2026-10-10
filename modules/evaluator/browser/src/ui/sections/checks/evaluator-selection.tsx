@@ -211,7 +211,7 @@ export function EvaluatorSelection({
                   justifyContent="center"
                   minHeight="200px"
                   _hover={{
-                    background: "gray.50",
+                    background: "bg.subtle",
                     textDecoration: "none",
                   }}
                 >
@@ -265,12 +265,12 @@ function EvaluatorChoiceCard({
         isDisabled
           ? undefined
           : {
-              background: "gray.200",
+              background: "bg.emphasized",
             }
       }
       onClick={choose}
-      color={isDisabled ? "gray.400" : undefined}
-      background={isDisabled ? "gray.50" : "white"}
+      color={isDisabled ? "fg.subtle" : undefined}
+      background={isDisabled ? "bg.subtle" : "bg.panel"}
     >
       <button type="button">
         <VStack align="start" gap={4} position="relative">
@@ -283,7 +283,7 @@ function EvaluatorChoiceCard({
                 position="absolute"
                 right="-12px"
                 top="-12px"
-                background="blue.100"
+                background="blue.subtle"
                 borderRadius="100%"
                 padding="4px"
               >
@@ -373,8 +373,8 @@ function EvaluatorChoiceCard({
                   >
                     <Badge
                       colorPalette="blue"
-                      backgroundColor="blue.50"
-                      color="blue.700"
+                      backgroundColor="blue.subtle"
+                      color="blue.fg"
                       whiteSpace="nowrap"
                     >
                       Requires Expected Output
@@ -397,8 +397,8 @@ function EvaluatorChoiceCard({
                   >
                     <Badge
                       colorPalette="purple"
-                      backgroundColor="purple.50"
-                      color="purple.700"
+                      backgroundColor="purple.subtle"
+                      color="purple.fg"
                       whiteSpace="nowrap"
                     >
                       Requires Expected Contexts

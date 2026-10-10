@@ -128,7 +128,7 @@ export function EvaluatorCard({
                   </Menu.Item>
                 )}
                 {onDelete && (
-                  <Menu.Item value="delete" color="red.500" onClick={stop(onDelete)}>
+                  <Menu.Item value="delete" color="red.fg" onClick={stop(onDelete)}>
                     <LuTrash2 size={14} /> Delete
                   </Menu.Item>
                 )}

@@ -278,7 +278,7 @@ EOF
                 API key.{" "}
                 <Link
                   href={apiKeyLink}
-                  color="blue.500"
+                  color="blue.fg"
                   display="inline-flex"
                   alignItems="center"
                   gap={1}
@@ -291,7 +291,7 @@ EOF
                 {usageMode === "experiment" ? "running experiments" : "online evaluations"} in our{" "}
                 <Link
                   href={docsLink}
-                  color="blue.500"
+                  color="blue.fg"
                   display="inline-flex"
                   alignItems="center"
                   gap={1}

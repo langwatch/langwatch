@@ -540,7 +540,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                         onChange={(e) => form.setValue("sample", parseFloat(e.target.value) || 1)}
                       />
                     </HStack>
-                    <Text color="gray.500" fontStyle="italic">
+                    <Text color="fg.subtle" fontStyle="italic">
                       This evaluation will run on {runOnText}
                       {preconditions.length > 0 && " matching the preconditions"}
                     </Text>
@@ -826,7 +826,7 @@ function PreconditionRow({
   const valueType = getFieldValueType(currentField);
   const keyInfo = fieldRequiresKey(currentField);
   return (
-    <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+    <Box borderLeft="4px solid" borderLeftColor="blue.emphasized" width="full">
       <VStack padding={3} width="full" align="start" position="relative">
         <Button
           aria-label={`Remove precondition ${index + 1}`}
@@ -837,7 +837,7 @@ function PreconditionRow({
           size="sm"
           variant="ghost"
           onClick={() => removePrecondition(index)}
-          color="gray.400"
+          color="fg.subtle"
         >
           <X size={16} />
         </Button>
@@ -990,7 +990,7 @@ function PreconditionsEditor({
     <VStack align="start" gap={3}>
       {isDefaultOnlyPrecondition(preconditions) && !expanded ? (
         <>
-          <Text color="gray.500" fontStyle="italic">
+          <Text color="fg.subtle" fontStyle="italic">
             This evaluation will run on every application trace
           </Text>
           <Button variant="outline" onClick={onAdd}>
@@ -1009,7 +1009,7 @@ function PreconditionsEditor({
               onRemove={onRemove}
             />
           ))}
-          <Text color="gray.500" fontStyle="italic">
+          <Text color="fg.subtle" fontStyle="italic">
             This evaluation will run on {runOnText}
             {preconditions.length > 0 && " matching the preconditions"}
           </Text>
@@ -1037,10 +1037,10 @@ function EvaluatorHelperText({
           <br />
           <Text
             as="span"
-            color="blue.500"
+            color="blue.fg"
             cursor="pointer"
             textDecoration="underline"
-            _hover={{ color: "blue.600" }}
+            _hover={{ color: "blue.fg" }}
             onClick={onRemoveSelection}
           >
             (Remove Selection)

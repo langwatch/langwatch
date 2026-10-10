@@ -141,7 +141,7 @@ export function EvaluatorEditorHeading({
           openDelay={0}
           showArrow
         >
-          <Circle size="10px" bg="orange.400" />
+          <Circle size="10px" bg="orange.solid" />
         </Tooltip>
       )}
     </>
