@@ -192,7 +192,7 @@ function ListeningIndicator() {
       <Box
         boxSize="8px"
         borderRadius="full"
-        background="blue.500"
+        background="blue.solid"
         css={{
           "@keyframes listening-dot": {
             "0%, 100%": { opacity: 1 },

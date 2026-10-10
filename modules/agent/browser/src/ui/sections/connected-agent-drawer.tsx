@@ -128,7 +128,7 @@ function PresenceLine({ agent }: { agent: ConnectedAgentBrowser }) {
       <Box
         boxSize="8px"
         borderRadius="full"
-        background={agent.status === "online" ? "green.500" : "fg.subtle"}
+        background={agent.status === "online" ? "green.solid" : "fg.subtle"}
       />
       <Text fontSize="sm" color="fg.muted">
         {parts.join(" · ")}

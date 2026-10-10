@@ -142,7 +142,7 @@ function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
             <Box
               boxSize="8px"
               borderRadius="full"
-              background="green.500"
+              background="green.solid"
               data-testid="agent-type-connected-dot"
             />
             <Text fontWeight="500" fontSize="sm">

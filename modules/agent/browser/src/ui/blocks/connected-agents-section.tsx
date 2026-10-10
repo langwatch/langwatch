@@ -75,7 +75,11 @@ function PresenceMark({ agent }: { agent: ConnectedAgentBrowser }) {
         aria-label={label}
         data-testid={`connected-agent-status-${agent.status}`}
       >
-        <Box boxSize="8px" borderRadius="full" background={isOnline ? "green.500" : "gray.400"} />
+        <Box
+          boxSize="8px"
+          borderRadius="full"
+          background={isOnline ? "green.solid" : "fg.subtle"}
+        />
         <Text fontSize="12px" color="fg.muted">
           {isOnline ? "Online" : "Offline"}
         </Text>
@@ -190,7 +194,7 @@ function ConnectedAgentMenu({
         {onDelete && (
           <Menu.Item
             value="delete"
-            color="red.500"
+            color="red.fg"
             onClick={(event) => {
               event.stopPropagation();
               onDelete();
