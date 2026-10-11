@@ -46,6 +46,14 @@ function page(state: ListPageState, extra: Partial<ListPageProps> = {}) {
 }
 
 describe("ListPage", () => {
+  it("shows the description once, inside the header", () => {
+    renderWithDesignSystem(page("ready", { description: "Who can run operators." }));
+
+    const line = screen.getByText("Who can run operators.");
+    expect(screen.getAllByText("Who can run operators.")).toHaveLength(1);
+    expect(line.closest("[data-page-header]")).not.toBeNull();
+  });
+
   /** @scenario A list distinguishes loading, empty and failed reads */
   it("replaces rows for loading, emptiness and failure", () => {
     const { rerender } = renderWithDesignSystem(page("loading"));

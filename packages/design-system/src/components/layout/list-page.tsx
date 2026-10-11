@@ -67,7 +67,7 @@ type ListPagePaging =
 export type ListPageProps = ListPagePaging &
   ListPageStateConfig & {
     title: string;
-    /** First body line, muted. */
+    /** One muted line under the title, in the header. */
     description?: string;
     back?: ListPageBack;
     /** `PageLayout.HeaderButton`s only; one `primary`. */
@@ -129,7 +129,7 @@ function ListPageView({
   const showToolbar = (toolbar || inlineSelection) && state !== "error" && state !== "empty";
   return (
     <>
-      <PageLayout.Header actions={actions}>
+      <PageLayout.Header actions={actions} description={description}>
         {back && (
           <BackLink href={back.href} onNavigate={back.onNavigate}>
             {back.label}
@@ -137,18 +137,13 @@ function ListPageView({
         )}
         <PageLayout.Heading>{title}</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container width="fill">
+      <PageLayout.Container width="fill" {...(description ? { paddingTop: 0 } : {})}>
         <Stack
           gap={4}
           minWidth={0}
           aria-busy={state === "loading" || (ready && refreshing)}
           data-state={state}
         >
-          {description && (
-            <Text textStyle="sm" color="fg.muted">
-              {description}
-            </Text>
-          )}
           {showToolbar && (
             <TableToolbar {...toolbar} selection={inlineSelection} disabled={state === "loading"} />
           )}
@@ -231,13 +226,10 @@ function LegacyListPage({
 
   return (
     <>
-      <PageLayout.Header actions={actions}>
-        <Stack gap={1} minWidth={0}>
-          <PageLayout.Heading>{title}</PageLayout.Heading>
-          {subtitle && <PageLayout.Subtitle>{subtitle}</PageLayout.Subtitle>}
-        </Stack>
+      <PageLayout.Header actions={actions} description={subtitle}>
+        <PageLayout.Heading>{title}</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container width="fill">
+      <PageLayout.Container width="fill" {...(subtitle ? { paddingTop: 0 } : {})}>
         <Stack gap={4} minWidth={0}>
           {toolbar && <Box minWidth={0}>{toolbar}</Box>}
           {refreshing && !loading && (

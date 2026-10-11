@@ -14,6 +14,7 @@ import {
   HStack,
   mergeRefs,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import {
   createContext,
@@ -26,6 +27,7 @@ import {
   type ReactElement,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from "react";
 
 import { useProductAccent } from "../scope/use-product-accent.ts";
@@ -95,6 +97,8 @@ export function PageHeaderSizeProvider({
 export interface PageHeaderProps {
   /** `HeaderButton`s only; one of them `primary`. */
   actions?: ReactNode;
+  /** What the page is, in one muted body line under the title; the header grows to fit it. */
+  description?: ReactNode;
   children: ReactNode;
   "data-testid"?: string;
 }
@@ -105,21 +109,11 @@ export interface LegacyHeaderProps extends ChakraStackProps {
   ref?: Ref<HTMLDivElement>;
   withBorder?: boolean;
   actions?: ReactNode;
+  description?: ReactNode;
 }
 
-function Header(props: PageHeaderProps): ReactNode;
-/** @deprecated Pass only `actions`, `children` and `data-testid`. */
-function Header(props: PropsWithChildren<LegacyHeaderProps>): ReactNode;
-function Header({
-  children,
-  withBorder = true,
-  size: requestedSize = "lg",
-  actions,
-  ref,
-  ...props
-}: PropsWithChildren<LegacyHeaderProps>): ReactNode {
-  const size = useContext(PageHeaderAreaContext) ?? requestedSize;
-  const headerRef = useRef<HTMLDivElement>(null);
+/** Whether the page has scrolled under the header, so its reserved hairline can show. */
+function useContentScrolled({ headerRef }: { headerRef: RefObject<HTMLDivElement | null> }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -144,7 +138,33 @@ function Header({
     update();
     document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => document.removeEventListener("scroll", onScroll, true);
-  }, []);
+  }, [headerRef]);
+  return scrolled;
+}
+
+/** A bordered title row is nudged by the rule; a described header pads by the scale. */
+function headerPaddingTop({ described, withBorder }: { described: boolean; withBorder: boolean }) {
+  if (described) return 3;
+  return withBorder ? "1px" : 0;
+}
+
+function Header(props: PageHeaderProps): ReactNode;
+/** @deprecated Pass only `actions`, `children` and `data-testid`. */
+function Header(props: PropsWithChildren<LegacyHeaderProps>): ReactNode;
+function Header({
+  children,
+  withBorder = true,
+  size: requestedSize = "lg",
+  actions,
+  description,
+  ref,
+  ...props
+}: PropsWithChildren<LegacyHeaderProps>): ReactNode {
+  const described = description !== undefined && description !== null && description !== false;
+  const size = useContext(PageHeaderAreaContext) ?? requestedSize;
+  const headerRef = useRef<HTMLDivElement>(null);
+  const scrolled = useContentScrolled({ headerRef });
+  const paddingTop = headerPaddingTop({ described, withBorder });
 
   return (
     <HeaderSizeContext.Provider value={size}>
@@ -154,7 +174,7 @@ function Header({
         data-scrolled={scrolled ? "true" : "false"}
         data-header-size={size}
         flexShrink={0}
-        alignItems="center"
+        alignItems={described ? "flex-start" : "center"}
         width="full"
         borderBottomWidth={withBorder ? "1px" : 0}
         borderBottomStyle={withBorder ? "solid" : "none"}
@@ -168,12 +188,12 @@ function Header({
         background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
         backdropFilter="var(--lw-backdrop-blur, blur(16px))"
         {...props}
-        height={`pageHeader.${size}`}
+        height={described ? "auto" : `pageHeader.${size}`}
         minHeight={`pageHeader.${size}`}
-        maxHeight={`pageHeader.${size}`}
+        maxHeight={described ? "none" : `pageHeader.${size}`}
         paddingX={PAGE_INSET}
-        paddingTop={withBorder ? "1px" : 0}
-        paddingBottom={0}
+        paddingTop={paddingTop}
+        paddingBottom={described ? 3 : 0}
         flexWrap="nowrap"
         css={{
           "& h1": {
@@ -191,9 +211,27 @@ function Header({
           ...props.css,
         }}
       >
-        {children}
+        {described ? (
+          <VStack align="stretch" gap={1} flex={1} minWidth={0}>
+            <HStack gap={3} minWidth={0}>
+              {children}
+            </HStack>
+            <Text data-header-description textStyle="body" color="fg.muted">
+              {description}
+            </Text>
+          </VStack>
+        ) : (
+          children
+        )}
         {actions && (
-          <HStack data-header-actions marginStart="auto" minWidth={0} overflowX="auto" gap={2}>
+          <HStack
+            data-header-actions
+            marginStart={described ? 0 : "auto"}
+            marginTop={described && size === "lg" ? "-1" : 0}
+            minWidth={0}
+            overflowX="auto"
+            gap={2}
+          >
             {actions}
           </HStack>
         )}
@@ -235,7 +273,7 @@ function Subtitle(props: { children: ReactNode }): ReactNode;
 /** @deprecated Pass only `children`; padding belongs to the header. */
 function Subtitle(props: ChakraTextProps): ReactNode;
 function Subtitle(props: ChakraTextProps): ReactNode {
-  return <Text color="fg.muted" textStyle="caption" {...props} />;
+  return <Text color="fg.muted" textStyle="body" {...props} />;
 }
 
 // Content component

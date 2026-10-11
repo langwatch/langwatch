@@ -20,6 +20,47 @@ describe("PageLayout", () => {
     });
   });
 
+  describe("given a header with a description", () => {
+    it("sets it as one muted body line under the title and lets the header grow", () => {
+      renderWithDesignSystem(
+        <PageLayout.Header
+          data-testid="header"
+          description="What a role can do."
+          actions={<PageLayout.HeaderButton>New role</PageLayout.HeaderButton>}
+        >
+          <PageLayout.Heading>Roles</PageLayout.Heading>
+        </PageLayout.Header>,
+      );
+
+      const header = getComputedStyle(screen.getByTestId("header"));
+      const line = screen.getByText("What a role can do.");
+      expect(header.height).toBe("auto");
+      expect(header.maxHeight).toBe("none");
+      expect(header.paddingTop).toBe("var(--chakra-spacing-3)");
+      expect(header.paddingBottom).toBe("var(--chakra-spacing-3)");
+      expect(line.hasAttribute("data-header-description")).toBe(true);
+      const stack = line.parentElement;
+      if (!stack) throw new Error("description has no stack");
+      expect(getComputedStyle(stack).gap).toBe("var(--chakra-spacing-1)");
+      expect(getComputedStyle(line).fontSize).toBe("14px");
+      expect(getComputedStyle(line).lineHeight).toBe("20px");
+      expect(screen.getByRole("button", { name: "New role" })).toBeTruthy();
+    });
+
+    it("reserves no description line when there is none", () => {
+      renderWithDesignSystem(
+        <PageLayout.Header data-testid="header">
+          <PageLayout.Heading>Security</PageLayout.Heading>
+        </PageLayout.Header>,
+      );
+
+      expect(document.querySelector("[data-header-description]")).toBeNull();
+      expect(getComputedStyle(screen.getByTestId("header")).maxHeight).toBe(
+        "var(--chakra-sizes-page-header-lg)",
+      );
+    });
+  });
+
   describe("given a header", () => {
     it("rules off the page below itself by default", () => {
       renderWithDesignSystem(<PageLayout.Header data-testid="header">Datasets</PageLayout.Header>);

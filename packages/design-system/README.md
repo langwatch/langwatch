@@ -125,6 +125,11 @@ Every docs page shows how many files import the component, counted from the
 import sites when Storybook starts or builds (`.storybook/adoption.ts`;
 `node .storybook/adoption.ts` prints the whole inventory).
 
+## Page headers
+
+A title-only header is a 48px row. A header with a `description` grows to fit it: 12px above the
+title, 4px to the description (14/20 muted), 12px below and the 1px rule, 77px for one line.
+
 ## Section navigation
 
 `SectionNavigationFrame` pairs a 176px text rail with the page content on `bg.card`.

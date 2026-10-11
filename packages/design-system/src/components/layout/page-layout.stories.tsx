@@ -159,12 +159,10 @@ export const HeaderStates: Story = {
             <Badge variant="subtle">12</Badge>
           </PageLayout.Header>
           <PageLayout.Header
+            description="Usage across your organization"
             actions={<PageLayout.HeaderButton disabled>Export</PageLayout.HeaderButton>}
           >
-            <Stack gap={0.5} minWidth={0}>
-              <PageLayout.Heading>Costs</PageLayout.Heading>
-              <PageLayout.Subtitle>Usage across your organization</PageLayout.Subtitle>
-            </Stack>
+            <PageLayout.Heading>Costs</PageLayout.Heading>
           </PageLayout.Header>
           <PageLayout.Header
             withBorder={false}
@@ -265,7 +263,7 @@ export const HeaderGeometry: Story = {
       if (!title) throw new Error("Missing title");
       const row = header.getBoundingClientRect();
       const box = title.getBoundingClientRect();
-      if (row.height !== 64 || box.left - row.left !== 24 || box.top - row.top !== 18) {
+      if (row.height !== 48 || box.left - row.left !== 24 || box.top - row.top !== 10) {
         throw new Error(
           `Header moved: ${row.height}, ${box.left - row.left}, ${box.top - row.top}`,
         );
@@ -275,7 +273,40 @@ export const HeaderGeometry: Story = {
       }
     }
     const rail = canvasElement.querySelector('[data-testid="section-navigation-title"]');
-    if (!rail || rail.getBoundingClientRect().height !== 64) throw new Error("Rail title resized");
+    if (!rail || rail.getBoundingClientRect().height !== 48) throw new Error("Rail title resized");
+  },
+};
+
+/** A description sits 4px under the title; one line makes the header 77px, a wrapped one grows. */
+export const DescribedHeader: Story = {
+  render: () => (
+    <PageHeaderSizeProvider size="lg">
+      <Stack width="640px" gap={4}>
+        <PageLayout.Header
+          data-testid="short"
+          description="What a role can do, and who holds one where."
+          actions={<PageLayout.HeaderButton primary>New role</PageLayout.HeaderButton>}
+        >
+          <PageLayout.Heading>Roles &amp; access</PageLayout.Heading>
+        </PageLayout.Header>
+        <PageLayout.Header
+          data-testid="wrapped"
+          description="A long description wraps onto further lines and every extra line adds twenty pixels, so nothing is ever clipped, however large the reader's text is set."
+        >
+          <PageLayout.Heading>Directory</PageLayout.Heading>
+        </PageLayout.Header>
+      </Stack>
+    </PageHeaderSizeProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await document.fonts.ready;
+    const header = canvasElement.querySelector<HTMLElement>('[data-testid="short"]');
+    const title = header?.querySelector("h1");
+    const line = header?.querySelector("[data-header-description]");
+    if (!header || !title || !line) throw new Error("Missing described header");
+    const row = header.getBoundingClientRect();
+    const gap = line.getBoundingClientRect().top - title.getBoundingClientRect().bottom;
+    if (row.height !== 77 || gap !== 4) throw new Error(`Described header: ${row.height}, ${gap}`);
   },
 };
 

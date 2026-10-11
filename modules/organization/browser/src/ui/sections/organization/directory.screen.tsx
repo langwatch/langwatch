@@ -5,7 +5,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  * Members, Teams and Groups are its tabs; their old addresses forward onto them.
  * Spec: specs/identity/directory-administration.feature
  */
-import { Box, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Suspense } from "react";
 
@@ -63,14 +63,10 @@ function Directory({
 
   return (
     <>
-      <PageLayout.Header>
+      <PageLayout.Header description="Who is in this organization, how they got here, and which system says so.">
         <PageLayout.Heading>Directory</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
-        <Text color="fg.muted">
-          Who is in this organization, how they got here, and which system says so.
-        </Text>
-
+      <VStack gap={3} width="full" align="stretch">
         {/* The status band reads what the directory has been doing: sso:view. */}
         {Summary && host.hasOrganizationPermission("sso:view") && (
           <Suspense fallback={null}>
@@ -117,7 +113,7 @@ function DirectoryTabs({
           label: "People",
           count: counts.people,
           content: (
-            <Box paddingTop={10}>
+            <Box paddingTop={4}>
               <MembersScreen />
             </Box>
           ),
@@ -127,7 +123,7 @@ function DirectoryTabs({
           label: "Teams & projects",
           count: counts.teams,
           content: (
-            <Box paddingTop={10}>
+            <Box paddingTop={4}>
               <TeamsScreen />
             </Box>
           ),
@@ -137,7 +133,7 @@ function DirectoryTabs({
           label: "Groups",
           count: counts.groups,
           content: (
-            <Box paddingTop={10}>
+            <Box paddingTop={4}>
               <GroupsScreen />
             </Box>
           ),
@@ -150,7 +146,7 @@ function DirectoryTabs({
                 label: "Departments",
                 count: departmentCount,
                 content: (
-                  <Box paddingTop={10}>
+                  <Box paddingTop={4}>
                     <DepartmentsScreen organizationId={organizationId} />
                   </Box>
                 ),

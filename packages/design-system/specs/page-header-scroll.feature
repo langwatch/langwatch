@@ -32,11 +32,19 @@ Feature: Sticky glass page titles
   Scenario: The area pins header geometry independently of actions
     Given a shell or section area with large headers
     When headers have no actions, one action, or several actions
-    Then every header row is 64 pixels high
-    And every title box starts 24 pixels from the left and 18 pixels from the top
+    Then every header row is 48 pixels high
+    And every title box starts 24 pixels from the left and 10 pixels from the top
     And titles are 20 pixel semibold with a 28 pixel line box
     And buttons are 36 pixels high
     And a page cannot select compact sizing inside that area
+
+  @integration @browser
+  Scenario: A described header grows to its description and spaces it by the scale
+    Given a large header with a one-line description
+    Then the title sits 12 pixels below the top and the description 4 pixels below the title
+    And the header is 12 pixels of padding, a 1 pixel rule and 77 pixels high in all
+    And a header without a description reserves no line for one
+    And a description that wraps adds 20 pixels a line and is never clipped
 
   @integration
   Scenario: Full-screen tools may use compact headers
