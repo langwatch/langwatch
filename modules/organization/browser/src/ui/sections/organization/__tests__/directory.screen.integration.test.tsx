@@ -211,9 +211,11 @@ describe("the directory page", () => {
     it("counts everybody on the people tab and every group on the groups tab", () => {
       renderDirectory();
 
-      expect(screen.getByRole("tab", { name: /People/ })).toHaveTextContent("People 5");
-      expect(screen.getByRole("tab", { name: /Groups/ })).toHaveTextContent("Groups 2");
-      expect(screen.getByRole("tab", { name: /Teams/ })).toHaveTextContent("Teams & projects 0");
+      expect(screen.getByRole("tab", { name: /People/ })).toHaveTextContent(/^People\s*5$/);
+      expect(screen.getByRole("tab", { name: /Groups/ })).toHaveTextContent(/^Groups\s*2$/);
+      expect(screen.getByRole("tab", { name: /Teams/ })).toHaveTextContent(
+        /^Teams & projects\s*0$/,
+      );
     });
 
     /** @scenario The tabs name the subjects this page owns */
@@ -320,7 +322,9 @@ describe("the directory page", () => {
     it("offers a departments tab carrying how many there are", () => {
       renderDirectory({ grants: GOVERNANCE_READER, flags: new Set([GOVERNANCE_FLAG]) });
 
-      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveTextContent("Departments 2");
+      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveTextContent(
+        /^Departments\s*2$/,
+      );
     });
 
     /** @scenario "The departments tab references what Governance manages" */
