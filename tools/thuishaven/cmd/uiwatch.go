@@ -32,7 +32,8 @@ func runUIWatch(ctx context.Context, _ deps, _ invocation) error {
 		MaxWait: envMillis("LANGWATCH_UI_WATCH_MAX_WAIT_MS", 60*time.Second),
 	}
 	served := filepath.Join(repoRoot, app.UIDirRel, "dist", "client", "index.html")
-	last := gowatch.UIFingerprint(repoRoot)
+	tree := gowatch.UITree(repoRoot)
+	last := tree.Fingerprint()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
@@ -40,7 +41,7 @@ func runUIWatch(ctx context.Context, _ deps, _ invocation) error {
 		case <-ctx.Done():
 			return nil
 		case now := <-tick.C:
-			if fp := gowatch.UIFingerprint(repoRoot); fp != last {
+			if fp := tree.Fingerprint(); fp != last {
 				last = fp
 				clock.Change(now)
 			}

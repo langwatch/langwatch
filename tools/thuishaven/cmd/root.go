@@ -104,6 +104,8 @@ func orphanLimits() domain.OrphanLimits {
 // before anything is built, wire() is the only place adapters are constructed,
 // and the command table is a table, not a ladder of branches.
 func Root(ctx context.Context, logger *zap.Logger, version string, args []string) error {
+	args, profile := stripProfileFlags(args)
+	defer profile.start()()
 	var hasAgentFlag bool
 	args, hasAgentFlag = stripFlag(args, "--agent")
 	isAgent := hasAgentFlag || resolveAgent()
@@ -705,45 +707,6 @@ func trustedRepoRoot() string {
 // child (and the daemon it may spawn) keeps resolving haven's source from it.
 func childEnvWithTrustedRoot(repoRoot string) []string {
 	return append(os.Environ(), "HAVEN_TRUSTED_REPO_ROOT="+repoRoot)
-}
-
-func gitTopLevel(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		return dir
-	}
-	return strings.TrimSpace(string(out))
-}
-
-func gitBranch(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
-}
-
-// gitIsLinkedWorktree reports whether dir is a linked git worktree (created by
-// `git worktree add`) rather than the primary checkout. Git points a linked
-// worktree's --git-dir at .git/worktrees/<name> while --git-common-dir stays the
-// shared .git, so the two diverge only for linked worktrees.
-func gitIsLinkedWorktree(dir string) bool {
-	gitDir, err1 := exec.Command("git", "-C", dir, "rev-parse", "--git-dir").Output()
-	commonDir, err2 := exec.Command("git", "-C", dir, "rev-parse", "--git-common-dir").Output()
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	abs := func(p string) string {
-		p = strings.TrimSpace(p)
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(dir, p)
-		}
-		if c, err := filepath.Abs(p); err == nil {
-			return c
-		}
-		return p
-	}
-	return abs(string(gitDir)) != abs(string(commonDir))
 }
 
 // runHavenUpIn re-invokes haven's own `up` with cwd set to a PR worktree, so the
