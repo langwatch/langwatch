@@ -177,6 +177,8 @@ export interface DialogProps {
    * primary action finishes the job; the X and Escape still close it under `dismissible`.
    */
   cancelLabel?: string | null;
+  /** `card`: the card ground, for a dialog over a card-toned page (onboarding). */
+  ground?: "card";
   /** Footer left: the acknowledge checkbox, "Step 2 of 2". */
   note?: React.ReactNode;
   /** `false`: no X, no Cancel, no Escape, no outside click; only the actions close it. */
@@ -224,6 +226,7 @@ export function Dialog({
   secondaryAction,
   secondaryActions,
   cancelLabel = "Cancel",
+  ground,
   note,
   dismissible = true,
   closeOnInteractOutside = true,
@@ -334,6 +337,7 @@ export function Dialog({
         maxHeight="calc(100dvh - 4rem)"
         withErrorBoundary={false}
         aria-label={title}
+        {...(ground === "card" ? { background: "bg.card" } : {})}
         data-size={size}
         data-testid={testId}
       >

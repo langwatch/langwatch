@@ -93,6 +93,11 @@ export const PrimaryOnly: Story = {
   globals: { colorMode: "light" },
 };
 
+/** The card ground, for a dialog opened over a card-toned page. */
+export const CardGround: Story = {
+  args: { title: "Add custom model", ground: "card" },
+};
+
 export const PrimaryOnlyDark: Story = {
   ...PrimaryOnly,
   globals: { colorMode: "dark" },

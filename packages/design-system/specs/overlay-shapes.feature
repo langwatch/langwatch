@@ -269,3 +269,8 @@ Feature: Drawer and dialog shapes
     Then the reason input has focus at once and typing lands in it
     And Tab stays inside the dialog
     And closing returns focus to the trigger
+
+  @integration
+  Scenario: A dialog can keep the card ground it had over a card-toned page
+    Given a dialog with ground card and another without
+    Then the first draws the card ground and the other keeps the overlay ground
