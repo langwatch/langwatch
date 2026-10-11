@@ -4,7 +4,6 @@ import { MetricTabs } from "@langwatch/design-system/metric-tabs";
 import {
   Box,
   Button,
-  Card as LinkCard,
   Flex,
   Grid,
   Heading,
@@ -123,28 +122,19 @@ export function CustomReportsSection({ slug }: { slug: string }) {
         <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
           Custom Dashboards
         </Heading>
-        <LinkCard.Root borderStyle="dashed">
-          <LinkCard.Body padding={5}>
-            <HStack gap={4}>
-              <Box color="fg.subtle">
-                <BarChart2 size={20} />
-              </Box>
-              <VStack align="start" gap={1} flex={1}>
-                <Text textStyle="sm" fontWeight="500">
-                  Build your own dashboard
-                </Text>
-                <Text textStyle="xs" color="fg.muted">
-                  Drag and drop charts to track the metrics that matter most to your team.
-                </Text>
-              </VStack>
+        <Card
+          placeholder
+          icon={<BarChart2 size={16} />}
+          title="Build your own dashboard"
+          description="Drag and drop charts to track the metrics that matter most to your team."
+          actions={
+            <Button asChild size="xs" variant="outline">
               <Link href={`/${slug}/analytics/reports`} _hover={{ textDecoration: "none" }}>
-                <Button size="sm" variant="outline">
-                  <Plus size={14} /> Create
-                </Button>
+                <Plus size={14} /> Create
               </Link>
-            </HStack>
-          </LinkCard.Body>
-        </LinkCard.Root>
+            </Button>
+          }
+        />
       </>
     );
   }
