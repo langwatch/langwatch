@@ -1,7 +1,8 @@
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 const here = import.meta.dirname;
 
@@ -64,14 +65,22 @@ function pageBase(name: string): string {
   return name === "storage" ? "/_sim/" : "/";
 }
 
+const outDir = resolve(here, "../../services/sims/simconsole/dist");
+
+// emptyOutDir deletes the tracked .gitkeep that lets go:embed compile before a build.
+const keepPlaceholder: Plugin = {
+  name: "keep-placeholder",
+  closeBundle: () => writeFileSync(resolve(outDir, ".gitkeep"), ""),
+};
+
 // `vite build` writes every page; `SIM=<page> vite` works on one page against its simulator.
 export default defineConfig(({ command }) => {
   if (command === "build") {
     return {
       root: resolve(here, "src"),
-      plugins: [react()],
+      plugins: [react(), keepPlaceholder],
       build: {
-        outDir: resolve(here, "../../services/sims/simconsole/dist"),
+        outDir,
         emptyOutDir: true,
         rollupOptions: {
           input: Object.fromEntries(
