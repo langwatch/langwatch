@@ -141,7 +141,7 @@ function ResetPasswordForm({ token }: { token: string }) {
         </Text>
       ) : null}
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <FrontDoorField label="New password" error={form.formState.errors.password}>
             {(id) => (
               <PasswordInput
@@ -234,7 +234,7 @@ function PostResetPasskeyOffer({
   }
   if (state === "added") {
     return (
-      <VStack width="full" align="stretch" gap="6px" textAlign="center">
+      <VStack width="full" align="stretch" gap="1.5" textAlign="center">
         <Text textStyle="cardTitle" data-testid="reset-passkey-added">
           Passkey added
         </Text>
@@ -249,7 +249,7 @@ function PostResetPasskeyOffer({
     <VStack
       width="full"
       align="stretch"
-      gap="10px"
+      gap="2.5"
       textAlign="center"
       data-testid="post-reset-passkey-offer"
     >

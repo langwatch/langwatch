@@ -432,7 +432,7 @@ const CompactMissingRow: React.FC<{
   fontSize: string;
 }> = ({ direction, fontSize }) => (
   <HStack gap={1} width="full" overflow="hidden" align="flex-start">
-    <Flex align="center" gap={1} flexShrink={0} paddingTop="2px">
+    <Flex align="center" gap={1} flexShrink={0} paddingTop="0.5">
       <Icon boxSize="10px" color="fg.subtle">
         {direction === "input" ? <ArrowUp /> : <ArrowDown />}
       </Icon>
@@ -470,7 +470,7 @@ const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => 
       {/* Removed the dashed vertical bar that used to sit before the
           arrow icon — it read as visual noise and didn't add an
           alignment cue the row tint isn't already providing. */}
-      <Flex align="center" gap={1} flexShrink={0} paddingTop="2px">
+      <Flex align="center" gap={1} flexShrink={0} paddingTop="0.5">
         <Icon boxSize="10px" color={accent}>
           {isInput ? <ArrowUp /> : <ArrowDown />}
         </Icon>

@@ -115,7 +115,7 @@ function PanelHeading({
           height={HEADING_LINE_HEIGHT}
           lineHeight={0}
           flexShrink={0}
-          marginTop="-2px"
+          marginTop="-0.5"
         >
           {icon}
         </Box>

@@ -145,7 +145,7 @@ export function RunsSidebar({
         fontWeight="medium"
         color="fg.muted"
         justifyContent="flex-start"
-        paddingX="10px"
+        paddingX="2.5"
         marginBottom={1}
         onClick={onBack}
       >

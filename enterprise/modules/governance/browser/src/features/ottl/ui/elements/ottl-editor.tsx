@@ -315,7 +315,7 @@ export function OttlEditor({
           paddingY={2}
         >
           <HStack alignItems="start" gap={2}>
-            <Box color="fg.muted" flexShrink={0} marginTop="2px">
+            <Box color="fg.muted" flexShrink={0} marginTop="0.5">
               <Info size={14} aria-hidden="true" />
             </Box>
             <Text fontSize="xs" color="fg.muted">
@@ -398,7 +398,7 @@ function problemOf({
 /** The plain-language problem, with its backticked code as code chips. */
 function ProblemText({ message }: { message: string }) {
   return (
-    <Text fontSize="xs" color="fg.error" marginLeft="14px" marginTop={0.5}>
+    <Text fontSize="xs" color="fg.error" marginLeft="3.5" marginTop={0.5}>
       {message
         .split("`")
         .map((part, i) => (i % 2 === 1 ? <InlineCode key={i}>{part}</InlineCode> : part))}

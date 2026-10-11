@@ -117,8 +117,8 @@ export function ComponentExecutionButton({
           minHeight="24px"
           maxWidth="24px"
           maxHeight="24px"
-          marginRight="-4px"
-          marginLeft="-4px"
+          marginRight="-1"
+          marginLeft="-1"
           data-testid="workflow-node-execution-status"
           data-status={executionStatus ?? "idle"}
           role={shouldOpenExecutionResults ? "button" : void 0}
@@ -133,7 +133,7 @@ export function ComponentExecutionButton({
           }}
         >
           {isWaitingLong && executionStatus === "waiting" && (
-            <Box marginLeft="-4px" marginRight="-4px">
+            <Box marginLeft="-1" marginRight="-1">
               <PulseLoader size={2} speedMultiplier={0.5} />
             </Box>
           )}

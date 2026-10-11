@@ -264,7 +264,7 @@ export function DatasetMappingPreview({
     // every preview checkbox under it, and a click on one went wherever the id
     // resolved first.
     <Box width="full" paddingY={4}>
-      <HStack width="full" gap="64px" align="start">
+      <HStack width="full" gap="16" align="start">
         <VStack align="start" maxWidth="50%" gap={4}>
           <Field.Root width="full">
             <HStack width="full" align="center" justify="space-between">

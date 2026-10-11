@@ -17,7 +17,7 @@ export function InvitingOrganization({
   return (
     <HStack
       gap={3}
-      padding="12px"
+      padding="3"
       borderWidth="1px"
       borderColor="frontDoor.fieldBorder"
       borderRadius={SHAPE.field}

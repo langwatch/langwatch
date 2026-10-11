@@ -285,7 +285,7 @@ function EvaluatorChoiceCard({
                 top="-12px"
                 background="blue.subtle"
                 borderRadius="100%"
-                padding="4px"
+                padding="1"
               >
                 <Shield />
               </Box>
@@ -293,13 +293,7 @@ function EvaluatorChoiceCard({
           )}
           <HStack>
             {evaluator.beta && (
-              <Tag.Root
-                size="sm"
-                colorPalette="pink"
-                paddingX={2}
-                textStyle="body"
-                marginLeft="-4px"
-              >
+              <Tag.Root size="sm" colorPalette="pink" paddingX={2} textStyle="body" marginLeft="-1">
                 <Tag.Label>Beta</Tag.Label>
               </Tag.Root>
             )}

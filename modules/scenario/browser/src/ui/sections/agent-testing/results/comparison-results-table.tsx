@@ -79,7 +79,7 @@ function MatrixHeader({
         }}
       >
         <Table.ColumnHeader>
-          <Box paddingTop="2px">Scenario</Box>
+          <Box paddingTop="0.5">Scenario</Box>
         </Table.ColumnHeader>
         {targets.map((target) => (
           <Table.ColumnHeader key={target.key}>

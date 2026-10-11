@@ -117,7 +117,7 @@ function ForgotPasswordForm() {
       intro="Enter the email for your account and we will send you a link to reset your password."
     >
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <FrontDoorField label="Email" error={form.formState.errors.email}>
             {(id) => (
               <Input

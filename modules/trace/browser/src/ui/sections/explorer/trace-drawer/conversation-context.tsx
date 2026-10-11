@@ -804,7 +804,7 @@ const TurnLine: React.FC<{
         // first text line's center, not with the top edge — `boxSize`
         // 3.5 (14px) inside `textStyle="xs"` (12px / 18px line) needs
         // (18-14)/2 = 2px of nudge.
-        marginTop="2px"
+        marginTop="0.5"
       />
       {redacted && !text ? (
         // Content hidden by a privacy rule — the shared lock + "Redacted"

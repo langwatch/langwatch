@@ -139,7 +139,7 @@ export function LangyCapabilityCard({
       // by a hairline and a few percent of white, and nothing else. Four
       // shadowed cards stacked in one turn read as a deck of trading cards.
       boxShadow="langyCard"
-      paddingX="12px"
+      paddingX="3"
       paddingY="11px"
       as="fieldset"
     >

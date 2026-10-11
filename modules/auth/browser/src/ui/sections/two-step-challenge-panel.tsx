@@ -76,13 +76,13 @@ export function TwoStepChallengePanel({
   };
 
   return (
-    <VStack width="full" align="stretch" gap="14px">
+    <VStack width="full" align="stretch" gap="3.5">
       <Text textStyle="bodySm" color="fg.muted">
         {introFor(factor)}
       </Text>
       <HandledErrorAlert error={refusal} fallbackTitle="Couldn't check that code" />
       <form onSubmit={(event) => void onSubmit(event)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <CodeField
             isBackupCode={isBackupCode}
             code={code}
@@ -95,7 +95,7 @@ export function TwoStepChallengePanel({
               if (tooShort) setTooShort(false);
             }}
           />
-          <VStack width="full" align="stretch" gap="14px" paddingTop="2px">
+          <VStack width="full" align="stretch" gap="3.5" paddingTop="0.5">
             <FrontDoorPrimaryButton type="submit" isBusy={isSubmitting}>
               Continue
             </FrontDoorPrimaryButton>

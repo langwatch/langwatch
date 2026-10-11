@@ -205,7 +205,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
         closeOnInteractOutside={false}
         modal={false}
       >
-        <Drawer.Content bg="bg" marginTop="56px">
+        <Drawer.Content bg="bg" marginTop="14">
           {node && <Drawer.Header>{headerContent}</Drawer.Header>}
 
           <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>

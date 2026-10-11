@@ -104,8 +104,8 @@ function FolderRow({
       alignItems="center"
       gap={2.5}
       width="full"
-      paddingX="10px"
-      paddingY="6px"
+      paddingX="2.5"
+      paddingY="1.5"
       borderRadius="lg"
       textAlign="left"
       fontWeight={active ? "medium" : "normal"}

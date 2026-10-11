@@ -164,7 +164,7 @@ function KeyHint({ children }: { children: React.ReactNode }) {
     <chakra.kbd
       minWidth="20px"
       height="20px"
-      paddingX="4px"
+      paddingX="1"
       display="inline-flex"
       alignItems="center"
       justifyContent="center"

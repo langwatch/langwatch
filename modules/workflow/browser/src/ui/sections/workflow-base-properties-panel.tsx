@@ -55,7 +55,7 @@ export function WorkflowPropertySectionTitle({
       </Text>
       {tooltip && (
         <Tooltip content={tooltip}>
-          <Box marginBottom="-2px">
+          <Box marginBottom="-0.5">
             <Info size={14} />
           </Box>
         </Tooltip>
@@ -694,7 +694,7 @@ export function WorkflowBasePropertiesPanel({
                 />
               )}
             </HStack>
-            <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
+            <HStack gap={0} marginRight="-1" hidden={isEditingName}>
               {!isWorkflow(node) && isExecutableComponent(node) && (
                 <ExecutionControls
                   node={node}

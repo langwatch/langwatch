@@ -317,7 +317,7 @@ export const LangyModelPill = memo(function LangyModelPill({
                   "& .model-reveal": {
                     display: "flex",
                     alignItems: "center",
-                    gap: "4px",
+                    gap: "1",
                     maxWidth: 0,
                     opacity: 0,
                     overflow: "hidden",
@@ -326,11 +326,11 @@ export const LangyModelPill = memo(function LangyModelPill({
                       "max-width 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms ease, margin-left 220ms cubic-bezier(0.32, 0.72, 0, 1)",
                   },
                   "&:hover .model-reveal, &:focus-visible .model-reveal, &[data-state='open'] .model-reveal":
-                    { maxWidth: "160px", opacity: 1, marginLeft: "6px" },
+                    { maxWidth: "160px", opacity: 1, marginLeft: "1.5" },
                   "&[data-loading='true'] .model-reveal": {
                     maxWidth: "180px",
                     opacity: 1,
-                    marginLeft: "6px",
+                    marginLeft: "1.5",
                   },
                   "@media (prefers-reduced-motion: reduce)": {
                     "& .model-reveal": { transition: "none" },

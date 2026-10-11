@@ -1071,7 +1071,7 @@ function SeriesFieldItem({
                 >
                   <VStack align="start" gap={2}>
                     <Text>{camelCaseToTitleCase(key)}</Text>
-                    <HStack gap={0} paddingLeft="12px">
+                    <HStack gap={0} paddingLeft="3">
                       {colorSet.map((color, i) => (
                         <Box
                           key={i}
@@ -1079,7 +1079,7 @@ function SeriesFieldItem({
                           height="32px"
                           borderRadius="100%"
                           backgroundColor={color.color}
-                          marginLeft="-12px"
+                          marginLeft="-3"
                         />
                       ))}
                     </HStack>
@@ -1484,7 +1484,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
             <chakraComponents.Option {...props}>
               <HStack align="end">
                 <Box width="16px">{props.isSelected && <Check width="16px" />}</Box>
-                <VStack align="start" gap={"2px"}>
+                <VStack align="start" gap="0.5">
                   {details && (
                     <Text fontSize="sm" color={props.isSelected ? "fg" : "fg.muted"}>
                       {details}

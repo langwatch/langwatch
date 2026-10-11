@@ -202,7 +202,7 @@ function PendingVerdictLine({ message }: { message: string }) {
     <VStack
       align="center"
       justify="flex-start"
-      paddingTop="64px"
+      paddingTop="16"
       paddingX={14}
       data-testid="run-verdict-pending"
     >

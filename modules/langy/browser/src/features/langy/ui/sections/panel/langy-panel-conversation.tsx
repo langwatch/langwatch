@@ -342,7 +342,7 @@ function LangyModelSetup({
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <VStack align="stretch" gap={2} paddingX="18px" paddingTop="18px">
+    <VStack align="stretch" gap={2} paddingX="4.5" paddingTop="4.5">
       {queuedPrompt ? (
         <VStack align="stretch" gap={1} paddingBottom={2}>
           <QueuedPrompt prompt={queuedPrompt} reduceMotion={reduceMotion} />
@@ -438,7 +438,7 @@ export function LangyTranscript({
       align="stretch"
       paddingX={gutter}
       paddingTop={gutter}
-      paddingBottom="12px"
+      paddingBottom="3"
     >
       {messages.map((message, index) => (
         <Fragment key={message.id}>

@@ -30,11 +30,11 @@ export function PasskeyCeremonyPanel({ ceremony }: { ceremony: PasskeyCeremonySt
     <VStack
       width="full"
       align="stretch"
-      gap="16px"
+      gap="4"
       data-testid="passkey-ceremony"
       data-status={ceremony.status}
     >
-      <VStack gap="14px" paddingTop="6px">
+      <VStack gap="3.5" paddingTop="1.5">
         <Box
           className="lw-front-door-passkey-glyph"
           data-testid="passkey-ceremony-glyph"

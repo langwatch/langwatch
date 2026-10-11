@@ -779,7 +779,7 @@ function RowHoverActions({
       // above it and the pointer crosses into it without passing over the row
       // beneath. It is a child of the row it belongs to, which is what keeps
       // the row hovered while the pointer is in here.
-      marginTop="-8px"
+      marginTop="-2"
       gap={0}
       paddingRight={1}
       // Opaque and lifted: it hangs over the row below, which must not read

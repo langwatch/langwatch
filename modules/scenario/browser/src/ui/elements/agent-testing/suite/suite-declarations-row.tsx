@@ -32,7 +32,7 @@ function FieldChip({ field, onClick }: { field: SuiteFieldDefinition; onClick?: 
       alignItems="center"
       gap={1}
       height="24px"
-      paddingX="8px"
+      paddingX="2"
       borderRadius="full"
       borderWidth="1px"
       borderColor="border"

@@ -200,7 +200,7 @@ export function LLMConfigPopover({
                   height="20px"
                   borderRadius="full"
                   bg={isStructuredOutputsEnabled ? "blue.solid" : "bg.emphasized"}
-                  padding="2px"
+                  padding="0.5"
                   cursor="pointer"
                   transition="background 0.2s"
                   flexShrink={0}

@@ -930,7 +930,7 @@ export const RunDetails = React.memo(
             {size === "sm" && (
               <Center
                 minHeight="31px"
-                marginBottom="-2px"
+                marginBottom="-0.5"
                 paddingX={4}
                 fontWeight={500}
                 color="fg.muted"

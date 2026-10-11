@@ -35,7 +35,7 @@ export function AuditPeriodPicker({
           minWidth="fit-content"
           height="32px"
           minHeight="32px"
-          paddingX="10px"
+          paddingX="2.5"
           gap={2}
           borderRadius="4px"
         >

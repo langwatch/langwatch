@@ -383,7 +383,7 @@ export function LeaderboardTrustPanel(props: LeaderboardTrustPanelProps) {
         const style = TONE_STYLES[check.tone];
         return (
           <HStack key={check.label} align="start" gap={2}>
-            <Box marginTop="2px" color={style.color} flexShrink={0}>
+            <Box marginTop="0.5" color={style.color} flexShrink={0}>
               <Icon as={style.icon} boxSize="13px" />
             </Box>
             <Box>

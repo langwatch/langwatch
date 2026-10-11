@@ -182,7 +182,7 @@ function HeaderActions({
           size="xs"
           variant="ghost"
           height="32px"
-          paddingX="10px"
+          paddingX="2.5"
           textStyle="caption"
           fontWeight="medium"
           color="fg.muted"

@@ -29,7 +29,7 @@ export const QueryPreview: React.FC<QueryPreviewProps> = ({ query, size = "sm" }
       display="inline-flex"
       alignItems="center"
       flexWrap="wrap"
-      gap="2px"
+      gap="0.5"
       fontSize={size === "sm" ? "xs" : "sm"}
       lineHeight="1.6"
       css={previewTokenStyles}

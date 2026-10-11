@@ -40,7 +40,7 @@ export function CustomizeChips({
             alignItems="center"
             gap={1.5}
             height="28px"
-            paddingX="10px"
+            paddingX="2.5"
             borderRadius="lg"
             borderWidth="1px"
             borderStyle="dashed"

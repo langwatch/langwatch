@@ -108,7 +108,7 @@ function ConsideringLangWatch() {
         borderColor="border.muted"
         borderRadius="full"
         paddingX={2.5}
-        paddingY="4px"
+        paddingY="1"
         transition="color 130ms ease, border-color 130ms ease"
         _hover={{
           color: "orange.fg",

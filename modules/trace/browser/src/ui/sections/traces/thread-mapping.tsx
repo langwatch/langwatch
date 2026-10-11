@@ -395,7 +395,7 @@ export const ThreadMapping = ({
                         borderColor="border.emphasized"
                         borderTop={0}
                         borderRight={0}
-                        marginLeft="12px"
+                        marginLeft="3"
                       />
                       <MultiSelect
                         isMulti

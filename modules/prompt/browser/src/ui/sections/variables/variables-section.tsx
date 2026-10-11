@@ -541,7 +541,7 @@ const VariableRow = ({
               fontFamily="mono"
               textStyle="bodySm"
               lineHeight="20px"
-              paddingY="6px"
+              paddingY="1.5"
               variant="flushed"
               borderColor="border"
               autoresize
@@ -566,7 +566,7 @@ const VariableRow = ({
             size="xs"
             variant="ghost"
             colorPalette="gray"
-            marginTop="4px"
+            marginTop="1"
             onClick={onRemove}
             flexShrink={0}
             color="fg.subtle"

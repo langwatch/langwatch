@@ -121,7 +121,7 @@ export function CurrentPlanBlock({
         >
           {features.map((feature) => (
             <HStack key={feature} gap={2} alignItems="start">
-              <Box color="green.fg" flexShrink={0} paddingTop="2px">
+              <Box color="green.fg" flexShrink={0} paddingTop="0.5">
                 <Check size={16} />
               </Box>
               <Text fontSize="sm">{feature}</Text>

@@ -691,7 +691,7 @@ function EmailLinkLandingBanner() {
       bg="colorPalette.subtle"
     >
       <HStack gap={2} align="start">
-        <Box color="colorPalette.fg" flexShrink={0} mt="2px">
+        <Box color="colorPalette.fg" flexShrink={0} mt="0.5">
           <Mail size={16} />
         </Box>
         <Text textStyle="sm" color="fg">

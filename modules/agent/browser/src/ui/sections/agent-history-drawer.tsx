@@ -109,7 +109,7 @@ function HistoryEntry({
   return (
     <HStack align="start" gap={3}>
       <VStack gap={0} align="center" flexShrink={0} width="24px">
-        <Box bg="blue.subtle" borderRadius="full" padding={1} mt="2px">
+        <Box bg="blue.subtle" borderRadius="full" padding={1} mt="0.5">
           <Icon size={12} color="var(--chakra-colors-blue-fg)" />
         </Box>
         {!isLast && <Box width="1px" flex={1} minHeight="24px" bg="border.muted" />}

@@ -27,7 +27,7 @@ export function PublishedPromptContent({
       data-testid={`prompt-row-${promptHandle ?? promptId}`}
     >
       {prompt?.scope === "ORGANIZATION" && (
-        <Box marginLeft="-12px">
+        <Box marginLeft="-3">
           <OrganizationBadge />
         </Box>
       )}

@@ -206,7 +206,7 @@ export function EvaluatorResultChip({
       {/* Status indicator - spinning for running, static for others */}
       {status === "running" ? (
         <Box flexShrink={0}>
-          <Spinner size="xs" color="fg.muted" marginBottom="-2px" />
+          <Spinner size="xs" color="fg.muted" marginBottom="-0.5" />
         </Box>
       ) : (
         <Circle size="10px" bg={statusColor} flexShrink={0} />

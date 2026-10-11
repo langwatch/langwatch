@@ -227,7 +227,7 @@ func main() {
                       ))}
                     </Tabs.List>
                     <CodeBlock.CopyTrigger asChild>
-                      <IconButton variant="ghost" size="2xs" mr={"-4px"} aria-label="Copy code">
+                      <IconButton variant="ghost" size="2xs" mr="-1" aria-label="Copy code">
                         <CodeBlock.CopyIndicator />
                       </IconButton>
                     </CodeBlock.CopyTrigger>

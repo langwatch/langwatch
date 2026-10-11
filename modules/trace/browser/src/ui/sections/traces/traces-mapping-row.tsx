@@ -58,7 +58,7 @@ function MappingElbow() {
       borderColor="border.emphasized"
       borderTop={0}
       borderRight={0}
-      marginLeft="12px"
+      marginLeft="3"
     />
   );
 }

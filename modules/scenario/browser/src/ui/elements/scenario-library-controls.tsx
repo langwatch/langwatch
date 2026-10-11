@@ -94,8 +94,8 @@ export function ScenarioBatchActionBar({
       borderColor="border"
       boxShadow="0 0 15px color-mix(in srgb, var(--chakra-colors-bg-scrim) 20%, transparent)"
       borderRadius="md"
-      padding="8px"
-      paddingX="16px"
+      padding="2"
+      paddingX="4"
       zIndex={1000}
       data-bottom-floating-bar=""
       data-testid="batch-action-bar"

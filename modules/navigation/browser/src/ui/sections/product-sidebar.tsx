@@ -395,7 +395,7 @@ export function SidebarContent({
             border: "3px solid transparent",
             borderRadius: "999px",
           },
-          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
+          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "1.5" },
         }}
       >
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />

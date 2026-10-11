@@ -36,7 +36,7 @@ export const SpanDuration = ({
         </>
       }
     >
-      <HStack gap={"6px"} color={span.error ? "red.fg" : durationColor(duration)}>
+      <HStack gap="1.5" color={span.error ? "red.fg" : durationColor(duration)}>
         <Clock width={12} />
         <Text>{formatMilliseconds(duration)}</Text>
       </HStack>

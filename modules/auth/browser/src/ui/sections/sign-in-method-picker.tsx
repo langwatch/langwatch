@@ -240,7 +240,7 @@ export function LastUsedBadge() {
 /** A thin "or" between the address step and the methods beside it, in the card's own type. */
 export function MethodDivider() {
   return (
-    <HStack width="full" gap="10px" paddingY="6px">
+    <HStack width="full" gap="2.5" paddingY="1.5">
       <Divider />
       <Text textStyle="caption" color="fg.subtle">
         or

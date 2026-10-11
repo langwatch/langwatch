@@ -126,7 +126,7 @@ export function WorkflowNodeSelectionPanel({
           align="start"
           overflowY="auto"
           padding={3}
-          paddingBottom="56px"
+          paddingBottom="14"
         >
           <Text fontWeight="500" padding={1}>
             Components

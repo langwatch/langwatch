@@ -336,7 +336,7 @@ function FieldsFilter({
             <InputGroup
               width="full"
               startElement={<Search size={14} color={gray400} />}
-              startElementProps={{ paddingStart: "4px" }}
+              startElementProps={{ paddingStart: "1" }}
               paddingY={1}
               paddingX={2}
             >
@@ -1040,7 +1040,7 @@ function ThumbsUpDownVoteFilter({
           <HStack key={field} width="full" paddingX={1} cursor="pointer">
             <Checkbox
               width="full"
-              paddingY="4px"
+              paddingY="1"
               gap={2}
               size="sm"
               checked={isChecked}

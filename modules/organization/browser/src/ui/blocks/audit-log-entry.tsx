@@ -157,7 +157,7 @@ export function AuditLogEntry({
           <ActorCell actor={actor} />
         </Table.Cell>
         <Table.Cell>
-          <Box display="flex" flexDirection="column" gap="2px" minWidth={0}>
+          <Box display="flex" flexDirection="column" gap="0.5" minWidth={0}>
             <HStack gap={2} minWidth={0} height="20px">
               <Text textStyle="label" title={log.action} truncate>
                 {auditActionPhrase(log.action)}

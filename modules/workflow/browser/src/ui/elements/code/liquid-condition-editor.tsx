@@ -144,8 +144,8 @@ export function LiquidConditionEditor({
         border="1px solid"
         borderColor={borderColor}
         borderRadius="md"
-        paddingX="8px"
-        gap="6px"
+        paddingX="2"
+        gap="1.5"
         overflow="hidden"
         data-testid="if-else-condition-input"
       >

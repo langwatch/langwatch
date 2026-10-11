@@ -131,7 +131,7 @@ const EvaluationSummaryCard = ({
             <Text textStyle="metric">
               {numeral(score).format(metric === "score" ? "0.00" : "0%")}
             </Text>
-            <Text textStyle="label" marginBottom="4px" opacity={0.8}>
+            <Text textStyle="label" marginBottom="1" opacity={0.8}>
               {metric === "score" ? "avg score" : "pass rate"}
             </Text>
           </HStack>

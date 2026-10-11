@@ -242,7 +242,7 @@ function CompareTargetRow({
         type="button"
         display="flex"
         alignItems="center"
-        marginTop="6px"
+        marginTop="1.5"
         color="fg.muted"
         cursor="pointer"
         boxShadow="none"

@@ -54,7 +54,7 @@ function FormErrorDisplay({ error }: { error?: unknown }) {
 
   if (typeof error === "string" || typeof error === "number") {
     return (
-      <Text marginTop="6px" textStyle="bodySm" color="fg.error">
+      <Text marginTop="1.5" textStyle="bodySm" color="fg.error">
         {error}
       </Text>
     );
@@ -64,7 +64,7 @@ function FormErrorDisplay({ error }: { error?: unknown }) {
   if (messages.length === 0) return null;
 
   return (
-    <VStack align="start" gap={1} marginTop="6px">
+    <VStack align="start" gap={1} marginTop="1.5">
       {messages.map((message, index) => (
         <Text key={index} textStyle="bodySm" color="fg.error">
           {message}

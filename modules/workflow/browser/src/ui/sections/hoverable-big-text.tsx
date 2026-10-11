@@ -130,8 +130,8 @@ export function HoverableBigText({
                 textAlign="center"
                 background="yellow.subtle"
                 width="calc(100% + 16px)"
-                marginLeft="-8px"
-                marginTop="-4px"
+                marginLeft="-2"
+                marginTop="-1"
                 color="yellow.fg"
               >
                 click anywhere to expand

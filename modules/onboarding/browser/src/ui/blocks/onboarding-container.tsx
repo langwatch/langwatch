@@ -112,9 +112,9 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             asChild
             display="inline-flex"
             alignItems="center"
-            gap="6px"
-            px="16px"
-            py="8px"
+            gap="1.5"
+            px="4"
+            py="2"
             borderRadius="10px"
             textStyle="label"
             color="fg.muted"

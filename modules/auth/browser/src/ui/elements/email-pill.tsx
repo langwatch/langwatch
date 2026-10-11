@@ -20,7 +20,7 @@ export function EmailPill({
       backgroundColor="bg.subtle"
       borderWidth="1px"
       borderRadius="full"
-      paddingX="14px"
+      paddingX="3.5"
       paddingY="7px"
     >
       <Text textStyle="bodySm" color="fg.muted" truncate data-testid={testId}>

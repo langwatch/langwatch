@@ -184,8 +184,8 @@ export function DatasetModal({
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()} size="full">
       <Dialog.Content
         css={{
-          marginX: "32px",
-          marginTop: "32px",
+          marginX: "8",
+          marginTop: "8",
           width: "calc(100vw - 64px)",
           minHeight: "0",
           height: "calc(100vh - 64px)",
@@ -211,7 +211,7 @@ export function DatasetModal({
                 </Button>
               </HStack>
             </Dialog.Header>
-            <Dialog.Body paddingBottom="32px">
+            <Dialog.Body paddingBottom="8">
               <Box ref={editorPortalRef} width="full" height="full">
                 <DatasetEditorBody
                   open={open}
@@ -234,7 +234,7 @@ export function DatasetModal({
                 </Text>
               </HStack>
             </Dialog.Header>
-            <Dialog.Body paddingBottom="32px" display="flex" flexDirection="column">
+            <Dialog.Body paddingBottom="8" display="flex" flexDirection="column">
               <HStack paddingBottom={4}>
                 <Text color="fg.muted" fontSize="sm">
                   Pick an existing dataset for this workflow, upload a CSV, or start a new draft.

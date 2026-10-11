@@ -135,7 +135,7 @@ export default function TeamDetailScreen() {
   if (team.isLoading || !team.data) {
     return (
       <VStack gap={6} width="full" align="start">
-        <HStack gap="8px">
+        <HStack gap="2">
           <Skeleton height="20px" width="60px" />
           <Skeleton height="20px" width="12px" />
           <Skeleton height="20px" width="120px" />

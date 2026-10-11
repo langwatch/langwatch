@@ -76,7 +76,7 @@ export function RunsLoadingSkeleton() {
           columnGap={3}
           alignItems="center"
           paddingX={4}
-          paddingY="10px"
+          paddingY="2.5"
           borderTopWidth={index === 0 ? "0" : "1px"}
           borderTopColor="border"
         >

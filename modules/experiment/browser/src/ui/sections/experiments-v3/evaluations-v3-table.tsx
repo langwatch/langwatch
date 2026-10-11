@@ -722,7 +722,7 @@ export function EvaluationsV3Table({
           top: 0,
           zIndex: 11,
           height: "48px",
-          padding: "12px",
+          padding: "3",
           backgroundColor: "var(--chakra-colors-bg-panel)",
           // Promotes the sticky cell to its own GPU compositing layer.
           willChange: "transform",

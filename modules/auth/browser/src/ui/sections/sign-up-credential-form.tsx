@@ -169,7 +169,7 @@ export function SignUpCredentialForm({
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-      <VStack width="full" align="stretch" gap="10px">
+      <VStack width="full" align="stretch" gap="2.5">
         <FormServerError form={form} />
         <HandledErrorAlert
           description={submitError}

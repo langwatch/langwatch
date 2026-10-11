@@ -752,7 +752,7 @@ function OptionRow({
       opacity={disabled ? 0.6 : 1}
       _hover={disabled ? undefined : { background: "bg.muted" }}
     >
-      <Box color="fg.muted" display="flex" paddingTop="2px" flexShrink={0}>
+      <Box color="fg.muted" display="flex" paddingTop="0.5" flexShrink={0}>
         {icon}
       </Box>
       <VStack align="stretch" gap={0} minWidth={0}>

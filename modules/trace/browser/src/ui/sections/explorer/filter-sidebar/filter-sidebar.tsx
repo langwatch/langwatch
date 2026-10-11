@@ -340,7 +340,7 @@ export const FilterSidebar: React.FC = () => {
             border: "3px solid transparent",
             borderRadius: "999px",
           },
-          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
+          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "1.5" },
           scrollbarWidth: "thin",
         }}
       >

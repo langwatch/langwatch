@@ -147,11 +147,11 @@ function Takeover({
     >
       <Dialog.Content data-testid={testId} borderRadius={0}>
         <Dialog.Body display="flex" alignItems="center" justifyContent="center" padding={6}>
-          <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
+          <VStack width="full" maxWidth="420px" align="stretch" gap="4.5">
             <Box>
               <Dialog.Title textAlign="center">{title}</Dialog.Title>
               {intro !== undefined && (
-                <Text textStyle="body" color="fg.muted" textAlign="center" paddingTop="6px">
+                <Text textStyle="body" color="fg.muted" textAlign="center" paddingTop="1.5">
                   {intro}
                 </Text>
               )}
