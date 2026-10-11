@@ -6,6 +6,11 @@
 import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { cloneElement, type ReactElement, type ReactNode } from "react";
 
+interface OpenerProps {
+  "aria-label"?: string;
+  type?: "button" | "submit" | "reset";
+}
+
 export interface ResourceTileProps {
   icon: ReactNode;
   title: string;
@@ -16,12 +21,23 @@ export interface ResourceTileProps {
   badges?: ReactNode;
   /** The row-actions overflow menu, top right. */
   menu?: ReactNode;
-  /** The native `<a>` or `<button>` that opens it; named by `title` unless it has a label. */
-  opener: ReactElement<{ "aria-label"?: string }>;
-  /** A pickable tile: role cards. */
+  /**
+   * The native `<a>` or `<button>` that opens it, or a link component that renders one; named by
+   * `title` unless it has a label. A bare `<button>` is given `type="button"`; any other native
+   * element is refused.
+   */
+  opener: ReactElement<OpenerProps>;
+  /** Paint only (a fill and border): a tile that picks one of several is a RadioCard. */
   selected?: boolean;
   "data-testid"?: string;
 }
+
+/** The meta row lets clicks fall through to the opener; a control inside it takes its own. */
+const BADGE_CONTROLS = {
+  "& a, & button, & input, & select, & textarea, & [role=button], & [role=link]": {
+    pointerEvents: "auto",
+  },
+} as const;
 
 const OPENER = {
   "& > [data-tile-opener] > a, & > [data-tile-opener] > button": {
@@ -45,6 +61,11 @@ export function ResourceTile({
   selected = false,
   "data-testid": testId,
 }: ResourceTileProps) {
+  const native = opener.type;
+  if (typeof native === "string" && native !== "a" && native !== "button") {
+    throw new Error(`ResourceTile: the opener must be a link or a button, not <${native}>`);
+  }
+  const buttonType = native === "button" && opener.props.type === void 0 ? "button" : void 0;
   return (
     <VStack
       align="stretch"
@@ -64,7 +85,10 @@ export function ResourceTile({
       data-testid={testId}
     >
       <Box data-tile-opener="">
-        {cloneElement(opener, { "aria-label": opener.props["aria-label"] ?? title })}
+        {cloneElement(opener, {
+          "aria-label": opener.props["aria-label"] ?? title,
+          type: buttonType ?? opener.props.type,
+        })}
       </Box>
       <HStack gap={3} align="start">
         <Box color="fg" display="flex" flexShrink={0}>
@@ -87,7 +111,14 @@ export function ResourceTile({
         </Text>
       )}
       {(meta != null || badges != null) && (
-        <HStack gap={2} flexWrap="wrap" position="relative" zIndex={2} pointerEvents="none">
+        <HStack
+          gap={2}
+          flexWrap="wrap"
+          position="relative"
+          zIndex={2}
+          pointerEvents="none"
+          css={BADGE_CONTROLS}
+        >
           {meta != null && (
             <Text textStyle="caption" color="fg.subtle">
               {meta}

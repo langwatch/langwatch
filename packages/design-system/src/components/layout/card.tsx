@@ -34,8 +34,11 @@ export interface CardProps {
   actions?: ReactNode;
   /** What the reader can do, under the body. */
   footer?: ReactNode;
-  /** md 16px, sm 12px; none: an embedded ListTable, a code block or an editor fills it. */
-  padding?: "md" | "sm" | "none";
+  /**
+   * md 16px, sm 12px; none: an embedded ListTable, a code block or an editor fills it. lg 20px
+   * is the old Chakra card's own space, kept for a surface whose screenshots show it.
+   */
+  padding?: "lg" | "md" | "sm" | "none";
   children?: ReactNode;
   "data-testid"?: string;
 }
@@ -59,7 +62,7 @@ const OVERRIDES: Partial<Record<CardVariant, typeof FRAME | typeof SHOWCASE>> = 
   showcase: SHOWCASE,
 };
 
-const PADDING = { md: 4, sm: 3, none: 0 } as const;
+const PADDING = { lg: 5, md: 4, sm: 3, none: 0 } as const;
 
 const DOT_COLOR: Record<CardStatus, string> = {
   ok: "green.solid",
@@ -103,7 +106,13 @@ export function Card({
   children,
   "data-testid": testId,
 }: CardProps) {
-  const hasHeader = title != null || badge != null || actions != null;
+  const hasHeader =
+    title != null ||
+    badge != null ||
+    actions != null ||
+    description != null ||
+    icon != null ||
+    status != null;
   const inset = PADDING[padding];
   return (
     <ChakraCard.Root

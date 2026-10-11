@@ -17,6 +17,20 @@ Feature: Card, resource tile, load more and the one-line empty state
     And the governance and gateway look is the showcase variant
 
   @integration
+  Scenario: A card can keep the old 20px space and host content that has no title
+    Given a card with the lg padding and a card with the default padding
+    Then the lg card insets its content further
+    And a card given only a description draws it
+    And a card with no padding hosts a bounded preview and its footer
+
+  @integration
+  Scenario: A resource tile accepts only a native opener and keeps its controls reachable
+    Given a resource tile whose opener is a div
+    Then it refuses the opener
+    And a bare button opener never submits an enclosing form
+    And a control among the badges takes its own clicks while plain meta falls through
+
+  @integration
   Scenario: The old settings card delegates to the card
     Given a settings card with a hint, a tone and actions
     Then it draws a card with the hint as its description and the actions as its footer

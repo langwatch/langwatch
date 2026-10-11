@@ -61,6 +61,58 @@ describe("Card", () => {
     });
   });
 
+  describe("given the old card's 20px space", () => {
+    /** @scenario "A card can keep the old 20px space and host content that has no title" */
+    it("offers lg beside md, with the content inset further", () => {
+      renderWithDesignSystem(
+        <CardGrid columns={2}>
+          <Card padding="lg" data-testid="roomy">
+            <p>Roomy body</p>
+          </Card>
+          <Card data-testid="regular">
+            <p>Regular body</p>
+          </Card>
+        </CardGrid>,
+      );
+
+      expect(screen.getByTestId("roomy").dataset.cardPadding).toBe("lg");
+      const inset = (testId: string, text: string) => {
+        const body = within(screen.getByTestId(testId)).getByText(text).parentElement;
+        return body ? getComputedStyle(body).paddingInline : "";
+      };
+      expect(inset("roomy", "Roomy body")).toBe("var(--chakra-spacing-5)");
+      expect(inset("regular", "Regular body")).toBe("var(--chakra-spacing-4)");
+    });
+  });
+
+  describe("given content that has no title", () => {
+    /** @scenario "A card can keep the old 20px space and host content that has no title" */
+    it("draws a description on its own without dropping it", () => {
+      renderWithDesignSystem(
+        <Card description="Nothing configured yet." data-testid="described" />,
+      );
+
+      expect(
+        within(screen.getByTestId("described")).getByText("Nothing configured yet."),
+      ).toBeTruthy();
+    });
+
+    /** @scenario "A card can keep the old 20px space and host content that has no title" */
+    it("hosts a bounded preview edge to edge with its footer", () => {
+      renderWithDesignSystem(
+        <Card padding="none" footer={<button type="button">Open run</button>} data-testid="preview">
+          <div style={{ height: 120, overflow: "hidden" }} data-testid="frame">
+            Simulation preview
+          </div>
+        </Card>,
+      );
+
+      const card = screen.getByTestId("preview");
+      expect(within(card).getByTestId("frame").style.height).toBe("120px");
+      expect(within(card).getByRole("button", { name: "Open run" })).toBeTruthy();
+    });
+  });
+
   describe("given the deprecated SettingsCard", () => {
     /** @scenario "The old settings card delegates to the card" */
     it("draws a panel card with its hint and actions", () => {
@@ -109,6 +161,56 @@ describe("ResourceTile", () => {
       fireEvent.click(screen.getByRole("button", { name: "More actions" }));
       expect(onOpen).toHaveBeenCalledTimes(1);
       expect(onMenu).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given an opener that is not a native link or button", () => {
+    /** @scenario "A resource tile accepts only a native opener and keeps its controls reachable" */
+    it("refuses a div, and a bare button never submits an enclosing form", () => {
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      expect(() =>
+        renderWithDesignSystem(
+          <ResourceTile icon={<span />} title="Support bot" opener={<div />} />,
+        ),
+      ).toThrow(/must be a link or a button/);
+
+      const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+      renderWithDesignSystem(
+        <form onSubmit={onSubmit}>
+          <ResourceTile icon={<span />} title="Billing bot" opener={createElement("button")} />
+        </form>,
+      );
+      const opener = screen.getByRole("button", { name: "Billing bot" });
+      expect(opener.getAttribute("type")).toBe("button");
+      fireEvent.click(opener);
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A resource tile accepts only a native opener and keeps its controls reachable" */
+    it("lets a control in the badges take its own clicks while plain meta falls through", () => {
+      const onBadge = vi.fn();
+      renderWithDesignSystem(
+        <ResourceTile
+          icon={<span />}
+          title="Support bot"
+          opener={<a href="/bots/1">open</a>}
+          meta="Updated 3 days ago"
+          badges={
+            <button type="button" onClick={onBadge}>
+              Draft
+            </button>
+          }
+        />,
+      );
+
+      const badge = screen.getByRole("button", { name: "Draft" });
+      expect(getComputedStyle(badge).pointerEvents).toBe("auto");
+      expect(
+        getComputedStyle(screen.getByText("Updated 3 days ago").parentElement ?? badge)
+          .pointerEvents,
+      ).toBe("none");
+      fireEvent.click(badge);
+      expect(onBadge).toHaveBeenCalledTimes(1);
     });
   });
 });
