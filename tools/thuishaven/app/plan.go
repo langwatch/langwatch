@@ -241,7 +241,7 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 	case svc.Name == domain.AnalyticsService && sel.Analytics && svc.Port != 0:
 		return domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.OutboundService && sel.Outbound && svc.Port != 0:
-		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL, svc.Port)
 	case svc.Name == domain.PaymentService && sel.Payment && svc.Port != 0:
 		return domain.PaymentProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.LLMService && sel.LLM && svc.Port != 0:

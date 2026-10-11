@@ -158,3 +158,23 @@ describe("given a configured Databricks workspace base", () => {
     );
   });
 });
+
+describe("given a configured outboundsim base on an http IP literal", () => {
+  const configuredBase = "http://127.0.0.1:6970";
+  const withBase = PullDestinationService.create({ configuredBase });
+
+  describe("when a Genie destination is checked", () => {
+    it("accepts exactly the configured origin", () => {
+      expect(() => withBase.assertAllowed(genie(configuredBase))).not.toThrow();
+    });
+
+    it("refuses an unconfigured http 127.0.0.1 origin", () => {
+      expect(() => withBase.assertAllowed(genie("http://127.0.0.1:6971"))).toThrow(
+        GovernanceValidationError,
+      );
+      expect(() => pullDestination.assertAllowed(genie(configuredBase))).toThrow(
+        GovernanceValidationError,
+      );
+    });
+  });
+});

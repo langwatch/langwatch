@@ -510,8 +510,11 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 // and its Slack Web API and webhook addresses at outboundsim's haven route, and
 // admits local webhook URLs, each only when the resolved environment leaves it unset.
 // It also names outboundsim as the base of each governance pull vendor (Databricks,
-// Dataverse, OpenAI, Anthropic, Microsoft sign-in and Graph), on the same rule.
-func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
+// Dataverse, OpenAI, Anthropic, Microsoft sign-in and Graph), on the same rule, at
+// outboundsim's direct IP-literal port: the egress fence refuses a *.localhost host,
+// and only a configured base is exempt from its private-address rule.
+func OutboundProviderEnv(resolved map[string]string, endpoint string, port int) []string {
+	direct := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var env []string
 	for _, c := range []struct{ key, bucket string }{
 		{"SLACK_CHANNEL_SIGNUPS", "B0SIGNUPS"},
@@ -532,12 +535,12 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 		env = append(env, "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1")
 	}
 	for _, v := range [][2]string{
-		{"DATABRICKS_WORKSPACE_BASE", endpoint},
-		{"DATAVERSE_ENVIRONMENT_BASE", endpoint + "/dataverse"},
-		{"OPENAI_ADMIN_API_BASE", endpoint + "/openai"},
-		{"ANTHROPIC_ADMIN_API_BASE", endpoint + "/anthropic"},
-		{"MICROSOFT_LOGIN_BASE", endpoint + "/microsoft-login"},
-		{"MICROSOFT_GRAPH_API_BASE", endpoint + "/microsoft-graph"},
+		{"DATABRICKS_WORKSPACE_BASE", direct},
+		{"DATAVERSE_ENVIRONMENT_BASE", direct + "/dataverse"},
+		{"OPENAI_ADMIN_API_BASE", direct + "/openai"},
+		{"ANTHROPIC_ADMIN_API_BASE", direct + "/anthropic"},
+		{"MICROSOFT_LOGIN_BASE", direct + "/microsoft-login"},
+		{"MICROSOFT_GRAPH_API_BASE", direct + "/microsoft-graph"},
 	} {
 		if resolved[v[0]] == "" {
 			env = append(env, v[0]+"="+v[1])

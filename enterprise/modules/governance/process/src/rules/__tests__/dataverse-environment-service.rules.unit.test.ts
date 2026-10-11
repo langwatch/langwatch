@@ -79,3 +79,13 @@ describe("isSameEnvironment()", () => {
     ).toBe(false);
   });
 });
+
+describe("isEnvironmentOrigin() with an http IP-literal base", () => {
+  const ipBase = "http://127.0.0.1:6970/dataverse";
+
+  it("accepts the configured base and refuses another 127.0.0.1 address", () => {
+    expect(isEnvironmentOrigin(ipBase, ipBase)).toBe(true);
+    expect(isEnvironmentOrigin("http://127.0.0.1:6971/dataverse", ipBase)).toBe(false);
+    expect(isEnvironmentOrigin(ipBase)).toBe(false);
+  });
+});
