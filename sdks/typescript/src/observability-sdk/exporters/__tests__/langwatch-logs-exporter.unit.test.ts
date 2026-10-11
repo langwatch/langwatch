@@ -1,4 +1,5 @@
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
@@ -80,6 +81,32 @@ describe("LangWatchLogsExporter", () => {
       expect((exporter as any).url).toBe(`${endpoint}${LOGS_PATH}`);
       const headers = (exporter as any).headers;
       expect(headers.authorization).toBe(`Bearer ${apiKey}`);
+    });
+  });
+
+  describe("when choosing compression", () => {
+    const lastConfig = () => vi.mocked(OTLPLogExporter).mock.calls.at(-1)?.[0];
+
+    it("defaults to gzip", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "");
+      vi.stubEnv("OTEL_EXPORTER_OTLP_LOGS_COMPRESSION", "");
+      new LangWatchLogsExporter();
+      expect(lastConfig()?.compression).toBe("gzip");
+      vi.unstubAllEnvs();
+    });
+
+    it("leaves the choice to the OTel env var when it is set", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "none");
+      new LangWatchLogsExporter();
+      expect(lastConfig()?.compression).toBeUndefined();
+      vi.unstubAllEnvs();
+    });
+
+    it("lets an explicit option win", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip");
+      new LangWatchLogsExporter({ compression: CompressionAlgorithm.NONE });
+      expect(lastConfig()?.compression).toBe("none");
+      vi.unstubAllEnvs();
     });
   });
 

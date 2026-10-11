@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -14,9 +15,8 @@ import {
   vi,
 } from "vitest";
 
-// The tunnel path verifies the binary on every start; the mock points at the
-// node executable. Tests pin platform/arch to darwin-x64, a named
-// UNVERIFIED_PLATFORMS exception, so verification skips deterministically.
+// The tunnel path verifies the binary on every start. Tests pin platform/arch to
+// darwin-x64, a named UNVERIFIED_PLATFORMS exception, so verification skips deterministically.
 const realPlatform = process.platform;
 const realArch = process.arch;
 beforeAll(() => {
@@ -67,8 +67,7 @@ vi.mock("ora", () => ({
 const fakeTunnels: EventEmitter[] = [];
 const quickMock = vi.hoisted(() => vi.fn());
 vi.mock("cloudflared", () => ({
-  // Points at a path that exists so the session never tries to download.
-  bin: process.execPath,
+  use: vi.fn(),
   install: vi.fn(),
   Tunnel: { quick: quickMock },
 }));
@@ -127,10 +126,11 @@ describe("agent tunnel session", () => {
     fakeTunnels.length = 0;
     // Keep the remembered-agent write away from the developer's real
     // ~/.langwatch/config.json.
-    process.env.LANGWATCH_CLI_CONFIG = path.join(
-      os.tmpdir(),
-      `lw-agent-tunnel-test-${process.pid}-${Math.random().toString(36).slice(2)}.json`,
-    );
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-agent-tunnel-test-"));
+    process.env.LANGWATCH_CLI_CONFIG = path.join(configDir, "config.json");
+    // The cached binary sits beside the config; a file there means no download.
+    fs.mkdirSync(path.join(configDir, "bin"));
+    fs.writeFileSync(path.join(configDir, "bin", "cloudflared"), "");
 
     mockGet = vi.fn().mockResolvedValue(makeAgent());
     mockList = vi.fn().mockResolvedValue({

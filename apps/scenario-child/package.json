@@ -39,6 +39,7 @@
     "@opentelemetry/exporter-logs-otlp-proto": "catalog:",
     "@opentelemetry/exporter-trace-otlp-proto": "catalog:",
     "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/otlp-exporter-base": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-logs": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",

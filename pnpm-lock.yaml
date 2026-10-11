@@ -260,6 +260,9 @@ catalogs:
     '@opentelemetry/instrumentation':
       specifier: ^0.221.0
       version: 0.221.0
+    '@opentelemetry/otlp-exporter-base':
+      specifier: 0.221.0
+      version: 0.221.0
     '@opentelemetry/otlp-transformer':
       specifier: 0.55.0
       version: 0.55.0
@@ -1580,6 +1583,9 @@ importers:
       '@opentelemetry/instrumentation':
         specifier: 'catalog:'
         version: 0.221.0(@opentelemetry/api@1.9.1)(supports-color@10.2.2)
+      '@opentelemetry/otlp-exporter-base':
+        specifier: 'catalog:'
+        version: 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
@@ -18458,6 +18464,9 @@ importers:
       '@opentelemetry/exporter-trace-otlp-proto':
         specifier: 'catalog:'
         version: 0.221.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/otlp-exporter-base':
+        specifier: 'catalog:'
+        version: 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
@@ -18470,24 +18479,6 @@ importers:
       '@opentelemetry/sdk-trace-node':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
-      chalk:
-        specifier: 'catalog:'
-        version: 6.0.0
-      cloudflared:
-        specifier: 0.7.1
-        version: 0.7.1
-      commander:
-        specifier: 'catalog:'
-        version: 15.0.0
-      dotenv:
-        specifier: 'catalog:'
-        version: 17.4.2
-      js-yaml:
-        specifier: 'catalog:'
-        version: 5.2.2
-      jsonc-parser:
-        specifier: ^3.3.1
-        version: 3.3.1
       liquidjs:
         specifier: '>=10.26.0 <11'
         version: 10.27.1
@@ -18497,12 +18488,6 @@ importers:
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
-      ora:
-        specifier: 'catalog:'
-        version: 9.4.1
-      prompts:
-        specifier: 'catalog:'
-        version: 2.4.2
       ws:
         specifier: 'catalog:'
         version: 8.21.3(bufferutil@4.1.0)
@@ -18567,6 +18552,18 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^5.0.1
         version: 5.0.1(@vitest/browser@5.0.1)(vitest@5.0.1)
+      chalk:
+        specifier: 'catalog:'
+        version: 6.0.0
+      cloudflared:
+        specifier: 0.7.1
+        version: 0.7.1
+      commander:
+        specifier: 'catalog:'
+        version: 15.0.0
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.4.2
       dotenv-cli:
         specifier: ^11.0.0
         version: 11.0.0
@@ -18582,6 +18579,12 @@ importers:
       fishery:
         specifier: ^2.3.1
         version: 2.4.0
+      js-yaml:
+        specifier: 'catalog:'
+        version: 5.2.2
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       langchain:
         specifier: '>=0.3.37'
         version: 0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))(handlebars@4.7.9)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
@@ -18597,6 +18600,12 @@ importers:
       openapi-typescript:
         specifier: 7.13.0
         version: 7.13.0(typescript@6.0.3)
+      ora:
+        specifier: 'catalog:'
+        version: 9.4.1
+      prompts:
+        specifier: 'catalog:'
+        version: 2.4.2
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.26)(supports-color@10.2.2)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)

@@ -15,6 +15,12 @@ import packageJson from "./package.json";
 // against the SDK's copy.
 const noExternal = [/^@langwatch\/(langy|handled-error)(\/|$)/, /^zod(\/|$)/];
 
+// Used only under src/cli, so they are devDependencies bundled into the CLI.
+// cloudflared's postinstall would otherwise download a binary on every install.
+const cliOnlyPackages = [
+  /^(chalk|ora|prompts|commander|js-yaml|dotenv|jsonc-parser|cloudflared)(\/|$)/,
+];
+
 // tsconfig.json is a solution container (no files of its own), so the build reads the
 // package's check config, which carries the same compiler options (ADR-150, 2026-10-10).
 const tsconfig = "tsconfig.app.json";
@@ -116,7 +122,7 @@ export default defineConfig([
     sourcemap: true,
     // `@opentelemetry/api` is a peer of the library, so tsup would leave it
     // external; `npx langwatch` has no host app to supply it.
-    noExternal: [...noExternal, /^@opentelemetry\/api(\/|$)/],
+    noExternal: [...noExternal, ...cliOnlyPackages, /^@opentelemetry\/api(\/|$)/],
     define,
     tsconfig,
     onSuccess: async () => {
