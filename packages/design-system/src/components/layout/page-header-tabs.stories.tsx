@@ -51,3 +51,27 @@ export const InTheHeader: Story = {
     );
   },
 };
+
+export const StackedOnPhones: Story = {
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  render: () => {
+    const [active, setActive] = useState("/cases");
+    return (
+      <div style={{ width: 320 }}>
+        <PageLayout.Header>
+          <PageLayout.Heading>A very long run plan name that needs to wrap</PageLayout.Heading>
+          <PageLayout.Tabs
+            stackOnMobile
+            label="Agent testing pages"
+            tabs={[
+              { label: "Scenarios", href: "/cases", count: 128 },
+              { label: "Results", href: "/results", count: 4096 },
+            ]}
+            activeHref={active}
+            onNavigate={setActive}
+          />
+        </PageLayout.Header>
+      </div>
+    );
+  },
+};

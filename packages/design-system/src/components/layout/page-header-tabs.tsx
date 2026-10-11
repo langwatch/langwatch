@@ -125,6 +125,7 @@ export function PageTabs({
   tabs,
   activeHref,
   onNavigate,
+  stackOnMobile = false,
   children,
 }: {
   /** Names the navigation landmark ("Analytics pages"). */
@@ -133,6 +134,8 @@ export function PageTabs({
   /** The tab this page is; empty when none of `tabs` is, such as on a menu tab's page. */
   activeHref: string;
   onNavigate: (href: string) => void;
+  /** Below `md`, drop to a full-width 36px row under the heading that scrolls sideways. */
+  stackOnMobile?: boolean;
   /** Trailing tabs, such as a PageTabMenu. */
   children?: ReactNode;
 }) {
@@ -145,9 +148,18 @@ export function PageTabs({
       alignItems="stretch"
       alignSelf="stretch"
       gap={1}
-      marginStart={3}
+      marginStart={stackOnMobile ? { base: 0, md: 3 } : 3}
       // The tabs keep their width; the header's actions give way (they scroll) instead.
       flexShrink={0}
+      {...(stackOnMobile
+        ? {
+            flexBasis: { base: "100%", md: "auto" },
+            width: { base: "full", md: "auto" },
+            minWidth: { base: 0, md: "auto" },
+            height: { base: "36px", md: "auto" },
+            overflowX: { base: "auto", md: "visible" },
+          }
+        : {})}
     >
       {tabs.map((tab) => (
         <PageTabLink

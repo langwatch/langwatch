@@ -26,3 +26,10 @@ Feature: Page header actions
     Given the header, heading, subtitle and button prop types
     Then style props are a type error on the closed shape
     And the old open props still compile as deprecated
+
+  @integration
+  Scenario: Header tabs can stack under the heading on phones
+    Given header tabs that opt in to stacking on phones
+    When the header is narrower than the medium breakpoint
+    Then the tabs form a full-width 36 pixel row under the heading that scrolls sideways
+    And from the medium breakpoint up, and for tabs that do not opt in, the tabs keep their inline geometry

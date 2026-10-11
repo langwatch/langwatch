@@ -4,6 +4,7 @@
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { page } from "vitest/browser";
 
 import { PageLayout } from "../../src/components/layout/page-layout.tsx";
 import { renderWithDesignSystem } from "../../src/testing/index.tsx";
@@ -116,6 +117,80 @@ describe("page header geometry", () => {
         wideButtons.getBoundingClientRect().left,
       );
       expect(height({ element: wide })).toBe(77);
+    });
+  });
+  /** @scenario Header tabs can stack under the heading on phones */
+  it("stacks opted-in tabs as a 36px row at 320px and leaves callers that omit the prop alone", async () => {
+    const tabs = [
+      { label: "Scenarios", href: "/a", count: 128 },
+      { label: "Results", href: "/b", count: 4096 },
+    ];
+    const header = (testId: string, stackOnMobile?: boolean) => (
+      <PageLayout.Header>
+        <PageLayout.Heading>Long run plan name for the checkout agent</PageLayout.Heading>
+        <PageLayout.Tabs
+          label={testId}
+          tabs={tabs}
+          activeHref="/a"
+          onNavigate={() => {}}
+          stackOnMobile={stackOnMobile}
+        />
+      </PageLayout.Header>
+    );
+    await page.viewport(320, 700);
+    renderWithDesignSystem(
+      <>
+        <div style={{ width: 320 }}>{header("stacked", true)}</div>
+        <div style={{ width: 320 }}>{header("plain")}</div>
+      </>,
+    );
+
+    await waitFor(() => {
+      const nav = (name: string) => {
+        const element = screen.getByRole("navigation", { name });
+        return { element, rect: element.getBoundingClientRect(), style: getComputedStyle(element) };
+      };
+      const stacked = nav("stacked");
+      const title = stacked.element.parentElement?.querySelector("h1");
+      if (!title) throw new Error("stacked header missing its title");
+      expect(stacked.rect.height).toBe(36);
+      expect(stacked.style.marginInlineStart).toBe("0px");
+      expect(stacked.rect.top).toBeGreaterThanOrEqual(title.getBoundingClientRect().bottom);
+      expect(stacked.style.overflowX).toBe("auto");
+      const header = stacked.element.parentElement;
+      if (!header) throw new Error("stacked header missing");
+      expect(header.getBoundingClientRect().right).toBeLessThanOrEqual(320);
+      expect(stacked.rect.right).toBeLessThanOrEqual(320);
+
+      const plain = nav("plain");
+      expect(plain.style.marginInlineStart).toBe("12px");
+      expect(plain.style.overflowX).toBe("visible");
+    });
+  });
+
+  /** @scenario Header tabs can stack under the heading on phones */
+  it("keeps opted-in tabs inline with their 12px start margin at 1280px", async () => {
+    await page.viewport(1280, 800);
+    renderWithDesignSystem(
+      <PageLayout.Header>
+        <PageLayout.Heading>Run plan</PageLayout.Heading>
+        <PageLayout.Tabs
+          stackOnMobile
+          label="wide"
+          tabs={[{ label: "Scenarios", href: "/a" }]}
+          activeHref="/a"
+          onNavigate={() => {}}
+        />
+      </PageLayout.Header>,
+    );
+
+    await waitFor(() => {
+      const nav = screen.getByRole("navigation", { name: "wide" });
+      const title = nav.parentElement?.querySelector("h1");
+      if (!title) throw new Error("wide header missing its title");
+      expect(getComputedStyle(nav).marginInlineStart).toBe("12px");
+      expect(getComputedStyle(nav).overflowX).toBe("visible");
+      expect(nav.getBoundingClientRect().top).toBeLessThan(title.getBoundingClientRect().bottom);
     });
   });
 });

@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { PageLayout, type PageTab } from "@langwatch/design-system/page-layout";
-import { HStack, Text } from "@langwatch/design-system/primitives";
+import { Box, Stack, Text } from "@langwatch/design-system/primitives";
 import { SectionNavigationHeader } from "@langwatch/design-system/section-navigation-frame";
 
 import type { AgentTestingTab } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
@@ -49,30 +49,28 @@ export function AgentTestingHeader({
 
   return (
     <SectionNavigationHeader>
-      {/* The title stays on one line and gives space back with an ellipsis; the
-          note beside it reads in full, since it is the shorter of the two. */}
-      <HStack gap={2} minWidth={0} alignItems="baseline">
-        <PageLayout.Heading
-          truncate
-          minWidth={0}
-          title={openPlan?.name}
-          data-testid="agent-testing-title"
-        >
-          {openPlan?.name ?? (tab === "results" ? "Results" : title)}
-        </PageLayout.Heading>
+      {/* Below md the name sits over the note and wraps; the tabs drop to their own row. */}
+      <Stack
+        direction={{ base: "column", md: "row" }}
+        alignItems={{ base: "stretch", md: "baseline" }}
+        gap={{ base: 0.5, md: 2 }}
+        width={{ base: "full", md: "auto" }}
+        minWidth={0}
+        maxWidth="full"
+      >
+        <Box minWidth={0} flex="0 1 auto">
+          <PageLayout.Heading title={openPlan?.name} data-testid="agent-testing-title">
+            {openPlan?.name ?? (tab === "results" ? "Results" : title)}
+          </PageLayout.Heading>
+        </Box>
         {openPlan ? (
-          <Text
-            textStyle="caption"
-            color="fg.muted"
-            flexShrink={0}
-            whiteSpace="nowrap"
-            data-testid="agent-testing-title-note"
-          >
+          <Text textStyle="caption" color="fg.muted" data-testid="agent-testing-title-note">
             {openPlan.note}
           </Text>
         ) : null}
-      </HStack>
+      </Stack>
       <PageLayout.Tabs
+        stackOnMobile
         label="Agent testing pages"
         tabs={tabs}
         activeHref={tabHrefs[tab]}

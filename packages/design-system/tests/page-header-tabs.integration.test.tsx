@@ -30,3 +30,31 @@ describe("page header tabs", () => {
     expect(first.hasAttribute("data-active")).toBe(false);
   });
 });
+
+describe("page header tabs stacking", () => {
+  /** @scenario Header tabs can stack under the heading on phones */
+  it("keeps the inline margin unless a caller opts in, and still marks the current tab", () => {
+    renderWithDesignSystem(
+      <>
+        <PageLayout.Tabs
+          label="Plain"
+          tabs={[{ label: "One", href: "/one" }]}
+          activeHref="/one"
+          onNavigate={vi.fn()}
+        />
+        <PageLayout.Tabs
+          stackOnMobile
+          label="Stacked"
+          tabs={[{ label: "Two", href: "/two" }]}
+          activeHref="/two"
+          onNavigate={vi.fn()}
+        />
+      </>,
+    );
+
+    expect(screen.getByRole("navigation", { name: "Plain" }).getAttribute("class")).not.toBe(
+      screen.getByRole("navigation", { name: "Stacked" }).getAttribute("class"),
+    );
+    expect(screen.getByRole("link", { name: "Two" }).getAttribute("aria-current")).toBe("page");
+  });
+});
