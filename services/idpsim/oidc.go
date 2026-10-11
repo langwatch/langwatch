@@ -459,6 +459,7 @@ func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error
 	if amr := t.Amr(); len(amr) > 0 {
 		claims["amr"] = amr
 	}
+	t.applyEmailVerified(claims)
 	claims["iss"] = t.Issuer()
 	claims["aud"] = aud.ClientID
 	claims["iat"] = now.Unix()

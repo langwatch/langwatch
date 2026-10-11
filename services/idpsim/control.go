@@ -179,6 +179,7 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 		SamlpSubjects *bool     `json:"samlpSubjects"`
 		SkewSeconds   *int      `json:"skewSeconds"`
 		Amr           *[]string `json:"amr"`
+		EmailVerified *string   `json:"emailVerified"`
 		Auth0Scopes   *[]string `json:"auth0Scopes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -196,13 +197,20 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 		t.SetAmr(*body.Amr)
 		s.record(t, Event{Kind: "config.amr", Outcome: OutcomeOK, Detail: "ID tokens assert amr " + strings.Join(t.Amr(), ",")})
 	}
+	if body.EmailVerified != nil {
+		if err := t.SetEmailVerified(*body.EmailVerified); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.record(t, Event{Kind: "config.email_verified", Outcome: OutcomeOK, Detail: "ID tokens carry email_verified " + *body.EmailVerified})
+	}
 	if body.Auth0Scopes != nil {
 		t.SetAuth0ManagementScopes(*body.Auth0Scopes)
 		s.record(t, Event{Kind: "config.auth0", Outcome: OutcomeOK, Detail: "Management tokens carry " + strings.Join(t.Auth0ManagementScopes(), ",")})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"samlpSubjects": t.SamlpSubjects(), "skewSeconds": int(t.Skew() / time.Second),
-		"amr": t.Amr(), "auth0Scopes": t.Auth0ManagementScopes(),
+		"amr": t.Amr(), "emailVerified": t.EmailVerifiedSetting(), "auth0Scopes": t.Auth0ManagementScopes(),
 	})
 }
 

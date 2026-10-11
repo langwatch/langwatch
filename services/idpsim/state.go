@@ -39,6 +39,7 @@ type savedTenant struct {
 	PreviousCert     []byte               `json:"previousCertificate,omitempty"`
 	Skew             time.Duration        `json:"skew,omitempty"`
 	Amr              []string             `json:"amr,omitempty"`
+	EmailVerified    string               `json:"emailVerified,omitempty"`
 	LastAssertionID  string               `json:"lastAssertionId,omitempty"`
 }
 
@@ -122,7 +123,7 @@ func restoreTenant(raw json.RawMessage, id int, baseURL string) (*Tenant, error)
 		samlpSubjects: saved.SamlpSubjects, events: saved.Events,
 		legacyProvider: saved.LegacyProvider,
 		codes:          map[string]*authCode{}, grants: map[string]*accessGrant{},
-		keyVersion: max(saved.KeyVersion, 1), skew: saved.Skew, amr: saved.Amr, lastAssertionID: saved.LastAssertionID,
+		keyVersion: max(saved.KeyVersion, 1), skew: saved.Skew, amr: saved.Amr, emailVerified: saved.EmailVerified, lastAssertionID: saved.LastAssertionID,
 	}
 	if len(saved.PreviousKey) == 0 {
 		return t, nil
@@ -161,7 +162,7 @@ func (t *Tenant) snapshotState() (json.RawMessage, error) {
 		Provisioning: t.provisioning, LastProvisioning: t.lastProvisioning,
 		SamlpSubjects: t.samlpSubjects, Events: t.events,
 		LegacyProvider: t.legacyProvider,
-		KeyVersion:     t.keyVersion, Skew: t.skew, Amr: t.amr, LastAssertionID: t.lastAssertionID,
+		KeyVersion:     t.keyVersion, Skew: t.skew, Amr: t.amr, EmailVerified: t.emailVerified, LastAssertionID: t.lastAssertionID,
 	}
 	if t.previousKey != nil {
 		saved.PreviousKey, saved.PreviousCert = x509.MarshalPKCS1PrivateKey(t.previousKey), t.previousCert.Raw

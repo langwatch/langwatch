@@ -462,6 +462,13 @@ Feature: Local IdP simulator (idpsim)
     And an empty list, or resetting the tenant, stops asserting it
 
   @unit
+  Scenario: A tenant can say its addresses are unverified in its ID tokens
+    Given a tenant whose ID tokens carry email_verified true, as every tenant's do
+    When its config sets emailVerified to "false"
+    Then the next ID token carries email_verified false
+    And "omit" drops the claim, resetting the tenant restores it, and any other value is refused
+
+  @unit
   Scenario: After a key rotation both keys are published and the new one signs
     Given a tenant with one signing key
     When the tenant's signing key is rotated through the control API
