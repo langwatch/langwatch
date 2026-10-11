@@ -1,12 +1,13 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 /**
  * InvoicesBlock — a card of recent Stripe invoices: number, date, amount,
  * status chip, and PDF download link.
  */
-import { Card, HStack, Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { type StatusChipTone, StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Download, ExternalLink, Receipt } from "lucide-react";
@@ -62,13 +63,13 @@ export function InvoicesBlock({
       }
     >
       {invoices.isLoading && (
-        <Card.Root data-testid="invoices-loading" width="full" padding={4}>
+        <Card data-testid="invoices-loading">
           <VStack gap={4} width="full">
             {[0, 1, 2].map((row) => (
               <Skeleton key={row} height="20px" width="100%" />
             ))}
           </VStack>
-        </Card.Root>
+        </Card>
       )}
 
       {invoices.isError && (
@@ -84,42 +85,42 @@ export function InvoicesBlock({
       )}
 
       {rows && rows.length > 0 && (
-        <ListTable containerProps={{ overflowX: "auto" }}>
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Invoice</Table.ColumnHeader>
-              <Table.ColumnHeader>Date</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="right">Amount</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
+        <ListTable scroll="x" scrollLabel="Invoices">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Invoice</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Date</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Amount</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
               <ListTable.ActionHeader label="Invoice PDF" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {rows.map((invoice) => (
-              <Table.Row key={invoice.id}>
-                <Table.Cell>
+              <ListTable.Row key={invoice.id}>
+                <ListTable.Cell>
                   <HStack gap={3}>
                     <Receipt size={16} />
                     <Text fontWeight="medium">{invoice.number ?? "--"}</Text>
                   </HStack>
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <Text color="fg.muted">{formatInvoiceDate(invoice.date)}</Text>
-                </Table.Cell>
-                <Table.Cell textAlign="right">
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Text fontVariantNumeric="tabular-nums">
                     {formatInvoiceAmount({
                       amountCents: invoice.amountDue,
                       currency: invoice.currency,
                     })}
                   </Text>
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <StatusChip
                     label={invoice.status}
                     tone={TONE_OF_PALETTE[getInvoiceStatusColor(invoice.status)] ?? "neutral"}
                   />
-                </Table.Cell>
+                </ListTable.Cell>
                 <ListTable.ActionCell>
                   {invoice.pdfUrl && (
                     <Link
@@ -135,9 +136,9 @@ export function InvoicesBlock({
                     </Link>
                   )}
                 </ListTable.ActionCell>
-              </Table.Row>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       )}
     </SettingsSection>

@@ -212,5 +212,21 @@
     "reason": "A chart frame; charts stay as they are. (X2g2 review)",
     "owner": "gateway",
     "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/billing/browser/src/ui/sections/user-management-drawer.tsx",
+    "rule": "card-box",
+    "line": 229,
+    "reason": "A planned-seat form row whose border turns red on an invalid email, not a card (X3e1 review).",
+    "owner": "billing",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/licensing/browser/src/ui/sections/no-license-card.tsx",
+    "rule": "card-box",
+    "line": 219,
+    "reason": "The dashed drag-and-drop licence zone with drop handlers, not a card (X3e1 review).",
+    "owner": "licensing",
+    "disposition": "reviewed"
   }
 ]
