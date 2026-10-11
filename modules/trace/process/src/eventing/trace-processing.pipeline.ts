@@ -45,7 +45,11 @@ type SummaryHandler = (
 
 /** Every reaction main's worker hung on trace_processing, keyed by its queued name. */
 interface TraceProcessingReactions {
-  resolveDeferredOrigin: (payload: { tenantId: string; traceId: string }) => Promise<void>;
+  resolveDeferredOrigin: (payload: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs: number;
+  }) => Promise<void>;
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
@@ -95,10 +99,11 @@ export function buildTraceProcessingConsumer(
       when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
       delay: DEFERRED_ORIGIN_DELAY_MS,
       dedup: DEFERRED_ORIGIN_DEDUP,
-      handler: (_event, context) =>
+      handler: (event, context) =>
         reactions.resolveDeferredOrigin({
           tenantId: context.tenantId,
           traceId: context.aggregateId,
+          occurredAtMs: event.occurredAt,
         }),
     })
     .withProjectionSubscriber("trackedEventSync", {

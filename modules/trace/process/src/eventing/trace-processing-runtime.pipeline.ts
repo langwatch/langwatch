@@ -65,7 +65,11 @@ export interface TraceProcessingPipelineInput {
   >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
-  findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
+  findSummary: (input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }) => Promise<TraceSummaryData | null>;
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
@@ -163,8 +167,12 @@ export class TraceProcessingRuntimeAdapter {
     const { peers, commands } = this.input;
     const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
-      resolveDeferredOrigin: async ({ tenantId, traceId }) => {
-        const summary = await this.input.findSummary({ projectId: tenantId, traceId });
+      resolveDeferredOrigin: async ({ tenantId, traceId, occurredAtMs }) => {
+        const summary = await this.input.findSummary({
+          projectId: tenantId,
+          traceId,
+          occurredAtMs,
+        });
         if (summary?.attributes["langwatch.origin"]) return;
         await resolveOrigin({ id: traceId, tenantId, traceId });
       },
