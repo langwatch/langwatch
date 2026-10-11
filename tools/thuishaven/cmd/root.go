@@ -63,6 +63,34 @@ func tsgoLimits(ram uint64) domain.TsgoLimits {
 	return l
 }
 
+// browserLimits resolves the headless browser governor's knobs with env
+// overrides; 0 disables a rule, HAVEN_BROWSER_SHELL_MAX_RSS_MB=0 the governor.
+func browserLimits() domain.BrowserLimits {
+	l := domain.DefaultBrowserLimits()
+	if mb := envInt("HAVEN_BROWSER_SHELL_MAX_RSS_MB", -1); mb >= 0 {
+		l.MaxRSS = int64(mb) << 20
+	}
+	if pct := envInt("HAVEN_BROWSER_SHELL_MAX_CPU_PCT", -1); pct >= 0 {
+		l.MaxCPU = float64(pct)
+	}
+	l.CPUSustain = envDuration("HAVEN_BROWSER_SHELL_CPU_SUSTAIN", l.CPUSustain)
+	l.MaxAge = envDuration("HAVEN_BROWSER_SHELL_MAX_AGE", l.MaxAge)
+	l.IdleTTL = envDuration("HAVEN_BROWSER_SHELL_IDLE_TTL", l.IdleTTL)
+	return l
+}
+
+// browserOwnerRoots is the main checkout holding root: a worktree under
+// .worktrees resolves to its main checkout, whose prefix covers every worktree.
+func browserOwnerRoots(root string) []string {
+	if root == "" {
+		return nil
+	}
+	if main, _, found := strings.Cut(root, "/.worktrees/"); found {
+		root = main
+	}
+	return []string{root}
+}
+
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
 // before anything is built, wire() is the only place adapters are constructed,
@@ -230,6 +258,8 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
 		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
 		Tsgo:                    tsgoLimits(ram),
+		Browser:                 browserLimits(),
+		BrowserOwnerRoots:       browserOwnerRoots(trustedRepoRoot()),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),

@@ -36,12 +36,18 @@ type Config struct {
 	// Tsgo bounds what tsgo may take from the machine (ADR-095); the daemon's
 	// tick enforces it over every live tsgo process regardless of who spawned
 	// it. Tsgo.RunMaxRSS == 0 disables the governor.
-	Tsgo           domain.TsgoLimits
-	HeartbeatEvery time.Duration // launcher heartbeat cadence
-	DaemonArgv     []string      // how to (re)launch `haven daemon`
-	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
-	GoWatchArgv    []string      // this Haven executable plus its internal Go watch command
-	UIWatchArgv    []string      // this Haven executable plus its internal UI watch command
+	Tsgo domain.TsgoLimits
+	// Browser bounds LangWatch's Playwright headless shells the same way;
+	// Browser.MaxRSS == 0 disables that governor.
+	Browser domain.BrowserLimits
+	// BrowserOwnerRoots are the checkout roots whose scripts' headless shells
+	// the browser governor may reap; worktrees sit beneath the main root.
+	BrowserOwnerRoots []string
+	HeartbeatEvery    time.Duration // launcher heartbeat cadence
+	DaemonArgv        []string      // how to (re)launch `haven daemon`
+	SimulatorArgv     []string      // this Haven executable plus its internal simulator command
+	GoWatchArgv       []string      // this Haven executable plus its internal Go watch command
+	UIWatchArgv       []string      // this Haven executable plus its internal UI watch command
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.

@@ -79,7 +79,9 @@ type Orchestrator struct {
 	// touched only from the daemon's monitor loop. procTel ships the watch's
 	// observations to the local observability stack; nil means unobserved.
 	procActivity map[int]tsgoSeen
-	procTel      ProcTelemetry
+	// browserActivity is the headless browser governor's cross-tick CPU clock.
+	browserActivity map[int]browserSeen
+	procTel         ProcTelemetry
 }
 
 // Deps is the injected object graph. A struct rather than a positional
