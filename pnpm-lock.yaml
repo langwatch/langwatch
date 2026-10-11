@@ -17243,6 +17243,9 @@ importers:
       react-icons:
         specifier: 'catalog:'
         version: 5.7.0(react@19.2.8)
+      recharts:
+        specifier: 'catalog:'
+        version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
       shiki:
         specifier: 'catalog:'
         version: 4.3.0

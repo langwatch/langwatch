@@ -455,6 +455,10 @@
       "types": "./dist/components/values/stat-tile.d.ts",
       "default": "./src/components/values/stat-tile.tsx"
     },
+    "./time-series-chart": {
+      "types": "./dist/components/display/time-series-chart.d.ts",
+      "default": "./src/components/display/time-series-chart.tsx"
+    },
     "./tab-count": {
       "types": "./dist/components/values/tab-count.d.ts",
       "default": "./src/components/values/tab-count.tsx"
@@ -605,6 +609,7 @@
     "react-feather": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
+    "recharts": "catalog:",
     "shiki": "catalog:",
     "slugify": "catalog:",
     "zod": "catalog:"

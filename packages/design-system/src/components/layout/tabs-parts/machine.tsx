@@ -55,7 +55,7 @@ const TRIGGER_METRIC = {
   height: "auto",
   paddingX: "0",
   paddingY: "3",
-  marginEnd: "12",
+  marginEnd: { base: "6", md: "12" },
   flexDirection: "column",
   alignItems: "flex-start",
   gap: "1",
@@ -113,6 +113,7 @@ function Trigger<Value extends string>({
   tabbable,
   look,
   density,
+  last,
   onFocusTab,
 }: {
   item: TabsMachineItem<Value>;
@@ -121,6 +122,7 @@ function Trigger<Value extends string>({
   tabbable: boolean;
   look: "content" | "metric" | "code";
   density: "default" | "compact";
+  last: boolean;
   onFocusTab: (value: string) => void;
 }) {
   const compact = density === "compact" || look === "code";
@@ -139,6 +141,7 @@ function Trigger<Value extends string>({
         ...TRIGGER_BASE,
         ...(compact ? TRIGGER_COMPACT : {}),
         ...(look === "metric" ? TRIGGER_METRIC : {}),
+        ...(look === "metric" && last ? { marginEnd: "0" } : {}),
         ...(item.disabled ? { cursor: "not-allowed", opacity: 0.5 } : {}),
       }}
     >
@@ -375,9 +378,10 @@ export function TabsMachine<Value extends string>({
             if (next instanceof Node && !event.currentTarget.contains(next)) focus.forget();
           }}
         >
-          {unique.map((item) => (
+          {unique.map((item, at) => (
             <Trigger
               key={item.value}
+              last={at === unique.length - 1}
               item={item}
               panelId={panelIdOf(item.value)}
               reasonId={`${base}-reason-${item.value}`}
