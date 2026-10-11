@@ -2,6 +2,7 @@ import { Popover as ChakraPopover, Portal } from "@chakra-ui/react";
 import * as React from "react";
 
 import { OverlayDepthContext, useOverlayZIndex } from "../../overlays/depth.ts";
+import { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
 import { CloseButton } from "./close-button.tsx";
 
 interface PopoverContentProps extends ChakraPopover.ContentProps {
@@ -14,8 +15,9 @@ export const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentPro
   function PopoverContent(props, ref) {
     const { portalled = true, portalRef, positionerProps, ...rest } = props;
     const { zIndex, depth } = useOverlayZIndex();
+    const overlayTarget = useOverlayPortalTarget();
     return (
-      <Portal disabled={!portalled} container={portalRef}>
+      <Portal disabled={!portalled} container={portalRef ?? overlayTarget}>
         <ChakraPopover.Positioner
           {...positionerProps}
           ref={(node: HTMLElement | null) => {

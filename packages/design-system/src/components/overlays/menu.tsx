@@ -5,6 +5,7 @@ import { Check, ChevronRight } from "lucide-react";
 import * as React from "react";
 
 import { OverlayDepthContext, useOverlayZIndex } from "../../overlays/depth.ts";
+import { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
 
 interface MenuContentProps extends ChakraMenu.ContentProps {
   portalled?: boolean;
@@ -15,8 +16,9 @@ export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
   function MenuContent(props, ref) {
     const { portalled = true, portalRef, ...rest } = props;
     const { zIndex, depth } = useOverlayZIndex();
+    const overlayTarget = useOverlayPortalTarget();
     return (
-      <Portal disabled={!portalled} container={portalRef}>
+      <Portal disabled={!portalled} container={portalRef ?? overlayTarget}>
         <ChakraMenu.Positioner
           ref={(node: HTMLElement | null) => {
             if (node) {
