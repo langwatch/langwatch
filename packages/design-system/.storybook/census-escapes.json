@@ -3641,5 +3641,325 @@
     "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
     "owner": "experiment",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 464,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 466,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 468,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 477,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 481,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 483,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 498,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 504,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/virtual-padding-row.tsx",
+    "rule": "legacy-table-part",
+    "line": 6,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/virtual-padding-row.tsx",
+    "rule": "legacy-table-part",
+    "line": 7,
+    "reason": "Approved: the protected batch results grid with rich cells, or the canvas node card (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 118,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 119,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 120,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 121,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 125,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 126,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 151,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 161,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 58,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 59,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 60,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 75,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 76,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-create-dialog-host.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 144,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-create-dialog-host.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 178,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 135,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 136,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 137,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 138,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 139,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 141,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 154,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 72,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 73,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 74,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 75,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 76,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 78,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 129,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflows/workflow-chat-screen.tsx",
+    "rule": "legacy-card-part",
+    "line": 46,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/properties/workflow-entry-point-properties-panel.tsx",
+    "rule": "card-box",
+    "line": 150,
+    "reason": "Not a plain card: entry point field well, secrets indicator hint or chat box surface (R10w2 review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/secrets/secrets-indicator.tsx",
+    "rule": "empty-text",
+    "line": 96,
+    "reason": "Not a plain card: entry point field well, secrets indicator hint or chat box surface (R10w2 review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-chat-box.tsx",
+    "rule": "card-box",
+    "line": 122,
+    "reason": "Not a plain card: entry point field well, secrets indicator hint or chat box surface (R10w2 review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-chat-box.tsx",
+    "rule": "card-box",
+    "line": 255,
+    "reason": "Not a plain card: entry point field well, secrets indicator hint or chat box surface (R10w2 review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-nodes.tsx",
+    "rule": "card-box",
+    "line": 304,
+    "reason": "Not a plain card: entry point field well, secrets indicator hint or chat box surface (R10w2 review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
   }
 ]
