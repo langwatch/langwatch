@@ -49,6 +49,7 @@ var (
 		"services/paymentsim",
 		"services/telemetrysim",
 		"services/lambdasim",
+		"services/githubsim",
 		"tools/diffsuite",
 		"tools/fuzz",
 		"tools/workerrun",
