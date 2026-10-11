@@ -9,6 +9,7 @@ import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
 import { optionItemRecipe, optionListContent, optionListSizes } from "./option-list.recipe.ts";
+import { PRODUCT_COLOURS, productColourTokens } from "./product-colours.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 import { segmentGroupSlotRecipe } from "./segment-group.recipe.ts";
 import { productTextStyles } from "./text-styles.ts";
@@ -490,6 +491,9 @@ export const designSystemConfig = defineConfig({
           indicator: { value: "{colors.orange.indicator}" },
           onSolid: { value: "{colors.orange.onSolid}" },
         },
+
+        // product.<id>.<role> aliases, generated from the one map in product-colours.ts.
+        product: productColourTokens({ colours: PRODUCT_COLOURS }),
 
         // The logo: brand navy with white faces on light; on dark the faces
         // drop out and the lines go off-white, as the dark-theme wordmark draws it.
@@ -1391,7 +1395,7 @@ export const designSystemConfig = defineConfig({
             "&:not([data-mounted])": { scale: "1" },
             transitionProperty: "translate, scale, opacity, height",
             // Collapsed, the newest card and two behind it show; behind cards show no content.
-            // Cards behind recede: each 6% smaller, a softer shadow, under a front card that floats.
+            // Cards behind recede: 6% smaller each, softer shadow, under a floating front card.
             "&[data-overlap]": {
               opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
               transformOrigin: "top center",

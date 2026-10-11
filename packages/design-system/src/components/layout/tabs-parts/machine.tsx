@@ -4,6 +4,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState 
 import { useIsDevelopment } from "../../../provider/environment.ts";
 import { Tooltip } from "../../overlays/tooltip.tsx";
 import { TriggerAnchor } from "../../overlays/trigger-anchor.tsx";
+import { useProductAccent } from "../../scope/use-product-accent.ts";
 
 /** One tab as the machine sees it: what the trigger shows, and the panel behind it. */
 export interface TabsMachineItem<Value extends string> {
@@ -37,11 +38,8 @@ export interface TabsMachineProps<Value extends string> {
   testId?: string;
 }
 
-/**
- * The one look switch for every content tab. Today's design-system tabs recipe (line,
- * accent) stays; a recolour, once screenshots in both modes are approved, changes only here.
- */
-export const CONTENT_TABS_LOOK = { variant: "line", colorPalette: "accent" } as const;
+/** The one look switch for every content tab; the colour is the product's, from product-colours. */
+export const CONTENT_TABS_LOOK = { variant: "line" } as const;
 
 const TRIGGER_BASE = { flexShrink: 0, whiteSpace: "nowrap" } as const;
 const TRIGGER_COMPACT = {
@@ -297,6 +295,7 @@ export function TabsMachine<Value extends string>({
   testId,
 }: TabsMachineProps<Value>) {
   const generated = useId();
+  const accent = useProductAccent();
   const base = id ?? generated;
   const unique = items.filter(
     (item, index) => items.findIndex((other) => other.value === item.value) === index,
@@ -335,7 +334,7 @@ export function TabsMachine<Value extends string>({
       // Zag only moves focus; automatic activation is the list's onKeyDown, the same everywhere.
       activationMode="manual"
       variant={CONTENT_TABS_LOOK.variant}
-      colorPalette={CONTENT_TABS_LOOK.colorPalette}
+      colorPalette={accent.colorPalette}
       size="sm"
       loopFocus
       data-testid={testId}

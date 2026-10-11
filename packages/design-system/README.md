@@ -53,6 +53,13 @@ a row in `colour.stories.tsx`, never a literal at the call site. Code that must
 hand a library a string uses Chakra's `useToken` or `system.token.var` (a CSS
 variable), or `getRawColorValue` / `useColorRawValue` for a literal in the current mode.
 
+### Product accents
+
+One file, `src/system/product-colours.ts`, says which palette each product draws (Me blue; the
+others the current accent). Set a product to `null` to remove its accent. Declare a product with
+`ProductScope` and read it with `useProductAccent`; never pick blue or orange by module. Status,
+chart and vendor colours do not read the map. See `adrs/003-content-tabs-and-table-parts.md`.
+
 ### Which surface for which region
 
 The palette follows production main (`e683dd9ea5`), including its inherited

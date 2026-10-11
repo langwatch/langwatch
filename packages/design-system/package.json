@@ -78,6 +78,18 @@
       "types": "./dist/system/index.d.ts",
       "default": "./src/system/index.ts"
     },
+    "./product-colours": {
+      "types": "./dist/system/product-colours.d.ts",
+      "default": "./src/system/product-colours.ts"
+    },
+    "./product-scope": {
+      "types": "./dist/components/scope/product-scope.d.ts",
+      "default": "./src/components/scope/product-scope.tsx"
+    },
+    "./use-product-accent": {
+      "types": "./dist/components/scope/use-product-accent.d.ts",
+      "default": "./src/components/scope/use-product-accent.ts"
+    },
     "./provider": {
       "types": "./dist/provider/index.d.ts",
       "default": "./src/provider/index.tsx"
